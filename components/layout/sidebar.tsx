@@ -71,13 +71,6 @@ const menuGroups = [
         icon: BookOpen, 
         roles: ['admin', 'sekpen', 'wali_kelas'] 
       },
-      // MENU BARU: LEGER NILAI
-      { 
-        title: "Leger Nilai", 
-        href: "/dashboard/akademik/leger", 
-        icon: FileSpreadsheet, 
-        roles: ['admin', 'sekpen', 'wali_kelas'] 
-      },
       { 
         title: "Ranking & Prestasi", 
         href: "/dashboard/akademik/ranking", 
@@ -91,6 +84,12 @@ const menuGroups = [
         roles: ['admin', 'sekpen', 'wali_kelas'] 
       },
       { 
+        title: "Leger Nilai", 
+        href: "/dashboard/akademik/leger", 
+        icon: FileSpreadsheet, 
+        roles: ['admin', 'sekpen', 'wali_kelas'] 
+      },
+      { 
         title: "Cetak Rapor", 
         href: "/dashboard/laporan/rapor", 
         icon: FileText, 
@@ -99,29 +98,97 @@ const menuGroups = [
     ]
   },
   {
-    label: "Asrama & Kesantrian",
+    label: "Kesantrian & Keamanan",
     items: [
-      { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama', 'keamanan'] },
-      { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Pembayaran SPP", href: "/dashboard/asrama/spp", icon: CreditCard, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Status Setoran", href: "/dashboard/asrama/status-setoran", icon: LayoutList, roles: ['admin', 'pengurus_asrama'] },
-      
-      { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
-      { title: "Monitoring Setoran", href: "/dashboard/dewan-santri/setoran", icon: LayoutList, roles: ['admin', 'dewan_santri'] },
-      
-      { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'dewan_santri', 'keamanan'] },
-      { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
-      { title: "Pelanggaran & SP", href: "/dashboard/keamanan", icon: ShieldAlert, roles: ['admin', 'keamanan'] },
+      { 
+        title: "Absen Malam", 
+        href: "/dashboard/asrama/absen-malam", 
+        icon: Moon, 
+        roles: ['admin', 'pengurus_asrama', 'keamanan'] 
+      },
+      { 
+        title: "Absen Sakit Pagi", 
+        href: "/dashboard/asrama/absen-sakit", 
+        icon: Stethoscope, 
+        roles: ['admin', 'pengurus_asrama'] 
+      },
+      { 
+        title: "Pembayaran SPP", 
+        href: "/dashboard/asrama/spp", 
+        icon: CreditCard, 
+        roles: ['admin', 'pengurus_asrama'] 
+      },
+      { 
+        title: "Status Setoran", 
+        href: "/dashboard/asrama/status-setoran", 
+        icon: LayoutList, 
+        roles: ['admin', 'pengurus_asrama'] 
+      },
+      { 
+        title: "Perizinan Santri", 
+        href: "/dashboard/keamanan/perizinan", 
+        icon: MapPin, 
+        roles: ['admin', 'dewan_santri'] 
+      },
+      { 
+        title: "Monitoring Setoran", 
+        href: "/dashboard/dewan-santri/setoran", 
+        icon: LayoutList, 
+        roles: ['admin', 'dewan_santri'] 
+      },
+      { 
+        title: "Cetak Telat Datang", 
+        href: "/dashboard/keamanan/perizinan/cetak-telat", 
+        icon: Clock, 
+        roles: ['admin', 'dewan_santri', 'keamanan'] 
+      },
+      { 
+        title: "Verifikasi Telat", 
+        href: "/dashboard/keamanan/perizinan/verifikasi-telat", 
+        icon: Gavel, 
+        roles: ['admin', 'keamanan'] 
+      },
+      { 
+        title: "Pelanggaran & SP", 
+        href: "/dashboard/keamanan", 
+        icon: ShieldAlert, 
+        roles: ['admin', 'keamanan'] 
+      },
     ]
   },
   {
     label: "Master Data & Admin",
     items: [
-      { title: "Manajemen User", href: "/dashboard/pengaturan/users", icon: UserCog, roles: ['admin'] },
-      { title: "Manajemen Wali Kelas", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin', 'sekpen'] },
-      { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin', 'sekpen'] },
-      { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin', 'sekpen'] },
-      { title: "Master Pelanggaran", href: "/dashboard/master/pelanggaran", icon: Settings, roles: ['admin', 'keamanan'] },
+      { 
+        title: "Manajemen User", 
+        href: "/dashboard/pengaturan/users", 
+        icon: UserCog, 
+        roles: ['admin'] 
+      },
+      { 
+        title: "Manajemen Wali Kelas", 
+        href: "/dashboard/master/wali-kelas", 
+        icon: UserCheck, 
+        roles: ['admin', 'sekpen'] 
+      },
+      { 
+        title: "Manajemen Kelas", 
+        href: "/dashboard/master/kelas", 
+        icon: Database, 
+        roles: ['admin', 'sekpen'] 
+      },
+      { 
+        title: "Manajemen Kitab", 
+        href: "/dashboard/master/kitab", 
+        icon: Book, 
+        roles: ['admin', 'sekpen'] 
+      },
+      { 
+        title: "Master Pelanggaran", 
+        href: "/dashboard/master/pelanggaran", 
+        icon: Settings, 
+        roles: ['admin', 'keamanan'] 
+      },
     ]
   }
 ];
@@ -130,74 +197,55 @@ interface SidebarProps {
   userRole?: string;
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  // Prop baru untuk menutup menu di mobile
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }: SidebarProps) {
+export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   
-  // State lokal untuk role yang aktif
   const [activeRole, setActiveRole] = useState<string>(userRole);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [debugMsg, setDebugMsg] = useState("");
 
-  // Efek 1: Jika props dari server berubah, update state
   useEffect(() => {
     if (userRole) {
         setActiveRole(userRole);
     }
   }, [userRole]);
 
-  // Fungsi cek role manual (Client-side)
   const checkRole = async () => {
     setIsRefreshing(true);
     setDebugMsg("Checking...");
     const supabase = createClient();
-    
-    // 1. Cek User Auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
     if (authError || !user) {
-        console.error("Auth Error:", authError);
         setDebugMsg("Auth Fail");
         setIsRefreshing(false);
         return;
     }
-
-    // 2. Cek Tabel Profiles
-    const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
-    
+    const { data, error } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if (error) {
-        console.error("Supabase Error:", JSON.stringify(error, null, 2));
-        setDebugMsg(`DB Err: ${error.code}`);
+        setDebugMsg(`DB Err`);
     } else if (data) {
         setDebugMsg(`DB Role: ${data.role}`);
         if (data.role) setActiveRole(data.role);
     } else {
         setDebugMsg("No Profile");
     }
-    
     setIsRefreshing(false);
   };
 
-  // Efek 2: Fetch ulang saat komponen dipasang (Mount)
-  useEffect(() => {
-    checkRole();
-  }, []);
+  useEffect(() => { checkRole(); }, []);
 
-  // Normalisasi Role (Trim spasi & lowercase)
   const normalizedRole = (activeRole || 'wali_kelas').trim().toLowerCase();
-  
   const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas'];
   const currentRole = validRoles.includes(normalizedRole as Role) ? (normalizedRole as Role) : 'wali_kelas';
 
   return (
     <div className="flex flex-col h-full w-full text-white/90 relative">
       
-      {/* Tombol Toggle */}
+      {/* Tombol Toggle (Hanya Desktop) */}
       <button 
         onClick={toggleSidebar}
         className="absolute -right-3 top-20 bg-green-700 text-white p-1 rounded-full border border-green-600 shadow-md hover:bg-green-600 transition-colors z-50 hidden md:flex"
@@ -211,19 +259,10 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         isCollapsed ? "h-16 justify-center" : "h-24 px-4 gap-4"
       )}>
         {isCollapsed ? (
-          <img 
-            src="/logo.png" 
-            alt="Logo" 
-            className="w-10 h-10 object-contain drop-shadow-md" 
-            title="Pondok Pesantren Sukahideng" 
-          />
+          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" title="Pondok Pesantren Sukahideng" />
         ) : (
           <>
-             <img 
-               src="/logo.png" 
-               alt="Logo" 
-               className="w-14 h-14 object-contain drop-shadow-lg" 
-             />
+             <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-lg" />
             <div className="flex flex-col min-w-0 justify-center h-full py-2">
               <span className="text-[10px] font-bold text-green-200/90 uppercase tracking-widest leading-tight">
                 Pondok Pesantren
@@ -236,12 +275,10 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         )}
       </div>
 
-      {/* MENU ITEMS (CUSTOM SCROLLBAR) */}
+      {/* MENU ITEMS */}
       <nav className="flex-1 p-2 space-y-6 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors">
         {menuGroups.map((group, idx) => {
-          // Filter menu berdasarkan role
           const allowedItems = group.items.filter(item => item.roles.includes(currentRole));
-          
           if (allowedItems.length === 0) return null;
 
           return (
@@ -260,6 +297,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={onMobileClose} // Tutup menu saat link diklik (Mobile)
                       title={isCollapsed ? item.title : undefined}
                       className={cn(
                         "flex items-center rounded-lg transition-all duration-200 text-sm font-medium group relative",
@@ -287,7 +325,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         })}
       </nav>
 
-      {/* FOOTER - Debugging & Refresh Role */}
+      {/* FOOTER */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 text-[10px] text-green-200/40 text-center shrink-0 bg-black/10 whitespace-nowrap overflow-hidden">
           <p>&copy; 2024 Sistem Pesantren</p>

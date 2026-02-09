@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner"; 
+import { Toaster } from "sonner";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -10,9 +11,8 @@ export const metadata: Metadata = {
   description: "Aplikasi Manajemen Terpadu Pesantren",
 };
 
-// --- WAJIB: Konfigurasi untuk Cloudflare Pages ---
-export const runtime = 'edge';
-// ------------------------------------------------
+// PENTING: Jangan ada 'export const runtime = edge' untuk Vercel (kecuali butuh banget)
+// Biarkan default (Node.js) agar Server Actions berjalan maksimal.
 
 export default function RootLayout({
   children,
@@ -23,8 +23,13 @@ export default function RootLayout({
     <html lang="id">
       <body className={inter.className}>
         {children}
-        {/* Pasang Toaster disini agar aktif di seluruh aplikasi */}
         <Toaster position="top-center" richColors />
+        
+        {/* Script Excel CDN */}
+        <Script 
+          src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" 
+          strategy="beforeInteractive"
+        />
       </body>
     </html>
   );

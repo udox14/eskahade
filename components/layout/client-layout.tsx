@@ -2,23 +2,24 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header"; // Header baru akan dipakai di sini
+import { Header } from "@/components/layout/header";
 import { cn } from "@/lib/utils";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
   userRole: string;
   userEmail: string;
-  userName: string; // TAMBAHAN
+  userName: string;
 }
 
 export function ClientLayout({ children, userRole, userEmail, userName }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false); // State Mobile
 
   return (
     <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
       
-      {/* 1. SIDEBAR (FIXED POSITION) */}
+      {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 
         className={cn(
           "hidden md:flex flex-col fixed inset-y-0 z-50 shadow-2xl transition-all duration-300 ease-in-out",
@@ -34,6 +35,30 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
         </div>
       </div>
 
+      {/* 1.5. SIDEBAR MOBILE (DRAWER) */}
+      {/* Overlay Gelap */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Drawer Sidebar */}
+      <div 
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-green-900 via-green-800 to-green-950 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+         <Sidebar 
+            userRole={userRole} 
+            isCollapsed={false} // Di mobile selalu lebar
+            toggleSidebar={() => {}} // Tombol collapse tidak aktif di mobile
+            onMobileClose={() => setIsMobileOpen(false)} // Tutup saat link diklik
+         />
+      </div>
+
       {/* 2. AREA KONTEN (DYNAMIC PADDING) */}
       <div 
         className={cn(
@@ -43,10 +68,13 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
       >
         
         {/* HEADER */}
-        <div className="sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm flex items-center px-6 transition-all">
+        <div className="sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm flex items-center px-4 md:px-6 transition-all">
           <div className="w-full">
-            {/* Pass Data Nama & Role ke Header */}
-            <Header userName={userName} userRole={userRole} />
+            <Header 
+                userName={userName} 
+                userRole={userRole} 
+                onMenuClick={() => setIsMobileOpen(true)} // Buka menu mobile
+            />
           </div>
         </div>
 
