@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Tipe data SUPER LENGKAP (+ Kelas Pesantren)
+// Tipe data dengan tambahan Kelas Pesantren
 type SantriImportData = {
   nis: string | number;
   nama_lengkap: string;
@@ -19,7 +19,7 @@ type SantriImportData = {
   asrama?: string;
   kamar?: string | number;
   
-  // TAMBAHAN BARU: KELAS PESANTREN (Untuk Migrasi Awal)
+  // KOLOM TAMBAHAN UNTUK MIGRASI
   kelas_pesantren?: string; 
 }
 
@@ -30,17 +30,16 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
     return { error: "Data kosong tidak bisa disimpan." }
   }
 
-  // 1. AMBIL REFERENSI KELAS (Untuk Mapping Nama -> ID)
-  // Kita butuh ID kelas untuk tabel riwayat_pendidikan
+  // 1. AMBIL REFERENSI KELAS (Mapping Nama -> ID)
+  // Tujuannya agar kalau di excel ditulis "1-A", kita tahu ID-nya berapa di database
   const { data: kelasList } = await supabase
     .from('kelas')
     .select('id, nama_kelas')
   
-  // Buat Map: "1-A" -> "UUID-xxxxx" (Case insensitive)
   const mapKelas = new Map()
   kelasList?.forEach(k => mapKelas.set(k.nama_kelas.trim().toLowerCase(), k.id))
 
-  // 2. BERSIHKAN DATA SANTRI
+  // 2. DATA CLEANING
   const cleanData = dataSantri.map(s => ({
     nis: String(s.nis).trim(),
     nama_lengkap: String(s.nama_lengkap).trim(),
@@ -56,39 +55,39 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
     kelas_sekolah: s.kelas_sekolah ? String(s.kelas_sekolah).trim() : null,
     asrama: s.asrama ? String(s.asrama).toUpperCase().trim() : null,
     kamar: s.kamar ? String(s.kamar).trim() : null
-    // Note: kelas_pesantren tidak dimasukkan ke tabel santri, tapi dipisah logicnya
   }))
 
   // 3. INSERT SANTRI
-  // Kita gunakan .select() agar mendapatkan kembali ID santri yang baru dibuat
-  const { data: insertedSantri, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('santri')
     .insert(cleanData)
-    .select('id, nis') 
+    .select('id, nis') // Ambil ID yang baru dibuat
   
   if (error) {
-    console.error("Gagal Import Santri:", error)
     if (error.code === '23505') {
-      return { error: "Gagal: Ada NIS atau NIK yang sama (Duplikat) di database." }
+      return { error: "Gagal: Ada NIS yang sama (Duplikat) di database." }
     }
     return { error: `Gagal menyimpan: ${error.message}` }
   }
 
-  // 4. INSERT RIWAYAT PENDIDIKAN (Untuk yang punya kolom kelas)
-  if (insertedSantri && insertedSantri.length > 0) {
+  // 4. INSERT KELAS OTOMATIS (MIGRASI)
+  // Jika insert santri sukses, cek apakah ada data kelas di excelnya?
+  if (inserted && inserted.length > 0) {
     const riwayatInserts: any[] = []
-
-    // Map inserted santri by NIS untuk pencarian cepat
+    
+    // Map ID Santri berdasarkan NIS untuk pencarian cepat
     const mapSantriId = new Map()
-    insertedSantri.forEach(s => mapSantriId.set(s.nis, s.id))
+    inserted.forEach(s => mapSantriId.set(s.nis, s.id))
 
+    // Loop data excel asli untuk cek kolom kelas
     dataSantri.forEach(row => {
       const namaKelasInput = row.kelas_pesantren ? String(row.kelas_pesantren).trim() : null
       
       if (namaKelasInput) {
         const santriId = mapSantriId.get(String(row.nis).trim())
-        const kelasId = mapKelas.get(namaKelasInput.toLowerCase())
+        const kelasId = mapKelas.get(namaKelasInput.toLowerCase()) // Cari ID kelas di Map
 
+        // Jika santri berhasil diinsert DAN kelasnya ditemukan di database
         if (santriId && kelasId) {
           riwayatInserts.push({
             santri_id: santriId,
@@ -99,19 +98,12 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
       }
     })
 
+    // Eksekusi insert riwayat
     if (riwayatInserts.length > 0) {
-      const { error: errRiwayat } = await supabase
-        .from('riwayat_pendidikan')
-        .insert(riwayatInserts)
-      
-      if (errRiwayat) {
-        console.error("Gagal buat riwayat kelas:", errRiwayat)
-        // Kita tidak return error disini karena santri sudah berhasil dibuat.
-        // Cukup log saja, atau beri info warning (opsional)
-      }
+      await supabase.from('riwayat_pendidikan').insert(riwayatInserts)
     }
   }
 
   revalidatePath('/dashboard/santri')
-  return { success: true, count: insertedSantri?.length || 0 }
+  return { success: true, count: inserted?.length || 0 }
 }
