@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter
+  ChevronLeft, ChevronRight, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -33,7 +33,7 @@ const menuGroups = [
     ]
   },
   {
-    label: "Akademik (Sekpen)",
+    label: "Akademik (Sekpen & Wali Kelas)",
     items: [
       { 
         title: "Tes Klasifikasi", 
@@ -52,14 +52,6 @@ const menuGroups = [
         href: "/dashboard/akademik/absensi", 
         icon: CalendarCheck, 
         roles: ['admin', 'sekpen'] 
-      },
-      // MENU BARU: REKAP ABSENSI
-      // Bisa diakses oleh banyak role untuk monitoring
-      { 
-        title: "Rekap Absensi", 
-        href: "/dashboard/akademik/absensi/rekap", 
-        icon: Filter, 
-        roles: ['admin', 'sekpen', 'wali_kelas', 'keamanan', 'dewan_santri', 'pengurus_asrama'] 
       },
       { 
         title: "Verifikasi Absen", 
@@ -80,6 +72,12 @@ const menuGroups = [
         roles: ['admin', 'sekpen', 'wali_kelas'] 
       },
       { 
+        title: "Leger Nilai", 
+        href: "/dashboard/akademik/leger", 
+        icon: FileSpreadsheet, 
+        roles: ['admin', 'sekpen', 'wali_kelas'] 
+      },
+      { 
         title: "Ranking & Prestasi", 
         href: "/dashboard/akademik/ranking", 
         icon: TrendingUp, 
@@ -89,12 +87,6 @@ const menuGroups = [
         title: "Kenaikan Kelas", 
         href: "/dashboard/akademik/kenaikan", 
         icon: ArrowUpCircle, 
-        roles: ['admin', 'sekpen', 'wali_kelas'] 
-      },
-      { 
-        title: "Leger Nilai", 
-        href: "/dashboard/akademik/leger", 
-        icon: FileSpreadsheet, 
         roles: ['admin', 'sekpen', 'wali_kelas'] 
       },
       { 
@@ -137,9 +129,11 @@ interface SidebarProps {
   userRole?: string;
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  // FIX: Tambahkan definisi prop onMobileClose agar TypeScript tidak error
+  onMobileClose?: () => void; 
 }
 
-export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }: SidebarProps) {
+export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   
   const [activeRole, setActiveRole] = useState<string>(userRole);
@@ -160,7 +154,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-        console.error("Auth Error:", authError);
         setDebugMsg("Auth Fail");
         setIsRefreshing(false);
         return;
@@ -173,7 +166,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
     .maybeSingle();
     
     if (error) {
-        console.error("Supabase Error:", JSON.stringify(error, null, 2));
         setDebugMsg(`DB Err: ${error.code}`);
     } else if (data) {
         setDebugMsg(`DB Role: ${data.role}`);
@@ -197,6 +189,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
   return (
     <div className="flex flex-col h-full w-full text-white/90 relative">
       
+      {/* Tombol Toggle (Hanya Desktop) */}
       <button 
         onClick={toggleSidebar}
         className="absolute -right-3 top-20 bg-green-700 text-white p-1 rounded-full border border-green-600 shadow-md hover:bg-green-600 transition-colors z-50 hidden md:flex"
@@ -204,6 +197,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
+      {/* HEADER LOGO */}
       <div className={cn(
         "flex items-center border-b border-white/10 shrink-0 bg-black/10 backdrop-blur-sm transition-all duration-300 overflow-hidden",
         isCollapsed ? "h-16 justify-center" : "h-24 px-4 gap-4"
@@ -234,6 +228,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         )}
       </div>
 
+      {/* MENU ITEMS */}
       <nav className="flex-1 p-2 space-y-6 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors">
         {menuGroups.map((group, idx) => {
           const allowedItems = group.items.filter(item => item.roles.includes(currentRole));
@@ -256,6 +251,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={onMobileClose} // FIX: Gunakan prop di sini untuk menutup drawer
                       title={isCollapsed ? item.title : undefined}
                       className={cn(
                         "flex items-center rounded-lg transition-all duration-200 text-sm font-medium group relative",
@@ -283,6 +279,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar }:
         })}
       </nav>
 
+      {/* FOOTER */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 text-[10px] text-green-200/40 text-center shrink-0 bg-black/10 whitespace-nowrap overflow-hidden">
           <p>&copy; 2024 Sistem Pesantren</p>
