@@ -5,6 +5,7 @@ import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapu
 import { SuratView } from './surat-view'
 import { useReactToPrint } from 'react-to-print'
 import { Printer, Search, FileText, ArrowLeft, Loader2, History, Filter, Calendar, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -133,8 +134,8 @@ export default function LayananSuratPage() {
   return (
     <div className="space-y-12 max-w-5xl mx-auto pb-20">
        
-       {/* HEADER */}
-       <div className="flex items-center gap-4">
+       {/* HEADER (Sembunyikan saat print) */}
+       <div className="flex items-center gap-4 print:hidden">
         {step > 1 && (
             <button onClick={() => setStep(step - 1)} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft className="w-6 h-6 text-gray-600"/></button>
         )}
@@ -145,11 +146,11 @@ export default function LayananSuratPage() {
       </div>
 
       {/* --- BAGIAN GENERATOR --- */}
-      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 print:border-none print:p-0 print:bg-white">
           
-          {/* STEP 1: PILIH JENIS */}
+          {/* STEP 1: PILIH JENIS (Sembunyikan saat print) */}
           {step === 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in print:hidden">
                 <MenuCard title="Ket. Mondok" desc="Surat aktif santri" icon={FileText} color="bg-blue-600" onClick={() => selectJenis('MONDOK')} />
                 <MenuCard title="Izin Pulang" desc="Surat jalan & perizinan" icon={FileText} color="bg-purple-600" onClick={() => selectJenis('IZIN')} />
                 <MenuCard title="Surat Tagihan" desc="Pemberitahuan tunggakan SPP" icon={FileText} color="bg-orange-600" onClick={() => selectJenis('TAGIHAN')} />
@@ -157,9 +158,9 @@ export default function LayananSuratPage() {
             </div>
           )}
 
-          {/* STEP 2: CARI SANTRI */}
+          {/* STEP 2: CARI SANTRI (Sembunyikan saat print) */}
           {step === 2 && (
-            <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4">
+            <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4 print:hidden">
                 <h3 className="font-bold text-lg mb-4 text-center">Cari Santri</h3>
                 <form onSubmit={handleSearch} className="flex gap-2 mb-4">
                     <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nama / NIS..." className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"/>
@@ -176,9 +177,9 @@ export default function LayananSuratPage() {
             </div>
           )}
 
-          {/* STEP 3: INPUT TAMBAHAN */}
+          {/* STEP 3: INPUT TAMBAHAN (Sembunyikan saat print) */}
           {step === 3 && (
-            <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4">
+            <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4 print:hidden">
                 <h3 className="font-bold text-lg mb-4">Detail Surat {jenisSurat}</h3>
                 <form onSubmit={handleInputTambahan} className="space-y-4">
                     {jenisSurat === 'IZIN' && (
@@ -201,7 +202,8 @@ export default function LayananSuratPage() {
           {/* STEP 4: PREVIEW */}
           {step === 4 && (
             <div className="flex flex-col items-center gap-4 animate-in fade-in">
-                <div className="flex gap-4">
+                {/* Tombol Aksi (Sembunyikan saat print) */}
+                <div className="flex gap-4 print:hidden">
                     <button onClick={() => setStep(1)} disabled={isPrinting} className="px-4 py-2 border bg-white rounded-lg hover:bg-gray-50">Batal / Ganti</button>
                     <button onClick={() => handlePrintProcess()} disabled={isPrinting} className="px-6 py-2 bg-green-700 text-white rounded-lg font-bold shadow hover:bg-green-800 flex items-center gap-2 disabled:opacity-50">
                         {isPrinting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Printer className="w-4 h-4"/>} Cetak & Simpan
@@ -209,8 +211,8 @@ export default function LayananSuratPage() {
                 </div>
                 
                 {/* Dokumen yang akan dicetak */}
-                <div className="bg-gray-200 p-8 border rounded-xl overflow-auto max-w-full">
-                    <div ref={printRef} className="bg-white shadow-2xl">
+                <div className="bg-gray-200 p-8 border rounded-xl overflow-auto max-w-full print:p-0 print:bg-white print:border-none print:w-full print:overflow-visible">
+                    <div ref={printRef} className="bg-white shadow-2xl print:shadow-none print:w-full">
                         <SuratView 
                             jenis={jenisSurat!} 
                             dataSantri={selectedSantri} 
@@ -223,8 +225,8 @@ export default function LayananSuratPage() {
           )}
       </div>
 
-      {/* --- BAGIAN RIWAYAT (TABEL BAWAH) --- */}
-      <div className="border-t pt-8">
+      {/* --- BAGIAN RIWAYAT (TABEL BAWAH) (Sembunyikan saat print) --- */}
+      <div className="border-t pt-8 print:hidden">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                   <History className="w-6 h-6 text-orange-600"/> Agenda Surat Keluar
