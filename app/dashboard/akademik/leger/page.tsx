@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger } from './actions'
-import { FileSpreadsheet, Loader2, Search, Trophy, Calculator, RefreshCw } from 'lucide-react'
+import { FileSpreadsheet, Loader2, Search, Trophy, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
 
 declare global { interface Window { XLSX: any; } }
@@ -101,7 +101,7 @@ export default function LegerNilaiPage() {
             <button 
                 onClick={handleExport}
                 disabled={isExporting || !dataLeger}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-green-800 disabled:opacity-50"
+                className="bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-green-800 disabled:opacity-50 transition-colors"
             >
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileSpreadsheet className="w-4 h-4"/>}
                 Excel
@@ -109,8 +109,8 @@ export default function LegerNilaiPage() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border flex gap-4 items-end shadow-sm">
-        <div>
+      <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
+        <div className="w-full md:w-auto">
           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kelas</label>
           <select 
             className="p-2 border rounded-md w-64 bg-gray-50 outline-none"
@@ -140,7 +140,7 @@ export default function LegerNilaiPage() {
         ) : !dataLeger || dataLeger.siswa.length === 0 ? (
             <div className="text-center py-20 text-gray-400 italic">Data kosong.</div>
         ) : (
-            <div className="overflow-x-auto pb-4"> {/* Padding bottom agar scrollbar horizontal tidak nempel */}
+            <div className="overflow-x-auto pb-4"> 
                 <table className="w-full text-sm text-left border-collapse">
                     <thead className="bg-slate-800 text-white font-bold sticky top-0 z-20 shadow-md">
                         <tr>
@@ -152,7 +152,6 @@ export default function LegerNilaiPage() {
                             {dataLeger.mapel.map((m: any) => (
                                 <th key={m.id} className="border border-slate-600 w-12 relative h-36 align-bottom pb-2 group hover:bg-slate-700 transition-colors">
                                     <div className="w-full h-full flex items-end justify-center">
-                                        {/* PERBAIKAN CSS: writing-mode vertical-rl + rotate 180 = Bawah ke Atas */}
                                         <span className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-xs tracking-wide">
                                             {m.nama}
                                         </span>
@@ -160,9 +159,10 @@ export default function LegerNilaiPage() {
                                 </th>
                             ))}
 
-                            <th className="p-2 border border-slate-600 text-center bg-orange-700 w-16 sticky right-[8rem] z-20">JML</th>
-                            <th className="p-2 border border-slate-600 text-center bg-blue-700 w-16 sticky right-[4rem] z-20">RATA</th>
-                            <th className="p-2 border border-slate-600 text-center bg-green-700 w-16 sticky right-0 z-20">RANK</th>
+                            {/* REVISI: Menghapus sticky right agar tidak menutupi nilai di HP */}
+                            <th className="p-2 border border-slate-600 text-center bg-orange-700 w-16">JML</th>
+                            <th className="p-2 border border-slate-600 text-center bg-blue-700 w-16">RATA</th>
+                            <th className="p-2 border border-slate-600 text-center bg-green-700 w-16">RANK</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -172,18 +172,21 @@ export default function LegerNilaiPage() {
                                 <td className="p-2 border font-mono text-xs sticky left-10 bg-white group-hover:bg-yellow-50 z-10">{s.nis}</td>
                                 <td className="p-2 border font-bold text-gray-800 sticky left-[8.5rem] bg-white group-hover:bg-yellow-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] truncate max-w-xs">{s.nama}</td>
 
+                                {/* Loop Nilai */}
                                 {dataLeger.mapel.map((m: any) => {
                                     const nilai = s.nilai[m.id]
+                                    const isFail = nilai < 60 && nilai !== 0
                                     return (
-                                        <td key={m.id} className={`p-2 border text-center font-mono text-xs ${nilai < 60 && nilai != 0 ? 'text-red-600 font-bold bg-red-50' : ''}`}>
+                                        <td key={m.id} className={`p-2 border text-center font-mono text-xs ${isFail ? 'text-red-600 font-bold bg-red-50' : ''}`}>
                                             {nilai || '-'}
                                         </td>
                                     )
                                 })}
 
-                                <td className="p-2 border text-center font-bold bg-orange-50 text-orange-900 sticky right-[8rem] group-hover:bg-orange-100 z-10">{s.jumlah}</td>
-                                <td className="p-2 border text-center font-bold bg-blue-50 text-blue-900 sticky right-[4rem] group-hover:bg-blue-100 z-10">{s.rata}</td>
-                                <td className="p-2 border text-center font-bold bg-green-50 text-green-900 sticky right-0 group-hover:bg-green-100 z-10">
+                                {/* REVISI: Menghapus sticky right */}
+                                <td className="p-2 border text-center font-bold bg-orange-50 text-orange-900">{s.jumlah}</td>
+                                <td className="p-2 border text-center font-bold bg-blue-50 text-blue-900">{s.rata}</td>
+                                <td className="p-2 border text-center font-bold bg-green-50 text-green-900">
                                     {s.rank <= 3 && <Trophy className="w-3 h-3 inline mr-1 text-yellow-500"/>}
                                     {s.rank}
                                 </td>
