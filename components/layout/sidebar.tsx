@@ -5,13 +5,12 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Coins, Receipt
+  ChevronLeft, ChevronRight, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// Update Definisi Role
 type Role = 'admin' | 'keamanan' | 'sekpen' | 'dewan_santri' | 'pengurus_asrama' | 'wali_kelas' | 'bendahara';
 
 const menuGroups = [
@@ -33,7 +32,60 @@ const menuGroups = [
     ]
   },
   {
-    label: "Keuangan Pusat (Bendahara)", // GRUP BARU
+    label: "Akademik (KBM)",
+    items: [
+      // HARIAN & MINGGUAN
+      { title: "Absen Guru", href: "/dashboard/akademik/absensi-guru", icon: Briefcase, roles: ['admin', 'sekpen'] },
+      { title: "Absen Pengajian", href: "/dashboard/akademik/absensi", icon: CalendarCheck, roles: ['admin', 'sekpen'] },
+      { title: "Verifikasi Absen", href: "/dashboard/akademik/absensi/verifikasi", icon: UserCheck, roles: ['admin', 'sekpen'] },
+      { title: "Cetak Pemanggilan", href: "/dashboard/akademik/absensi/cetak", icon: Printer, roles: ['admin', 'sekpen'] },
+      { title: "Rekap Absensi", href: "/dashboard/akademik/absensi/rekap", icon: Filter, roles: ['admin', 'sekpen', 'wali_kelas', 'keamanan', 'dewan_santri', 'pengurus_asrama'] },
+      { title: "Rekap Absen Guru", href: "/dashboard/akademik/absensi-guru/rekap", icon: UserCheck, roles: ['admin', 'sekpen'] },
+      
+      // SEMESTERAN (NILAI)
+      { title: "Input Nilai", href: "/dashboard/akademik/nilai/input", icon: BookOpen, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Leger Nilai", href: "/dashboard/akademik/leger", icon: FileSpreadsheet, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Ranking & Prestasi", href: "/dashboard/akademik/ranking", icon: TrendingUp, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Cetak Rapor", href: "/dashboard/laporan/rapor", icon: FileText, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      
+      // TAHUNAN (ADMINISTRASI)
+      { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
+      { title: "Penempatan Kelas", href: "/dashboard/santri/atur-kelas", icon: UserPlus, roles: ['admin', 'sekpen'] },
+      { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen', 'wali_kelas'] },
+    ]
+  },
+  {
+    label: "Kesantrian (Disiplin)",
+    items: [
+      // PERIZINAN & SURAT
+      { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
+      { title: "Layanan Surat", href: "/dashboard/dewan-santri/surat", icon: Mail, roles: ['admin', 'dewan_santri'] },
+      { title: "Sensus Penduduk", href: "/dashboard/dewan-santri/sensus", icon: BarChart3, roles: ['admin', 'dewan_santri'] },
+
+      // HUKUM & KEAMANAN
+      { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
+      { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'dewan_santri', 'keamanan'] },
+      { title: "Pelanggaran & SP", href: "/dashboard/keamanan", icon: ShieldAlert, roles: ['admin', 'keamanan'] },
+    ]
+  },
+  {
+    label: "Manajemen Asrama",
+    items: [
+      // KONTROL HARIAN
+      { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama', 'keamanan'] },
+      { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
+      
+      // KEUANGAN ASRAMA
+      { title: "Uang Jajan", href: "/dashboard/asrama/uang-jajan", icon: Wallet, roles: ['admin', 'pengurus_asrama'] },
+      { title: "Pembayaran SPP", href: "/dashboard/asrama/spp", icon: CreditCard, roles: ['admin', 'pengurus_asrama'] },
+      
+      // LAPORAN SETORAN
+      { title: "Status Setoran", href: "/dashboard/asrama/status-setoran", icon: LayoutList, roles: ['admin', 'pengurus_asrama'] },
+      { title: "Monitoring Setoran", href: "/dashboard/dewan-santri/setoran", icon: LayoutList, roles: ['admin', 'dewan_santri'] },
+    ]
+  },
+  {
+    label: "Keuangan Pusat",
     items: [
       { title: "Loket Pembayaran", href: "/dashboard/keuangan/pembayaran", icon: Coins, roles: ['admin', 'bendahara'] },
       { title: "Pengaturan Tarif", href: "/dashboard/keuangan/tarif", icon: Settings, roles: ['admin', 'bendahara'] },
@@ -41,44 +93,10 @@ const menuGroups = [
     ]
   },
   {
-    label: "Asrama & Kesantrian",
-    items: [
-      { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama', 'keamanan'] },
-      { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Pembayaran SPP", href: "/dashboard/asrama/spp", icon: CreditCard, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Status Setoran", href: "/dashboard/asrama/status-setoran", icon: LayoutList, roles: ['admin', 'pengurus_asrama'] },
-      
-      { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
-      { title: "Layanan Surat", href: "/dashboard/dewan-santri/surat", icon: Mail, roles: ['admin', 'dewan_santri'] },
-      { title: "Monitoring Setoran", href: "/dashboard/dewan-santri/setoran", icon: LayoutList, roles: ['admin', 'dewan_santri'] },
-      { title: "Sensus Penduduk", href: "/dashboard/dewan-santri/sensus", icon: BarChart3, roles: ['admin', 'dewan_santri'] },
-      
-      { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'dewan_santri', 'keamanan'] },
-      { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
-      { title: "Pelanggaran & SP", href: "/dashboard/keamanan", icon: ShieldAlert, roles: ['admin', 'keamanan'] },
-    ]
-  },
-  {
-    label: "Akademik (Sekpen)",
-    items: [
-      { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
-      { title: "Penempatan Kelas", href: "/dashboard/santri/atur-kelas", icon: UserPlus, roles: ['admin', 'sekpen'] },
-      { title: "Absen Pengajian", href: "/dashboard/akademik/absensi", icon: CalendarCheck, roles: ['admin', 'sekpen'] },
-      { title: "Rekap Absensi", href: "/dashboard/akademik/absensi/rekap", icon: Filter, roles: ['admin', 'sekpen', 'wali_kelas', 'keamanan', 'dewan_santri', 'pengurus_asrama'] },
-      { title: "Verifikasi Absen", href: "/dashboard/akademik/absensi/verifikasi", icon: UserCheck, roles: ['admin', 'sekpen'] },
-      { title: "Cetak Pemanggilan", href: "/dashboard/akademik/absensi/cetak", icon: Printer, roles: ['admin', 'sekpen'] },
-      { title: "Input Nilai", href: "/dashboard/akademik/nilai/input", icon: BookOpen, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Leger Nilai", href: "/dashboard/akademik/leger", icon: FileSpreadsheet, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Ranking & Prestasi", href: "/dashboard/akademik/ranking", icon: TrendingUp, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Cetak Rapor", href: "/dashboard/laporan/rapor", icon: FileText, roles: ['admin', 'sekpen', 'wali_kelas'] },
-    ]
-  },
-  {
     label: "Master Data & Admin",
     items: [
       { title: "Manajemen User", href: "/dashboard/pengaturan/users", icon: UserCog, roles: ['admin'] },
-      { title: "Manajemen Wali Kelas", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin', 'sekpen'] },
+      { title: "Manajemen Guru & Jadwal", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin', 'sekpen'] },
       { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin', 'sekpen'] },
       { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin', 'sekpen'] },
       { title: "Master Pelanggaran", href: "/dashboard/master/pelanggaran", icon: Settings, roles: ['admin', 'keamanan'] },
@@ -143,13 +161,13 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   }, []);
 
   const normalizedRole = (activeRole || 'wali_kelas').trim().toLowerCase();
-  
-  const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']; // UPDATE valid roles
+  const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara'];
   const currentRole = validRoles.includes(normalizedRole as Role) ? (normalizedRole as Role) : 'wali_kelas';
 
   return (
     <div className="flex flex-col h-full w-full text-white/90 relative">
       
+      {/* Tombol Toggle (Hanya Desktop) */}
       <button 
         onClick={toggleSidebar}
         className="absolute -right-3 top-20 bg-green-700 text-white p-1 rounded-full border border-green-600 shadow-md hover:bg-green-600 transition-colors z-50 hidden md:flex"
@@ -157,15 +175,25 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
+      {/* HEADER LOGO */}
       <div className={cn(
         "flex items-center border-b border-white/10 shrink-0 bg-black/10 backdrop-blur-sm transition-all duration-300 overflow-hidden",
         isCollapsed ? "h-16 justify-center" : "h-24 px-4 gap-4"
       )}>
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" title="Pondok Pesantren Sukahideng" />
+          <img 
+            src="/logo.png" 
+            alt="Logo" 
+            className="w-10 h-10 object-contain drop-shadow-md" 
+            title="Pondok Pesantren Sukahideng" 
+          />
         ) : (
           <>
-             <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-lg" />
+             <img 
+               src="/logo.png" 
+               alt="Logo" 
+               className="w-14 h-14 object-contain drop-shadow-lg" 
+             />
             <div className="flex flex-col min-w-0 justify-center h-full py-2">
               <span className="text-[10px] font-bold text-green-200/90 uppercase tracking-widest leading-tight">
                 Pondok Pesantren
@@ -178,6 +206,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         )}
       </div>
 
+      {/* MENU ITEMS */}
       <nav className="flex-1 p-2 space-y-6 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors">
         {menuGroups.map((group, idx) => {
           const allowedItems = group.items.filter(item => item.roles.includes(currentRole as any));
@@ -228,6 +257,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         })}
       </nav>
 
+      {/* FOOTER */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 text-[10px] text-green-200/40 text-center shrink-0 bg-black/10 whitespace-nowrap overflow-hidden">
           <p>&copy; 2024 Sistem Pesantren</p>

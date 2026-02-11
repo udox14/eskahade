@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// 1. GETTERS
+// 1. GETTERS (Untuk Client Component)
 export async function getMarhalahList() {
   const supabase = await createClient()
   const { data } = await supabase.from('marhalah').select('*').order('urutan')
@@ -15,8 +15,18 @@ export async function getKelasList() {
   const { data } = await supabase
     .from('kelas')
     .select('*, marhalah(nama)')
-    .order('nama_kelas')
-  return data || []
+    // Kita hapus .order('nama_kelas') dari database karena kita akan sort manual
+  
+  if (!data) return []
+
+  // ALGORITMA NATURAL SORT
+  // Ini akan mengurutkan: "1-2" dulu, baru "1-10"
+  return data.sort((a, b) => {
+    return a.nama_kelas.localeCompare(b.nama_kelas, undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    })
+  })
 }
 
 // 2. TAMBAH MANUAL
@@ -27,6 +37,7 @@ export async function tambahKelas(formData: FormData) {
   const marhalahId = formData.get('marhalah_id') as string
   const jenisKelamin = formData.get('jenis_kelamin') as string
 
+  // Ambil tahun ajaran aktif
   const { data: tahunAktif } = await supabase
     .from('tahun_ajaran')
     .select('id')
@@ -63,6 +74,7 @@ export async function tambahKelas(formData: FormData) {
 export async function hapusKelas(kelasId: string) {
   const supabase = await createClient()
 
+  // Cek apakah ada santri di kelas ini?
   const { count } = await supabase
     .from('riwayat_pendidikan')
     .select('*', { count: 'exact', head: true })
@@ -99,13 +111,12 @@ export async function importKelasMassal(dataExcel: any[]) {
     const mapMarhalah = new Map()
     marhalahList?.forEach(m => mapMarhalah.set(m.nama.toLowerCase().trim(), m.id))
 
-    // CEK DATA EKSISTING (Untuk mencegah duplikat)
+    // CEK DATA EKSISTING
     const { data: existingClasses } = await supabase
         .from('kelas')
         .select('nama_kelas, marhalah_id')
         .eq('tahun_ajaran_id', tahunAktif.id)
 
-    // Buat Set untuk pengecekan cepat (Format: "namakelas-idmarhalah")
     const existingSet = new Set(
         existingClasses?.map(c => `${c.nama_kelas.toLowerCase().trim()}-${c.marhalah_id}`)
     )
@@ -135,7 +146,7 @@ export async function importKelasMassal(dataExcel: any[]) {
         const keyCheck = `${namaKelas.toLowerCase()}-${marhalahId}`
         if (existingSet.has(keyCheck)) {
             duplicates++
-            continue; // Skip, jangan dimasukkan ke inserts
+            continue; 
         }
 
         // Normalisasi JK
@@ -150,7 +161,6 @@ export async function importKelasMassal(dataExcel: any[]) {
             tahun_ajaran_id: tahunAktif.id
         })
         
-        // Tambahkan ke Set sementara agar tidak duplikat di dalam file excel itu sendiri
         existingSet.add(keyCheck)
     }
 
