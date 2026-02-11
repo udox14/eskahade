@@ -1,20 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-// HAPUS IMPORT XLSX STATIS
 import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch } from './actions'
-import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle } from 'lucide-react'
+import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
 import { toast } from 'sonner' 
 
-// Definisi TypeScript untuk window.XLSX (CDN)
 declare global {
   interface Window {
     XLSX: any;
   }
 }
 
+// UPDATE: Tambahkan Role Bendahara
 const ROLES = [
   { value: 'admin', label: 'Admin' },
+  { value: 'bendahara', label: 'Bendahara Umum' }, // BARU
   { value: 'sekpen', label: 'Sekpen' },
   { value: 'keamanan', label: 'Keamanan' },
   { value: 'dewan_santri', label: 'Dewan Santri' },
@@ -196,7 +196,7 @@ export default function ManajemenUserPage() {
     const rows = [
       { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@pesantren.com", "PASSWORD": "password123", "ROLE": "wali_kelas", "ASRAMA": "" },
       { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@pesantren.com", "PASSWORD": "password123", "ROLE": "keamanan", "ASRAMA": "" },
-      { "NAMA LENGKAP": "Ujang Bahagia", "EMAIL": "ujang@pesantren.com", "PASSWORD": "password123", "ROLE": "pengurus_asrama", "ASRAMA": "BAHAGIA" },
+      { "NAMA LENGKAP": "Siti Bendahara", "EMAIL": "siti@pesantren.com", "PASSWORD": "password123", "ROLE": "bendahara", "ASRAMA": "" },
     ]
     const worksheet = window.XLSX.utils.json_to_sheet(rows)
     worksheet['!cols'] = [{wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:15}]
@@ -347,6 +347,7 @@ export default function ManajemenUserPage() {
                           className={`p-2 border rounded-lg text-sm w-48 outline-none cursor-pointer font-bold transition-colors ${
                             u.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             u.role === 'pengurus_asrama' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            u.role === 'bendahara' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             'bg-white text-gray-700'
                           }`}
                           value={u.role}
@@ -420,6 +421,12 @@ export default function ManajemenUserPage() {
         </div>
       </div>
 
+      {/* ... MODAL (Sama seperti sebelumnya) ... */}
+      {/* SAYA TIDAK MENGULANG BAGIAN MODAL AGAR KODE TIDAK KEPOTONG, */}
+      {/* KARENA BAGIAN BAWAH FILE INI SUDAH BENAR SEPERTI SEBELUMNYA */}
+      {/* Pastikan Anda menyalin bagian modal dari kode sebelumnya jika belum ada */}
+      {/* Tapi untuk amannya, saya sertakan full code lagi di bawah ini */}
+      
       {/* --- MODAL TAMBAH USER --- */}
       {isOpenAdd && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -567,27 +574,7 @@ export default function ManajemenUserPage() {
         </div>
       )}
 
-      {/* --- MODAL KONFIRMASI DELETE --- */}
-      {isOpenDelete && userToDelete && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden text-center p-6">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-               <AlertTriangle className="w-8 h-8 text-red-600" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Hapus Akun?</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Apakah Anda yakin ingin menghapus akun <b>{userToDelete.name}</b>?
-              <br/>Tindakan ini tidak dapat dibatalkan.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-               <button onClick={() => setIsOpenDelete(false)} className="py-2.5 rounded-xl border border-gray-300 font-bold text-gray-600 hover:bg-gray-50">Batal</button>
-               <button onClick={handleDeleteUser} className="py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-md flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Hapus</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL IMPORT EXCEL (DYNAMIC & CDN) --- */}
+      {/* --- MODAL IMPORT EXCEL --- */}
       {isOpenImport && (
          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -662,6 +649,26 @@ export default function ManajemenUserPage() {
              </div>
            </div>
          </div>
+      )}
+
+      {/* --- MODAL KONFIRMASI DELETE --- */}
+      {isOpenDelete && userToDelete && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden text-center p-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+               <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Hapus Akun?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Apakah Anda yakin ingin menghapus akun <b>{userToDelete.name}</b>?
+              <br/>Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+               <button onClick={() => setIsOpenDelete(false)} className="py-2.5 rounded-xl border border-gray-300 font-bold text-gray-600 hover:bg-gray-50">Batal</button>
+               <button onClick={handleDeleteUser} className="py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-md flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Hapus</button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

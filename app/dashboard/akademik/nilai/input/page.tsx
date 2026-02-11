@@ -1,17 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-// HAPUS IMPORT XLSX STATIS
 import { Upload, Download, Save, AlertCircle, FileSpreadsheet, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { getReferensiData, getDataSantriPerKelas, simpanNilaiSemuaMapel } from './actions'
 import { toast } from 'sonner'
 
+// Definisi TypeScript untuk window
+declare global {
+  interface Window {
+    XLSX: any;
+  }
+}
+
 export default function InputNilaiPage() {
-  // State
   const [refData, setRefData] = useState<{ mapel: any[], kelas: any[] }>({ mapel: [], kelas: [] })
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
+  
   const [excelData, setExcelData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -30,6 +36,11 @@ export default function InputNilaiPage() {
       toast.warning("Mohon pilih Kelas terlebih dahulu.")
       return
     }
+
+    if (!window.XLSX) {
+      toast.error("Library Excel belum siap.")
+      return
+    }
     
     setIsDownloading(true)
     const loadToast = toast.loading("Menyiapkan template...")
@@ -45,9 +56,6 @@ export default function InputNilaiPage() {
 
     const namaKelas = refData.kelas.find(k => k.id == selectedKelas)?.nama_kelas
 
-    // DYNAMIC IMPORT
-    const XLSX = await import('xlsx')
-
     const dataRows = santriList.map(s => {
       const row: any = {
         NIS: s.nis,
@@ -59,37 +67,40 @@ export default function InputNilaiPage() {
       return row
     })
 
-    const worksheet = XLSX.utils.json_to_sheet(dataRows)
+    const worksheet = window.XLSX.utils.json_to_sheet(dataRows)
+    
     const wscols = [{ wch: 15 }, { wch: 35 }]
     refData.mapel.forEach(() => wscols.push({ wch: 15 }))
     worksheet['!cols'] = wscols
 
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Lengkap")
+    const workbook = window.XLSX.utils.book_new()
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Lengkap")
     
-    XLSX.writeFile(workbook, `Template_Nilai_${namaKelas}_Lengkap.xlsx`)
+    window.XLSX.writeFile(workbook, `Template_Nilai_${namaKelas}_Lengkap.xlsx`)
     
     toast.dismiss(loadToast)
     toast.success("Template berhasil didownload")
     setIsDownloading(false)
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const loadToast = toast.loading("Membaca file Excel...")
+    if (!window.XLSX) {
+      toast.error("Library Excel belum siap.")
+      return
+    }
 
-    // DYNAMIC IMPORT
-    const XLSX = await import('xlsx')
+    const loadToast = toast.loading("Membaca file Excel...")
 
     const reader = new FileReader()
     reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result
-        const wb = XLSX.read(bstr, { type: 'binary' })
+        const wb = window.XLSX.read(bstr, { type: 'binary' })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        const rawData = XLSX.utils.sheet_to_json(ws)
+        const rawData = window.XLSX.utils.sheet_to_json(ws)
         
         setExcelData(rawData)
         toast.dismiss(loadToast)
@@ -126,9 +137,14 @@ export default function InputNilaiPage() {
     toast.dismiss(loadToast)
 
     if (res?.error) {
-      toast.error("Gagal Menyimpan", { description: res.error, duration: 5000 })
+      toast.error("Gagal Menyimpan", {
+        description: res.error,
+        duration: 5000 
+      })
     } else {
-      toast.success("Sukses!", { description: `Berhasil menyimpan ${res.count} nilai santri.` })
+      toast.success("Sukses!", {
+        description: `Berhasil menyimpan ${res.count} nilai santri.`
+      })
       setExcelData([])
       const fileInput = document.getElementById('file-upload') as HTMLInputElement
       if (fileInput) fileInput.value = ''

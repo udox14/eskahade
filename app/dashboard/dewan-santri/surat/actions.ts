@@ -47,11 +47,12 @@ export async function cekTunggakanSantri(santriId: string) {
   }
 }
 
-// 3. Catat Surat Keluar (History)
+// 3. Catat Surat Keluar & Auto Update Status
 export async function catatSuratKeluar(santriId: string, jenis: string, detail: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // A. Catat Riwayat Surat
   const { error } = await supabase.from('riwayat_surat').insert({
     santri_id: santriId,
     jenis_surat: jenis,
@@ -60,16 +61,36 @@ export async function catatSuratKeluar(santriId: string, jenis: string, detail: 
   })
 
   if (error) return { error: error.message }
+
+  // B. LOGIKA OTOMATIS: Jika Surat Berhenti -> Update Status Santri
+  if (jenis === 'BERHENTI') {
+    // 1. Update Status Global jadi 'dikeluarkan' (Non-Aktif)
+    const { error: errSantri } = await supabase
+      .from('santri')
+      .update({ status_global: 'dikeluarkan' }) 
+      .eq('id', santriId)
+    
+    if (errSantri) console.error("Gagal update status santri:", errSantri)
+
+    // 2. Keluarkan juga dari Kelas Aktif (opsional tapi rapi)
+    const { error: errKelas } = await supabase
+      .from('riwayat_pendidikan')
+      .update({ status_riwayat: 'keluar' })
+      .eq('santri_id', santriId)
+      .eq('status_riwayat', 'aktif')
+
+    if (errKelas) console.error("Gagal update kelas:", errKelas)
+  }
   
   revalidatePath('/dashboard/dewan-santri/surat')
+  revalidatePath('/dashboard/santri') // Refresh data induk agar santri hilang dari list aktif
   return { success: true }
 }
 
-// 4. Ambil Riwayat Surat (Filter Bulan/Tahun)
+// 4. Ambil Riwayat Surat
 export async function getRiwayatSurat(bulan: number, tahun: number) {
   const supabase = await createClient()
 
-  // Range tanggal dalam bulan tersebut
   const startDate = new Date(tahun, bulan - 1, 1).toISOString()
   const endDate = new Date(tahun, bulan, 0, 23, 59, 59).toISOString()
 
@@ -90,17 +111,12 @@ export async function getRiwayatSurat(bulan: number, tahun: number) {
   return data || []
 }
 
-// 5. BARU: Hapus Riwayat Surat
+// 5. Hapus Riwayat Surat
 export async function hapusRiwayatSurat(id: string) {
   const supabase = await createClient()
-  
-  const { error } = await supabase
-    .from('riwayat_surat')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('riwayat_surat').delete().eq('id', id)
 
   if (error) return { error: error.message }
-
   revalidatePath('/dashboard/dewan-santri/surat')
   return { success: true }
 }
