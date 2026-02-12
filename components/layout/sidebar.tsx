@@ -38,7 +38,12 @@ const menuGroups = [
       { title: "Absen Guru", href: "/dashboard/akademik/absensi-guru", icon: Briefcase, roles: ['admin', 'sekpen'] },
       { title: "Absen Pengajian", href: "/dashboard/akademik/absensi", icon: CalendarCheck, roles: ['admin', 'sekpen'] },
       { title: "Verifikasi Absen", href: "/dashboard/akademik/absensi/verifikasi", icon: UserCheck, roles: ['admin', 'sekpen'] },
+      
+      // CETAK-CETAKAN
+      { title: "Cetak Blanko Absen", href: "/dashboard/akademik/absensi/cetak-blanko", icon: FileText, roles: ['admin', 'sekpen'] }, // BARU
       { title: "Cetak Pemanggilan", href: "/dashboard/akademik/absensi/cetak", icon: Printer, roles: ['admin', 'sekpen'] },
+      
+      // REKAP
       { title: "Rekap Absensi", href: "/dashboard/akademik/absensi/rekap", icon: Filter, roles: ['admin', 'sekpen', 'wali_kelas', 'keamanan', 'dewan_santri', 'pengurus_asrama'] },
       { title: "Rekap Absen Guru", href: "/dashboard/akademik/absensi-guru/rekap", icon: UserCheck, roles: ['admin', 'sekpen'] },
       
@@ -57,12 +62,10 @@ const menuGroups = [
   {
     label: "Kesantrian (Disiplin)",
     items: [
-      // PERIZINAN & SURAT
       { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
       { title: "Layanan Surat", href: "/dashboard/dewan-santri/surat", icon: Mail, roles: ['admin', 'dewan_santri'] },
       { title: "Sensus Penduduk", href: "/dashboard/dewan-santri/sensus", icon: BarChart3, roles: ['admin', 'dewan_santri'] },
 
-      // HUKUM & KEAMANAN
       { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
       { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'dewan_santri', 'keamanan'] },
       { title: "Pelanggaran & SP", href: "/dashboard/keamanan", icon: ShieldAlert, roles: ['admin', 'keamanan'] },
@@ -71,15 +74,12 @@ const menuGroups = [
   {
     label: "Manajemen Asrama",
     items: [
-      // KONTROL HARIAN
       { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama', 'keamanan'] },
       { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
       
-      // KEUANGAN ASRAMA
       { title: "Uang Jajan", href: "/dashboard/asrama/uang-jajan", icon: Wallet, roles: ['admin', 'pengurus_asrama'] },
       { title: "Pembayaran SPP", href: "/dashboard/asrama/spp", icon: CreditCard, roles: ['admin', 'pengurus_asrama'] },
       
-      // LAPORAN SETORAN
       { title: "Status Setoran", href: "/dashboard/asrama/status-setoran", icon: LayoutList, roles: ['admin', 'pengurus_asrama'] },
       { title: "Monitoring Setoran", href: "/dashboard/dewan-santri/setoran", icon: LayoutList, roles: ['admin', 'dewan_santri'] },
     ]
@@ -167,7 +167,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   return (
     <div className="flex flex-col h-full w-full text-white/90 relative">
       
-      {/* Tombol Toggle (Hanya Desktop) */}
       <button 
         onClick={toggleSidebar}
         className="absolute -right-3 top-20 bg-green-700 text-white p-1 rounded-full border border-green-600 shadow-md hover:bg-green-600 transition-colors z-50 hidden md:flex"
@@ -175,7 +174,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* HEADER LOGO */}
       <div className={cn(
         "flex items-center border-b border-white/10 shrink-0 bg-black/10 backdrop-blur-sm transition-all duration-300 overflow-hidden",
         isCollapsed ? "h-16 justify-center" : "h-24 px-4 gap-4"
@@ -206,7 +204,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         )}
       </div>
 
-      {/* MENU ITEMS */}
       <nav className="flex-1 p-2 space-y-6 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors">
         {menuGroups.map((group, idx) => {
           const allowedItems = group.items.filter(item => item.roles.includes(currentRole as any));
@@ -257,7 +254,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         })}
       </nav>
 
-      {/* FOOTER */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 text-[10px] text-green-200/40 text-center shrink-0 bg-black/10 whitespace-nowrap overflow-hidden">
           <p>&copy; 2024 Sistem Pesantren</p>
