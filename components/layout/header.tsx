@@ -64,7 +64,7 @@ export function Header({ userName, userRole, onMenuClick }: HeaderProps) {
         <div className="flex flex-col justify-center min-w-0">
           {/* Tampilan Mobile: Judul Singkat */}
           <h2 className="text-lg font-bold text-slate-800 leading-tight tracking-tight md:hidden truncate">
-            SIM Santri
+            ESKAHADE
           </h2>
           {/* Tampilan Desktop: Judul Lengkap */}
           <h2 className="hidden md:block text-lg font-bold text-slate-800 leading-tight tracking-tight">
