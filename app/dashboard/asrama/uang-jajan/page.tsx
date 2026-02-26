@@ -41,19 +41,24 @@ export default function UangJajanPage() {
     })
   }, [])
 
-  // 2. Load Data
+  // 2. Load Data (Reset kamar saat ganti asrama)
   useEffect(() => {
-    loadData()
+    loadData(false) // false = Jangan pertahankan posisi kamar (reset ke 0)
   }, [asrama])
 
-  const loadData = async () => {
+  // UPDATE: Tambah parameter preserveKamar
+  const loadData = async (preserveKamar = false) => {
     setLoading(true)
     const res = await getDashboardTabungan(asrama)
     setData(res)
     setDraftJajan({}) 
     setManualMode({})
     setLoading(false)
-    setCurrentKamarIndex(0)
+    
+    // Hanya reset ke kamar 0 jika TIDAK diminta untuk mempertahankan posisi
+    if (!preserveKamar) {
+        setCurrentKamarIndex(0)
+    }
   }
 
   // --- LOGIC DISTIBUSI JAJAN ---
@@ -75,7 +80,6 @@ export default function UangJajanPage() {
   const handleManualInput = (santriId: string, value: string, saldoSaatIni: number) => {
     const val = parseInt(value) || 0
     if (val > saldoSaatIni) {
-        // Jangan set draft jika saldo kurang, tapi biarkan input jalan
         return 
     }
     if (val > 0) {
@@ -89,7 +93,6 @@ export default function UangJajanPage() {
 
   const toggleManualMode = (santriId: string) => {
     setManualMode(prev => ({...prev, [santriId]: !prev[santriId]}))
-    // Reset draft saat toggle mode
     const next = { ...draftJajan }
     delete next[santriId]
     setDraftJajan(next)
@@ -120,7 +123,8 @@ export default function UangJajanPage() {
         toast.error("Gagal", { description: res.error })
     } else {
         toast.success("Berhasil!", { description: "Saldo santri telah terpotong." })
-        loadData()
+        // FIX: Panggil loadData dengan true agar posisi kamar tidak kereset
+        loadData(true)
     }
   }
 
@@ -152,9 +156,9 @@ export default function UangJajanPage() {
     } else {
         toast.success("Topup Berhasil")
         setTopupNominal('')
-        // Refresh history & data utama
         openModal(selectedSantri) 
-        loadData()
+        // FIX: Panggil loadData dengan true agar posisi kamar tidak kereset
+        loadData(true)
     }
   }
 
@@ -167,8 +171,9 @@ export default function UangJajanPage() {
 
     if (res?.success) {
         toast.success("Transaksi Dibatalkan")
-        openModal(selectedSantri) // Refresh history
-        loadData() // Refresh saldo utama
+        openModal(selectedSantri) 
+        // FIX: Panggil loadData dengan true agar posisi kamar tidak kereset
+        loadData(true)
     }
   }
 

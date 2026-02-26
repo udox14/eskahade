@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPP, getClientRestriction } from './actions'
-import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPP, getClientRestriction, simpanSppBatch } from './actions'
+import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -29,6 +29,10 @@ export default function SPPPage() {
   // STATE FILTER BARU
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('SEMUA')
 
+  // STATE BATCH DRAFT (NEW FEATURE)
+  const [drafts, setDrafts] = useState<Record<string, any>>({})
+  const [isSavingBatch, setIsSavingBatch] = useState(false)
+
   // --- STATE PAYMENT FORM ---
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [riwayatBayar, setRiwayatBayar] = useState<any[]>([])
@@ -46,18 +50,27 @@ export default function SPPPage() {
   }, [])
 
   // LOAD MONITORING DATA
+  // Efek ini jalan saat ganti Asrama, Tahun, atau View
   useEffect(() => {
     if (view === 'LIST') {
-      loadMonitoring()
+      // Jika ganti asrama/tahun, reset kamar (false)
+      // Jika kembali dari view payment, idealnya pertahankan, tapi biar konsisten kita reset dulu kecuali ada logic khusus
+      loadMonitoring(false)
     }
   }, [view, asrama, tahun])
 
-  const loadMonitoring = async () => {
+  // UPDATE: Tambah parameter preserveKamar
+  const loadMonitoring = async (preserveKamar = false) => {
     setLoadingList(true)
     const res = await getDashboardSPP(tahun, asrama)
     setDataMonitoring(res)
+    setDrafts({}) // Reset draft
     setLoadingList(false)
-    setCurrentKamarIndex(0) // Reset ke kamar pertama saat ganti asrama/tahun
+    
+    // Hanya reset kamar jika TIDAK diminta untuk mempertahankan
+    if (!preserveKamar) {
+        setCurrentKamarIndex(0) 
+    }
   }
 
   // LOAD PAYMENT DATA
@@ -92,7 +105,45 @@ export default function SPPPage() {
       toast.error(res.error)
     } else {
       toast.success("Pembayaran Berhasil!")
-      loadStatusSantri() // Refresh grid di payment view
+      loadStatusSantri() 
+    }
+  }
+
+  // BATCH ACTIONS
+  const toggleDraft = (e: React.MouseEvent, santri: any) => {
+    e.stopPropagation() // Biar gak masuk ke detail
+    setDrafts(prev => {
+        const next = { ...prev }
+        if (next[santri.id]) {
+            delete next[santri.id]
+        } else {
+            next[santri.id] = { nominal, bulan: currentMonthIdx, nama: santri.nama_lengkap }
+        }
+        return next
+    })
+  }
+
+  const handleSimpanBatch = async () => {
+    const listPayload = Object.keys(drafts).map(id => ({
+        santriId: id,
+        bulan: drafts[id].bulan,
+        tahun: tahun,
+        nominal: drafts[id].nominal
+    }))
+
+    if (listPayload.length === 0) return
+    if (!confirm(`Simpan pembayaran untuk ${listPayload.length} santri?`)) return
+
+    setIsSavingBatch(true)
+    const res = await simpanSppBatch(listPayload)
+    setIsSavingBatch(false)
+
+    if (res?.error) {
+        toast.error(res.error)
+    } else {
+        toast.success(`Sukses menyimpan ${res.count} pembayaran!`)
+        // FIX: Panggil loadMonitoring dengan true agar tidak reset kamar
+        loadMonitoring(true)
     }
   }
 
@@ -104,7 +155,8 @@ export default function SPPPage() {
   const handleBackToList = () => {
     setView('LIST')
     setSelectedSantri(null)
-    loadMonitoring() // Refresh list agar status update
+    // Saat kembali dari detail, kita refresh data tapi pertahankan kamar (opsional, tapi di sini saya buat true biar nyaman)
+    loadMonitoring(true) 
   }
 
   // --- RENDER HELPERS ---
@@ -129,17 +181,23 @@ export default function SPPPage() {
     if (!acc[k]) acc[k] = []
     acc[k].push(s)
     return acc
-  }, {} as Record<string, any[]>)
+  }, {})
   
+  // Sort Kamar by Number
   const sortedKamars = Object.keys(groupedData).sort((a, b) => (parseInt(a)||999) - (parseInt(b)||999))
 
-  // Data Kamar Aktif (Pagination Kamar)
-  const activeKamar = sortedKamars[currentKamarIndex]
+  // Safety check index
+  const safeIndex = currentKamarIndex >= sortedKamars.length ? 0 : currentKamarIndex
+  const activeKamar = sortedKamars[safeIndex]
   const santriInKamar = activeKamar ? groupedData[activeKamar] : []
 
   // Handler Navigasi Kamar
-  const prevKamar = () => { if (currentKamarIndex > 0) setCurrentKamarIndex(prev => prev - 1) }
-  const nextKamar = () => { if (currentKamarIndex < sortedKamars.length - 1) setCurrentKamarIndex(prev => prev + 1) }
+  const prevKamar = () => { if (safeIndex > 0) setCurrentKamarIndex(prev => prev - 1) }
+  const nextKamar = () => { if (safeIndex < sortedKamars.length - 1) setCurrentKamarIndex(prev => prev + 1) }
+
+  // Draft Stats
+  const totalDraft = Object.keys(drafts).length
+  const totalNominalDraft = Object.values(drafts).reduce((a: any, b: any) => a + b.nominal, 0)
 
 
   // --- VIEW: LIST MONITORING ---
@@ -150,7 +208,7 @@ export default function SPPPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
         <div>
            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-             <CreditCard className="w-6 h-6 text-orange-600"/> Dashboard SPP
+             <CreditCard className="w-6 h-6 text-emerald-600"/> Dashboard SPP
            </h1>
            <p className="text-gray-500 text-sm">Monitoring pembayaran santri per kamar.</p>
         </div>
@@ -185,58 +243,48 @@ export default function SPPPage() {
             <input 
                 type="text" 
                 placeholder="Cari nama santri..." 
-                className="w-full pl-10 pr-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                className="w-full pl-10 pr-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
           
-          <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200 overflow-x-auto">
-             <Filter className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0"/>
-             
-             <button 
-               onClick={() => setFilterStatus('SEMUA')}
-               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'SEMUA' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:bg-gray-100'}`}
-             >
-               Semua
-             </button>
-             
-             <button 
-               onClick={() => setFilterStatus('SUDAH_BAYAR_INI')}
-               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'SUDAH_BAYAR_INI' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
-             >
-               Lunas {BULAN_LIST[currentMonthIdx - 1]}
-             </button>
-
-             <button 
-               onClick={() => setFilterStatus('NUNGGAK')}
-               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'NUNGGAK' ? 'bg-red-100 text-red-700 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
-             >
-               Menunggak
-             </button>
-
-             <button 
-               onClick={() => setFilterStatus('AMAN')}
-               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'AMAN' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
-             >
-               Lunas Total
-             </button>
+          <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200 overflow-x-auto scrollbar-hide">
+              <Filter className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0"/>
+              <button 
+                onClick={() => setFilterStatus('SEMUA')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'SEMUA' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:bg-gray-100'}`}
+              >
+                Semua
+              </button>
+              <button 
+                onClick={() => setFilterStatus('SUDAH_BAYAR_INI')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'SUDAH_BAYAR_INI' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
+              >
+                Lunas {BULAN_LIST[currentMonthIdx - 1]}
+              </button>
+              <button 
+                onClick={() => setFilterStatus('NUNGGAK')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterStatus === 'NUNGGAK' ? 'bg-red-100 text-red-700 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
+              >
+                Menunggak
+              </button>
           </div>
       </div>
 
       {/* NAVIGATION CONTROLS (ATAS) */}
       {!loadingList && sortedKamars.length > 0 && (
          <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
-            <button onClick={prevKamar} disabled={currentKamarIndex === 0} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
+            <button onClick={prevKamar} disabled={safeIndex === 0} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
                 <ChevronLeft className="w-6 h-6"/>
             </button>
             <div className="flex flex-col items-center">
                 <span className="text-xs text-gray-500 uppercase font-bold tracking-widest">Kamar Saat Ini</span>
-                <select value={currentKamarIndex} onChange={(e) => setCurrentKamarIndex(Number(e.target.value))} className="font-bold text-lg text-gray-800 text-center outline-none bg-transparent cursor-pointer">
+                <select value={safeIndex} onChange={(e) => setCurrentKamarIndex(Number(e.target.value))} className="font-bold text-lg text-gray-800 text-center outline-none bg-transparent cursor-pointer">
                     {sortedKamars.map((k, idx) => <option key={k} value={idx}>{k}</option>)}
                 </select>
             </div>
-            <button onClick={nextKamar} disabled={currentKamarIndex === sortedKamars.length - 1} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
+            <button onClick={nextKamar} disabled={safeIndex === sortedKamars.length - 1} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
                 <ChevronRight className="w-6 h-6"/>
             </button>
          </div>
@@ -249,77 +297,96 @@ export default function SPPPage() {
         <div className="text-center py-12 text-gray-400 border-2 border-dashed rounded-xl">Data tidak ditemukan untuk filter ini.</div>
       ) : (
         <div className="space-y-6">
-            {/* Hanya render kamar yang aktif */}
-            <div key={activeKamar} className="bg-white border rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="bg-gray-50 px-4 py-3 border-b font-bold text-gray-700 text-sm flex justify-between items-center">
                     <span className="text-lg">KAMAR {activeKamar}</span>
                     <span className="text-xs bg-white border px-2 py-1 rounded font-normal text-gray-500">{santriInKamar?.length || 0} Santri</span>
                 </div>
                 <div className="divide-y">
-                    {santriInKamar?.map((s: any) => (
-                        <div 
-                            key={s.id} 
-                            onClick={() => handleSelectSantri(s)}
-                            className="p-4 flex items-center justify-between hover:bg-orange-50 cursor-pointer group transition-colors"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-600 group-hover:bg-white group-hover:text-orange-600 border flex-shrink-0">
-                                    {s.nis.slice(-2)}
-                                </div>
-                                <div>
-                                    <p className="font-bold text-gray-800 text-sm">{s.nama_lengkap}</p>
-                                    <p className="text-xs text-gray-400">{s.nis}</p>
-                                </div>
-                            </div>
-                            
-                            <div className="text-right flex items-center gap-3">
-                                {/* Indikator Lunas Bulan Ini */}
-                                {isCurrentYear && (
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[10px] text-gray-400 uppercase font-bold">{BULAN_LIST[currentMonthIdx - 1]}</span>
-                                        {s.bulan_ini_lunas ? (
-                                            <span className="text-xs font-bold text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Lunas</span>
-                                        ) : (
-                                            <span className="text-xs font-bold text-gray-400">Belum</span>
-                                        )}
+                    {santriInKamar?.map((s: any) => {
+                        const isPaid = s.status_bayar === 'LUNAS' || s.bulan_ini_lunas // Handle different field names from action
+                        const isDraft = !!drafts[s.id]
+                        
+                        return (
+                            <div 
+                                key={s.id} 
+                                onClick={() => handleSelectSantri(s)}
+                                className={`p-4 flex items-center justify-between transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-gray-50'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-600 group-hover:bg-white group-hover:text-emerald-600 border flex-shrink-0">
+                                        {s.nis.slice(-2)}
                                     </div>
-                                )}
-
-                                {/* Indikator Tunggakan */}
-                                {s.jumlah_tunggakan > 0 ? (
-                                    <span className="px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold border border-red-200 whitespace-nowrap">
-                                        -{s.jumlah_tunggakan} Bln
-                                    </span>
-                                ) : (
-                                    isCurrentYear && s.bulan_ini_lunas && (
-                                        <span className="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold border border-green-200">
-                                            Aman
+                                    <div>
+                                        <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
+                                        <div className="flex gap-2 text-xs text-gray-400 items-center">
+                                            <span>{s.nis}</span>
+                                            {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="text-right">
+                                    {isCurrentYear && !isPaid ? (
+                                        <button 
+                                            onClick={(e) => toggleDraft(e, s)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1 transition-all ${
+                                                isDraft 
+                                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' 
+                                                  : 'bg-white text-gray-500 hover:border-emerald-500 hover:text-emerald-600'
+                                            }`}
+                                        >
+                                            {isDraft ? <><CheckCircle className="w-3 h-3"/> Siap Bayar</> : <><PlusCircle className="w-3 h-3"/> Bayar {BULAN_LIST[currentMonthIdx - 1]}</>}
+                                        </button>
+                                    ) : (
+                                        <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                                            <CheckCircle className="w-3 h-3"/> Lunas
                                         </span>
-                                    )
-                                )}
-                                <ArrowLeft className="w-4 h-4 text-gray-300 rotate-180 group-hover:text-orange-500 group-hover:translate-x-1 transition-all"/>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </div>
       )}
+
+      {/* FLOATING SAVE BUTTON */}
+      {totalDraft > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
+            <button 
+                onClick={handleSimpanBatch}
+                disabled={isSavingBatch}
+                className="w-full bg-slate-900 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-black transition-transform active:scale-95 disabled:opacity-70"
+            >
+                <div className="text-left">
+                    <p className="text-xs text-slate-400">{totalDraft} Santri Dipilih</p>
+                    <p className="text-xl font-bold text-emerald-400">Total: Rp {totalNominalDraft.toLocaleString('id-ID')}</p>
+                </div>
+                <div className="flex items-center gap-2 font-bold bg-white/10 px-4 py-2 rounded-lg">
+                    {isSavingBatch ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                    {isSavingBatch ? "Menyimpan..." : "SIMPAN"}
+                </div>
+            </button>
+        </div>
+      )}
+
     </div>
   )
 
-  // --- VIEW: PAYMENT FORM ---
+  // --- VIEW: PAYMENT FORM (DETAIL) ---
   if (view === 'PAYMENT') return (
     <div className="space-y-6 max-w-4xl mx-auto pb-20 animate-in slide-in-from-right-4">
        <div className="flex items-center gap-4 mb-6">
          <button onClick={handleBackToList} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ArrowLeft className="w-6 h-6 text-gray-600"/></button>
          <div>
             <h1 className="text-xl font-bold text-gray-800">Input Pembayaran</h1>
-            <p className="text-sm text-gray-500">Membayar untuk: <span className="font-bold text-orange-600">{selectedSantri.nama_lengkap}</span></p>
+            <p className="text-sm text-gray-500">Membayar untuk: <span className="font-bold text-emerald-600">{selectedSantri.nama_lengkap}</span></p>
          </div>
        </div>
 
-       {/* GRID BULAN (SAMA SEPERTI KODE LAMA) */}
+       {/* GRID BULAN */}
        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {BULAN_LIST.map((namaBulan, idx) => {
                 const bulanIndex = idx + 1
@@ -327,9 +394,9 @@ export default function SPPPage() {
                 const isSelected = selectedMonths.includes(bulanIndex)
                 
                 // Logic Warna
-                let style = "bg-white border-gray-200 text-gray-500 hover:border-orange-300"
+                let style = "bg-white border-gray-200 text-gray-500 hover:border-emerald-300"
                 if (dataBayar) style = "bg-green-100 border-green-500 text-green-800 cursor-default"
-                else if (isSelected) style = "bg-blue-600 text-white border-blue-600 shadow-md transform scale-105"
+                else if (isSelected) style = "bg-emerald-600 text-white border-emerald-600 shadow-md transform scale-105"
                 else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
                     style = "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" // Nunggak
                 }
@@ -365,7 +432,7 @@ export default function SPPPage() {
             })}
        </div>
 
-       {/* FOOTER BAYAR */}
+       {/* FOOTER BAYAR DETAIL */}
        {selectedMonths.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
             <button 

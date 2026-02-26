@@ -1,15 +1,42 @@
 'use server'
+
 import { createClient } from '@/lib/supabase/server'
 
-// 1. Data Utama (Biodata)
-export async function getProfilSantri(id: string) {
+// 1. Data Utama (Biodata + Foto + Info Kelas)
+// Fungsi ini menggabungkan 'getProfilSantri' lama dengan update foto/kelas baru
+export async function getSantriDetail(id: string) {
   const supabase = await createClient()
+  
   const { data, error } = await supabase
     .from('santri')
-    .select('*')
+    .select(`
+      *,
+      riwayat_pendidikan (
+        id,
+        status_riwayat,
+        kelas (
+           id, 
+           nama_kelas, 
+           marhalah (nama)
+        )
+      )
+    `)
     .eq('id', id)
     .single()
-  return { data, error }
+
+  if (error || !data) return null
+
+  // Cari kelas aktif untuk ditampilkan di header profil
+  const kelasAktif = data.riwayat_pendidikan?.find((r: any) => r.status_riwayat === 'aktif')?.kelas
+  
+  const infoKelas = kelasAktif 
+    ? `${kelasAktif.nama_kelas} (${kelasAktif.marhalah?.nama})` 
+    : 'Belum Masuk Kelas'
+
+  return {
+    ...data,
+    info_kelas: infoKelas
+  }
 }
 
 // 2. Data Akademik (Riwayat Kelas + Nilai per Semester)
@@ -67,7 +94,7 @@ export async function getRiwayatPerizinan(santriId: string) {
   return data || []
 }
 
-// 5. Data Keuangan / SPP (BARU)
+// 5. Data Keuangan / SPP
 export async function getRiwayatSPP(santriId: string) {
   const supabase = await createClient()
   const { data } = await supabase
@@ -77,4 +104,15 @@ export async function getRiwayatSPP(santriId: string) {
     .order('tahun', { ascending: false })
     .order('bulan', { ascending: false })
   return data || []
+}
+
+// 6. Data Tabungan (Tambahan dari fitur Uang Jajan)
+export async function getRiwayatTabungan(santriId: string) {
+    const supabase = await createClient()
+    const { data } = await supabase
+        .from('tabungan_log')
+        .select('*')
+        .eq('santri_id', santriId)
+        .order('created_at', { ascending: false })
+    return data || []
 }
