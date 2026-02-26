@@ -14,7 +14,7 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children, userRole, userEmail, userName }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false); // State Mobile
+  const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
   return (
     <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
@@ -26,7 +26,8 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
           isCollapsed ? "w-20" : "w-64"
         )}
       >
-        <div className="h-full w-full bg-gradient-to-b from-green-900 via-green-800 to-green-950 text-white">
+        {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
+        <div className="h-full w-full bg-slate-900 text-white">
            <Sidebar 
              userRole={userRole} 
              isCollapsed={isCollapsed} 
@@ -36,7 +37,6 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
       </div>
 
       {/* 1.5. SIDEBAR MOBILE (DRAWER) */}
-      {/* Overlay Gelap */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in"
@@ -47,15 +47,15 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
       {/* Drawer Sidebar */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-green-900 via-green-800 to-green-950 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
          <Sidebar 
             userRole={userRole} 
-            isCollapsed={false} // Di mobile selalu lebar
-            toggleSidebar={() => {}} // Tombol collapse tidak aktif di mobile
-            onMobileClose={() => setIsMobileOpen(false)} // Tutup saat link diklik
+            isCollapsed={false}
+            toggleSidebar={() => {}} 
+            onMobileClose={() => setIsMobileOpen(false)} 
          />
       </div>
 
@@ -66,14 +66,13 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
           isCollapsed ? "md:pl-20" : "md:pl-64"
         )}
       >
-        
         {/* HEADER */}
         <div className="sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm flex items-center px-4 md:px-6 transition-all">
           <div className="w-full">
             <Header 
                 userName={userName} 
                 userRole={userRole} 
-                onMenuClick={() => setIsMobileOpen(true)} // Buka menu mobile
+                onMenuClick={() => setIsMobileOpen(true)}
             />
           </div>
         </div>
