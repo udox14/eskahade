@@ -5,9 +5,10 @@ import { getRekapAlfaMingguan } from './actions'
 import { PemanggilanView } from './pemanggilan-view'
 import { useReactToPrint } from 'react-to-print'
 import { Printer, Search, Loader2, ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function CetakPemanggilanPage() {
+  const router = useRouter()
   const [tglRef, setTglRef] = useState(new Date().toISOString().split('T')[0])
   const [tglPanggil, setTglPanggil] = useState(new Date().toISOString().split('T')[0])
   
@@ -21,7 +22,6 @@ export default function CetakPemanggilanPage() {
     documentTitle: `Pemanggilan_Alfa_${tglRef}`,
   })
 
-  // Helper hitung periode
   const getWeekRange = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay(); 
@@ -41,12 +41,9 @@ export default function CetakPemanggilanPage() {
     setLoading(false)
   }
 
-  // --- LOGIC GROUPING DATA PER ASRAMA ---
   const groupedData = data.reduce((groups, item) => {
     const asrama = item.asrama || 'NON-ASRAMA';
-    if (!groups[asrama]) {
-      groups[asrama] = [];
-    }
+    if (!groups[asrama]) groups[asrama] = [];
     groups[asrama].push(item);
     return groups;
   }, {} as Record<string, any[]>);
@@ -57,9 +54,10 @@ export default function CetakPemanggilanPage() {
     <div className="space-y-6">
       {/* HEADER NO-PRINT */}
       <div className="flex items-center gap-4 print:hidden">
-        <Link href="/dashboard/akademik/absensi" className="p-2 hover:bg-gray-100 rounded-full">
+        {/* FIX: Ganti Link href ke button router.back() */}
+        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Cetak Pemanggilan Alfa</h1>
           <p className="text-gray-500 text-sm">Rekap santri yang alfa dalam satu pekan pengajian.</p>
@@ -118,16 +116,14 @@ export default function CetakPemanggilanPage() {
         ) : data.length === 0 ? (
            <div className="text-center text-gray-400 py-20">Tidak ada data alfa pada periode ini.</div>
         ) : (
-          /* AREA CETAK */
           <div ref={printRef}>
-            {/* Loop setiap Asrama menjadi halaman terpisah */}
-            {sortedAsramaKeys.map((asrama, idx) => (
+            {sortedAsramaKeys.map((asrama) => (
               <div key={asrama} style={{ pageBreakAfter: 'always' }} className="mb-8 last:mb-0 print:mb-0">
                 <PemanggilanView 
                   data={groupedData[asrama]} 
                   periode={periode} 
                   tglPanggil={new Date(tglPanggil)}
-                  namaAsrama={asrama} // Pass nama asrama ke view
+                  namaAsrama={asrama}
                 />
               </div>
             ))}

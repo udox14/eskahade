@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 export async function getMarhalahList() {
   const supabase = await createClient()
   const { data } = await supabase.from('marhalah').select('*').order('urutan')
-  return data || []
+  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 // 2. Ambil Daftar Kelas & Guru Terplot (Filtered)
@@ -25,7 +25,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
       guru_ashar:guru_ashar_id(id, nama_lengkap),
       guru_maghrib:guru_maghrib_id(id, nama_lengkap)
     `)
-    .order('nama_kelas')
+    .order('id')
 
   // Filter by Marhalah
   if (marhalahId) {
@@ -56,7 +56,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
   })
 
   return {
-    list: kelasList,
+    list: (kelasList || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })),
     absensi: absensiMap
   }
 }

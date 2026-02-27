@@ -7,7 +7,8 @@ import { revalidatePath } from 'next/cache'
 export async function getReferensiData() {
   const supabase = await createClient()
   const { data: mapel } = await supabase.from('mapel').select('id, nama').eq('aktif', true).order('nama')
-  const { data: kelas } = await supabase.from('kelas').select('id, nama_kelas, marhalah(nama)').order('nama_kelas')
+  const { data: kelasRaw } = await supabase.from('kelas').select('id, nama_kelas, marhalah(nama)')
+  const kelas = (kelasRaw || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
   return { mapel, kelas }
 }
 

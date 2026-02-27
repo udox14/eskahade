@@ -107,3 +107,93 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
   revalidatePath('/dashboard/santri')
   return { success: true, count: inserted?.length || 0 }
 }
+// ============================================================
+// Tambah santri satu per satu via formulir
+// ============================================================
+export async function tambahSantriSatuSatu(data: {
+  nis: string
+  nama_lengkap: string
+  nik?: string
+  jenis_kelamin: 'L' | 'P'
+  tempat_lahir?: string
+  tanggal_lahir?: string
+  nama_ayah?: string
+  nama_ibu?: string
+  alamat?: string
+  sekolah?: string
+  kelas_sekolah?: string
+  asrama?: string
+  kamar?: string
+  kelas_pesantren?: string
+}) {
+  const supabase = await createClient()
+
+  const { nis, nama_lengkap, kelas_pesantren, ...rest } = data
+
+  if (!nis || !nama_lengkap) return { error: "NIS dan Nama wajib diisi." }
+
+  // Cek duplikat NIS
+  const { data: existing } = await supabase
+    .from('santri')
+    .select('id')
+    .eq('nis', nis.trim())
+    .maybeSingle()
+
+  if (existing) return { error: `NIS ${nis} sudah terdaftar di database.` }
+
+  // Insert santri
+  const { data: inserted, error } = await supabase
+    .from('santri')
+    .insert({
+      nis: nis.trim(),
+      nama_lengkap: nama_lengkap.trim(),
+      nik: rest.nik?.trim() || null,
+      jenis_kelamin: rest.jenis_kelamin,
+      tempat_lahir: rest.tempat_lahir?.trim() || null,
+      tanggal_lahir: rest.tanggal_lahir || null,
+      nama_ayah: rest.nama_ayah?.trim() || null,
+      nama_ibu: rest.nama_ibu?.trim() || null,
+      alamat: rest.alamat?.trim() || null,
+      sekolah: rest.sekolah?.toUpperCase().trim() || null,
+      kelas_sekolah: rest.kelas_sekolah?.trim() || null,
+      asrama: rest.asrama?.toUpperCase().trim() || null,
+      kamar: rest.kamar?.trim() || null,
+      status_global: 'aktif'
+    })
+    .select('id')
+    .single()
+
+  if (error || !inserted) {
+    return { error: error?.message || "Gagal menyimpan santri." }
+  }
+
+  // Kalau ada kelas pesantren, insert ke riwayat_pendidikan
+  if (kelas_pesantren?.trim()) {
+    const { data: kelasData } = await supabase
+      .from('kelas')
+      .select('id')
+      .ilike('nama_kelas', kelas_pesantren.trim())
+      .maybeSingle()
+
+    if (kelasData) {
+      await supabase.from('riwayat_pendidikan').insert({
+        santri_id: inserted.id,
+        kelas_id: kelasData.id,
+        status_riwayat: 'aktif'
+      })
+    }
+  }
+
+  revalidatePath('/dashboard/santri')
+  return { success: true }
+}
+
+// Ambil daftar kelas untuk dropdown formulir
+export async function getKelasList() {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('kelas')
+    .select('id, nama_kelas')
+
+  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+}

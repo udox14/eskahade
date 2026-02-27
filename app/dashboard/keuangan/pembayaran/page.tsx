@@ -50,6 +50,33 @@ export default function LoketPembayaranPage() {
     setLoadingInfo(false)
   }
 
+  // ============================================================
+  // FIX TOMBOL BACK HP: Sync view ke browser history
+  // ============================================================
+  useEffect(() => {
+    if (selectedSantri) {
+      // Saat santri dipilih (masuk view detail), push state baru ke history browser
+      window.history.pushState({ view: 'DETAIL' }, '')
+    }
+  }, [selectedSantri])
+
+  useEffect(() => {
+    // Tangkap event tombol back HP/browser
+    const handlePopState = (e: PopStateEvent) => {
+      if (!e.state || e.state.view !== 'DETAIL') {
+        // Kembali ke list
+        setSelectedSantri(null)
+        setInfoTagihan(null)
+        setNominalCicil('')
+        loadMonitoring()
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+  // ============================================================
+
   // --- HANDLERS ---
 
   const handleSelect = (s: any) => {
@@ -142,8 +169,8 @@ export default function LoketPembayaranPage() {
   }
 
   const handleBackToList = () => {
-    setSelectedSantri(null)
-    loadMonitoring() // Refresh monitoring list to update statuses
+    // Gunakan history.back() agar konsisten dengan tombol back HP
+    window.history.back()
   }
 
   return (
@@ -280,7 +307,7 @@ export default function LoketPembayaranPage() {
             </div>
          </div>
       ) : (
-         /* VIEW 2: FORM PEMBAYARAN DETAIL (DETAIL) */
+         /* VIEW 2: FORM PEMBAYARAN DETAIL */
          <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
             
             {/* Tombol Kembali */}
@@ -343,7 +370,6 @@ export default function LoketPembayaranPage() {
 
                             {infoTagihan.bangunan.sisa > 0 ? (
                                 <div className="space-y-2">
-                                    {/* Input Cicilan */}
                                     <div className="flex gap-2">
                                         <input 
                                             type="number" 
@@ -361,7 +387,6 @@ export default function LoketPembayaranPage() {
                                         </button>
                                     </div>
                                     
-                                    {/* Tombol Lunas Langsung */}
                                     <button 
                                         onClick={handleLunasBangunan}
                                         disabled={isProcessing}

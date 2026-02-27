@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { cariSantri, simpanPelanggaran, getMasterPelanggaran } from '../actions'
 import { Search, Save, User, ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react'
-import Link from 'next/link'
 
 export default function InputPelanggaranPage() {
   const router = useRouter()
@@ -16,30 +15,22 @@ export default function InputPelanggaranPage() {
   
   // State Master Data
   const [masterList, setMasterList] = useState<any[]>([])
-  const [kategoriList, setKategoriList] = useState<string[]>([]) // List Kategori Unik
+  const [kategoriList, setKategoriList] = useState<string[]>([])
   const [selectedKategori, setSelectedKategori] = useState('')
   const [selectedMasterId, setSelectedMasterId] = useState('')
   
   const [loading, setLoading] = useState(false)
 
-  // Load Master Data & Ekstrak Kategori Unik
   useEffect(() => {
     getMasterPelanggaran().then(data => {
       setMasterList(data)
-      
-      // Ambil list kategori unik (RINGAN, SEDANG, BERAT, dll)
       const unik = Array.from(new Set(data.map((m: any) => m.kategori)))
       setKategoriList(unik as string[])
-      
-      // Default pilih kategori pertama jika ada
       if (unik.length > 0) setSelectedKategori(unik[0] as string)
     })
   }, [])
 
-  // Filter jenis pelanggaran sesuai kategori yang dipilih user
   const filteredJenis = masterList.filter(m => m.kategori === selectedKategori)
-
-  // Cari point untuk preview
   const selectedItem = masterList.find(m => String(m.id) === selectedMasterId)
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -67,16 +58,18 @@ export default function InputPelanggaranPage() {
       alert("Gagal: " + res.error)
     } else {
       alert("Pelanggaran berhasil dicatat.")
-      router.push('/dashboard/keamanan')
+      // FIX: Ganti router.push ke router.back()
+      router.back()
     }
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/keamanan" className="p-2 hover:bg-gray-100 rounded-full">
+        {/* FIX: Ganti Link href ke button router.back() */}
+        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Input Pelanggaran</h1>
           <p className="text-gray-500 text-sm">Pilih jenis pelanggaran dari daftar master.</p>
@@ -151,7 +144,6 @@ export default function InputPelanggaranPage() {
                 />
               </div>
               
-              {/* DROPDOWN 1: KATEGORI DINAMIS */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
                 <select 
@@ -169,7 +161,6 @@ export default function InputPelanggaranPage() {
               </div>
             </div>
 
-            {/* DROPDOWN 2: JENIS SPESIFIK */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Pelanggaran</label>
               <select 

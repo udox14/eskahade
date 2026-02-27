@@ -216,7 +216,7 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
               <option value="">-- Pilih Kelas --</option>
               {kelasList.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {k.nama_kelas} ({k.marhalah?.nama})
+                  {k.nama_kelas}
                 </option>
               ))}
             </select>

@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { getAntrianTelat, simpanVonisTelat } from './actions'
 import { AlertTriangle, ArrowLeft, Loader2, Clock, CheckCircle, Gavel } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner'
 
 export default function VerifikasiTelatPage() {
+  const router = useRouter()
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -44,9 +45,10 @@ export default function VerifikasiTelatPage() {
       
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/keamanan/perizinan" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+        {/* FIX: Ganti Link href ke button router.back() */}
+        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Verifikasi Keterlambatan</h1>
           <p className="text-gray-500 text-sm">Sidang santri yang terlambat kembali.</p>

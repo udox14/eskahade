@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getKelasForCetak, getDataBlanko, getMarhalahForCetak, getDataBlankoMassal } from './actions'
 import { Printer, Loader2, Search, FileText, Layers, List } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { useReactToPrint } from 'react-to-print'
 
 // --- KOMPONEN KERTAS ABSENSI (REUSABLE) ---
 function BlankoSheet({ data }: { data: any }) {
@@ -137,6 +138,12 @@ export default function CetakBlankoPage() {
   const [singleData, setSingleData] = useState<any>(null)
   const [massalData, setMassalData] = useState<any[] | null>(null)
 
+  const printRef = useRef<HTMLDivElement>(null)
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: 'Blanko Absensi'
+  })
+
   useEffect(() => {
     getKelasForCetak().then(setKelasList)
     getMarhalahForCetak().then(setMarhalahList)
@@ -164,8 +171,6 @@ export default function CetakBlankoPage() {
     }
     setLoading(false)
   }
-
-  const handlePrint = () => window.print()
 
   const hasData = singleData || (massalData && massalData.length > 0)
 
@@ -255,7 +260,7 @@ export default function CetakBlankoPage() {
                  </button>
                  
                  {hasData && (
-                     <button onClick={handlePrint} className="flex-1 bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow hover:bg-green-700 flex items-center justify-center gap-2">
+                     <button onClick={() => handlePrint()} className="flex-1 bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow hover:bg-green-700 flex items-center justify-center gap-2">
                          <Printer className="w-4 h-4"/> Cetak
                      </button>
                  )}
@@ -264,7 +269,7 @@ export default function CetakBlankoPage() {
       </div>
 
       {/* RENDER AREA */}
-      <div>
+      <div ref={printRef}>
           {mode === 'SATUAN' && singleData && <BlankoSheet data={singleData} />}
           
           {mode === 'MASSAL' && massalData && (

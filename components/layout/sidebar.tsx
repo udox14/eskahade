@@ -5,85 +5,85 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette
+  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// --- KONFIGURASI TEMA (PALET WARNA) ---
+// --- KONFIGURASI TEMA (PALET WARNA PREMIUM) ---
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
 const THEME_COLORS: Record<ThemeKey, any> = {
   emerald: {
-    bg: "bg-gradient-to-b from-emerald-900 via-emerald-800 to-emerald-950",
-    toggleBtn: "bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]",
-    glowText: "text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]",
-    activeText: "text-emerald-300",
-    activeBg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/5",
+    bg: "bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950",
+    toggleBtn: "bg-emerald-900 border-emerald-500/30 text-emerald-400 hover:bg-emerald-700 hover:text-emerald-100 hover:border-emerald-400",
+    glowText: "text-emerald-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
     activeBorder: "border-emerald-400",
-    hoverBg: "hover:bg-white/10",
-    mutedText: "text-emerald-100/70",
-    folderActiveBg: "bg-gradient-to-br from-emerald-500/30 to-emerald-500/10 border-emerald-500/30",
-    folderOpenBg: "border-emerald-500/50",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-emerald-100/60",
+    folderActiveBg: "bg-black/20 border-emerald-500/20",
+    folderOpenBg: "border-emerald-500/30",
     indicator: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    glowBg: "bg-emerald-400/20"
+    glowBg: "bg-emerald-400/10"
   },
   blue: {
-    bg: "bg-gradient-to-b from-blue-900 via-blue-800 to-slate-900",
-    toggleBtn: "bg-blue-500 hover:bg-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.4)]",
-    glowText: "text-blue-300 drop-shadow-[0_0_8px_rgba(96,165,250,0.6)]",
-    activeText: "text-blue-300",
-    activeBg: "bg-gradient-to-r from-blue-500/20 to-blue-400/5",
+    bg: "bg-gradient-to-b from-blue-950 via-blue-900 to-slate-950",
+    toggleBtn: "bg-blue-900 border-blue-500/30 text-blue-400 hover:bg-blue-700 hover:text-blue-100 hover:border-blue-400",
+    glowText: "text-blue-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
     activeBorder: "border-blue-400",
-    hoverBg: "hover:bg-white/10",
-    mutedText: "text-blue-100/70",
-    folderActiveBg: "bg-gradient-to-br from-blue-500/30 to-blue-500/10 border-blue-500/30",
-    folderOpenBg: "border-blue-500/50",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-blue-100/60",
+    folderActiveBg: "bg-black/20 border-blue-500/20",
+    folderOpenBg: "border-blue-500/30",
     indicator: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
-    glowBg: "bg-blue-400/20"
+    glowBg: "bg-blue-400/10"
   },
   purple: {
-    bg: "bg-gradient-to-b from-purple-900 via-purple-800 to-slate-900",
-    toggleBtn: "bg-purple-500 hover:bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)]",
-    glowText: "text-purple-300 drop-shadow-[0_0_8px_rgba(192,132,252,0.6)]",
-    activeText: "text-purple-300",
-    activeBg: "bg-gradient-to-r from-purple-500/20 to-purple-400/5",
+    bg: "bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950",
+    toggleBtn: "bg-purple-900 border-purple-500/30 text-purple-400 hover:bg-purple-700 hover:text-purple-100 hover:border-purple-400",
+    glowText: "text-purple-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
     activeBorder: "border-purple-400",
-    hoverBg: "hover:bg-white/10",
-    mutedText: "text-purple-100/70",
-    folderActiveBg: "bg-gradient-to-br from-purple-500/30 to-purple-500/10 border-purple-500/30",
-    folderOpenBg: "border-purple-500/50",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-purple-100/60",
+    folderActiveBg: "bg-black/20 border-purple-500/20",
+    folderOpenBg: "border-purple-500/30",
     indicator: "bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)]",
-    glowBg: "bg-purple-400/20"
+    glowBg: "bg-purple-400/10"
   },
   rose: {
-    bg: "bg-gradient-to-b from-rose-900 via-rose-800 to-slate-900",
-    toggleBtn: "bg-rose-500 hover:bg-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)]",
-    glowText: "text-rose-300 drop-shadow-[0_0_8px_rgba(251,113,133,0.6)]",
-    activeText: "text-rose-300",
-    activeBg: "bg-gradient-to-r from-rose-500/20 to-rose-400/5",
+    bg: "bg-gradient-to-b from-rose-950 via-rose-900 to-slate-950",
+    toggleBtn: "bg-rose-900 border-rose-500/30 text-rose-400 hover:bg-rose-700 hover:text-rose-100 hover:border-rose-400",
+    glowText: "text-rose-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
     activeBorder: "border-rose-400",
-    hoverBg: "hover:bg-white/10",
-    mutedText: "text-rose-100/70",
-    folderActiveBg: "bg-gradient-to-br from-rose-500/30 to-rose-500/10 border-rose-500/30",
-    folderOpenBg: "border-rose-500/50",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-rose-100/60",
+    folderActiveBg: "bg-black/20 border-rose-500/20",
+    folderOpenBg: "border-rose-500/30",
     indicator: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]",
-    glowBg: "bg-rose-400/20"
+    glowBg: "bg-rose-400/10"
   },
   slate: {
-    bg: "bg-gradient-to-b from-slate-900 via-slate-800 to-black",
-    toggleBtn: "bg-slate-500 hover:bg-slate-400 shadow-[0_0_15px_rgba(100,116,139,0.4)]",
-    glowText: "text-slate-300 drop-shadow-[0_0_8px_rgba(148,163,184,0.6)]",
-    activeText: "text-slate-300",
-    activeBg: "bg-gradient-to-r from-slate-500/20 to-slate-400/5",
+    bg: "bg-gradient-to-b from-slate-950 via-slate-900 to-black",
+    toggleBtn: "bg-slate-900 border-slate-500/30 text-slate-400 hover:bg-slate-800 hover:text-slate-100 hover:border-slate-400",
+    glowText: "text-slate-300",
+    activeText: "text-white",
+    activeBg: "bg-black/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]",
     activeBorder: "border-slate-400",
-    hoverBg: "hover:bg-white/10",
-    mutedText: "text-slate-300/70",
-    folderActiveBg: "bg-gradient-to-br from-slate-500/30 to-slate-500/10 border-slate-500/30",
-    folderOpenBg: "border-slate-500/50",
+    hoverBg: "hover:bg-white/5",
+    mutedText: "text-slate-400",
+    folderActiveBg: "bg-black/30 border-slate-500/20",
+    folderOpenBg: "border-slate-500/30",
     indicator: "bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.8)]",
-    glowBg: "bg-slate-400/20"
+    glowBg: "bg-slate-400/10"
   }
 };
 
@@ -135,6 +135,7 @@ const menuNodes: MenuNode[] = [
       { title: "Layanan Surat", href: "/dashboard/dewan-santri/surat", icon: Mail, roles: ['admin', 'dewan_santri'] },
       { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama'] },
       { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
+      { title: "Katering & Laundry", href: "/dashboard/asrama/layanan", icon: Utensils, roles: ['admin', 'dewan_santri', 'pengurus_asrama'] },
       { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
       { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'keamanan'] },
       { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
@@ -148,7 +149,8 @@ const menuNodes: MenuNode[] = [
     items: [
       { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
       { title: "Penempatan Kelas", href: "/dashboard/santri/atur-kelas", icon: UserPlus, roles: ['admin', 'sekpen'] },
-      { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Grading Ilmu Alat", href: "/dashboard/akademik/grading", icon: BarChart3, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen'] },
     ]
   },
   {
@@ -209,6 +211,7 @@ const menuNodes: MenuNode[] = [
       { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin'] },
       { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin'] },
       { title: "Master Pelanggaran", href: "/dashboard/master/pelanggaran", icon: Settings, roles: ['admin'] },
+      { title: "Arsip Alumni", href: "/dashboard/santri/arsip", icon: Archive, roles: ['admin'] },
     ]
   }
 ];
@@ -226,7 +229,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   const [activeRole, setActiveRole] = useState<string>(userRole);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // STATE TEMA (Dimulai dari emerald, lalu load dari local storage)
+  // STATE TEMA
   const [theme, setTheme] = useState<ThemeKey>('emerald');
   const [mounted, setMounted] = useState(false);
 
@@ -289,10 +292,14 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
       
-      {/* Tombol Toggle (Hanya Desktop) */}
+      {/* Tombol Toggle */}
       <button 
         onClick={toggleSidebar}
-        className={cn("absolute -right-3 top-20 text-white p-1.5 rounded-full border-4 border-slate-50 transition-all duration-300 z-50 hidden md:flex", c.toggleBtn)}
+        className={cn(
+          "absolute -right-3 top-24 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5", 
+          c.toggleBtn
+        )}
+        title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
       >
         {isCollapsed ? <ChevronRight size={14} className="ml-0.5" /> : <ChevronLeft size={14} className="mr-0.5" />}
       </button>
@@ -302,28 +309,26 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-20" : "h-28 gap-3"
       )}>
-        {/* Subtle background glow di belakang logo */}
+        {/* Subtle background glow */}
         <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 blur-[30px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
         
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" title="Pondok Pesantren Sukahideng" />
+          <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
              <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-xl relative z-10" />
             <div className="flex flex-col min-w-0 justify-center relative z-10">
-              <span className={cn("text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 transition-colors duration-300", c.activeText)}>Pondok Pesantren</span>
-              {/* Teks SUKAHIDENG tanpa truncate agar tidak jadi titik-titik */}
+              <span className={cn("text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
               <h1 className="text-xl font-black font-serif text-white tracking-wide leading-none drop-shadow-md">SUKAHIDENG</h1>
             </div>
           </>
         )}
       </div>
 
-      {/* MENU ITEMS (LINKS & FOLDERS) */}
+      {/* MENU ITEMS */}
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {menuNodes.map((node, idx) => {
           
-          // --- RENDER UNTUK DIRECT LINK (Dashboard / Data Santri) ---
           if (!node.isGroup) {
             if (!node.roles?.includes(currentRole as Role)) return null;
             
@@ -337,21 +342,20 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                     "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
                     isCollapsed ? "justify-center p-3 mb-2" : "justify-start px-4 py-3.5 mb-1",
                     isActive 
-                      ? `${c.activeBg} text-white shadow-lg ${c.shadow} border-l-4 ${c.activeBorder}` 
-                      : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 hover:shadow-md border-l-4 border-transparent`
+                      ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}` 
+                      : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
                   )}
-                  title={isCollapsed ? node.title : undefined}
                 >
                   <div className="flex items-center space-x-3">
                     <node.icon className={cn(
                       "flex-shrink-0 transition-all duration-300",
                       isCollapsed ? "w-6 h-6" : "w-5 h-5",
-                      isActive ? c.glowText : `${c.mutedText} group-hover:${c.activeText}`
+                      isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
                     )} />
                     {!isCollapsed && (
                       <span className={cn(
-                        "font-bold text-sm tracking-wide transition-colors duration-300", 
-                        isActive ? "text-white" : `${c.mutedHoverText} group-hover:text-white`
+                        "text-sm tracking-wide transition-colors duration-300", 
+                        isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
                       )}>
                         {node.title}
                       </span>
@@ -362,7 +366,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
             )
           }
 
-          // --- RENDER UNTUK FOLDER ACCORDION ---
           const allowedItems = node.items!.filter(item => item.roles.includes(currentRole as any));
           if (allowedItems.length === 0) return null;
 
@@ -372,33 +375,29 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
           return (
             <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
               
-              {/* FOLDER HEADER (Tombol) */}
               <button
                 onClick={() => toggleFolder(node.title)}
                 className={cn(
                   "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
                   isCollapsed ? "justify-center p-3 mb-2" : "justify-between px-4 py-3.5 mb-1",
-                  
-                  // Pewarnaan state Aktif / Hover
                   hasActiveChild && !isOpen && isCollapsed 
                     ? `${c.folderActiveBg} text-white shadow-lg border` 
                     : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1`,
                   isOpen && !isCollapsed 
-                    ? `bg-black/20 text-white shadow-inner border-l-2 ${c.folderOpenBg}` 
+                    ? `bg-black/20 text-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] border-l-2 ${c.folderOpenBg}` 
                     : "border-l-2 border-transparent"
                 )}
-                title={isCollapsed ? node.title : undefined}
               >
                 <div className="flex items-center space-x-3">
                   <node.icon className={cn(
                     "flex-shrink-0 transition-all duration-300",
                     isCollapsed ? "w-6 h-6" : "w-5 h-5",
-                    hasActiveChild ? c.glowText : `opacity-60 group-hover:${c.activeText} group-hover:opacity-100`
+                    hasActiveChild ? c.glowText : `opacity-80 group-hover:text-white group-hover:opacity-100`
                   )} />
                   {!isCollapsed && (
                     <span className={cn(
-                      "font-bold text-sm tracking-wide transition-colors", 
-                      hasActiveChild || isOpen ? "text-white" : `${c.mutedHoverText} group-hover:text-white`
+                      "font-semibold text-sm tracking-wide transition-colors", 
+                      hasActiveChild || isOpen ? "text-white" : `${c.mutedText} group-hover:text-white`
                     )}>
                       {node.title}
                     </span>
@@ -407,7 +406,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                 {!isCollapsed && (
                   <div className={cn(
                     "transition-transform duration-300", 
-                    hasActiveChild ? c.activeText : `opacity-40 group-hover:${c.activeText} group-hover:opacity-100`,
+                    hasActiveChild ? c.activeText : `opacity-40 group-hover:text-white group-hover:opacity-100`,
                     isOpen ? "rotate-180" : "rotate-0"
                   )}>
                     <ChevronDown size={16} />
@@ -415,7 +414,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                 )}
               </button>
 
-              {/* FOLDER ITEMS (Anak Menu) */}
               {!isCollapsed && (
                 <div className={cn(
                     "overflow-hidden transition-all duration-300 ease-in-out",
@@ -431,10 +429,10 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                           href={item.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center pl-7 pr-4 py-2.5 rounded-r-xl text-sm font-medium transition-all duration-300 relative group overflow-hidden",
+                            "flex items-center pl-7 pr-4 py-2.5 rounded-r-xl text-sm transition-all duration-300 relative group overflow-hidden",
                             isActive
-                              ? `text-white ${c.activeBg} shadow-sm before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${c.indicator}`
-                              : `${c.mutedText} hover:text-white ${c.hoverBg} hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-white/20 before:rounded-full hover:before:bg-white/60`
+                              ? `text-white ${c.activeBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${c.indicator}`
+                              : `${c.mutedText} hover:text-white ${c.hoverBg} font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-white/20 before:rounded-full hover:before:bg-white/60`
                           )}
                         >
                           <item.icon className={cn(
@@ -459,13 +457,11 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         <div className="p-4 border-t border-white/10 shrink-0 bg-black/20 backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
           
-          {/* THEME PICKER */}
           <div className="flex items-center justify-center gap-2 mb-4 relative z-10">
               <Palette className="w-4 h-4 text-white/40 mr-1"/>
               {Object.keys(THEME_COLORS).map(t => (
                   <button
                       key={t}
-                      title={`Tema ${t}`}
                       onClick={() => changeTheme(t as ThemeKey)}
                       className={cn(
                           "w-4 h-4 rounded-full border-2 transition-all duration-300",
@@ -489,8 +485,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
             <button 
               onClick={checkRole} 
               disabled={isRefreshing}
-              className={cn("bg-white/5 hover:bg-white/10 p-2.5 rounded-full border border-white/10 transition-all duration-300 hover:shadow-lg active:scale-90", c.activeText)}
-              title="Refresh Hak Akses"
+              className={cn("bg-white/5 hover:bg-white/10 p-2.5 rounded-full border border-white/10 transition-all duration-300 hover:shadow-lg active:scale-90", c.glowText)}
             >
               <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
             </button>
