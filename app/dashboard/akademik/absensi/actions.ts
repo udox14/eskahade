@@ -48,27 +48,48 @@ export async function simpanAbsensi(dataInput: any[]) {
   if (!user) return { error: "Unauthorized" }
 
   const upsertData: any[] = []
+  // Baris yang semua H → hapus dari DB (tidak perlu disimpan, default = hadir)
+  const deleteKeys: { riwayat_id: string, tanggal: string }[] = []
 
   for (const item of dataInput) {
-    upsertData.push({
-      riwayat_pendidikan_id: item.riwayat_id,
-      tanggal: item.tanggal,
-      shubuh: item.shubuh || 'H',
-      ashar: item.ashar || 'H',
-      maghrib: item.maghrib || 'H',
-      created_by: user.id,
-      // Reset verifikasi jika status berubah (biar aman)
-      // Tapi kita biarkan null dulu biar logic verifikasi yang handle
-    })
+    const s = item.shubuh || 'H'
+    const a = item.ashar || 'H'
+    const m = item.maghrib || 'H'
+
+    if (s === 'H' && a === 'H' && m === 'H') {
+      // Semua hadir → tidak perlu baris di DB, hapus kalau ada
+      deleteKeys.push({ riwayat_id: item.riwayat_id, tanggal: item.tanggal })
+    } else {
+      upsertData.push({
+        riwayat_pendidikan_id: item.riwayat_id,
+        tanggal: item.tanggal,
+        shubuh: s,
+        ashar: a,
+        maghrib: m,
+        created_by: user.id,
+      })
+    }
   }
 
-  const { error } = await supabase
-    .from('absensi_harian')
-    .upsert(upsertData, { onConflict: 'riwayat_pendidikan_id, tanggal' })
+  // Hapus baris yang sekarang semua H (mungkin dulu dikoreksi dari alfa/sakit)
+  for (const key of deleteKeys) {
+    await supabase
+      .from('absensi_harian')
+      .delete()
+      .eq('riwayat_pendidikan_id', key.riwayat_id)
+      .eq('tanggal', key.tanggal)
+  }
 
-  if (error) {
-    console.error("Error Absen:", error)
-    return { error: error.message }
+  // Upsert hanya yang ada ketidakhadiran
+  if (upsertData.length > 0) {
+    const { error } = await supabase
+      .from('absensi_harian')
+      .upsert(upsertData, { onConflict: 'riwayat_pendidikan_id, tanggal' })
+
+    if (error) {
+      console.error("Error Absen:", error)
+      return { error: error.message }
+    }
   }
 
   revalidatePath('/dashboard/akademik/absensi')
@@ -77,6 +98,7 @@ export async function simpanAbsensi(dataInput: any[]) {
 
 export async function getKelasList() {
   const supabase = await createClient()
-  const { data } = await supabase.from('kelas').select('id, nama_kelas').order('nama_kelas')
-  return data || []
+  const { data } = await supabase.from('kelas').select('id, nama_kelas')
+  const sorted = (data || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  return sorted
 }

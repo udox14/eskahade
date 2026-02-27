@@ -176,12 +176,17 @@ export default function AbsensiPage() {
       days.forEach(day => {
         const dayData = santriGrid[day.dateStr]
         if (dayData) {
+          const s_ = dayData.shubuh || 'H'
+          const a_ = dayData.ashar  || 'H'
+          const m_ = dayData.maghrib || 'H'
+          // Selalu kirim ke server — biar server yang putuskan upsert atau delete
+          // (termasuk baris semua H agar bisa hapus data lama yang salah input)
           payload.push({
             riwayat_id: s.id,
             tanggal: day.dateStr,
-            shubuh: dayData.shubuh,
-            ashar: dayData.ashar,
-            maghrib: dayData.maghrib
+            shubuh: s_,
+            ashar: a_,
+            maghrib: m_
           })
         }
       })
