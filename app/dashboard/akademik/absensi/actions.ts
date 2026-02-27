@@ -77,6 +77,7 @@ export async function simpanAbsensi(dataInput: any[]) {
 
 export async function getKelasList() {
   const supabase = await createClient()
-  const { data } = await supabase.from('kelas').select('id, nama_kelas').order('nama_kelas')
-  return data || []
+  const { data } = await supabase.from('kelas').select('id, nama_kelas')
+  const sorted = (data || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  return sorted
 }

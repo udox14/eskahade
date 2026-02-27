@@ -7,11 +7,11 @@ import { revalidatePath } from 'next/cache'
 export async function getSantriBaru(search: string = '') {
   const supabase = await createClient()
 
-  // Ambil santri yang statusnya aktif
+  // Ambil santri yang statusnya aktif + kolom asrama dan kamar
   let query = supabase
     .from('santri')
     .select(`
-      id, nis, nama_lengkap, jenis_kelamin,
+      id, nis, nama_lengkap, jenis_kelamin, asrama, kamar,
       hasil_tes_klasifikasi (
         id, rekomendasi_marhalah, catatan_grade, hari_tes, sesi_tes
       ),
@@ -53,6 +53,8 @@ export async function getSantriBaru(search: string = '') {
         nis: s.nis,
         nama: s.nama_lengkap,
         jk: s.jenis_kelamin,
+        asrama: s.asrama, 
+        kamar: s.kamar,
         // Cek keberadaan objek hasilData untuk tentukan status
         status_tes: hasilData ? 'SUDAH' : 'BELUM',
         hasil: hasilData || null

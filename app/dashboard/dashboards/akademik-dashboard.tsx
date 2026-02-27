@@ -25,7 +25,7 @@ export async function AkademikDashboard({ role }: { role: string }) {
         const mData = kelas.marhalah as any
         const namaMarhalah = Array.isArray(mData) ? mData[0]?.nama : mData?.nama
         
-        namaKelas = `${kelas.nama_kelas} (${namaMarhalah || '?'})`
+        namaKelas = kelas.nama_kelas
         
         const { count } = await supabase
           .from('riwayat_pendidikan')

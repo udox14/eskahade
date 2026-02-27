@@ -1,136 +1,106 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
 
-// Helper: Tentukan Predikat
-function getPredikat(rataRata: number) {
-  if (rataRata >= 86) return 'Mumtaz'
-  if (rataRata >= 76) return 'Jayyid Jiddan'
-  if (rataRata >= 66) return 'Jayyid'
-  if (rataRata >= 56) return 'Maqbul'
-  return 'Dhoif'
-}
-
-// 1. Ambil Data Ranking yang Sudah Ada
-export async function getDataRanking(kelasId: string, semester: number) {
+export async function getJuaraUmum(semester: number) {
   const supabase = await createClient()
-  
-  // STEP 1: Ambil ID semua santri di kelas ini
-  const { data: santriKelas } = await supabase
-    .from('riwayat_pendidikan')
-    .select('id, santri(nama_lengkap, nis)')
-    .eq('kelas_id', kelasId)
-    .eq('status_riwayat', 'aktif')
-    .order('santri(nama_lengkap)')
 
-  if (!santriKelas || santriKelas.length === 0) return []
+  // 1. Ambil SEMUA Kelas yang aktif di database + Nama Wali Kelas
+  const { data: allKelas } = await supabase
+    .from('kelas')
+    .select(`
+      id,
+      nama_kelas,
+      tahun_ajaran(nama),
+      marhalah!inner (nama, urutan),
+      wali_kelas:wali_kelas_id(full_name)
+    `)
 
-  const ids = santriKelas.map(s => s.id)
-
-  // STEP 2: Ambil ranking mereka
-  const { data: ranking } = await supabase
+  // 2. Ambil data ranking (Hanya juara 1, 2, 3)
+  const { data: rankingData } = await supabase
     .from('ranking')
-    .select('*')
-    .in('riwayat_pendidikan_id', ids)
+    .select(`
+      ranking_kelas,
+      jumlah_nilai,
+      rata_rata,
+      riwayat_pendidikan!inner (
+        kelas_id,
+        santri!inner (nama_lengkap, nis, asrama, kamar)
+      )
+    `)
     .eq('semester', semester)
-    .order('ranking_kelas', { ascending: true })
+    .lte('ranking_kelas', 3)
 
-  // Gabungkan data (Ranking + Nama Santri)
-  const result = ranking?.map(r => {
-    const s = santriKelas.find(sk => sk.id === r.riwayat_pendidikan_id)
+  // 3. Format dan Urutkan Kelas (Natural Sort)
+  const formattedKelas = (allKelas || []).map((k: any) => {
+    const marhalah = Array.isArray(k.marhalah) ? k.marhalah[0] : k.marhalah;
+    const ta = k.tahun_ajaran ? (Array.isArray(k.tahun_ajaran) ? k.tahun_ajaran[0]?.nama : k.tahun_ajaran?.nama) : null;
+    const wali = k.wali_kelas ? (Array.isArray(k.wali_kelas) ? k.wali_kelas[0]?.full_name : k.wali_kelas?.full_name) : null;
     
-    // PERBAIKAN: Cek apakah s.santri itu array atau object
-    // Jika array, ambil elemen pertama [0]. Jika object, pakai langsung.
-    const santriData = Array.isArray(s?.santri) ? s.santri[0] : s?.santri
-
     return {
-      ...r,
-      nama: santriData?.nama_lengkap || 'Tanpa Nama',
-      nis: santriData?.nis || '-'
+      kelas_id: k.id,
+      kelas_nama: k.nama_kelas,
+      tahun_ajaran: ta,
+      marhalah_nama: marhalah.nama,
+      marhalah_urutan: marhalah.urutan,
+      wali_kelas: wali || '-'
     }
   })
 
-  return result || []
-}
+  formattedKelas.sort((a, b) => {
+    if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan;
+    return a.kelas_nama.localeCompare(b.kelas_nama, undefined, { numeric: true, sensitivity: 'base' });
+  });
 
-// 2. PROSES HITUNG ULANG (LOGIC UTAMA)
-export async function hitungUlangRanking(kelasId: string, semester: number) {
-  const supabase = await createClient()
+  // 4. Gabungkan Data (Paksakan 3 Baris per Kelas)
+  const result: any[] = []
 
-  // A. Ambil ID Mapel Kunci untuk Tie-Breaker (Nahwu & Sharaf)
-  const { data: mapelRef } = await supabase.from('mapel').select('id, nama')
-  const idNahwu = mapelRef?.find(m => m.nama.toLowerCase() === 'nahwu')?.id
-  const idSharaf = mapelRef?.find(m => m.nama.toLowerCase() === 'sharaf')?.id
+  formattedKelas.forEach(kelas => {
+    // Cari data ranking untuk kelas ini
+    const ranksForClass = (rankingData || []).filter((r:any) => {
+      const rp = Array.isArray(r.riwayat_pendidikan) ? r.riwayat_pendidikan[0] : r.riwayat_pendidikan;
+      return rp.kelas_id === kelas.kelas_id;
+    })
 
-  // B. Ambil Semua Santri di Kelas
-  const { data: listSantri } = await supabase
-    .from('riwayat_pendidikan')
-    .select('id')
-    .eq('kelas_id', kelasId)
-    .eq('status_riwayat', 'aktif')
-
-  if (!listSantri || listSantri.length === 0) return { error: "Kelas kosong" }
-
-  const riwayatIds = listSantri.map(s => s.id)
-
-  // C. Ambil Semua Nilai Akademik mereka
-  const { data: listNilai } = await supabase
-    .from('nilai_akademik')
-    .select('riwayat_pendidikan_id, mapel_id, nilai')
-    .in('riwayat_pendidikan_id', riwayatIds)
-    .eq('semester', semester)
-
-  // D. Kalkulasi di Memory
-  const rekapNilai: any[] = riwayatIds.map(id => {
-    const nilaiAnak = listNilai?.filter(n => n.riwayat_pendidikan_id === id) || []
-    
-    const total = nilaiAnak.reduce((sum, curr) => sum + (curr.nilai || 0), 0)
-    // Asumsi pembagi 10 mapel
-    const rata = total > 0 ? (total / 10) : 0 
-
-    const nilaiNahwu = nilaiAnak.find(n => n.mapel_id === idNahwu)?.nilai || 0
-    const nilaiSharaf = nilaiAnak.find(n => n.mapel_id === idSharaf)?.nilai || 0
-
-    return {
-      riwayat_pendidikan_id: id,
-      jumlah: total,
-      rata: Number(rata.toFixed(2)),
-      nahwu: nilaiNahwu,
-      sharaf: nilaiSharaf
+    // Selalu hasilkan Juara 1, 2, dan 3 (Jika kosong, tampilkan baris kosong)
+    for (let i = 1; i <= 3; i++) {
+      const foundRank = ranksForClass.find(r => r.ranking_kelas === i);
+      if (foundRank) {
+        const rp = Array.isArray(foundRank.riwayat_pendidikan) ? foundRank.riwayat_pendidikan[0] : foundRank.riwayat_pendidikan;
+        const santri = Array.isArray(rp.santri) ? rp.santri[0] : rp.santri;
+        result.push({
+          rank: i,
+          jumlah: foundRank.jumlah_nilai,
+          rata: foundRank.rata_rata,
+          kelas_nama: kelas.kelas_nama,
+          tahun_ajaran: kelas.tahun_ajaran,
+          marhalah_nama: kelas.marhalah_nama,
+          marhalah_urutan: kelas.marhalah_urutan,
+          wali_kelas: kelas.wali_kelas,
+          santri_nama: santri.nama_lengkap,
+          nis: santri.nis,
+          asrama: santri.asrama || '',
+          kamar: santri.kamar || ''
+        })
+      } else {
+        // Data Kosong (Tetap dicetak sebagai placeholder)
+        result.push({
+          rank: i,
+          jumlah: '',
+          rata: '',
+          kelas_nama: kelas.kelas_nama,
+          tahun_ajaran: kelas.tahun_ajaran,
+          marhalah_nama: kelas.marhalah_nama,
+          marhalah_urutan: kelas.marhalah_urutan,
+          wali_kelas: kelas.wali_kelas,
+          santri_nama: '', 
+          nis: '',
+          asrama: '',
+          kamar: ''
+        })
+      }
     }
-  })
+  });
 
-  // E. Sorting
-  rekapNilai.sort((a, b) => {
-    if (b.rata !== a.rata) return b.rata - a.rata
-    if (b.nahwu !== a.nahwu) return b.nahwu - a.nahwu
-    return b.sharaf - a.sharaf
-  })
-
-  // F. Siapkan Data
-  const dataToUpsert = rekapNilai.map((item, index) => ({
-    riwayat_pendidikan_id: item.riwayat_pendidikan_id,
-    semester: semester,
-    jumlah_nilai: item.jumlah,
-    rata_rata: item.rata,
-    ranking_kelas: index + 1,
-    predikat: getPredikat(item.rata)
-  }))
-
-  // G. Simpan
-  const { error } = await supabase
-    .from('ranking')
-    .upsert(dataToUpsert, { onConflict: 'riwayat_pendidikan_id, semester' })
-
-  if (error) return { error: error.message }
-
-  revalidatePath('/dashboard/akademik/ranking')
-  return { success: true, count: dataToUpsert.length }
-}
-
-export async function getKelasList() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('kelas').select('id, nama_kelas').order('nama_kelas')
-  return data || []
+  return result;
 }

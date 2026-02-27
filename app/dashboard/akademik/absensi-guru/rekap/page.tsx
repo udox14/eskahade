@@ -4,30 +4,26 @@ import { useState, useEffect } from 'react'
 import { getMarhalahList, getRekapKinerjaGuru } from './actions'
 import { Filter, Search, Loader2, Briefcase, UserX, UserCheck, Calendar, ArrowLeft } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function RekapAbsensiGuruPage() {
+  const router = useRouter()
+
   // State Filter
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [selectedMarhalah, setSelectedMarhalah] = useState('')
-  
-  // OPSI BADAL: true = Hadir, false = Kosong
   const [badalAsHadir, setBadalAsHadir] = useState(true)
 
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Init Data (Client Side Only untuk menghindari mismatch server/client date)
   useEffect(() => {
-    // Set default date hari ini
     const now = new Date()
     setStartDate(format(startOfMonth(now), 'yyyy-MM-dd'))
     setEndDate(format(endOfMonth(now), 'yyyy-MM-dd'))
-    
-    // Load marhalah
     getMarhalahList().then(setMarhalahList)
   }, [])
 
@@ -39,7 +35,6 @@ export default function RekapAbsensiGuruPage() {
     setLoading(false)
   }
 
-  // Shortcut Tanggal
   const setRange = (type: 'THIS_WEEK' | 'THIS_MONTH') => {
     const now = new Date()
     if (type === 'THIS_MONTH') {
@@ -57,9 +52,10 @@ export default function RekapAbsensiGuruPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-           <Link href="/dashboard/akademik/absensi-guru" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+           {/* FIX: Ganti Link href ke button router.back() */}
+           <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <ArrowLeft className="w-6 h-6 text-gray-600"/>
-           </Link>
+           </button>
            <div>
              <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                <Briefcase className="w-6 h-6 text-indigo-600"/> Rekap Kinerja Guru
@@ -75,10 +71,9 @@ export default function RekapAbsensiGuruPage() {
         </div>
       </div>
 
-      {/* FILTER BAR KOMPLEKS */}
+      {/* FILTER BAR */}
       <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* TANGGAL */}
             <div className="md:col-span-2 flex gap-2 items-end">
                 <div className="flex-1">
                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Dari</label>
@@ -90,7 +85,6 @@ export default function RekapAbsensiGuruPage() {
                 </div>
             </div>
 
-            {/* MARHALAH */}
             <div>
                 <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filter Tingkat</label>
                 <select value={selectedMarhalah} onChange={e=>setSelectedMarhalah(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
@@ -99,7 +93,6 @@ export default function RekapAbsensiGuruPage() {
                 </select>
             </div>
 
-            {/* TOMBOL CARI */}
             <div className="flex items-end">
                 <button 
                     onClick={handleCari}
@@ -112,30 +105,16 @@ export default function RekapAbsensiGuruPage() {
             </div>
          </div>
 
-         {/* OPSI BADAL (TOGGLE) */}
+         {/* OPSI BADAL */}
          <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
              <span className="text-sm font-bold text-gray-700 flex items-center gap-2"><Filter className="w-4 h-4"/> Opsi Perhitungan:</span>
-             
              <div className="flex gap-4">
                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                        type="radio" 
-                        name="badalOpt" 
-                        checked={badalAsHadir === true} 
-                        onChange={() => setBadalAsHadir(true)}
-                        className="accent-indigo-600 w-4 h-4"
-                    />
+                    <input type="radio" name="badalOpt" checked={badalAsHadir === true} onChange={() => setBadalAsHadir(true)} className="accent-indigo-600 w-4 h-4"/>
                     <span className="text-sm text-gray-600">Badal = <b className="text-green-600">Terisi (Hadir)</b></span>
                  </label>
-                 
                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                        type="radio" 
-                        name="badalOpt" 
-                        checked={badalAsHadir === false} 
-                        onChange={() => setBadalAsHadir(false)}
-                        className="accent-red-600 w-4 h-4"
-                    />
+                    <input type="radio" name="badalOpt" checked={badalAsHadir === false} onChange={() => setBadalAsHadir(false)} className="accent-red-600 w-4 h-4"/>
                     <span className="text-sm text-gray-600">Badal = <b className="text-red-600">Kosong (Alfa)</b></span>
                  </label>
              </div>
@@ -189,7 +168,6 @@ export default function RekapAbsensiGuruPage() {
                                         }`}>
                                             {row.persentase}%
                                         </span>
-                                        {/* Progress Bar Visual */}
                                         <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                             <div 
                                                 className={`h-full ${
@@ -209,7 +187,6 @@ export default function RekapAbsensiGuruPage() {
              </div>
         )}
       </div>
-
     </div>
   )
 }

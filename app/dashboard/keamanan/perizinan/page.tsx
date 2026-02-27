@@ -5,7 +5,7 @@ import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri } from './acti
 import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner' 
 
 const LIST_PEMBERI_IZIN = [
@@ -14,6 +14,7 @@ const LIST_PEMBERI_IZIN = [
 ]
 
 export default function PerizinanPage() {
+  const router = useRouter()
   const [list, setList] = useState<any[]>([])
   const [filterWaktu, setFilterWaktu] = useState<'HARI' | 'MINGGU' | 'BULAN'>('HARI')
   const [loading, setLoading] = useState(true)
@@ -97,7 +98,6 @@ export default function PerizinanPage() {
     if (res?.error) {
       toast.error(res.error)
     } else {
-      // Tampilkan pesan berbeda jika telat
       if (res.message?.includes('Terlambat')) {
         toast.warning("Tercatat Terlambat!", { description: "Data masuk ke antrian verifikasi/sidang." })
       } else {
@@ -113,9 +113,10 @@ export default function PerizinanPage() {
       
       {/* HEADER */}
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/keamanan" className="p-2 hover:bg-gray-100 rounded-full">
+        {/* FIX: Ganti Link href ke button router.back() */}
+        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </Link>
+        </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-800">Perizinan Santri</h1>
           <p className="text-gray-500 text-sm">Monitoring santri keluar/masuk komplek.</p>
@@ -128,70 +129,59 @@ export default function PerizinanPage() {
         </button>
       </div>
 
-      {/* FILTER TABS */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
-        {['HARI', 'MINGGU', 'BULAN'].map((f) => (
+      {/* FILTER WAKTU */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
+        {(['HARI', 'MINGGU', 'BULAN'] as const).map(f => (
           <button
             key={f}
-            onClick={() => setFilterWaktu(f as any)}
-            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${
-              filterWaktu === f ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
+            onClick={() => setFilterWaktu(f)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${filterWaktu === f ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            {f} INI
+            {f === 'HARI' ? 'Hari Ini' : f === 'MINGGU' ? 'Minggu Ini' : 'Bulan Ini'}
           </button>
         ))}
       </div>
 
       {/* TABEL LIST */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-600 font-bold border-b">
               <tr>
-                <th className="px-4 py-3">Nama Santri</th>
+                <th className="px-4 py-3">Santri</th>
                 <th className="px-4 py-3">Jenis & Alasan</th>
-                <th className="px-4 py-3">Waktu Izin</th>
-                <th className="px-4 py-3 text-center">Status / Aksi</th>
+                <th className="px-4 py-3">Waktu</th>
+                <th className="px-4 py-3 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Memuat data...</td></tr>
+                <tr><td colSpan={4} className="py-12 text-center text-gray-400"><Clock className="w-6 h-6 animate-spin mx-auto mb-2"/>Memuat...</td></tr>
               ) : list.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-12 text-gray-400">Tidak ada data izin.</td></tr>
+                <tr><td colSpan={4} className="py-12 text-center text-gray-400">Tidak ada data perizinan untuk periode ini.</td></tr>
               ) : (
                 list.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    
-                    {/* 1. SANTRI INFO */}
+                    {/* 1. SANTRI */}
                     <td className="px-4 py-3">
-                      <div className="font-bold text-gray-800">{item.santri?.nama_lengkap}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                        <Home className="w-3 h-3"/> 
-                        {item.santri?.asrama} - {item.santri?.kamar}
-                      </div>
+                      <p className="font-bold text-gray-800">{item.nama}</p>
+                      <p className="text-xs text-gray-500">{item.asrama} • {item.kelas}</p>
                     </td>
 
                     {/* 2. JENIS & ALASAN */}
-                    <td className="px-4 py-3 max-w-xs">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
-                          item.jenis === 'PULANG' 
-                            ? 'bg-purple-50 text-purple-700 border-purple-100' 
-                            : 'bg-blue-50 text-blue-700 border-blue-100'
-                        }`}>
-                          {item.jenis === 'PULANG' ? 'PULANG' : 'KELUAR'}
-                        </span>
-                        <span className="text-[10px] text-gray-400">Oleh: {item.pemberi_izin}</span>
+                        {item.jenis === 'PULANG' 
+                          ? <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> PULANG</span>
+                          : <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> KELUAR KOMPLEK</span>
+                        }
+                        <span className="text-xs text-gray-500">via {item.pemberi_izin}</span>
                       </div>
-                      <p className="text-gray-600 text-xs truncate" title={item.alasan}>
-                        "{item.alasan}"
-                      </p>
+                      <p className="text-xs text-gray-600 italic">"{item.alasan}"</p>
                     </td>
 
                     {/* 3. WAKTU */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3">
                       <div className="flex flex-col text-xs">
                         <span className="text-gray-500 flex items-center gap-1">
                           Pergi: <span className="font-medium text-gray-900">{format(new Date(item.tgl_mulai), 'dd/MM HH:mm')}</span>
@@ -213,7 +203,6 @@ export default function PerizinanPage() {
                     <td className="px-4 py-3 text-center">
                       {item.status === 'AKTIF' ? (
                         item.tgl_kembali_aktual ? (
-                          // KASUS: SUDAH BALIK TAPI TELAT (Belum Divonis)
                           <div className="flex flex-col items-center">
                             <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-bold border border-orange-200">
                               <AlertTriangle className="w-3 h-3"/> MENUNGGU SIDANG
@@ -221,7 +210,6 @@ export default function PerizinanPage() {
                             <span className="text-[10px] text-orange-600 mt-1">Terlambat Kembali</span>
                           </div>
                         ) : (
-                          // KASUS: BELUM BALIK (Tombol Aktif)
                           <button 
                             onClick={() => openReturnModal(item)}
                             className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shadow-sm active:scale-95"
@@ -230,7 +218,6 @@ export default function PerizinanPage() {
                           </button>
                         )
                       ) : (
-                        // KASUS: SUDAH SELESAI
                         <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-green-200">
                           <CheckCircle className="w-3 h-3"/> SELESAI
                         </span>
@@ -245,7 +232,7 @@ export default function PerizinanPage() {
         </div>
       </div>
 
-      {/* --- MODAL INPUT & RETURN (SAMA SEPERTI SEBELUMNYA) --- */}
+      {/* --- MODAL INPUT IZIN BARU --- */}
       {isOpenInput && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">

@@ -51,7 +51,7 @@ export async function getRekapAbsensi(
     .select(`
       id, nama_lengkap, nis, asrama, kamar,
       riwayat_pendidikan!inner (
-        id,
+        id, kelas_id,
         kelas (id, nama_kelas) 
       )
     `)
@@ -67,7 +67,7 @@ export async function getRekapAbsensi(
     query = query.eq('asrama', scope.value)
   } else if (scope.type === 'KELAS') {
     if (!scope.value) return [] 
-    query = query.eq('riwayat_pendidikan.kelas.id', scope.value)
+    query = query.eq('riwayat_pendidikan.kelas_id', scope.value)
   }
 
   // Terapkan Filter User
@@ -80,7 +80,7 @@ export async function getRekapAbsensi(
   }
 
   if (filterKelasId && scope.type !== 'KELAS') {
-    query = query.eq('riwayat_pendidikan.kelas.id', filterKelasId)
+    query = query.eq('riwayat_pendidikan.kelas_id', filterKelasId)
   }
   if (filterNama) {
     query = query.ilike('nama_lengkap', `%${filterNama}%`)
@@ -168,6 +168,7 @@ export async function getDetailAbsensiSantri(santriId: string) {
 // Helper untuk Dropdown
 export async function getReferensiFilter() {
   const supabase = await createClient()
-  const { data: kelas } = await supabase.from('kelas').select('id, nama_kelas').order('nama_kelas')
-  return { kelas: kelas || [] }
+  const { data: kelas } = await supabase.from('kelas').select('id, nama_kelas')
+  const sorted = (kelas || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  return { kelas: sorted }
 }

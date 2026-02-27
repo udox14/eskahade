@@ -117,7 +117,7 @@ export default function LegerNilaiPage() {
             value={selectedKelas}
             onChange={(e) => setSelectedKelas(e.target.value)}
           >
-            {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas} ({k.marhalah?.nama})</option>)}
+            {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
           </select>
         </div>
         <div>

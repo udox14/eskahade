@@ -30,7 +30,8 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
 
   // 2. Ambil Data Referensi untuk Filter (Marhalah & Kelas)
   const { data: marhalahList } = await supabase.from('marhalah').select('id, nama').order('urutan');
-  const { data: kelasList } = await supabase.from('kelas').select('id, nama_kelas, marhalah_id').order('nama_kelas');
+  const { data: kelasRaw } = await supabase.from('kelas').select('id, nama_kelas, marhalah_id');
+  const kelasList = (kelasRaw || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }));
 
   // 3. Ambil Parameter dari URL
   const page = Number(searchParams.page) || 1;

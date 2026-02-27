@@ -13,14 +13,14 @@ export async function getKelasListForLeger() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const role = profile?.role
 
-  let query = supabase.from('kelas').select('id, nama_kelas, marhalah(nama)').order('nama_kelas')
+  let query = supabase.from('kelas').select('id, nama_kelas, marhalah(nama)')
 
   if (role === 'wali_kelas') {
     query = query.eq('wali_kelas_id', user.id)
   }
 
   const { data } = await query
-  return data || []
+  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 // 2. Ambil Data Leger (Hanya Baca, Tidak Hitung Ulang)

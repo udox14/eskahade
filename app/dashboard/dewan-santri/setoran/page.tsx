@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { getDetailSetoranBulan, terimaSetoran, batalkanSetoran } from './actions'
 import { Loader2, CheckCircle, XCircle, Calendar, ArrowLeft, ChevronDown, ChevronRight, DollarSign, Edit, Save, Trash2, AlertCircle, User } from 'lucide-react'
 import { toast } from 'sonner'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 export default function MonitoringSetoranPage() {
+  const router = useRouter()
   const [tahun, setTahun] = useState(new Date().getFullYear())
   const [expandedBulan, setExpandedBulan] = useState<number | null>(new Date().getMonth() + 1)
   
@@ -18,7 +19,10 @@ export default function MonitoringSetoranPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft className="w-6 h-6 text-gray-600"/></Link>
+            {/* FIX: Ganti Link href ke router.back() */}
+            <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
+              <ArrowLeft className="w-6 h-6 text-gray-600"/>
+            </button>
             <div>
             <h1 className="text-2xl font-bold text-gray-800">Audit Setoran Asrama</h1>
             <p className="text-gray-500 text-sm">Rekonsiliasi uang masuk sistem vs uang fisik diterima.</p>
@@ -109,7 +113,6 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
     setIsSaving(true)
     const loadingToast = toast.loading("Menyimpan setoran...")
     
-    // Server action otomatis mengambil ID user login sebagai penerima
     const res = await terimaSetoran(
         selectedAsrama.asrama, 
         bulan, 
@@ -237,7 +240,6 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
                         value={inputAktual}
                         onChange={(e) => setInputAktual(Number(e.target.value))}
                     />
-                    {/* Indikator Selisih Realtime */}
                     {inputAktual !== selectedAsrama.total_sistem && (
                         <p className={`text-xs mt-1 font-bold ${inputAktual < selectedAsrama.total_sistem ? 'text-red-500' : 'text-blue-500'}`}>
                             {inputAktual < selectedAsrama.total_sistem ? `Kurang Rp ${(selectedAsrama.total_sistem - inputAktual).toLocaleString()}` : `Lebih Rp ${(inputAktual - selectedAsrama.total_sistem).toLocaleString()}`}
