@@ -30,7 +30,7 @@ export async function getSantriDetail(id: string) {
   const kelasAktif = data.riwayat_pendidikan?.find((r: any) => r.status_riwayat === 'aktif')?.kelas
   
   const infoKelas = kelasAktif 
-    ? `${kelasAktif.nama_kelas} (${kelasAktif.marhalah?.nama})` 
+    ? kelasAktif.nama_kelas 
     : 'Belum Masuk Kelas'
 
   return {

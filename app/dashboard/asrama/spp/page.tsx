@@ -49,17 +49,39 @@ export default function SPPPage() {
     })
   }, [])
 
+  // ============================================================
+  // FIX TOMBOL BACK HP: Sync view ke browser history
+  // ============================================================
+  useEffect(() => {
+    if (view === 'PAYMENT') {
+      // Saat masuk view PAYMENT, push state baru ke history browser
+      window.history.pushState({ view: 'PAYMENT' }, '')
+    }
+  }, [view])
+
+  useEffect(() => {
+    // Tangkap event tombol back HP/browser
+    const handlePopState = (e: PopStateEvent) => {
+      // Jika state sebelumnya adalah LIST (atau kosong), kembali ke LIST
+      if (!e.state || e.state.view !== 'PAYMENT') {
+        setView('LIST')
+        setSelectedSantri(null)
+        loadMonitoring(true)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+  // ============================================================
+
   // LOAD MONITORING DATA
-  // Efek ini jalan saat ganti Asrama, Tahun, atau View
   useEffect(() => {
     if (view === 'LIST') {
-      // Jika ganti asrama/tahun, reset kamar (false)
-      // Jika kembali dari view payment, idealnya pertahankan, tapi biar konsisten kita reset dulu kecuali ada logic khusus
       loadMonitoring(false)
     }
   }, [view, asrama, tahun])
 
-  // UPDATE: Tambah parameter preserveKamar
   const loadMonitoring = async (preserveKamar = false) => {
     setLoadingList(true)
     const res = await getDashboardSPP(tahun, asrama)
@@ -67,7 +89,6 @@ export default function SPPPage() {
     setDrafts({}) // Reset draft
     setLoadingList(false)
     
-    // Hanya reset kamar jika TIDAK diminta untuk mempertahankan
     if (!preserveKamar) {
         setCurrentKamarIndex(0) 
     }
@@ -111,7 +132,7 @@ export default function SPPPage() {
 
   // BATCH ACTIONS
   const toggleDraft = (e: React.MouseEvent, santri: any) => {
-    e.stopPropagation() // Biar gak masuk ke detail
+    e.stopPropagation()
     setDrafts(prev => {
         const next = { ...prev }
         if (next[santri.id]) {
@@ -142,7 +163,6 @@ export default function SPPPage() {
         toast.error(res.error)
     } else {
         toast.success(`Sukses menyimpan ${res.count} pembayaran!`)
-        // FIX: Panggil loadMonitoring dengan true agar tidak reset kamar
         loadMonitoring(true)
     }
   }
@@ -153,22 +173,18 @@ export default function SPPPage() {
   }
 
   const handleBackToList = () => {
-    setView('LIST')
-    setSelectedSantri(null)
-    // Saat kembali dari detail, kita refresh data tapi pertahankan kamar (opsional, tapi di sini saya buat true biar nyaman)
-    loadMonitoring(true) 
+    // Gunakan history.back() agar konsisten dengan tombol back HP
+    window.history.back()
   }
 
   // --- RENDER HELPERS ---
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
 
-  // Grouping & Filtering untuk List View
   const filteredData = dataMonitoring.filter(s => {
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase())
     if (!matchSearch) return false
 
-    // Logic Filter Status
     if (filterStatus === 'SUDAH_BAYAR_INI') return s.bulan_ini_lunas
     if (filterStatus === 'NUNGGAK') return s.jumlah_tunggakan > 0
     if (filterStatus === 'AMAN') return s.jumlah_tunggakan === 0
@@ -183,19 +199,15 @@ export default function SPPPage() {
     return acc
   }, {})
   
-  // Sort Kamar by Number
   const sortedKamars = Object.keys(groupedData).sort((a, b) => (parseInt(a)||999) - (parseInt(b)||999))
 
-  // Safety check index
   const safeIndex = currentKamarIndex >= sortedKamars.length ? 0 : currentKamarIndex
   const activeKamar = sortedKamars[safeIndex]
   const santriInKamar = activeKamar ? groupedData[activeKamar] : []
 
-  // Handler Navigasi Kamar
   const prevKamar = () => { if (safeIndex > 0) setCurrentKamarIndex(prev => prev - 1) }
   const nextKamar = () => { if (safeIndex < sortedKamars.length - 1) setCurrentKamarIndex(prev => prev + 1) }
 
-  // Draft Stats
   const totalDraft = Object.keys(drafts).length
   const totalNominalDraft = Object.values(drafts).reduce((a: any, b: any) => a + b.nominal, 0)
 
@@ -304,7 +316,7 @@ export default function SPPPage() {
                 </div>
                 <div className="divide-y">
                     {santriInKamar?.map((s: any) => {
-                        const isPaid = s.status_bayar === 'LUNAS' || s.bulan_ini_lunas // Handle different field names from action
+                        const isPaid = s.status_bayar === 'LUNAS' || s.bulan_ini_lunas
                         const isDraft = !!drafts[s.id]
                         
                         return (
@@ -393,12 +405,11 @@ export default function SPPPage() {
                 const dataBayar = riwayatBayar.find(r => r.bulan === bulanIndex)
                 const isSelected = selectedMonths.includes(bulanIndex)
                 
-                // Logic Warna
                 let style = "bg-white border-gray-200 text-gray-500 hover:border-emerald-300"
                 if (dataBayar) style = "bg-green-100 border-green-500 text-green-800 cursor-default"
                 else if (isSelected) style = "bg-emerald-600 text-white border-emerald-600 shadow-md transform scale-105"
                 else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
-                    style = "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" // Nunggak
+                    style = "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
                 }
 
                 return (

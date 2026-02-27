@@ -10,24 +10,46 @@ export async function getMarhalahList() {
   return data || []
 }
 
-// 2. Ambil Santri per Marhalah (Untuk Download Template)
-export async function getSantriByMarhalah(marhalahId: string) {
+// FITUR BARU: Ambil Kelas berdasarkan Marhalah (Natural Sort)
+export async function getKelasByMarhalah(marhalahId: string) {
+  if (!marhalahId) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('kelas').select('id, nama_kelas').eq('marhalah_id', marhalahId)
+  
+  if (!data) return []
+  
+  // Natural Sort (1-1, 1-2, ... 1-10)
+  return data.sort((a, b) => 
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
+}
+
+// 2. Ambil Santri per Marhalah / Kelas (Untuk Download Template)
+export async function getSantriForKenaikan(marhalahId: string, kelasId: string) {
   const supabase = await createClient()
 
-  // Ambil semua kelas di marhalah ini
-  const { data: kelasList } = await supabase
-    .from('kelas')
-    .select('id')
-    .eq('marhalah_id', marhalahId)
-  
-  if (!kelasList || kelasList.length === 0) return []
-  const kelasIds = kelasList.map(k => k.id)
+  let kelasIds: string[] = []
 
-  // Ambil santri aktif di kelas-kelas tersebut
+  // Jika spesifik kelas dipilih, ambil kelas itu saja
+  if (kelasId) {
+    kelasIds = [kelasId]
+  } else if (marhalahId) {
+    // Jika hanya marhalah, ambil semua kelas di marhalah tersebut
+    const { data: listKelas } = await supabase
+      .from('kelas')
+      .select('id')
+      .eq('marhalah_id', marhalahId)
+    kelasIds = listKelas?.map(k => k.id) || []
+  }
+
+  if (kelasIds.length === 0) return []
+
+  // Ambil santri aktif di kelas-kelas tersebut + grade_lanjutan
   const { data: listSantriRaw } = await supabase
     .from('riwayat_pendidikan')
     .select(`
       id,
+      grade_lanjutan,
       santri (id, nama_lengkap, nis),
       kelas (nama_kelas),
       ranking (rata_rata, predikat)
@@ -50,6 +72,7 @@ export async function getSantriByMarhalah(marhalahId: string) {
       nis: s?.nis,
       nama: s?.nama_lengkap,
       kelas_sekarang: k?.nama_kelas,
+      grade_lanjutan: item.grade_lanjutan || 'Belum Di-Grading', // Info dari Wali Kelas
       rata_rata: r?.rata_rata || 0,
       predikat: r?.predikat || '-'
     }
@@ -81,8 +104,6 @@ export async function importKenaikanKelas(dataExcel: any[]) {
   })
 
   // C. Validasi & Mapping Data
-  const updates = [] // ID riwayat lama untuk di-close
-  const inserts = [] // Data baru untuk di-insert
   const errors = []
 
   for (let i = 0; i < dataExcel.length; i++) {
@@ -92,7 +113,7 @@ export async function importKenaikanKelas(dataExcel: any[]) {
     const nis = String(row['NIS'] || row['nis']).trim()
     const targetKelasNama = String(row['TARGET KELAS'] || row['target kelas'] || '').trim()
 
-    // Skip jika target kosong (mungkin tinggal kelas di tempat yang sama, atau belum diputuskan)
+    // Skip jika target kosong
     if (!targetKelasNama) continue;
 
     // Validasi
@@ -107,35 +128,23 @@ export async function importKenaikanKelas(dataExcel: any[]) {
       errors.push(`Baris ${rowNum}: Kelas tujuan '${targetKelasNama}' tidak ditemukan di database.`)
       continue
     }
-
-    // Siapkan Data
-    updates.push(riwayatLamaId)
-    
-    // Kita butuh santri_id untuk insert baru. Ambil dari riwayat lama (agak tricky kalau tidak query ulang)
-    // Cara cepat: Kita query riwayat_pendidikan di awal harusnya include santri_id.
-    // Revisi query B di atas:
   }
 
-  // REVISI LOGIC LOOP (Biar efisien ambil santri_id)
-  // Kita fetch ulang data spesifik untuk santri yang valid saja biar aman
   if (errors.length > 0) {
     return { error: `Ditemukan masalah:\n${errors.slice(0, 5).join('\n')}` }
   }
 
   // --- EKSEKUSI DATABASE ---
   
-  // Karena keterbatasan Supabase JS client untuk Transaction kompleks, 
-  // kita lakukan loop tapi kita pastikan data valid dulu.
-  
   // 1. Ambil detail santri_id dari NIS yang valid
   const validNisList = dataExcel
     .filter(r => r['TARGET KELAS'])
-    .map(r => String(r['NIS']).trim())
+    .map(r => String(r['NIS'] || r['nis']).trim())
 
   const { data: sourceData } = await supabase
     .from('riwayat_pendidikan')
     .select('id, santri_id, santri(nis)')
-    .in('status_riwayat', ['aktif']) // Hanya yang aktif
+    .in('status_riwayat', ['aktif']) 
     
   const mapNisToFullData = new Map()
   sourceData?.forEach((d: any) => {
@@ -147,10 +156,10 @@ export async function importKenaikanKelas(dataExcel: any[]) {
   const recordsToUpdateIds = []
 
   for (const row of dataExcel) {
-    const targetName = String(row['TARGET KELAS'] || '').trim()
+    const targetName = String(row['TARGET KELAS'] || row['target kelas'] || '').trim()
     if (!targetName) continue
 
-    const nis = String(row['NIS']).trim()
+    const nis = String(row['NIS'] || row['nis']).trim()
     const santriData = mapNisToFullData.get(nis)
     const targetId = mapKelas.get(targetName.toLowerCase())
 

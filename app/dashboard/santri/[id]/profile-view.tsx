@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { User, MapPin, Calendar, School, Home, BookOpen, AlertTriangle, Clock, CreditCard, Wallet, Trophy, CheckCircle, XCircle, AlertCircle, Users } from 'lucide-react'
+import { User, MapPin, Calendar, School, Home, BookOpen, AlertTriangle, Clock, CreditCard, Wallet, Trophy, CheckCircle, XCircle, AlertCircle, Users, Utensils, Shirt } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -120,6 +120,18 @@ export function SantriProfileView({
                     <InfoRow label="Asrama" value={santri.asrama} />
                     <InfoRow label="Kamar" value={santri.kamar} />
                     <InfoRow label="Kelas Diniyah" value={santri.info_kelas} isBold />
+                    
+                    {/* INFO KATERING & LAUNDRY YANG BARU DITAMBAHKAN */}
+                    <div className="pt-2 mt-2 border-t border-emerald-100 space-y-3">
+                        <InfoRow 
+                            label={<span className="flex items-center gap-1.5"><Utensils className="w-3.5 h-3.5"/> Tempat Makan</span>} 
+                            value={santri.nama_tempat_makan || 'Belum diatur'} 
+                        />
+                        <InfoRow 
+                            label={<span className="flex items-center gap-1.5"><Shirt className="w-3.5 h-3.5"/> Tempat Cuci</span>} 
+                            value={santri.nama_tempat_mencuci || 'Belum diatur'} 
+                        />
+                    </div>
                  </div>
               </div>
            </div>

@@ -8,10 +8,11 @@ export default async function AturKelasPage() {
   const supabase = await createClient()
 
   // 1. Ambil Daftar Kelas Aktif
-  const { data: kelasList } = await supabase
+  const { data: kelasRaw } = await supabase
     .from('kelas')
     .select('id, nama_kelas, marhalah(nama)')
-    .order('nama_kelas')
+
+  const kelasList = (kelasRaw || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 
   // 2. Ambil Santri Aktif BESERTA Hasil Tes Klasifikasi
   const { data: santriList } = await supabase

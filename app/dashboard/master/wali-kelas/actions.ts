@@ -31,15 +31,18 @@ export async function getDataMaster() {
       guru_maghrib:guru_maghrib_id(id, nama_lengkap),
       wali_kelas:wali_kelas_id(full_name) 
     `)
-    .order('nama_kelas')
 
   const { data: guru } = await supabaseAdmin
     .from('data_guru')
     .select('*')
     .order('nama_lengkap')
 
+  const sortedKelas = (kelas || []).sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
   return { 
-    kelasList: kelas || [], 
+    kelasList: sortedKelas, 
     guruList: guru || [] 
   }
 }
@@ -70,7 +73,17 @@ export async function hapusGuru(id: string) {
   return { success: true }
 }
 
-// 3. IMPORT DATA GURU (EXCEL)
+// Hapus banyak guru sekaligus
+export async function hapusGuruBatch(ids: string[]) {
+  const supabase = await createClient()
+  if (!ids || ids.length === 0) return { error: "Pilih minimal 1 guru" }
+  const { error } = await supabase.from('data_guru').delete().in('id', ids)
+  if (error) return { error: "Gagal menghapus (Mungkin sedang dipakai di jadwal?)" }
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true, count: ids.length }
+}
+
+// 3. IMPORT DATA GURU (EXCEL) - dengan pengecekan duplikat
 export async function importDataGuru(dataExcel: any[]) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "Server Key Error" }
 
@@ -82,20 +95,39 @@ export async function importDataGuru(dataExcel: any[]) {
   
   if (!dataExcel || dataExcel.length === 0) return { error: "Data kosong" }
 
-  const inserts = dataExcel.map(row => ({
+  // Normalisasi data dari Excel
+  const parsed = dataExcel.map(row => ({
     nama_lengkap: String(row['NAMA LENGKAP'] || row['nama'] || row['Nama'] || '').trim(),
     gelar: row['GELAR'] || row['gelar'] || '',
     kode_guru: row['KODE'] || row['kode'] || null
   })).filter(d => d.nama_lengkap)
 
-  if (inserts.length === 0) return { error: "Tidak ada data guru valid" }
+  if (parsed.length === 0) return { error: "Tidak ada data guru valid" }
 
-  const { error } = await supabaseAdmin.from('data_guru').insert(inserts)
+  // Ambil semua nama guru yang sudah ada di DB
+  const { data: existing } = await supabaseAdmin
+    .from('data_guru')
+    .select('nama_lengkap')
+
+  const existingNames = new Set(
+    (existing || []).map((g: any) => g.nama_lengkap.toLowerCase().trim())
+  )
+
+  // Filter: hanya yang belum ada di DB
+  const newOnly = parsed.filter(d => !existingNames.has(d.nama_lengkap.toLowerCase()))
+  const skippedCount = parsed.length - newOnly.length
+
+  // Semua duplikat - tidak ada yang perlu diinsert
+  if (newOnly.length === 0) {
+    return { success: true, count: 0, skipped: skippedCount, allDuplicate: true }
+  }
+
+  const { error } = await supabaseAdmin.from('data_guru').insert(newOnly)
   
   if (error) return { error: error.message }
   
   revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true, count: inserts.length }
+  return { success: true, count: newOnly.length, skipped: skippedCount }
 }
 
 // 4. SET JADWAL BATCH (SIMPAN SEMUA) & AUTO ACCOUNT

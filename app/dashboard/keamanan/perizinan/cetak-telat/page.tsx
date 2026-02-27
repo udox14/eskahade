@@ -5,16 +5,17 @@ import { getSantriTelat } from './actions'
 import { PemanggilanTelatView } from './pemanggilan-telat-view'
 import { useReactToPrint } from 'react-to-print'
 import { Printer, ArrowLeft, Loader2, Search } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 export default function CetakTelatPage() {
+  const router = useRouter()
   const [tglRef, setTglRef] = useState(new Date().toISOString().split('T')[0])
   const [tglPanggil, setTglPanggil] = useState(new Date().toISOString().split('T')[0])
   
   const [data, setData] = useState<Record<string, any[]> | null>(null)
   const [loading, setLoading] = useState(false)
-  const [hasSearched, setHasSearched] = useState(false) // Penanda sudah pernah cari atau belum
+  const [hasSearched, setHasSearched] = useState(false)
 
   const printRef = useRef(null)
   
@@ -26,7 +27,7 @@ export default function CetakTelatPage() {
 
   const handleLoad = async () => {
     setLoading(true)
-    setHasSearched(true) // Tandai user sudah klik tombol
+    setHasSearched(true)
     const res = await getSantriTelat(tglRef)
     setData(res)
     setLoading(false)
@@ -45,9 +46,10 @@ export default function CetakTelatPage() {
     <div className="space-y-6">
       {/* HEADER NO-PRINT */}
       <div className="flex items-center gap-4 print:hidden">
-        <Link href="/dashboard/keamanan/perizinan" className="p-2 hover:bg-gray-100 rounded-full">
+        {/* FIX: Ganti Link href ke button router.back() */}
+        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Cetak Santri Terlambat</h1>
           <p className="text-gray-500 text-sm">Daftar santri yang belum kembali melebihi batas izin (Per Minggu).</p>

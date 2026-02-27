@@ -8,9 +8,8 @@ export async function getKelasForCetak() {
   const { data } = await supabase
     .from('kelas')
     .select('id, nama_kelas, marhalah(nama)')
-    .order('nama_kelas')
-    
-  return data || []
+
+  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 // 2. BARU: Ambil Daftar Marhalah
@@ -76,12 +75,13 @@ export async function getDataBlankoMassal(marhalahId: string) {
       guru_maghrib:guru_maghrib_id(nama_lengkap)
     `)
     .eq('marhalah_id', marhalahId)
-    .order('nama_kelas')
+    .order('id')
 
-  if (!kelasList || kelasList.length === 0) return { error: "Tidak ada kelas di tingkat ini." }
+  const sortedKelasList = (kelasList || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  if (!sortedKelasList || sortedKelasList.length === 0) return { error: "Tidak ada kelas di tingkat ini." }
 
   // B. Ambil data santri untuk setiap kelas (Parallel)
-  const result = await Promise.all(kelasList.map(async (kelas) => {
+  const result = await Promise.all(sortedKelasList.map(async (kelas) => {
       const { data: riwayat } = await supabase
         .from('riwayat_pendidikan')
         .select(`

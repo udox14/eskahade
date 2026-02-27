@@ -188,7 +188,7 @@ export default function InputNilaiPage() {
               >
                 <option value="">-- Pilih Kelas --</option>
                 {refData.kelas.map((k: any) => (
-                  <option key={k.id} value={k.id}>{k.nama_kelas} ({k.marhalah?.nama})</option>
+                  <option key={k.id} value={k.id}>{k.nama_kelas}</option>
                 ))}
               </select>
             </div>
