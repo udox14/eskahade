@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 export async function getMarhalahList() {
   const supabase = await createClient()
   const { data } = await supabase.from('marhalah').select('*').order('urutan')
-  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  return data || []
 }
 
 // 2. Ambil Daftar Kelas & Guru Terplot (Filtered)

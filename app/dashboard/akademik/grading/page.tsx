@@ -236,7 +236,7 @@ export default function GradingKelasPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
             <TrendingUp className="w-7 h-7 text-indigo-600" />
-            Grading Ilmu Alat
+            Grading
           </h1>
           <p className="text-gray-500 text-sm mt-1">Sistem Rekomendasi Penentuan Grade Nahwu & Sharaf (A/B/C)</p>
         </div>

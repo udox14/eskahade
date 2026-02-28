@@ -149,7 +149,7 @@ const menuNodes: MenuNode[] = [
     items: [
       { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
       { title: "Penempatan Kelas", href: "/dashboard/santri/atur-kelas", icon: UserPlus, roles: ['admin', 'sekpen'] },
-      { title: "Grading Ilmu Alat", href: "/dashboard/akademik/grading", icon: BarChart3, roles: ['admin', 'sekpen', 'wali_kelas'] },
+      { title: "Grading Santri", href: "/dashboard/akademik/grading", icon: BarChart3, roles: ['admin', 'sekpen', 'wali_kelas'] },
       { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen'] },
     ]
   },
