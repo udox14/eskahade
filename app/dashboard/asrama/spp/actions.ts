@@ -121,7 +121,7 @@ export async function getStatusSPP(santriId: string, tahun: number) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('spp_log')
-    .select('*')
+    .select('id, bulan, tahun, nominal_bayar, tanggal_bayar, status_bayar')
     .eq('santri_id', santriId)
     .eq('tahun', tahun)
   return data || []

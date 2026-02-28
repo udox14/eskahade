@@ -34,7 +34,7 @@ export async function getDataMaster() {
 
   const { data: guru } = await supabaseAdmin
     .from('data_guru')
-    .select('*')
+    .select('id, nama_lengkap, gelar')
     .order('nama_lengkap')
 
   const sortedKelas = (kelas || []).sort((a: any, b: any) =>

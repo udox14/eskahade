@@ -47,8 +47,8 @@ export async function getMasterPelanggaran() {
   
   const { data } = await supabase
     .from('master_pelanggaran')
-    .select('*')
-    .order('kategori', { ascending: false }) // Berat di atas
+    .select('id, nama_pelanggaran, kategori, poin_default')
+    .order('kategori', { ascending: false })
     .order('nama_pelanggaran')
 
   return data || []
@@ -66,7 +66,7 @@ export async function simpanPelanggaran(formData: FormData) {
   // Validasi: Ambil detail dari Master untuk memastikan Poin & Jenis benar
   const { data: masterData } = await supabase
     .from('master_pelanggaran')
-    .select('*')
+    .select('id, nama_pelanggaran, kategori, poin_default, poin')
     .eq('id', masterId)
     .single()
 

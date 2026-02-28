@@ -77,7 +77,7 @@ export async function getRiwayatPelanggaran(santriId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('pelanggaran')
-    .select('*')
+    .select('id, tanggal, jenis, deskripsi, poin')
     .eq('santri_id', santriId)
     .order('tanggal', { ascending: false })
   return data || []
@@ -88,7 +88,7 @@ export async function getRiwayatPerizinan(santriId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('perizinan')
-    .select('*')
+    .select('id, created_at, status, jenis, alasan, tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual')
     .eq('santri_id', santriId)
     .order('created_at', { ascending: false })
   return data || []
@@ -99,7 +99,7 @@ export async function getRiwayatSPP(santriId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('spp_log')
-    .select('*, penerima:penerima_id(full_name)')
+    .select('id, bulan, tahun, nominal_bayar, tanggal_bayar, penerima:penerima_id(full_name)')
     .eq('santri_id', santriId)
     .order('tahun', { ascending: false })
     .order('bulan', { ascending: false })

@@ -32,7 +32,7 @@ export async function getAbsensiData(kelasId: string, tanggalRef: string) {
 
   const { data: absensi } = await supabase
     .from('absensi_harian')
-    .select('*')
+    .select('riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib')
     .in('riwayat_pendidikan_id', santri.map(s => s.id))
     .gte('tanggal', start.toISOString())
     .lte('tanggal', end.toISOString())

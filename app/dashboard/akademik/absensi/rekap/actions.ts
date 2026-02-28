@@ -157,7 +157,7 @@ export async function getDetailAbsensiSantri(santriId: string) {
 
   const { data } = await supabase
     .from('absensi_harian')
-    .select('*')
+    .select('tanggal, shubuh, ashar, maghrib')
     .eq('riwayat_pendidikan_id', riwayat.id)
     .or('shubuh.neq.H,ashar.neq.H,maghrib.neq.H')
     .order('tanggal', { ascending: false })

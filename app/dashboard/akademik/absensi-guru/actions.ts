@@ -39,7 +39,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
   // Ambil data absensi
   const { data: absensi } = await supabase
     .from('absensi_guru')
-    .select('*')
+    .select('kelas_id, tanggal, shubuh, ashar, maghrib')
     .gte('tanggal', startDate)
     .lte('tanggal', endDate)
     // Optimasi: Filter absensi hanya untuk kelas yang diambil (jika perlu, tapi filter date sudah cukup kuat)

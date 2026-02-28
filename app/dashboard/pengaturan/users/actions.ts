@@ -20,7 +20,7 @@ export async function getUsersList() {
   // 1. Ambil data Profile
   const { data: profiles, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('*')
+    .select('id, full_name, role, asrama_binaan, email, created_at')
     .order('created_at', { ascending: false })
 
   if (profileError || !profiles) return []

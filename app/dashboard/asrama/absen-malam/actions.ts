@@ -47,7 +47,7 @@ export async function getDataAbsenMalam(asramaRequest: string) {
   // 2. Ambil Absen Malam (Hanya status)
   const { data: absenList } = await supabase
     .from('absen_asrama')
-    .select('*')
+    .select('santri_id, status, updated_at')
     .in('santri_id', santriIds)
 
   // 3. Ambil Izin yang SEDANG AKTIF saat ini

@@ -229,7 +229,7 @@ export async function arsipkanSantri(santriIds: string[], catatan: string) {
       if (riwayatIds.length > 0) {
         const { data: absensi } = await supabaseAdmin
           .from('absensi_harian')
-          .select('*')
+          .select('riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib')
           .in('riwayat_pendidikan_id', riwayatIds)
         absensiList = absensi || []
       }
@@ -446,7 +446,7 @@ export async function getArsipForDownload(arsipIds?: string[]) {
 
   let query = supabase
     .from('santri_arsip')
-    .select('*')
+    .select('id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip')
     .order('angkatan', { ascending: false })
     .order('nama_lengkap')
 

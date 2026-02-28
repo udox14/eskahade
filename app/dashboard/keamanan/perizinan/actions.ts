@@ -24,7 +24,8 @@ export async function getPerizinanList(filterWaktu: 'HARI' | 'MINGGU' | 'BULAN' 
   const { data, error } = await supabase
     .from('perizinan')
     .select(`
-      *,
+      id, created_at, status, jenis, alasan,
+      tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual,
       santri (nama_lengkap, nis, asrama, kamar)
     `)
     // Tampilkan yang AKTIF (termasuk yang telat & menunggu sidang) 
