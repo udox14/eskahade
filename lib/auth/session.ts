@@ -1,4 +1,3 @@
-/// <reference types="node" />
 // lib/auth/session.ts
 // Manajemen session via JWT cookie — pengganti Supabase Auth session
 
