@@ -1,37 +1,34 @@
 import { ClientLayout } from "@/components/layout/client-layout";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  const session = await getSession();
 
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    // Redirect ke Landing Page (Root)
+  if (!session) {
     redirect("/");
   }
 
-  // Ambil data profile seperti biasa
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .maybeSingle();
+  const user = await queryOne<{ full_name: string; role: string }>(
+    'SELECT full_name, role FROM users WHERE id = ?',
+    [session.id]
+  );
 
-  const userRole = profile?.role || 'wali_kelas';
-  const userName = profile?.full_name || user.email || 'User';
+  const userRole = user?.role || 'wali_kelas';
+  const userName = user?.full_name || 'User';
 
   return (
-    <ClientLayout 
-      userRole={userRole} 
-      userEmail={user.email || ""} 
+    <ClientLayout
+      userRole={userRole}
+      userEmail=""
       userName={userName}
     >
       {children}

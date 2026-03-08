@@ -1,186 +1,120 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne, execute, generateId } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// 1. Helper & Config
 export async function getClientRestriction() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data } = await supabase.from('profiles').select('role, asrama_binaan').eq('id', user.id).single()
-    if (data?.role === 'pengurus_asrama') return data.asrama_binaan
-  }
+  const session = await getSession()
+  if (session?.role === 'pengurus_asrama') return session.asrama_binaan ?? null
   return null
 }
 
 export async function getNominalSPP() {
-  // Idealnya dari database settings, sementara hardcode/default
-  return 70000 
+  return 70000
 }
 
-// =========================================================================
-// FUNGSI BARU: Untuk Widget Dashboard (Menghitung Total Anak yang Menunggak)
-// =========================================================================
 export async function getRingkasanTunggakan(asramaFilter?: string) {
-  const supabase = await createClient()
   const tahun = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
 
-  // 1. Ambil santri aktif
-  let query = supabase.from('santri').select('id').eq('status_global', 'aktif')
-  if (asramaFilter && asramaFilter !== 'SEMUA') {
-    query = query.eq('asrama', asramaFilter)
-  }
-  const { data: santriList } = await query
-  
-  if (!santriList || santriList.length === 0) return 0
+  let sql = `SELECT id FROM santri WHERE status_global = 'aktif'`
+  const params: any[] = []
+  if (asramaFilter && asramaFilter !== 'SEMUA') { sql += ' AND asrama = ?'; params.push(asramaFilter) }
 
-  const santriIds = santriList.map(s => s.id)
+  const santriList = await query<any>(sql, params)
+  if (!santriList.length) return 0
 
-  // 2. Ambil log bayar tahun ini
-  const { data: logs } = await supabase
-    .from('spp_log')
-    .select('santri_id, bulan')
-    .eq('tahun', tahun)
-    .in('santri_id', santriIds)
+  const santriIds = santriList.map((s: any) => s.id)
+  const ph = santriIds.map(() => '?').join(',')
 
-  // 3. Hitung jumlah anak yang menunggak (minimal 1 bulan belum bayar s/d bulan ini)
+  const logs = await query<any>(
+    `SELECT santri_id, bulan FROM spp_log WHERE tahun = ? AND santri_id IN (${ph})`,
+    [tahun, ...santriIds]
+  )
+
   let penunggakCount = 0
-
-  santriList.forEach(s => {
-    const bayarAnak = logs?.filter(l => l.santri_id === s.id) || []
-    let nunggak = false
-    
-    for(let i = 1; i <= currentMonth; i++) {
-        if(!bayarAnak.some(l => l.bulan === i)) {
-            nunggak = true
-            break
-        }
+  santriList.forEach((s: any) => {
+    const bayarAnak = logs.filter((l: any) => l.santri_id === s.id)
+    for (let i = 1; i <= currentMonth; i++) {
+      if (!bayarAnak.some((l: any) => l.bulan === i)) { penunggakCount++; break }
     }
-    if (nunggak) penunggakCount++
   })
 
   return penunggakCount
 }
 
-// 2. Data Dashboard Monitoring (List View)
 export async function getDashboardSPP(tahun: number, asrama: string) {
-  const supabase = await createClient()
   const currentMonth = new Date().getMonth() + 1
-  
-  // A. Ambil Santri
-  let query = supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, asrama, kamar')
-    .eq('status_global', 'aktif')
-    .order('nama_lengkap')
 
-  if (asrama && asrama !== 'SEMUA') {
-    query = query.eq('asrama', asrama)
-  }
+  let sql = `SELECT id, nama_lengkap, nis, asrama, kamar FROM santri WHERE status_global = 'aktif'`
+  const params: any[] = []
+  if (asrama && asrama !== 'SEMUA') { sql += ' AND asrama = ?'; params.push(asrama) }
+  sql += ' ORDER BY nama_lengkap'
 
-  const { data: santriList } = await query
-  if (!santriList) return []
+  const santriList = await query<any>(sql, params)
+  if (!santriList.length) return []
 
-  const santriIds = santriList.map(s => s.id)
+  const santriIds = santriList.map((s: any) => s.id)
+  const ph = santriIds.map(() => '?').join(',')
 
-  // B. Ambil Pembayaran Tahun Ini
-  const { data: logs } = await supabase
-    .from('spp_log')
-    .select('santri_id, bulan')
-    .eq('tahun', tahun)
-    .in('santri_id', santriIds)
+  const logs = await query<any>(
+    `SELECT santri_id, bulan FROM spp_log WHERE tahun = ? AND santri_id IN (${ph})`,
+    [tahun, ...santriIds]
+  )
 
-  // C. Hitung Status
-  return santriList.map(s => {
-    const bayarAnak = logs?.filter(l => l.santri_id === s.id) || []
-    const bulanIniLunas = bayarAnak.some(l => l.bulan === currentMonth)
-    
-    // Hitung tunggakan (Januari s.d. Bulan Ini yg belum bayar)
+  return santriList.map((s: any) => {
+    const bayarAnak = logs.filter((l: any) => l.santri_id === s.id)
+    const bulanIniLunas = bayarAnak.some((l: any) => l.bulan === currentMonth)
+    const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
     let tunggakan = 0
-    // Asumsi tahun berjalan. Kalau tahun lalu, cek 1-12.
-    const maxCheck = (tahun < new Date().getFullYear()) ? 12 : currentMonth
-    
-    for(let i=1; i<=maxCheck; i++) {
-        if(!bayarAnak.some(l => l.bulan === i)) tunggakan++
+    for (let i = 1; i <= maxCheck; i++) {
+      if (!bayarAnak.some((l: any) => l.bulan === i)) tunggakan++
     }
-
-    return {
-        ...s,
-        bulan_ini_lunas: bulanIniLunas,
-        jumlah_tunggakan: tunggakan,
-        // Helper untuk sorting kamar
-        kamar_num: parseInt(s.kamar) || 999 
-    }
+    return { ...s, bulan_ini_lunas: bulanIniLunas, jumlah_tunggakan: tunggakan, kamar_num: parseInt(s.kamar) || 999 }
   })
 }
 
-// 3. Data Detail Santri (Payment View)
 export async function getStatusSPP(santriId: string, tahun: number) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('spp_log')
-    .select('id, bulan, tahun, nominal_bayar, tanggal_bayar, status_bayar')
-    .eq('santri_id', santriId)
-    .eq('tahun', tahun)
-  return data || []
+  return query<any>(
+    `SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar, status_bayar
+     FROM spp_log WHERE santri_id = ? AND tahun = ?`,
+    [santriId, tahun]
+  )
 }
 
-// 4. Bayar Manual (Detail View)
 export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
+  const ph = bulans.map(() => '?').join(',')
 
-  // Cek duplikat
-  const { data: exist } = await supabase
-    .from('spp_log')
-    .select('bulan')
-    .eq('santri_id', santriId)
-    .eq('tahun', tahun)
-    .in('bulan', bulans)
+  const exist = await query<any>(
+    `SELECT bulan FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan IN (${ph})`,
+    [santriId, tahun, ...bulans]
+  )
+  if (exist.length > 0) return { error: 'Beberapa bulan sudah dibayar sebelumnya.' }
 
-  if (exist && exist.length > 0) {
-    return { error: `Beberapa bulan sudah dibayar sebelumnya.` }
+  for (const b of bulans) {
+    await execute(`
+      INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar)
+      VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Manual', date('now'))
+    `, [generateId(), santriId, tahun, b, nominalPerBulan, session?.id ?? null])
   }
 
-  const inserts = bulans.map(b => ({
-    santri_id: santriId,
-    tahun,
-    bulan: b,
-    nominal_bayar: nominalPerBulan,
-    penerima_id: user?.id,
-    keterangan: 'Pembayaran Manual'
-  }))
-
-  const { error } = await supabase.from('spp_log').insert(inserts)
-
-  if (error) return { error: error.message }
-  
   revalidatePath('/dashboard/asrama/spp')
   return { success: true }
 }
 
-// 5. Simpan Batch (List View - Fitur Baru)
 export async function simpanSppBatch(listTransaksi: any[]) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
+  if (!listTransaksi.length) return { error: 'Tidak ada data.' }
 
-  if (!listTransaksi || listTransaksi.length === 0) return { error: "Tidak ada data." }
-
-  const inserts = listTransaksi.map(item => ({
-    santri_id: item.santriId,
-    bulan: item.bulan,
-    tahun: item.tahun,
-    nominal_bayar: item.nominal,
-    penerima_id: user?.id,
-    keterangan: 'Pembayaran Cepat'
-  }))
-
-  const { error } = await supabase.from('spp_log').insert(inserts)
-
-  if (error) return { error: error.message }
+  for (const item of listTransaksi) {
+    await execute(`
+      INSERT INTO spp_log (id, santri_id, bulan, tahun, nominal_bayar, penerima_id, keterangan, tanggal_bayar)
+      VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Cepat', date('now'))
+    `, [generateId(), item.santriId, item.bulan, item.tahun, item.nominal, session?.id ?? null])
+  }
 
   revalidatePath('/dashboard/asrama/spp')
-  return { success: true, count: inserts.length }
+  return { success: true, count: listTransaksi.length }
 }

@@ -1,89 +1,58 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query } from '@/lib/db'
+import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
 
-// 1. Ambil Santri untuk List (Dengan Filter)
 export async function getSantriForFoto(search: string, asrama: string, kamar: string) {
-  const supabase = await createClient()
-  
-  let query = supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, asrama, kamar, foto_url')
-    .eq('status_global', 'aktif')
-    .order('nama_lengkap')
-    
-  // Filter Search
-  if (search) {
-    query = query.ilike('nama_lengkap', `%${search}%`)
-  }
+  let sql = `SELECT id, nama_lengkap, nis, asrama, kamar, foto_url
+    FROM santri WHERE status_global = 'aktif'`
+  const params: any[] = []
 
-  // Filter Asrama
-  if (asrama && asrama !== 'SEMUA') {
-    query = query.eq('asrama', asrama)
-  }
+  if (search) { sql += ' AND nama_lengkap LIKE ?'; params.push(`%${search}%`) }
+  if (asrama && asrama !== 'SEMUA') { sql += ' AND asrama = ?'; params.push(asrama) }
+  if (kamar && kamar !== 'SEMUA') { sql += ' AND kamar = ?'; params.push(kamar) }
 
-  // Filter Kamar
-  if (kamar && kamar !== 'SEMUA') {
-    query = query.eq('kamar', kamar)
-  }
+  sql += ' ORDER BY nama_lengkap LIMIT 100'
 
-  // Limit hasil agar tidak berat (misal 50 per load jika tanpa filter spesifik)
-  // Tapi kalau sudah filter kamar, biasanya sedikit, jadi aman.
-  query = query.limit(100)
+  const data = await query<any>(sql, params)
 
-  const { data } = await query
-  
-  // Sort manual: Yang belum ada foto taruh paling atas
-  if (data) {
-    data.sort((a, b) => {
-        if (!a.foto_url && b.foto_url) return -1
-        if (a.foto_url && !b.foto_url) return 1
-        return 0
-    })
-  }
+  data.sort((a: any, b: any) => {
+    if (!a.foto_url && b.foto_url) return -1
+    if (a.foto_url && !b.foto_url) return 1
+    return 0
+  })
 
-  return data || []
+  return data
 }
 
-// 2. Upload Foto ke Storage & Update DB
 export async function uploadFotoSantri(formData: FormData) {
-  const supabase = await createClient()
-  
   const file = formData.get('file') as File
   const santriId = formData.get('santriId') as string
-  
-  if (!file || !santriId) return { error: "File atau ID tidak valid" }
 
-  // A. Upload ke Storage
-  const fileName = `${santriId}_${Date.now()}.jpg`
-  const { error: uploadError } = await supabase
-    .storage
-    .from('foto-santri')
-    .upload(fileName, file, {
-        upsert: true,
-        contentType: 'image/jpeg'
-    })
+  if (!file || !santriId) return { error: 'File atau ID tidak valid' }
 
-  if (uploadError) return { error: "Gagal upload storage: " + uploadError.message }
+  // Cek foto lama untuk dihapus
+  const existing = await query<{ foto_url: string | null }>(
+    'SELECT foto_url FROM santri WHERE id = ?', [santriId]
+  )
+  const fotoLama = existing[0]?.foto_url
 
-  // B. Dapatkan Public URL
-  const { data: urlData } = supabase
-    .storage
-    .from('foto-santri')
-    .getPublicUrl(fileName)
+  // Upload ke R2
+  const result = await uploadToR2(file, santriId)
 
-  const publicUrl = urlData.publicUrl
+  if ('error' in result) return { error: 'Gagal upload foto: ' + result.error }
 
-  // C. Simpan URL ke Tabel Santri
-  const { error: dbError } = await supabase
-    .from('santri')
-    .update({ foto_url: publicUrl })
-    .eq('id', santriId)
+  // Hapus foto lama dari R2 jika ada
+  if (fotoLama) await deleteFromR2(fotoLama)
 
-  if (dbError) return { error: "Gagal update database: " + dbError.message }
+  // Update URL di database
+  await query(
+    'UPDATE santri SET foto_url = ?, updated_at = ? WHERE id = ?',
+    [result.url, new Date().toISOString(), santriId]
+  )
 
-  revalidatePath('/dashboard/santri') 
+  revalidatePath('/dashboard/santri')
   revalidatePath('/dashboard/santri/foto')
-  return { success: true, url: publicUrl }
+  return { success: true, url: result.url }
 }

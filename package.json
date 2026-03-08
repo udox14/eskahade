@@ -15,8 +15,6 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.94.0",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

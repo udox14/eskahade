@@ -1,205 +1,155 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { query, queryOne } from '@/lib/db'
+import { hashPassword } from '@/lib/auth/password'
 import { revalidatePath } from 'next/cache'
 
-// Helper Email Generator
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.com`
 }
 
-// 1. GETTERS
 export async function getDataMaster() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return { kelasList: [], guruList: [] };
-  }
+  const kelas = await query<any>(`
+    SELECT 
+      k.id, k.nama_kelas,
+      m.nama as marhalah_nama,
+      gs.id as guru_shubuh_id, gs.nama_lengkap as guru_shubuh_nama,
+      ga.id as guru_ashar_id, ga.nama_lengkap as guru_ashar_nama,
+      gm.id as guru_maghrib_id, gm.nama_lengkap as guru_maghrib_nama,
+      u.full_name as wali_kelas_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    LEFT JOIN data_guru gs ON k.guru_shubuh_id = gs.id
+    LEFT JOIN data_guru ga ON k.guru_ashar_id = ga.id
+    LEFT JOIN data_guru gm ON k.guru_maghrib_id = gm.id
+    LEFT JOIN users u ON k.wali_kelas_id = u.id
+  `)
 
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-  
-  const { data: kelas } = await supabaseAdmin
-    .from('kelas')
-    .select(`
-      id, nama_kelas, marhalah(nama),
-      guru_shubuh:guru_shubuh_id(id, nama_lengkap),
-      guru_ashar:guru_ashar_id(id, nama_lengkap),
-      guru_maghrib:guru_maghrib_id(id, nama_lengkap),
-      wali_kelas:wali_kelas_id(full_name) 
-    `)
+  const guru = await query('SELECT id, nama_lengkap, gelar FROM data_guru ORDER BY nama_lengkap')
 
-  const { data: guru } = await supabaseAdmin
-    .from('data_guru')
-    .select('id, nama_lengkap, gelar')
-    .order('nama_lengkap')
-
-  const sortedKelas = (kelas || []).sort((a: any, b: any) =>
+  const sortedKelas = kelas.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
 
-  return { 
-    kelasList: sortedKelas, 
-    guruList: guru || [] 
-  }
+  return { kelasList: sortedKelas, guruList: guru }
 }
 
-// 2. MANAJEMEN GURU (CRUD MANUAL)
 export async function tambahGuruManual(nama: string, gelar: string, kode: string) {
-  const supabase = await createClient()
-  
-  const { error } = await supabase.from('data_guru').insert({
-    nama_lengkap: nama,
-    gelar: gelar,
-    kode_guru: kode
-  })
-
-  if (error) return { error: error.message }
+  await query(
+    'INSERT INTO data_guru (id, nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?, ?)',
+    [crypto.randomUUID(), nama, gelar, kode || null]
+  )
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
 
 export async function hapusGuru(id: string) {
-  const supabase = await createClient()
-
-  // Cek relasi dulu (optional, tapi biasanya FK sudah handle via SET NULL)
-  const { error } = await supabase.from('data_guru').delete().eq('id', id)
-
-  if (error) return { error: "Gagal menghapus (Mungkin sedang dipakai di jadwal?)" }
-  revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true }
+  try {
+    await query('DELETE FROM data_guru WHERE id = ?', [id])
+    revalidatePath('/dashboard/master/wali-kelas')
+    return { success: true }
+  } catch {
+    return { error: 'Gagal menghapus (Mungkin sedang dipakai di jadwal?)' }
+  }
 }
 
-// Hapus banyak guru sekaligus
 export async function hapusGuruBatch(ids: string[]) {
-  const supabase = await createClient()
-  if (!ids || ids.length === 0) return { error: "Pilih minimal 1 guru" }
-  const { error } = await supabase.from('data_guru').delete().in('id', ids)
-  if (error) return { error: "Gagal menghapus (Mungkin sedang dipakai di jadwal?)" }
-  revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true, count: ids.length }
+  if (!ids || ids.length === 0) return { error: 'Pilih minimal 1 guru' }
+  try {
+    const placeholders = ids.map(() => '?').join(',')
+    await query(`DELETE FROM data_guru WHERE id IN (${placeholders})`, ids)
+    revalidatePath('/dashboard/master/wali-kelas')
+    return { success: true, count: ids.length }
+  } catch {
+    return { error: 'Gagal menghapus (Mungkin sedang dipakai di jadwal?)' }
+  }
 }
 
-// 3. IMPORT DATA GURU (EXCEL) - dengan pengecekan duplikat
 export async function importDataGuru(dataExcel: any[]) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "Server Key Error" }
+  if (!dataExcel || dataExcel.length === 0) return { error: 'Data kosong' }
 
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-  
-  if (!dataExcel || dataExcel.length === 0) return { error: "Data kosong" }
-
-  // Normalisasi data dari Excel
   const parsed = dataExcel.map(row => ({
     nama_lengkap: String(row['NAMA LENGKAP'] || row['nama'] || row['Nama'] || '').trim(),
     gelar: row['GELAR'] || row['gelar'] || '',
     kode_guru: row['KODE'] || row['kode'] || null
   })).filter(d => d.nama_lengkap)
 
-  if (parsed.length === 0) return { error: "Tidak ada data guru valid" }
+  if (parsed.length === 0) return { error: 'Tidak ada data guru valid' }
 
-  // Ambil semua nama guru yang sudah ada di DB
-  const { data: existing } = await supabaseAdmin
-    .from('data_guru')
-    .select('nama_lengkap')
+  const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
+  const existingNames = new Set(existing.map(g => g.nama_lengkap.toLowerCase().trim()))
 
-  const existingNames = new Set(
-    (existing || []).map((g: any) => g.nama_lengkap.toLowerCase().trim())
-  )
-
-  // Filter: hanya yang belum ada di DB
   const newOnly = parsed.filter(d => !existingNames.has(d.nama_lengkap.toLowerCase()))
   const skippedCount = parsed.length - newOnly.length
 
-  // Semua duplikat - tidak ada yang perlu diinsert
   if (newOnly.length === 0) {
     return { success: true, count: 0, skipped: skippedCount, allDuplicate: true }
   }
 
-  const { error } = await supabaseAdmin.from('data_guru').insert(newOnly)
-  
-  if (error) return { error: error.message }
-  
+  for (const g of newOnly) {
+    await query(
+      'INSERT INTO data_guru (id, nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?, ?)',
+      [crypto.randomUUID(), g.nama_lengkap, g.gelar, g.kode_guru]
+    )
+  }
+
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: newOnly.length, skipped: skippedCount }
 }
 
-// 4. SET JADWAL BATCH (SIMPAN SEMUA) & AUTO ACCOUNT
 export async function simpanJadwalBatch(listJadwal: any[]) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "Server Key Error" }
-  
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
   let successCount = 0
 
   for (const item of listJadwal) {
     const { kelasId, shubuhId, asharId, maghribId } = item
-    
-    // A. Update Tabel Kelas
-    const { error: errKelas } = await supabaseAdmin
-      .from('kelas')
-      .update({
-        guru_shubuh_id: shubuhId || null,
-        guru_ashar_id: asharId || null,
-        guru_maghrib_id: maghribId || null
-      })
-      .eq('id', kelasId)
 
-    if (errKelas) continue;
+    try {
+      // A. Update jadwal guru di kelas
+      await query(
+        'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
+        [shubuhId || null, asharId || null, maghribId || null, kelasId]
+      )
 
-    // B. LOGIKA OTOMATIS WALI KELAS (Berdasarkan Guru Maghrib)
-    if (maghribId) {
-      const { data: guruData } = await supabaseAdmin
-        .from('data_guru')
-        .select('nama_lengkap')
-        .eq('id', maghribId)
-        .single()
+      // B. Auto wali kelas dari guru maghrib
+      if (maghribId) {
+        const guruData = await queryOne<{ nama_lengkap: string }>(
+          'SELECT nama_lengkap FROM data_guru WHERE id = ?',
+          [maghribId]
+        )
 
-      if (guruData) {
-        const email = generateEmail(guruData.nama_lengkap)
-        const password = "password123"
+        if (guruData) {
+          const email = generateEmail(guruData.nama_lengkap)
 
-        let userId = null
-        const { data: existingUsers } = await supabaseAdmin.from('profiles').select('id').eq('full_name', guruData.nama_lengkap).limit(1)
-        
-        if (existingUsers && existingUsers.length > 0) {
-          userId = existingUsers[0].id
-        } else {
-          const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-            email: email,
-            password: password,
-            email_confirm: true,
-            user_metadata: { full_name: guruData.nama_lengkap }
-          })
+          // Cek apakah user sudah ada
+          let user = await queryOne<{ id: string }>(
+            'SELECT id FROM users WHERE full_name = ? LIMIT 1',
+            [guruData.nama_lengkap]
+          )
 
-          if (newUser.user) {
-            userId = newUser.user.id
-            await supabaseAdmin.from('profiles').upsert({
-              id: userId,
-              full_name: guruData.nama_lengkap,
-              role: 'wali_kelas'
-            })
+          if (!user) {
+            // Buat user baru dengan password default
+            const passwordHash = await hashPassword('password123')
+            const newId = crypto.randomUUID()
+            const now = new Date().toISOString()
+
+            await query(
+              'INSERT INTO users (id, email, password_hash, full_name, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [newId, email, passwordHash, guruData.nama_lengkap, 'wali_kelas', now, now]
+            )
+            user = { id: newId }
           }
-        }
 
-        if (userId) {
-          await supabaseAdmin.from('kelas').update({ wali_kelas_id: userId }).eq('id', kelasId)
+          await query('UPDATE kelas SET wali_kelas_id = ? WHERE id = ?', [user.id, kelasId])
         }
+      } else {
+        await query('UPDATE kelas SET wali_kelas_id = NULL WHERE id = ?', [kelasId])
       }
-    } else {
-      await supabaseAdmin.from('kelas').update({ wali_kelas_id: null }).eq('id', kelasId)
+
+      successCount++
+    } catch (err) {
+      console.error('Error simpanJadwal untuk kelas', kelasId, err)
     }
-    successCount++
   }
 
   revalidatePath('/dashboard/master/wali-kelas')

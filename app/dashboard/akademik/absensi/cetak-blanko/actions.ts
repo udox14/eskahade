@@ -1,104 +1,81 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
 
-// 1. Ambil Daftar Kelas untuk Dropdown
 export async function getKelasForCetak() {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('kelas')
-    .select('id, nama_kelas, marhalah(nama)')
-
-  return (data || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  const data = await query<any>(`
+    SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+  `, [])
+  return data.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 }
 
-// 2. BARU: Ambil Daftar Marhalah
 export async function getMarhalahForCetak() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('marhalah').select('*').order('urutan')
-  return data || []
+  return query<any>('SELECT * FROM marhalah ORDER BY urutan', [])
 }
 
-// 3. Ambil Data Detail Kelas & Daftar Santri (SATUAN)
 export async function getDataBlanko(kelasId: string) {
-  const supabase = await createClient()
+  const kelas = await queryOne<any>(`
+    SELECT k.nama_kelas,
+           m.nama AS marhalah_nama,
+           gs.nama_lengkap AS guru_shubuh,
+           ga.nama_lengkap AS guru_ashar,
+           gm.nama_lengkap AS guru_maghrib
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
+    LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
+    LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+    WHERE k.id = ?
+  `, [kelasId])
 
-  // A. Ambil Detail Kelas
-  const { data: kelas, error: errKelas } = await supabase
-    .from('kelas')
-    .select(`
-      nama_kelas,
-      marhalah(nama),
-      guru_shubuh:guru_shubuh_id(nama_lengkap),
-      guru_ashar:guru_ashar_id(nama_lengkap),
-      guru_maghrib:guru_maghrib_id(nama_lengkap)
-    `)
-    .eq('id', kelasId)
-    .single()
+  if (!kelas) return { error: 'Kelas tidak ditemukan' }
 
-  if (errKelas || !kelas) return { error: "Kelas tidak ditemukan" }
-
-  // B. Ambil Santri
-  const { data: riwayat } = await supabase
-    .from('riwayat_pendidikan')
-    .select(`
-      santri:santri_id (
-        id, nama_lengkap, nis, asrama, kamar, sekolah, kelas_sekolah
-      )
-    `)
-    .eq('kelas_id', kelasId)
-    .eq('status_riwayat', 'aktif')
-
-  // C. Ekstrak & Sort
-  let santriList = riwayat?.map((r: any) => {
-     return Array.isArray(r.santri) ? r.santri[0] : r.santri
-  }).filter(Boolean) || []
-
-  santriList.sort((a: any, b: any) => a.nama_lengkap.localeCompare(b.nama_lengkap))
+  const santriList = await query<any>(`
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [kelasId])
 
   return { kelas, santriList }
 }
 
-// 4. BARU: Ambil Data Blanko Massal (PER MARHALAH)
 export async function getDataBlankoMassal(marhalahId: string) {
-  const supabase = await createClient()
+  const kelasList = await query<any>(`
+    SELECT k.id, k.nama_kelas,
+           m.nama AS marhalah_nama,
+           gs.nama_lengkap AS guru_shubuh,
+           ga.nama_lengkap AS guru_ashar,
+           gm.nama_lengkap AS guru_maghrib
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
+    LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
+    LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+    WHERE k.marhalah_id = ?
+    ORDER BY k.nama_kelas
+  `, [marhalahId])
 
-  // A. Ambil Semua Kelas di Marhalah ini
-  const { data: kelasList } = await supabase
-    .from('kelas')
-    .select(`
-      id,
-      nama_kelas,
-      marhalah(nama),
-      guru_shubuh:guru_shubuh_id(nama_lengkap),
-      guru_ashar:guru_ashar_id(nama_lengkap),
-      guru_maghrib:guru_maghrib_id(nama_lengkap)
-    `)
-    .eq('marhalah_id', marhalahId)
-    .order('id')
+  const sorted = kelasList.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 
-  const sortedKelasList = (kelasList || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
-  if (!sortedKelasList || sortedKelasList.length === 0) return { error: "Tidak ada kelas di tingkat ini." }
+  if (!sorted.length) return { error: 'Tidak ada kelas di tingkat ini.' }
 
-  // B. Ambil data santri untuk setiap kelas (Parallel)
-  const result = await Promise.all(sortedKelasList.map(async (kelas) => {
-      const { data: riwayat } = await supabase
-        .from('riwayat_pendidikan')
-        .select(`
-          santri:santri_id (
-            id, nama_lengkap, nis, asrama, kamar, sekolah, kelas_sekolah
-          )
-        `)
-        .eq('kelas_id', kelas.id)
-        .eq('status_riwayat', 'aktif')
-
-      let santriList = riwayat?.map((r: any) => {
-         return Array.isArray(r.santri) ? r.santri[0] : r.santri
-      }).filter(Boolean) || []
-
-      santriList.sort((a: any, b: any) => a.nama_lengkap.localeCompare(b.nama_lengkap))
-
-      return { kelas, santriList }
+  const result = await Promise.all(sorted.map(async (kelas: any) => {
+    const santriList = await query<any>(`
+      SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah
+      FROM riwayat_pendidikan rp
+      JOIN santri s ON s.id = rp.santri_id
+      WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+      ORDER BY s.nama_lengkap
+    `, [kelas.id])
+    return { kelas, santriList }
   }))
 
   return { massal: result }

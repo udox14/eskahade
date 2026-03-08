@@ -1,50 +1,40 @@
-import { createClient } from '@/lib/supabase/server'
+import { query } from '@/lib/db'
 import { FileText } from 'lucide-react'
 import { FormAturKelas } from './form-atur-kelas'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 export default async function AturKelasPage() {
-  const supabase = await createClient()
+  const kelasRaw = await query<any>(
+    'SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama FROM kelas k LEFT JOIN marhalah m ON m.id = k.marhalah_id', []
+  )
+  const kelasList = kelasRaw.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 
-  // 1. Ambil Daftar Kelas Aktif
-  const { data: kelasRaw } = await supabase
-    .from('kelas')
-    .select('id, nama_kelas, marhalah(nama)')
+  const santriRaw = await query<any>(`
+    SELECT s.id, s.nis, s.nama_lengkap,
+           htk.rekomendasi_marhalah, htk.catatan_grade
+    FROM santri s
+    LEFT JOIN hasil_tes_klasifikasi htk ON htk.santri_id = s.id
+    WHERE s.status_global = 'aktif'
+    ORDER BY s.nama_lengkap
+    LIMIT 1000
+  `, [])
 
-  const kelasList = (kelasRaw || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  const riwayatAda = await query<{ santri_id: string }>(
+    "SELECT santri_id FROM riwayat_pendidikan WHERE status_riwayat = 'aktif'", []
+  )
+  const sudahAdaKelas = new Set(riwayatAda.map(r => r.santri_id))
 
-  // 2. Ambil Santri Aktif BESERTA Hasil Tes Klasifikasi
-  const { data: santriList } = await supabase
-    .from('santri')
-    .select(`
-      id, nis, nama_lengkap, 
-      hasil_tes_klasifikasi (
-        rekomendasi_marhalah, 
-        catatan_grade
-      )
-    `)
-    .eq('status_global', 'aktif')
-    .order('nama_lengkap')
-    .limit(1000) // Naikkan limit agar semua santri baru termuat
-
-  // 3. Cek siapa yang sudah punya kelas (Untuk filter)
-  const { data: riwayatAda } = await supabase
-    .from('riwayat_pendidikan')
-    .select('santri_id')
-    .eq('status_riwayat', 'aktif')
-
-  // Filter santri: Hanya tampilkan yang BELUM punya kelas
-  const santriBelumDapatKelas = santriList?.filter(s => 
-    !riwayatAda?.some((r: any) => r.santri_id === s.id)
-  ).map((s: any) => {
-    // Ratakan objek hasil tes (karena bisa array/null tergantung query)
-    const hasil = Array.isArray(s.hasil_tes_klasifikasi) ? s.hasil_tes_klasifikasi[0] : s.hasil_tes_klasifikasi
-    return {
+  const santriBelumDapatKelas = santriRaw
+    .filter((s: any) => !sudahAdaKelas.has(s.id))
+    .map((s: any) => ({
       ...s,
-      rekomendasi: hasil ? `${hasil.rekomendasi_marhalah} (${hasil.catatan_grade})` : null
-    }
-  }) || []
+      rekomendasi: s.rekomendasi_marhalah
+        ? `${s.rekomendasi_marhalah} (${s.catatan_grade})`
+        : null,
+    }))
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -61,12 +51,7 @@ export default async function AturKelasPage() {
             <p>Gunakan label rekomendasi (berwarna) sebagai acuan untuk memilih kelas tujuan.</p>
           </div>
         </div>
-
-        {/* Form Client Component */}
-        <FormAturKelas 
-          kelasList={kelasList || []} 
-          santriList={santriBelumDapatKelas} 
-        />
+        <FormAturKelas kelasList={kelasList} santriList={santriBelumDapatKelas} />
       </div>
     </div>
   )

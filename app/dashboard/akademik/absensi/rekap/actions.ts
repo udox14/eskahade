@@ -1,174 +1,121 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 
-// 1. Cek Hak Akses (Scope) User
 export async function getUserScope() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) return { role: 'guest', filter: null }
+  const session = await getSession()
+  if (!session) return { role: 'guest', filter: null }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, asrama_binaan')
-    .eq('id', user.id)
-    .single()
+  const role = session.role
 
-  const role = profile?.role || 'wali_kelas'
-
-  // LOGIKA PEMBATASAN DATA
   if (role === 'pengurus_asrama') {
-    return { role, type: 'ASRAMA', value: profile?.asrama_binaan }
+    return { role, type: 'ASRAMA', value: session.asrama_binaan }
   }
-  
+
   if (role === 'wali_kelas') {
-    const { data: kelas } = await supabase
-      .from('kelas')
-      .select('id')
-      .eq('wali_kelas_id', user.id)
-      .single()
-    
+    const kelas = await queryOne<{ id: string }>(
+      'SELECT id FROM kelas WHERE wali_kelas_id = ?', [session.id]
+    )
     return { role, type: 'KELAS', value: kelas?.id }
   }
 
   return { role, type: 'GLOBAL', value: null }
 }
 
-// 2. Ambil Data Rekap (Agregasi S/I/A)
 export async function getRekapAbsensi(
-  filterNama: string, 
-  filterAsrama: string, 
+  filterNama: string,
+  filterAsrama: string,
   filterKelasId: string,
   filterKamar: string
 ) {
-  const supabase = await createClient()
   const scope = await getUserScope()
 
-  // --- QUERY SANTRI ---
-  let query = supabase
-    .from('santri')
-    .select(`
-      id, nama_lengkap, nis, asrama, kamar,
-      riwayat_pendidikan!inner (
-        id, kelas_id,
-        kelas (id, nama_kelas) 
-      )
-    `)
-    // Note: Saya hapus fetch marhalah(nama) karena tidak dipakai lagi untuk display
-    .eq('status_global', 'aktif')
-    .eq('riwayat_pendidikan.status_riwayat', 'aktif')
-    .order('nama_lengkap')
-    .limit(100)
+  let sql = `
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+           rp.id AS riwayat_id,
+           k.nama_kelas
+    FROM santri s
+    JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    JOIN kelas k ON k.id = rp.kelas_id
+    WHERE s.status_global = 'aktif'
+  `
+  const params: any[] = []
 
-  // Terapkan Scope Role
   if (scope.type === 'ASRAMA') {
-    if (!scope.value) return [] 
-    query = query.eq('asrama', scope.value)
+    if (!scope.value) return []
+    sql += ' AND s.asrama = ?'; params.push(scope.value)
   } else if (scope.type === 'KELAS') {
-    if (!scope.value) return [] 
-    query = query.eq('riwayat_pendidikan.kelas_id', scope.value)
+    if (!scope.value) return []
+    sql += ' AND rp.kelas_id = ?'; params.push(scope.value)
   }
 
-  // Terapkan Filter User
-  if (filterAsrama && scope.type !== 'ASRAMA') {
-    query = query.eq('asrama', filterAsrama)
-  }
-  
-  if (filterKamar) {
-    query = query.eq('kamar', filterKamar)
-  }
+  if (filterAsrama && scope.type !== 'ASRAMA') { sql += ' AND s.asrama = ?'; params.push(filterAsrama) }
+  if (filterKamar) { sql += ' AND s.kamar = ?'; params.push(filterKamar) }
+  if (filterKelasId && scope.type !== 'KELAS') { sql += ' AND rp.kelas_id = ?'; params.push(filterKelasId) }
+  if (filterNama) { sql += ' AND s.nama_lengkap LIKE ?'; params.push(`%${filterNama}%`) }
 
-  if (filterKelasId && scope.type !== 'KELAS') {
-    query = query.eq('riwayat_pendidikan.kelas_id', filterKelasId)
-  }
-  if (filterNama) {
-    query = query.ilike('nama_lengkap', `%${filterNama}%`)
-  }
+  sql += ' ORDER BY s.nama_lengkap LIMIT 100'
 
-  const { data: santriList, error } = await query
+  const santriList = await query<any>(sql, params)
+  if (!santriList.length) return []
 
-  if (error || !santriList || santriList.length === 0) return []
+  const riwayatIds = santriList.map((s: any) => s.riwayat_id)
+  const ph = riwayatIds.map(() => '?').join(',')
 
-  const riwayatIds = santriList.map((s: any) => {
-    const r = Array.isArray(s.riwayat_pendidikan) ? s.riwayat_pendidikan[0] : s.riwayat_pendidikan
-    return r?.id
-  }).filter(Boolean)
+  const absenList = await query<any>(`
+    SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
+    FROM absensi_harian
+    WHERE riwayat_pendidikan_id IN (${ph})
+      AND (shubuh != 'H' OR ashar != 'H' OR maghrib != 'H')
+  `, riwayatIds)
 
-  // --- QUERY ABSENSI ---
-  const { data: absenList } = await supabase
-    .from('absensi_harian')
-    .select('riwayat_pendidikan_id, shubuh, ashar, maghrib')
-    .in('riwayat_pendidikan_id', riwayatIds)
-    .or('shubuh.neq.H,ashar.neq.H,maghrib.neq.H')
-
-  // --- AGREGASI ---
   const result = santriList.map((s: any) => {
-    const rArr = Array.isArray(s.riwayat_pendidikan) ? s.riwayat_pendidikan : [s.riwayat_pendidikan]
-    const r = rArr[0] || {}
-    
-    const riwayatId = r.id
-    const absenAnak = absenList?.filter(a => a.riwayat_pendidikan_id === riwayatId) || []
-
+    const absenAnak = absenList.filter((a: any) => a.riwayat_pendidikan_id === s.riwayat_id)
     let sakit = 0, izin = 0, alfa = 0
 
     absenAnak.forEach((row: any) => {
-      if (row.shubuh === 'S') sakit++; if (row.shubuh === 'I') izin++; if (row.shubuh === 'A') alfa++;
-      if (row.ashar === 'S') sakit++; if (row.ashar === 'I') izin++; if (row.ashar === 'A') alfa++;
-      if (row.maghrib === 'S') sakit++; if (row.maghrib === 'I') izin++; if (row.maghrib === 'A') alfa++;
+      if (row.shubuh === 'S') sakit++; if (row.shubuh === 'I') izin++; if (row.shubuh === 'A') alfa++
+      if (row.ashar === 'S') sakit++;  if (row.ashar === 'I') izin++;  if (row.ashar === 'A') alfa++
+      if (row.maghrib === 'S') sakit++; if (row.maghrib === 'I') izin++; if (row.maghrib === 'A') alfa++
     })
-
-    // Handle Kelas Data
-    const kArr = Array.isArray(r.kelas) ? r.kelas : [r.kelas]
-    const k = kArr[0] || {}
-    
-    // UPDATE: Hanya tampilkan nama kelas saja, tanpa marhalah di dalam kurung
-    const namaKelas = k.nama_kelas || '-'
 
     return {
       id: s.id,
       nama: s.nama_lengkap,
       nis: s.nis,
       info_asrama: `${s.asrama || '-'} - Kamar ${s.kamar || '-'}`,
-      info_kelas: namaKelas,
+      info_kelas: s.nama_kelas || '-',
       total_s: sakit,
       total_i: izin,
       total_a: alfa,
-      total_masalah: sakit + izin + alfa
+      total_masalah: sakit + izin + alfa,
     }
   })
 
-  // Sort by Total Alfa
-  return result.sort((a, b) => b.total_a - a.total_a)
+  return result.sort((a: any, b: any) => b.total_a - a.total_a)
 }
 
-// 3. Ambil Detail (Untuk Modal Popup)
 export async function getDetailAbsensiSantri(santriId: string) {
-  const supabase = await createClient()
-
-  const { data: riwayat } = await supabase
-    .from('riwayat_pendidikan')
-    .select('id')
-    .eq('santri_id', santriId)
-    .eq('status_riwayat', 'aktif')
-    .single()
-
+  const riwayat = await queryOne<{ id: string }>(
+    `SELECT id FROM riwayat_pendidikan WHERE santri_id = ? AND status_riwayat = 'aktif'`,
+    [santriId]
+  )
   if (!riwayat) return []
 
-  const { data } = await supabase
-    .from('absensi_harian')
-    .select('tanggal, shubuh, ashar, maghrib')
-    .eq('riwayat_pendidikan_id', riwayat.id)
-    .or('shubuh.neq.H,ashar.neq.H,maghrib.neq.H')
-    .order('tanggal', { ascending: false })
-
-  return data || []
+  return query<any>(`
+    SELECT tanggal, shubuh, ashar, maghrib
+    FROM absensi_harian
+    WHERE riwayat_pendidikan_id = ?
+      AND (shubuh != 'H' OR ashar != 'H' OR maghrib != 'H')
+    ORDER BY tanggal DESC
+  `, [riwayat.id])
 }
 
-// Helper untuk Dropdown
 export async function getReferensiFilter() {
-  const supabase = await createClient()
-  const { data: kelas } = await supabase.from('kelas').select('id, nama_kelas')
-  const sorted = (kelas || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  const kelas = await query<any>('SELECT id, nama_kelas FROM kelas')
+  const sorted = kelas.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
   return { kelas: sorted }
 }

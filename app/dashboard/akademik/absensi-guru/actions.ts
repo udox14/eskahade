@@ -1,89 +1,69 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, execute } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// 1. Ambil Daftar Marhalah (Untuk Filter)
 export async function getMarhalahList() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('marhalah').select('*').order('urutan')
-  return data || []
+  return query<any>('SELECT * FROM marhalah ORDER BY urutan', [])
 }
 
-// 2. Ambil Daftar Kelas & Guru Terplot (Filtered)
 export async function getJurnalGuru(startDate: string, endDate: string, marhalahId?: string) {
-  const supabase = await createClient()
+  let sql = `
+    SELECT k.id, k.nama_kelas,
+           m.id AS marhalah_id, m.nama AS marhalah_nama,
+           gs.id AS guru_shubuh_id, gs.nama_lengkap AS guru_shubuh_nama,
+           ga.id AS guru_ashar_id, ga.nama_lengkap AS guru_ashar_nama,
+           gm.id AS guru_maghrib_id, gm.nama_lengkap AS guru_maghrib_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
+    LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
+    LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+  `
+  const params: any[] = []
+  if (marhalahId) { sql += ' WHERE k.marhalah_id = ?'; params.push(marhalahId) }
+  sql += ' ORDER BY k.id'
 
-  // Query Kelas
-  let query = supabase
-    .from('kelas')
-    .select(`
-      id, 
-      nama_kelas, 
-      marhalah(id, nama),
-      guru_shubuh:guru_shubuh_id(id, nama_lengkap),
-      guru_ashar:guru_ashar_id(id, nama_lengkap),
-      guru_maghrib:guru_maghrib_id(id, nama_lengkap)
-    `)
-    .order('id')
+  const kelasList = await query<any>(sql, params)
+  if (!kelasList.length) return { list: [], absensi: {} }
 
-  // Filter by Marhalah
-  if (marhalahId) {
-    query = query.eq('marhalah_id', marhalahId)
-  }
+  const absensi = await query<any>(
+    `SELECT kelas_id, tanggal, shubuh, ashar, maghrib
+     FROM absensi_guru
+     WHERE tanggal >= ? AND tanggal <= ?`,
+    [startDate, endDate]
+  )
 
-  const { data: kelasList } = await query
-
-  if (!kelasList) return { list: [], absensi: {} }
-
-  // Ambil data absensi
-  const { data: absensi } = await supabase
-    .from('absensi_guru')
-    .select('kelas_id, tanggal, shubuh, ashar, maghrib')
-    .gte('tanggal', startDate)
-    .lte('tanggal', endDate)
-    // Optimasi: Filter absensi hanya untuk kelas yang diambil (jika perlu, tapi filter date sudah cukup kuat)
-
-  // Mapping
   const absensiMap: Record<string, any> = {}
-  absensi?.forEach((a: any) => {
-    const key = `${a.kelas_id}-${a.tanggal}`
-    absensiMap[key] = {
-      shubuh: a.shubuh,
-      ashar: a.ashar,
-      maghrib: a.maghrib
-    }
+  absensi.forEach((a: any) => {
+    absensiMap[`${a.kelas_id}-${a.tanggal}`] = { shubuh: a.shubuh, ashar: a.ashar, maghrib: a.maghrib }
   })
 
   return {
-    list: (kelasList || []).sort((a: any, b: any) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })),
-    absensi: absensiMap
+    list: kelasList.sort((a: any, b: any) =>
+      a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+    ),
+    absensi: absensiMap,
   }
 }
 
-// 3. Simpan Absensi Guru
 export async function simpanAbsensiGuru(payload: any[]) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
+  if (payload.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
-  if (payload.length === 0) return { error: "Tidak ada data untuk disimpan" }
+  for (const item of payload) {
+    await execute(`
+      INSERT INTO absensi_guru (kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
+        shubuh = excluded.shubuh,
+        ashar = excluded.ashar,
+        maghrib = excluded.maghrib,
+        updated_by = excluded.updated_by
+    `, [item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session?.id ?? null])
+  }
 
-  const dataInsert = payload.map(item => ({
-    kelas_id: item.kelas_id,
-    guru_id: item.guru_id_wali, 
-    tanggal: item.tanggal,
-    shubuh: item.shubuh,
-    ashar: item.ashar,
-    maghrib: item.maghrib,
-    updated_by: user?.id
-  }))
-
-  const { error } = await supabase
-    .from('absensi_guru')
-    .upsert(dataInsert, { onConflict: 'kelas_id, tanggal' })
-
-  if (error) return { error: error.message }
-  
   revalidatePath('/dashboard/akademik/absensi-guru')
   return { success: true }
 }

@@ -25,7 +25,7 @@ function BlankoSheet({ data }: { data: any }) {
   const getNamaGuru = (dataGuru: any) => {
     if (!dataGuru) return '............................'
     if (Array.isArray(dataGuru)) return dataGuru[0]?.nama_lengkap || '............................'
-    return dataGuru.nama_lengkap || '............................'
+    return dataGuru.full_name || '............................'
   }
 
   const formatAsrama = (asrama: string, kamar: string) => {

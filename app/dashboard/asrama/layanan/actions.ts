@@ -1,134 +1,114 @@
-"use server";
+'use server'
 
-import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { query, execute, generateId } from '@/lib/db'
+import { revalidatePath } from 'next/cache'
 
-// --- REFERENSI ASRAMA & KAMAR ---
 export async function getDaftarAsrama() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('santri')
-    .select('asrama')
-    .not('asrama', 'is', null)
-    .order('asrama');
-  
-  if (error) throw error;
-  
-  const uniqueAsrama = Array.from(new Set(data.map(item => item.asrama)));
-  return uniqueAsrama;
+  const data = await query<any>(
+    `SELECT DISTINCT asrama FROM santri WHERE asrama IS NOT NULL ORDER BY asrama`, []
+  )
+  return data.map((d: any) => d.asrama)
 }
 
 export async function getDaftarKamar(asrama: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('santri')
-    .select('kamar')
-    .eq('asrama', asrama)
-    .not('kamar', 'is', null)
-    .order('kamar');
-  
-  if (error) throw error;
-  
-  const uniqueKamar = Array.from(new Set(data.map(item => item.kamar)));
-  return uniqueKamar;
+  const data = await query<any>(
+    `SELECT DISTINCT kamar FROM santri WHERE asrama = ? AND kamar IS NOT NULL ORDER BY kamar`,
+    [asrama]
+  )
+  return data.map((d: any) => d.kamar)
 }
 
-// --- MASTER PENYEDIA JASA ---
 export async function getMasterJasa() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('master_jasa')
-    .select('*')
-    .order('nama_jasa', { ascending: true });
-  
-  if (error) throw error;
-  return data;
+  return query<any>('SELECT * FROM master_jasa ORDER BY nama_jasa', [])
 }
 
 export async function tambahMasterJasa(nama_jasa: string, jenis: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from('master_jasa').insert([{ nama_jasa, jenis }]);
-  
-  if (error) throw error;
-  revalidatePath('/dashboard/asrama/layanan');
-  return { success: true };
+  await execute(
+    'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
+    [generateId(), nama_jasa, jenis]
+  )
+  revalidatePath('/dashboard/asrama/layanan')
+  return { success: true }
 }
 
-// Tambah massal - Sekarang menerima array objek langsung (hasil parsing Excel dari Client)
-export async function tambahMasterJasaBatch(dataBatch: { nama_jasa: string, jenis: string }[]) {
-  if (!dataBatch || dataBatch.length === 0) return { error: "Data kosong" };
+export async function tambahMasterJasaBatch(dataBatch: { nama_jasa: string; jenis: string }[]) {
+  if (!dataBatch || !dataBatch.length) return { error: 'Data kosong' }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from('master_jasa').insert(dataBatch);
-  if (error) throw error;
-  
-  revalidatePath('/dashboard/asrama/layanan');
-  return { success: true, count: dataBatch.length };
+  for (const item of dataBatch) {
+    await execute(
+      'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
+      [generateId(), item.nama_jasa, item.jenis]
+    )
+  }
+
+  revalidatePath('/dashboard/asrama/layanan')
+  return { success: true, count: dataBatch.length }
 }
 
 export async function hapusMasterJasa(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from('master_jasa').delete().eq('id', id);
-  if (error) throw error;
-  revalidatePath('/dashboard/asrama/layanan');
+  await execute('DELETE FROM master_jasa WHERE id = ?', [id])
+  revalidatePath('/dashboard/asrama/layanan')
 }
 
-// --- LAZY LOAD LIST SANTRI ---
 export async function getSantriLayanan({
   asrama,
   kamar,
   belumDitempatkan,
   page = 0,
-  limit = 20
+  limit = 20,
 }: {
-  asrama: string;
-  kamar?: string;
-  belumDitempatkan: boolean;
-  page: number;
-  limit: number;
+  asrama: string
+  kamar?: string
+  belumDitempatkan: boolean
+  page: number
+  limit: number
 }) {
-  const supabase = await createClient();
-  const start = page * limit;
-  const end = start + limit - 1;
+  let sql = `
+    SELECT id, nis, nama_lengkap, kamar, tempat_makan_id, tempat_mencuci_id
+    FROM santri
+    WHERE asrama = ?
+  `
+  const params: any[] = [asrama]
 
-  let query = supabase
-    .from('santri')
-    .select('id, nis, nama_lengkap, kamar, tempat_makan_id, tempat_mencuci_id', { count: 'exact' })
-    .eq('asrama', asrama)
-    .order('kamar', { ascending: true })
-    .order('nama_lengkap', { ascending: true })
-    .range(start, end);
+  if (kamar) { sql += ' AND kamar = ?'; params.push(kamar) }
+  if (belumDitempatkan) { sql += ' AND (tempat_makan_id IS NULL OR tempat_mencuci_id IS NULL)' }
 
-  if (kamar) {
-    query = query.eq('kamar', kamar);
-  }
+  sql += ' ORDER BY kamar, nama_lengkap'
 
-  if (belumDitempatkan) {
-    query = query.or('tempat_makan_id.is.null,tempat_mencuci_id.is.null');
-  }
+  // count total
+  const countSql = sql.replace(
+    'SELECT id, nis, nama_lengkap, kamar, tempat_makan_id, tempat_mencuci_id',
+    'SELECT COUNT(*) AS total'
+  )
+  const countResult = await query<any>(countSql, params)
+  const count = countResult[0]?.total ?? 0
 
-  const { data, error, count } = await query;
-  if (error) throw error;
+  sql += ' LIMIT ? OFFSET ?'
+  params.push(limit, page * limit)
 
-  return { data, count };
+  const data = await query<any>(sql, params)
+  return { data, count }
 }
 
-// --- SIMPAN BATCH (BULK UPDATE) ---
-export async function simpanBatchLayanan(changes: Record<string, { tempat_makan_id?: string | null, tempat_mencuci_id?: string | null }>) {
-  const supabase = await createClient();
-  const entries = Object.entries(changes);
-  
-  if (entries.length === 0) return { success: true };
+export async function simpanBatchLayanan(
+  changes: Record<string, { tempat_makan_id?: string | null; tempat_mencuci_id?: string | null }>
+) {
+  const entries = Object.entries(changes)
+  if (!entries.length) return { success: true }
 
-  const promises = entries.map(([id, data]) => {
-    return supabase.from('santri').update(data).eq('id', id);
-  });
+  for (const [id, data] of entries) {
+    const sets: string[] = []
+    const params: any[] = []
 
-  const results = await Promise.all(promises);
-  
-  const hasError = results.some(res => res.error !== null);
-  if (hasError) throw new Error("Gagal menyimpan beberapa data");
+    if ('tempat_makan_id' in data) { sets.push('tempat_makan_id = ?'); params.push(data.tempat_makan_id) }
+    if ('tempat_mencuci_id' in data) { sets.push('tempat_mencuci_id = ?'); params.push(data.tempat_mencuci_id) }
 
-  revalidatePath('/dashboard/asrama/layanan');
-  return { success: true, count: entries.length };
+    if (sets.length) {
+      params.push(id)
+      await execute(`UPDATE santri SET ${sets.join(', ')} WHERE id = ?`, params)
+    }
+  }
+
+  revalidatePath('/dashboard/asrama/layanan')
+  return { success: true, count: entries.length }
 }

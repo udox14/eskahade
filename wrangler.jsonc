@@ -1,25 +1,47 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "eskahade",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-04-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "mansatas"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "NEXT_INC_CACHE_KV",
-      "id": "5c584e05fa9749b3a4320199513c2275",
-      "preview_id": "4a01dc7b15284dd7aedc23ab613beef0",
-      "remote": true
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "eskahade",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2025-04-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "eskahade"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "NEXT_INC_CACHE_KV",
+			"id": "5c584e05fa9749b3a4320199513c2275",
+			"preview_id": "4a01dc7b15284dd7aedc23ab613beef0",
+			"remote": true
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "eskahade-db",
+			"database_id": "a2010f08-f314-46af-88fd-dbb9b4ef1bb1",
+			"remote": true
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "eskahade-foto",
+			"preview_bucket_name": "eskahade-foto-preview"
+		},
+		{
+			"bucket_name": "eskahade-foto",
+			"binding": "eskahade_foto",
+			"remote": true
+		}
+	]
 }

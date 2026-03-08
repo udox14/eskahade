@@ -1,29 +1,23 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 export async function tambahJenisPelanggaran(formData: FormData) {
-  const supabase = await createClient()
+  const kategori = formData.get('kategori') as string
+  const nama = formData.get('nama_pelanggaran') as string
+  const poin = Number(formData.get('poin'))
 
-  const kategori = formData.get('kategori')
-  const nama = formData.get('nama_pelanggaran')
-  const poin = formData.get('poin')
+  await query(
+    'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin) VALUES (?, ?, ?)',
+    [kategori, nama, poin]
+  )
 
-  const { error } = await supabase.from('master_pelanggaran').insert({
-    kategori,
-    nama_pelanggaran: nama,
-    poin: Number(poin)
-  })
-
-  if (error) return { error: error.message }
-  
   revalidatePath('/dashboard/master/pelanggaran')
   return { success: true }
 }
 
 export async function hapusJenisPelanggaran(id: number) {
-  const supabase = await createClient()
-  await supabase.from('master_pelanggaran').delete().eq('id', id)
+  await query('DELETE FROM master_pelanggaran WHERE id = ?', [id])
   revalidatePath('/dashboard/master/pelanggaran')
 }

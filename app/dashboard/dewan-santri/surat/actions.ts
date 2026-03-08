@@ -1,122 +1,92 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, execute, generateId, now } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// 1. Cari Santri
 export async function cariSantri(keyword: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, asrama, kamar, tempat_lahir, tanggal_lahir, alamat, nama_ayah, sekolah, kelas_sekolah')
-    .eq('status_global', 'aktif')
-    .ilike('nama_lengkap', `%${keyword}%`)
-    .limit(5)
-  return data || []
+  return query<any>(`
+    SELECT id, nama_lengkap, nis, asrama, kamar, tempat_lahir, tanggal_lahir,
+           alamat, nama_ayah, sekolah, kelas_sekolah
+    FROM santri
+    WHERE status_global = 'aktif' AND nama_lengkap LIKE ?
+    LIMIT 5
+  `, [`%${keyword}%`])
 }
 
-// 2. Hitung Detail Tunggakan SPP
 export async function cekTunggakanSantri(santriId: string) {
-  const supabase = await createClient()
   const tahun = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
-  
-  const { data: logs } = await supabase
-    .from('spp_log')
-    .select('bulan, nominal_bayar')
-    .eq('santri_id', santriId)
-    .eq('tahun', tahun)
+
+  const logs = await query<any>(
+    'SELECT bulan, nominal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?',
+    [santriId, tahun]
+  )
+
+  const BULAN_NAMA = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
   const bulanNunggak: string[] = []
   let totalHutang = 0
-  const BULAN_NAMA = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
   for (let i = 1; i <= currentMonth; i++) {
-    const isLunas = logs?.some(l => l.bulan === i)
-    if (!isLunas) {
-      bulanNunggak.push(BULAN_NAMA[i-1])
-      totalHutang += 70000 
+    if (!logs.some((l: any) => l.bulan === i)) {
+      bulanNunggak.push(BULAN_NAMA[i - 1])
+      totalHutang += 70000
     }
   }
 
   return {
     adaTunggakan: bulanNunggak.length > 0,
-    listBulan: bulanNunggak.join(", "),
+    listBulan: bulanNunggak.join(', '),
     total: totalHutang,
-    tahun: tahun
+    tahun,
   }
 }
 
-// 3. Catat Surat Keluar & Auto Update Status
 export async function catatSuratKeluar(santriId: string, jenis: string, detail: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  // A. Catat Riwayat Surat
-  const { error } = await supabase.from('riwayat_surat').insert({
-    santri_id: santriId,
-    jenis_surat: jenis,
-    detail_info: detail,
-    created_by: user?.id
-  })
+  await execute(`
+    INSERT INTO riwayat_surat (id, santri_id, jenis_surat, detail_info, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [generateId(), santriId, jenis, detail, session?.id ?? null, now()])
 
-  if (error) return { error: error.message }
-
-  // B. LOGIKA OTOMATIS: Jika Surat Berhenti -> Update Status Santri
   if (jenis === 'BERHENTI') {
-    // 1. Update Status Global jadi 'dikeluarkan' (Non-Aktif)
-    const { error: errSantri } = await supabase
-      .from('santri')
-      .update({ status_global: 'dikeluarkan' }) 
-      .eq('id', santriId)
-    
-    if (errSantri) console.error("Gagal update status santri:", errSantri)
-
-    // 2. Keluarkan juga dari Kelas Aktif (opsional tapi rapi)
-    const { error: errKelas } = await supabase
-      .from('riwayat_pendidikan')
-      .update({ status_riwayat: 'keluar' })
-      .eq('santri_id', santriId)
-      .eq('status_riwayat', 'aktif')
-
-    if (errKelas) console.error("Gagal update kelas:", errKelas)
+    await execute(
+      `UPDATE santri SET status_global = 'dikeluarkan' WHERE id = ?`,
+      [santriId]
+    )
+    await execute(
+      `UPDATE riwayat_pendidikan SET status_riwayat = 'keluar'
+       WHERE santri_id = ? AND status_riwayat = 'aktif'`,
+      [santriId]
+    )
   }
-  
+
   revalidatePath('/dashboard/dewan-santri/surat')
-  revalidatePath('/dashboard/santri') // Refresh data induk agar santri hilang dari list aktif
+  revalidatePath('/dashboard/santri')
   return { success: true }
 }
 
-// 4. Ambil Riwayat Surat
 export async function getRiwayatSurat(bulan: number, tahun: number) {
-  const supabase = await createClient()
-
   const startDate = new Date(tahun, bulan - 1, 1).toISOString()
   const endDate = new Date(tahun, bulan, 0, 23, 59, 59).toISOString()
 
-  const { data } = await supabase
-    .from('riwayat_surat')
-    .select(`
-      id, 
-      jenis_surat, 
-      detail_info, 
-      created_at,
-      santri (nama_lengkap, asrama),
-      admin:created_by (full_name)
-    `)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
-    .order('created_at', { ascending: false })
-
-  return data || []
+  return query<any>(`
+    SELECT rs.id, rs.jenis_surat, rs.detail_info, rs.created_at,
+           s.nama_lengkap, s.asrama,
+           u.full_name AS admin_nama
+    FROM riwayat_surat rs
+    JOIN santri s ON s.id = rs.santri_id
+    LEFT JOIN users u ON u.id = rs.created_by
+    WHERE rs.created_at >= ? AND rs.created_at <= ?
+    ORDER BY rs.created_at DESC
+  `, [startDate, endDate])
 }
 
-// 5. Hapus Riwayat Surat
 export async function hapusRiwayatSurat(id: string) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('riwayat_surat').delete().eq('id', id)
-
-  if (error) return { error: error.message }
+  await execute('DELETE FROM riwayat_surat WHERE id = ?', [id])
   revalidatePath('/dashboard/dewan-santri/surat')
   return { success: true }
 }

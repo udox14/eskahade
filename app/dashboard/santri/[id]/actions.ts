@@ -1,118 +1,82 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
 
-// 1. Data Utama (Biodata + Foto + Info Kelas)
-// Fungsi ini menggabungkan 'getProfilSantri' lama dengan update foto/kelas baru
 export async function getSantriDetail(id: string) {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase
-    .from('santri')
-    .select(`
-      *,
-      riwayat_pendidikan (
-        id,
-        status_riwayat,
-        kelas (
-           id, 
-           nama_kelas, 
-           marhalah (nama)
-        )
-      )
-    `)
-    .eq('id', id)
-    .single()
+  const data = await queryOne<any>('SELECT * FROM santri WHERE id = ?', [id])
+  if (!data) return null
 
-  if (error || !data) return null
+  const riwayat = await query<any>(`
+    SELECT rp.id, rp.status_riwayat,
+      k.id as kelas_id, k.nama_kelas,
+      m.nama as marhalah_nama
+    FROM riwayat_pendidikan rp
+    LEFT JOIN kelas k ON rp.kelas_id = k.id
+    LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    WHERE rp.santri_id = ?
+  `, [id])
 
-  // Cari kelas aktif untuk ditampilkan di header profil
-  const kelasAktif = data.riwayat_pendidikan?.find((r: any) => r.status_riwayat === 'aktif')?.kelas
-  
-  const infoKelas = kelasAktif 
-    ? kelasAktif.nama_kelas 
-    : 'Belum Masuk Kelas'
+  const kelasAktif = riwayat.find((r: any) => r.status_riwayat === 'aktif')
+  const infoKelas = kelasAktif ? kelasAktif.nama_kelas : 'Belum Masuk Kelas'
 
-  return {
-    ...data,
-    info_kelas: infoKelas
-  }
+  return { ...data, riwayat_pendidikan: riwayat, info_kelas: infoKelas }
 }
 
-// 2. Data Akademik (Riwayat Kelas + Nilai per Semester)
 export async function getRiwayatAkademik(santriId: string) {
-  const supabase = await createClient()
-  
-  const { data: riwayat } = await supabase
-    .from('riwayat_pendidikan')
-    .select(`
-      id, 
-      status_riwayat, 
-      kelas (nama_kelas, marhalah(nama), tahun_ajaran(nama)),
-      ranking (ranking_kelas, predikat, rata_rata)
-    `)
-    .eq('santri_id', santriId)
-    .order('created_at', { ascending: false })
+  const riwayat = await query<any>(`
+    SELECT rp.id, rp.status_riwayat,
+      k.nama_kelas, m.nama as marhalah_nama, ta.nama as tahun_ajaran_nama,
+      r.ranking_kelas, r.predikat, r.rata_rata
+    FROM riwayat_pendidikan rp
+    LEFT JOIN kelas k ON rp.kelas_id = k.id
+    LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    LEFT JOIN tahun_ajaran ta ON k.tahun_ajaran_id = ta.id
+    LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id
+    WHERE rp.santri_id = ?
+    ORDER BY rp.created_at DESC
+  `, [santriId])
 
-  if (!riwayat) return []
-
-  const historyWithGrades = await Promise.all(riwayat.map(async (r: any) => {
-    const { data: nilai } = await supabase
-      .from('nilai_akademik')
-      .select('mapel(nama), nilai, semester')
-      .eq('riwayat_pendidikan_id', r.id)
-      .order('semester')
-      
-    return {
-      ...r,
-      nilai_detail: nilai || []
-    }
+  const result = await Promise.all(riwayat.map(async (r: any) => {
+    const nilai = await query<any>(`
+      SELECT mp.nama as mapel_nama, na.nilai, na.semester
+      FROM nilai_akademik na
+      LEFT JOIN mapel mp ON na.mapel_id = mp.id
+      WHERE na.riwayat_pendidikan_id = ?
+      ORDER BY na.semester
+    `, [r.id])
+    return { ...r, nilai_detail: nilai }
   }))
 
-  return historyWithGrades
+  return result
 }
 
-// 3. Data Pelanggaran
 export async function getRiwayatPelanggaran(santriId: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('pelanggaran')
-    .select('id, tanggal, jenis, deskripsi, poin')
-    .eq('santri_id', santriId)
-    .order('tanggal', { ascending: false })
-  return data || []
+  return await query(
+    'SELECT id, tanggal, jenis, deskripsi, poin FROM pelanggaran WHERE santri_id = ? ORDER BY tanggal DESC',
+    [santriId]
+  )
 }
 
-// 4. Data Perizinan
 export async function getRiwayatPerizinan(santriId: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('perizinan')
-    .select('id, created_at, status, jenis, alasan, tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual')
-    .eq('santri_id', santriId)
-    .order('created_at', { ascending: false })
-  return data || []
+  return await query(
+    'SELECT id, created_at, status, jenis, alasan, tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual FROM perizinan WHERE santri_id = ? ORDER BY created_at DESC',
+    [santriId]
+  )
 }
 
-// 5. Data Keuangan / SPP
 export async function getRiwayatSPP(santriId: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('spp_log')
-    .select('id, bulan, tahun, nominal_bayar, tanggal_bayar, penerima:penerima_id(full_name)')
-    .eq('santri_id', santriId)
-    .order('tahun', { ascending: false })
-    .order('bulan', { ascending: false })
-  return data || []
+  return await query<any>(`
+    SELECT sl.id, sl.bulan, sl.tahun, sl.nominal_bayar, sl.tanggal_bayar, u.full_name as penerima_nama
+    FROM spp_log sl
+    LEFT JOIN users u ON sl.penerima_id = u.id
+    WHERE sl.santri_id = ?
+    ORDER BY sl.tahun DESC, sl.bulan DESC
+  `, [santriId])
 }
 
-// 6. Data Tabungan (Tambahan dari fitur Uang Jajan)
 export async function getRiwayatTabungan(santriId: string) {
-    const supabase = await createClient()
-    const { data } = await supabase
-        .from('tabungan_log')
-        .select('*')
-        .eq('santri_id', santriId)
-        .order('created_at', { ascending: false })
-    return data || []
+  return await query(
+    'SELECT * FROM tabungan_log WHERE santri_id = ? ORDER BY created_at DESC',
+    [santriId]
+  )
 }

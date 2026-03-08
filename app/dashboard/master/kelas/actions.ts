@@ -1,182 +1,120 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
-// 1. GETTERS (Untuk Client Component)
 export async function getMarhalahList() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('marhalah').select('*').order('urutan')
-  return data || []
+  return await query('SELECT * FROM marhalah ORDER BY urutan')
 }
 
 export async function getKelasList() {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('kelas')
-    .select('*, marhalah(nama)')
-    // Kita hapus .order('nama_kelas') dari database karena kita akan sort manual
-  
-  if (!data) return []
-
-  // ALGORITMA NATURAL SORT
-  // Ini akan mengurutkan: "1-2" dulu, baru "1-10"
-  return data.sort((a, b) => {
-    return a.nama_kelas.localeCompare(b.nama_kelas, undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    })
-  })
+  const data = await query<any>(`
+    SELECT k.*, m.nama as marhalah_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON k.marhalah_id = m.id
+  `)
+  return data.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 }
 
-// 2. TAMBAH MANUAL
 export async function tambahKelas(formData: FormData) {
-  const supabase = await createClient()
-  
   const namaKelas = formData.get('nama_kelas') as string
   const marhalahId = formData.get('marhalah_id') as string
   const jenisKelamin = formData.get('jenis_kelamin') as string
 
-  // Ambil tahun ajaran aktif
-  const { data: tahunAktif } = await supabase
-    .from('tahun_ajaran')
-    .select('id')
-    .eq('is_active', true)
-    .single()
+  const tahunAktif = await queryOne<{ id: string }>(
+    'SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1'
+  )
+  if (!tahunAktif) return { error: 'Tidak ada tahun ajaran aktif.' }
 
-  if (!tahunAktif) return { error: "Tidak ada tahun ajaran aktif." }
+  const exist = await queryOne(
+    'SELECT id FROM kelas WHERE nama_kelas = ? AND marhalah_id = ? AND tahun_ajaran_id = ?',
+    [namaKelas, marhalahId, tahunAktif.id]
+  )
+  if (exist) return { error: 'Kelas dengan nama ini sudah ada di marhalah tersebut.' }
 
-  // Cek duplikat manual
-  const { data: exist } = await supabase
-    .from('kelas')
-    .select('id')
-    .eq('nama_kelas', namaKelas)
-    .eq('marhalah_id', marhalahId)
-    .eq('tahun_ajaran_id', tahunAktif.id)
-    .single()
+  await query(
+    'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
+    [crypto.randomUUID(), namaKelas, marhalahId, jenisKelamin, tahunAktif.id]
+  )
 
-  if (exist) return { error: "Kelas dengan nama ini sudah ada di marhalah tersebut." }
-
-  const { error } = await supabase.from('kelas').insert({
-    nama_kelas: namaKelas,
-    marhalah_id: marhalahId,
-    jenis_kelamin: jenisKelamin,
-    tahun_ajaran_id: tahunAktif.id
-  })
-
-  if (error) return { error: error.message }
-  
   revalidatePath('/dashboard/master/kelas')
   return { success: true }
 }
 
-// 3. HAPUS KELAS
 export async function hapusKelas(kelasId: string) {
-  const supabase = await createClient()
+  const rows = await query<{ count: number }>(
+    'SELECT COUNT(*) as count FROM riwayat_pendidikan WHERE kelas_id = ? AND status_riwayat = ?',
+    [kelasId, 'aktif']
+  )
+  const count = rows[0]?.count ?? 0
+  if (count > 0) return { error: 'Gagal hapus: Masih ada santri aktif di kelas ini. Kosongkan dulu.' }
 
-  // Cek apakah ada santri di kelas ini?
-  const { count } = await supabase
-    .from('riwayat_pendidikan')
-    .select('*', { count: 'exact', head: true })
-    .eq('kelas_id', kelasId)
-    .eq('status_riwayat', 'aktif') 
+  await query('DELETE FROM kelas WHERE id = ?', [kelasId])
 
-  if (count && count > 0) {
-    return { error: "Gagal hapus: Masih ada santri aktif di kelas ini. Kosongkan dulu." }
+  revalidatePath('/dashboard/master/kelas')
+  return { success: true }
+}
+
+export async function importKelasMassal(dataExcel: any[]) {
+  const tahunAktif = await queryOne<{ id: string }>(
+    'SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1'
+  )
+  if (!tahunAktif) return { error: 'Tidak ada tahun ajaran aktif.' }
+
+  const marhalahList = await query<{ id: string; nama: string }>('SELECT id, nama FROM marhalah')
+  const mapMarhalah = new Map(marhalahList.map(m => [m.nama.toLowerCase().trim(), m.id]))
+
+  const existingClasses = await query<{ nama_kelas: string; marhalah_id: string }>(
+    'SELECT nama_kelas, marhalah_id FROM kelas WHERE tahun_ajaran_id = ?',
+    [tahunAktif.id]
+  )
+  const existingSet = new Set(existingClasses.map(c => `${c.nama_kelas.toLowerCase().trim()}-${c.marhalah_id}`))
+
+  const inserts: any[] = []
+  const errors: string[] = []
+  let duplicates = 0
+
+  for (let i = 0; i < dataExcel.length; i++) {
+    const row = dataExcel[i]
+    const rowNum = i + 2
+    const namaKelas = String(row['NAMA KELAS'] || row['nama kelas'] || '').trim()
+    const namaMarhalah = String(row['MARHALAH'] || row['marhalah'] || '').trim()
+    const jkRaw = String(row['JENIS KELAMIN'] || row['jenis kelamin'] || 'L').toUpperCase().trim()
+
+    if (!namaKelas || !namaMarhalah) continue
+
+    const marhalahId = mapMarhalah.get(namaMarhalah.toLowerCase())
+    if (!marhalahId) {
+      errors.push(`Baris ${rowNum}: Marhalah '${namaMarhalah}' tidak ditemukan di sistem.`)
+      continue
+    }
+
+    const keyCheck = `${namaKelas.toLowerCase()}-${marhalahId}`
+    if (existingSet.has(keyCheck)) { duplicates++; continue }
+
+    let jk = 'L'
+    if (jkRaw === 'P' || jkRaw === 'PUTRI' || jkRaw === 'PEREMPUAN') jk = 'P'
+    else if (jkRaw === 'C' || jkRaw === 'CAMPURAN') jk = 'C'
+
+    inserts.push([crypto.randomUUID(), namaKelas, marhalahId, jk, tahunAktif.id])
+    existingSet.add(keyCheck)
   }
 
-  const { error } = await supabase.from('kelas').delete().eq('id', kelasId)
+  if (errors.length > 0) return { error: `Gagal sebagian:\n${errors.slice(0, 5).join('\n')}` }
+  if (inserts.length === 0) {
+    if (duplicates > 0) return { error: `Semua data (${duplicates}) dilewati karena kelas sudah ada.` }
+    return { error: 'Tidak ada data valid untuk disimpan.' }
+  }
 
-  if (error) return { error: error.message }
-  
-  revalidatePath('/dashboard/master/kelas')
-  return { success: true }
-}
-
-// 4. IMPORT EXCEL MASSAL (Anti Duplikat)
-export async function importKelasMassal(dataExcel: any[]) {
-    const supabase = await createClient()
-
-    // Ambil Tahun Ajaran Aktif
-    const { data: tahunAktif } = await supabase
-        .from('tahun_ajaran')
-        .select('id')
-        .eq('is_active', true)
-        .single()
-
-    if (!tahunAktif) return { error: "Tidak ada tahun ajaran aktif." }
-
-    // Ambil Referensi Marhalah
-    const { data: marhalahList } = await supabase.from('marhalah').select('id, nama')
-    const mapMarhalah = new Map()
-    marhalahList?.forEach(m => mapMarhalah.set(m.nama.toLowerCase().trim(), m.id))
-
-    // CEK DATA EKSISTING
-    const { data: existingClasses } = await supabase
-        .from('kelas')
-        .select('nama_kelas, marhalah_id')
-        .eq('tahun_ajaran_id', tahunAktif.id)
-
-    const existingSet = new Set(
-        existingClasses?.map(c => `${c.nama_kelas.toLowerCase().trim()}-${c.marhalah_id}`)
+  for (const row of inserts) {
+    await query(
+      'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
+      row
     )
+  }
 
-    const inserts = []
-    const errors = []
-    let duplicates = 0
-
-    for (let i = 0; i < dataExcel.length; i++) {
-        const row = dataExcel[i]
-        const rowNum = i + 2
-        
-        const namaKelas = String(row['NAMA KELAS'] || row['nama kelas'] || '').trim()
-        const namaMarhalah = String(row['MARHALAH'] || row['marhalah'] || '').trim()
-        const jkRaw = String(row['JENIS KELAMIN'] || row['jenis kelamin'] || 'L').toUpperCase().trim()
-        
-        if (!namaKelas || !namaMarhalah) continue;
-
-        const marhalahId = mapMarhalah.get(namaMarhalah.toLowerCase())
-        
-        if (!marhalahId) {
-            errors.push(`Baris ${rowNum}: Marhalah '${namaMarhalah}' tidak ditemukan di sistem.`)
-            continue
-        }
-
-        // CEK DUPLIKAT
-        const keyCheck = `${namaKelas.toLowerCase()}-${marhalahId}`
-        if (existingSet.has(keyCheck)) {
-            duplicates++
-            continue; 
-        }
-
-        // Normalisasi JK
-        let jk = 'L'
-        if (jkRaw === 'P' || jkRaw === 'PUTRI' || jkRaw === 'PEREMPUAN') jk = 'P'
-        else if (jkRaw === 'C' || jkRaw === 'CAMPURAN') jk = 'C'
-
-        inserts.push({
-            nama_kelas: namaKelas,
-            marhalah_id: marhalahId,
-            jenis_kelamin: jk,
-            tahun_ajaran_id: tahunAktif.id
-        })
-        
-        existingSet.add(keyCheck)
-    }
-
-    if (errors.length > 0) {
-        return { error: `Gagal sebagian:\n${errors.slice(0, 5).join('\n')}` }
-    }
-
-    if (inserts.length === 0) {
-        if (duplicates > 0) return { error: `Semua data (${duplicates}) dilewati karena kelas sudah ada.` }
-        return { error: "Tidak ada data valid untuk disimpan." }
-    }
-
-    const { error } = await supabase.from('kelas').insert(inserts)
-
-    if (error) return { error: error.message }
-
-    revalidatePath('/dashboard/master/kelas')
-    return { success: true, count: inserts.length, skipped: duplicates }
+  revalidatePath('/dashboard/master/kelas')
+  return { success: true, count: inserts.length, skipped: duplicates }
 }

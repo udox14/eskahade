@@ -1,99 +1,64 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// 1. Ambil Daftar Pelanggaran (Terbaru)
 export async function getDaftarPelanggaran() {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('pelanggaran')
-    .select(`
-      id,
-      tanggal,
-      jenis,
-      deskripsi,
-      poin,
-      santri (
-        nama_lengkap,
-        nis,
-        status_global
-      )
-    `)
-    .order('tanggal', { ascending: false })
-    .limit(50)
-
-  if (error) console.error(error)
-  return data || []
+  return query<any>(`
+    SELECT p.id, p.tanggal, p.jenis, p.deskripsi, p.poin,
+           s.nama_lengkap, s.nis, s.status_global
+    FROM pelanggaran p
+    JOIN santri s ON s.id = p.santri_id
+    ORDER BY p.tanggal DESC
+    LIMIT 50
+  `, [])
 }
 
-// 2. Cari Santri
 export async function cariSantri(keyword: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, status_global, asrama, kamar')
-    .or(`nama_lengkap.ilike.%${keyword}%,nis.eq.${keyword}`)
-    .eq('status_global', 'aktif')
-    .limit(5)
-
-  return data || []
+  return query<any>(`
+    SELECT id, nama_lengkap, nis, status_global, asrama, kamar
+    FROM santri
+    WHERE status_global = 'aktif'
+      AND (nama_lengkap LIKE ? OR nis = ?)
+    LIMIT 5
+  `, [`%${keyword}%`, keyword])
 }
 
-// 3. Ambil Master Pelanggaran (DINAMIS)
 export async function getMasterPelanggaran() {
-  const supabase = await createClient()
-  
-  const { data } = await supabase
-    .from('master_pelanggaran')
-    .select('id, nama_pelanggaran, kategori, poin_default')
-    .order('kategori', { ascending: false })
-    .order('nama_pelanggaran')
-
-  return data || []
+  return query<any>(`
+    SELECT id, nama_pelanggaran, kategori, poin_default
+    FROM master_pelanggaran
+    ORDER BY kategori DESC, nama_pelanggaran
+  `, [])
 }
 
-// 4. Simpan Pelanggaran
 export async function simpanPelanggaran(formData: FormData) {
-  const supabase = await createClient()
-  
+  const session = await getSession()
+
   const santriId = formData.get('santri_id') as string
   const masterId = formData.get('master_id') as string
   const deskripsiTambahan = formData.get('deskripsi') as string
   const tanggal = formData.get('tanggal') as string
 
-  // Validasi: Ambil detail dari Master untuk memastikan Poin & Jenis benar
-  const { data: masterData } = await supabase
-    .from('master_pelanggaran')
-    .select('id, nama_pelanggaran, kategori, poin_default, poin')
-    .eq('id', masterId)
-    .single()
+  const masterData = await queryOne<any>(
+    'SELECT id, nama_pelanggaran, kategori, poin FROM master_pelanggaran WHERE id = ?',
+    [masterId]
+  )
+  if (!masterData) return { error: 'Jenis pelanggaran tidak valid atau sudah dihapus dari Master.' }
 
-  if (!masterData) return { error: "Jenis pelanggaran tidak valid atau sudah dihapus dari Master." }
-
-  // Gabungkan deskripsi
   const deskripsiFinal = `${masterData.nama_pelanggaran}. ${deskripsiTambahan}`
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { error } = await supabase.from('pelanggaran').insert({
-    santri_id: santriId,
-    jenis: masterData.kategori, // Ambil kategori asli dari master
-    deskripsi: deskripsiFinal,
-    tanggal: tanggal,
-    poin: masterData.poin,      // Ambil poin asli dari master
-    penindak_id: user?.id
-  })
-
-  if (error) return { error: error.message }
+  await execute(`
+    INSERT INTO pelanggaran (id, santri_id, jenis, deskripsi, tanggal, poin, penindak_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [generateId(), santriId, masterData.kategori, deskripsiFinal, tanggal, masterData.poin, session?.id ?? null])
 
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
 
 export async function hapusPelanggaran(id: string) {
-  const supabase = await createClient()
-  await supabase.from('pelanggaran').delete().eq('id', id)
+  await execute('DELETE FROM pelanggaran WHERE id = ?', [id])
   revalidatePath('/dashboard/keamanan')
 }

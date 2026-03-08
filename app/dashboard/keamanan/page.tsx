@@ -1,6 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, AlertTriangle, Trash2, Search, ChevronDown } from 'lucide-react'
+import { Plus, AlertTriangle, Trash2 } from 'lucide-react'
 import { getDaftarPelanggaran, hapusPelanggaran } from './actions'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -10,29 +9,21 @@ export default async function KeamananPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Disiplin & Keamanan</h1>
           <p className="text-gray-500 text-sm">Catatan pelanggaran santri dan poin kedisiplinan.</p>
         </div>
         <div className="flex gap-2">
-          <Link 
-            href="/dashboard/keamanan/perizinan" 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm font-medium"
-          >
+          <Link href="/dashboard/keamanan/perizinan" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm font-medium">
             Perizinan Santri
           </Link>
-          <Link 
-            href="/dashboard/keamanan/input" 
-            className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm font-medium"
-          >
+          <Link href="/dashboard/keamanan/input" className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm font-medium">
             <Plus className="w-4 h-4" /> Catat Pelanggaran
           </Link>
         </div>
       </div>
 
-      {/* Tabel Riwayat */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -54,19 +45,13 @@ export default async function KeamananPage() {
             <tbody className="divide-y divide-gray-100">
               {pelanggaranList.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-400">
-                    Belum ada data pelanggaran tercatat.
-                  </td>
+                  <td colSpan={6} className="text-center py-8 text-gray-400">Belum ada data pelanggaran tercatat.</td>
                 </tr>
               )}
-
               {pelanggaranList.map((p: any) => {
-                // Parsing Deskripsi: Cek apakah ada separator "Detail:"
-                // Format: "Judul.... \nDetail: Isi detail..."
-                // Kita split berdasarkan '\nDetail:' atau '\n' saja jika format lama
                 const hasDetail = p.deskripsi.includes('Detail:')
-                const [judul, detail] = hasDetail 
-                  ? p.deskripsi.split(/\\n?Detail:/) // Regex untuk menangkap \nDetail: atau Detail:
+                const [judul, detail] = hasDetail
+                  ? p.deskripsi.split(/\\n?Detail:/)
                   : [p.deskripsi, null]
 
                 return (
@@ -75,15 +60,11 @@ export default async function KeamananPage() {
                       {format(new Date(p.tanggal), 'dd MMMM yyyy', { locale: id })}
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900">
-                      {p.santri?.nama_lengkap}
-                      <div className="text-xs text-gray-400 font-normal">{p.santri?.nis}</div>
+                      {p.nama_lengkap}
+                      <div className="text-xs text-gray-400 font-normal">{p.nis}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        p.jenis === 'BERAT' ? 'bg-red-100 text-red-700' :
-                        p.jenis === 'SEDANG' ? 'bg-orange-100 text-orange-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${p.jenis === 'BERAT' ? 'bg-red-100 text-red-700' : p.jenis === 'SEDANG' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
                         {p.jenis.replace('_', ' ')}
                       </span>
                     </td>
@@ -92,21 +73,15 @@ export default async function KeamananPage() {
                         <details className="group/details cursor-pointer">
                           <summary className="list-none font-medium flex items-center gap-1 text-slate-700 hover:text-blue-600">
                             <span>{judul}</span>
-                            <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 group-open/details:bg-blue-100 group-open/details:text-blue-700">
-                              Lihat Detail
-                            </span>
+                            <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 group-open/details:bg-blue-100 group-open/details:text-blue-700">Lihat Detail</span>
                           </summary>
-                          <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 text-slate-500 leading-relaxed animate-in slide-in-from-top-1">
-                            {detail}
-                          </div>
+                          <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 text-slate-500 leading-relaxed animate-in slide-in-from-top-1">{detail}</div>
                         </details>
                       ) : (
                         <span>{p.deskripsi}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center font-bold text-red-600">
-                      +{p.poin}
-                    </td>
+                    <td className="px-6 py-4 text-center font-bold text-red-600">+{p.poin}</td>
                     <td className="px-6 py-4 text-right">
                       <form action={async () => {
                         'use server'

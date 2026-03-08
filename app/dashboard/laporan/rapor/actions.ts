@@ -1,102 +1,86 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
 
 export async function getDataRapor(kelasId: string, semester: number) {
-  const supabase = await createClient()
+  const listSantri = await query<any>(`
+    SELECT rp.id,
+           s.nama_lengkap, s.nis, s.nama_ayah,
+           k.id AS kelas_id, k.nama_kelas,
+           m.id AS marhalah_id, m.nama AS marhalah_nama,
+           u.full_name AS wali_kelas_nama,
+           r.ranking_kelas, r.predikat, r.rata_rata, r.catatan_wali_kelas
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN users u ON u.id = k.wali_kelas_id
+    LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [semester, kelasId])
 
-  // 1. Ambil Data Santri + Kelas + Wali Kelas
-  const { data: listSantri } = await supabase
-    .from('riwayat_pendidikan')
-    .select(`
-      id,
-      santri (nama_lengkap, nis, nama_ayah),
-      kelas (id, nama_kelas, marhalah(id, nama), wali_kelas:wali_kelas_id(full_name)),
-      ranking (ranking_kelas, predikat, rata_rata, catatan_wali_kelas)
-    `)
-    .eq('kelas_id', kelasId)
-    .eq('status_riwayat', 'aktif')
-    .eq('ranking.semester', semester)
-    .order('santri(nama_lengkap)')
+  if (!listSantri.length) return []
 
-  if (!listSantri || listSantri.length === 0) return []
+  const riwayatIds = listSantri.map((s: any) => s.id)
+  const ph = riwayatIds.map(() => '?').join(',')
 
-  const riwayatIds = listSantri.map(s => s.id)
+  const nilaiAkademik = await query<any>(`
+    SELECT na.riwayat_pendidikan_id, na.mapel_id, mp.nama AS mapel_nama, na.nilai
+    FROM nilai_akademik na
+    JOIN mapel mp ON mp.id = na.mapel_id
+    WHERE na.riwayat_pendidikan_id IN (${ph}) AND na.semester = ?
+    ORDER BY mp.nama
+  `, [...riwayatIds, semester])
 
-  // 2. Ambil Nilai Akademik
-  const { data: nilaiAkademik } = await supabase
-    .from('nilai_akademik')
-    .select('riwayat_pendidikan_id, mapel_id, mapel(nama), nilai')
-    .in('riwayat_pendidikan_id', riwayatIds)
-    .eq('semester', semester)
-    .order('mapel(nama)')
+  const absensi = await query<any>(`
+    SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
+    FROM absensi_harian
+    WHERE riwayat_pendidikan_id IN (${ph})
+  `, riwayatIds)
 
-  // 3. Ambil Rekap Absensi
-  const { data: absensi } = await supabase
-    .from('absensi_harian')
-    .select('riwayat_pendidikan_id, shubuh, ashar, maghrib')
-    .in('riwayat_pendidikan_id', riwayatIds)
-
-  // 4. Kitab (Safely extract marhalah ID)
-  // Ambil sample kelas dari data pertama
-  const firstData = listSantri[0]
-  const klsSample = Array.isArray(firstData.kelas) ? firstData.kelas[0] : firstData.kelas
-  const mrhSample = Array.isArray(klsSample?.marhalah) ? klsSample.marhalah[0] : klsSample?.marhalah
-  
+  const marhalahId = listSantri[0]?.marhalah_id
   let listKitab: any[] = []
-  if (mrhSample?.id) {
-    const { data: kitab } = await supabase.from('kitab').select('mapel_id, nama_kitab').eq('marhalah_id', mrhSample.id)
-    listKitab = kitab || []
+  if (marhalahId) {
+    listKitab = await query<any>(
+      'SELECT mapel_id, nama_kitab FROM kitab WHERE marhalah_id = ?', [marhalahId]
+    )
   }
 
-  // GABUNGKAN DATA
-  const dataRapor = listSantri.map(s => {
-    // Nilai & Absen Logic (Sama)
-    const nilainya = nilaiAkademik?.filter(n => n.riwayat_pendidikan_id === s.id) || []
-    const absennya = absensi?.filter(a => a.riwayat_pendidikan_id === s.id) || []
-    
+  return listSantri.map((s: any) => {
+    const nilainya = nilaiAkademik.filter((n: any) => n.riwayat_pendidikan_id === s.id)
+    const absennya = absensi.filter((a: any) => a.riwayat_pendidikan_id === s.id)
+
     let sakit = 0, izin = 0, alfa = 0
-    absennya.forEach(row => { 
-        if (row.shubuh === 'S') sakit++; if (row.shubuh === 'I') izin++; if (row.shubuh === 'A') alfa++; 
-        if (row.ashar === 'S') sakit++; if (row.ashar === 'I') izin++; if (row.ashar === 'A') alfa++; 
-        if (row.maghrib === 'S') sakit++; if (row.maghrib === 'I') izin++; if (row.maghrib === 'A') alfa++; 
+    absennya.forEach((row: any) => {
+      if (row.shubuh === 'S') sakit++; if (row.shubuh === 'I') izin++; if (row.shubuh === 'A') alfa++
+      if (row.ashar === 'S') sakit++;  if (row.ashar === 'I') izin++;  if (row.ashar === 'A') alfa++
+      if (row.maghrib === 'S') sakit++; if (row.maghrib === 'I') izin++; if (row.maghrib === 'A') alfa++
     })
-
-    // Handle Join Data (Array vs Object Check)
-    const santriData = Array.isArray(s.santri) ? s.santri[0] : s.santri
-    const kelasData = Array.isArray(s.kelas) ? s.kelas[0] : s.kelas
-    const rankData = Array.isArray(s.ranking) ? s.ranking[0] : s.ranking
-
-    // FIX UTAMA: Handle Wali Kelas
-    const rawWali = kelasData?.wali_kelas
-    const waliObj = Array.isArray(rawWali) ? rawWali[0] : rawWali
-    const waliKelasNama = waliObj?.full_name || ".........................."
 
     return {
       id: s.id,
-      santri: santriData,
-      kelas: kelasData,
-      wali_kelas_nama: waliKelasNama,
-      ranking: rankData || { ranking_kelas: '-', predikat: '-', rata_rata: 0 },
-      nilai: nilainya.map(n => {
-        const mapelData = Array.isArray(n.mapel) ? n.mapel[0] : n.mapel
+      santri: { nama_lengkap: s.nama_lengkap, nis: s.nis, nama_ayah: s.nama_ayah },
+      kelas: { id: s.kelas_id, nama_kelas: s.nama_kelas, marhalah: { id: s.marhalah_id, nama: s.marhalah_nama } },
+      wali_kelas_nama: s.wali_kelas_nama || '..........................',
+      ranking: {
+        ranking_kelas: s.ranking_kelas ?? '-',
+        predikat: s.predikat ?? '-',
+        rata_rata: s.rata_rata ?? 0,
+        catatan_wali_kelas: s.catatan_wali_kelas ?? '',
+      },
+      nilai: nilainya.map((n: any) => {
         const kitabData = listKitab.find((k: any) => k.mapel_id === n.mapel_id)
-        
-        return { 
-            mapel: mapelData?.nama || 'Tanpa Nama', 
-            kitab: kitabData?.nama_kitab || '-', 
-            angka: n.nilai 
-        }
+        return { mapel: n.mapel_nama || 'Tanpa Nama', kitab: kitabData?.nama_kitab || '-', angka: n.nilai }
       }),
-      absen: { sakit, izin, alfa }
+      absen: { sakit, izin, alfa },
     }
   })
-
-  return dataRapor
 }
 
 export async function getKelasList() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('kelas').select('id, nama_kelas')
-  return (data || []).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  const data = await query<any>('SELECT id, nama_kelas FROM kelas', [])
+  return data.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 }

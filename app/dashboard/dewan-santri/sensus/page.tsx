@@ -23,6 +23,7 @@ export default function SensusPage() {
   }
 
   if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-blue-600"/></div>
+  if (!data) return <div className="flex h-96 items-center justify-center text-gray-400">Tidak ada data santri.</div>
 
   // Sort Asrama Keys
   const asramaKeys = data?.distribusi_kamar ? Object.keys(data.distribusi_kamar).sort() : []
@@ -121,7 +122,7 @@ export default function SensusPage() {
          </div>
       </div>
 
-      {/* 4. STATISTIK PER KAMAR (BARU) */}
+      {/* 4. STATISTIK PER KAMAR */}
       <div className="bg-white p-6 rounded-xl border shadow-sm">
          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-2">
             <Bed className="w-5 h-5 text-indigo-500"/> Kepadatan Penduduk per Kamar

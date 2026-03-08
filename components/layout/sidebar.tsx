@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
+import {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
   ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 // --- KONFIGURASI TEMA (PALET WARNA PREMIUM) ---
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
@@ -100,14 +99,12 @@ interface MenuNode {
   isGroup: boolean;
   title: string;
   icon: React.ElementType;
-  href?: string;       
-  roles?: Role[];      
-  items?: MenuItem[];  
+  href?: string;
+  roles?: Role[];
+  items?: MenuItem[];
 }
 
-// STRUKTUR NAVIGASI
 const menuNodes: MenuNode[] = [
-  // --- DIRECT LINKS (Top Level) ---
   {
     isGroup: false,
     title: "Dashboard",
@@ -122,11 +119,9 @@ const menuNodes: MenuNode[] = [
     icon: Users,
     roles: ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
   },
-  
-  // --- FOLDERS (Accordion) ---
   {
     isGroup: true,
-    title: "Kesantrian", 
+    title: "Kesantrian",
     icon: ShieldAlert,
     items: [
       { title: "Sensus Penduduk", href: "/dashboard/dewan-santri/sensus", icon: BarChart3, roles: ['admin', 'dewan_santri'] },
@@ -144,7 +139,7 @@ const menuNodes: MenuNode[] = [
   },
   {
     isGroup: true,
-    title: "Pengkelasan", 
+    title: "Pengkelasan",
     icon: School,
     items: [
       { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
@@ -166,7 +161,7 @@ const menuNodes: MenuNode[] = [
   },
   {
     isGroup: true,
-    title: "Absensi", 
+    title: "Absensi",
     icon: CalendarCheck,
     items: [
       { title: "Absen Pengajian", href: "/dashboard/akademik/absensi", icon: CalendarCheck, roles: ['admin', 'sekpen'] },
@@ -180,7 +175,7 @@ const menuNodes: MenuNode[] = [
   },
   {
     isGroup: true,
-    title: "Keuangan", 
+    title: "Keuangan",
     icon: Coins,
     items: [
       { title: "Loket Pembayaran", href: "/dashboard/keuangan/pembayaran", icon: Coins, roles: ['admin', 'bendahara'] },
@@ -194,7 +189,7 @@ const menuNodes: MenuNode[] = [
   },
   {
     isGroup: true,
-    title: "UPK", 
+    title: "UPK",
     icon: Package,
     items: [
       { title: "Kasir UPK", href: "/dashboard/akademik/upk/kasir", icon: ShoppingCart, roles: ['admin', 'sekpen'] },
@@ -225,46 +220,27 @@ interface SidebarProps {
 
 export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  
-  const [activeRole, setActiveRole] = useState<string>(userRole);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
+  // Role langsung dari props (sudah diambil dari JWT di server)
+  const [activeRole] = useState<string>(userRole);
+
   // STATE TEMA
   const [theme, setTheme] = useState<ThemeKey>('emerald');
   const [mounted, setMounted] = useState(false);
-
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('app-theme') as ThemeKey;
     if (savedTheme && THEME_COLORS[savedTheme]) {
-        setTheme(savedTheme);
+      setTheme(savedTheme);
     }
   }, []);
 
   const changeTheme = (newTheme: ThemeKey) => {
-      setTheme(newTheme);
-      localStorage.setItem('app-theme', newTheme);
+    setTheme(newTheme);
+    localStorage.setItem('app-theme', newTheme);
   };
-
-  useEffect(() => {
-    if (userRole) setActiveRole(userRole);
-  }, [userRole]);
-
-  const checkRole = async () => {
-    setIsRefreshing(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (user) {
-        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-        if (data?.role) setActiveRole(data.role);
-    }
-    setIsRefreshing(false);
-  };
-
-  useEffect(() => { checkRole(); }, []);
 
   useEffect(() => {
     const activeGroup = menuNodes.find(n => n.isGroup && n.items?.some(i => i.href === pathname));
@@ -275,8 +251,8 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
 
   const toggleFolder = (title: string) => {
     if (isCollapsed) {
-      toggleSidebar(); 
-      setOpenFolders({ [title]: true }); 
+      toggleSidebar();
+      setOpenFolders({ [title]: true });
     } else {
       setOpenFolders(prev => ({ ...prev, [title]: !prev[title] }));
     }
@@ -286,17 +262,16 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara'];
   const currentRole = validRoles.includes(normalizedRole as Role) ? (normalizedRole as Role) : 'wali_kelas';
 
-  // AMBIL WARNA BERDASARKAN TEMA
   const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
 
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
-      
+
       {/* Tombol Toggle */}
-      <button 
+      <button
         onClick={toggleSidebar}
         className={cn(
-          "absolute -right-3 top-24 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5", 
+          "absolute -right-3 top-24 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
           c.toggleBtn
         )}
         title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
@@ -309,14 +284,13 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-20" : "h-28 gap-3"
       )}>
-        {/* Subtle background glow */}
         <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 blur-[30px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
-        
+
         {isCollapsed ? (
           <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
-             <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-xl relative z-10" />
+            <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-xl relative z-10" />
             <div className="flex flex-col min-w-0 justify-center relative z-10">
               <span className={cn("text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
               <h1 className="text-xl font-black font-serif text-white tracking-wide leading-none drop-shadow-md">SUKAHIDENG</h1>
@@ -328,10 +302,10 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
       {/* MENU ITEMS */}
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {menuNodes.map((node, idx) => {
-          
+
           if (!node.isGroup) {
             if (!node.roles?.includes(currentRole as Role)) return null;
-            
+
             const isActive = pathname === node.href;
             return (
               <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
@@ -341,8 +315,8 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                   className={cn(
                     "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
                     isCollapsed ? "justify-center p-3 mb-2" : "justify-start px-4 py-3.5 mb-1",
-                    isActive 
-                      ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}` 
+                    isActive
+                      ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
                       : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
                   )}
                 >
@@ -354,7 +328,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                     )} />
                     {!isCollapsed && (
                       <span className={cn(
-                        "text-sm tracking-wide transition-colors duration-300", 
+                        "text-sm tracking-wide transition-colors duration-300",
                         isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
                       )}>
                         {node.title}
@@ -374,17 +348,17 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
 
           return (
             <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
-              
+
               <button
                 onClick={() => toggleFolder(node.title)}
                 className={cn(
                   "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
                   isCollapsed ? "justify-center p-3 mb-2" : "justify-between px-4 py-3.5 mb-1",
-                  hasActiveChild && !isOpen && isCollapsed 
-                    ? `${c.folderActiveBg} text-white shadow-lg border` 
+                  hasActiveChild && !isOpen && isCollapsed
+                    ? `${c.folderActiveBg} text-white shadow-lg border`
                     : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1`,
-                  isOpen && !isCollapsed 
-                    ? `bg-black/20 text-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] border-l-2 ${c.folderOpenBg}` 
+                  isOpen && !isCollapsed
+                    ? `bg-black/20 text-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] border-l-2 ${c.folderOpenBg}`
                     : "border-l-2 border-transparent"
                 )}
               >
@@ -396,7 +370,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                   )} />
                   {!isCollapsed && (
                     <span className={cn(
-                      "font-semibold text-sm tracking-wide transition-colors", 
+                      "font-semibold text-sm tracking-wide transition-colors",
                       hasActiveChild || isOpen ? "text-white" : `${c.mutedText} group-hover:text-white`
                     )}>
                       {node.title}
@@ -405,7 +379,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                 </div>
                 {!isCollapsed && (
                   <div className={cn(
-                    "transition-transform duration-300", 
+                    "transition-transform duration-300",
                     hasActiveChild ? c.activeText : `opacity-40 group-hover:text-white group-hover:opacity-100`,
                     isOpen ? "rotate-180" : "rotate-0"
                   )}>
@@ -416,10 +390,9 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
 
               {!isCollapsed && (
                 <div className={cn(
-                    "overflow-hidden transition-all duration-300 ease-in-out",
-                    isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
-                  )}
-                >
+                  "overflow-hidden transition-all duration-300 ease-in-out",
+                  isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
+                )}>
                   <div className="pl-4 space-y-1.5 relative before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 before:rounded-full">
                     {allowedItems.map((item) => {
                       const isActive = pathname === item.href;
@@ -436,7 +409,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                           )}
                         >
                           <item.icon className={cn(
-                            "w-4 h-4 mr-3 flex-shrink-0 transition-all duration-300", 
+                            "w-4 h-4 mr-3 flex-shrink-0 transition-all duration-300",
                             isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
                           )} />
                           <span className="truncate">{item.title}</span>
@@ -456,22 +429,22 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 shrink-0 bg-black/20 backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
-          
+
           <div className="flex items-center justify-center gap-2 mb-4 relative z-10">
-              <Palette className="w-4 h-4 text-white/40 mr-1"/>
-              {Object.keys(THEME_COLORS).map(t => (
-                  <button
-                      key={t}
-                      onClick={() => changeTheme(t as ThemeKey)}
-                      className={cn(
-                          "w-4 h-4 rounded-full border-2 transition-all duration-300",
-                          theme === t ? "border-white scale-125" : "border-transparent opacity-40 hover:opacity-100 hover:scale-110"
-                      )}
-                      style={{
-                          backgroundColor: t === 'emerald' ? '#10b981' : t === 'blue' ? '#3b82f6' : t === 'purple' ? '#a855f7' : t === 'rose' ? '#f43f5e' : '#475569'
-                      }}
-                  />
-              ))}
+            <Palette className="w-4 h-4 text-white/40 mr-1" />
+            {Object.keys(THEME_COLORS).map(t => (
+              <button
+                key={t}
+                onClick={() => changeTheme(t as ThemeKey)}
+                className={cn(
+                  "w-4 h-4 rounded-full border-2 transition-all duration-300",
+                  theme === t ? "border-white scale-125" : "border-transparent opacity-40 hover:opacity-100 hover:scale-110"
+                )}
+                style={{
+                  backgroundColor: t === 'emerald' ? '#10b981' : t === 'blue' ? '#3b82f6' : t === 'purple' ? '#a855f7' : t === 'rose' ? '#f43f5e' : '#475569'
+                }}
+              />
+            ))}
           </div>
 
           <div className="flex items-center justify-between relative z-10 px-2">
@@ -481,14 +454,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                 {currentRole.replace('_', ' ')}
               </span>
             </div>
-            
-            <button 
-              onClick={checkRole} 
-              disabled={isRefreshing}
-              className={cn("bg-white/5 hover:bg-white/10 p-2.5 rounded-full border border-white/10 transition-all duration-300 hover:shadow-lg active:scale-90", c.glowText)}
-            >
-              <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
-            </button>
           </div>
         </div>
       )}

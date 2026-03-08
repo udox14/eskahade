@@ -1,479 +1,263 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { query, queryOne } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-
-function getAdminClient() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Server Key Error")
-  return createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 const PAGE_SIZE = 30
 
-// ============================================================
-// 1. GETTER: Santri aktif dengan lazy load + filter
-// ============================================================
 export type FilterSantri = {
   search?: string
   asrama?: string
   sekolah?: string
   kelas_sekolah?: string
-  kelas_pesantren?: string   // nama kelas, misal "1-A"
+  kelas_pesantren?: string
   page?: number
 }
 
 export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
-  const supabase = await createClient()
   const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, page = 1 } = filter
-  const from = (page - 1) * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+  const offset = (page - 1) * PAGE_SIZE
 
-  // Base query — join riwayat_pendidikan untuk filter kelas pesantren
-  let query = supabase
-    .from('santri')
-    .select(`
-      id, nis, nama_lengkap, asrama, kamar, sekolah, kelas_sekolah,
-      riwayat_pendidikan!left (
-        kelas:kelas_id (nama_kelas)
-      )
-    `, { count: 'exact' })
-    .eq('status_global', 'aktif')
-    .eq('riwayat_pendidikan.status_riwayat', 'aktif')
-    .order('nama_lengkap')
-    .range(from, to)
+  let sql = `
+    SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah,
+      k.nama_kelas as kelas_pesantren_nama
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON rp.kelas_id = k.id
+    WHERE s.status_global = 'aktif'
+  `
+  const params: any[] = []
 
-  if (search) {
-    query = query.or(`nama_lengkap.ilike.%${search}%,nis.ilike.%${search}%`)
-  }
-  if (asrama) query = query.eq('asrama', asrama)
-  if (sekolah) query = query.eq('sekolah', sekolah)
-  if (kelas_sekolah) query = query.ilike('kelas_sekolah', `%${kelas_sekolah}%`)
+  if (search) { sql += ` AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)`; params.push(`%${search}%`, `%${search}%`) }
+  if (asrama) { sql += ' AND s.asrama = ?'; params.push(asrama) }
+  if (sekolah) { sql += ' AND s.sekolah = ?'; params.push(sekolah) }
+  if (kelas_sekolah) { sql += ' AND s.kelas_sekolah LIKE ?'; params.push(`%${kelas_sekolah}%`) }
+  if (kelas_pesantren) { sql += ' AND LOWER(k.nama_kelas) = LOWER(?)'; params.push(kelas_pesantren) }
 
-  const { data, count, error } = await query
+  sql += ' ORDER BY s.nama_lengkap'
 
-  // Filter kelas pesantren di sisi server setelah join (Supabase tidak support filter nested langsung)
-  let rows = (data || []) as any[]
-  if (kelas_pesantren) {
-    rows = rows.filter((s: any) =>
-      (s.riwayat_pendidikan || []).some((r: any) =>
-        r.kelas?.nama_kelas?.toLowerCase() === kelas_pesantren.toLowerCase()
-      )
-    )
-  }
+  const allData = await query<any>(sql, params)
+  const total = allData.length
+  const data = allData.slice(offset, offset + PAGE_SIZE)
 
-  return {
-    data: rows,
-    total: count ?? 0,
-    page,
-    hasMore: to < (count ?? 0) - 1
-  }
+  return { data, total, page, hasMore: offset + PAGE_SIZE < total }
 }
 
-// Ambil opsi filter (distinct values) untuk dropdown
 export async function getFilterOptionsSantri() {
-  const supabase = await createClient()
-
-  const [asramaRes, sekolahRes, kelasRes] = await Promise.all([
-    supabase.from('santri').select('asrama').eq('status_global', 'aktif').not('asrama', 'is', null),
-    supabase.from('santri').select('sekolah').eq('status_global', 'aktif').not('sekolah', 'is', null),
-    supabase.from('kelas').select('nama_kelas')
+  const [asramaRows, sekolahRows, kelasRows] = await Promise.all([
+    query<{ asrama: string }>(`SELECT DISTINCT asrama FROM santri WHERE status_global = 'aktif' AND asrama IS NOT NULL`),
+    query<{ sekolah: string }>(`SELECT DISTINCT sekolah FROM santri WHERE status_global = 'aktif' AND sekolah IS NOT NULL`),
+    query<{ nama_kelas: string }>('SELECT nama_kelas FROM kelas'),
   ])
 
-  const asramaList = [...new Set((asramaRes.data || []).map((r: any) => r.asrama))].sort()
-  const sekolahList = [...new Set((sekolahRes.data || []).map((r: any) => r.sekolah))].sort()
-  const kelasList = (kelasRes.data || []).map((r: any) => r.nama_kelas).sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
-
-  return { asramaList, sekolahList, kelasList }
+  return {
+    asramaList: asramaRows.map(r => r.asrama).sort(),
+    sekolahList: sekolahRows.map(r => r.sekolah).sort(),
+    kelasList: kelasRows.map(r => r.nama_kelas).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+  }
 }
 
-// ============================================================
-// 2. GETTER: Grup arsip (Level 1 — per angkatan/catatan)
-// ============================================================
 export async function getGrupArsip() {
-  const supabase = await createClient()
+  const data = await query<any>(
+    'SELECT angkatan, catatan, tanggal_arsip, asrama FROM santri_arsip ORDER BY tanggal_arsip DESC'
+  )
 
-  // Ambil semua arsip, group by (angkatan, catatan, tanggal_arsip::date)
-  // Karena Supabase tidak support GROUP BY langsung, kita ambil kolom ringkas
-  // lalu group di sisi server
-  const { data, error } = await supabase
-    .from('santri_arsip')
-    .select('angkatan, catatan, tanggal_arsip, asrama')
-    .order('tanggal_arsip', { ascending: false })
-
-  if (error || !data) return []
-
-  // Group by: kombinasi angkatan + catatan + tanggal (hari)
-  const grupMap = new Map<string, {
-    key: string
-    angkatan: number | null
-    catatan: string | null
-    tanggal_arsip: string       // tanggal hari pertama batch ini
-    jumlah: number
-    asramaList: string[]
-  }>()
-
+  const grupMap = new Map<string, any>()
   for (const row of data) {
     const tgl = row.tanggal_arsip?.split('T')[0] ?? ''
-    // Key unik per grup: angkatan + catatan + tanggal hari
     const key = `${row.angkatan ?? 'null'}__${row.catatan ?? ''}__${tgl}`
-
     if (grupMap.has(key)) {
       const g = grupMap.get(key)!
       g.jumlah++
       if (row.asrama && !g.asramaList.includes(row.asrama)) g.asramaList.push(row.asrama)
     } else {
-      grupMap.set(key, {
-        key,
-        angkatan: row.angkatan,
-        catatan: row.catatan,
-        tanggal_arsip: tgl,
-        jumlah: 1,
-        asramaList: row.asrama ? [row.asrama] : []
-      })
+      grupMap.set(key, { key, angkatan: row.angkatan, catatan: row.catatan, tanggal_arsip: tgl, jumlah: 1, asramaList: row.asrama ? [row.asrama] : [] })
     }
   }
-
   return Array.from(grupMap.values())
 }
 
-// ============================================================
-// 2b. GETTER: Santri dalam satu grup (Level 2 — lazy load)
-// ============================================================
-export type FilterSantriArsip = {
-  search?: string
-  asrama?: string
-  page?: number
-}
+export type FilterSantriArsip = { search?: string; asrama?: string; page?: number }
 
 export async function getSantriDalamGrup(
   angkatan: number | null,
   catatan: string | null,
-  tanggalArsip: string,         // format YYYY-MM-DD
+  tanggalArsip: string,
   filter: FilterSantriArsip = {}
 ) {
-  const supabase = await createClient()
   const { search, asrama, page = 1 } = filter
-  const from = (page - 1) * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+  const offset = (page - 1) * PAGE_SIZE
 
-  let query = supabase
-    .from('santri_arsip')
-    .select('id, nis, nama_lengkap, asrama, tanggal_arsip, catatan, angkatan', { count: 'exact' })
-    .gte('tanggal_arsip', `${tanggalArsip}T00:00:00`)
-    .lte('tanggal_arsip', `${tanggalArsip}T23:59:59`)
-    .order('nama_lengkap')
-    .range(from, to)
+  let sql = `SELECT id, nis, nama_lengkap, asrama, tanggal_arsip, catatan, angkatan
+    FROM santri_arsip
+    WHERE tanggal_arsip >= ? AND tanggal_arsip <= ?`
+  const params: any[] = [`${tanggalArsip}T00:00:00`, `${tanggalArsip}T23:59:59`]
 
-  // Filter angkatan
-  if (angkatan !== null) query = query.eq('angkatan', angkatan)
-  else query = query.is('angkatan', null)
+  if (angkatan !== null) { sql += ' AND angkatan = ?'; params.push(angkatan) }
+  else sql += ' AND angkatan IS NULL'
 
-  // Filter catatan
-  if (catatan) query = query.eq('catatan', catatan)
-  else query = query.is('catatan', null)
+  if (catatan) { sql += ' AND catatan = ?'; params.push(catatan) }
+  else sql += ' AND catatan IS NULL'
 
-  if (search) query = query.or(`nama_lengkap.ilike.%${search}%,nis.ilike.%${search}%`)
-  if (asrama) query = query.eq('asrama', asrama)
+  if (search) { sql += ` AND (nama_lengkap LIKE ? OR nis LIKE ?)`; params.push(`%${search}%`, `%${search}%`) }
+  if (asrama) { sql += ' AND asrama = ?'; params.push(asrama) }
 
-  const { data, count } = await query
+  sql += ' ORDER BY nama_lengkap'
 
-  return {
-    data: data || [],
-    total: count ?? 0,
-    page,
-    hasMore: to < (count ?? 0) - 1
-  }
+  const allData = await query<any>(sql, params)
+  const total = allData.length
+  const data = allData.slice(offset, offset + PAGE_SIZE)
+
+  return { data, total, page, hasMore: offset + PAGE_SIZE < total }
 }
 
-// ============================================================
-// 3. CORE: Arsipkan santri (bisa satu atau banyak sekaligus)
-// ============================================================
 export async function arsipkanSantri(santriIds: string[], catatan: string) {
-  const supabaseAdmin = getAdminClient()
+  if (!santriIds || santriIds.length === 0) return { error: 'Pilih minimal 1 santri' }
 
-  if (!santriIds || santriIds.length === 0) return { error: "Pilih minimal 1 santri" }
-
-  let berhasil = 0
-  let gagal = 0
+  let berhasil = 0, gagal = 0
   const errorList: string[] = []
 
   for (const santriId of santriIds) {
     try {
-      // --- STEP 1: Ambil profil santri ---
-      const { data: profil } = await supabaseAdmin
-        .from('santri')
-        .select('*')
-        .eq('id', santriId)
-        .single()
-
+      const profil = await queryOne<any>('SELECT * FROM santri WHERE id = ?', [santriId])
       if (!profil) { gagal++; errorList.push(`ID ${santriId}: Data tidak ditemukan`); continue }
 
-      // --- STEP 2: Ambil riwayat pendidikan + nilai ---
-      const { data: riwayatList } = await supabaseAdmin
-        .from('riwayat_pendidikan')
-        .select(`
-          id, kelas_id, status_riwayat,
-          kelas:kelas_id (nama_kelas),
-          nilai_akademik (mapel_id, semester, nilai, mapel:mapel_id (nama))
-        `)
-        .eq('santri_id', santriId)
+      const riwayatList = await query<any>(`
+        SELECT rp.id, rp.kelas_id, rp.status_riwayat, k.nama_kelas
+        FROM riwayat_pendidikan rp LEFT JOIN kelas k ON rp.kelas_id = k.id
+        WHERE rp.santri_id = ?
+      `, [santriId])
 
-      // --- STEP 3: Ambil absensi harian ---
-      const riwayatIds = (riwayatList || []).map((r: any) => r.id)
-      let absensiList: any[] = []
-      if (riwayatIds.length > 0) {
-        const { data: absensi } = await supabaseAdmin
-          .from('absensi_harian')
-          .select('riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib')
-          .in('riwayat_pendidikan_id', riwayatIds)
-        absensiList = absensi || []
-      }
+      const riwayatIds = riwayatList.map((r: any) => r.id)
 
-      // --- STEP 4: Ambil pelanggaran ---
-      const { data: pelanggaranList } = await supabaseAdmin
-        .from('pelanggaran')
-        .select('*')
-        .eq('santri_id', santriId)
+      // Ambil nilai dan absensi
+      const nilaiList = riwayatIds.length > 0
+        ? await query(`SELECT * FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${riwayatIds.map(() => '?').join(',')})`, riwayatIds)
+        : []
+      const absensiList = riwayatIds.length > 0
+        ? await query(`SELECT * FROM absensi_harian WHERE riwayat_pendidikan_id IN (${riwayatIds.map(() => '?').join(',')})`, riwayatIds)
+        : []
+      const pelanggaranList = await query('SELECT * FROM pelanggaran WHERE santri_id = ?', [santriId])
+      const sppList = await query('SELECT * FROM spp_log WHERE santri_id = ?', [santriId])
 
-      // --- STEP 5: Ambil SPP log ---
-      const { data: sppList } = await supabaseAdmin
-        .from('spp_log')
-        .select('*')
-        .eq('santri_id', santriId)
-
-      // --- STEP 6: Rakit snapshot JSONB ---
-      const snapshot = {
-        profil,
-        riwayat_pendidikan: riwayatList || [],
-        absensi: absensiList,
-        pelanggaran: pelanggaranList || [],
-        spp: sppList || []
-      }
-
-      // Hitung angkatan dari NIS (ambil 4 digit pertama) atau tahun masuk
-      // Fallback ke tahun arsip jika tidak ketahuan
+      const snapshot = JSON.stringify({ profil, riwayat_pendidikan: riwayatList, absensi: absensiList, pelanggaran: pelanggaranList, spp: sppList, nilai: nilaiList })
       const angkatan = profil.nis ? parseInt(String(profil.nis).substring(0, 4)) || null : null
+      const now = new Date().toISOString()
 
-      // --- STEP 7: Simpan ke tabel arsip ---
-      const { error: errArsip } = await supabaseAdmin
-        .from('santri_arsip')
-        .insert({
-          santri_id_asli: santriId,
-          nis: profil.nis,
-          nama_lengkap: profil.nama_lengkap,
-          angkatan: isNaN(angkatan as number) ? null : angkatan,
-          asrama: profil.asrama,
-          catatan: catatan || null,
-          snapshot
-        })
+      await query(
+        `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), santriId, profil.nis, profil.nama_lengkap, isNaN(angkatan as number) ? null : angkatan, profil.asrama, catatan || null, snapshot, now]
+      )
 
-      if (errArsip) {
-        gagal++
-        errorList.push(`${profil.nama_lengkap}: ${errArsip.message}`)
-        continue
-      }
-
-      // --- STEP 8: Hapus data relasi & santri dari tabel aktif ---
-      // Urutan penting: hapus child dulu baru parent
-
-      // Hapus nilai akademik
+      // Hapus data relasi
       if (riwayatIds.length > 0) {
-        await supabaseAdmin.from('nilai_akademik').delete().in('riwayat_pendidikan_id', riwayatIds)
-        await supabaseAdmin.from('absensi_harian').delete().in('riwayat_pendidikan_id', riwayatIds)
-        await supabaseAdmin.from('riwayat_pendidikan').delete().eq('santri_id', santriId)
+        const ph = riwayatIds.map(() => '?').join(',')
+        await query(`DELETE FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${ph})`, riwayatIds)
+        await query(`DELETE FROM absensi_harian WHERE riwayat_pendidikan_id IN (${ph})`, riwayatIds)
+        await query('DELETE FROM riwayat_pendidikan WHERE santri_id = ?', [santriId])
       }
-
-      await supabaseAdmin.from('pelanggaran').delete().eq('santri_id', santriId)
-      await supabaseAdmin.from('spp_log').delete().eq('santri_id', santriId)
-
-      // Hapus santri utama
-      await supabaseAdmin.from('santri').delete().eq('id', santriId)
+      await query('DELETE FROM pelanggaran WHERE santri_id = ?', [santriId])
+      await query('DELETE FROM spp_log WHERE santri_id = ?', [santriId])
+      await query('DELETE FROM santri WHERE id = ?', [santriId])
 
       berhasil++
-
     } catch (err: any) {
-      gagal++
-      errorList.push(`ID ${santriId}: ${err.message}`)
+      gagal++; errorList.push(`ID ${santriId}: ${err.message}`)
     }
   }
 
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
-
-  return {
-    success: true,
-    berhasil,
-    gagal,
-    errors: errorList
-  }
+  return { success: true, berhasil, gagal, errors: errorList }
 }
 
-// ============================================================
-// 4. CORE: Restore santri dari arsip (bisa pilih sebagian)
-// ============================================================
 export async function restoreSantri(arsipIds: string[]) {
-  const supabaseAdmin = getAdminClient()
+  if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data untuk direstore' }
 
-  if (!arsipIds || arsipIds.length === 0) return { error: "Pilih minimal 1 data untuk direstore" }
-
-  let berhasil = 0
-  let gagal = 0
+  let berhasil = 0, gagal = 0
   const errorList: string[] = []
 
   for (const arsipId of arsipIds) {
     try {
-      // Ambil data arsip
-      const { data: arsip } = await supabaseAdmin
-        .from('santri_arsip')
-        .select('*')
-        .eq('id', arsipId)
-        .single()
-
+      const arsip = await queryOne<any>('SELECT * FROM santri_arsip WHERE id = ?', [arsipId])
       if (!arsip) { gagal++; errorList.push(`Arsip ID ${arsipId}: Tidak ditemukan`); continue }
 
-      const snap = arsip.snapshot
-
-      // --- STEP 1: Restore profil santri dengan ID BARU ---
+      const snap = JSON.parse(arsip.snapshot)
       const profilAsli = { ...snap.profil }
-      const idAsli = profilAsli.id
-
-      // Hapus id lama, biarkan Supabase generate UUID baru
       delete profilAsli.id
-
-      // Reset kelas ke null (admin atur manual setelahnya)
       profilAsli.status_global = 'aktif'
 
-      const { data: santriBaruList, error: errInsert } = await supabaseAdmin
-        .from('santri')
-        .insert(profilAsli)
-        .select('id')
+      const idBaru = crypto.randomUUID()
+      const now = new Date().toISOString()
 
-      if (errInsert || !santriBaruList || santriBaruList.length === 0) {
-        gagal++
-        errorList.push(`${arsip.nama_lengkap}: Gagal insert santri — ${errInsert?.message || 'unknown'}`)
-        continue
-      }
+      await query(
+        `INSERT INTO santri (id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
+          nama_ayah, nama_ibu, alamat, status_global, sekolah, kelas_sekolah, asrama, kamar, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idBaru, profilAsli.nis, profilAsli.nama_lengkap, profilAsli.nik, profilAsli.jenis_kelamin,
+         profilAsli.tempat_lahir, profilAsli.tanggal_lahir, profilAsli.nama_ayah, profilAsli.nama_ibu,
+         profilAsli.alamat, 'aktif', profilAsli.sekolah, profilAsli.kelas_sekolah, profilAsli.asrama, profilAsli.kamar, now, now]
+      )
 
-      const idBaru = santriBaruList[0].id
+      // Restore riwayat (kelas dikosongkan)
+      const mapRiwayat = new Map<string, string>()
+      for (const rw of (snap.riwayat_pendidikan || [])) {
+        const rwId = crypto.randomUUID()
+        await query(
+          'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+          [rwId, idBaru, null, rw.status_riwayat || 'aktif', now]
+        )
+        mapRiwayat.set(rw.id, rwId)
 
-      // --- STEP 2: Restore riwayat pendidikan (kelas = null) ---
-      const mapRiwayatOldToNew = new Map<string, string>()
-
-      for (const riwayat of (snap.riwayat_pendidikan || [])) {
-        const { data: rwBaru, error: errRw } = await supabaseAdmin
-          .from('riwayat_pendidikan')
-          .insert({
-            santri_id: idBaru,
-            kelas_id: null,       // Kelas dikosongkan, admin atur manual
-            status_riwayat: riwayat.status_riwayat || 'aktif'
-          })
-          .select('id')
-
-        if (!errRw && rwBaru && rwBaru.length > 0) {
-          mapRiwayatOldToNew.set(riwayat.id, rwBaru[0].id)
-
-          // Restore nilai akademik untuk riwayat ini
-          const nilaiList = riwayat.nilai_akademik || []
-          if (nilaiList.length > 0) {
-            const nilaiInserts = nilaiList.map((n: any) => ({
-              riwayat_pendidikan_id: rwBaru[0].id,
-              mapel_id: n.mapel_id,
-              semester: n.semester,
-              nilai: n.nilai
-            }))
-            await supabaseAdmin.from('nilai_akademik').insert(nilaiInserts)
-          }
+        for (const n of (rw.nilai_akademik || [])) {
+          await query(
+            'INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai) VALUES (?, ?, ?, ?, ?)',
+            [crypto.randomUUID(), rwId, n.mapel_id, n.semester, n.nilai]
+          )
         }
       }
 
-      // --- STEP 3: Restore absensi harian ---
-      for (const absensi of (snap.absensi || [])) {
-        const riwayatIdBaru = mapRiwayatOldToNew.get(absensi.riwayat_pendidikan_id)
-        if (!riwayatIdBaru) continue
-
-        const { id: _id, riwayat_pendidikan_id: _old, ...absensiData } = absensi
-        await supabaseAdmin.from('absensi_harian').insert({
-          ...absensiData,
-          riwayat_pendidikan_id: riwayatIdBaru
-        })
-      }
-
-      // --- STEP 4: Restore pelanggaran ---
       for (const p of (snap.pelanggaran || [])) {
         const { id: _id, santri_id: _old, ...pData } = p
-        await supabaseAdmin.from('pelanggaran').insert({
-          ...pData,
-          santri_id: idBaru
-        })
+        await query(
+          'INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin) VALUES (?, ?, ?, ?, ?, ?)',
+          [crypto.randomUUID(), idBaru, pData.tanggal, pData.jenis, pData.deskripsi, pData.poin]
+        )
       }
 
-      // --- STEP 5: Restore SPP log ---
-      for (const spp of (snap.spp || [])) {
-        const { id: _id, santri_id: _old, ...sppData } = spp
-        await supabaseAdmin.from('spp_log').insert({
-          ...sppData,
-          santri_id: idBaru
-        })
-      }
-
-      // --- STEP 6: Hapus dari tabel arsip setelah berhasil restore ---
-      await supabaseAdmin.from('santri_arsip').delete().eq('id', arsipId)
-
+      await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
       berhasil++
-
     } catch (err: any) {
-      gagal++
-      errorList.push(`Arsip ID ${arsipId}: ${err.message}`)
+      gagal++; errorList.push(`Arsip ID ${arsipId}: ${err.message}`)
     }
   }
 
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
-
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
-// ============================================================
-// 6. DOWNLOAD: Ambil data arsip lengkap (dengan snapshot) untuk diexport
-// ============================================================
 export async function getArsipForDownload(arsipIds?: string[]) {
-  const supabase = await createClient()
-
-  let query = supabase
-    .from('santri_arsip')
-    .select('id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip')
-    .order('angkatan', { ascending: false })
-    .order('nama_lengkap')
-
-  // Jika ada filter ID tertentu, hanya ambil yang itu
   if (arsipIds && arsipIds.length > 0) {
-    query = query.in('id', arsipIds)
+    const ph = arsipIds.map(() => '?').join(',')
+    const data = await query(`SELECT id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip FROM santri_arsip WHERE id IN (${ph}) ORDER BY angkatan DESC, nama_lengkap`, arsipIds)
+    return { data }
   }
-
-  const { data, error } = await query
-  if (error) return { error: error.message }
-  return { data: data || [] }
+  const data = await query('SELECT id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip FROM santri_arsip ORDER BY angkatan DESC, nama_lengkap')
+  return { data }
 }
 
 export async function hapusArsipPermanen(arsipId: string) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('santri_arsip').delete().eq('id', arsipId)
-  if (error) return { error: error.message }
+  await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
   revalidatePath('/dashboard/santri/arsip')
   return { success: true }
 }
 
-// Hapus banyak arsip sekaligus
 export async function hapusArsipMassal(arsipIds: string[]) {
-  const supabase = await createClient()
-  if (!arsipIds || arsipIds.length === 0) return { error: "Pilih minimal 1 data" }
-  const { error } = await supabase.from('santri_arsip').delete().in('id', arsipIds)
-  if (error) return { error: error.message }
+  if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data' }
+  const ph = arsipIds.map(() => '?').join(',')
+  await query(`DELETE FROM santri_arsip WHERE id IN (${ph})`, arsipIds)
   revalidatePath('/dashboard/santri/arsip')
   return { success: true, count: arsipIds.length }
 }

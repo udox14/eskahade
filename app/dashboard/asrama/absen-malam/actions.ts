@@ -1,73 +1,51 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, execute } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// Helper: Cek apakah user terbatas pada satu asrama?
 export async function getUserRestriction() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, asrama_binaan')
-      .eq('id', user.id)
-      .single()
-    
-    // Jika Pengurus Asrama, kembalikan nama asramanya
-    if (profile?.role === 'pengurus_asrama') {
-      return profile.asrama_binaan
-    }
-  }
-  return null // Admin/Sekpen/dll bebas (null restriction)
+  const session = await getSession()
+  if (session?.role === 'pengurus_asrama') return session.asrama_binaan ?? null
+  return null
 }
 
-// Ambil data santri per asrama + Status Absen + Status Izin
 export async function getDataAbsenMalam(asramaRequest: string) {
-  const supabase = await createClient()
-
-  // CEK RESTRIKSI: Jika user punya asrama binaan, paksa gunakan itu
   const restrictedAsrama = await getUserRestriction()
   const targetAsrama = restrictedAsrama || asramaRequest
 
-  // 1. Ambil Santri di Asrama tersebut
-  const { data: santriList } = await supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, kamar')
-    .eq('asrama', targetAsrama)
-    .eq('status_global', 'aktif')
-    .order('kamar') 
-    .order('nama_lengkap')
+  const santriList = await query<any>(`
+    SELECT id, nama_lengkap, nis, kamar
+    FROM santri
+    WHERE asrama = ? AND status_global = 'aktif'
+    ORDER BY kamar, nama_lengkap
+  `, [targetAsrama])
 
-  if (!santriList || santriList.length === 0) return []
+  if (!santriList.length) return []
 
-  const santriIds = santriList.map(s => s.id)
+  const santriIds = santriList.map((s: any) => s.id)
+  const ph = santriIds.map(() => '?').join(',')
 
-  // 2. Ambil Absen Malam (Hanya status)
-  const { data: absenList } = await supabase
-    .from('absen_asrama')
-    .select('santri_id, status, updated_at')
-    .in('santri_id', santriIds)
+  const absenList = await query<any>(`
+    SELECT santri_id, status, updated_at
+    FROM absen_asrama
+    WHERE santri_id IN (${ph})
+  `, santriIds)
 
-  // 3. Ambil Izin yang SEDANG AKTIF saat ini
-  const { data: izinList } = await supabase
-    .from('perizinan')
-    .select('santri_id, jenis')
-    .eq('status', 'AKTIF') 
-    .in('santri_id', santriIds)
+  const izinList = await query<any>(`
+    SELECT santri_id, jenis
+    FROM perizinan
+    WHERE status = 'AKTIF' AND santri_id IN (${ph})
+  `, santriIds)
 
-  // 4. Gabungkan Data (Merge)
   const todayResetTime = new Date()
-  todayResetTime.setHours(12, 0, 0, 0) 
-  if (new Date() < todayResetTime) {
-    todayResetTime.setDate(todayResetTime.getDate() - 1)
-  }
+  todayResetTime.setHours(12, 0, 0, 0)
+  if (new Date() < todayResetTime) todayResetTime.setDate(todayResetTime.getDate() - 1)
 
-  const result = santriList.map(s => {
-    const izin = izinList?.find(i => i.santri_id === s.id)
-    const absenDB = absenList?.find(a => a.santri_id === s.id)
-    
+  return santriList.map((s: any) => {
+    const izin = izinList.find((i: any) => i.santri_id === s.id)
+    const absenDB = absenList.find((a: any) => a.santri_id === s.id)
+
     let statusFinal = 'BELUM'
     let isIzin = false
 
@@ -76,42 +54,30 @@ export async function getDataAbsenMalam(asramaRequest: string) {
       isIzin = true
     } else if (absenDB) {
       const dbTime = new Date(absenDB.updated_at)
-      if (dbTime > todayResetTime) {
-        statusFinal = absenDB.status 
-      }
+      if (dbTime > todayResetTime) statusFinal = absenDB.status
     }
 
     return {
       ...s,
       status: statusFinal,
       is_izin: isIzin,
-      kamar_norm: normalizeKamar(s.kamar) 
+      kamar_norm: parseInt(s.kamar) || 999,
     }
   })
-
-  return result
 }
 
-// Simpan Absen (Upsert)
 export async function updateAbsenMalam(santriId: string, status: 'HADIR' | 'TIDAK') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  const { error } = await supabase
-    .from('absen_asrama')
-    .upsert({
-      santri_id: santriId,
-      status: status,
-      updated_at: new Date().toISOString(), 
-      created_by: user?.id
-    })
+  await execute(`
+    INSERT INTO absen_asrama (santri_id, status, updated_at, created_by)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(santri_id) DO UPDATE SET
+      status = excluded.status,
+      updated_at = excluded.updated_at,
+      created_by = excluded.created_by
+  `, [santriId, status, new Date().toISOString(), session?.id ?? null])
 
-  if (error) return { error: error.message }
   revalidatePath('/dashboard/asrama/absen-malam')
   return { success: true }
-}
-
-function normalizeKamar(k: string) {
-  const num = parseInt(k)
-  return isNaN(num) ? 999 : num
 }

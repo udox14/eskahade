@@ -1,133 +1,68 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { query, execute, generateId, now } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-// 1. Ambil Daftar Kitab (Grouped by Marhalah)
 export async function getDaftarKitab() {
-  const supabase = await createClient()
-  
-  // Ambil data raw
-  const { data, error } = await supabase
-    .from('kitab')
-    .select(`
-      id, 
-      nama_kitab, 
-      harga, 
-      marhalah (id, nama, urutan)
-    `)
-  
-  if (error || !data) {
-    console.error("Error Fetch Kitab:", error)
-    return {}
-  }
+  const data = await query<any>(`
+    SELECT k.id, k.nama_kitab, k.harga,
+           m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan
+    FROM kitab k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    ORDER BY k.nama_kitab
+  `, [])
 
-  // Sorting Manual di JS (Lebih Aman)
-  // 1. Sort by Nama Kitab
-  data.sort((a, b) => a.nama_kitab.localeCompare(b.nama_kitab))
-
-  // Grouping
   const grouped: Record<string, any[]> = {}
-  
+
   data.forEach((k: any) => {
-    // Handle join array/object
-    const m = Array.isArray(k.marhalah) ? k.marhalah[0] : k.marhalah
-    const mNama = m?.nama || 'Umum / Lainnya'
-    const mUrut = m?.urutan || 999
-
-    if (!grouped[mNama]) {
-      // Simpan metadata urutan di array untuk sorting group nanti (trik)
-      // Tapi karena return type Record<string, []>, kita sort keys nya di frontend atau di sini convert ke array of object
-      // Untuk kemudahan frontend yang sudah ada, kita tetap return Record, tapi kita urutkan insert kuncinya (JS object keys order is insertion order mostly)
-      grouped[mNama] = []
-    }
-    
-    grouped[mNama].push({
-        id: k.id,
-        nama: k.nama_kitab, // Mapping ke 'nama' agar sesuai frontend
-        harga: k.harga,
-        urutan_marhalah: mUrut
-    })
+    const mNama = k.marhalah_nama || 'Umum / Lainnya'
+    const mUrut = k.marhalah_urutan || 999
+    if (!grouped[mNama]) grouped[mNama] = []
+    grouped[mNama].push({ id: k.id, nama: k.nama_kitab, harga: k.harga, urutan_marhalah: mUrut })
   })
 
-  // Re-order Object Keys berdasarkan Urutan Marhalah
   const orderedGrouped: Record<string, any[]> = {}
-  const keys = Object.keys(grouped).sort((a, b) => {
-    const urutanA = grouped[a][0]?.urutan_marhalah || 999
-    const urutanB = grouped[b][0]?.urutan_marhalah || 999
-    return urutanA - urutanB
-  })
-
-  keys.forEach(key => {
-    orderedGrouped[key] = grouped[key]
-  })
+  Object.keys(grouped)
+    .sort((a, b) => (grouped[a][0]?.urutan_marhalah || 999) - (grouped[b][0]?.urutan_marhalah || 999))
+    .forEach(key => { orderedGrouped[key] = grouped[key] })
 
   return orderedGrouped
 }
 
-// 2. Cari Santri
 export async function cariSantri(keyword: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('santri')
-    .select('id, nama_lengkap, nis, asrama, kamar')
-    .eq('status_global', 'aktif')
-    .ilike('nama_lengkap', `%${keyword}%`)
-    .limit(5)
-  return data || []
+  return query<any>(`
+    SELECT id, nama_lengkap, nis, asrama, kamar
+    FROM santri
+    WHERE status_global = 'aktif' AND nama_lengkap LIKE ?
+    LIMIT 5
+  `, [`%${keyword}%`])
 }
 
-// 3. Simpan Transaksi Lengkap
 export async function simpanTransaksiUPK(payload: any) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await getSession()
+  const { santriId, namaPemesan, infoTambahan, totalTagihan, totalBayar, items } = payload
 
-  const { 
-    santriId, 
-    namaPemesan, 
-    infoTambahan, 
-    totalTagihan, 
-    totalBayar, 
-    items 
-  } = payload
-
-  // Hitung status keuangan
   const diff = totalBayar - totalTagihan
   const kembalian = diff > 0 ? diff : 0
   const tunggakan = diff < 0 ? Math.abs(diff) : 0
-  const lunas = tunggakan === 0
+  const lunas = tunggakan === 0 ? 1 : 0
 
-  // A. Insert Header
-  const { data: trx, error: errTrx } = await supabase
-    .from('upk_transaksi')
-    .insert({
-      santri_id: santriId,
-      nama_pemesan: namaPemesan,
-      info_tambahan: infoTambahan,
-      total_tagihan: totalTagihan,
-      total_bayar: totalBayar,
-      sisa_kembalian: kembalian,
-      sisa_tunggakan: tunggakan,
-      status_lunas: lunas,
-      created_by: user?.id
-    })
-    .select('id')
-    .single()
+  const trxId = generateId()
 
-  if (errTrx) return { error: errTrx.message }
+  await execute(`
+    INSERT INTO upk_transaksi (id, santri_id, nama_pemesan, info_tambahan, total_tagihan, total_bayar,
+      sisa_kembalian, sisa_tunggakan, status_lunas, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [trxId, santriId, namaPemesan, infoTambahan, totalTagihan, totalBayar,
+      kembalian, tunggakan, lunas, session?.id ?? null, now()])
 
-  // B. Insert Items
-  const itemsInsert = items.map((item: any) => ({
-    transaksi_id: trx.id,
-    kitab_id: item.id,
-    harga_saat_ini: item.hargaAsli, 
-    is_gratis: item.isGratis,
-    status_serah: 'BELUM' 
-  }))
-
-  const { error: errItem } = await supabase.from('upk_item').insert(itemsInsert)
-
-  if (errItem) return { error: "Gagal simpan item: " + errItem.message }
+  for (const item of items) {
+    await execute(`
+      INSERT INTO upk_item (id, transaksi_id, kitab_id, harga_saat_ini, is_gratis, status_serah)
+      VALUES (?, ?, ?, ?, ?, 'BELUM')
+    `, [generateId(), trxId, item.id, item.hargaAsli, item.isGratis ? 1 : 0])
+  }
 
   revalidatePath('/dashboard/akademik/upk')
   return { success: true }

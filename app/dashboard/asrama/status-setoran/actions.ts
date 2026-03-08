@@ -1,48 +1,31 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-
-// Helper Restriksi Asrama
-async function getUserRestriction() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data } = await supabase.from('profiles').select('role, asrama_binaan').eq('id', user.id).single()
-    if (data?.role === 'pengurus_asrama') return data.asrama_binaan
-  }
-  return null
-}
+import { query } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 
 export async function getStatusSetoranSaya(tahun: number) {
-  const supabase = await createClient()
-  
-  // 1. Cek Asrama User
-  const asrama = await getUserRestriction()
+  const session = await getSession()
 
-  if (!asrama) {
-    return { error: "Anda tidak memiliki akses asrama binaan." }
+  if (session?.role !== 'pengurus_asrama' || !session.asrama_binaan) {
+    return { error: 'Anda tidak memiliki akses asrama binaan.' }
   }
 
-  const { data } = await supabase
-    .from('spp_setoran')
-    .select('bulan, tanggal_terima, penerima:penerima_id(full_name)')
-    .eq('asrama', asrama)
-    .eq('tahun', tahun)
-    .order('bulan')
+  const asrama = session.asrama_binaan
 
-  // Mapping 1-12
+  const data = await query<any>(`
+    SELECT ss.bulan, ss.tanggal_terima, u.full_name AS penerima_nama
+    FROM spp_setoran ss
+    LEFT JOIN users u ON u.id = ss.penerima_id
+    WHERE ss.asrama = ? AND ss.tahun = ?
+    ORDER BY ss.bulan
+  `, [asrama, tahun])
+
   const statusBulan: Record<number, any> = {}
-  
-  data?.forEach((d: any) => {
-    // FIX BUILD ERROR: Handle join array/object secara eksplisit
-    // Supabase kadang mengembalikan array [{full_name: '...'}] atau object {full_name: '...'}
-    const p = d.penerima
-    const namaPenerima = Array.isArray(p) ? p[0]?.full_name : p?.full_name
-
+  data.forEach((d: any) => {
     statusBulan[d.bulan] = {
       lunas: true,
       tanggal: d.tanggal_terima,
-      penerima: namaPenerima || 'Sistem'
+      penerima: d.penerima_nama || 'Sistem',
     }
   })
 

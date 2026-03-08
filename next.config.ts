@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+
+initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**.supabase.co",
+        hostname: "**.r2.cloudflarestorage.com",
       },
     ],
   },
@@ -20,7 +21,6 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Next.js 16 default pakai Turbopack, deklarasikan eksplisit
   turbopack: {},
 };
 
