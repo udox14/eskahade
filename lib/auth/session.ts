@@ -5,7 +5,28 @@
 import { cookies } from 'next/headers'
 
 const SESSION_COOKIE = 'eskahade_session'
-const JWT_SECRET = process.env.JWT_SECRET!
+
+// ============================================================
+// Ambil JWT_SECRET dari env (Cloudflare Workers compat)
+// Di Cloudflare, env vars ada di getCloudflareContext().env, BUKAN process.env
+// Tapi untuk compat, kita coba keduanya
+// ============================================================
+async function getJWTSecret(): Promise<string> {
+  // Coba process.env dulu (works di dev/Node)
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET
+
+  // Di Cloudflare Workers runtime, pakai getCloudflareContext
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
+    const { env } = await getCloudflareContext({ async: true })
+    const secret = (env as any).JWT_SECRET
+    if (secret) return secret
+  } catch {
+    // ignore — mungkin bukan di CF context
+  }
+
+  throw new Error('JWT_SECRET tidak ditemukan. Tambahkan sebagai Cloudflare Secret atau di .env.local')
+}
 
 // ============================================================
 // Tipe data session
@@ -40,6 +61,7 @@ function base64urlDecode(data: string): string {
 // Buat JWT token
 // ============================================================
 async function createJWT(payload: object): Promise<string> {
+  const secret = await getJWTSecret()
   const header = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const body = base64urlEncode(JSON.stringify({
     ...payload,
@@ -50,7 +72,7 @@ async function createJWT(payload: object): Promise<string> {
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw',
-    enc.encode(JWT_SECRET),
+    enc.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
@@ -67,13 +89,14 @@ async function createJWT(payload: object): Promise<string> {
 // ============================================================
 async function verifyJWT(token: string): Promise<SessionUser | null> {
   try {
+    const secret = await getJWTSecret()
     const [header, body, sig] = token.split('.')
     if (!header || !body || !sig) return null
 
     const enc = new TextEncoder()
     const key = await crypto.subtle.importKey(
       'raw',
-      enc.encode(JWT_SECRET),
+      enc.encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
@@ -114,7 +137,7 @@ export async function setSession(user: SessionUser): Promise<void> {
     name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7 // 7 hari
@@ -144,7 +167,7 @@ export async function clearSession(): Promise<void> {
 }
 
 // ============================================================
-// Baca session dari cookie header (untuk middleware)
+// Baca session dari cookie header (untuk middleware/proxy)
 // ============================================================
 export async function getSessionFromCookieString(
   cookieString: string

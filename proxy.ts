@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import { type NextRequest, NextResponse } from "next/server";
 import { getSessionFromCookieString } from "@/lib/auth/session";
 
@@ -10,7 +8,6 @@ export async function proxy(request: NextRequest) {
   // Proteksi semua halaman dashboard
   if (pathname.startsWith("/dashboard")) {
     const user = await getSessionFromCookieString(cookieHeader);
-
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -19,7 +16,6 @@ export async function proxy(request: NextRequest) {
   // Kalau sudah login, redirect dari /login ke /dashboard
   if (pathname === "/login") {
     const user = await getSessionFromCookieString(cookieHeader);
-
     if (user) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }

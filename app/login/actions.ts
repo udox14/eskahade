@@ -13,29 +13,47 @@ export async function login(formData: FormData) {
     return { error: 'Email dan password wajib diisi.' }
   }
 
+  // PENTING: letakkan semua logic di luar try/catch yang membungkus redirect()
+  // karena Next.js redirect() bekerja dengan melempar error NEXT_REDIRECT
+  // yang akan di-catch dan dianggap error biasa jika ada try/catch di luar
+
+  let user: {
+    id: string
+    email: string
+    password_hash: string
+    full_name: string
+    role: string
+    asrama_binaan: string | null
+  } | null = null
+
   try {
-    const user = await queryOne<{
-      id: string
-      email: string
-      password_hash: string
-      full_name: string
-      role: string
-      asrama_binaan: string | null
-    }>(
+    user = await queryOne(
       'SELECT id, email, password_hash, full_name, role, asrama_binaan FROM users WHERE email = ?',
       [email.toLowerCase().trim()]
     )
+  } catch (err: any) {
+    console.error('DB error saat login:', err)
+    return { error: 'Gagal terhubung ke database. Coba lagi nanti.' }
+  }
 
-    if (!user) {
-      return { error: 'Email atau Password salah.' }
-    }
+  if (!user) {
+    return { error: 'Email atau Password salah.' }
+  }
 
-    const valid = await verifyPassword(password, user.password_hash)
+  let valid = false
+  try {
+    valid = await verifyPassword(password, user.password_hash)
+  } catch (err: any) {
+    console.error('Error verifikasi password:', err)
+    return { error: 'Terjadi kesalahan saat verifikasi. Coba lagi.' }
+  }
 
-    if (!valid) {
-      return { error: 'Email atau Password salah.' }
-    }
+  if (!valid) {
+    return { error: 'Email atau Password salah.' }
+  }
 
+  // Set session DULU (masih aman di try/catch terpisah)
+  try {
     await setSession({
       id: user.id,
       email: user.email,
@@ -43,16 +61,11 @@ export async function login(formData: FormData) {
       role: user.role,
       asrama_binaan: user.asrama_binaan,
     })
-
-    redirect('/dashboard')
-
   } catch (err: any) {
-    console.error('Login error:', err)
-
-    if (err.message?.includes('fetch failed') || err.code === 'UND_ERR_CONNECT_TIMEOUT') {
-      return { error: 'Koneksi ke server database terputus. Periksa internet Anda.' }
-    }
-
-    return { error: 'Terjadi kesalahan sistem. Coba lagi nanti.' }
+    console.error('Error set session:', err)
+    return { error: 'Gagal menyimpan sesi. Coba lagi.' }
   }
+
+  // redirect() HARUS di luar try/catch — ia melempar NEXT_REDIRECT error secara internal
+  redirect('/dashboard')
 }
