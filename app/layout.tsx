@@ -1,10 +1,7 @@
 import React from 'react'
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sistem Pesantren Sukahideng",
@@ -18,15 +15,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body className={inter.className}>
+      <head>
+        {/* Google Fonts via CSS link — aman untuk Cloudflare Workers */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      </head>
+      <body style={{ fontFamily: "'Inter', sans-serif" }}>
         {children}
         <Toaster position="top-center" richColors />
-        {/* 
-          CATATAN: xlsx CDN Script dihapus karena tidak diperlukan.
-          Semua halaman yang butuh xlsx sudah menggunakan dynamic import:
-          const XLSX = await import('xlsx')
-          Ini lebih optimal untuk bundle size Cloudflare Workers.
-        */}
       </body>
     </html>
   );
