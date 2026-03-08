@@ -110,12 +110,14 @@ export async function setSession(user: SessionUser): Promise<void> {
   const token = await createJWT(user)
   const cookieStore = await cookies()
 
-  cookieStore.set(SESSION_COOKIE, token, {
+  cookieStore.set({
+    name: SESSION_COOKIE,
+    value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 hari
     path: '/',
+    maxAge: 60 * 60 * 24 * 7 // 7 hari
   })
 }
 
