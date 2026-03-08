@@ -1,35 +1,17 @@
 // lib/auth/session.ts
-// Manajemen session via JWT cookie — pengganti Supabase Auth session
 
 import { cookies } from 'next/headers'
 
 const SESSION_COOKIE = 'eskahade_session'
 
-// ============================================================
-// Ambil JWT_SECRET dari env (Cloudflare Workers compat)
-// Di Cloudflare, env vars ada di getCloudflareContext().env, BUKAN process.env
-// Tapi untuk compat, kita coba keduanya
-// ============================================================
-async function getJWTSecret(): Promise<string> {
-  // Coba process.env dulu (works di dev/Node)
-  if (process.env.JWT_SECRET) return process.env.JWT_SECRET
-
-  // Di Cloudflare Workers runtime, pakai getCloudflareContext
-  try {
-    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
-    const { env } = await getCloudflareContext({ async: true })
-    const secret = (env as any).JWT_SECRET
-    if (secret) return secret
-  } catch {
-    // ignore — mungkin bukan di CF context
-  }
-
-  throw new Error('JWT_SECRET tidak ditemukan. Tambahkan sebagai Cloudflare Secret atau di .env.local')
+// Di Cloudflare Workers (via OpenNext), secrets yang di-set via `wrangler secret put`
+// langsung tersedia di process.env — tidak perlu getCloudflareContext()
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET tidak ditemukan di environment variables')
+  return secret
 }
 
-// ============================================================
-// Tipe data session
-// ============================================================
 export type SessionUser = {
   id: string
   email: string
@@ -38,100 +20,62 @@ export type SessionUser = {
   asrama_binaan: string | null
 }
 
-// ============================================================
-// Helper: encode base64url
-// ============================================================
 function base64urlEncode(data: string): string {
-  return btoa(data)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  return btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-// ============================================================
-// Helper: decode base64url
-// ============================================================
 function base64urlDecode(data: string): string {
   const padded = data + '=='.slice((data.length + 3) % 4)
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
 
-// ============================================================
-// Buat JWT token
-// ============================================================
 async function createJWT(payload: object): Promise<string> {
-  const secret = await getJWTSecret()
+  const secret = getJWTSecret()
   const header = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const body = base64urlEncode(JSON.stringify({
     ...payload,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 // 7 hari
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7
   }))
 
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
+    'raw', enc.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
+    false, ['sign']
   )
-
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(`${header}.${body}`))
-  const sigHex = base64urlEncode(String.fromCharCode(...new Uint8Array(sig)))
-
-  return `${header}.${body}.${sigHex}`
+  const sigB64 = base64urlEncode(String.fromCharCode(...new Uint8Array(sig)))
+  return `${header}.${body}.${sigB64}`
 }
 
-// ============================================================
-// Verifikasi JWT token
-// ============================================================
 async function verifyJWT(token: string): Promise<SessionUser | null> {
   try {
-    const secret = await getJWTSecret()
+    const secret = getJWTSecret()
     const [header, body, sig] = token.split('.')
     if (!header || !body || !sig) return null
 
     const enc = new TextEncoder()
     const key = await crypto.subtle.importKey(
-      'raw',
-      enc.encode(secret),
+      'raw', enc.encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
+      false, ['verify']
     )
-
-    const sigBytes = Uint8Array.from(
-      base64urlDecode(sig).split('').map(c => c.charCodeAt(0))
-    )
-
-    const valid = await crypto.subtle.verify(
-      'HMAC',
-      key,
-      sigBytes,
-      enc.encode(`${header}.${body}`)
-    )
-
+    const sigBytes = Uint8Array.from(base64urlDecode(sig).split('').map(c => c.charCodeAt(0)))
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(`${header}.${body}`))
     if (!valid) return null
 
     const payload = JSON.parse(base64urlDecode(body))
-
-    // Cek expiry
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
-
     return payload as SessionUser
   } catch {
     return null
   }
 }
 
-// ============================================================
-// Set session cookie setelah login
-// ============================================================
 export async function setSession(user: SessionUser): Promise<void> {
   const token = await createJWT(user)
   const cookieStore = await cookies()
-
   cookieStore.set({
     name: SESSION_COOKIE,
     value: token,
@@ -139,13 +83,10 @@ export async function setSession(user: SessionUser): Promise<void> {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7 // 7 hari
+    maxAge: 60 * 60 * 24 * 7
   })
 }
 
-// ============================================================
-// Baca session dari cookie (pengganti supabase.auth.getUser())
-// ============================================================
 export async function getSession(): Promise<SessionUser | null> {
   try {
     const cookieStore = await cookies()
@@ -157,20 +98,12 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
-// ============================================================
-// Hapus session cookie (logout)
-// ============================================================
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete(SESSION_COOKIE)
 }
 
-// ============================================================
-// Baca session dari cookie header (untuk middleware/proxy)
-// ============================================================
-export async function getSessionFromCookieString(
-  cookieString: string
-): Promise<SessionUser | null> {
+export async function getSessionFromCookieString(cookieString: string): Promise<SessionUser | null> {
   const match = cookieString.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))
   if (!match) return null
   return await verifyJWT(match[1])
