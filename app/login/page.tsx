@@ -13,15 +13,19 @@ export default function LoginPage() {
 
   const handleLogin = async (formData: FormData) => {
     setIsSubmitting(true);
+
     const res = await login(formData);
 
     if (res?.error) {
       setIsSubmitting(false);
       toast.error("Login Gagal", { description: res.error });
-    } else {
-      toast.success("Berhasil Login", { description: "Mengalihkan ke dashboard..." });
-      window.location.href = "/dashboard";
+      return;
     }
+
+    toast.success("Berhasil Login", { description: "Mengalihkan ke dashboard..." });
+
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -37,12 +41,15 @@ export default function LoginPage() {
         </div>
 
         <form action={handleLogin} className="space-y-5">
+
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Email</label>
+
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-slate-400 group-focus-within:text-green-600 transition-colors" />
               </div>
+
               <input
                 name="email"
                 type="email"
@@ -58,10 +65,12 @@ export default function LoginPage() {
             <label className="text-sm font-bold text-slate-700 block flex justify-between">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password</span>
             </label>
+
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-600 transition-colors" />
               </div>
+
               <input
                 name="password"
                 type="password"
@@ -81,10 +90,12 @@ export default function LoginPage() {
             {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
             {isSubmitting ? "Memproses..." : "Masuk"}
           </button>
+
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400 mb-2">Lupa kata sandi?</p>
+
           <a
             href="https://wa.me/6282218943383"
             target="_blank"

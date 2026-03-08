@@ -3,6 +3,7 @@
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setSession } from '@/lib/auth/session'
+import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
@@ -13,7 +14,6 @@ export async function login(formData: FormData) {
   }
 
   try {
-    // Cari user di D1
     const user = await queryOne<{
       id: string
       email: string
@@ -30,13 +30,12 @@ export async function login(formData: FormData) {
       return { error: 'Email atau Password salah.' }
     }
 
-    // Verifikasi password
     const valid = await verifyPassword(password, user.password_hash)
+
     if (!valid) {
       return { error: 'Email atau Password salah.' }
     }
 
-    // Set JWT session cookie
     await setSession({
       id: user.id,
       email: user.email,
@@ -45,7 +44,7 @@ export async function login(formData: FormData) {
       asrama_binaan: user.asrama_binaan,
     })
 
-    return { success: true }
+    redirect('/dashboard')
 
   } catch (err: any) {
     console.error('Login error:', err)
