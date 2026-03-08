@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
         hostname: "**.r2.cloudflarestorage.com",
       },
     ],
+    // Disable sharp/resvg untuk menghindari .wasm issue di Windows
+    unoptimized: true,
   },
 
   experimental: {
