@@ -5,7 +5,6 @@ import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 
 export default async function DashboardLayout({
   children,
@@ -13,10 +12,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-
-  if (!session) {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
 
   const user = await queryOne<{ full_name: string; role: string }>(
     'SELECT full_name, role FROM users WHERE id = ?',
@@ -27,11 +23,7 @@ export default async function DashboardLayout({
   const userName = user?.full_name || 'User';
 
   return (
-    <ClientLayout
-      userRole={userRole}
-      userEmail=""
-      userName={userName}
-    >
+    <ClientLayout userRole={userRole} userEmail="" userName={userName}>
       {children}
     </ClientLayout>
   );

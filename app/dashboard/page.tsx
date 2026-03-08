@@ -7,7 +7,6 @@ import { AkademikDashboard } from './dashboards/akademik-dashboard'
 import { DewanSantriDashboard } from './dashboards/dewan-santri-dashboard'
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
 
 export default async function DashboardPage() {
   const session = await getSession()

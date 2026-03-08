@@ -37,11 +37,6 @@
 			"binding": "R2_BUCKET",
 			"bucket_name": "eskahade-foto",
 			"preview_bucket_name": "eskahade-foto-preview"
-		},
-		{
-			"bucket_name": "eskahade-foto",
-			"binding": "eskahade_foto",
-			"remote": true
 		}
 	]
 }
