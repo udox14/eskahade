@@ -1,32 +1,31 @@
 'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { login } from "@/app/login/actions";
-import { User, Lock, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import Link from "next/link";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { login } from "@/app/login/actions"
+import { User, Lock, ArrowRight, ShieldCheck, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import Link from "next/link"
 
-export default function LoginClient() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const router = useRouter();
+export default function LoginForm() {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
 
   const handleLogin = async (formData: FormData) => {
-    setIsSubmitting(true);
+    setIsSubmitting(true)
 
-    const res = await login(formData);
+    const res = await login(formData)
 
     if (res?.error) {
-      setIsSubmitting(false);
-      toast.error("Login Gagal", { description: res.error });
-      return;
+      setIsSubmitting(false)
+      toast.error("Login Gagal", { description: res.error })
+      return
     }
 
-    toast.success("Berhasil Login", { description: "Mengalihkan ke dashboard..." });
-
-    router.push("/dashboard");
-    router.refresh();
-  };
+    toast.success("Berhasil Login", { description: "Mengalihkan ke dashboard..." })
+    router.push("/dashboard")
+    router.refresh()
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
@@ -44,12 +43,10 @@ export default function LoginClient() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Email</label>
-
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-slate-400 group-focus-within:text-green-600 transition-colors" />
               </div>
-
               <input
                 name="email"
                 type="email"
@@ -62,15 +59,11 @@ export default function LoginClient() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 block flex justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password</span>
-            </label>
-
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Password</label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-600 transition-colors" />
               </div>
-
               <input
                 name="password"
                 type="password"
@@ -95,7 +88,6 @@ export default function LoginClient() {
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400 mb-2">Lupa kata sandi?</p>
-
           <a
             href="https://wa.me/6282218943383"
             target="_blank"
