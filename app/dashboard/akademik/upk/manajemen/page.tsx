@@ -72,8 +72,8 @@ export default function ManajemenUPKPage() {
       const res = await serahkanBarangPartial(selectedItems)
       setIsProcessing(false)
       
-      if(res?.error) {
-          toast.error(res.error)
+      if('error' in res) {
+          toast.error((res as any).error)
       } else {
           toast.success("Barang Diserahkan")
           setIsModalOpen(false)
@@ -84,14 +84,14 @@ export default function ManajemenUPKPage() {
   const handleLunas = async (id: string, nama: string) => {
     if(!confirm(`Terima pelunasan hutang dari ${nama}?`)) return
     const res = await selesaikanKeuangan(id, 'LUNAS')
-    if(res?.error) toast.error(res.error)
+    if('error' in res) toast.error((res as any).error)
     else { toast.success("Hutang Lunas"); loadDistribusi(); }
   }
 
   const handleAmbilKembalian = async (id: string, nama: string) => {
     if(!confirm(`Serahkan uang kembalian kepada ${nama}?`)) return
     const res = await selesaikanKeuangan(id, 'AMBIL_KEMBALIAN')
-    if(res?.error) toast.error(res.error)
+    if('error' in res) toast.error((res as any).error)
     else { toast.success("Kembalian Diserahkan"); loadDistribusi(); }
   }
 

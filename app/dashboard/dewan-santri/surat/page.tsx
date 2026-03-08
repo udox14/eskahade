@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useRef, useEffect } from 'react'
 import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapusRiwayatSurat } from './actions'
 import { SuratView } from './surat-view'
@@ -105,7 +107,7 @@ export default function LayananSuratPage() {
 
     const res = await catatSuratKeluar(selectedSantri.id, jenisSurat!, info)
     
-    if (res?.error) {
+    if ('error' in res) {
         toast.error("Gagal mencatat riwayat surat", { description: "Tapi proses cetak tetap dilanjutkan." })
     } else {
         loadRiwayat() // Refresh tabel bawah
@@ -123,8 +125,8 @@ export default function LayananSuratPage() {
     const res = await hapusRiwayatSurat(id)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error("Gagal hapus", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal hapus", { description: (res as any).error })
     } else {
         toast.success("Berhasil dihapus")
         loadRiwayat()

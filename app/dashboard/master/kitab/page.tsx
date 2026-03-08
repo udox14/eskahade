@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab } from './actions'
 // PERBAIKAN: Menambahkan 'List' ke dalam import
@@ -59,7 +61,7 @@ export default function MasterKitabPage() {
     const res = await tambahKitab(formData)
     toast.dismiss(toastId)
 
-    if (res?.error) {
+    if ('error' in res) {
         toast.error(res.error)
     } else {
         toast.success("Kitab ditambahkan")
@@ -80,12 +82,12 @@ export default function MasterKitabPage() {
     if (isNaN(harga)) return toast.warning("Harga tidak valid")
     
     const res = await updateHargaKitab(id, harga)
-    if (res?.success) {
+    if ((res as any).success) {
         toast.success("Harga diupdate")
         setEditingId(null)
         loadKitab()
     } else {
-        toast.error(res?.error)
+        toast.error((res as any).error)
     }
   }
 
@@ -122,13 +124,13 @@ export default function MasterKitabPage() {
     const res = await importKitabMassal(excelData)
     setIsProcessing(false)
     
-    if (res?.success) {
-        toast.success(`Berhasil import ${res.count} kitab`)
+    if ((res as any).success) {
+        toast.success(`Berhasil import ${(res as any).count} kitab`)
         setExcelData([])
         setTab('LIST')
         loadKitab()
     } else {
-        toast.error(res?.error)
+        toast.error((res as any).error)
     }
   }
 

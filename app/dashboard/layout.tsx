@@ -1,3 +1,4 @@
+import React from 'react'
 import { ClientLayout } from "@/components/layout/client-layout";
 import { getSession } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";

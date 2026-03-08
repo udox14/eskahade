@@ -27,7 +27,7 @@ export async function getTarifByTahun(tahun: number) {
   return result
 }
 
-export async function simpanTarif(tahun: number, tarifData: any) {
+export async function simpanTarif(tahun: number, tarifData: any): Promise<{ success: boolean } | { error: string }> {
   const items = [
     { jenis: 'BANGUNAN', nominal: tarifData.BANGUNAN },
     { jenis: 'KESEHATAN', nominal: tarifData.KESEHATAN },

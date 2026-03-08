@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPP, getClientRestriction, simpanSppBatch } from './actions'
 import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, XCircle } from 'lucide-react'
@@ -122,7 +124,7 @@ export default function SPPPage() {
     const res = await bayarSPP(selectedSantri.id, tahun, selectedMonths, nominal)
     toast.dismiss(toastId)
 
-    if (res?.error) {
+    if ('error' in res) {
       toast.error(res.error)
     } else {
       toast.success("Pembayaran Berhasil!")
@@ -159,10 +161,10 @@ export default function SPPPage() {
     const res = await simpanSppBatch(listPayload)
     setIsSavingBatch(false)
 
-    if (res?.error) {
+    if ('error' in res) {
         toast.error(res.error)
     } else {
-        toast.success(`Sukses menyimpan ${res.count} pembayaran!`)
+        toast.success(`Sukses menyimpan ${(res as any).count} pembayaran!`)
         loadMonitoring(true)
     }
   }
@@ -209,7 +211,7 @@ export default function SPPPage() {
   const nextKamar = () => { if (safeIndex < sortedKamars.length - 1) setCurrentKamarIndex(prev => prev + 1) }
 
   const totalDraft = Object.keys(drafts).length
-  const totalNominalDraft = Object.values(drafts).reduce((a: any, b: any) => a + b.nominal, 0)
+  const totalNominalDraft = Object.values(drafts).reduce((a: number, b: any) => a + b.nominal, 0)
 
 
   // --- VIEW: LIST MONITORING ---

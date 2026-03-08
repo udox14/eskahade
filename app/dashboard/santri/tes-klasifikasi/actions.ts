@@ -40,7 +40,7 @@ export async function getSantriBaru(search: string = '') {
     }))
 }
 
-export async function simpanTes(formData: FormData) {
+export async function simpanTes(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const santriId = formData.get('santri_id') as string
   const hari = formData.get('hari_tes') as string
   const sesi = formData.get('sesi_tes') as string

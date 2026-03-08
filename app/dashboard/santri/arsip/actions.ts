@@ -111,7 +111,7 @@ export async function getSantriDalamGrup(
   return { data, total, page, hasMore: offset + PAGE_SIZE < total }
 }
 
-export async function arsipkanSantri(santriIds: string[], catatan: string) {
+export async function arsipkanSantri(santriIds: string[], catatan: string): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
   if (!santriIds || santriIds.length === 0) return { error: 'Pilih minimal 1 santri' }
 
   let berhasil = 0, gagal = 0
@@ -172,7 +172,7 @@ export async function arsipkanSantri(santriIds: string[], catatan: string) {
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
-export async function restoreSantri(arsipIds: string[]) {
+export async function restoreSantri(arsipIds: string[]): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data untuk direstore' }
 
   let berhasil = 0, gagal = 0
@@ -238,7 +238,7 @@ export async function restoreSantri(arsipIds: string[]) {
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
-export async function getArsipForDownload(arsipIds?: string[]) {
+export async function getArsipForDownload(arsipIds?: string[]): Promise<{ data: any[] } | { error: string }> {
   if (arsipIds && arsipIds.length > 0) {
     const ph = arsipIds.map(() => '?').join(',')
     const data = await query(`SELECT id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip FROM santri_arsip WHERE id IN (${ph}) ORDER BY angkatan DESC, nama_lengkap`, arsipIds)
@@ -248,13 +248,13 @@ export async function getArsipForDownload(arsipIds?: string[]) {
   return { data }
 }
 
-export async function hapusArsipPermanen(arsipId: string) {
+export async function hapusArsipPermanen(arsipId: string): Promise<{ success: boolean } | { error: string }> {
   await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
   revalidatePath('/dashboard/santri/arsip')
   return { success: true }
 }
 
-export async function hapusArsipMassal(arsipIds: string[]) {
+export async function hapusArsipMassal(arsipIds: string[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data' }
   const ph = arsipIds.map(() => '?').join(',')
   await query(`DELETE FROM santri_arsip WHERE id IN (${ph})`, arsipIds)

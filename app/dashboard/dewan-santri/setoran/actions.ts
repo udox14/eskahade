@@ -84,7 +84,7 @@ export async function terimaSetoran(
   return { success: true }
 }
 
-export async function batalkanSetoran(asrama: string, bulan: number, tahun: number) {
+export async function batalkanSetoran(asrama: string, bulan: number, tahun: number): Promise<{ success: boolean } | { error: string }> {
   await execute(
     'DELETE FROM spp_setoran WHERE asrama = ? AND bulan = ? AND tahun = ?',
     [asrama, bulan, tahun]

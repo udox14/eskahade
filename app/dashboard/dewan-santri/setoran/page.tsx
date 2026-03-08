@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getDetailSetoranBulan, terimaSetoran, batalkanSetoran } from './actions'
 import { Loader2, CheckCircle, XCircle, Calendar, ArrowLeft, ChevronDown, ChevronRight, DollarSign, Edit, Save, Trash2, AlertCircle, User } from 'lucide-react'
@@ -126,8 +128,8 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
     toast.dismiss(loadingToast)
     setIsSaving(false)
 
-    if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal", { description: (res as any).error })
     } else {
         toast.success("Setoran Diterima!")
         setIsModalOpen(false)
@@ -138,7 +140,7 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
   const handleBatal = async (item: any) => {
     if (!confirm(`Batalkan/Hapus data setoran ${item.asrama}?`)) return
     const res = await batalkanSetoran(item.asrama, bulan, tahun)
-    if (res?.success) {
+    if ((res as any).success) {
         toast.success("Data dihapus")
         loadData()
     }

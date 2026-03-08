@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState } from 'react'
 // HAPUS IMPORT XLSX STATIS
 import { simpanSantriKeKelas, simpanPenempatanBatch } from './actions'

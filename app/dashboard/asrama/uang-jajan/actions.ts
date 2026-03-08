@@ -58,7 +58,7 @@ export async function getDashboardTabungan(asramaRequest: string) {
   }
 }
 
-export async function simpanTopup(santriId: string, nominal: number, keterangan: string) {
+export async function simpanTopup(santriId: string, nominal: number, keterangan: string): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
 
   await execute(
@@ -71,7 +71,7 @@ export async function simpanTopup(santriId: string, nominal: number, keterangan:
   return { success: true }
 }
 
-export async function simpanJajanMassal(listTransaksi: { santriId: string; nominal: number }[]) {
+export async function simpanJajanMassal(listTransaksi: { santriId: string; nominal: number }[]): Promise<{ success: boolean; count: number } | { error: string }> {
   const session = await getSession()
   if (!listTransaksi.length) return { error: 'Tidak ada data.' }
 

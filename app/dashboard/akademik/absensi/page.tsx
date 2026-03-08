@@ -334,9 +334,9 @@ export default function AbsensiPage() {
 
                               return (
                                 <CellInput 
-                                  key={session}
+                                  key={session as string}
                                   id={cellId}
-                                  value={val[session]} 
+                                  value={(val[session] as string) ?? 'H'} 
                                   isHoliday={isOff}
                                   onChange={(v) => handleCellChange(s.id, day.dateStr, session, v)} 
                                   onKeyDown={(e) => handleKeyDown(e, rowIdx, cellColIndex)}
@@ -365,6 +365,7 @@ function CellInput({
   onChange,
   onKeyDown
 }: { 
+  key?: React.Key,
   id: string,
   value: string, 
   isHoliday: boolean,

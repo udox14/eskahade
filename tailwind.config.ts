@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import type { Config } from "tailwindcss";
 
 const config: Config = {

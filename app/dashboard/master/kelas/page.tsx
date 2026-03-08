@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal } from './actions'
 import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2 } from 'lucide-react'

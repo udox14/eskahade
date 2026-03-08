@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
 import { Save, Settings, DollarSign, History, Loader2, Edit } from 'lucide-react'
@@ -52,8 +54,8 @@ export default function TarifPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal", { description: (res as any).error })
     } else {
         toast.success("Tarif Berhasil Disimpan", { description: `Angkatan ${tahunInput} telah diperbarui.` })
         refreshList()

@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch } from './actions'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
@@ -81,8 +83,8 @@ export default function ManajemenUserPage() {
     toast.dismiss(toastId)
     setProcessingId(null)
 
-    if (res?.error) {
-      toast.error("Gagal update", { description: res.error })
+    if ('error' in res) {
+      toast.error("Gagal update", { description: (res as any).error })
     } else {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole, asrama_binaan: asrama } : u))
       toast.success("Berhasil diupdate", { 
@@ -120,8 +122,8 @@ export default function ManajemenUserPage() {
     setIsCreating(false)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-      toast.error("Gagal membuat user", { description: res.error })
+    if ('error' in res) {
+      toast.error("Gagal membuat user", { description: (res as any).error })
     } else {
       toast.success("Akun Berhasil Dibuat!", { description: "User bisa langsung login sekarang." })
       setIsOpenAdd(false)
@@ -142,8 +144,8 @@ export default function ManajemenUserPage() {
     const res = await updateUserDetails(userToEdit.id, fullName, email)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-      toast.error("Gagal Edit", { description: res.error })
+    if ('error' in res) {
+      toast.error("Gagal Edit", { description: (res as any).error })
     } else {
       toast.success("Data User Diperbarui")
       setIsOpenEdit(false)
@@ -163,8 +165,8 @@ export default function ManajemenUserPage() {
     const res = await resetUserPassword(userToReset.id, newPass)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-      toast.error("Gagal Reset", { description: res.error })
+    if ('error' in res) {
+      toast.error("Gagal Reset", { description: (res as any).error })
     } else {
       toast.success("Password Berhasil Direset")
       setIsOpenReset(false)
@@ -179,8 +181,8 @@ export default function ManajemenUserPage() {
     const res = await deleteUser(userToDelete.id)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error("Gagal Hapus", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal Hapus", { description: (res as any).error })
     } else {
         toast.success("User Dihapus")
         setUsers(prev => prev.filter(u => u.id !== userToDelete.id))
@@ -258,9 +260,9 @@ export default function ManajemenUserPage() {
     toast.dismiss(toastId)
 
     if (res?.success) {
-        toast.success(`Berhasil membuat ${res.count} user.`)
-        if (res.errors) {
-            toast.warning("Beberapa user gagal", { description: res.errors.join(", ") })
+        toast.success(`Berhasil membuat ${(res as any).count} user.`)
+        if ((res as any).errors) {
+            toast.warning("Beberapa user gagal", { description: (res as any).errors.join(", ") })
         }
         setIsOpenImport(false)
         setExcelData([])

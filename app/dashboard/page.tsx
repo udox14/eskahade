@@ -13,13 +13,14 @@ export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const role = session.role || 'wali_kelas'
+  const s = session!
+  const role = s.role || 'wali_kelas'
 
   if (role === 'pengurus_asrama') {
-    if (!session.asrama_binaan) {
+    if (!s.asrama_binaan) {
       return <div className="p-10 text-center text-gray-500">Anda belum ditugaskan ke asrama manapun. Hubungi Admin.</div>
     }
-    return <AsramaDashboard asrama={session.asrama_binaan} />
+    return <AsramaDashboard asrama={s.asrama_binaan!} />
   }
 
   if (role === 'dewan_santri') return <DewanSantriDashboard />

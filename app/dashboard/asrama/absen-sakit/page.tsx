@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { cariSantriAsrama, simpanAbsenSakit, getListSakitMingguan, hapusAbsenSakit, getAsramaRestrictionClient } from './actions'
 import { Search, Trash2, Home, FileText, Loader2, Lock, AlertTriangle } from 'lucide-react'

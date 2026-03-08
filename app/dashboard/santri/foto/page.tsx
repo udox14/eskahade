@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useRef } from 'react'
 import { getSantriForFoto, uploadFotoSantri } from './actions'
 import { Search, Upload, Image as ImageIcon, RefreshCw, Loader2, Home, Filter } from 'lucide-react'

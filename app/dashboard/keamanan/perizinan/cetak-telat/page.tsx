@@ -40,7 +40,7 @@ export default function CetakTelatPage() {
     }
   }
 
-  const totalSantri = data ? Object.values(data).reduce((acc, curr) => acc + curr.length, 0) : 0
+  const totalSantri = data ? Object.values(data).reduce((acc: number, curr: any) => acc + curr.length, 0) : 0
 
   return (
     <div className="space-y-6">

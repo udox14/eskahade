@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getDaftarKitab, cariSantri, simpanTransaksiUPK } from './actions'
 import { Search, ShoppingCart, User, Package, Check, Trash2, Loader2, Save, Gift, X, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react'
@@ -121,8 +123,8 @@ export default function KasirUPKPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error(res.error)
+    if ('error' in res) {
+        toast.error((res as any).error)
     } else {
         toast.success("Transaksi Berhasil Disimpan!")
         // Reset Form
@@ -329,14 +331,14 @@ export default function KasirUPKPage() {
                                 <div className="bg-blue-50/80 p-3 flex justify-between items-center px-4">
                                     <h3 className="font-bold text-blue-900 text-sm">{marhalah}</h3>
                                     <button 
-                                        onClick={() => addPaket(items)}
+                                        onClick={() => addPaket(items as any[])}
                                         className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 flex items-center gap-1 shadow-sm active:scale-95"
                                     >
                                         <Package className="w-3 h-3"/> Paket
                                     </button>
                                 </div>
                                 <div className="divide-y bg-white">
-                                    {items.map(k => {
+                                    {(items as any[]).map(k => {
                                         const isInCart = cart.some(c => c.id === k.id)
                                         return (
                                             <div 

@@ -32,8 +32,8 @@ export default function VerifikasiTelatPage() {
     const res = await simpanVonisTelat(item.izin_id, item.santri_id, vonis)
     setProcessingId(null)
 
-    if (res?.error) {
-      toast.error("Gagal", { description: res.error })
+    if ('error' in res) {
+      toast.error("Gagal", { description: (res as any).error })
     } else {
       toast.success("Berhasil", { description: vonis === 'MANGKIR' ? "Ditunda ke sidang berikutnya" : "Status diperbarui." })
       setList(prev => prev.filter(i => i.izin_id !== item.izin_id))

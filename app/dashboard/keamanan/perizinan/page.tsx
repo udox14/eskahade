@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri } from './actions'
 import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react'
@@ -69,8 +71,8 @@ export default function PerizinanPage() {
     const res = await simpanIzin(formData)
     toast.dismiss(loadingToast)
 
-    if (res?.error) {
-      toast.error("Gagal menyimpan: " + res.error)
+    if ('error' in res) {
+      toast.error("Gagal menyimpan: " + (res as any).error)
     } else {
       toast.success("Data perizinan berhasil disimpan!")
       setIsOpenInput(false)
@@ -95,10 +97,10 @@ export default function PerizinanPage() {
     const res = await setSudahDatang(selectedReturnId, waktuKembali)
     toast.dismiss(loadingToast)
 
-    if (res?.error) {
-      toast.error(res.error)
+    if ('error' in res) {
+      toast.error((res as any).error)
     } else {
-      if (res.message?.includes('Terlambat')) {
+      if ((res as any).message?.includes('Terlambat')) {
         toast.warning("Tercatat Terlambat!", { description: "Data masuk ke antrian verifikasi/sidang." })
       } else {
         toast.success("Tepat Waktu.", { description: "Izin diselesaikan." })

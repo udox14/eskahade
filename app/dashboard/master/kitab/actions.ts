@@ -31,7 +31,7 @@ export async function getKitabList(marhalahId?: string) {
   `)
 }
 
-export async function tambahKitab(formData: FormData) {
+export async function tambahKitab(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const nama = formData.get('nama_kitab') as string
   const marhalah = formData.get('marhalah_id') as string
   const mapel = formData.get('mapel_id') as string
@@ -46,19 +46,19 @@ export async function tambahKitab(formData: FormData) {
   return { success: true }
 }
 
-export async function hapusKitab(id: string) {
+export async function hapusKitab(id: string): Promise<{ success: boolean } | { error: string }> {
   await query('DELETE FROM kitab WHERE id = ?', [id])
   revalidatePath('/dashboard/master/kitab')
   return { success: true }
 }
 
-export async function updateHargaKitab(id: string, hargaBaru: number) {
+export async function updateHargaKitab(id: string, hargaBaru: number): Promise<{ success: boolean } | { error: string }> {
   await query('UPDATE kitab SET harga = ? WHERE id = ?', [hargaBaru, id])
   revalidatePath('/dashboard/master/kitab')
   return { success: true }
 }
 
-export async function importKitabMassal(dataExcel: any[]) {
+export async function importKitabMassal(dataExcel: any[]): Promise<{ success: boolean; count: number; failed: number } | { error: string }> {
   const mrh = await query<{ id: string; nama: string }>('SELECT id, nama FROM marhalah')
   const mpl = await query<{ id: string; nama: string }>('SELECT id, nama FROM mapel')
 

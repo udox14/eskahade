@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // lib/r2/upload.ts
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 

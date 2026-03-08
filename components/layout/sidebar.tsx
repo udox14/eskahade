@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -262,7 +264,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara'];
   const currentRole = validRoles.includes(normalizedRole as Role) ? (normalizedRole as Role) : 'wali_kelas';
 
-  const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
+  const c = mounted ? THEME_COLORS[theme as ThemeKey] : THEME_COLORS['emerald'];
 
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>

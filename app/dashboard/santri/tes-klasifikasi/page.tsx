@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getSantriBaru, simpanTes } from './actions'
 import { Search, Save, CheckCircle, Clock, AlertCircle, User, RefreshCw, X, FileText, BookOpen, Hash, GraduationCap } from 'lucide-react'
@@ -58,8 +60,8 @@ export default function TesKlasifikasiPage() {
     const res = await simpanTes(formData)
     setSaving(false)
 
-    if (res?.error) {
-      alert("Gagal: " + res.error)
+    if ('error' in res) {
+      alert("Gagal: " + (res as any).error)
     } else {
       // Custom toast success bisa ditaruh di sini
       handleCloseForm()

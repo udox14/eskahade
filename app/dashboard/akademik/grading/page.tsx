@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect, useRef } from 'react'
 import { getKelasList, getDataGrading, simpanGradingBatch } from './actions'
 import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet } from 'lucide-react'
@@ -86,7 +88,7 @@ export default function GradingKelasPage() {
     try {
       const payload = Object.entries(pendingChanges).map(([id, grade]) => ({
         riwayat_id: id,
-        grade: grade
+        grade: grade as string
       }))
 
       await simpanGradingBatch(payload)

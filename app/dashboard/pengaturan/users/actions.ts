@@ -10,7 +10,7 @@ export async function getUsersList() {
   )
 }
 
-export async function updateUserRole(id: string, newRole: string, asrama?: string) {
+export async function updateUserRole(id: string, newRole: string, asrama?: string): Promise<{ success: boolean } | { error: string }> {
   const asramaBinaan = newRole === 'pengurus_asrama' ? (asrama || null) : null
 
   await query(
@@ -22,7 +22,7 @@ export async function updateUserRole(id: string, newRole: string, asrama?: strin
   return { success: true }
 }
 
-export async function createUser(formData: FormData) {
+export async function createUser(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const email = (formData.get('email') as string).toLowerCase().trim()
   const password = formData.get('password') as string
   const fullName = formData.get('full_name') as string
@@ -100,7 +100,7 @@ export async function createUsersBatch(usersData: any[]) {
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
 
-export async function updateUserDetails(userId: string, fullName: string, email: string) {
+export async function updateUserDetails(userId: string, fullName: string, email: string): Promise<{ success: boolean } | { error: string }> {
   const emailClean = email.toLowerCase().trim()
 
   // Cek email duplikat (kecuali user itu sendiri)
@@ -116,7 +116,7 @@ export async function updateUserDetails(userId: string, fullName: string, email:
   return { success: true }
 }
 
-export async function resetUserPassword(userId: string, newPassword: string) {
+export async function resetUserPassword(userId: string, newPassword: string): Promise<{ success: boolean } | { error: string }> {
   const passwordHash = await hashPassword(newPassword)
 
   await query(
@@ -127,7 +127,7 @@ export async function resetUserPassword(userId: string, newPassword: string) {
   return { success: true }
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string): Promise<{ success: boolean } | { error: string }> {
   await query('DELETE FROM users WHERE id = ?', [userId])
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }

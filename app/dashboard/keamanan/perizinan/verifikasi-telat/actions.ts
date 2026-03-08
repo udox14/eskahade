@@ -64,7 +64,7 @@ export async function simpanVonisTelat(
   izinId: string,
   santriId: string,
   vonis: 'TELAT_MURNI' | 'SAKIT' | 'IZIN_UZUR' | 'MANGKIR'
-) {
+): Promise<{ success: boolean; message?: string } | { error: string }> {
   const session = await getSession()
 
   if (vonis === 'MANGKIR') {

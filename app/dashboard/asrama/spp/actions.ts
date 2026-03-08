@@ -83,7 +83,7 @@ export async function getStatusSPP(santriId: string, tahun: number) {
   )
 }
 
-export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number) {
+export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const ph = bulans.map(() => '?').join(',')
 
@@ -104,7 +104,7 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
   return { success: true }
 }
 
-export async function simpanSppBatch(listTransaksi: any[]) {
+export async function simpanSppBatch(listTransaksi: any[]): Promise<{ success: boolean; count: number } | { error: string }> {
   const session = await getSession()
   if (!listTransaksi.length) return { error: 'Tidak ada data.' }
 

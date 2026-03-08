@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getDashboardTabungan, simpanTopup, simpanJajanMassal, getClientRestriction, getRiwayatTabunganSantri, hapusTransaksi } from './actions'
 import { Wallet, TrendingUp, TrendingDown, Plus, Save, Loader2, ChevronLeft, ChevronRight, Home, Lock, AlertCircle, Edit, Trash2, History } from 'lucide-react'
@@ -99,7 +101,7 @@ export default function UangJajanPage() {
   }
 
   const handleSimpanJajan = async () => {
-    const list = Object.entries(draftJajan).map(([id, nominal]) => ({ santriId: id, nominal }))
+    const list = (Object.entries(draftJajan) as [string, number][]).map(([id, nominal]) => ({ santriId: id, nominal }))
     if (list.length === 0) return
 
     // Cek Over Limit (> 20.000)
@@ -109,7 +111,7 @@ export default function UangJajanPage() {
         warningMsg = `\n\n⚠️ PERINGATAN: Ada ${overLimit.length} santri mengambil > 20.000 (Asumsi Akumulasi).`
     }
 
-    if (!confirm(`Simpan jajan untuk ${list.length} santri?\nTotal Keluar: Rp ${list.reduce((a,b)=>a+b.nominal, 0).toLocaleString()}${warningMsg}`)) return
+    if (!confirm(`Simpan jajan untuk ${list.length} santri?\nTotal Keluar: Rp ${list.reduce((a: number, b: {santriId: string; nominal: number})=>a+b.nominal, 0).toLocaleString()}${warningMsg}`)) return
 
     setIsSaving(true)
     const toastId = toast.loading("Memproses transaksi...")
@@ -119,8 +121,8 @@ export default function UangJajanPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal", { description: (res as any).error })
     } else {
         toast.success("Berhasil!", { description: "Saldo santri telah terpotong." })
         // FIX: Panggil loadData dengan true agar posisi kamar tidak kereset
@@ -151,8 +153,8 @@ export default function UangJajanPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+    if ('error' in res) {
+        toast.error("Gagal", { description: (res as any).error })
     } else {
         toast.success("Topup Berhasil")
         setTopupNominal('')
@@ -185,10 +187,10 @@ export default function UangJajanPage() {
     return acc
   }, {}) || {}
 
-  const sortedKamars = Object.keys(groupedData).sort((a, b) => (parseInt(a)||999) - (parseInt(b)||999))
+  const sortedKamars = (Object.keys(groupedData) as string[]).sort((a: string, b: string) => (parseInt(a)||999) - (parseInt(b)||999))
   const activeKamar = sortedKamars[currentKamarIndex]
   const santriInKamar = activeKamar ? groupedData[activeKamar] : []
-  const totalJajanDraft = Object.values(draftJajan).reduce((a, b) => a + b, 0)
+  const totalJajanDraft: number = (Object.values(draftJajan) as number[]).reduce((a: number, b: number) => a + b, 0)
 
   return (
     <div className="space-y-6 max-w-lg mx-auto pb-32">

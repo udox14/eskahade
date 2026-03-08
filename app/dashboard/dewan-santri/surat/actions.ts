@@ -44,7 +44,7 @@ export async function cekTunggakanSantri(santriId: string) {
   }
 }
 
-export async function catatSuratKeluar(santriId: string, jenis: string, detail: string) {
+export async function catatSuratKeluar(santriId: string, jenis: string, detail: string): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
 
   await execute(`
@@ -85,7 +85,7 @@ export async function getRiwayatSurat(bulan: number, tahun: number) {
   `, [startDate, endDate])
 }
 
-export async function hapusRiwayatSurat(id: string) {
+export async function hapusRiwayatSurat(id: string): Promise<{ success: boolean } | { error: string }> {
   await execute('DELETE FROM riwayat_surat WHERE id = ?', [id])
   revalidatePath('/dashboard/dewan-santri/surat')
   return { success: true }

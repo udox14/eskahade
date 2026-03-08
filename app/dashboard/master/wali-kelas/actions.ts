@@ -35,7 +35,7 @@ export async function getDataMaster() {
   return { kelasList: sortedKelas, guruList: guru }
 }
 
-export async function tambahGuruManual(nama: string, gelar: string, kode: string) {
+export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {
   await query(
     'INSERT INTO data_guru (id, nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?, ?)',
     [crypto.randomUUID(), nama, gelar, kode || null]
@@ -44,7 +44,7 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
   return { success: true }
 }
 
-export async function hapusGuru(id: string) {
+export async function hapusGuru(id: string): Promise<{ success: boolean } | { error: string }> {
   try {
     await query('DELETE FROM data_guru WHERE id = ?', [id])
     revalidatePath('/dashboard/master/wali-kelas')
@@ -54,7 +54,7 @@ export async function hapusGuru(id: string) {
   }
 }
 
-export async function hapusGuruBatch(ids: string[]) {
+export async function hapusGuruBatch(ids: string[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!ids || ids.length === 0) return { error: 'Pilih minimal 1 guru' }
   try {
     const placeholders = ids.map(() => '?').join(',')
@@ -66,7 +66,7 @@ export async function hapusGuruBatch(ids: string[]) {
   }
 }
 
-export async function importDataGuru(dataExcel: any[]) {
+export async function importDataGuru(dataExcel: any[]): Promise<{ success: boolean; count: number; skipped: number; allDuplicate?: boolean } | { error: string }> {
   if (!dataExcel || dataExcel.length === 0) return { error: 'Data kosong' }
 
   const parsed = dataExcel.map(row => ({

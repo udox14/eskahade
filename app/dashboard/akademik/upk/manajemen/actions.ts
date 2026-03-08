@@ -86,7 +86,7 @@ export async function getRekapGudang() {
   return Object.values(rekap).sort((a: any, b: any) => a.marhalah.localeCompare(b.marhalah))
 }
 
-export async function serahkanBarang(transaksiId: string) {
+export async function serahkanBarang(transaksiId: string): Promise<{ success: boolean } | { error: string }> {
   await execute(`
     UPDATE upk_item SET status_serah = 'SUDAH', tanggal_serah = ?
     WHERE transaksi_id = ? AND status_serah = 'BELUM'
@@ -95,7 +95,7 @@ export async function serahkanBarang(transaksiId: string) {
   return { success: true }
 }
 
-export async function serahkanBarangPartial(itemIds: string[]) {
+export async function serahkanBarangPartial(itemIds: string[]): Promise<{ success: boolean } | { error: string }> {
   if (!itemIds || !itemIds.length) return { error: 'Pilih minimal satu item.' }
   const ph = itemIds.map(() => '?').join(',')
   await execute(
@@ -106,7 +106,7 @@ export async function serahkanBarangPartial(itemIds: string[]) {
   return { success: true }
 }
 
-export async function selesaikanKeuangan(transaksiId: string, jenis: 'LUNAS' | 'AMBIL_KEMBALIAN') {
+export async function selesaikanKeuangan(transaksiId: string, jenis: 'LUNAS' | 'AMBIL_KEMBALIAN'): Promise<{ success: boolean } | { error: string }> {
   if (jenis === 'LUNAS') {
     await execute(
       'UPDATE upk_transaksi SET sisa_tunggakan = 0, status_lunas = 1 WHERE id = ?',

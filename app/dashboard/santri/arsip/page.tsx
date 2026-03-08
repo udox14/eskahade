@@ -29,7 +29,7 @@ type Grup = {
 export default function ArsipSantriPage() {
   const router = useRouter()
   const [tab, setTab] = useState<'ARSIPKAN' | 'DAFTAR_ARSIP'>('ARSIPKAN')
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── TAB ARSIPKAN ──
   const [santriList, setSantriList] = useState<any[]>([])
@@ -158,7 +158,7 @@ export default function ArsipSantriPage() {
     const toastId = toast.loading(`Memproses ${selectedArsip.size} santri...`)
     const res = await arsipkanSantri(Array.from(selectedArsip), catatanArsip)
     toast.dismiss(toastId); setIsArsipkan(false)
-    if (res?.error) { toast.error("Gagal", { description: res.error }); return }
+    if ('error' in res) { toast.error("Gagal", { description: res.error }); return }
     const msg = (res?.gagal ?? 0) > 0 ? `${res?.berhasil} berhasil, ${res?.gagal} gagal` : `${res?.berhasil} santri berhasil diarsipkan`
     toast.success("Selesai!", { description: msg })
     if ((res?.errors?.length ?? 0) > 0) console.error("Errors:", res?.errors)
@@ -172,7 +172,7 @@ export default function ArsipSantriPage() {
     const toastId = toast.loading(`Merestore ${selectedRestore.size} santri...`)
     const res = await restoreSantri(Array.from(selectedRestore))
     toast.dismiss(toastId); setIsRestore(false)
-    if (res?.error) { toast.error("Gagal", { description: res.error }); return }
+    if ('error' in res) { toast.error("Gagal", { description: res.error }); return }
     const msg = (res?.gagal ?? 0) > 0 ? `${res?.berhasil} berhasil, ${res?.gagal} gagal` : `${res?.berhasil} santri berhasil direstore`
     toast.success("Restore Selesai!", { description: msg })
     // Refresh grup & level 2
@@ -187,7 +187,7 @@ export default function ArsipSantriPage() {
     const toastId = toast.loading(`Menghapus ${selectedRestore.size} arsip...`)
     const res = await hapusArsipMassal(Array.from(selectedRestore))
     toast.dismiss(toastId); setIsHapusMassal(false)
-    if (res?.error) { toast.error("Gagal hapus", { description: res.error }); return }
+    if ('error' in res) { toast.error("Gagal hapus", { description: res.error }); return }
     toast.success(`${res?.count} arsip dihapus`, { description: "Storage Supabase kini lebih lega." })
     loadSantriGrup(1, filterSantriArsip, false)
     loadGrup()
@@ -198,20 +198,20 @@ export default function ArsipSantriPage() {
   const handleHapusSatu = async (id: string, nama: string) => {
     if (!confirm(`Hapus permanen arsip "${nama}"?\n\nData ini TIDAK BISA dikembalikan lagi!`)) return
     const res = await hapusArsipPermanen(id)
-    if (res?.error) { toast.error("Gagal hapus"); return }
+    if ('error' in res) { toast.error("Gagal hapus"); return }
     toast.success("Arsip dihapus")
     loadSantriGrup(santriArsipPage, filterSantriArsip, false)
     loadGrup()
   }
 
   const handleDownload = async () => {
-    const ids = selectedRestore.size > 0 ? Array.from(selectedRestore) : undefined
+    const ids = selectedRestore.size > 0 ? Array.from(selectedRestore) as string[] : undefined
     setIsDownloading(true)
     const toastId = toast.loading("Menyiapkan data...")
     // Kalau tidak ada yang dipilih, download semua dalam grup ini
     const res = await getArsipForDownload(ids)
     toast.dismiss(toastId); setIsDownloading(false)
-    if (res.error || !res.data) { toast.error("Gagal", { description: res.error }); return }
+    if ('error' in res || !('data' in res)) { toast.error("Gagal", { description: (res as any).error }); return }
     const blob = new Blob([JSON.stringify({
       keterangan: "Backup Arsip Alumni - SKHDAPP",
       tanggal_export: new Date().toISOString(),

@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 import { useState, useEffect } from 'react'
 import { getDataMaster, importDataGuru, tambahGuruManual, hapusGuru, hapusGuruBatch, simpanJadwalBatch } from './actions'
 import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
@@ -71,8 +73,8 @@ export default function ManajemenGuruPage() {
     const res = await simpanJadwalBatch(payload)
     setIsSavingBatch(false)
     toast.dismiss(toastId)
-    if (res?.error) toast.error("Gagal", { description: res.error })
-    else { toast.success("Berhasil!", { description: `${res.count} kelas telah diperbarui.` }); loadData() }
+    if ('error' in res) toast.error("Gagal", { description: (res as any).error })
+    else { toast.success("Berhasil!", { description: `${(res as any).count} kelas telah diperbarui.` }); loadData() }
   }
 
   const handleTambahGuru = async (e: React.FormEvent) => {
@@ -81,15 +83,15 @@ export default function ManajemenGuruPage() {
     const toastId = toast.loading("Menambahkan...")
     const res = await tambahGuruManual(newGuru.nama, newGuru.gelar, newGuru.kode)
     toast.dismiss(toastId)
-    if (res?.success) { toast.success("Guru ditambahkan"); setNewGuru({ nama: '', gelar: '', kode: '' }); loadData() }
-    else toast.error(res?.error)
+    if ((res as any).success) { toast.success("Guru ditambahkan"); setNewGuru({ nama: '', gelar: '', kode: '' }); loadData() }
+    else toast.error((res as any).error)
   }
 
   const handleHapusGuru = async (id: string, nama: string) => {
     if (!confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
     const res = await hapusGuru(id)
-    if (res?.success) { toast.success("Guru dihapus"); loadData() }
-    else toast.error(res?.error)
+    if ((res as any).success) { toast.success("Guru dihapus"); loadData() }
+    else toast.error((res as any).error)
   }
 
   const toggleSelectGuru = (id: string) => {
@@ -109,8 +111,8 @@ export default function ManajemenGuruPage() {
     const res = await hapusGuruBatch(selectedGuruIds)
     setIsDeletingBatch(false)
     toast.dismiss(toastId)
-    if (res?.success) { toast.success("Berhasil", { description: `${res.count} guru dihapus.` }); loadData() }
-    else toast.error("Gagal Menghapus", { description: res?.error })
+    if ((res as any).success) { toast.success("Berhasil", { description: `${(res as any).count} guru dihapus.` }); loadData() }
+    else toast.error("Gagal Menghapus", { description: (res as any).error })
   }
 
   const handleDownloadTemplate = () => {
@@ -147,11 +149,11 @@ export default function ManajemenGuruPage() {
     const res = await importDataGuru(excelData)
     setIsProcessing(false)
     toast.dismiss(toastId)
-    if (res?.error) toast.error("Gagal import", { description: res?.error })
-    else if (res?.allDuplicate) toast.warning("Semua sudah terdaftar", { description: `${res.skipped} nama ditolak karena sudah ada di database.` })
+    if ('error' in res) toast.error("Gagal import", { description: (res as any).error })
+    else if (res?.allDuplicate) toast.warning("Semua sudah terdaftar", { description: `${(res as any).skipped} nama ditolak karena sudah ada di database.` })
     else {
       const skippedMsg = (res?.skipped ?? 0) > 0 ? ` (${res?.skipped} duplikat dilewati)` : ''
-      toast.success(`Berhasil import ${res.count} guru${skippedMsg}`)
+      toast.success(`Berhasil import ${(res as any).count} guru${skippedMsg}`)
       setExcelData([]); loadData(); setTab('JADWAL')
     }
   }

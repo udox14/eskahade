@@ -34,7 +34,7 @@ export async function getPerizinanList(filterWaktu: 'HARI' | 'MINGGU' | 'BULAN' 
   `, [startISO])
 }
 
-export async function simpanIzin(formData: FormData) {
+export async function simpanIzin(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
 
   const santri_id = formData.get('santri_id') as string
@@ -66,7 +66,7 @@ export async function simpanIzin(formData: FormData) {
   return { success: true }
 }
 
-export async function setSudahDatang(id: string, waktuDatang: string) {
+export async function setSudahDatang(id: string, waktuDatang: string): Promise<{ success: boolean; message: string } | { error: string }> {
   const izin = await queryOne<{ tgl_selesai_rencana: string }>(
     'SELECT tgl_selesai_rencana FROM perizinan WHERE id = ?', [id]
   )

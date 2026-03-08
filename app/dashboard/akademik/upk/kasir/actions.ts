@@ -39,7 +39,7 @@ export async function cariSantri(keyword: string) {
   `, [`%${keyword}%`])
 }
 
-export async function simpanTransaksiUPK(payload: any) {
+export async function simpanTransaksiUPK(payload: any): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const { santriId, namaPemesan, infoTambahan, totalTagihan, totalBayar, items } = payload
 
