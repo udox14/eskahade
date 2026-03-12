@@ -287,7 +287,7 @@ export default function AbsensiPage() {
                   return (
                     <tr key={s.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="p-2 border sticky left-0 bg-inherit font-medium truncate z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                        {s.santri.nama_lengkap}
+                        {s.nama_lengkap}
                       </td>
                       
                       <td className="p-1 border bg-inherit z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] text-center md:sticky md:left-48">
