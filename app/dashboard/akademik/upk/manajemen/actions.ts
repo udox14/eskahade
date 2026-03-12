@@ -121,3 +121,18 @@ export async function selesaikanKeuangan(transaksiId: string, jenis: 'LUNAS' | '
   revalidatePath('/dashboard/akademik/upk/manajemen')
   return { success: true }
 }
+export async function resetUPKTransaksi(): Promise<{ success: boolean; deleted: number } | { error: string }> {
+  // Hitung dulu berapa yang akan dihapus
+  const count = await query<{ c: number }>('SELECT COUNT(*) as c FROM upk_transaksi', [])
+  const total = count[0]?.c ?? 0
+
+  if (total === 0) return { error: 'Tidak ada transaksi untuk direset.' }
+
+  // Hapus upk_item dulu (FK constraint), lalu upk_transaksi
+  await execute('DELETE FROM upk_item', [])
+  await execute('DELETE FROM upk_transaksi', [])
+
+  revalidatePath('/dashboard/akademik/upk/manajemen')
+  revalidatePath('/dashboard/akademik/upk/kasir')
+  return { success: true, deleted: total }
+}

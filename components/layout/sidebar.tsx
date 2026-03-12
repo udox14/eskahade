@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils
+  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -204,6 +204,7 @@ const menuNodes: MenuNode[] = [
     icon: Database,
     items: [
       { title: "Manajemen User", href: "/dashboard/pengaturan/users", icon: UserCog, roles: ['admin'] },
+      { title: "Tahun Ajaran", href: "/dashboard/pengaturan/tahun-ajaran", icon: CalendarDays, roles: ['admin'] },
       { title: "Manajemen Guru & Jadwal", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin'] },
       { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin'] },
       { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin'] },

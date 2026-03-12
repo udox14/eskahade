@@ -3,10 +3,10 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab } from './actions'
-// PERBAIKAN: Menambahkan 'List' ke dalam import
-import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List } from 'lucide-react'
+import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab, getTahunAjaranAktif } from './actions'
+import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 export default function MasterKitabPage() {
   const [tab, setTab] = useState<'LIST' | 'IMPORT'>('LIST')
@@ -15,6 +15,7 @@ export default function MasterKitabPage() {
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [mapelList, setMapelList] = useState<any[]>([])
   const [kitabList, setKitabList] = useState<any[]>([])
+  const [tahunAktif, setTahunAktif] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   // Filter List
@@ -37,9 +38,10 @@ export default function MasterKitabPage() {
   }, [filterMarhalah]) 
 
   const initData = async () => {
-    const [m, mp] = await Promise.all([getMarhalahList(), getMapelList()])
+    const [m, mp, ta] = await Promise.all([getMarhalahList(), getMapelList(), getTahunAjaranAktif()])
     setMarhalahList(m)
     setMapelList(mp)
+    setTahunAktif(ta)
   }
 
   const loadKitab = async () => {
@@ -142,7 +144,7 @@ export default function MasterKitabPage() {
            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
              <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab & Harga
            </h1>
-           <p className="text-gray-500 text-sm">Database kitab kuning dan harga jual (UPK).</p>
+           <p className="text-gray-500 text-sm">Database kitab kuning dan harga jual (UPK) per tahun ajaran.</p>
         </div>
         
         <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -154,6 +156,28 @@ export default function MasterKitabPage() {
            </button>
         </div>
       </div>
+
+      {/* BANNER TAHUN AJARAN */}
+      {tahunAktif ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-center gap-3">
+          <CalendarDays className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <p className="text-sm text-emerald-800">
+            Menampilkan kitab tahun ajaran: <span className="font-bold">{tahunAktif.nama}</span>
+            <span className="text-emerald-600"> — Kitab baru otomatis masuk ke tahun ini.</span>
+          </p>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">Belum ada tahun ajaran aktif!</p>
+            <p className="text-xs text-amber-700 mt-0.5">Kitab tidak bisa ditambahkan sebelum tahun ajaran diaktifkan.</p>
+            <Link href="/dashboard/pengaturan/tahun-ajaran" className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-amber-800 underline hover:text-amber-900">
+              <CalendarDays className="w-3.5 h-3.5" /> Atur Tahun Ajaran →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* --- TAB LIST & INPUT MANUAL --- */}
       {tab === 'LIST' && (

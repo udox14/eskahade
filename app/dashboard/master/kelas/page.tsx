@@ -4,13 +4,16 @@ import React from 'react'
 
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal } from './actions'
-import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2 } from 'lucide-react'
+import { getTahunAjaranAktif } from '../../../pengaturan/tahun-ajaran/actions'
+import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 export default function MasterKelasPage() {
   const [mode, setMode] = useState<'manual' | 'excel'>('manual')
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [kelasList, setKelasList] = useState<any[]>([])
+  const [tahunAktif, setTahunAktif] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [excelData, setExcelData] = useState<any[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -21,9 +24,10 @@ export default function MasterKelasPage() {
 
   const loadData = async () => {
     setLoading(true)
-    const [m, k] = await Promise.all([getMarhalahList(), getKelasList()])
+    const [m, k, ta] = await Promise.all([getMarhalahList(), getKelasList(), getTahunAjaranAktif()])
     setMarhalahList(m)
     setKelasList(k)
+    setTahunAktif(ta)
     setLoading(false)
   }
 
@@ -114,6 +118,28 @@ export default function MasterKelasPage() {
            </button>
         </div>
       </div>
+
+      {/* BANNER TAHUN AJARAN */}
+      {!loading && (tahunAktif ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
+          <CalendarDays className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-800">
+            Tahun ajaran aktif: <span className="font-bold">{tahunAktif.nama}</span>
+            <span className="text-green-600"> — Kelas baru otomatis masuk ke tahun ini.</span>
+          </p>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">Belum ada tahun ajaran aktif!</p>
+            <p className="text-xs text-amber-700 mt-0.5">Kelas tidak bisa ditambahkan sebelum tahun ajaran diaktifkan.</p>
+            <Link href="/dashboard/pengaturan/tahun-ajaran" className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-amber-800 underline hover:text-amber-900">
+              <CalendarDays className="w-3.5 h-3.5" /> Atur Tahun Ajaran →
+            </Link>
+          </div>
+        </div>
+      ))}
 
       {mode === 'manual' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2">
