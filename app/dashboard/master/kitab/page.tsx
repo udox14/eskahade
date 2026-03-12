@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab, getTahunAjaranAktif } from './actions'
 import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
 
 export default function MasterKitabPage() {
@@ -15,6 +16,8 @@ export default function MasterKitabPage() {
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [mapelList, setMapelList] = useState<any[]>([])
   const [kitabList, setKitabList] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [tahunAktif, setTahunAktif] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -135,6 +138,8 @@ export default function MasterKitabPage() {
     }
   }
 
+  const { paged: pagedKitabList, totalPages: totalPagesKitabList, safePage: safePageKitabList } = usePagination(kitabList, pageSize, page)
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       
@@ -245,7 +250,7 @@ export default function MasterKitabPage() {
                             ) : kitabList.length === 0 ? (
                                 <tr><td colSpan={3} className="text-center py-10 text-gray-400">Belum ada data.</td></tr>
                             ) : (
-                                kitabList.map(k => (
+                                pagedKitabList.map(k => (
                                     <tr key={k.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-3">
                                             <p className="font-bold text-gray-800">{k.nama_kitab}</p>
@@ -285,6 +290,14 @@ export default function MasterKitabPage() {
                             )}
                         </tbody>
                     </table>
+              <Pagination
+                currentPage={safePageKitabList}
+                totalPages={totalPagesKitabList}
+                pageSize={pageSize}
+                total={kitabList.length}
+                onPageChange={setPage}
+                onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+              />
                 </div>
             </div>
 

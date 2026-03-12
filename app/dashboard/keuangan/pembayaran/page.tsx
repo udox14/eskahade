@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cariSantriKeuangan, getInfoTagihan, bayarTagihan, getMonitoringPembayaran, bayarLunasSetahun } from './actions'
 import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Coins, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
@@ -18,6 +19,8 @@ export default function LoketPembayaranPage() {
   const [searchQuery, setSearchQuery] = useState('')
   
   const [dataList, setDataList] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loadingList, setLoadingList] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
 
@@ -173,6 +176,7 @@ export default function LoketPembayaranPage() {
     window.history.back()
   }
 
+  const { paged: pagedDataList, totalPages: totalPagesDataList, safePage: safePageDataList } = usePagination(dataList, pageSize, page)
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       
@@ -267,7 +271,7 @@ export default function LoketPembayaranPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {dataList.map((s) => (
+                            {pagedDataList.map((s) => (
                                 <tr key={s.id} onClick={() => handleSelect(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
                                     <td className="px-6 py-3">
                                         <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
@@ -303,6 +307,14 @@ export default function LoketPembayaranPage() {
                             ))}
                         </tbody>
                     </table>
+                    <Pagination
+                      currentPage={safePageDataList}
+                      totalPages={totalPagesDataList}
+                      pageSize={pageSize}
+                      total={dataList.length}
+                      onPageChange={setPage}
+                      onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                    />
                 )}
             </div>
          </div>

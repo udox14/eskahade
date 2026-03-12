@@ -11,6 +11,8 @@ export default function AbsenMalamPage() {
   const [userAsrama, setUserAsrama] = useState<string | null>(null) // Asrama Binaan User
   
   const [dataSantri, setDataSantri] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [currentKamarIndex, setCurrentKamarIndex] = useState(0)

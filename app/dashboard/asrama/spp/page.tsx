@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPP, getClientRestriction, simpanSppBatch } from './actions'
 import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -24,6 +25,8 @@ export default function SPPPage() {
 
   // --- STATE LIST MONITORING ---
   const [dataMonitoring, setDataMonitoring] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loadingList, setLoadingList] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentKamarIndex, setCurrentKamarIndex] = useState(0)
@@ -321,7 +324,8 @@ export default function SPPPage() {
                         const isPaid = s.bulan_ini_lunas
                         const isDraft = !!drafts[s.id]
                         
-                        return (
+
+  return (
                             <div 
                                 key={s.id} 
                                 onClick={() => handleSelectSantri(s)}

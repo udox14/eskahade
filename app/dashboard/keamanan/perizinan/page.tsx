@@ -8,7 +8,8 @@ import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, Ar
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner' 
+import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination' 
 
 const LIST_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
@@ -18,6 +19,8 @@ const LIST_PEMBERI_IZIN = [
 export default function PerizinanPage() {
   const router = useRouter()
   const [list, setList] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [filterWaktu, setFilterWaktu] = useState<'HARI' | 'MINGGU' | 'BULAN'>('HARI')
   const [loading, setLoading] = useState(true)
 
@@ -110,6 +113,7 @@ export default function PerizinanPage() {
     }
   }
 
+  const { paged: pagedList, totalPages: totalPagesList, safePage: safePageList } = usePagination(list, pageSize, page)
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
@@ -162,7 +166,7 @@ export default function PerizinanPage() {
               ) : list.length === 0 ? (
                 <tr><td colSpan={4} className="py-12 text-center text-gray-400">Tidak ada data perizinan untuk periode ini.</td></tr>
               ) : (
-                list.map((item) => (
+                pagedList.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     {/* 1. SANTRI */}
                     <td className="px-4 py-3">
@@ -231,6 +235,14 @@ export default function PerizinanPage() {
               )}
             </tbody>
           </table>
+          <Pagination
+            currentPage={safePageList}
+            totalPages={totalPagesList}
+            pageSize={pageSize}
+            total={list.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+          />
         </div>
       </div>
 

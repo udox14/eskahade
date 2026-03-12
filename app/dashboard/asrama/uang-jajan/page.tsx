@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getDashboardTabungan, simpanTopup, simpanJajanMassal, getClientRestriction, getRiwayatTabunganSantri, hapusTransaksi } from './actions'
 import { Wallet, TrendingUp, TrendingDown, Plus, Save, Loader2, ChevronLeft, ChevronRight, Home, Lock, AlertCircle, Edit, Trash2, History } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -17,6 +18,8 @@ export default function UangJajanPage() {
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
   
   const [data, setData] = useState<any>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   
   // State Navigasi Kamar

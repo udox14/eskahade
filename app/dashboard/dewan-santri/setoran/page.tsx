@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getDetailSetoranBulan, terimaSetoran, batalkanSetoran } from './actions'
 import { Loader2, CheckCircle, XCircle, Calendar, ArrowLeft, ChevronDown, ChevronRight, DollarSign, Edit, Save, Trash2, AlertCircle, User } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useRouter } from 'next/navigation'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -80,6 +81,8 @@ export default function MonitoringSetoranPage() {
 // --- SUB-COMPONENT: Detail Tabel per Bulan ---
 function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
   const [data, setData] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   
   // State Form Modal
@@ -148,6 +151,7 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
 
   if (loading) return <div className="p-8 text-center text-gray-400 flex justify-center items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Memuat data transaksi...</div>
 
+  const { paged: pagedData, totalPages: totalPagesData, safePage: safePageData } = usePagination(data, pageSize, page)
   return (
     <div className="border-t p-4 bg-gray-50/50 animate-in slide-in-from-top-2">
       <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
@@ -164,7 +168,7 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.map((row) => (
+              {pagedData.map((row) => (
                   <tr key={row.asrama} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-bold text-slate-800">{row.asrama}</td>
                     
@@ -214,6 +218,14 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={safePageData}
+            totalPages={totalPagesData}
+            pageSize={pageSize}
+            total={data.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+          />
         </div>
       </div>
 

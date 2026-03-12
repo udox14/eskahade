@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getDataMaster, importDataGuru, tambahGuruManual, hapusGuru, hapusGuruBatch, simpanJadwalBatch } from './actions'
 import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 
 export default function ManajemenGuruPage() {
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
@@ -14,6 +15,8 @@ export default function ManajemenGuruPage() {
   const [localKelasList, setLocalKelasList] = useState<any[]>([])
   
   const [guruList, setGuruList] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([])
   
   const [loading, setLoading] = useState(true)
@@ -35,9 +38,9 @@ export default function ManajemenGuruPage() {
     const mappedLocal = res.kelasList.map((k: any) => ({
       id: k.id,
       nama_kelas: k.nama_kelas,
-      s: k.guru_shubuh?.id || "",
-      a: k.guru_ashar?.id || "",
-      m: k.guru_maghrib?.id || ""
+      s: k.guru_shubuh_id?.toString() || "",
+      a: k.guru_ashar_id?.toString() || "",
+      m: k.guru_maghrib_id?.toString() || ""
     }))
     setLocalKelasList(mappedLocal)
     setGuruList(res.guruList)
@@ -58,9 +61,9 @@ export default function ManajemenGuruPage() {
     const changedClasses = localKelasList.filter(local => {
       const asli = kelasList.find(k => k.id === local.id)
       if (!asli) return false
-      const asliS = asli.guru_shubuh?.id?.toString() || ""
-      const asliA = asli.guru_ashar?.id?.toString() || ""
-      const asliM = asli.guru_maghrib?.id?.toString() || ""
+      const asliS = asli.guru_shubuh_id?.toString() || ""
+      const asliA = asli.guru_ashar_id?.toString() || ""
+      const asliM = asli.guru_maghrib_id?.toString() || ""
       return local.s?.toString() !== asliS || local.a?.toString() !== asliA || local.m?.toString() !== asliM
     })
     if (changedClasses.length === 0) return toast.info("Tidak ada perubahan", { description: "Jadwal kelas belum ada yang diubah." })
@@ -159,6 +162,8 @@ export default function ManajemenGuruPage() {
     k.nama_kelas.toLowerCase().includes(search.toLowerCase())
   )
 
+  const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
@@ -216,19 +221,19 @@ export default function ManajemenGuruPage() {
                       <td className="px-4 py-2">
                         <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
                           <option value="">- Kosong -</option>
-                          {guruList.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-2">
                         <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
                           <option value="">- Kosong -</option>
-                          {guruList.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-2 bg-yellow-50/30 border-l border-yellow-100">
                         <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full p-1.5 border border-yellow-300 bg-white text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-yellow-500">
                           <option value="">- Kosong -</option>
-                          {guruList.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                         {k.m && <p className="text-[9px] text-green-600 mt-1 text-center font-bold">Auto Akun</p>}
                       </td>
@@ -327,6 +332,14 @@ export default function ManajemenGuruPage() {
                       ))}
                     </tbody>
                   </table>
+                <Pagination
+                  currentPage={safePageGuruList}
+                  totalPages={totalPagesGuruList}
+                  pageSize={pageSize}
+                  total={guruList.length}
+                  onPageChange={setPage}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                />
                 </div>
               </div>
             )
@@ -353,7 +366,7 @@ export default function ManajemenGuruPage() {
               </div>
             </div>
             <div className="max-h-96 overflow-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {guruList.map(g => (
+              {pagedGuruList.map(g => (
                 <div key={g.id} onClick={() => toggleSelectGuru(g.id)}
                   className={`p-3 border rounded-lg flex justify-between items-center cursor-pointer transition-all ${selectedGuruIds.includes(g.id) ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-gray-50 hover:bg-white hover:shadow-sm'}`}>
                   <div className="flex items-center gap-3 overflow-hidden">

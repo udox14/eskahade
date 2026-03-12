@@ -5,7 +5,8 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch } from './actions'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
-import { toast } from 'sonner' 
+import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination' 
 
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
@@ -22,6 +23,8 @@ const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIF
 
 export default function ManajemenUserPage() {
   const [users, setUsers] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
   
@@ -262,6 +265,8 @@ export default function ManajemenUserPage() {
     }
   }
 
+  const { paged: pagedUsers, totalPages: totalPagesUsers, safePage: safePageUsers } = usePagination(filteredUsers, pageSize, page)
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
       
@@ -325,7 +330,7 @@ export default function ManajemenUserPage() {
               ) : filteredUsers.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-10">Data user tidak ditemukan.</td></tr>
               ) : (
-                filteredUsers.map((u) => (
+                pagedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <p className="font-bold text-gray-800">{u.full_name || "Tanpa Nama"}</p>
@@ -410,6 +415,14 @@ export default function ManajemenUserPage() {
               )}
             </tbody>
           </table>
+          <Pagination
+            currentPage={safePageUsers}
+            totalPages={totalPagesUsers}
+            pageSize={pageSize}
+            total={filteredUsers.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+          />
         </div>
       </div>
 

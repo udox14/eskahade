@@ -285,18 +285,18 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
       {/* HEADER LOGO */}
       <div className={cn(
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
-        isCollapsed ? "h-20" : "h-28 gap-3"
+        isCollapsed ? "h-16 px-2" : "h-[72px] gap-2.5 px-4"
       )}>
-        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 blur-[30px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
+        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
 
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
+          <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
-            <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain drop-shadow-xl relative z-10" />
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-xl relative z-10 shrink-0" />
             <div className="flex flex-col min-w-0 justify-center relative z-10">
-              <span className={cn("text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
-              <h1 className="text-xl font-black font-serif text-white tracking-wide leading-none drop-shadow-md">SUKAHIDENG</h1>
+              <span className={cn("text-[9px] font-semibold uppercase tracking-[0.12em] leading-tight transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
+              <h1 className="text-[15px] font-black font-serif text-white tracking-wide leading-tight drop-shadow-md">SUKAHIDENG</h1>
             </div>
           </>
         )}

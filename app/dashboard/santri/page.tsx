@@ -24,7 +24,8 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   )
 
   const page = Number(searchParams.page) || 1
-  const limit = Number(searchParams.limit) || 10
+  const rawLimit = Number(searchParams.limit) || 10
+  const limit = rawLimit === 9999 ? 999999 : rawLimit
   const q = (searchParams.q as string) || ''
   const asrama = userAsrama || (searchParams.asrama as string) || ''
   const kamar = (searchParams.kamar as string) || ''
