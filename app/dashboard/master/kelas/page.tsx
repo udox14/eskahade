@@ -3,8 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal } from './actions'
-import { getTahunAjaranAktif } from '../../../pengaturan/tahun-ajaran/actions'
+import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif } from './actions'
 import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'

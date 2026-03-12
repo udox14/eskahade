@@ -3,6 +3,10 @@
 import { query, queryOne } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
+export async function getTahunAjaranAktif() {
+  return await queryOne<any>('SELECT * FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
+}
+
 export async function getMarhalahList() {
   return await query('SELECT * FROM marhalah ORDER BY urutan')
 }
