@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
+import { query, execute, generateId } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 export async function getReferensiData() {
@@ -75,10 +75,10 @@ export async function simpanNilaiSemuaMapel(
 
   for (const item of toUpsert) {
     await execute(`
-      INSERT INTO nilai_akademik (riwayat_pendidikan_id, mapel_id, semester, nilai)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(riwayat_pendidikan_id, mapel_id, semester) DO UPDATE SET nilai = excluded.nilai
-    `, [item.riwayat_pendidikan_id, item.mapel_id, item.semester, item.nilai])
+    `, [generateId(), item.riwayat_pendidikan_id, item.mapel_id, item.semester, item.nilai])
   }
 
   revalidatePath('/dashboard/akademik/nilai')

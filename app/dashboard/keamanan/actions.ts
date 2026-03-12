@@ -27,7 +27,7 @@ export async function cariSantri(keyword: string) {
 
 export async function getMasterPelanggaran() {
   return query<any>(`
-    SELECT id, nama_pelanggaran, kategori, poin_default
+    SELECT id, nama_pelanggaran, kategori, poin
     FROM master_pelanggaran
     ORDER BY kategori DESC, nama_pelanggaran
   `, [])

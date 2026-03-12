@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
+import { query, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -97,14 +97,14 @@ export async function hitungDanSimpanLeger(kelasId: string, semester: number) {
     const item = kalkulasi[idx]
     const predikat = getPredikat(item.rata_rata)
     await execute(`
-      INSERT INTO ranking (riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
         jumlah_nilai = excluded.jumlah_nilai,
         rata_rata = excluded.rata_rata,
         ranking_kelas = excluded.ranking_kelas,
         predikat = excluded.predikat
-    `, [item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, idx + 1, predikat])
+    `, [generateId(), item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, idx + 1, predikat])
   }
 
   revalidatePath('/dashboard/akademik/leger')

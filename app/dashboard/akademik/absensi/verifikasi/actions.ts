@@ -52,6 +52,16 @@ type VonisItem = {
   vonis: 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
 }
 
+const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
+function getVerifColumn(sesi: string): string {
+  if (!VALID_SESI.includes(sesi as any)) throw new Error(`Sesi tidak valid: ${sesi}`)
+  return `verif_${sesi}`
+}
+function getSesiColumn(sesi: string): string {
+  if (!VALID_SESI.includes(sesi as any)) throw new Error(`Sesi tidak valid: ${sesi}`)
+  return sesi
+}
+
 export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
   const session = await getSession()
   if (!daftarVonis || daftarVonis.length === 0) return { error: 'Tidak ada data untuk disimpan' }
@@ -85,23 +95,27 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
       })
 
       for (const item of items) {
+        const verifCol = getVerifColumn(item.sesi)
         await execute(
-          `UPDATE absensi_harian SET verif_${item.sesi} = 'OK' WHERE id = ?`,
+          `UPDATE absensi_harian SET ${verifCol} = 'OK' WHERE id = ?`,
           [item.absen_id]
         )
       }
     } else if (vonis === 'BELUM') {
       for (const item of items) {
+        const verifCol = getVerifColumn(item.sesi)
         await execute(
-          `UPDATE absensi_harian SET verif_${item.sesi} = 'BELUM' WHERE id = ?`,
+          `UPDATE absensi_harian SET ${verifCol} = 'BELUM' WHERE id = ?`,
           [item.absen_id]
         )
       }
     } else {
       const newStatus = vonis === 'SAKIT' ? 'S' : vonis === 'IZIN' ? 'I' : 'H'
       for (const item of items) {
+        const sesiCol = getSesiColumn(item.sesi)
+        const verifCol = getVerifColumn(item.sesi)
         await execute(
-          `UPDATE absensi_harian SET ${item.sesi} = ?, verif_${item.sesi} = NULL WHERE id = ?`,
+          `UPDATE absensi_harian SET ${sesiCol} = ?, ${verifCol} = NULL WHERE id = ?`,
           [newStatus, item.absen_id]
         )
       }

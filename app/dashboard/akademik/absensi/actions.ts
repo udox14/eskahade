@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
+import { query, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -70,14 +70,14 @@ export async function simpanAbsensi(dataInput: any[]) {
 
   for (const item of toUpsert) {
     await execute(`
-      INSERT INTO absensi_harian (riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO absensi_harian (id, riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(riwayat_pendidikan_id, tanggal) DO UPDATE SET
         shubuh = excluded.shubuh,
         ashar = excluded.ashar,
         maghrib = excluded.maghrib,
         created_by = excluded.created_by
-    `, [item.riwayat_id, item.tanggal, item.s, item.a, item.m, session.id])
+    `, [generateId(), item.riwayat_id, item.tanggal, item.s, item.a, item.m, session.id])
   }
 
   revalidatePath('/dashboard/akademik/absensi')

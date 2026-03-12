@@ -77,7 +77,7 @@ export async function getDashboardSPP(tahun: number, asrama: string) {
 
 export async function getStatusSPP(santriId: string, tahun: number) {
   return query<any>(
-    `SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar, status_bayar
+    `SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar
      FROM spp_log WHERE santri_id = ? AND tahun = ?`,
     [santriId, tahun]
   )

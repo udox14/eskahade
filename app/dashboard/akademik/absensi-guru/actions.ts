@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
+import { query, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -54,14 +54,14 @@ export async function simpanAbsensiGuru(payload: any[]) {
 
   for (const item of payload) {
     await execute(`
-      INSERT INTO absensi_guru (kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO absensi_guru (id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
         shubuh = excluded.shubuh,
         ashar = excluded.ashar,
         maghrib = excluded.maghrib,
         updated_by = excluded.updated_by
-    `, [item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session?.id ?? null])
+    `, [generateId(), item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session?.id ?? null])
   }
 
   revalidatePath('/dashboard/akademik/absensi-guru')

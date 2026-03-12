@@ -38,8 +38,8 @@ export async function tambahKitab(formData: FormData): Promise<{ success: boolea
   const harga = parseInt(formData.get('harga') as string) || 0
 
   await query(
-    'INSERT INTO kitab (id, nama_kitab, marhalah_id, mapel_id, harga) VALUES (?, ?, ?, ?, ?)',
-    [crypto.randomUUID(), nama, marhalah, mapel, harga]
+    'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga) VALUES (?, ?, ?, ?)',
+    [nama, marhalah, mapel, harga]
   )
 
   revalidatePath('/dashboard/master/kitab')
@@ -80,7 +80,7 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
     const mapelId = mapMapel.get(String(namaMapel).toLowerCase().trim())
 
     if (marhalahId && mapelId) {
-      inserts.push([crypto.randomUUID(), namaKitab, marhalahId, mapelId, harga])
+      inserts.push([namaKitab, marhalahId, mapelId, harga])
     } else {
       failCount++
     }
@@ -90,7 +90,7 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
 
   for (const row of inserts) {
     await query(
-      'INSERT INTO kitab (id, nama_kitab, marhalah_id, mapel_id, harga) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga) VALUES (?, ?, ?, ?)',
       row
     )
   }

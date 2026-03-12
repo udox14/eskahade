@@ -37,8 +37,8 @@ export async function getDataMaster() {
 
 export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {
   await query(
-    'INSERT INTO data_guru (id, nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?, ?)',
-    [crypto.randomUUID(), nama, gelar, kode || null]
+    'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
+    [nama, gelar, kode || null]
   )
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
@@ -89,8 +89,8 @@ export async function importDataGuru(dataExcel: any[]): Promise<{ success: boole
 
   for (const g of newOnly) {
     await query(
-      'INSERT INTO data_guru (id, nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?, ?)',
-      [crypto.randomUUID(), g.nama_lengkap, g.gelar, g.kode_guru]
+      'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
+      [g.nama_lengkap, g.gelar, g.kode_guru]
     )
   }
 
