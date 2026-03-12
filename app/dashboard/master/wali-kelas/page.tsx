@@ -7,8 +7,6 @@ import { getDataMaster, importDataGuru, tambahGuruManual, hapusGuru, hapusGuruBa
 import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 
-declare global { interface Window { XLSX: any; } }
-
 export default function ManajemenGuruPage() {
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
   
@@ -115,31 +113,30 @@ export default function ManajemenGuruPage() {
     else toast.error("Gagal Menghapus", { description: (res as any).error })
   }
 
-  const handleDownloadTemplate = () => {
-    if (!window.XLSX) return toast.error("Library Excel belum siap.")
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const rows = [
       { "NAMA LENGKAP": "Ahmad Fulan", "GELAR": "S.Pd.I", "KODE": "AHM" },
       { "NAMA LENGKAP": "Budi Santoso", "GELAR": "M.Ag", "KODE": "BUD" }
     ]
-    const ws = window.XLSX.utils.json_to_sheet(rows)
-    const wb = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(wb, ws, "Data Guru")
-    window.XLSX.writeFile(wb, "Template_Guru.xlsx")
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Data Guru")
+    XLSX.writeFile(wb, "Template_Guru.xlsx")
   }
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !window.XLSX) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const wb = window.XLSX.read(evt.target?.result, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        setExcelData(JSON.parse(JSON.stringify(window.XLSX.utils.sheet_to_json(ws))))
-        toast.success(`${excelData.length} baris terbaca`)
-      } catch { toast.error("Gagal baca file") }
-    }
-    reader.readAsBinaryString(file)
+    if (!file) return
+    try {
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const data = XLSX.utils.sheet_to_json(ws)
+      setExcelData(JSON.parse(JSON.stringify(data)))
+      toast.success(`${data.length} baris terbaca`)
+    } catch { toast.error("Gagal baca file") }
   }
 
   const handleSimpanGuru = async () => {

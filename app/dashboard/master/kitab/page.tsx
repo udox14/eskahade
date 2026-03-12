@@ -8,9 +8,6 @@ import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, i
 import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List } from 'lucide-react'
 import { toast } from 'sonner'
 
-// CDN Type
-declare global { interface Window { XLSX: any; } }
-
 export default function MasterKitabPage() {
   const [tab, setTab] = useState<'LIST' | 'IMPORT'>('LIST')
   
@@ -92,30 +89,32 @@ export default function MasterKitabPage() {
   }
 
   // --- HANDLER EXCEL ---
-  const downloadTemplate = () => {
-    if (!window.XLSX) return toast.error("Excel belum siap")
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const rows = [
        { "NAMA KITAB": "Jurumiyah", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Nahwu", "HARGA": 15000 },
        { "NAMA KITAB": "Kailani", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Shorof", "HARGA": 12000 }
     ]
-    const ws = window.XLSX.utils.json_to_sheet(rows)
-    const wb = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(wb, ws, "Master Kitab")
-    window.XLSX.writeFile(wb, "Template_Kitab.xlsx")
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Master Kitab")
+    XLSX.writeFile(wb, "Template_Kitab.xlsx")
   }
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !window.XLSX) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-       const wb = window.XLSX.read(evt.target?.result, {type:'binary'})
-       const data = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
-       // Bersihkan data
-       setExcelData(JSON.parse(JSON.stringify(data)))
-       toast.success(`${data.length} baris terbaca`)
+    if (!file) return
+    try {
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array' })
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
+      // Bersihkan data
+      setExcelData(JSON.parse(JSON.stringify(data)))
+      toast.success(`${data.length} baris terbaca`)
+    } catch {
+      toast.error("Gagal membaca file Excel")
     }
-    reader.readAsBinaryString(file)
   }
 
   const handleSimpanImport = async () => {

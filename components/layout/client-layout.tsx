@@ -24,7 +24,7 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 
         className={cn(
-          "hidden md:flex flex-col fixed inset-y-0 z-50 shadow-2xl transition-all duration-300 ease-in-out",
+          "no-print hidden md:flex flex-col fixed inset-y-0 z-50 shadow-2xl transition-all duration-300 ease-in-out",
           isCollapsed ? "w-20" : "w-64"
         )}
       >
@@ -69,7 +69,7 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
         )}
       >
         {/* HEADER */}
-        <div className="sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm flex items-center px-4 md:px-6 transition-all">
+        <div className="no-print sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm flex items-center px-4 md:px-6 transition-all">
           <div className="w-full">
             <Header 
                 userName={userName} 

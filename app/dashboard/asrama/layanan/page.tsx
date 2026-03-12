@@ -13,13 +13,6 @@ import {
     hapusMasterJasa 
 } from "./actions";
 
-// Memastikan interface TypeScript untuk Library XLSX via window
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
-
 export default function LayananAsramaPage() {
     // --- STATE FILTER ---
     const [asramaList, setAsramaList] = useState<string[]>([]);
@@ -115,20 +108,6 @@ export default function LayananAsramaPage() {
         return () => observer.disconnect();
     }, [hasMore, isLoading, selectedAsrama, page]);
 
-    // --- HELPER UNTUK LOAD EXCEL CDN (SHEETJS) ---
-    const loadSheetJS = async () => {
-        if (window.XLSX) return window.XLSX;
-        
-        // Memuat skrip CDN secara dinamis
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-            script.onload = () => resolve(window.XLSX);
-            script.onerror = reject;
-            document.body.appendChild(script);
-        });
-    };
-
     // --- HANDLERS ---
     const handleSelectChange = (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', value: string) => {
         setPendingChanges(prev => {
@@ -180,7 +159,7 @@ export default function LayananAsramaPage() {
     // Download Template Excel Asli
     const downloadTemplateExcel = async () => {
         try {
-            const XLSX = await loadSheetJS();
+            const XLSX = await import('xlsx');
             
             // Data sampel
             const dataTemplate = [
@@ -190,13 +169,11 @@ export default function LayananAsramaPage() {
             ];
 
             const ws = XLSX.utils.json_to_sheet(dataTemplate);
-            // Lebarkan kolom biar rapi
             ws['!cols'] = [{ wch: 25 }, { wch: 25 }];
             
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template Penyedia");
             
-            // Generate dan trigger download
             XLSX.writeFile(wb, "Template_Penyedia_Jasa.xlsx");
         } catch (error) {
             alert("Gagal membuat template Excel.");
@@ -211,59 +188,47 @@ export default function LayananAsramaPage() {
 
         setIsUploading(true);
         try {
-            const XLSX = await loadSheetJS();
-            const reader = new FileReader();
+            const XLSX = await import('xlsx');
+            const arrayBuffer = await file.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
             
-            reader.onload = async (event) => {
-                try {
-                    const data = new Uint8Array(event.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-                    // Transformasi hasil Excel ke array yang diharapkan server
-                    const dataBatch: { nama_jasa: string, jenis: string }[] = [];
+            // Transformasi hasil Excel ke array yang diharapkan server
+            const dataBatch: { nama_jasa: string, jenis: string }[] = [];
+            
+            jsonData.forEach(row => {
+                const values = Object.values(row);
+                if(values.length > 0) {
+                    const nama = String(values[0]).trim();
+                    let jenis = 'Makan'; // default
                     
-                    jsonData.forEach(row => {
-                        // Mengambil nilai berdasarkan key atau indeks bebas agar aman dari typo header
-                        const values = Object.values(row);
-                        if(values.length > 0) {
-                            const nama = String(values[0]).trim();
-                            let jenis = 'Makan'; // default
-                            
-                            if (values.length > 1) {
-                                const j = String(values[1]).trim().toLowerCase();
-                                if (j.includes('cuci') || j.includes('laundry')) jenis = 'Cuci';
-                            }
-                            
-                            if(nama) dataBatch.push({ nama_jasa: nama, jenis });
-                        }
-                    });
-
-                    if (dataBatch.length === 0) throw new Error("File kosong atau format salah");
-
-                    await tambahMasterJasaBatch(dataBatch);
-                    const freshMaster = await getMasterJasa();
-                    setMasterJasa(freshMaster);
+                    if (values.length > 1) {
+                        const j = String(values[1]).trim().toLowerCase();
+                        if (j.includes('cuci') || j.includes('laundry')) jenis = 'Cuci';
+                    }
                     
-                    setToastMsg(`${dataBatch.length} Jasa berhasil diimpor.`);
-                    setTimeout(() => setToastMsg(""), 4000);
-                } catch (error) {
-                    console.error(error);
-                    alert("Gagal memproses data Excel. Pastikan format sesuai template.");
-                } finally {
-                    setIsUploading(false);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    if(nama) dataBatch.push({ nama_jasa: nama, jenis });
                 }
-            };
-            
-            reader.readAsArrayBuffer(file);
+            });
 
-        } catch (err) {
-            alert("Gagal memuat sistem Excel. Coba periksa koneksi internet.");
+            if (dataBatch.length === 0) throw new Error("File kosong atau format salah");
+
+            await tambahMasterJasaBatch(dataBatch);
+            const freshMaster = await getMasterJasa();
+            setMasterJasa(freshMaster);
+            
+            setToastMsg(`${dataBatch.length} Jasa berhasil diimpor.`);
+            setTimeout(() => setToastMsg(""), 4000);
+        } catch (error) {
+            console.error(error);
+            alert("Gagal memproses data Excel. Pastikan format sesuai template.");
+        } finally {
             setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 

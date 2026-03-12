@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation'
 import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './actions'
 import { toast } from 'sonner'
 
-declare global { interface Window { XLSX: any; } }
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "SADESA", "LAINNYA"]
@@ -57,37 +56,34 @@ export default function InputSantriPage() {
   }
 
   // ── HANDLER EXCEL ──
-  const downloadTemplate = () => {
-    if (!window.XLSX) return toast.error("Fitur Excel belum siap.")
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const headers = [{ nis: "12345", nama_lengkap: "Ahmad Fulan", nik: "3201", jenis_kelamin: "L", tempat_lahir: "Tasik", tanggal_lahir: "2010-01-01", nama_ayah: "Budi", alamat: "Sukarame", sekolah: "MTSN", kelas_sekolah: "7", asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A" }]
-    const ws = window.XLSX.utils.json_to_sheet(headers)
+    const ws = XLSX.utils.json_to_sheet(headers)
     ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 15 }]
-    const wb = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(wb, ws, "Data")
-    window.XLSX.writeFile(wb, "Template_Santri_Migrasi.xlsx")
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Data")
+    XLSX.writeFile(wb, "Template_Santri_Migrasi.xlsx")
     toast.success("Template didownload")
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!window.XLSX) return toast.error("Fitur Excel belum siap.")
     const id = toast.loading("Membaca file...")
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const wb = window.XLSX.read(evt.target?.result, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = window.XLSX.utils.sheet_to_json(ws)
-        const clean = JSON.parse(JSON.stringify(raw)).map((row: any) => ({
-          ...row, kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren']
-        }))
-        setExcelData(clean)
-        toast.dismiss(id)
-        toast.success(`Berhasil membaca ${clean.length} baris data`)
-      } catch { toast.dismiss(id); toast.error("Format file salah") }
-    }
-    reader.readAsBinaryString(file)
+    try {
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const raw = XLSX.utils.sheet_to_json(ws)
+      const clean = JSON.parse(JSON.stringify(raw)).map((row: any) => ({
+        ...row, kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren']
+      }))
+      setExcelData(clean)
+      toast.dismiss(id)
+      toast.success(`Berhasil membaca ${clean.length} baris data`)
+    } catch { toast.dismiss(id); toast.error("Format file salah") }
   }
 
   const handleSaveExcel = async () => {

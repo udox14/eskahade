@@ -24,3 +24,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── PRINT STYLES ─────────────────────────────────────────── */
+@media print {
+  /* Sembunyikan header app, sidebar, dan elemen non-print */
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  /* Reset layout saat print: hilangkan padding dari sidebar */
+  body,
+  html {
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  /* Pastikan konten print memenuhi halaman */
+  .print-area {
+    position: static !important;
+    overflow: visible !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hindari page break di tengah tabel */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Pastikan gambar tidak overflow */
+  img {
+    max-width: 100% !important;
+  }
+}

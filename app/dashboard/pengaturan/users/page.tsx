@@ -7,12 +7,6 @@ import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
 import { toast } from 'sonner' 
 
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
-
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -191,59 +185,55 @@ export default function ManajemenUserPage() {
     }
   }
 
-  // --- HANDLER IMPORT EXCEL (CDN) ---
-  const handleDownloadTemplate = () => {
-    if (!window.XLSX) return toast.error("Library Excel belum siap.")
+  // --- HANDLER IMPORT EXCEL ---
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx')
 
     const rows = [
       { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@pesantren.com", "PASSWORD": "password123", "ROLE": "wali_kelas", "ASRAMA": "" },
       { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@pesantren.com", "PASSWORD": "password123", "ROLE": "keamanan", "ASRAMA": "" },
       { "NAMA LENGKAP": "Siti Bendahara", "EMAIL": "siti@pesantren.com", "PASSWORD": "password123", "ROLE": "bendahara", "ASRAMA": "" },
     ]
-    const worksheet = window.XLSX.utils.json_to_sheet(rows)
+    const worksheet = XLSX.utils.json_to_sheet(rows)
     worksheet['!cols'] = [{wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:15}]
     
-    const workbook = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Template User")
-    window.XLSX.writeFile(workbook, "Template_Import_User.xlsx")
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template User")
+    XLSX.writeFile(workbook, "Template_Import_User.xlsx")
 
     toast.success("Template berhasil didownload")
   }
 
-  const handleUploadExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!window.XLSX) return toast.error("Library Excel belum siap.")
 
     const toastId = toast.loading("Membaca file Excel...")
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-        try {
-          const bstr = evt.target?.result
-          const wb = window.XLSX.read(bstr, { type: 'binary' })
-          const ws = wb.Sheets[wb.SheetNames[0]]
-          const data = window.XLSX.utils.sheet_to_json(ws)
-          
-          // Mapping
-          const mappedData = data.map((row: any) => ({
-              full_name: row['NAMA LENGKAP'],
-              email: row['EMAIL'],
-              password: row['PASSWORD'],
-              role: row['ROLE']?.toLowerCase(),
-              asrama_binaan: row['ASRAMA']?.toUpperCase(),
-              isValid: row['NAMA LENGKAP'] && row['EMAIL'] && row['PASSWORD'] && row['ROLE']
+    try {
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const data = XLSX.utils.sheet_to_json(ws)
+      
+      // Mapping
+      const mappedData = data.map((row: any) => ({
+          full_name: row['NAMA LENGKAP'],
+          email: row['EMAIL'],
+          password: row['PASSWORD'],
+          role: row['ROLE']?.toLowerCase(),
+          asrama_binaan: row['ASRAMA']?.toUpperCase(),
+          isValid: row['NAMA LENGKAP'] && row['EMAIL'] && row['PASSWORD'] && row['ROLE']
           }))
           
-          setExcelData(mappedData)
-          toast.dismiss(toastId)
-          toast.success(`Berhasil membaca ${mappedData.length} baris data`)
-        } catch (error) {
-          toast.dismiss(toastId)
-          toast.error("File Excel tidak valid")
-        }
+      setExcelData(mappedData)
+      toast.dismiss(toastId)
+      toast.success(`Berhasil membaca ${mappedData.length} baris data`)
+    } catch (error) {
+      toast.dismiss(toastId)
+      toast.error("File Excel tidak valid")
     }
-    reader.readAsBinaryString(file)
   }
 
   const handleSimpanBatch = async () => {

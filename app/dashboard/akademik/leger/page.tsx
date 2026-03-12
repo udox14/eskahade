@@ -5,7 +5,6 @@ import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger } from './acti
 import { FileSpreadsheet, Loader2, Search, Trophy, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
 
-declare global { interface Window { XLSX: any; } }
 
 export default function LegerNilaiPage() {
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -56,12 +55,12 @@ export default function LegerNilaiPage() {
   // Export
   const handleExport = async () => {
     if (!dataLeger || dataLeger.siswa.length === 0) return
-    if (!window.XLSX) return toast.error("Library Excel belum siap")
 
     setIsExporting(true)
     const toastId = toast.loading("Download Excel...")
 
     try {
+        const XLSX = await import('xlsx')
         const headers = ["No", "NIS", "Nama Santri", ...dataLeger.mapel.map((m:any) => m.nama), "JUMLAH", "RATA-RATA", "RANKING"]
         const rows = dataLeger.siswa.map((s:any, idx:number) => {
           const rowData: any[] = [idx + 1, s.nis, s.nama]
@@ -70,11 +69,11 @@ export default function LegerNilaiPage() {
           return rowData
         })
     
-        const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows])
-        const wb = window.XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+        const wb = XLSX.utils.book_new()
         const namaKelas = kelasList.find(k => k.id == selectedKelas)?.nama_kelas || "Kelas"
-        window.XLSX.utils.book_append_sheet(wb, ws, `Leger ${namaKelas}`)
-        window.XLSX.writeFile(wb, `Leger_${namaKelas}.xlsx`)
+        XLSX.utils.book_append_sheet(wb, ws, `Leger ${namaKelas}`)
+        XLSX.writeFile(wb, `Leger_${namaKelas}.xlsx`)
         toast.success("Berhasil")
     } catch (e) { toast.error("Gagal export") }
     finally { setIsExporting(false); toast.dismiss(toastId); }

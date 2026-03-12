@@ -9,11 +9,6 @@ import { getReferensiData, getDataSantriPerKelas, simpanNilaiSemuaMapel } from '
 import { toast } from 'sonner'
 
 // Definisi TypeScript untuk window
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
 
 export default function InputNilaiPage() {
   const [refData, setRefData] = useState<{ mapel: any[], kelas: any[] }>({ mapel: [], kelas: [] })
@@ -36,11 +31,6 @@ export default function InputNilaiPage() {
   const handleDownloadTemplate = async () => {
     if (!selectedKelas) {
       toast.warning("Mohon pilih Kelas terlebih dahulu.")
-      return
-    }
-
-    if (!window.XLSX) {
-      toast.error("Library Excel belum siap.")
       return
     }
     
@@ -69,50 +59,43 @@ export default function InputNilaiPage() {
       return row
     })
 
-    const worksheet = window.XLSX.utils.json_to_sheet(dataRows)
+    const XLSX = await import('xlsx')
+    const worksheet = XLSX.utils.json_to_sheet(dataRows)
     
     const wscols = [{ wch: 15 }, { wch: 35 }]
     refData.mapel.forEach(() => wscols.push({ wch: 15 }))
     worksheet['!cols'] = wscols
 
-    const workbook = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Lengkap")
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Lengkap")
     
-    window.XLSX.writeFile(workbook, `Template_Nilai_${namaKelas}_Lengkap.xlsx`)
+    XLSX.writeFile(workbook, `Template_Nilai_${namaKelas}_Lengkap.xlsx`)
     
     toast.dismiss(loadToast)
     toast.success("Template berhasil didownload")
     setIsDownloading(false)
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!window.XLSX) {
-      toast.error("Library Excel belum siap.")
-      return
-    }
-
     const loadToast = toast.loading("Membaca file Excel...")
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result
-        const wb = window.XLSX.read(bstr, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rawData = window.XLSX.utils.sheet_to_json(ws)
-        
-        setExcelData(rawData)
-        toast.dismiss(loadToast)
-        toast.success(`Berhasil membaca ${rawData.length} baris data`)
-      } catch (err) {
-        toast.dismiss(loadToast)
-        toast.error("Format file tidak valid")
-      }
+    try {
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const wb = XLSX.read(arrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rawData = XLSX.utils.sheet_to_json(ws)
+      
+      setExcelData(rawData)
+      toast.dismiss(loadToast)
+      toast.success(`Berhasil membaca ${rawData.length} baris data`)
+    } catch (err) {
+      toast.dismiss(loadToast)
+      toast.error("Format file tidak valid")
     }
-    reader.readAsBinaryString(file)
   }
 
   const handleSimpan = async () => {

@@ -7,11 +7,6 @@ import { getKelasList, getDataGrading, simpanGradingBatch } from './actions'
 import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet } from 'lucide-react'
 
 // Memastikan interface TypeScript untuk Library XLSX via window
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
 
 export default function GradingKelasPage() {
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -111,24 +106,13 @@ export default function GradingKelasPage() {
     }
   }
 
-  // --- EXCEL INTEGRATION (CDN) ---
-  const loadSheetJS = async () => {
-    if (window.XLSX) return window.XLSX;
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-      script.onload = () => resolve(window.XLSX);
-      script.onerror = reject;
-      document.body.appendChild(script);
-    });
-  };
-
+  // --- EXCEL INTEGRATION ---
   const handleDownloadTemplate = async () => {
     if (dataGrading.length === 0) return alert("Belum ada data santri untuk diunduh.");
     
     setIsProcessingExcel(true);
     try {
-      const XLSX = await loadSheetJS();
+      const XLSX = await import('xlsx');
       
       // Siapkan data untuk Excel
       const dataTemplate = dataGrading.map(s => ({
@@ -164,22 +148,19 @@ export default function GradingKelasPage() {
 
     setIsProcessingExcel(true);
     try {
-      const XLSX = await loadSheetJS();
-      const reader = new FileReader();
-      
-      reader.onload = async (event) => {
-        try {
-          const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+      const XLSX = await import('xlsx');
+      const arrayBuffer = await file.arrayBuffer();
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-          let validChanges = 0;
-          const newPendingObj = { ...pendingChanges };
+      let validChanges = 0;
+      const newPendingObj = { ...pendingChanges };
 
-          jsonData.forEach(row => {
-            const id = row["ID_SYSTEM_JANGAN_DIUBAH"];
-            let rawGrade = row["Grade Final (Ketik: Grade A / Grade B / Grade C)"];
+      jsonData.forEach(row => {
+        const id = row["ID_SYSTEM_JANGAN_DIUBAH"];
+        let rawGrade = row["Grade Final (Ketik: Grade A / Grade B / Grade C)"];
 
             if (id && rawGrade) {
               // Normalisasi ketikan (Misal ngetik cuma "a" atau "GRADE B")
@@ -207,19 +188,12 @@ export default function GradingKelasPage() {
             alert("Tidak ada perubahan baru yang terdeteksi dari file Excel.");
           }
 
-        } catch (error) {
-          console.error(error);
-          alert("Gagal memproses data Excel. Pastikan format kolom tidak diubah.");
-        } finally {
-          setIsProcessingExcel(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-      };
-      
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      alert("Gagal memuat sistem Excel. Periksa koneksi internet.");
+    } catch (error) {
+      console.error(error);
+      alert("Gagal memproses data Excel. Pastikan format kolom tidak diubah.");
+    } finally {
       setIsProcessingExcel(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 

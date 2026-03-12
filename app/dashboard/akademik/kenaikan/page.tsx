@@ -7,12 +7,6 @@ import { getMarhalahList, getKelasByMarhalah, getSantriForKenaikan, importKenaik
 import { FileSpreadsheet, Upload, Save, Loader2, CheckCircle, AlertTriangle, Download, X, HelpCircle, LayoutList, CheckSquare, Square, Users, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner' 
 
-// Definisi Window Type untuk CDN SheetJS
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
 
 export default function KenaikanKelasPage() {
   const [mode, setMode] = useState<'EXCEL' | 'MANUAL'>('MANUAL')
@@ -68,18 +62,6 @@ export default function KenaikanKelasPage() {
   }, [targetMarhalah])
 
 
-  // --- HELPER UNTUK LOAD EXCEL CDN (SHEETJS) ---
-  const loadSheetJS = async () => {
-      if (window.XLSX) return window.XLSX;
-      return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-          script.onload = () => resolve(window.XLSX);
-          script.onerror = reject;
-          document.body.appendChild(script);
-      });
-  };
-
   // ==========================================
   // LOGIKA MODE EXCEL
   // ==========================================
@@ -98,7 +80,7 @@ export default function KenaikanKelasPage() {
         return
       }
 
-      const XLSX = await loadSheetJS()
+      const XLSX = await import('xlsx')
       const rows = dataSantri.map(s => ({
         NIS: s.nis,
         "NAMA SANTRI": s.nama,
@@ -133,26 +115,18 @@ export default function KenaikanKelasPage() {
     const loadToast = toast.loading("Membaca file Excel...")
 
     try {
-      const XLSX = await loadSheetJS()
-      const reader = new FileReader()
-      reader.onload = (evt) => {
-        try {
-          const dataArray = new Uint8Array(evt.target?.result as ArrayBuffer);
-          const wb = XLSX.read(dataArray, { type: 'array' })
-          const ws = wb.Sheets[wb.SheetNames[0]]
-          const data = XLSX.utils.sheet_to_json(ws)
-          setExcelData(data)
-          toast.dismiss(loadToast)
-          toast.success(`Berhasil membaca ${data.length} baris data`)
-        } catch (err) {
-          toast.dismiss(loadToast)
-          toast.error("Format file tidak valid")
-        }
-      }
-      reader.readAsArrayBuffer(file)
+      const XLSX = await import('xlsx')
+      const arrayBuffer = await file.arrayBuffer()
+      const dataArray = new Uint8Array(arrayBuffer)
+      const wb = XLSX.read(dataArray, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const data = XLSX.utils.sheet_to_json(ws)
+      setExcelData(data)
+      toast.dismiss(loadToast)
+      toast.success(`Berhasil membaca ${data.length} baris data`)
     } catch (error) {
       toast.dismiss(loadToast)
-      toast.error("Gagal memuat sistem Excel.")
+      toast.error("Format file tidak valid atau gagal membaca.")
     }
   }
 

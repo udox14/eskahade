@@ -7,12 +7,6 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
-declare global {
-  interface Window {
-    XLSX: any;
-  }
-}
-
 export default function LaporanKeuanganPage() {
   const [tahun, setTahun] = useState(new Date().getFullYear())
   const [data, setData] = useState<any>(null)
@@ -46,9 +40,10 @@ export default function LaporanKeuanganPage() {
   const totalPages = Math.ceil(totalItems / limit)
 
   // Helper Export
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!data || data.list.length === 0) return toast.warning("Data kosong")
-    if (!window.XLSX) return toast.error("Fitur Excel belum siap. Refresh halaman.")
+
+    const XLSX = await import('xlsx')
 
     const rows = data.list.map((item: any, idx: number) => ({
       No: idx + 1,
@@ -63,13 +58,13 @@ export default function LaporanKeuanganPage() {
       Keterangan: item.keterangan
     }))
 
-    const worksheet = window.XLSX.utils.json_to_sheet(rows)
+    const worksheet = XLSX.utils.json_to_sheet(rows)
     const wscols = [{wch:5}, {wch:20}, {wch:30}, {wch:15}, {wch:15}, {wch:15}, {wch:10}, {wch:15}, {wch:20}, {wch:30}]
     worksheet['!cols'] = wscols
 
-    const workbook = window.XLSX.utils.book_new()
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, `Laporan ${tahun}`)
-    window.XLSX.writeFile(workbook, `Laporan_Keuangan_${tahun}.xlsx`)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, `Laporan ${tahun}`)
+    XLSX.writeFile(workbook, `Laporan_Keuangan_${tahun}.xlsx`)
     toast.success("Laporan berhasil didownload")
   }
 
