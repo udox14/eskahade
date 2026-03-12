@@ -23,7 +23,9 @@ const FORM_INIT = {
   tanggal_masuk: '', tanggal_keluar: '',
   sekolah: '', kelas_sekolah: '',
   asrama: '', kamar: '',
-  kelas_pesantren: ''
+  kelas_pesantren: '',
+  nama_tempat_makan: '',
+  nama_tempat_cuci: '',
 }
 
 export default function InputSantriPage() {
@@ -73,7 +75,9 @@ export default function InputSantriPage() {
       no_wa_ortu: "08123456789",
       tanggal_masuk: "2024-07-01", tanggal_keluar: "",
       sekolah: "MTSN", kelas_sekolah: "7",
-      asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A"
+      asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A",
+      nama_tempat_makan: "Bi Ade",
+      nama_tempat_cuci: "Bi Hani"
     }]
     const ws = XLSX.utils.json_to_sheet(headers)
     ws['!cols'] = [
@@ -81,7 +85,8 @@ export default function InputSantriPage() {
       {wch:15},{wch:15},{wch:15},
       {wch:5},{wch:35},{wch:15},{wch:15},{wch:15},{wch:20},
       {wch:14},{wch:14},{wch:14},
-      {wch:10},{wch:10},{wch:15},{wch:8},{wch:15}
+      {wch:10},{wch:10},{wch:15},{wch:8},{wch:15},
+      {wch:20},{wch:20}
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Data")
@@ -301,6 +306,18 @@ export default function InputSantriPage() {
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Keluar <span className="text-gray-400 font-normal normal-case">(isi jika keluar sebelum lulus)</span></label>
               <input type="date" value={form.tanggal_keluar} onChange={e => set('tanggal_keluar', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                🍽️ Tempat Makan <span className="text-gray-400 font-normal normal-case">(auto-sync ke Katering)</span>
+              </label>
+              <input value={form.nama_tempat_makan} onChange={e => set('nama_tempat_makan', e.target.value)} placeholder="Contoh: Bi Ade" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                👕 Tempat Cuci <span className="text-gray-400 font-normal normal-case">(auto-sync ke Laundry)</span>
+              </label>
+              <input value={form.nama_tempat_cuci} onChange={e => set('nama_tempat_cuci', e.target.value)} placeholder="Contoh: Bi Hani" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
 

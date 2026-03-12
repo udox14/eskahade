@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, execute, generateId } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 type SantriImportData = {
@@ -27,6 +27,26 @@ type SantriImportData = {
   asrama?: string
   kamar?: string | number
   kelas_pesantren?: string
+  nama_tempat_makan?: string   // nama penyedia jasa makan (auto-create di master_jasa)
+  nama_tempat_cuci?: string    // nama penyedia jasa cuci (auto-create di master_jasa)
+}
+
+/**
+ * Cari jasa berdasarkan nama & jenis. Jika belum ada, buat baru.
+ * Return: id dari master_jasa
+ */
+async function upsertJasa(nama: string, jenis: 'Makan' | 'Cuci'): Promise<string> {
+  const existing = await queryOne<{ id: string }>(
+    'SELECT id FROM master_jasa WHERE LOWER(nama_jasa) = LOWER(?) AND jenis = ?',
+    [nama.trim(), jenis]
+  )
+  if (existing) return existing.id
+  const id = generateId()
+  await execute(
+    'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
+    [id, nama.trim(), jenis]
+  )
+  return id
 }
 
 export async function getKelasList() {
@@ -68,6 +88,8 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
     asrama: s.asrama ? String(s.asrama).toUpperCase().trim() : null,
     kamar: s.kamar ? String(s.kamar).trim() : null,
     kelas_pesantren: s.kelas_pesantren ? String(s.kelas_pesantren).trim() : null,
+    nama_tempat_makan: s.nama_tempat_makan ? String(s.nama_tempat_makan).trim() : null,
+    nama_tempat_cuci: s.nama_tempat_cuci ? String(s.nama_tempat_cuci).trim() : null,
   }))
 
   const now = new Date().toISOString()
@@ -75,20 +97,30 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
 
   for (const s of cleanData) {
     try {
+      // Resolve tempat makan & cuci → auto-create di master_jasa jika perlu
+      let tempat_makan_id: string | null = null
+      let tempat_mencuci_id: string | null = null
+      if (s.nama_tempat_makan) tempat_makan_id = await upsertJasa(s.nama_tempat_makan, 'Makan')
+      if (s.nama_tempat_cuci) tempat_mencuci_id = await upsertJasa(s.nama_tempat_cuci, 'Cuci')
+
       await query(
         `INSERT INTO santri (
           id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
           nama_ayah, nama_ibu, alamat,
           gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
           jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
-          status_global, sekolah, kelas_sekolah, asrama, kamar, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          status_global, sekolah, kelas_sekolah, asrama, kamar,
+          tempat_makan_id, tempat_mencuci_id,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
           s.nama_ayah, s.nama_ibu, s.alamat,
           s.gol_darah, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
           s.jemaah, s.no_wa_ortu, s.tanggal_masuk, s.tanggal_keluar,
-          s.status_global, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, now, now
+          s.status_global, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar,
+          tempat_makan_id, tempat_mencuci_id,
+          now, now
         ]
       )
 
@@ -136,8 +168,10 @@ export async function tambahSantriSatuSatu(data: {
   asrama?: string
   kamar?: string
   kelas_pesantren?: string
+  nama_tempat_makan?: string
+  nama_tempat_cuci?: string
 }) {
-  const { nis, nama_lengkap, kelas_pesantren, ...rest } = data
+  const { nis, nama_lengkap, kelas_pesantren, nama_tempat_makan, nama_tempat_cuci, ...rest } = data
   if (!nis || !nama_lengkap) return { error: 'NIS dan Nama wajib diisi.' }
 
   const existing = await queryOne('SELECT id FROM santri WHERE nis = ?', [nis.trim()])
@@ -147,14 +181,22 @@ export async function tambahSantriSatuSatu(data: {
   const now = new Date().toISOString()
   const tahunMasuk = new Date().getFullYear()
 
+  // Auto-create master_jasa jika diisi
+  let tempat_makan_id: string | null = null
+  let tempat_mencuci_id: string | null = null
+  if (nama_tempat_makan?.trim()) tempat_makan_id = await upsertJasa(nama_tempat_makan, 'Makan')
+  if (nama_tempat_cuci?.trim()) tempat_mencuci_id = await upsertJasa(nama_tempat_cuci, 'Cuci')
+
   await query(
     `INSERT INTO santri (
       id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
       nama_ayah, nama_ibu, alamat,
       gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
       jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
-      sekolah, kelas_sekolah, asrama, kamar, status_global, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sekolah, kelas_sekolah, asrama, kamar,
+      tempat_makan_id, tempat_mencuci_id,
+      status_global, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, nis.trim(), nama_lengkap.trim(),
       rest.nik?.trim() || null, rest.jenis_kelamin,
@@ -173,6 +215,7 @@ export async function tambahSantriSatuSatu(data: {
       rest.kelas_sekolah?.trim() || null,
       rest.asrama?.toUpperCase().trim() || null,
       rest.kamar?.trim() || null,
+      tempat_makan_id, tempat_mencuci_id,
       'aktif', now, now
     ]
   )

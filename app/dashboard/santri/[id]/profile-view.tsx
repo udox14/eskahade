@@ -77,12 +77,7 @@ export function SantriProfileView({
                     label="Tempat, Tanggal Lahir" 
                     value={`${santri.tempat_lahir || '-'}, ${santri.tanggal_lahir ? format(new Date(santri.tanggal_lahir), 'dd MMMM yyyy', {locale:id}) : '-'}`} 
                 />
-                <div className="pt-2">
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Alamat Lengkap</p>
-                    <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">
-                        {santri.alamat || 'Alamat belum diisi.'}
-                    </p>
-                </div>
+                <InfoRow label="Golongan Darah" value={santri.gol_darah} />
                 <InfoRow 
                     label="Status Santri" 
                     value={
@@ -92,7 +87,42 @@ export function SantriProfileView({
                     } 
                     isCustom 
                 />
-                <InfoRow label="Tahun Masuk" value={santri.tahun_masuk} />
+                <InfoRow label="Tanggal Masuk" value={santri.tanggal_masuk ? format(new Date(santri.tanggal_masuk), 'dd MMMM yyyy', {locale:id}) : null} />
+                {santri.tanggal_keluar && (
+                  <InfoRow label="Tanggal Keluar" value={format(new Date(santri.tanggal_keluar), 'dd MMMM yyyy', {locale:id})} />
+                )}
+              </div>
+
+              {/* ALAMAT */}
+              <div className="pt-2 border-t space-y-3">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3.5 h-3.5"/> Alamat</p>
+                {santri.alamat_lengkap ? (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Alamat Lengkap</p>
+                    <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">{santri.alamat_lengkap}</p>
+                  </div>
+                ) : santri.alamat ? (
+                  <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">{santri.alamat}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Alamat belum diisi.</p>
+                )}
+                {(santri.kecamatan || santri.kab_kota || santri.provinsi) && (
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="bg-gray-50 p-2 rounded border text-center">
+                      <p className="text-gray-400 uppercase font-bold mb-0.5">Kecamatan</p>
+                      <p className="text-gray-700 font-medium">{santri.kecamatan || '-'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border text-center">
+                      <p className="text-gray-400 uppercase font-bold mb-0.5">Kab/Kota</p>
+                      <p className="text-gray-700 font-medium">{santri.kab_kota || '-'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border text-center">
+                      <p className="text-gray-400 uppercase font-bold mb-0.5">Provinsi</p>
+                      <p className="text-gray-700 font-medium">{santri.provinsi || '-'}</p>
+                    </div>
+                  </div>
+                )}
+                {santri.jemaah && <InfoRow label="Jemaah" value={santri.jemaah} />}
               </div>
            </div>
 
