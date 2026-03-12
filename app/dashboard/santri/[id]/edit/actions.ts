@@ -16,14 +16,28 @@ export async function updateSantri(id: string, formData: FormData) {
     `UPDATE santri SET
       nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
       jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?, status_global = ?,
+      gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
+      jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
       sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
     WHERE id = ?`,
     [
-      formData.get('nis'), formData.get('nama_lengkap'), formData.get('nik'),
-      formData.get('tempat_lahir'), formData.get('tanggal_lahir'), formData.get('jenis_kelamin'),
-      formData.get('nama_ayah'), formData.get('nama_ibu'), formData.get('alamat'),
-      formData.get('status_global'), formData.get('sekolah'), formData.get('kelas_sekolah'),
-      formData.get('asrama'), formData.get('kamar'), now, id
+      formData.get('nis'), formData.get('nama_lengkap'), formData.get('nik') || null,
+      formData.get('tempat_lahir') || null, formData.get('tanggal_lahir') || null,
+      formData.get('jenis_kelamin'),
+      formData.get('nama_ayah') || null, formData.get('nama_ibu') || null,
+      formData.get('alamat') || null, formData.get('status_global'),
+      formData.get('gol_darah') || null,
+      formData.get('alamat_lengkap') || null,
+      formData.get('kecamatan') || null,
+      formData.get('kab_kota') || null,
+      formData.get('provinsi') || null,
+      formData.get('jemaah') || null,
+      formData.get('no_wa_ortu') || null,
+      formData.get('tanggal_masuk') || null,
+      formData.get('tanggal_keluar') || null,
+      formData.get('sekolah') || null, formData.get('kelas_sekolah') || null,
+      formData.get('asrama') || null, formData.get('kamar') || null,
+      now, id
     ]
   )
 

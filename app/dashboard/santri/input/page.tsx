@@ -17,6 +17,10 @@ const FORM_INIT = {
   jenis_kelamin: 'L' as 'L' | 'P',
   tempat_lahir: '', tanggal_lahir: '',
   nama_ayah: '', nama_ibu: '', alamat: '',
+  gol_darah: '',
+  alamat_lengkap: '', kecamatan: '', kab_kota: '', provinsi: '',
+  jemaah: '', no_wa_ortu: '',
+  tanggal_masuk: '', tanggal_keluar: '',
   sekolah: '', kelas_sekolah: '',
   asrama: '', kamar: '',
   kelas_pesantren: ''
@@ -58,9 +62,27 @@ export default function InputSantriPage() {
   // ── HANDLER EXCEL ──
   const downloadTemplate = async () => {
     const XLSX = await import('xlsx')
-    const headers = [{ nis: "12345", nama_lengkap: "Ahmad Fulan", nik: "3201", jenis_kelamin: "L", tempat_lahir: "Tasik", tanggal_lahir: "2010-01-01", nama_ayah: "Budi", alamat: "Sukarame", sekolah: "MTSN", kelas_sekolah: "7", asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A" }]
+    const headers = [{
+      nis: "12345", nama_lengkap: "Ahmad Fulan", nik: "3201",
+      jenis_kelamin: "L", tempat_lahir: "Tasik", tanggal_lahir: "2010-01-01",
+      nama_ayah: "Budi", nama_ibu: "Siti", alamat: "Sukarame",
+      gol_darah: "A",
+      alamat_lengkap: "Kp. Sukarame RT 01/02 Desa Sukahideng",
+      kecamatan: "Taraju", kab_kota: "Tasikmalaya", provinsi: "Jawa Barat",
+      jemaah: "Jemaah Taraju",
+      no_wa_ortu: "08123456789",
+      tanggal_masuk: "2024-07-01", tanggal_keluar: "",
+      sekolah: "MTSN", kelas_sekolah: "7",
+      asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A"
+    }]
     const ws = XLSX.utils.json_to_sheet(headers)
-    ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 15 }]
+    ws['!cols'] = [
+      {wch:12},{wch:25},{wch:16},{wch:5},{wch:12},{wch:14},
+      {wch:15},{wch:15},{wch:15},
+      {wch:5},{wch:35},{wch:15},{wch:15},{wch:15},{wch:20},
+      {wch:14},{wch:14},{wch:14},
+      {wch:10},{wch:10},{wch:15},{wch:8},{wch:15}
+    ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Data")
     XLSX.writeFile(wb, "Template_Santri_Migrasi.xlsx")
@@ -78,7 +100,9 @@ export default function InputSantriPage() {
       const ws = wb.Sheets[wb.SheetNames[0]]
       const raw = XLSX.utils.sheet_to_json(ws)
       const clean = JSON.parse(JSON.stringify(raw)).map((row: any) => ({
-        ...row, kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren']
+        ...row,
+        kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren'],
+        no_wa_ortu: row.no_wa_ortu ? String(row.no_wa_ortu) : (row['no_wa_ortu'] || ''),
       }))
       setExcelData(clean)
       toast.dismiss(id)
@@ -168,20 +192,64 @@ export default function InputSantriPage() {
               <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Lahir</label>
               <input type="date" value={form.tanggal_lahir} onChange={e => set('tanggal_lahir', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
-            {/* Nama Ayah */}
+            {/* Golongan Darah */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Golongan Darah</label>
+              <select value={form.gol_darah} onChange={e => set('gol_darah', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="">-- Tidak Diketahui --</option>
+                {['A','B','AB','O'].map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            {/* Alamat ringkas */}
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Alamat (Ringkas)</label>
+              <textarea value={form.alamat} onChange={e => set('alamat', e.target.value)} placeholder="Alamat singkat" rows={2} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+            </div>
+          </div>
+
+          {/* SEKSI: ALAMAT LENGKAP */}
+          <div className="px-6 pt-5 pb-4 border-b bg-yellow-50/40">
+            <h2 className="font-bold text-sm uppercase tracking-wide text-yellow-800">Alamat Lengkap & Jemaah</h2>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Alamat Lengkap (Jalan/Kampung, RT/RW, Desa)</label>
+              <textarea value={form.alamat_lengkap} onChange={e => set('alamat_lengkap', e.target.value)} placeholder="Contoh: Kp. Sukarame RT 01/02 Desa Sukahideng" rows={2} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400 resize-none" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kecamatan</label>
+              <input value={form.kecamatan} onChange={e => set('kecamatan', e.target.value)} placeholder="Nama kecamatan" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kab/Kota</label>
+              <input value={form.kab_kota} onChange={e => set('kab_kota', e.target.value)} placeholder="Kabupaten atau Kota" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Provinsi</label>
+              <input value={form.provinsi} onChange={e => set('provinsi', e.target.value)} placeholder="Nama provinsi" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Jemaah</label>
+              <input value={form.jemaah} onChange={e => set('jemaah', e.target.value)} placeholder="Pengelompokan wilayah/jemaah" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+            </div>
+          </div>
+
+          {/* SEKSI: ORANG TUA */}
+          <div className="px-6 pt-5 pb-4 border-b bg-green-50/40">
+            <h2 className="font-bold text-sm uppercase tracking-wide text-green-800">Orang Tua & Kontak</h2>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Ayah</label>
-              <input value={form.nama_ayah} onChange={e => set('nama_ayah', e.target.value)} placeholder="Nama ayah kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <input value={form.nama_ayah} onChange={e => set('nama_ayah', e.target.value)} placeholder="Nama ayah kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
-            {/* Nama Ibu */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Ibu</label>
-              <input value={form.nama_ibu} onChange={e => set('nama_ibu', e.target.value)} placeholder="Nama ibu kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <input value={form.nama_ibu} onChange={e => set('nama_ibu', e.target.value)} placeholder="Nama ibu kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
-            {/* Alamat */}
             <div className="md:col-span-2">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Alamat</label>
-              <textarea value={form.alamat} onChange={e => set('alamat', e.target.value)} placeholder="Alamat lengkap" rows={2} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">No. WhatsApp Orang Tua</label>
+              <input value={form.no_wa_ortu} onChange={e => set('no_wa_ortu', e.target.value)} placeholder="Contoh: 08123456789" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
           </div>
 
@@ -225,6 +293,14 @@ export default function InputSantriPage() {
                 <option value="">-- Pilih Kelas --</option>
                 {kelasList.map(k => <option key={k.id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Masuk <span className="text-gray-400 font-normal normal-case">(tahun masuk otomatis)</span></label>
+              <input type="date" value={form.tanggal_masuk} onChange={e => set('tanggal_masuk', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Keluar <span className="text-gray-400 font-normal normal-case">(isi jika keluar sebelum lulus)</span></label>
+              <input type="date" value={form.tanggal_keluar} onChange={e => set('tanggal_keluar', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
 
@@ -272,7 +348,7 @@ export default function InputSantriPage() {
                   {isSavingExcel ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />} Simpan Semua
                 </button>
               </div>
-              <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+              <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto overflow-x-auto">
                 <table className="w-full text-sm text-left whitespace-nowrap">
                   <thead className="bg-gray-50 sticky top-0 font-bold text-gray-600">
                     <tr>
@@ -281,6 +357,10 @@ export default function InputSantriPage() {
                       <th className="p-3 border-b bg-green-50 text-green-800">Kelas Pesantren</th>
                       <th className="p-3 border-b">Asrama</th>
                       <th className="p-3 border-b">Sekolah</th>
+                      <th className="p-3 border-b">Kab/Kota</th>
+                      <th className="p-3 border-b">Jemaah</th>
+                      <th className="p-3 border-b">No. WA Ortu</th>
+                      <th className="p-3 border-b">Tgl Masuk</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -291,6 +371,10 @@ export default function InputSantriPage() {
                         <td className="p-3 font-bold text-green-700 bg-green-50/30">{r.kelas_pesantren || <span className="text-gray-400 font-normal italic">Kosong</span>}</td>
                         <td className="p-3 text-gray-500">{r.asrama}</td>
                         <td className="p-3 text-blue-600">{r.sekolah}</td>
+                        <td className="p-3 text-gray-500">{r.kab_kota}</td>
+                        <td className="p-3 text-gray-500">{r.jemaah}</td>
+                        <td className="p-3 text-gray-500">{r.no_wa_ortu}</td>
+                        <td className="p-3 text-gray-500">{r.tanggal_masuk}</td>
                       </tr>
                     ))}
                   </tbody>

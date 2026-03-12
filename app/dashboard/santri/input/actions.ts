@@ -13,6 +13,15 @@ type SantriImportData = {
   nama_ayah?: string
   nama_ibu?: string
   alamat?: string
+  gol_darah?: string
+  alamat_lengkap?: string
+  kecamatan?: string
+  kab_kota?: string
+  provinsi?: string
+  jemaah?: string
+  no_wa_ortu?: string | number
+  tanggal_masuk?: string
+  tanggal_keluar?: string
   sekolah?: string
   kelas_sekolah?: string
   asrama?: string
@@ -31,6 +40,8 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
   const kelasList = await query<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas')
   const mapKelas = new Map(kelasList.map(k => [k.nama_kelas.trim().toLowerCase(), k.id]))
 
+  const tahunMasukDefault = new Date().getFullYear()
+
   const cleanData = dataSantri.map(s => ({
     id: crypto.randomUUID(),
     nis: String(s.nis).trim(),
@@ -42,6 +53,15 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
     nama_ayah: s.nama_ayah || null,
     nama_ibu: s.nama_ibu || null,
     alamat: s.alamat || null,
+    gol_darah: s.gol_darah ? String(s.gol_darah).toUpperCase().trim() : null,
+    alamat_lengkap: s.alamat_lengkap || null,
+    kecamatan: s.kecamatan || null,
+    kab_kota: s.kab_kota || null,
+    provinsi: s.provinsi || null,
+    jemaah: s.jemaah || null,
+    no_wa_ortu: s.no_wa_ortu ? String(s.no_wa_ortu).trim() : null,
+    tanggal_masuk: s.tanggal_masuk || `${tahunMasukDefault}-01-01`,
+    tanggal_keluar: s.tanggal_keluar || null,
     status_global: 'aktif',
     sekolah: s.sekolah ? String(s.sekolah).toUpperCase().trim() : null,
     kelas_sekolah: s.kelas_sekolah ? String(s.kelas_sekolah).trim() : null,
@@ -56,11 +76,20 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
   for (const s of cleanData) {
     try {
       await query(
-        `INSERT INTO santri (id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
-          nama_ayah, nama_ibu, alamat, status_global, sekolah, kelas_sekolah, asrama, kamar, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
-         s.nama_ayah, s.nama_ibu, s.alamat, s.status_global, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, now, now]
+        `INSERT INTO santri (
+          id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
+          nama_ayah, nama_ibu, alamat,
+          gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
+          jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
+          status_global, sekolah, kelas_sekolah, asrama, kamar, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
+          s.nama_ayah, s.nama_ibu, s.alamat,
+          s.gol_darah, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
+          s.jemaah, s.no_wa_ortu, s.tanggal_masuk, s.tanggal_keluar,
+          s.status_global, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, now, now
+        ]
       )
 
       if (s.kelas_pesantren) {
@@ -93,6 +122,15 @@ export async function tambahSantriSatuSatu(data: {
   nama_ayah?: string
   nama_ibu?: string
   alamat?: string
+  gol_darah?: string
+  alamat_lengkap?: string
+  kecamatan?: string
+  kab_kota?: string
+  provinsi?: string
+  jemaah?: string
+  no_wa_ortu?: string
+  tanggal_masuk?: string
+  tanggal_keluar?: string
   sekolah?: string
   kelas_sekolah?: string
   asrama?: string
@@ -107,17 +145,36 @@ export async function tambahSantriSatuSatu(data: {
 
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
+  const tahunMasuk = new Date().getFullYear()
 
   await query(
-    `INSERT INTO santri (id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
-      nama_ayah, nama_ibu, alamat, sekolah, kelas_sekolah, asrama, kamar, status_global, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, nis.trim(), nama_lengkap.trim(), rest.nik?.trim() || null, rest.jenis_kelamin,
-     rest.tempat_lahir?.trim() || null, rest.tanggal_lahir || null,
-     rest.nama_ayah?.trim() || null, rest.nama_ibu?.trim() || null, rest.alamat?.trim() || null,
-     rest.sekolah?.toUpperCase().trim() || null, rest.kelas_sekolah?.trim() || null,
-     rest.asrama?.toUpperCase().trim() || null, rest.kamar?.trim() || null,
-     'aktif', now, now]
+    `INSERT INTO santri (
+      id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
+      nama_ayah, nama_ibu, alamat,
+      gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
+      jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
+      sekolah, kelas_sekolah, asrama, kamar, status_global, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id, nis.trim(), nama_lengkap.trim(),
+      rest.nik?.trim() || null, rest.jenis_kelamin,
+      rest.tempat_lahir?.trim() || null, rest.tanggal_lahir || null,
+      rest.nama_ayah?.trim() || null, rest.nama_ibu?.trim() || null, rest.alamat?.trim() || null,
+      rest.gol_darah?.toUpperCase().trim() || null,
+      rest.alamat_lengkap?.trim() || null,
+      rest.kecamatan?.trim() || null,
+      rest.kab_kota?.trim() || null,
+      rest.provinsi?.trim() || null,
+      rest.jemaah?.trim() || null,
+      rest.no_wa_ortu?.trim() || null,
+      rest.tanggal_masuk || `${tahunMasuk}-01-01`,
+      rest.tanggal_keluar || null,
+      rest.sekolah?.toUpperCase().trim() || null,
+      rest.kelas_sekolah?.trim() || null,
+      rest.asrama?.toUpperCase().trim() || null,
+      rest.kamar?.trim() || null,
+      'aktif', now, now
+    ]
   )
 
   if (kelas_pesantren?.trim()) {
