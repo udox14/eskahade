@@ -58,16 +58,13 @@ export default function LoketPembayaranPage() {
   // ============================================================
   useEffect(() => {
     if (selectedSantri) {
-      // Saat santri dipilih (masuk view detail), push state baru ke history browser
       window.history.pushState({ view: 'DETAIL' }, '')
     }
   }, [selectedSantri])
 
   useEffect(() => {
-    // Tangkap event tombol back HP/browser
     const handlePopState = (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'DETAIL') {
-        // Kembali ke list
         setSelectedSantri(null)
         setInfoTagihan(null)
         setNominalCicil('')
@@ -87,7 +84,6 @@ export default function LoketPembayaranPage() {
     setNominalCicil('')
   }
 
-  // Bayar Lunas Tahunan (EHB, KES, EKS)
   const handleLunasTahunanSemua = async () => {
     if (!infoTagihan) return
     if(!confirm(`Lunasi seluruh tagihan tahunan (EHB, Kesehatan, Ekskul) untuk ${selectedSantri.nama_lengkap}?`)) return
@@ -106,7 +102,6 @@ export default function LoketPembayaranPage() {
     }
   }
 
-  // Bayar Lunas Bangunan (Sisa)
   const handleLunasBangunan = async () => {
     const sisa = infoTagihan.bangunan.sisa
     if (sisa <= 0) return toast.info("Sudah lunas.")
@@ -129,7 +124,6 @@ export default function LoketPembayaranPage() {
     }
   }
 
-  // Bayar Bangunan (Cicilan Manual)
   const handleBayarBangunan = async () => {
     const bayar = parseInt(nominalCicil.replace(/\./g, ''))
     if (!bayar || bayar <= 0) return toast.warning("Nominal tidak valid")
@@ -152,7 +146,6 @@ export default function LoketPembayaranPage() {
     }
   }
 
-  // Bayar Tahunan (Per Item)
   const handleBayarTahunan = async (jenis: string, nominal: number) => {
     if (nominal <= 0) return toast.error("Tarif belum diatur untuk angkatan ini.")
     if (!confirm(`Terima pembayaran ${jenis} Tahun ${tahunTagihan} sebesar Rp ${nominal.toLocaleString()}?`)) return
@@ -172,11 +165,11 @@ export default function LoketPembayaranPage() {
   }
 
   const handleBackToList = () => {
-    // Gunakan history.back() agar konsisten dengan tombol back HP
     window.history.back()
   }
 
   const { paged: pagedDataList, totalPages: totalPagesDataList, safePage: safePageDataList } = usePagination(dataList, pageSize, page)
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       
@@ -261,60 +254,62 @@ export default function LoketPembayaranPage() {
                 ) : dataList.length === 0 ? (
                     <div className="py-20 text-center text-gray-400">Data tidak ditemukan.</div>
                 ) : (
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-600 font-bold border-b">
-                            <tr>
-                                <th className="px-6 py-3">Nama Santri</th>
-                                <th className="px-6 py-3 text-center">Bangunan</th>
-                                <th className="px-6 py-3 text-center">Tahunan {tahunTagihan}</th>
-                                <th className="px-6 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {pagedDataList.map((s) => (
-                                <tr key={s.id} onClick={() => handleSelect(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
-                                    <td className="px-6 py-3">
-                                        <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
-                                        <p className="text-xs text-gray-500">{s.asrama} - Kamar {s.kamar}</p>
-                                    </td>
-                                    
-                                    {/* STATUS BANGUNAN */}
-                                    <td className="px-6 py-3 text-center">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                                            s.status_bangunan === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' :
-                                            s.status_bangunan === 'CICIL' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                            'bg-gray-100 text-gray-500 border-gray-200'
-                                        }`}>
-                                            {s.status_bangunan}
-                                        </span>
-                                    </td>
-
-                                    {/* STATUS TAHUNAN */}
-                                    <td className="px-6 py-3 text-center">
-                                        <div className="flex justify-center gap-1">
-                                            <BadgeItem label="EHB" active={s.lunas_ehb} />
-                                            <BadgeItem label="KES" active={s.lunas_kesehatan} />
-                                            <BadgeItem label="EKS" active={s.lunas_ekskul} />
-                                        </div>
-                                    </td>
-
-                                    <td className="px-6 py-3 text-right">
-                                        <span className="text-indigo-600 font-bold text-xs flex items-center justify-end gap-1 group-hover:underline">
-                                            Bayar <ArrowLeft className="w-3 h-3 rotate-180"/>
-                                        </span>
-                                    </td>
+                    <>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-600 font-bold border-b">
+                                <tr>
+                                    <th className="px-6 py-3">Nama Santri</th>
+                                    <th className="px-6 py-3 text-center">Bangunan</th>
+                                    <th className="px-6 py-3 text-center">Tahunan {tahunTagihan}</th>
+                                    <th className="px-6 py-3 text-right">Aksi</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    <Pagination
-                      currentPage={safePageDataList}
-                      totalPages={totalPagesDataList}
-                      pageSize={pageSize}
-                      total={dataList.length}
-                      onPageChange={setPage}
-                      onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-                    />
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {pagedDataList.map((s) => (
+                                    <tr key={s.id} onClick={() => handleSelect(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
+                                        <td className="px-6 py-3">
+                                            <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
+                                            <p className="text-xs text-gray-500">{s.asrama} - Kamar {s.kamar}</p>
+                                        </td>
+                                        
+                                        {/* STATUS BANGUNAN */}
+                                        <td className="px-6 py-3 text-center">
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
+                                                s.status_bangunan === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                s.status_bangunan === 'CICIL' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                                'bg-gray-100 text-gray-500 border-gray-200'
+                                            }`}>
+                                                {s.status_bangunan}
+                                            </span>
+                                        </td>
+
+                                        {/* STATUS TAHUNAN */}
+                                        <td className="px-6 py-3 text-center">
+                                            <div className="flex justify-center gap-1">
+                                                <BadgeItem label="EHB" active={s.lunas_ehb} />
+                                                <BadgeItem label="KES" active={s.lunas_kesehatan} />
+                                                <BadgeItem label="EKS" active={s.lunas_ekskul} />
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-3 text-right">
+                                            <span className="text-indigo-600 font-bold text-xs flex items-center justify-end gap-1 group-hover:underline">
+                                                Bayar <ArrowLeft className="w-3 h-3 rotate-180"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <Pagination
+                          currentPage={safePageDataList}
+                          totalPages={totalPagesDataList}
+                          pageSize={pageSize}
+                          total={dataList.length}
+                          onPageChange={setPage}
+                          onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                        />
+                    </>
                 )}
             </div>
          </div>
