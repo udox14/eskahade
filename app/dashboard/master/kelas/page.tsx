@@ -34,7 +34,7 @@ export default function MasterKelasPage() {
     const toastId = toast.loading("Menambahkan kelas...")
     const res = await tambahKelas(formData)
     toast.dismiss(toastId)
-    if (res?.error) toast.error(res.error)
+    if ('error' in res) toast.error(res.error)
     else {
       toast.success("Kelas berhasil ditambahkan")
       loadData()
@@ -48,7 +48,7 @@ export default function MasterKelasPage() {
     const toastId = toast.loading("Menghapus...")
     const res = await hapusKelas(id)
     toast.dismiss(toastId)
-    if (res?.error) toast.error("Gagal", { description: res.error })
+    if ('error' in res) toast.error("Gagal", { description: res.error })
     else {
       toast.success("Kelas dihapus")
       loadData()
@@ -92,9 +92,9 @@ export default function MasterKelasPage() {
     const res = await importKelasMassal(excelData)
     setIsProcessing(false)
     toast.dismiss(toastId)
-    if (res?.error) toast.error("Gagal Import", { description: res.error })
+    if ('error' in res) toast.error("Gagal Import", { description: res.error })
     else {
-      toast.success(`Sukses! ${res.count} kelas ditambahkan.`)
+      toast.success(`Sukses! ${(res as any).count} kelas ditambahkan.`)
       setExcelData([])
       loadData()
       setMode('manual')

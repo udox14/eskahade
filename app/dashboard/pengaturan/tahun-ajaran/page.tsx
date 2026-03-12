@@ -32,7 +32,7 @@ export default function TahunAjaranPage() {
     setIsSaving(true)
     const res = await tambahTahunAjaran(nama.trim())
     setIsSaving(false)
-    if (res?.error) toast.error(res.error)
+    if ('error' in res) toast.error(res.error)
     else {
       toast.success(`Tahun ajaran "${nama}" berhasil ditambahkan.`)
       setNama('')
@@ -45,7 +45,7 @@ export default function TahunAjaranPage() {
     setLoadingAktif(id)
     const res = await aktifkanTahunAjaran(id)
     setLoadingAktif(null)
-    if (res?.error) toast.error(res.error)
+    if ('error' in res) toast.error(res.error)
     else {
       toast.success(`Tahun ajaran "${nama}" sekarang aktif.`)
       loadData()
@@ -57,7 +57,7 @@ export default function TahunAjaranPage() {
     setLoadingHapus(id)
     const res = await hapusTahunAjaran(id)
     setLoadingHapus(null)
-    if (res?.error) toast.error(res.error)
+    if ('error' in res) toast.error(res.error)
     else {
       toast.success('Tahun ajaran dihapus.')
       loadData()

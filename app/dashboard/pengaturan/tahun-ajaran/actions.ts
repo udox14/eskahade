@@ -37,7 +37,7 @@ export async function tambahTahunAjaran(nama: string) {
   return { success: true }
 }
 
-export async function aktifkanTahunAjaran(id: number) {
+export async function aktifkanTahunAjaran(id: number): Promise<{ success: boolean } | { error: string }> {
   // Nonaktifkan semua dulu
   await execute('UPDATE tahun_ajaran SET is_active = 0', [])
   // Aktifkan yang dipilih
@@ -49,7 +49,7 @@ export async function aktifkanTahunAjaran(id: number) {
   return { success: true }
 }
 
-export async function hapusTahunAjaran(id: number) {
+export async function hapusTahunAjaran(id: number): Promise<{ success: boolean } | { error: string }> {
   // Cek apakah aktif
   const ta = await queryOne<any>('SELECT * FROM tahun_ajaran WHERE id = ?', [id])
   if (!ta) return { error: 'Tahun ajaran tidak ditemukan.' }
