@@ -358,7 +358,7 @@ export default function TesKlasifikasiPage() {
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="cursor-pointer">
-                      <input type="radio" name="nahwu_pengalaman" value="on" defaultChecked={selectedSantri.hasil?.nahwu_pengalaman === true} className="peer sr-only"/>
+                      <input type="radio" name="nahwu_pengalaman" value="on" defaultChecked={!!selectedSantri.hasil?.nahwu_pengalaman} className="peer sr-only"/>
                       <div className="p-4 rounded-xl border-2 border-slate-200 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition-all hover:border-amber-200 active:scale-95">
                         <span className="block text-sm md:text-base font-black text-slate-800 peer-checked:text-amber-800 mb-1">SUDAH PERNAH</span>
                         <span className="text-[10px] md:text-xs text-slate-500 font-medium">Lanjut Tes Spesifik</span>

@@ -318,7 +318,7 @@ export default function SPPPage() {
                 </div>
                 <div className="divide-y">
                     {santriInKamar?.map((s: any) => {
-                        const isPaid = s.status_bayar === 'LUNAS' || s.bulan_ini_lunas
+                        const isPaid = s.bulan_ini_lunas
                         const isDraft = !!drafts[s.id]
                         
                         return (
