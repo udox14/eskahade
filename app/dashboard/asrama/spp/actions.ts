@@ -25,13 +25,13 @@ export async function getRingkasanTunggakan(asramaFilter?: string) {
   const santriList = await query<any>(sql, params)
   if (!santriList.length) return 0
 
-  const santriIds = santriList.map((s: any) => s.id)
-  const ph = santriIds.map(() => '?').join(',')
+  let joinSQL = `SELECT sl.santri_id, sl.bulan FROM spp_log sl
+                 INNER JOIN santri s ON s.id = sl.santri_id
+                 WHERE sl.tahun = ? AND s.status_global = 'aktif'`
+  const joinParams: any[] = [tahun]
+  if (asramaFilter && asramaFilter !== 'SEMUA') { joinSQL += ' AND s.asrama = ?'; joinParams.push(asramaFilter) }
 
-  const logs = await query<any>(
-    `SELECT santri_id, bulan FROM spp_log WHERE tahun = ? AND santri_id IN (${ph})`,
-    [tahun, ...santriIds]
-  )
+  const logs = await query<any>(joinSQL, joinParams)
 
   let penunggakCount = 0
   santriList.forEach((s: any) => {
@@ -55,13 +55,13 @@ export async function getDashboardSPP(tahun: number, asrama: string) {
   const santriList = await query<any>(sql, params)
   if (!santriList.length) return []
 
-  const santriIds = santriList.map((s: any) => s.id)
-  const ph = santriIds.map(() => '?').join(',')
+  let joinSQL = `SELECT sl.santri_id, sl.bulan FROM spp_log sl
+                 INNER JOIN santri s ON s.id = sl.santri_id
+                 WHERE sl.tahun = ? AND s.status_global = 'aktif'`
+  const joinParams: any[] = [tahun]
+  if (asrama && asrama !== 'SEMUA') { joinSQL += ' AND s.asrama = ?'; joinParams.push(asrama) }
 
-  const logs = await query<any>(
-    `SELECT santri_id, bulan FROM spp_log WHERE tahun = ? AND santri_id IN (${ph})`,
-    [tahun, ...santriIds]
-  )
+  const logs = await query<any>(joinSQL, joinParams)
 
   return santriList.map((s: any) => {
     const bayarAnak = logs.filter((l: any) => l.santri_id === s.id)

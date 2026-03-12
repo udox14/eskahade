@@ -112,11 +112,16 @@ export async function importKenaikanKelas(dataExcel: any[]) {
 
   if (!recordsToInsert.length) return { error: 'Tidak ada data valid untuk diproses.' }
 
-  const phUpdate = recordsToUpdate.map(() => '?').join(',')
-  await execute(
-    `UPDATE riwayat_pendidikan SET status_riwayat = 'naik' WHERE id IN (${phUpdate})`,
-    recordsToUpdate
-  )
+  // Chunk UPDATE agar tidak kena limit 999 SQL variables
+  const CHUNK = 200
+  for (let i = 0; i < recordsToUpdate.length; i += CHUNK) {
+    const chunk = recordsToUpdate.slice(i, i + CHUNK)
+    const phUpdate = chunk.map(() => '?').join(',')
+    await execute(
+      `UPDATE riwayat_pendidikan SET status_riwayat = 'naik' WHERE id IN (${phUpdate})`,
+      chunk
+    )
+  }
 
   for (const rec of recordsToInsert) {
     await execute(`

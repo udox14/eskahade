@@ -106,17 +106,21 @@ export async function getMonitoringPembayaran(
   const santriList = await query<any>(sql, params)
   if (!santriList.length) return []
 
-  const santriIds = santriList.map((s: any) => s.id)
-  const ph = santriIds.map(() => '?').join(',')
+  // Ambil semua pembayaran sekaligus pakai JOIN, bukan IN (biar tidak kena limit SQL variables)
+  let paySQL = `SELECT p.santri_id, p.jenis_biaya, p.nominal_bayar, p.tahun_tagihan
+                FROM pembayaran_tahunan p
+                INNER JOIN santri s ON s.id = p.santri_id
+                WHERE s.status_global = 'aktif'`
+  const payParams: any[] = []
 
-  const payBangunan = await query<any>(
-    `SELECT santri_id, nominal_bayar FROM pembayaran_tahunan WHERE santri_id IN (${ph}) AND jenis_biaya = 'BANGUNAN'`,
-    santriIds
-  )
-  const payTahunan = await query<any>(
-    `SELECT santri_id, jenis_biaya FROM pembayaran_tahunan WHERE santri_id IN (${ph}) AND tahun_tagihan = ?`,
-    [...santriIds, tahunTagihan]
-  )
+  if (asrama && asrama !== 'SEMUA') { paySQL += ' AND s.asrama = ?'; payParams.push(asrama) }
+  if (kamar && kamar !== 'SEMUA') { paySQL += ' AND s.kamar = ?'; payParams.push(kamar) }
+  if (search) { paySQL += ' AND s.nama_lengkap LIKE ?'; payParams.push(`%${search}%`) }
+
+  const allPay = await query<any>(paySQL, payParams)
+
+  const payBangunan = allPay.filter((p: any) => p.jenis_biaya === 'BANGUNAN')
+  const payTahunan = allPay.filter((p: any) => p.tahun_tagihan === tahunTagihan)
 
   return santriList.map((s: any) => {
     const tahunMasuk = s.tahun_masuk || new Date(s.created_at).getFullYear()

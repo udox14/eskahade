@@ -23,13 +23,12 @@ export async function getDashboardTabungan(asramaRequest: string) {
 
   if (!santriList.length) return { santri: [], stats: null }
 
-  const santriIds = santriList.map((s: any) => s.id)
-  const ph = santriIds.map(() => '?').join(',')
-
-  const logs = await query<any>(
-    `SELECT santri_id, jenis, nominal, created_at FROM tabungan_log WHERE santri_id IN (${ph})`,
-    santriIds
-  )
+  const logs = await query<any>(`
+    SELECT tl.santri_id, tl.jenis, tl.nominal, tl.created_at
+    FROM tabungan_log tl
+    INNER JOIN santri s ON s.id = tl.santri_id
+    WHERE s.asrama = ? AND s.status_global = 'aktif'
+  `, [targetAsrama])
 
   const now = new Date()
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()

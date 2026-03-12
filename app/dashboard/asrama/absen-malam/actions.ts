@@ -23,20 +23,19 @@ export async function getDataAbsenMalam(asramaRequest: string) {
 
   if (!santriList.length) return []
 
-  const santriIds = santriList.map((s: any) => s.id)
-  const ph = santriIds.map(() => '?').join(',')
-
   const absenList = await query<any>(`
-    SELECT santri_id, status, updated_at
-    FROM absen_asrama
-    WHERE santri_id IN (${ph})
-  `, santriIds)
+    SELECT aa.santri_id, aa.status, aa.updated_at
+    FROM absen_asrama aa
+    INNER JOIN santri s ON s.id = aa.santri_id
+    WHERE s.asrama = ? AND s.status_global = 'aktif'
+  `, [targetAsrama])
 
   const izinList = await query<any>(`
-    SELECT santri_id, jenis
-    FROM perizinan
-    WHERE status = 'AKTIF' AND santri_id IN (${ph})
-  `, santriIds)
+    SELECT p.santri_id, p.jenis
+    FROM perizinan p
+    INNER JOIN santri s ON s.id = p.santri_id
+    WHERE p.status = 'AKTIF' AND s.asrama = ? AND s.status_global = 'aktif'
+  `, [targetAsrama])
 
   const todayResetTime = new Date()
   todayResetTime.setHours(12, 0, 0, 0)
