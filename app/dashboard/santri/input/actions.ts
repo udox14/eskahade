@@ -54,7 +54,7 @@ export async function getKelasList() {
   return data.sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
-export async function importSantriMassal(dataSantri: SantriImportData[]) {
+export async function importSantriMassal(dataSantri: SantriImportData[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!dataSantri || dataSantri.length === 0) return { error: 'Data kosong tidak bisa disimpan.' }
 
   const kelasList = await query<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas')
@@ -135,8 +135,8 @@ export async function importSantriMassal(dataSantri: SantriImportData[]) {
       }
       inserted++
     } catch (err: any) {
-      if (err.message?.includes('UNIQUE')) return { error: `NIS ${s.nis} sudah terdaftar di database.` }
-      return { error: `Gagal menyimpan: ${err.message}` }
+      if (err.message?.includes('UNIQUE')) continue // NIS sudah ada, skip saja
+      return { error: `Gagal menyimpan NIS ${s.nis}: ${err.message}` }
     }
   }
 

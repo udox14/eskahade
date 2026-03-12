@@ -117,14 +117,38 @@ export default function InputSantriPage() {
 
   const handleSaveExcel = async () => {
     if (excelData.length === 0) return toast.warning("Data kosong")
-    if (!confirm(`Import ${excelData.length} santri beserta kelasnya?`)) return
+    if (!confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nData yang NIS-nya sudah ada akan dilewati otomatis.`)) return
+
     setIsSavingExcel(true)
-    const id = toast.loading("Menyimpan data...")
-    const result = await importSantriMassal(excelData)
+    const BATCH_SIZE = 50
+    const total = excelData.length
+    let inserted = 0
+
+    const toastId = toast.loading(`Memproses 0 / ${total} santri...`)
+
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+      const batch = excelData.slice(i, i + BATCH_SIZE)
+      const result = await importSantriMassal(batch)
+
+      if ('error' in result) {
+        toast.dismiss(toastId)
+        toast.error("Import terhenti", { description: result.error })
+        setIsSavingExcel(false)
+        return
+      }
+
+      inserted += result.count ?? 0
+      toast.loading(`Memproses ${Math.min(i + BATCH_SIZE, total)} / ${total} santri...`, { id: toastId })
+    }
+
     setIsSavingExcel(false)
-    toast.dismiss(id)
-    if (result?.error) toast.error("Gagal", { description: result.error })
-    else { toast.success("Berhasil!", { description: `Sukses import ${result.count} santri.` }); router.push('/dashboard/santri') }
+    toast.dismiss(toastId)
+    const skipped = total - inserted
+    const desc = skipped > 0
+      ? `${inserted} santri ditambahkan, ${skipped} dilewati (NIS sudah ada).`
+      : `${inserted} santri berhasil diimport.`
+    toast.success("Import selesai!", { description: desc })
+    router.push('/dashboard/santri')
   }
 
   return (
