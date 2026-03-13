@@ -1,0 +1,362 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah } from './actions'
+import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
+const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
+type Waktu = typeof WAKTU[number]
+
+const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shb', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
+
+function bulanIni() { return new Date().toISOString().slice(0, 7) }
+function getDaysInMonth(bulan: string) {
+  const [y, m] = bulan.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+function formatBulan(bulan: string) {
+  const [y, m] = bulan.split('-').map(Number)
+  return new Date(y, m - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+}
+function prevBulan(b: string) {
+  const [y, m] = b.split('-').map(Number)
+  const d = new Date(y, m - 2)
+  return d.toISOString().slice(0, 7)
+}
+function nextBulan(b: string) {
+  const [y, m] = b.split('-').map(Number)
+  const d = new Date(y, m)
+  return d.toISOString().slice(0, 7)
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  'A': 'bg-red-500 text-white',
+  'S': 'bg-orange-400 text-white',
+  'H': 'bg-purple-400 text-white',
+  'P': 'bg-blue-400 text-white',
+  'ALFA': 'bg-red-500 text-white',
+}
+
+export default function RekapAsramaPage() {
+  const [sessionInfo, setSessionInfo] = useState<any>(null)
+  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [bulan, setBulan] = useState(bulanIni())
+  const [tab, setTab] = useState<'malam' | 'berjamaah'>('malam')
+  const [loading, setLoading] = useState(false)
+
+  // Malam data
+  const [malamSantri, setMalamSantri] = useState<any[]>([])
+  const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
+  const [malamDetail, setMalamDetail] = useState<Record<string, Record<string, string>>>({})
+
+  // Berjamaah data
+  const [bjSantri, setBjSantri] = useState<any[]>([])
+  const [bjDetail, setBjDetail] = useState<Record<string, Record<string, any>>>({})
+
+  const [expandedSantri, setExpandedSantri] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSessionRekap().then(s => {
+      setSessionInfo(s)
+      if (s?.asrama_binaan) setAsrama(s.asrama_binaan)
+    })
+  }, [])
+
+  const load = useCallback(async () => {
+    if (!asrama || !sessionInfo) return
+    setLoading(true)
+    const hideHaid = !sessionInfo.isPutri || sessionInfo.role === 'keamanan'
+    const [malam, bj] = await Promise.all([
+      getRekapAbsenMalam(asrama, bulan),
+      ASRAMA_PUTRI.includes(asrama) ? getRekapAbsenBerjamaah(asrama, bulan, hideHaid) : Promise.resolve({ santriList: [], detail: {} })
+    ])
+    setMalamSantri(malam.santriList)
+    setMalamAlfa(malam.alfaPerSantri)
+    setMalamDetail(malam.detailPerSantri)
+    setBjSantri(bj.santriList)
+    setBjDetail(bj.detail)
+    setExpandedSantri(null)
+    setLoading(false)
+  }, [asrama, bulan, sessionInfo])
+
+  useEffect(() => { load() }, [load])
+
+  const days = getDaysInMonth(bulan)
+  const daysArr = Array.from({ length: days }, (_, i) => {
+    const d = String(i + 1).padStart(2, '0')
+    return `${bulan}-${d}`
+  })
+
+  const grouped = (list: any[]) => list.reduce((acc, s) => {
+    const k = s.kamar || 'Tanpa Kamar'
+    if (!acc[k]) acc[k] = []
+    acc[k].push(s)
+    return acc
+  }, {} as Record<string, any[]>)
+
+  const sortedKamars = (list: any[]) =>
+    Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+
+  return (
+    <div className="space-y-5 max-w-7xl mx-auto pb-16">
+
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <BarChart3 className="w-7 h-7 text-indigo-600"/> Rekap Absen Asrama
+          </h1>
+          <p className="text-sm text-gray-500">Absen malam & shalat berjamaah</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Bulan nav */}
+          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
+            <button onClick={() => setBulan(prevBulan(bulan))} className="p-1.5 hover:bg-gray-100 rounded-lg">
+              <ChevronLeft className="w-4 h-4"/>
+            </button>
+            <span className="text-sm font-bold text-gray-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
+            <button onClick={() => setBulan(nextBulan(bulan))} disabled={bulan >= bulanIni()}
+              className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30">
+              <ChevronRight className="w-4 h-4"/>
+            </button>
+          </div>
+
+          {/* Asrama */}
+          {sessionInfo?.asrama_binaan
+            ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
+              </span>
+            : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm">
+                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+          }
+        </div>
+      </div>
+
+      {/* TABS */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+        <button onClick={() => setTab('malam')}
+          className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-gray-500 hover:text-gray-700'}`}>
+          <Moon className="w-4 h-4"/> Absen Malam
+        </button>
+        {ASRAMA_PUTRI.includes(asrama) && (
+          <button onClick={() => setTab('berjamaah')}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Sun className="w-4 h-4"/> Berjamaah
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-indigo-400"/></div>
+      ) : (
+
+        <>
+          {/* ── ABSEN MALAM ── */}
+          {tab === 'malam' && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-gray-800">{malamSantri.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">Total Santri</p>
+                </div>
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-red-600">
+                    {Object.values(malamAlfa).reduce((s, v) => s + v, 0)}
+                  </p>
+                  <p className="text-xs text-red-400 mt-1">Total Alfa</p>
+                </div>
+                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-orange-600">
+                    {Object.keys(malamAlfa).length}
+                  </p>
+                  <p className="text-xs text-orange-400 mt-1">Santri Pernah Alfa</p>
+                </div>
+              </div>
+
+              {/* Per kamar */}
+              {sortedKamars(malamSantri).map(kamar => {
+                const santriKamar = grouped(malamSantri)[kamar]
+                return (
+                  <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center">
+                      <span className="font-bold">Kamar {kamar}</span>
+                      <span className="text-xs text-slate-400">{santriKamar.length} santri</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs min-w-[500px]">
+                        <thead className="bg-slate-50 border-b">
+                          <tr>
+                            <th className="px-3 py-2 text-left sticky left-0 bg-slate-50 z-10 w-40">Nama</th>
+                            <th className="px-2 py-2 text-center font-bold text-red-600 w-10">Σ Alfa</th>
+                            {daysArr.map(d => (
+                              <th key={d} className="px-1 py-2 text-center text-slate-400 font-normal w-7">
+                                {d.slice(8)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {santriKamar.map((s: any) => {
+                            const alfa = malamAlfa[s.id] || 0
+                            const detail = malamDetail[s.id] || {}
+                            return (
+                              <tr key={s.id} className="hover:bg-slate-50">
+                                <td className="px-3 py-2 sticky left-0 bg-white z-10">
+                                  <p className="font-semibold text-gray-800 truncate max-w-[150px]">{s.nama_lengkap}</p>
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                  {alfa > 0
+                                    ? <span className="bg-red-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full">{alfa}</span>
+                                    : <span className="text-slate-300">—</span>
+                                  }
+                                </td>
+                                {daysArr.map(d => {
+                                  const st = detail[d]
+                                  return (
+                                    <td key={d} className="px-1 py-2 text-center">
+                                      {st === 'ALFA'
+                                        ? <span className="inline-block w-5 h-5 rounded bg-red-500 text-white text-[9px] font-black leading-5">A</span>
+                                        : <span className="text-slate-200">·</span>
+                                      }
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* ── ABSEN BERJAMAAH ── */}
+          {tab === 'berjamaah' && (
+            <div className="space-y-4">
+              {!ASRAMA_PUTRI.includes(asrama) ? (
+                <div className="py-12 text-center text-gray-400 bg-white border rounded-2xl">
+                  Absen berjamaah hanya untuk asrama putri (ASY-SYIFA 1–4).
+                </div>
+              ) : (
+                <>
+                  {/* Summary 4 waktu */}
+                  <div className="grid grid-cols-4 gap-3">
+                    {WAKTU.map(w => {
+                      const total = bjSantri.length * days
+                      const nonHadir = bjSantri.reduce((s, santri) => {
+                        return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] !== null).length
+                      }, 0)
+                      const alfa = bjSantri.reduce((s, santri) => {
+                        return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] === 'A').length
+                      }, 0)
+                      return (
+                        <div key={w} className="bg-white border rounded-xl p-3 text-center shadow-sm">
+                          <p className="text-sm text-gray-500 font-semibold capitalize">{w}</p>
+                          <p className="text-xl font-black text-red-600 tabular-nums">{alfa}</p>
+                          <p className="text-[10px] text-gray-400">alfa bulan ini</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Per kamar — grid 4 waktu */}
+                  {sortedKamars(bjSantri).map(kamar => {
+                    const santriKamar = grouped(bjSantri)[kamar]
+                    return (
+                      <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                        <div className="bg-teal-900 text-white px-4 py-2.5 flex justify-between items-center">
+                          <span className="font-bold">Kamar {kamar}</span>
+                          <span className="text-xs text-teal-300">{santriKamar.length} santri</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs min-w-[600px]">
+                            <thead className="bg-slate-50 border-b">
+                              <tr>
+                                <th className="px-3 py-2 text-left sticky left-0 bg-slate-50 z-10 w-36">Nama</th>
+                                {WAKTU.map(w => (
+                                  <th key={w} className="px-1 py-2 text-center font-bold text-slate-500 w-10">{WAKTU_LABEL[w]}</th>
+                                ))}
+                                {daysArr.map(d => (
+                                  <th key={d} className="px-0.5 py-2 text-center text-slate-400 font-normal w-5 text-[10px]">
+                                    {d.slice(8)}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {santriKamar.map((s: any) => {
+                                const detail = bjDetail[s.id] || {}
+                                // Count per waktu
+                                const counts: Record<Waktu, Record<string, number>> = {
+                                  shubuh: {}, ashar: {}, maghrib: {}, isya: {}
+                                }
+                                Object.values(detail).forEach((d: any) => {
+                                  WAKTU.forEach(w => {
+                                    if (d[w]) counts[w][d[w]] = (counts[w][d[w]] || 0) + 1
+                                  })
+                                })
+                                return (
+                                  <tr key={s.id} className="hover:bg-slate-50">
+                                    <td className="px-3 py-2 sticky left-0 bg-white z-10">
+                                      <p className="font-semibold text-gray-800 truncate max-w-[130px]">{s.nama_lengkap}</p>
+                                    </td>
+                                    {WAKTU.map(w => {
+                                      const a = counts[w]['A'] || 0
+                                      const nonH = Object.values(counts[w]).reduce((s, v) => s + v, 0)
+                                      return (
+                                        <td key={w} className="px-1 py-2 text-center">
+                                          {a > 0
+                                            ? <span className="inline-block bg-red-500 text-white font-black text-[9px] px-1 py-0.5 rounded-full min-w-[16px]">{a}</span>
+                                            : nonH > 0
+                                              ? <span className="inline-block bg-orange-200 text-orange-700 font-bold text-[9px] px-1 py-0.5 rounded-full min-w-[16px]">{nonH}</span>
+                                              : <span className="text-slate-200">—</span>
+                                          }
+                                        </td>
+                                      )
+                                    })}
+                                    {daysArr.map(d => {
+                                      const dayData = detail[d]
+                                      const hasIssue = dayData && WAKTU.some(w => dayData[w] !== null)
+                                      if (!hasIssue) return <td key={d} className="px-0.5 py-2 text-center"><span className="text-slate-200 text-[9px]">·</span></td>
+                                      return (
+                                        <td key={d} className="px-0.5 py-1 text-center">
+                                          <div className="flex flex-col gap-0.5 items-center">
+                                            {WAKTU.map(w => {
+                                              const st = dayData?.[w]
+                                              if (!st) return null
+                                              return (
+                                                <span key={w} className={`inline-block text-[8px] font-black w-4 h-4 rounded leading-4 text-center ${STATUS_COLOR[st] || 'bg-gray-200 text-gray-600'}`}>
+                                                  {st}
+                                                </span>
+                                              )
+                                            })}
+                                          </div>
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

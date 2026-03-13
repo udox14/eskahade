@@ -1,191 +1,232 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { getDataAbsenMalam, updateAbsenMalam, getUserRestriction } from './actions'
-import { Moon, Home, User, Check, X, Loader2, AlertCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { getSessionInfo, getDataAbsenMalam, batchSaveAbsenMalam } from './actions'
+import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
-export default function AbsenMalamPage() {
-  const [selectedAsrama, setSelectedAsrama] = useState(ASRAMA_LIST[0])
-  const [userAsrama, setUserAsrama] = useState<string | null>(null) // Asrama Binaan User
-  
-  const [dataSantri, setDataSantri] = useState<any[]>([])
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [loading, setLoading] = useState(false)
-  const [processingId, setProcessingId] = useState<string | null>(null)
-  const [currentKamarIndex, setCurrentKamarIndex] = useState(0)
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
 
-  // 1. Cek User Permission saat Load
+export default function AbsenMalamPage() {
+  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asramaBinaan, setAsramaBinaan] = useState<string | null>(null)
+  const [tanggal, setTanggal] = useState(todayStr())
+  const [santriList, setSantriList] = useState<any[]>([])
+  const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedKamars, setSavedKamars] = useState<Set<string>>(new Set())
+  const [kamarIdx, setKamarIdx] = useState(0)
+
   useEffect(() => {
-    getUserRestriction().then(asrama => {
-      if (asrama) {
-        setUserAsrama(asrama)
-        setSelectedAsrama(asrama) // Paksa pilih asrama binaan
-      }
+    getSessionInfo().then(s => {
+      if (s?.asrama_binaan) { setAsramaBinaan(s.asrama_binaan); setAsrama(s.asrama_binaan) }
     })
   }, [])
 
-  // 2. Load Data (Dependensi: selectedAsrama)
-  useEffect(() => {
-    loadData()
-  }, [selectedAsrama])
-
-  const loadData = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
-    const res = await getDataAbsenMalam(selectedAsrama)
-    setDataSantri(res)
+    const res = await getDataAbsenMalam(asrama, tanggal)
+    setSantriList(res)
+    const map: Record<string, string> = {}
+    res.forEach((s: any) => { map[s.id] = s.status })
+    setLocalStatus(map)
+    setSavedKamars(new Set())
+    setKamarIdx(0)
     setLoading(false)
-    setCurrentKamarIndex(0)
-  }
+  }, [asrama, tanggal])
 
-  // Handle Klik Absen
-  const handleAbsen = async (santriId: string, status: 'HADIR' | 'TIDAK') => {
-    setProcessingId(santriId)
-    setDataSantri(prev => prev.map(s => s.id === santriId ? { ...s, status: status } : s))
-    await updateAbsenMalam(santriId, status)
-    setProcessingId(null)
-  }
+  useEffect(() => { load() }, [load])
 
-  // Grouping & Sorting
-  const groupedData = dataSantri.reduce((acc, santri) => {
-    const k = santri.kamar || "Tanpa Kamar"
+  const grouped = santriList.reduce((acc, s) => {
+    const k = s.kamar || 'Tanpa Kamar'
     if (!acc[k]) acc[k] = []
-    acc[k].push(santri)
+    acc[k].push(s)
     return acc
   }, {} as Record<string, any[]>)
 
-  const sortedKamars = Object.keys(groupedData).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+  const kamars = Object.keys(grouped).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+  const activeKamar = kamars[kamarIdx]
+  const santriKamar = activeKamar ? grouped[activeKamar] : []
 
-  // Statistik Realtime
-  const totalSantri = dataSantri.length
-  const hadir = dataSantri.filter(s => s.status === 'HADIR').length
-  const tidak = dataSantri.filter(s => s.status === 'TIDAK').length
-  const izin = dataSantri.filter(s => s.is_izin).length
-  
-  // Data Kamar Aktif
-  const activeKamar = sortedKamars[currentKamarIndex]
-  const santriInKamar = activeKamar ? groupedData[activeKamar] : []
+  const hadir = Object.values(localStatus).filter(v => v === 'HADIR').length
+  const alfa = Object.values(localStatus).filter(v => v === 'ALFA').length
+  const izin = santriList.filter(s => s.is_izin).length
 
-  // Navigasi
-  const prevKamar = () => { if (currentKamarIndex > 0) setCurrentKamarIndex(prev => prev - 1) }
-  const nextKamar = () => { if (currentKamarIndex < sortedKamars.length - 1) setCurrentKamarIndex(prev => prev + 1) }
+  const toggle = (id: string) => {
+    if (santriList.find(s => s.id === id)?.is_izin) return
+    setLocalStatus(prev => ({ ...prev, [id]: prev[id] === 'ALFA' ? 'HADIR' : 'ALFA' }))
+    // Mark kamar unsaved when changed
+    setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
+  }
+
+  const saveKamar = async () => {
+    setSaving(true)
+    const records = santriKamar
+      .filter(s => !s.is_izin)
+      .map(s => ({ santri_id: s.id, status: localStatus[s.id] || 'HADIR' }))
+    const res = await batchSaveAbsenMalam(records, tanggal)
+    setSaving(false)
+    if ('error' in res) { toast.error(res.error); return }
+    setSavedKamars(prev => new Set([...prev, activeKamar]))
+    toast.success(`Kamar ${activeKamar} tersimpan`)
+    // Auto advance to next unsaved kamar
+    const nextIdx = kamars.findIndex((k, i) => i > kamarIdx && !savedKamars.has(k))
+    if (nextIdx !== -1) setKamarIdx(nextIdx)
+  }
 
   return (
-    <div className="space-y-6 max-w-lg mx-auto pb-32">
-      
-      {/* HEADER & FILTER */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Moon className="w-5 h-5 text-yellow-300"/> Absen Malam
-              </h1>
-              <p className="text-slate-400 text-xs">Pantauan per kamar.</p>
-            </div>
-            
-            {/* Dropdown Asrama (Locked jika User Terbatas) */}
-            <div className={`p-1 rounded-lg inline-flex items-center gap-2 ${userAsrama ? 'bg-green-800/50 border border-green-700' : 'bg-white/10'}`}>
-                {userAsrama ? <Lock className="w-3 h-3 ml-2 text-green-400"/> : <Home className="w-4 h-4 ml-2 text-slate-300"/>}
-                <select 
-                  value={selectedAsrama}
-                  onChange={(e) => setSelectedAsrama(e.target.value)}
-                  disabled={!!userAsrama} // Disable jika user punya asrama binaan
-                  className={`bg-transparent text-white font-bold text-sm outline-none p-2 w-32 ${userAsrama ? 'cursor-not-allowed opacity-90' : 'cursor-pointer [&>option]:text-black'}`}
-                >
-                  {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+    <div className="max-w-lg mx-auto pb-32 select-none">
+
+      {/* HEADER */}
+      <div className="bg-slate-900 text-white p-5 rounded-b-3xl shadow-xl mb-4 relative overflow-hidden">
+        <div className="relative z-10 space-y-3">
+          <div className="flex justify-between items-center">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Moon className="w-5 h-5 text-yellow-300"/> Absen Malam
+            </h1>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-sm font-bold ${asramaBinaan ? 'bg-green-800/60 text-green-300' : 'bg-white/10'}`}>
+              {asramaBinaan ? <Lock className="w-3 h-3"/> : <Home className="w-3.5 h-3.5 text-slate-400"/>}
+              {asramaBinaan
+                ? <span>{asramaBinaan}</span>
+                : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                    className="bg-transparent text-white text-sm outline-none cursor-pointer">
+                    {ASRAMA_LIST.map(a => <option key={a} value={a} className="text-black">{a}</option>)}
+                  </select>
+              }
             </div>
           </div>
-          
-          <div className="flex justify-between items-end">
-              <div>
-                <p className="text-xs text-slate-400">Total Hadir</p>
-                <p className="text-2xl font-bold">{hadir}<span className="text-sm text-slate-500 font-normal">/{totalSantri}</span></p>
-              </div>
-              <div className="flex gap-2 text-[10px] font-bold">
-                 <span className="bg-red-500/20 text-red-300 px-2 py-1 rounded">ALFA: {tidak}</span>
-                 <span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">IZIN: {izin}</span>
-              </div>
+
+          <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+            className="bg-white/10 text-white text-sm px-3 py-1.5 rounded-xl outline-none border border-white/20 w-full cursor-pointer"/>
+
+          <div className="flex gap-3">
+            <div className="flex-1 bg-white/10 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black">{hadir}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Hadir</p>
+            </div>
+            <div className="flex-1 bg-red-500/20 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-red-300">{alfa}</p>
+              <p className="text-[10px] text-red-400 font-bold uppercase">Alfa</p>
+            </div>
+            <div className="flex-1 bg-blue-500/20 rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-blue-300">{izin}</p>
+              <p className="text-[10px] text-blue-400 font-bold uppercase">Izin</p>
+            </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"/>
       </div>
 
-      {/* NAVIGATION CONTROLS */}
-      {!loading && sortedKamars.length > 0 && (
-         <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
-            <button onClick={prevKamar} disabled={currentKamarIndex === 0} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
-                <ChevronLeft className="w-6 h-6"/>
-            </button>
-            <div className="flex flex-col items-center">
-                <span className="text-xs text-gray-500 uppercase font-bold tracking-widest">Kamar Saat Ini</span>
-                <select value={currentKamarIndex} onChange={(e) => setCurrentKamarIndex(Number(e.target.value))} className="font-bold text-lg text-gray-800 text-center outline-none bg-transparent cursor-pointer">
-                    {sortedKamars.map((k, idx) => <option key={k} value={idx}>{k}</option>)}
-                </select>
-            </div>
-            <button onClick={nextKamar} disabled={currentKamarIndex === sortedKamars.length - 1} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600">
-                <ChevronRight className="w-6 h-6"/>
-            </button>
-         </div>
+      {/* KAMAR NAV */}
+      {!loading && kamars.length > 0 && (
+        <div className="flex items-center gap-2 px-4 mb-3">
+          <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
+            className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
+            <ChevronLeft className="w-5 h-5 text-slate-700"/>
+          </button>
+          <select value={kamarIdx} onChange={e => setKamarIdx(Number(e.target.value))}
+            className="flex-1 bg-white border rounded-xl px-3 py-2 text-sm font-bold text-center outline-none shadow cursor-pointer">
+            {kamars.map((k, i) => (
+              <option key={k} value={i}>
+                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({grouped[k]?.length || 0} santri)
+              </option>
+            ))}
+          </select>
+          <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
+            className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
+            <ChevronRight className="w-5 h-5 text-slate-700"/>
+          </button>
+        </div>
       )}
 
-      {/* LIST PER KAMAR */}
+      {/* CONTENT */}
       {loading ? (
-        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400"/></div>
-      ) : totalSantri === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-dashed text-gray-400">
-          Tidak ada santri terdaftar di asrama {selectedAsrama}.
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-slate-400"/></div>
+      ) : kamars.length === 0 ? (
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
+          Tidak ada santri di asrama ini.
         </div>
       ) : (
-        <div className="space-y-4">
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300" key={activeKamar}>
-              <div className="bg-slate-50 px-5 py-3 border-b flex justify-between items-center">
-                <h3 className="font-extrabold text-lg text-slate-800">KAMAR {activeKamar}</h3>
-                <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">{santriInKamar?.length || 0} Santri</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {santriInKamar?.map((santri: any) => (
-                  <div key={santri.id} className="p-4 flex items-center justify-between gap-3 transition-colors hover:bg-slate-50">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 border-2 ${
-                        santri.status === 'HADIR' ? 'bg-green-100 text-green-700 border-green-200' :
-                        santri.status === 'TIDAK' ? 'bg-red-100 text-red-700 border-red-200' :
-                        santri.is_izin ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                        'bg-gray-100 text-gray-400 border-gray-200'
-                      }`}>{santri.nis.slice(-2)}</div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-gray-800 truncate leading-tight">{santri.nama_lengkap}</p>
-                        {santri.is_izin ? (
-                          <p className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-0.5"><AlertCircle className="w-3 h-3"/> SEDANG IZIN</p>
-                        ) : (<p className="text-[10px] text-gray-400 font-mono mt-0.5">{santri.nis}</p>)}
-                      </div>
-                    </div>
-                    {!santri.is_izin ? (
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => handleAbsen(santri.id, 'TIDAK')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${santri.status === 'TIDAK' ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-300'}`}><X className="w-5 h-5"/></button>
-                        <button onClick={() => handleAbsen(santri.id, 'HADIR')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${santri.status === 'HADIR' ? 'bg-green-600 text-white shadow-lg' : 'bg-green-50 text-green-300'}`}><Check className="w-5 h-5"/></button>
-                      </div>
-                    ) : (
-                       <span className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold border border-blue-100">{santri.status.replace('IZIN: ', '')}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+        <div className="mx-4 bg-white rounded-2xl shadow border overflow-hidden" key={activeKamar}>
+          {/* Kamar header */}
+          <div className="bg-slate-800 text-white px-4 py-3 flex justify-between items-center">
+            <span className="font-black text-base">KAMAR {activeKamar}</span>
+            <div className="flex items-center gap-2">
+              {savedKamars.has(activeKamar) && (
+                <span className="text-[10px] bg-green-500/30 text-green-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3"/> Tersimpan
+                </span>
+              )}
+              <span className="text-xs text-slate-400">{santriKamar.length} santri</span>
             </div>
+          </div>
+
+          {/* Santri list */}
+          <div className="divide-y divide-slate-100">
+            {santriKamar.map((s: any) => {
+              const st = localStatus[s.id] || 'HADIR'
+              const isAlfa = st === 'ALFA'
+              const isIzin = s.is_izin
+              return (
+                <button key={s.id} disabled={isIzin}
+                  onClick={() => toggle(s.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
+                    isAlfa ? 'bg-red-50' : isIzin ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  }`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 border-2 ${
+                    isAlfa ? 'bg-red-500 text-white border-red-400' :
+                    isIzin ? 'bg-blue-100 text-blue-600 border-blue-200' :
+                    'bg-green-100 text-green-700 border-green-200'
+                  }`}>{s.nis?.slice(-2) || '??'}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{s.nama_lengkap}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
+                  </div>
+                  <span className={`text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ${
+                    isAlfa ? 'bg-red-500 text-white' :
+                    isIzin ? 'bg-blue-100 text-blue-600' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {isIzin ? 'IZIN' : isAlfa ? 'ALFA' : 'HADIR'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* FOOTER NAVIGATION */}
-      {!loading && sortedKamars.length > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
-           <div className="bg-slate-900 text-white p-2 rounded-full shadow-2xl flex items-center gap-4 border border-slate-700">
-              <button onClick={prevKamar} disabled={currentKamarIndex === 0} className="p-3 bg-slate-800 rounded-full hover:bg-slate-700 disabled:opacity-30 transition-colors"><ChevronLeft className="w-6 h-6"/></button>
-              <div className="text-center px-2 min-w-[100px]"><p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">KAMAR</p><p className="text-lg font-bold leading-none">{activeKamar}</p></div>
-              <button onClick={nextKamar} disabled={currentKamarIndex === sortedKamars.length - 1} className="p-3 bg-white text-slate-900 rounded-full hover:bg-gray-100 disabled:opacity-30 transition-colors font-bold shadow-lg"><ChevronRight className="w-6 h-6"/></button>
-           </div>
+      {/* FIXED BOTTOM: SAVE + NAV */}
+      {!loading && kamars.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
+          <div className="max-w-lg mx-auto flex gap-3">
+            <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
+              className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">
+              <ChevronLeft className="w-5 h-5 text-slate-600"/>
+            </button>
+            <button onClick={saveKamar} disabled={saving}
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 ${
+                savedKamars.has(activeKamar)
+                  ? 'bg-green-600 text-white'
+                  : 'bg-slate-900 text-white'
+              }`}>
+              {saving
+                ? <Loader2 className="w-5 h-5 animate-spin"/>
+                : savedKamars.has(activeKamar)
+                  ? <><CheckCircle className="w-5 h-5"/> TERSIMPAN</>
+                  : <><Save className="w-5 h-5"/> SIMPAN KAMAR {activeKamar}</>
+              }
+            </button>
+            <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
+              className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">
+              <ChevronRight className="w-5 h-5 text-slate-600"/>
+            </button>
+          </div>
         </div>
       )}
     </div>
