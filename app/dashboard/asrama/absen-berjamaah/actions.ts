@@ -32,10 +32,13 @@ export async function getDataAbsenBerjamaah(asrama: string, tanggal: string) {
   const ids = santriList.map((s: any) => s.id)
   const ph = ids.map(() => '?').join(',')
 
-  const absenList = await query<any>(
-    `SELECT santri_id, shubuh, ashar, maghrib, isya FROM absen_berjamaah WHERE tanggal = ? AND santri_id IN (${ph})`,
-    [tanggal, ...ids]
-  )
+  let absenList: any[] = []
+  try {
+    absenList = await query<any>(
+      `SELECT santri_id, shubuh, ashar, maghrib, isya FROM absen_berjamaah WHERE tanggal = ? AND santri_id IN (${ph})`,
+      [tanggal, ...ids]
+    )
+  } catch (_) {}
 
   const absenMap: Record<string, any> = {}
   absenList.forEach((a: any) => { absenMap[a.santri_id] = a })

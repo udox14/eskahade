@@ -24,17 +24,25 @@ export async function getDataAbsenMalam(asrama: string, tanggal: string) {
   if (!santriList.length) return []
 
   const ids = santriList.map((s: any) => s.id)
-  const placeholders = ids.map(() => '?').join(',')
+  const ph = ids.map(() => '?').join(',')
 
-  const absenList = await query<any>(
-    `SELECT santri_id, status FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${placeholders})`,
-    [tanggal, ...ids]
-  )
+  // Graceful fallback jika tabel belum ada
+  let absenList: any[] = []
+  let izinList: any[] = []
 
-  const izinList = await query<any>(
-    `SELECT p.santri_id FROM perizinan p WHERE p.status = 'AKTIF' AND p.santri_id IN (${placeholders})`,
-    ids
-  )
+  try {
+    absenList = await query<any>(
+      `SELECT santri_id, status FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
+      [tanggal, ...ids]
+    )
+  } catch (_) {}
+
+  try {
+    izinList = await query<any>(
+      `SELECT p.santri_id FROM perizinan p WHERE p.status = 'AKTIF' AND p.santri_id IN (${ph})`,
+      ids
+    )
+  } catch (_) {}
 
   const absenMap: Record<string, string> = {}
   absenList.forEach((a: any) => { absenMap[a.santri_id] = a.status })

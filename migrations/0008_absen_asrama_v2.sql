@@ -1,6 +1,3 @@
--- Hapus data lama absen_asrama (harian, diganti per-tanggal)
-DELETE FROM absen_asrama;
-
 -- Absen Malam v2: per santri per tanggal
 CREATE TABLE IF NOT EXISTS absen_malam_v2 (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
