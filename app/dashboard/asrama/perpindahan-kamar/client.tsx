@@ -15,7 +15,7 @@ import {
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
 // ── Tipe ──────────────────────────────────────────────────────────────────────
-type KamarConfig = { nomor_kamar: string; kuota: number }
+type KamarConfig = { nomor_kamar: string; kuota: number; blok?: string }
 type SantriData = {
   id: string; nama_lengkap: string; nis: string; jenis_kelamin: string
   kamar_asli: string | null; sekolah: string | null; kelas_sekolah: string | null
@@ -57,6 +57,7 @@ export default function PerpindahanClient({
   const [modalKamar, setModalKamar] = useState<string | null>(null)
   const [dragSantriId, setDragSantriId] = useState<string | null>(null)
   const [dragOverKamar, setDragOverKamar] = useState<string | null>(null)
+  const [configOpen, setConfigOpen] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,7 +77,8 @@ export default function PerpindahanClient({
       setStep('config')
       setLocalKamar([])
     } else {
-      setLocalKamar(res.configs.map((c: any) => ({ nomor_kamar: c.nomor_kamar, kuota: c.kuota })))
+      setLocalKamar(res.configs.map((c: any) => ({ nomor_kamar: c.nomor_kamar, kuota: c.kuota, blok: c.blok || '' })))
+      setConfigOpen(false)
       if (res.drafts.length > 0) {
         setIsApplied(res.drafts.every((d: any) => d.applied === 1))
         setStep('plotting')
@@ -289,20 +291,28 @@ export default function PerpindahanClient({
               </div>
 
               {/* ─ STEP 1: KONFIGURASI ─ */}
-              <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${step !== 'config' ? 'opacity-80' : ''}`}>
+              <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50 cursor-pointer"
-                  onClick={() => setStep('config')}>
+                  onClick={() => setConfigOpen(v => !v)}>
                   <h3 className="font-bold text-gray-700 flex items-center gap-2">
                     <Settings className="w-4 h-4 text-indigo-500"/>
                     Step 1 — Konfigurasi Kamar
+                    {configs.length > 0 && !configOpen && (
+                      <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-semibold">
+                        {localKamar.length} kamar · {[...new Set(localKamar.map(k => k.blok).filter(Boolean))].length} blok
+                      </span>
+                    )}
                   </h3>
-                  <span className="text-xs text-gray-400">{localKamar.length} kamar dikonfigurasi</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{localKamar.length} kamar dikonfigurasi</span>
+                    {configOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
+                  </div>
                 </div>
-                {step === 'config' && (
+                {configOpen && (
                   <div className="p-5 space-y-4">
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-500">Tentukan daftar kamar dan kuota masing-masing.</p>
-                      <button onClick={() => setLocalKamar(prev => [...prev, { nomor_kamar: String(prev.length + 1), kuota: 10 }])}
+                      <button onClick={() => setLocalKamar(prev => [...prev, { nomor_kamar: String(prev.length + 1), kuota: 10, blok: '' }])}
                         className="flex items-center gap-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                         <Plus className="w-3.5 h-3.5"/> Tambah Kamar
                       </button>
@@ -324,6 +334,13 @@ export default function PerpindahanClient({
                             <input type="number" min={1} max={50} value={k.kuota}
                               onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, kuota: Number(e.target.value)} : x))}
                               className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <label className="text-[10px] text-gray-400 shrink-0">Blok:</label>
+                            <input value={k.blok || ''} placeholder="A/B/C (opt)"
+                              onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, blok: e.target.value.toUpperCase()} : x))}
+                              className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
+                              maxLength={3}/>
                           </div>
                         </div>
                       ))}
@@ -357,6 +374,37 @@ export default function PerpindahanClient({
                         Sistem akan mendistribusikan santri secara proporsional berdasarkan kelas sekolah.
                         Sebagian slot dikosongkan untuk santri baru.
                       </p>
+                      {(() => {
+                        const bloks = [...new Set(configs.map((k:any) => k.blok).filter(Boolean))]
+                        return bloks.length > 0 ? (
+                          <div className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                            <div className="w-4 h-4 mt-0.5 shrink-0 text-indigo-500">🔒</div>
+                            <div>
+                              <p className="text-xs font-semibold text-indigo-700 mb-1">Blok aktif — santri hanya dipindah dalam blok yang sama</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {bloks.map((blok:any) => {
+                                  const kamarBlok = configs.filter((k:any) => k.blok === blok)
+                                  return (
+                                    <span key={blok} className="text-[10px] bg-white border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded-lg">
+                                      Blok {blok}: Kamar {kamarBlok.map((k:any) => k.nomor_kamar).join(', ')}
+                                    </span>
+                                  )
+                                })}
+                                {configs.filter((k:any) => !k.blok).length > 0 && (
+                                  <span className="text-[10px] bg-white border border-gray-200 text-gray-500 font-medium px-2 py-0.5 rounded-lg">
+                                    Tanpa blok: Kamar {configs.filter((k:any) => !k.blok).map((k:any) => k.nomor_kamar).join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-500">
+                            <span>ℹ️</span> Tidak ada blok dikonfigurasi — semua santri didistribusikan bebas ke semua kamar.
+                            <button onClick={() => setConfigOpen(true)} className="text-indigo-600 font-semibold hover:underline ml-1">Set blok →</button>
+                          </div>
+                        )
+                      })()}
                       <div className="flex items-center gap-4 bg-indigo-50 rounded-xl p-4">
                         <div className="flex-1">
                           <label className="text-sm font-semibold text-indigo-800 block mb-1">
@@ -464,6 +512,11 @@ export default function PerpindahanClient({
                           <div className="flex items-center justify-between px-3 py-2 border-b border-inherit bg-white rounded-t-xl">
                             <div className="flex items-center gap-2">
                               <span className="font-black text-gray-800">Kamar {cfg.nomor_kamar}</span>
+                              {(cfg as any).blok && (
+                                <span className="text-[9px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded">
+                                  Blok {(cfg as any).blok}
+                                </span>
+                              )}
                               <KamarStatusBadge isi={santriKamar.length} kuota={cfg.kuota}/>
                             </div>
                             <div className="flex items-center gap-2 text-xs">
@@ -581,6 +634,7 @@ export default function PerpindahanClient({
                       <thead className="bg-gray-50 border-b text-xs text-gray-500 uppercase font-bold">
                         <tr>
                           <th className="px-4 py-3 text-left">Kamar</th>
+                          <th className="px-4 py-3 text-center">Blok</th>
                           <th className="px-4 py-3 text-center">Kuota</th>
                           <th className="px-4 py-3 text-center">Terisi</th>
                           <th className="px-4 py-3 text-center">Sisa</th>
@@ -597,6 +651,7 @@ export default function PerpindahanClient({
                           return (
                             <tr key={cfg.nomor_kamar} className="hover:bg-gray-50">
                               <td className="px-4 py-3 font-bold text-gray-800">Kamar {cfg.nomor_kamar}</td>
+                              <td className="px-4 py-3 text-center text-xs">{(cfg as any).blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{(cfg as any).blok}</span> : <span className="text-gray-300">—</span>}</td>
                               <td className="px-4 py-3 text-center text-gray-600">{cfg.kuota}</td>
                               <td className="px-4 py-3 text-center font-bold">{isi}</td>
                               <td className={`px-4 py-3 text-center font-bold ${cfg.kuota - isi < 0 ? 'text-red-500' : 'text-green-600'}`}>

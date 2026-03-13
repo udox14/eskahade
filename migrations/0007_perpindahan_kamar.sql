@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS kamar_config (
   asrama      TEXT NOT NULL,
   nomor_kamar TEXT NOT NULL,
   kuota       INTEGER NOT NULL DEFAULT 10,
+  blok        TEXT,                            -- opsional, misal A/B/C/D
   created_at  TEXT DEFAULT (datetime('now')),
   UNIQUE(asrama, nomor_kamar)
 );

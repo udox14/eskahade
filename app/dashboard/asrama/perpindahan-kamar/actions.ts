@@ -45,7 +45,7 @@ export async function getDataPerpindahan(asrama: string) {
 
 export async function simpanKonfigurasiKamar(
   asrama: string,
-  kamarList: { nomor_kamar: string; kuota: number }[]
+  kamarList: { nomor_kamar: string; kuota: number; blok?: string }[]
 ) {
   const session = await getSession()
   if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
@@ -56,7 +56,7 @@ export async function simpanKonfigurasiKamar(
     const stmts = [
       db.prepare('DELETE FROM kamar_config WHERE asrama = ?').bind(asrama),
       ...kamarList.map(k =>
-        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota) VALUES (?, ?, ?)').bind(asrama, k.nomor_kamar, k.kuota)
+        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota, blok) VALUES (?, ?, ?, ?)').bind(asrama, k.nomor_kamar, k.kuota, k.blok || null)
       )
     ]
     await db.batch(stmts)
@@ -84,48 +84,77 @@ export async function generateDraft(
   const kamarSlots = configs.map((k: any) => ({
     nomor: k.nomor_kamar,
     kuota: k.kuota,
+    blok: k.blok || null,
     efektif: Math.max(1, Math.floor(k.kuota * (1 - persenUntukBaru / 100))),
   }))
 
-  const totalSlot = kamarSlots.reduce((s: number, k: any) => s + k.efektif, 0)
+  // Pengelompokan blok: { 'A': [kamar1,kamar2,...], null: [...] }
+  const blokKamar: Record<string, typeof kamarSlots> = {}
+  for (const k of kamarSlots) {
+    const blokKey = k.blok || '__TANPA_BLOK__'
+    if (!blokKamar[blokKey]) blokKamar[blokKey] = []
+    blokKamar[blokKey].push(k)
+  }
 
-  // Kelompokkan santri berdasarkan kelas_sekolah untuk distribusi proporsional
-  const kelasGroups: Record<string, any[]> = {}
+  // Helper: interleave santri per kelas → campuran proporsional
+  function interleaveByKelas(list: any[]): any[] {
+    const groups: Record<string, any[]> = {}
+    for (const s of list) {
+      const key = s.kelas_sekolah || 'BELUM_SET'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(s)
+    }
+    const keys = Object.keys(groups).sort()
+    const maxLen = Math.max(...keys.map(k => groups[k].length), 0)
+    const result: any[] = []
+    for (let i = 0; i < maxLen; i++) {
+      for (const key of keys) { if (groups[key][i]) result.push(groups[key][i]) }
+    }
+    return result
+  }
+
+  // Helper: distribusi santri ke kamar dalam satu blok
+  function distribusiBlok(santriBlok: any[], kamarBlok: typeof kamarSlots, assignment: Record<string,string>) {
+    const shuffled = interleaveByKelas(santriBlok)
+    let idx = 0
+    for (const kamar of kamarBlok) {
+      for (let slot = 0; slot < kamar.efektif && idx < shuffled.length; slot++, idx++) {
+        assignment[shuffled[idx].id] = kamar.nomor
+      }
+    }
+    // Overflow: taruh di kamar tersedikit dalam blok ini (over capacity)
+    for (let i = idx; i < shuffled.length; i++) {
+      const counts: Record<string, number> = {}
+      for (const [sid, nom] of Object.entries(assignment)) {
+        if (kamarBlok.some(k => k.nomor === nom)) counts[nom] = (counts[nom] || 0) + 1
+      }
+      const min = kamarBlok.reduce((a, b) => (counts[a.nomor]||0) <= (counts[b.nomor]||0) ? a : b)
+      assignment[shuffled[i].id] = min.nomor
+    }
+  }
+
+  const assignment: Record<string, string> = {}
+
+  // Santri yang kamar lamanya ada di blok tertentu → ikut blok itu
+  // Santri tanpa kamar / kamar tidak dikenali blok → masuk pool __TANPA_BLOK__
+  const blokSantri: Record<string, any[]> = {}
+
+  // Bangun map: nomor kamar → blok
+  const kamarToBlok: Record<string, string> = {}
+  for (const k of kamarSlots) { kamarToBlok[k.nomor] = k.blok || '__TANPA_BLOK__' }
+
   for (const s of santriList) {
-    const key = s.kelas_sekolah || 'BELUM_SET'
-    if (!kelasGroups[key]) kelasGroups[key] = []
-    kelasGroups[key].push(s)
+    const blokSantriKey = s.kamar_asli && kamarToBlok[s.kamar_asli]
+      ? kamarToBlok[s.kamar_asli]
+      : '__TANPA_BLOK__'
+    if (!blokSantri[blokSantriKey]) blokSantri[blokSantriKey] = []
+    blokSantri[blokSantriKey].push(s)
   }
 
-  // Shuffle dalam setiap kelompok, lalu interleave agar kamar dapat campuran kelas
-  const shuffled: any[] = []
-  const groupKeys = Object.keys(kelasGroups).sort()
-  const maxLen = Math.max(...groupKeys.map(k => kelasGroups[k].length))
-  for (let i = 0; i < maxLen; i++) {
-    for (const key of groupKeys) {
-      if (kelasGroups[key][i]) shuffled.push(kelasGroups[key][i])
-    }
-  }
-
-  // Distribusikan ke kamar secara round-robin berdasarkan slot efektif
-  const assignment: Record<string, string> = {}  // santri_id -> kamar_baru
-  let idx = 0
-  for (const kamar of kamarSlots) {
-    for (let slot = 0; slot < kamar.efektif && idx < shuffled.length; slot++, idx++) {
-      assignment[shuffled[idx].id] = kamar.nomor
-    }
-  }
-
-  // Santri yang tidak tertampung (melebihi total slot efektif) → tetap di kamar lama atau kamar pertama
-  for (let i = idx; i < shuffled.length; i++) {
-    const s = shuffled[i]
-    // Taruh di kamar dengan isi paling sedikit (over capacity)
-    const counts: Record<string, number> = {}
-    for (const v of Object.values(assignment)) counts[v] = (counts[v] || 0) + 1
-    const kamarTersedikit = kamarSlots.reduce((min: any, k: any) =>
-      (counts[k.nomor] || 0) < (counts[min.nomor] || 0) ? k : min
-    , kamarSlots[0])
-    assignment[s.id] = kamarTersedikit.nomor
+  // Distribusikan per blok
+  for (const [blokKey, santriBlok] of Object.entries(blokSantri)) {
+    const targetKamar = blokKamar[blokKey] || kamarSlots  // fallback ke semua kamar jika blok tidak dikenali
+    distribusiBlok(santriBlok, targetKamar, assignment)
   }
 
   // Simpan ke kamar_draft (upsert)
