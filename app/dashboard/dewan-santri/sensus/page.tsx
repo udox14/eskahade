@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSensusData } from './actions'
-import { BarChart3, Users, Home, ArrowRightLeft, Loader2, BookOpen, Bed, X, Male, Female, User } from 'lucide-react'
+import { BarChart3, Users, Home, ArrowRightLeft, Loader2, BookOpen, Bed, X, User } from 'lucide-react'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 type SantriKamar = { id: string; nama_lengkap: string; nis: string; sekolah: string | null; kelas_sekolah: string | null }
