@@ -1,6 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { getCachedMasterPelanggaran } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -26,11 +27,7 @@ export async function cariSantri(keyword: string) {
 }
 
 export async function getMasterPelanggaran() {
-  return query<any>(`
-    SELECT id, nama_pelanggaran, kategori, poin
-    FROM master_pelanggaran
-    ORDER BY kategori DESC, nama_pelanggaran
-  `, [])
+  return getCachedMasterPelanggaran()
 }
 
 export async function simpanPelanggaran(formData: FormData) {

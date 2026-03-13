@@ -1,10 +1,11 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, execute, batch, generateId } from '@/lib/db'
+import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 export async function getReferensiData() {
-  const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama', [])
+  const mapel = await getCachedMapelList()
   const kelasRaw = await query<any>(`
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
     FROM kelas k
@@ -32,6 +33,7 @@ export async function getDataSantriPerKelas(kelasId: string) {
   }))
 }
 
+// FIX #9: Ganti for...of await execute -> batch()
 export async function simpanNilaiSemuaMapel(
   kelasId: string,
   semester: number,
@@ -73,13 +75,12 @@ export async function simpanNilaiSemuaMapel(
   if (errors.length > 0) return { error: `Ditemukan masalah:\n${errors.slice(0, 5).join('\n')}` }
   if (!toUpsert.length) return { error: 'Tidak ada data nilai yang terbaca. Pastikan nama kolom Excel sesuai nama Mata Pelajaran.' }
 
-  for (const item of toUpsert) {
-    await execute(`
-      INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(riwayat_pendidikan_id, mapel_id, semester) DO UPDATE SET nilai = excluded.nilai
-    `, [generateId(), item.riwayat_pendidikan_id, item.mapel_id, item.semester, item.nilai])
-  }
+  await batch(toUpsert.map(item => ({
+    sql: `INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(riwayat_pendidikan_id, mapel_id, semester) DO UPDATE SET nilai = excluded.nilai`,
+    params: [generateId(), item.riwayat_pendidikan_id, item.mapel_id, item.semester, item.nilai],
+  })))
 
   revalidatePath('/dashboard/akademik/nilai')
   return { success: true, count: toUpsert.length }

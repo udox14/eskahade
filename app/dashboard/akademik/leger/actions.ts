@@ -1,6 +1,7 @@
 'use server'
 
 import { query, execute, generateId } from '@/lib/db'
+import { getCachedMapelList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -27,9 +28,7 @@ export async function getKelasListForLeger() {
 }
 
 export async function getLegerData(kelasId: string, semester: number) {
-  const mapelList = await query<any>(
-    'SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama', []
-  )
+  const mapelList = await getCachedMapelList()
   if (!mapelList.length) return { mapel: [], siswa: [] }
 
   const santriList = await query<any>(`

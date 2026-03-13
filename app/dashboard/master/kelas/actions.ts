@@ -1,15 +1,12 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
-export async function getTahunAjaranAktif() {
-  return await queryOne<any>('SELECT * FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
-}
-
-export async function getMarhalahList() {
-  return await query('SELECT * FROM marhalah ORDER BY urutan')
-}
+// Pakai cache untuk data yang jarang berubah
+export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
+export { getCachedMarhalahList as getMarhalahList }
 
 export async function getKelasList() {
   const data = await query<any>(`
@@ -67,8 +64,9 @@ export async function importKelasMassal(dataExcel: any[]) {
   )
   if (!tahunAktif) return { error: 'Tidak ada tahun ajaran aktif.' }
 
-  const marhalahList = await query<{ id: string; nama: string }>('SELECT id, nama FROM marhalah')
-  const mapMarhalah = new Map(marhalahList.map(m => [m.nama.toLowerCase().trim(), m.id]))
+  // Pakai cache untuk marhalah list
+  const marhalahList = await getCachedMarhalahList()
+  const mapMarhalah = new Map(marhalahList.map((m: any) => [m.nama.toLowerCase().trim(), m.id]))
 
   const existingClasses = await query<{ nama_kelas: string; marhalah_id: string }>(
     'SELECT nama_kelas, marhalah_id FROM kelas WHERE tahun_ajaran_id = ?',

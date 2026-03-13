@@ -1,6 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 
 export async function getKelasForCetak() {
   const data = await query<any>(`
@@ -14,7 +15,7 @@ export async function getKelasForCetak() {
 }
 
 export async function getMarhalahForCetak() {
-  return query<any>('SELECT * FROM marhalah ORDER BY urutan', [])
+  return getCachedMarhalahList()
 }
 
 export async function getDataBlanko(kelasId: string) {

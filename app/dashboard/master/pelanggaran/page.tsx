@@ -1,11 +1,9 @@
-import { query } from '@/lib/db'
+import { getCachedMasterPelanggaran } from '@/lib/cache/master'
 import { tambahJenisPelanggaran, hapusJenisPelanggaran } from './actions'
 import { Trash2, Plus } from 'lucide-react'
 
 export default async function MasterPelanggaranPage() {
-  const list = await query<any>(
-    'SELECT * FROM master_pelanggaran ORDER BY kategori DESC, poin DESC', []
-  )
+  const list = await getCachedMasterPelanggaran()
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

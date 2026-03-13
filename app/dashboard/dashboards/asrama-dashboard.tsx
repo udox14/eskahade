@@ -1,4 +1,4 @@
-import { queryOne, query } from '@/lib/db'
+import { queryOne } from '@/lib/db'
 import { Home, Moon, Stethoscope, Users, MapPin, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { getRingkasanTunggakan } from '../asrama/spp/actions'
@@ -6,34 +6,31 @@ import { getRingkasanTunggakan } from '../asrama/spp/actions'
 export async function AsramaDashboard({ asrama }: { asrama: string }) {
   const today = new Date().toISOString().split('T')[0]
 
-  const { total: totalSantri } = await queryOne<{ total: number }>(
-    "SELECT COUNT(*) AS total FROM santri WHERE asrama = ? AND status_global = 'aktif'",
-    [asrama]
-  ) ?? { total: 0 }
+  // FIX #6: Hapus double-query (ambil santriIds lalu IN), ganti langsung COUNT + JOIN
+  // Semua 4 query dijalankan paralel sekaligus
+  const [santriRow, sakitRow, izinRow, tunggakanSPP] = await Promise.all([
+    queryOne<{ total: number }>(
+      "SELECT COUNT(*) AS total FROM santri WHERE asrama = ? AND status_global = 'aktif'",
+      [asrama]
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM absen_sakit abs
+       JOIN santri s ON s.id = abs.santri_id
+       WHERE abs.tanggal = ? AND s.asrama = ? AND s.status_global = 'aktif'`,
+      [today, asrama]
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM perizinan p
+       JOIN santri s ON s.id = p.santri_id
+       WHERE p.status = 'AKTIF' AND s.asrama = ? AND s.status_global = 'aktif'`,
+      [asrama]
+    ),
+    getRingkasanTunggakan(asrama),
+  ])
 
-  const santriIds = (await query<{ id: string }>(
-    'SELECT id FROM santri WHERE asrama = ?', [asrama]
-  )).map(s => s.id)
-
-  let countSakit = 0
-  let countIzin = 0
-
-  if (santriIds.length > 0) {
-    const ph = santriIds.map(() => '?').join(',')
-    const sakitRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM absen_sakit WHERE tanggal = ? AND santri_id IN (${ph})`,
-      [today, ...santriIds]
-    )
-    countSakit = sakitRow?.total || 0
-
-    const izinRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM perizinan WHERE status = 'AKTIF' AND santri_id IN (${ph})`,
-      santriIds
-    )
-    countIzin = izinRow?.total || 0
-  }
-
-  const tunggakanSPP = await getRingkasanTunggakan(asrama)
+  const totalSantri = santriRow?.total ?? 0
+  const countSakit = sakitRow?.total ?? 0
+  const countIzin = izinRow?.total ?? 0
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4">

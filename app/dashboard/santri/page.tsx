@@ -1,4 +1,5 @@
 import { query, queryOne } from '@/lib/db'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import Link from 'next/link'
 import { Plus, Pencil, Home } from 'lucide-react'
@@ -17,7 +18,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     userAsrama = session.asrama_binaan ?? null
   }
 
-  const marhalahList = await query<any>('SELECT id, nama FROM marhalah ORDER BY urutan', [])
+  const marhalahList = await getCachedMarhalahList()
   const kelasRaw = await query<any>('SELECT id, nama_kelas, marhalah_id FROM kelas', [])
   const kelasList = kelasRaw.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })

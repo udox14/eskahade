@@ -1,10 +1,11 @@
 'use server'
 
 import { query, execute, generateId, now } from '@/lib/db'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 export async function getMarhalahList() {
-  return query<any>('SELECT id, nama FROM marhalah ORDER BY urutan', [])
+  return getCachedMarhalahList()
 }
 
 export async function getKelasByMarhalah(marhalahId: string) {

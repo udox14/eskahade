@@ -1,29 +1,19 @@
 'use server'
 
-import { query, queryOne, execute } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getCachedMarhalahList, getCachedMapelAll, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 
-export async function getMarhalahList() {
-  return await query('SELECT * FROM marhalah ORDER BY urutan')
-}
-
-export async function getMapelList() {
-  return await query('SELECT * FROM mapel ORDER BY nama')
-}
-
-export async function getTahunAjaranAktif() {
-  return await queryOne<any>('SELECT * FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
-}
-
-export async function getTahunAjaranList() {
-  return await query<any>('SELECT * FROM tahun_ajaran ORDER BY id DESC')
-}
+// Pakai cache untuk data yang jarang berubah
+export { getCachedMarhalahList as getMarhalahList }
+export { getCachedMapelAll as getMapelList }
+export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
+export { getCachedTahunAjaranList as getTahunAjaranList }
 
 export async function getKitabList(marhalahId?: string, tahunAjaranId?: number) {
-  // Kalau tidak di-pass, default ke tahun aktif
   let tahunId = tahunAjaranId
   if (!tahunId) {
-    const aktif = await queryOne<any>('SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
+    const aktif = await getCachedTahunAjaranAktif()
     tahunId = aktif?.id
   }
 
@@ -54,7 +44,7 @@ export async function tambahKitab(formData: FormData): Promise<{ success: boolea
   const mapel = formData.get('mapel_id') as string
   const harga = parseInt(formData.get('harga') as string) || 0
 
-  const aktif = await queryOne<any>('SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
+  const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
   await query(
@@ -67,7 +57,6 @@ export async function tambahKitab(formData: FormData): Promise<{ success: boolea
 }
 
 export async function hapusKitab(id: string): Promise<{ success: boolean } | { error: string }> {
-  // Cek apakah kitab ini sudah dipakai di UPK
   const used = await queryOne<any>('SELECT id FROM upk_item WHERE kitab_id = ? LIMIT 1', [id])
   if (used) return { error: 'Kitab ini sudah pernah digunakan di transaksi UPK dan tidak bisa dihapus.' }
 
@@ -83,14 +72,17 @@ export async function updateHargaKitab(id: string, hargaBaru: number): Promise<{
 }
 
 export async function importKitabMassal(dataExcel: any[]): Promise<{ success: boolean; count: number; failed: number } | { error: string }> {
-  const aktif = await queryOne<any>('SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1')
+  const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
-  const mrh = await query<{ id: string; nama: string }>('SELECT id, nama FROM marhalah')
-  const mpl = await query<{ id: string; nama: string }>('SELECT id, nama FROM mapel')
+  // Pakai cache untuk marhalah dan mapel
+  const [mrh, mpl] = await Promise.all([
+    getCachedMarhalahList(),
+    getCachedMapelAll(),
+  ])
 
-  const mapMarhalah = new Map(mrh.map(m => [m.nama.toLowerCase().trim(), m.id]))
-  const mapMapel = new Map(mpl.map(m => [m.nama.toLowerCase().trim(), m.id]))
+  const mapMarhalah = new Map(mrh.map((m: any) => [m.nama.toLowerCase().trim(), m.id]))
+  const mapMapel = new Map(mpl.map((m: any) => [m.nama.toLowerCase().trim(), m.id]))
 
   const inserts: any[] = []
   let failCount = 0

@@ -1,6 +1,6 @@
 'use server'
 
-import { query } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 
 function getJenjang(sekolah: string | null) {
   if (!sekolah) return 'TIDAK_SEKOLAH'
@@ -24,44 +24,56 @@ const emptyStats = () => ({
 })
 
 export async function getSensusData(asramaFilter: string) {
-  let sql = `
-    SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, s.created_at,
-           rp.status_riwayat, m.nama AS marhalah_nama, k.nama_kelas
-    FROM santri s
-    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-    LEFT JOIN kelas k ON k.id = rp.kelas_id
-    LEFT JOIN marhalah m ON m.id = k.marhalah_id
-    WHERE s.status_global = 'aktif'
-  `
-  const params: any[] = []
-  if (asramaFilter && asramaFilter !== 'SEMUA') { sql += ' AND s.asrama = ?'; params.push(asramaFilter) }
-
-  const santriList = await query<any>(sql, params)
-  if (!santriList.length) return emptyStats()
-
+  const asramaClause = (asramaFilter && asramaFilter !== 'SEMUA') ? 'AND s.asrama = ?' : ''
+  const asramaParams = (asramaFilter && asramaFilter !== 'SEMUA') ? [asramaFilter] : []
   const now = new Date()
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  let keluarSql = `
-    SELECT COUNT(*) AS total FROM riwayat_surat rs
-    JOIN santri s ON s.id = rs.santri_id
-    WHERE rs.jenis_surat = 'BERHENTI' AND rs.created_at >= ?
-  `
-  const keluarParams: any[] = [startMonth]
-  if (asramaFilter && asramaFilter !== 'SEMUA') { keluarSql += ' AND s.asrama = ?'; keluarParams.push(asramaFilter) }
+  // FIX #4: Jalankan query agregasi dan detail secara paralel
+  const [santriList, statsRow, keluarRow] = await Promise.all([
+    // Detail per santri untuk distribusi kamar (tetap diperlukan karena strukturnya kompleks)
+    query<any>(`
+      SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
+             s.asrama, s.kamar, s.created_at,
+             m.nama AS marhalah_nama, k.nama_kelas
+      FROM santri s
+      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      LEFT JOIN kelas k ON k.id = rp.kelas_id
+      LEFT JOIN marhalah m ON m.id = k.marhalah_id
+      WHERE s.status_global = 'aktif' ${asramaClause}
+    `, asramaParams),
 
-  const keluarResult = await query<any>(keluarSql, keluarParams)
-  const jumlahKeluar = keluarResult[0]?.total || 0
+    // Agregasi angka ringkasan langsung di SQL
+    queryOne<{ total: number; L: number; P: number; masuk: number }>(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN s.jenis_kelamin = 'L' THEN 1 ELSE 0 END) AS L,
+        SUM(CASE WHEN s.jenis_kelamin = 'P' THEN 1 ELSE 0 END) AS P,
+        SUM(CASE WHEN s.created_at >= ? THEN 1 ELSE 0 END) AS masuk
+      FROM santri s
+      WHERE s.status_global = 'aktif' ${asramaClause}
+    `, [startMonth, ...asramaParams]),
+
+    // Hitung santri keluar bulan ini
+    queryOne<{ total: number }>(`
+      SELECT COUNT(*) AS total FROM riwayat_surat rs
+      JOIN santri s ON s.id = rs.santri_id
+      WHERE rs.jenis_surat = 'BERHENTI' AND rs.created_at >= ?
+      ${asramaClause}
+    `, [startMonth, ...asramaParams]),
+  ])
+
+  if (!santriList.length) return emptyStats()
 
   const stats = emptyStats()
-  stats.total = santriList.length
-  stats.keluar_bulan_ini = jumlahKeluar
-  stats.masuk_bulan_ini = santriList.filter((s: any) => s.created_at >= startMonth).length
+  stats.total = statsRow?.total ?? santriList.length
+  stats.jenis_kelamin.L = statsRow?.L ?? 0
+  stats.jenis_kelamin.P = statsRow?.P ?? 0
+  stats.masuk_bulan_ini = statsRow?.masuk ?? 0
+  stats.keluar_bulan_ini = keluarRow?.total ?? 0
 
+  // Hitung distribusi jenjang, marhalah, kamar dari list (sudah lebih kecil karena filter asrama)
   santriList.forEach((s: any) => {
-    if (s.jenis_kelamin === 'L') stats.jenis_kelamin.L++
-    else if (s.jenis_kelamin === 'P') stats.jenis_kelamin.P++
-
     const jenjang = getJenjang(s.sekolah)
     // @ts-ignore
     if (stats.jenjang[jenjang] !== undefined) stats.jenjang[jenjang]++
@@ -81,7 +93,10 @@ export async function getSensusData(asramaFilter: string) {
     stats.distribusi_kamar[namaAsrama][namaKamar] = (stats.distribusi_kamar[namaAsrama][namaKamar] || 0) + 1
     if (!stats.santri_kamar[namaAsrama]) stats.santri_kamar[namaAsrama] = {}
     if (!stats.santri_kamar[namaAsrama][namaKamar]) stats.santri_kamar[namaAsrama][namaKamar] = []
-    stats.santri_kamar[namaAsrama][namaKamar].push({ id: s.id, nama_lengkap: s.nama_lengkap, nis: s.nis, kelas_pesantren: s.nama_kelas || null, sekolah: s.sekolah, kelas_sekolah: s.kelas_sekolah })
+    stats.santri_kamar[namaAsrama][namaKamar].push({
+      id: s.id, nama_lengkap: s.nama_lengkap, nis: s.nis,
+      kelas_pesantren: s.nama_kelas || null, sekolah: s.sekolah, kelas_sekolah: s.kelas_sekolah
+    })
   })
 
   return stats

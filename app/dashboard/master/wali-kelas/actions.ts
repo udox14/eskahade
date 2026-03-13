@@ -2,7 +2,8 @@
 
 import { query, queryOne } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+import { getCachedDataGuru } from '@/lib/cache/master'
 
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -11,7 +12,7 @@ function generateEmail(name: string) {
 
 export async function getDataMaster() {
   const kelas = await query<any>(`
-    SELECT 
+    SELECT
       k.id, k.nama_kelas,
       m.nama as marhalah_nama,
       gs.id as guru_shubuh_id, gs.nama_lengkap as guru_shubuh_nama,
@@ -26,7 +27,8 @@ export async function getDataMaster() {
     LEFT JOIN users u ON k.wali_kelas_id = u.id
   `)
 
-  const guru = await query('SELECT id, nama_lengkap, gelar FROM data_guru ORDER BY nama_lengkap')
+  // Pakai cache untuk daftar guru
+  const guru = await getCachedDataGuru()
 
   const sortedKelas = kelas.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
@@ -38,120 +40,98 @@ export async function getDataMaster() {
 export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {
   await query(
     'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
-    [nama, gelar, kode || null]
+    [nama, gelar, kode]
+  )
+  revalidateTag('data-guru')
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true }
+}
+
+export async function hapusGuru(id: number): Promise<{ success: boolean } | { error: string }> {
+  const used = await queryOne<any>('SELECT id FROM kelas WHERE guru_shubuh_id = ? OR guru_ashar_id = ? OR guru_maghrib_id = ? LIMIT 1', [id, id, id])
+  if (used) return { error: 'Guru ini masih terdaftar sebagai pengajar di salah satu kelas.' }
+
+  await query('DELETE FROM data_guru WHERE id = ?', [id])
+  revalidateTag('data-guru')
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true }
+}
+
+export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean; count: number } | { error: string }> {
+  if (!ids.length) return { error: 'Tidak ada data.' }
+  const placeholders = ids.map(() => '?').join(',')
+  const usedCheck = await query<any>(`SELECT id FROM kelas WHERE guru_shubuh_id IN (${placeholders}) OR guru_ashar_id IN (${placeholders}) OR guru_maghrib_id IN (${placeholders}) LIMIT 1`, [...ids, ...ids, ...ids])
+  if (usedCheck.length > 0) return { error: 'Beberapa guru masih terdaftar sebagai pengajar aktif di kelas.' }
+
+  await query(`DELETE FROM data_guru WHERE id IN (${placeholders})`, ids)
+  revalidateTag('data-guru')
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true, count: ids.length }
+}
+
+export async function importGuruMassal(dataExcel: any[]): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+  if (!dataExcel.length) return { error: 'Data kosong.' }
+
+  const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
+  const existingNames = new Set(existing.map((g: any) => g.nama_lengkap.toLowerCase().trim()))
+
+  const toInsert: any[] = []
+  let skipped = 0
+
+  for (const row of dataExcel) {
+    const nama = String(row['NAMA'] || row['nama'] || '').trim()
+    const gelar = String(row['GELAR'] || row['gelar'] || '').trim()
+    const kode = String(row['KODE'] || row['kode'] || '').trim()
+    if (!nama) { skipped++; continue }
+    if (existingNames.has(nama.toLowerCase())) { skipped++; continue }
+    toInsert.push([nama, gelar, kode])
+    existingNames.add(nama.toLowerCase())
+  }
+
+  if (!toInsert.length) return { error: `Semua data dilewati (${skipped} duplikat atau kosong).` }
+
+  for (const row of toInsert) {
+    await query('INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)', row)
+  }
+
+  revalidateTag('data-guru')
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true, count: toInsert.length, skipped }
+}
+
+export async function setWaliKelas(kelasId: string, userId: string | null) {
+  await query('UPDATE kelas SET wali_kelas_id = ? WHERE id = ?', [userId, kelasId])
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true }
+}
+
+export async function setGuruKelas(kelasId: string, guruShubuhId: string | null, guruAsharId: string | null, guruMaghribId: string | null) {
+  await query(
+    'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
+    [guruShubuhId, guruAsharId, guruMaghribId, kelasId]
   )
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
 
-export async function hapusGuru(id: string): Promise<{ success: boolean } | { error: string }> {
-  try {
-    await query('DELETE FROM data_guru WHERE id = ?', [id])
-    revalidatePath('/dashboard/master/wali-kelas')
-    return { success: true }
-  } catch {
-    return { error: 'Gagal menghapus (Mungkin sedang dipakai di jadwal?)' }
-  }
+export async function getUsersForWaliKelas() {
+  return query<any>("SELECT id, full_name FROM users WHERE role IN ('wali_kelas', 'sekpen') ORDER BY full_name")
 }
 
-export async function hapusGuruBatch(ids: string[]): Promise<{ success: boolean; count: number } | { error: string }> {
-  if (!ids || ids.length === 0) return { error: 'Pilih minimal 1 guru' }
-  try {
-    const placeholders = ids.map(() => '?').join(',')
-    await query(`DELETE FROM data_guru WHERE id IN (${placeholders})`, ids)
-    revalidatePath('/dashboard/master/wali-kelas')
-    return { success: true, count: ids.length }
-  } catch {
-    return { error: 'Gagal menghapus (Mungkin sedang dipakai di jadwal?)' }
-  }
-}
+export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: boolean; email?: string } | { error: string }> {
+  const guru = await queryOne<any>('SELECT * FROM data_guru WHERE id = ?', [guruId])
+  if (!guru) return { error: 'Data guru tidak ditemukan.' }
 
-export async function importDataGuru(dataExcel: any[]): Promise<{ success: boolean; count: number; skipped: number; allDuplicate?: boolean } | { error: string }> {
-  if (!dataExcel || dataExcel.length === 0) return { error: 'Data kosong' }
+  const email = generateEmail(guru.nama_lengkap)
+  const existing = await queryOne('SELECT id FROM users WHERE email = ?', [email])
+  if (existing) return { error: `Akun dengan email ${email} sudah ada.` }
 
-  const parsed = dataExcel.map(row => ({
-    nama_lengkap: String(row['NAMA LENGKAP'] || row['nama'] || row['Nama'] || '').trim(),
-    gelar: row['GELAR'] || row['gelar'] || '',
-    kode_guru: row['KODE'] || row['kode'] || null
-  })).filter(d => d.nama_lengkap)
-
-  if (parsed.length === 0) return { error: 'Tidak ada data guru valid' }
-
-  const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
-  const existingNames = new Set(existing.map(g => g.nama_lengkap.toLowerCase().trim()))
-
-  const newOnly = parsed.filter(d => !existingNames.has(d.nama_lengkap.toLowerCase()))
-  const skippedCount = parsed.length - newOnly.length
-
-  if (newOnly.length === 0) {
-    return { success: true, count: 0, skipped: skippedCount, allDuplicate: true }
-  }
-
-  for (const g of newOnly) {
-    await query(
-      'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
-      [g.nama_lengkap, g.gelar, g.kode_guru]
-    )
-  }
+  const hashed = await hashPassword('sukahideng123')
+  await query(
+    "INSERT INTO users (id, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, 'wali_kelas')",
+    [crypto.randomUUID(), email, hashed, guru.nama_lengkap]
+  )
 
   revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true, count: newOnly.length, skipped: skippedCount }
-}
-
-export async function simpanJadwalBatch(listJadwal: any[]) {
-  let successCount = 0
-
-  for (const item of listJadwal) {
-    const { kelasId, shubuhId, asharId, maghribId } = item
-
-    try {
-      // A. Update jadwal guru di kelas
-      await query(
-        'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
-        [shubuhId || null, asharId || null, maghribId || null, kelasId]
-      )
-
-      // B. Auto wali kelas dari guru maghrib
-      if (maghribId) {
-        const guruData = await queryOne<{ nama_lengkap: string }>(
-          'SELECT nama_lengkap FROM data_guru WHERE id = ?',
-          [maghribId]
-        )
-
-        if (guruData) {
-          const email = generateEmail(guruData.nama_lengkap)
-
-          // Cek apakah user sudah ada
-          let user = await queryOne<{ id: string }>(
-            'SELECT id FROM users WHERE full_name = ? LIMIT 1',
-            [guruData.nama_lengkap]
-          )
-
-          if (!user) {
-            // Buat user baru dengan password default
-            const passwordHash = await hashPassword('password123')
-            const newId = crypto.randomUUID()
-            const now = new Date().toISOString()
-
-            await query(
-              'INSERT INTO users (id, email, password_hash, full_name, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [newId, email, passwordHash, guruData.nama_lengkap, 'wali_kelas', now, now]
-            )
-            user = { id: newId }
-          }
-
-          await query('UPDATE kelas SET wali_kelas_id = ? WHERE id = ?', [user.id, kelasId])
-        }
-      } else {
-        await query('UPDATE kelas SET wali_kelas_id = NULL WHERE id = ?', [kelasId])
-      }
-
-      successCount++
-    } catch (err) {
-      console.error('Error simpanJadwal untuk kelas', kelasId, err)
-    }
-  }
-
-  revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true, count: successCount }
+  return { success: true, email }
 }

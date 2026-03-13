@@ -1,11 +1,12 @@
 'use server'
 
 import { query, execute, generateId } from '@/lib/db'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 export async function getMarhalahList() {
-  return query<any>('SELECT * FROM marhalah ORDER BY urutan', [])
+  return getCachedMarhalahList()
 }
 
 export async function getJurnalGuru(startDate: string, endDate: string, marhalahId?: string) {

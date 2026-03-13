@@ -1,6 +1,6 @@
 'use server'
 
-import { query } from '@/lib/db'
+import { query, batch } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 type ImportRow = {
@@ -8,6 +8,7 @@ type ImportRow = {
   nama_kelas: string
 }
 
+// FIX #8: Ganti for...of await query INSERT -> batch()
 export async function importPenempatanKelas(data: ImportRow[]) {
   if (!data || data.length === 0) return { error: 'Data kosong.' }
 
@@ -39,12 +40,10 @@ export async function importPenempatanKelas(data: ImportRow[]) {
   }
 
   const now = new Date().toISOString()
-  for (const item of toInsert) {
-    await query(
-      'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
-      [crypto.randomUUID(), item.santri_id, item.kelas_id, 'aktif', now]
-    )
-  }
+  await batch(toInsert.map(item => ({
+    sql: 'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+    params: [crypto.randomUUID(), item.santri_id, item.kelas_id, 'aktif', now],
+  })))
 
   revalidatePath('/dashboard/santri')
   return { success: true, count: toInsert.length }

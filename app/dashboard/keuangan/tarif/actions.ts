@@ -1,12 +1,11 @@
 'use server'
 
 import { query, execute } from '@/lib/db'
+import { getCachedBiayaSettings } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 export async function getDaftarTarif() {
-  const data = await query<any>(
-    'SELECT * FROM biaya_settings ORDER BY tahun_angkatan DESC', []
-  )
+  const data = await getCachedBiayaSettings()
   if (!data.length) return []
 
   const grouped: Record<number, any> = {}

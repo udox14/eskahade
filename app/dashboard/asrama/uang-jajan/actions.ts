@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -10,50 +10,49 @@ async function getUserRestriction() {
   return null
 }
 
+// FIX #5: Hitung saldo langsung di SQL, ambil stats ringkasan juga di SQL
 export async function getDashboardTabungan(asramaRequest: string) {
   const restrictedAsrama = await getUserRestriction()
   const targetAsrama = restrictedAsrama || asramaRequest
 
-  const santriList = await query<any>(`
-    SELECT id, nama_lengkap, nis, kamar, asrama
-    FROM santri
-    WHERE asrama = ? AND status_global = 'aktif'
-    ORDER BY kamar, nama_lengkap
-  `, [targetAsrama])
-
-  if (!santriList.length) return { santri: [], stats: null }
-
-  const logs = await query<any>(`
-    SELECT tl.santri_id, tl.jenis, tl.nominal, tl.created_at
-    FROM tabungan_log tl
-    INNER JOIN santri s ON s.id = tl.santri_id
-    WHERE s.asrama = ? AND s.status_global = 'aktif'
-  `, [targetAsrama])
-
   const now = new Date()
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  let totalUangFisik = 0, masukBulanIni = 0, keluarBulanIni = 0
+  // Query santri + saldo masing-masing, dihitung langsung di SQL
+  const [santriRows, statsRow] = await Promise.all([
+    query<any>(`
+      SELECT
+        s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama,
+        CAST(s.kamar AS INTEGER) AS kamar_norm,
+        COALESCE(SUM(CASE WHEN tl.jenis = 'MASUK' THEN tl.nominal ELSE -tl.nominal END), 0) AS saldo
+      FROM santri s
+      LEFT JOIN tabungan_log tl ON tl.santri_id = s.id
+      WHERE s.asrama = ? AND s.status_global = 'aktif'
+      GROUP BY s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama
+      ORDER BY CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
+    `, [targetAsrama]),
 
-  const dataFinal = santriList.map((s: any) => {
-    const trans = logs.filter((l: any) => l.santri_id === s.id)
-    let saldo = 0
-    trans.forEach((t: any) => {
-      if (t.jenis === 'MASUK') {
-        saldo += t.nominal
-        if (t.created_at >= startMonth) masukBulanIni += t.nominal
-      } else {
-        saldo -= t.nominal
-        if (t.created_at >= startMonth) keluarBulanIni += t.nominal
-      }
-    })
-    totalUangFisik += saldo
-    return { ...s, saldo, kamar_norm: parseInt(s.kamar) || 999 }
-  })
+    // Statistik bulan ini sekaligus
+    queryOne<{ uang_fisik: number; masuk_bulan_ini: number; keluar_bulan_ini: number }>(`
+      SELECT
+        SUM(CASE WHEN tl.jenis = 'MASUK' THEN tl.nominal ELSE -tl.nominal END) AS uang_fisik,
+        SUM(CASE WHEN tl.jenis = 'MASUK' AND tl.created_at >= ? THEN tl.nominal ELSE 0 END) AS masuk_bulan_ini,
+        SUM(CASE WHEN tl.jenis = 'KELUAR' AND tl.created_at >= ? THEN tl.nominal ELSE 0 END) AS keluar_bulan_ini
+      FROM tabungan_log tl
+      INNER JOIN santri s ON s.id = tl.santri_id
+      WHERE s.asrama = ? AND s.status_global = 'aktif'
+    `, [startMonth, startMonth, targetAsrama]),
+  ])
+
+  if (!santriRows.length) return { santri: [], stats: null }
 
   return {
-    santri: dataFinal,
-    stats: { uang_fisik: totalUangFisik, masuk_bulan_ini: masukBulanIni, keluar_bulan_ini: keluarBulanIni },
+    santri: santriRows,
+    stats: {
+      uang_fisik: statsRow?.uang_fisik ?? 0,
+      masuk_bulan_ini: statsRow?.masuk_bulan_ini ?? 0,
+      keluar_bulan_ini: statsRow?.keluar_bulan_ini ?? 0,
+    },
   }
 }
 
@@ -70,17 +69,17 @@ export async function simpanTopup(santriId: string, nominal: number, keterangan:
   return { success: true }
 }
 
+// FIX #7c: Ganti for...of await execute -> batch()
 export async function simpanJajanMassal(listTransaksi: { santriId: string; nominal: number }[]): Promise<{ success: boolean; count: number } | { error: string }> {
   const session = await getSession()
   if (!listTransaksi.length) return { error: 'Tidak ada data.' }
 
-  for (const item of listTransaksi) {
-    await execute(
-      `INSERT INTO tabungan_log (id, santri_id, jenis, nominal, keterangan, created_by, created_at)
-       VALUES (?, ?, 'KELUAR', ?, 'Jajan Harian', ?, ?)`,
-      [generateId(), item.santriId, item.nominal, session?.id ?? null, new Date().toISOString()]
-    )
-  }
+  const now = new Date().toISOString()
+  await batch(listTransaksi.map(item => ({
+    sql: `INSERT INTO tabungan_log (id, santri_id, jenis, nominal, keterangan, created_by, created_at)
+          VALUES (?, ?, 'KELUAR', ?, 'Jajan Harian', ?, ?)`,
+    params: [generateId(), item.santriId, item.nominal, session?.id ?? null, now],
+  })))
 
   revalidatePath('/dashboard/asrama/uang-jajan')
   return { success: true, count: listTransaksi.length }

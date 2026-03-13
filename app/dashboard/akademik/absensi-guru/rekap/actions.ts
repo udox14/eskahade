@@ -1,6 +1,7 @@
 'use server'
 
 import { query } from '@/lib/db'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 
 function isLibur(dayOfWeek: number, session: 'shubuh' | 'ashar' | 'maghrib'): boolean {
   if (dayOfWeek === 2 && session === 'maghrib') return true
@@ -22,7 +23,7 @@ function hitungHariEfektif(startDate: string, endDate: string, session: 'shubuh'
 }
 
 export async function getMarhalahList() {
-  return query<any>('SELECT * FROM marhalah ORDER BY urutan', [])
+  return getCachedMarhalahList()
 }
 
 export async function getRekapKinerjaGuru(

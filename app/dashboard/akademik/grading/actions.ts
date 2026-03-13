@@ -1,6 +1,7 @@
 'use server'
 
 import { query, execute } from '@/lib/db'
+import { getCachedMapelAll } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -38,7 +39,7 @@ export async function getDataGrading(kelasId: string) {
   const riwayatIds = listSantri.map((s: any) => s.id)
   const ph = riwayatIds.map(() => '?').join(',')
 
-  const mapelRef = await query<any>('SELECT id, nama FROM mapel', [])
+  const mapelRef = await getCachedMapelAll()
   const mapelIlmuAlatIds = mapelRef
     .filter((m: any) => m.nama.toLowerCase().includes('nahwu') || m.nama.toLowerCase().includes('sharaf'))
     .map((m: any) => m.id)
