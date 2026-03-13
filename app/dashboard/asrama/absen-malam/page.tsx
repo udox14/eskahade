@@ -51,7 +51,7 @@ export default function AbsenMalamPage() {
 
   const kamars = Object.keys(grouped).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
   const activeKamar = kamars[kamarIdx]
-  const santriKamar = activeKamar ? grouped[activeKamar] : []
+  const santriKamar: any[] = activeKamar ? grouped[activeKamar] : []
 
   const hadir = Object.values(localStatus).filter(v => v === 'HADIR').length
   const alfa = Object.values(localStatus).filter(v => v === 'ALFA').length
