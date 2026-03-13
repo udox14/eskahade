@@ -21,8 +21,9 @@ export async function getSppSettings(tahun: number) {
   return row ?? { nominal: 70000, tahun_kalender: tahun }
 }
 
-// ─── Monitoring setoran: 1 query agregasi per asrama ─────────────────────
-// Rows read: ~santri aktif (2339) + spp_log bulan itu via index
+// ─── Monitoring setoran: CTE flat, tidak ada correlated subquery ──────────
+// Row reads: santri aktif + spp_log bulan ini + bulan lalu (via composite index)
+// Jauh lebih efisien dari versi EXISTS per-row sebelumnya.
 export async function getMonitoringSetoran(tahun: number, bulan: number) {
   const bulanSebelumnya = bulan === 1 ? 12 : bulan - 1
   const tahunSebelumnya = bulan === 1 ? tahun - 1 : tahun
@@ -36,56 +37,43 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     bayar_tunggakan_lalu: number
     total_nominal: number
   }>(`
+    WITH
+      bayar_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ?
+      ),
+      bayar_lalu AS (
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ?
+      ),
+      nominal_asrama AS (
+        SELECT s2.asrama, SUM(sl.nominal_bayar) AS total_nominal
+        FROM spp_log sl
+        INNER JOIN santri s2 ON s2.id = sl.santri_id AND s2.status_global = 'aktif'
+        WHERE sl.tahun = ? AND sl.bulan = ?
+        GROUP BY s2.asrama
+      )
     SELECT
       s.asrama,
-      COUNT(*)                                                          AS total_santri,
-      SUM(s.bebas_spp)                                                  AS bebas_spp,
-      COUNT(*) - SUM(s.bebas_spp)                                       AS wajib_bayar,
-
-      SUM(
-        CASE WHEN s.bebas_spp = 0
-          AND EXISTS (
-            SELECT 1 FROM spp_log sl
-            WHERE sl.santri_id = s.id
-              AND sl.tahun = ? AND sl.bulan = ?
-          )
-        THEN 1 ELSE 0 END
-      ) AS bayar_bulan_ini,
-
-      -- Bayar tunggakan bulan lalu: ada catatan bulan lalu, tapi TIDAK ada bulan ini
-      -- (artinya mereka nyicil tunggakan, bukan bayar rutin)
-      SUM(
-        CASE WHEN s.bebas_spp = 0
-          AND EXISTS (
-            SELECT 1 FROM spp_log sl
-            WHERE sl.santri_id = s.id
-              AND sl.tahun = ? AND sl.bulan = ?
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM spp_log sl2
-            WHERE sl2.santri_id = s.id
-              AND sl2.tahun = ? AND sl2.bulan = ?
-          )
-        THEN 1 ELSE 0 END
-      ) AS bayar_tunggakan_lalu,
-
-      COALESCE((
-        SELECT SUM(sl3.nominal_bayar)
-        FROM spp_log sl3
-        INNER JOIN santri s2 ON s2.id = sl3.santri_id
-        WHERE s2.asrama = s.asrama
-          AND s2.status_global = 'aktif'
-          AND sl3.tahun = ? AND sl3.bulan = ?
-      ), 0) AS total_nominal
-
+      COUNT(*)                                                                          AS total_santri,
+      SUM(s.bebas_spp)                                                                  AS bebas_spp,
+      COUNT(*) - SUM(s.bebas_spp)                                                       AS wajib_bayar,
+      SUM(CASE WHEN s.bebas_spp = 0 AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END)    AS bayar_bulan_ini,
+      SUM(CASE WHEN s.bebas_spp = 0 AND bl.santri_id IS NOT NULL
+                                    AND bi.santri_id IS NULL  THEN 1 ELSE 0 END)        AS bayar_tunggakan_lalu,
+      COALESCE(na.total_nominal, 0)                                                     AS total_nominal
     FROM santri s
+    LEFT JOIN bayar_ini      bi ON bi.santri_id = s.id
+    LEFT JOIN bayar_lalu     bl ON bl.santri_id = s.id
+    LEFT JOIN nominal_asrama na ON na.asrama    = s.asrama
     WHERE s.status_global = 'aktif'
-    GROUP BY s.asrama
+    GROUP BY s.asrama, na.total_nominal
     ORDER BY s.asrama
   `, [
     tahun, bulan,
     tahunSebelumnya, bulanSebelumnya,
-    tahun, bulan,
     tahun, bulan,
   ])
 

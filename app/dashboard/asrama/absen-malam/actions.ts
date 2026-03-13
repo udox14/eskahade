@@ -39,8 +39,12 @@ export async function getDataAbsenMalam(asrama: string, tanggal: string) {
 
   try {
     izinList = await query<any>(
-      `SELECT p.santri_id FROM perizinan p WHERE p.status = 'AKTIF' AND p.santri_id IN (${ph})`,
-      ids
+      `SELECT p.santri_id FROM perizinan p
+       WHERE p.status = 'AKTIF'
+         AND p.tgl_mulai <= ?
+         AND p.tgl_selesai_rencana >= ?
+         AND p.santri_id IN (${ph})`,
+      [tanggal, tanggal, ...ids]
     )
   } catch (_) {}
 

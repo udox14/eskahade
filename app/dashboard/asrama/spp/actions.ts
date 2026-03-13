@@ -46,9 +46,12 @@ export async function getDashboardSPP(tahun: number, asrama: string) {
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
 
   const asramaClause = (asrama && asrama !== 'SEMUA') ? 'AND s.asrama = ?' : ''
-  const params: any[] = []
+  // Urutan params harus mengikuti urutan ? dalam SQL dari atas ke bawah:
+  // 1. tahun, maxCheck  -> subquery jumlah_bayar
+  // 2. tahun, currentMonth -> subquery bulan_ini_lunas
+  // 3. asrama (opsional) -> WHERE clause
+  const params: any[] = [tahun, maxCheck, tahun, currentMonth]
   if (asrama && asrama !== 'SEMUA') params.push(asrama)
-  params.push(tahun, maxCheck, tahun, currentMonth)
 
   const rows = await query<any>(`
     SELECT

@@ -55,7 +55,7 @@ export default function AbsenMalamPage() {
 
   const hadir = Object.values(localStatus).filter(v => v === 'HADIR').length
   const alfa = Object.values(localStatus).filter(v => v === 'ALFA').length
-  const izin = santriList.filter(s => s.is_izin).length
+  const izin = Object.values(localStatus).filter(v => v === 'IZIN').length
 
   const toggle = (id: string) => {
     if (santriList.find(s => s.id === id)?.is_izin) return
