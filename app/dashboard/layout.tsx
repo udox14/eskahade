@@ -14,16 +14,17 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const user = await queryOne<{ full_name: string; role: string }>(
-    'SELECT full_name, role FROM users WHERE id = ?',
+  const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null }>(
+    'SELECT full_name, role, avatar_url FROM users WHERE id = ?',
     [session.id]
   );
 
   const userRole = user?.role || 'wali_kelas';
   const userName = user?.full_name || 'User';
+  const avatarUrl = user?.avatar_url || null;
 
   return (
-    <ClientLayout userRole={userRole} userEmail="" userName={userName}>
+    <ClientLayout userRole={userRole} userEmail="" userName={userName} avatarUrl={avatarUrl}>
       {children}
     </ClientLayout>
   );

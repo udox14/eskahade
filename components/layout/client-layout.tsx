@@ -12,9 +12,10 @@ interface ClientLayoutProps {
   userRole: string;
   userEmail: string;
   userName: string;
+  avatarUrl?: string | null;
 }
 
-export function ClientLayout({ children, userRole, userEmail, userName }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
@@ -73,7 +74,8 @@ export function ClientLayout({ children, userRole, userEmail, userName }: Client
           <div className="w-full">
             <Header 
                 userName={userName} 
-                userRole={userRole} 
+                userRole={userRole}
+                avatarUrl={avatarUrl}
                 onMenuClick={() => setIsMobileOpen(true)}
             />
           </div>
