@@ -19,11 +19,12 @@ const emptyStats = () => ({
   kelas_sekolah: {} as Record<string, number>,
   marhalah: {} as Record<string, number>,
   distribusi_kamar: {} as Record<string, Record<string, number>>,
+  santri_kamar: {} as Record<string, Record<string, {id:string,nama_lengkap:string,nis:string,sekolah:string|null,kelas_sekolah:string|null}[]>>,
 })
 
 export async function getSensusData(asramaFilter: string) {
   let sql = `
-    SELECT s.id, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, s.created_at,
            rp.status_riwayat, m.nama AS marhalah_nama
     FROM santri s
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
@@ -74,6 +75,9 @@ export async function getSensusData(asramaFilter: string) {
     const namaKamar = s.kamar || '?'
     if (!stats.distribusi_kamar[namaAsrama]) stats.distribusi_kamar[namaAsrama] = {}
     stats.distribusi_kamar[namaAsrama][namaKamar] = (stats.distribusi_kamar[namaAsrama][namaKamar] || 0) + 1
+    if (!stats.santri_kamar[namaAsrama]) stats.santri_kamar[namaAsrama] = {}
+    if (!stats.santri_kamar[namaAsrama][namaKamar]) stats.santri_kamar[namaAsrama][namaKamar] = []
+    stats.santri_kamar[namaAsrama][namaKamar].push({ id: s.id, nama_lengkap: s.nama_lengkap, nis: s.nis, sekolah: s.sekolah, kelas_sekolah: s.kelas_sekolah })
   })
 
   return stats

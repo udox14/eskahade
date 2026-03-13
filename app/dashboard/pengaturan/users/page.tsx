@@ -315,6 +315,7 @@ export default function ManajemenUserPage() {
       {/* TABEL LIST */}
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
+          <>
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-600 font-bold border-b">
               <tr>
@@ -423,6 +424,7 @@ export default function ManajemenUserPage() {
             onPageChange={setPage}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
           />
+          </>
         </div>
       </div>
 

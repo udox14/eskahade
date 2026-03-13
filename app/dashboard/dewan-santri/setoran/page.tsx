@@ -156,6 +156,7 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
     <div className="border-t p-4 bg-gray-50/50 animate-in slide-in-from-top-2">
       <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
+          <>
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
@@ -226,6 +227,7 @@ function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
             onPageChange={setPage}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
           />
+          </>
         </div>
       </div>
 

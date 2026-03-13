@@ -151,6 +151,7 @@ export default function PerizinanPage() {
       {/* TABEL LIST */}
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
+          <>
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-600 font-bold border-b">
               <tr>
@@ -243,6 +244,7 @@ export default function PerizinanPage() {
             onPageChange={setPage}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
           />
+          </>
         </div>
       </div>
 

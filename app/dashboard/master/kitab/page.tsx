@@ -236,7 +236,8 @@ export default function MasterKitabPage() {
                 </div>
 
                 <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                    <table className="w-full text-sm text-left">
+                    <>
+<table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 text-gray-600 font-bold border-b">
                             <tr>
                                 <th className="px-4 py-3">Nama Kitab</th>
@@ -298,6 +299,7 @@ export default function MasterKitabPage() {
                 onPageChange={setPage}
                 onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
               />
+                    </>
                 </div>
             </div>
 

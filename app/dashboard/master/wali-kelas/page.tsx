@@ -18,6 +18,7 @@ export default function ManajemenGuruPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([])
+  const [guruSearch, setGuruSearch] = useState("")
   
   const [loading, setLoading] = useState(true)
   const [isSavingBatch, setIsSavingBatch] = useState(false)
@@ -162,6 +163,9 @@ export default function ManajemenGuruPage() {
     k.nama_kelas.toLowerCase().includes(search.toLowerCase())
   )
 
+  const filteredForDropdown = guruSearch
+    ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
+    : guruList
   const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
 
   return (
@@ -188,10 +192,16 @@ export default function ManajemenGuruPage() {
       {/* TAB 1: JADWAL KELAS */}
       {tab === 'JADWAL' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
-          <div className="flex justify-between items-end">
-            <div className="relative max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+            <div className="flex gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
+              </div>
             </div>
             <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
               {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -221,19 +231,19 @@ export default function ManajemenGuruPage() {
                       <td className="px-4 py-2">
                         <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
                           <option value="">- Kosong -</option>
-                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-2">
                         <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
                           <option value="">- Kosong -</option>
-                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-2 bg-yellow-50/30 border-l border-yellow-100">
                         <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full p-1.5 border border-yellow-300 bg-white text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-yellow-500">
                           <option value="">- Kosong -</option>
-                          {pagedGuruList.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                         </select>
                         {k.m && <p className="text-[9px] text-green-600 mt-1 text-center font-bold">Auto Akun</p>}
                       </td>
@@ -314,7 +324,8 @@ export default function ManajemenGuruPage() {
                   </button>
                 </div>
                 <div className="max-h-64 overflow-auto border rounded">
-                  <table className="w-full text-sm text-left">
+                  <>
+                <table className="w-full text-sm text-left">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
                     </thead>
@@ -340,6 +351,7 @@ export default function ManajemenGuruPage() {
                   onPageChange={setPage}
                   onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
                 />
+                </>
                 </div>
               </div>
             )

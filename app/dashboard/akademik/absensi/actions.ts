@@ -18,6 +18,8 @@ function getWeekRange(date: Date) {
 
 export async function getAbsensiData(kelasId: string, tanggalRef: string) {
   const { start, end } = getWeekRange(new Date(tanggalRef))
+  const startStr = start.toISOString().split('T')[0]
+  const endStr = end.toISOString().split('T')[0]
 
   const santri = await query<any>(`
     SELECT rp.id, s.id AS santri_id, s.nama_lengkap, s.nis
@@ -29,15 +31,14 @@ export async function getAbsensiData(kelasId: string, tanggalRef: string) {
 
   if (!santri.length) return { santri: [], absensi: [] }
 
-  const riwayatIds = santri.map((s: any) => s.id)
-  const ph = riwayatIds.map(() => '?').join(',')
-
+  // JOIN langsung ke kelas — hindari IN (100+ ids) yang melebihi batas 999 variabel D1
   const absensi = await query<any>(`
-    SELECT riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib
-    FROM absensi_harian
-    WHERE riwayat_pendidikan_id IN (${ph})
-      AND tanggal >= ? AND tanggal <= ?
-  `, [...riwayatIds, start.toISOString().split('T')[0], end.toISOString().split('T')[0]])
+    SELECT ah.riwayat_pendidikan_id, ah.tanggal, ah.shubuh, ah.ashar, ah.maghrib
+    FROM absensi_harian ah
+    JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+      AND ah.tanggal >= ? AND ah.tanggal <= ?
+  `, [kelasId, startStr, endStr])
 
   return { santri, absensi }
 }
