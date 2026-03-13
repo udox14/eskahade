@@ -1,310 +1,434 @@
 'use client'
 
-import React from 'react'
-
-import { useState, useEffect } from 'react'
-import { getDetailSetoranBulan, terimaSetoran, batalkanSetoran } from './actions'
-import { Loader2, CheckCircle, XCircle, Calendar, ArrowLeft, ChevronDown, ChevronRight, DollarSign, Edit, Save, Trash2, AlertCircle, User } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction } from './actions'
+import {
+  Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
+  TrendingUp, CalendarCheck, Banknote, RefreshCw, ChevronLeft,
+  ChevronRight, Clock, UserCheck, UserX, ArrowLeftRight, Pencil, X, Check
+} from 'lucide-react'
 import { toast } from 'sonner'
-import Pagination, { usePagination } from '@/components/ui/pagination'
-import { useRouter } from 'next/navigation'
+import { format } from 'date-fns'
+import { id as idLocale } from 'date-fns/locale'
 
-const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+const BULAN_NAMA = [
+  '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+]
 
-export default function MonitoringSetoranPage() {
-  const router = useRouter()
-  const [tahun, setTahun] = useState(new Date().getFullYear())
-  const [expandedBulan, setExpandedBulan] = useState<number | null>(new Date().getMonth() + 1)
-  
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
-            {/* FIX: Ganti Link href ke router.back() */}
-            <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
-              <ArrowLeft className="w-6 h-6 text-gray-600"/>
-            </button>
-            <div>
-            <h1 className="text-2xl font-bold text-gray-800">Audit Setoran Asrama</h1>
-            <p className="text-gray-500 text-sm">Rekonsiliasi uang masuk sistem vs uang fisik diterima.</p>
-            </div>
-        </div>
-
-        <div className="flex items-center gap-2 bg-white border rounded-lg p-1 shadow-sm">
-            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold">-</button>
-            <span className="px-2 font-mono font-bold text-gray-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4"/> {tahun}
-            </span>
-            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold">+</button>
-        </div>
-      </div>
-
-      {/* LIST BULAN (ACCORDION) */}
-      <div className="space-y-4">
-        {BULAN_LIST.map((namaBulan, idx) => {
-           const bulanNum = idx + 1
-           const isOpen = expandedBulan === bulanNum
-
-           return (
-             <div key={bulanNum} className={`bg-white rounded-xl border transition-all ${isOpen ? 'ring-2 ring-blue-500 shadow-md' : 'shadow-sm hover:border-blue-300'}`}>
-                
-                {/* HEADER BULAN */}
-                <button 
-                  onClick={() => setExpandedBulan(isOpen ? null : bulanNum)}
-                  className="w-full flex items-center justify-between p-4"
-                >
-                   <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${isOpen ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
-                         <Calendar className="w-5 h-5"/>
-                      </div>
-                      <span className="font-bold text-lg text-gray-800">{namaBulan}</span>
-                   </div>
-                   
-                   {isOpen ? <ChevronDown className="w-5 h-5 text-gray-400"/> : <ChevronRight className="w-5 h-5 text-gray-400"/>}
-                </button>
-
-                {/* CONTENT DETAIL (LAZY LOAD COMPONENT) */}
-                {isOpen && (
-                   <DetailBulan bulan={bulanNum} tahun={tahun} />
-                )}
-
-             </div>
-           )
-        })}
-      </div>
-    </div>
-  )
+type AsramaRow = {
+  asrama: string
+  total_santri: number
+  bebas_spp: number
+  wajib_bayar: number
+  bayar_bulan_ini: number
+  bayar_tunggakan_lalu: number
+  penunggak: number
+  total_nominal: number
+  persentase: number
+  tanggal_setor: string | null
+  nama_penyetor: string | null
+  jumlah_aktual: number | null
 }
 
-// --- SUB-COMPONENT: Detail Tabel per Bulan ---
-function DetailBulan({ bulan, tahun }: { bulan: number, tahun: number }) {
-  const [data, setData] = useState<any[]>([])
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [loading, setLoading] = useState(true)
-  
-  // State Form Modal
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedAsrama, setSelectedAsrama] = useState<any>(null)
-  const [inputAktual, setInputAktual] = useState(0)
-  const [inputPenyetor, setInputPenyetor] = useState('')
-  const [inputCatatan, setInputCatatan] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+type SetoranFormState = {
+  asrama: string
+  jumlahAktual: string
+  namaPenyetor: string
+}
+
+export default function MonitoringSetoranPage() {
+  const now = new Date()
+  const [tahun, setTahun] = useState(now.getFullYear())
+  const [bulan, setBulan] = useState(now.getMonth() + 1)
+  const [nominal, setNominal] = useState(70000)
+  const [data, setData] = useState<AsramaRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [userAsrama, setUserAsrama] = useState<string | null>(null)
+  const [setoranForm, setSetoranForm] = useState<SetoranFormState | null>(null)
+  const [savingSetoran, setSavingSetoran] = useState(false)
+
+  const tahunList = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [rows, settings] = await Promise.all([
+        getMonitoringSetoran(tahun, bulan),
+        getSppSettings(tahun),
+      ])
+      // Filter per asrama jika user terbatas
+      setData(userAsrama ? rows.filter(r => r.asrama === userAsrama) : rows)
+      setNominal(settings.nominal)
+    } finally {
+      setLoading(false)
+    }
+  }, [tahun, bulan, userAsrama])
 
   useEffect(() => {
-    loadData()
-  }, [bulan, tahun])
+    getClientRestriction().then(setUserAsrama)
+  }, [])
 
-  const loadData = async () => {
-    setLoading(true)
-    const res = await getDetailSetoranBulan(bulan, tahun)
-    setData(res)
-    setLoading(false)
+  useEffect(() => { load() }, [load])
+
+  function prevBulan() {
+    if (bulan === 1) { setBulan(12); setTahun(t => t - 1) }
+    else setBulan(b => b - 1)
+  }
+  function nextBulan() {
+    if (bulan === 12) { setBulan(1); setTahun(t => t + 1) }
+    else setBulan(b => b + 1)
   }
 
-  // --- HANDLERS ---
-  const handleOpenForm = (item: any) => {
-    setSelectedAsrama(item)
-    setInputAktual(item.is_done ? item.total_aktual : item.total_sistem) 
-    setInputPenyetor(item.penyetor !== '-' ? item.penyetor : '')
-    setInputCatatan(item.catatan || '')
-    setIsModalOpen(true)
-  }
-
-  const handleSimpan = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    const loadingToast = toast.loading("Menyimpan setoran...")
-    
-    const res = await terimaSetoran(
-        selectedAsrama.asrama, 
-        bulan, 
-        tahun, 
-        selectedAsrama.total_sistem,
-        inputAktual, 
-        inputPenyetor,
-        inputCatatan
-    )
-
-    toast.dismiss(loadingToast)
-    setIsSaving(false)
-
-    if ('error' in res) {
-        toast.error("Gagal", { description: (res as any).error })
-    } else {
-        toast.success("Setoran Diterima!")
-        setIsModalOpen(false)
-        loadData()
+  async function handleSimpanSetoran() {
+    if (!setoranForm) return
+    setSavingSetoran(true)
+    try {
+      const res = await simpanSetoran(
+        setoranForm.asrama, tahun, bulan,
+        Number(setoranForm.jumlahAktual.replace(/\D/g, '')),
+        setoranForm.namaPenyetor
+      )
+      if ('error' in res) { toast.error(res.error); return }
+      toast.success('Setoran berhasil disimpan')
+      setSetoranForm(null)
+      load()
+    } finally {
+      setSavingSetoran(false)
     }
   }
 
-  const handleBatal = async (item: any) => {
-    if (!confirm(`Batalkan/Hapus data setoran ${item.asrama}?`)) return
-    const res = await batalkanSetoran(item.asrama, bulan, tahun)
-    if ((res as any).success) {
-        toast.success("Data dihapus")
-        loadData()
-    }
+  const totalSantri    = data.reduce((a, r) => a + r.total_santri, 0)
+  const totalBebasSpp  = data.reduce((a, r) => a + r.bebas_spp, 0)
+  const totalWajib     = data.reduce((a, r) => a + r.wajib_bayar, 0)
+  const totalBayar     = data.reduce((a, r) => a + r.bayar_bulan_ini, 0)
+  const totalTunggak   = data.reduce((a, r) => a + r.penunggak, 0)
+  const totalNominal   = data.reduce((a, r) => a + r.total_nominal, 0)
+  const pctKeseluruhan = totalWajib > 0 ? Math.round((totalBayar / totalWajib) * 100) : 0
+
+  function fmt(n: number) {
+    return new Intl.NumberFormat('id-ID').format(n)
+  }
+  function fmtRp(n: number) {
+    return 'Rp ' + new Intl.NumberFormat('id-ID').format(n)
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-400 flex justify-center items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Memuat data transaksi...</div>
-
-  const { paged: pagedData, totalPages: totalPagesData, safePage: safePageData } = usePagination(data, pageSize, page)
   return (
-    <div className="border-t p-4 bg-gray-50/50 animate-in slide-in-from-top-2">
-      <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <>
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-              <tr>
-                <th className="px-4 py-3">Asrama</th>
-                <th className="px-4 py-3 text-right">Target (Sistem)</th>
-                <th className="px-4 py-3 text-right">Aktual (Disetor)</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3">Penyetor & Penerima</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {pagedData.map((row) => (
-                  <tr key={row.asrama} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-800">{row.asrama}</td>
-                    
-                    <td className="px-4 py-3 text-right font-mono text-slate-600">
-                        Rp {row.total_sistem.toLocaleString('id-ID')}
-                    </td>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      {/* ── Header ── */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Monitoring Setoran SPP</h1>
+        <p className="text-sm text-gray-500 mt-1">Rekap pembayaran SPP per asrama</p>
+      </div>
 
-                    <td className={`px-4 py-3 text-right font-mono font-bold ${
-                        row.status === 'MATCH' ? 'text-green-600' :
-                        row.status === 'MINUS' ? 'text-red-600' :
-                        row.status === 'PLUS' ? 'text-blue-600' : 'text-gray-400'
-                    }`}>
-                        {row.is_done ? `Rp ${row.total_aktual.toLocaleString('id-ID')}` : '-'}
-                    </td>
+      {/* ── Filter Bulan + Tahun ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Navigator bulan */}
+          <div className="flex items-center gap-2">
+            <button onClick={prevBulan} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <ChevronLeft className="w-4 h-4 text-gray-600" />
+            </button>
+            <div className="min-w-[160px] text-center">
+              <span className="text-lg font-semibold text-gray-900">
+                {BULAN_NAMA[bulan]} {tahun}
+              </span>
+            </div>
+            <button
+              onClick={nextBulan}
+              disabled={tahun === now.getFullYear() && bulan === now.getMonth() + 1}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
 
-                    <td className="px-4 py-3 text-center">
-                        <StatusBadge status={row.status} />
-                    </td>
+          {/* Pilih bulan langsung */}
+          <select
+            value={bulan}
+            onChange={e => setBulan(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {BULAN_NAMA.slice(1).map((b, i) => (
+              <option key={i + 1} value={i + 1}>{b}</option>
+            ))}
+          </select>
 
-                    <td className="px-4 py-3 text-xs">
-                        <div className="font-bold text-slate-700">{row.penyetor}</div>
-                        {row.is_done && (
-                          <div className="text-[10px] text-green-600 font-medium flex items-center gap-1 mt-0.5">
-                            <User className="w-3 h-3"/> Diterima: {row.penerima || 'Sistem'}
-                          </div>
-                        )}
-                        {row.catatan && <span className="block text-[10px] text-orange-600 italic max-w-[150px] truncate mt-0.5">{row.catatan}</span>}
-                    </td>
+          {/* Pilih tahun */}
+          <select
+            value={tahun}
+            onChange={e => setTahun(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {tahunList.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
 
-                    <td className="px-4 py-3 text-right">
-                        {row.is_done ? (
-                          <div className="flex justify-end gap-1">
-                              <button onClick={() => handleOpenForm(row)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit"><Edit className="w-4 h-4"/></button>
-                              <button onClick={() => handleBatal(row)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus"><Trash2 className="w-4 h-4"/></button>
-                          </div>
-                        ) : (
-                          <button 
-                              onClick={() => handleOpenForm(row)}
-                              disabled={row.total_sistem === 0}
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              Terima Uang
-                          </button>
-                        )}
-                    </td>
-                  </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination
-            currentPage={safePageData}
-            totalPages={totalPagesData}
-            pageSize={pageSize}
-            total={data.length}
-            onPageChange={setPage}
-            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-          />
-          </>
+          {/* Tarif */}
+          <div className="flex items-center gap-2 ml-auto bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            <Banknote className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Tarif {tahun}: <strong>{fmtRp(nominal)}</strong>
+            </span>
+          </div>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* MODAL FORM TERIMA UANG */}
-      {isModalOpen && selectedAsrama && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-              <div className="p-5 border-b bg-gray-50">
-                 <h3 className="text-lg font-bold text-gray-800">Terima Setoran: {selectedAsrama.asrama}</h3>
-                 <p className="text-sm text-gray-500">Rekonsiliasi uang fisik dengan sistem.</p>
+      {/* ── Ringkasan Total ── */}
+      {!userAsrama && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: 'Total Santri', value: fmt(totalSantri), icon: Users, color: 'bg-slate-50 text-slate-600 border-slate-100' },
+            { label: 'Wajib Bayar', value: fmt(totalWajib), icon: UserCheck, color: 'bg-blue-50 text-blue-600 border-blue-100' },
+            { label: 'Sudah Bayar', value: fmt(totalBayar), sub: `${pctKeseluruhan}%`, icon: CheckCircle2, color: 'bg-green-50 text-green-600 border-green-100' },
+            { label: 'Penunggak', value: fmt(totalTunggak), icon: AlertCircle, color: 'bg-red-50 text-red-600 border-red-100' },
+          ].map(item => (
+            <div key={item.label} className={`rounded-2xl border p-4 ${item.color.split(' ').slice(2).join(' ')} bg-white`}>
+              <div className={`inline-flex p-2 rounded-lg mb-2 ${item.color.split(' ').slice(0, 2).join(' ')}`}>
+                <item.icon className="w-4 h-4" />
               </div>
-              
-              <form onSubmit={handleSimpan} className="p-6 space-y-4">
-                 
-                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
-                    <p className="text-xs font-bold text-blue-600 uppercase mb-1">Total Tercatat di Sistem</p>
-                    <p className="text-2xl font-extrabold text-blue-800 font-mono">Rp {selectedAsrama.total_sistem.toLocaleString('id-ID')}</p>
-                 </div>
+              <div className="text-2xl font-bold text-gray-900">{item.value}
+                {item.sub && <span className="text-sm font-medium text-green-600 ml-2">{item.sub}</span>}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">{item.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Uang Fisik Diterima (Rp)</label>
-                    <input 
-                        type="number" 
-                        required
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl font-bold text-lg focus:border-green-500 outline-none"
-                        value={inputAktual}
-                        onChange={(e) => setInputAktual(Number(e.target.value))}
+      {/* ── Kartu Per Asrama ── */}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-500">Memuat data...</span>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="text-center py-20 text-gray-400">Tidak ada data asrama</div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {data.map(row => {
+            const isEditingSetoran = setoranForm?.asrama === row.asrama
+            const barColor = row.persentase >= 80 ? 'bg-green-500' : row.persentase >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+
+            return (
+              <div key={row.asrama} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Card Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-50 rounded-xl">
+                      <Building2 className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-base leading-tight">{row.asrama}</h3>
+                      <span className="text-xs text-gray-400">{fmt(row.total_santri)} santri</span>
+                    </div>
+                  </div>
+                  {/* Persen badge */}
+                  <div className={`px-3 py-1.5 rounded-full text-sm font-bold ${
+                    row.persentase >= 80 ? 'bg-green-100 text-green-700' :
+                    row.persentase >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {row.persentase}%
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="px-5 pb-4">
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${barColor}`}
+                      style={{ width: `${row.persentase}%` }}
                     />
-                    {inputAktual !== selectedAsrama.total_sistem && (
-                        <p className={`text-xs mt-1 font-bold ${inputAktual < selectedAsrama.total_sistem ? 'text-red-500' : 'text-blue-500'}`}>
-                            {inputAktual < selectedAsrama.total_sistem ? `Kurang Rp ${(selectedAsrama.total_sistem - inputAktual).toLocaleString()}` : `Lebih Rp ${(inputAktual - selectedAsrama.total_sistem).toLocaleString()}`}
-                        </p>
-                    )}
-                 </div>
+                  </div>
+                </div>
 
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Penyetor (Pengurus)</label>
-                    <input 
-                        type="text" 
-                        required
-                        placeholder="Contoh: Ustadz Ahmad"
-                        className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-green-500"
-                        value={inputPenyetor}
-                        onChange={(e) => setInputPenyetor(e.target.value)}
-                    />
-                 </div>
+                {/* Stats Grid */}
+                <div className="px-5 pb-4 grid grid-cols-3 gap-3">
+                  <StatBox
+                    icon={<ShieldCheck className="w-3.5 h-3.5 text-purple-500" />}
+                    label="Bebas SPP"
+                    value={fmt(row.bebas_spp)}
+                    sub="santri"
+                    color="text-purple-700"
+                  />
+                  <StatBox
+                    icon={<UserCheck className="w-3.5 h-3.5 text-blue-500" />}
+                    label="Wajib Bayar"
+                    value={fmt(row.wajib_bayar)}
+                    sub="santri"
+                    color="text-blue-700"
+                  />
+                  <StatBox
+                    icon={<CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                    label="Sudah Bayar"
+                    value={fmt(row.bayar_bulan_ini)}
+                    sub="santri"
+                    color="text-green-700"
+                  />
+                  <StatBox
+                    icon={<UserX className="w-3.5 h-3.5 text-red-500" />}
+                    label="Penunggak"
+                    value={fmt(row.penunggak)}
+                    sub="santri"
+                    color="text-red-700"
+                  />
+                  <StatBox
+                    icon={<ArrowLeftRight className="w-3.5 h-3.5 text-orange-500" />}
+                    label="Bayar Tunggakan"
+                    value={fmt(row.bayar_tunggakan_lalu)}
+                    sub="bln lalu"
+                    color="text-orange-700"
+                  />
+                  <StatBox
+                    icon={<Banknote className="w-3.5 h-3.5 text-emerald-500" />}
+                    label="Total Setor"
+                    value={fmtRp(row.total_nominal)}
+                    color="text-emerald-700"
+                    small
+                  />
+                </div>
 
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Catatan (Opsional)</label>
-                    <textarea 
-                        className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                        placeholder="Alasan selisih, dll..."
-                        rows={2}
-                        value={inputCatatan}
-                        onChange={(e) => setInputCatatan(e.target.value)}
-                    />
-                 </div>
+                {/* Divider */}
+                <div className="border-t border-gray-100 mx-5" />
 
-                 <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-gray-300 font-bold text-gray-600 hover:bg-gray-50">Batal</button>
-                    <button type="submit" disabled={isSaving} className="flex-1 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-70">
-                        {isSaving ? "Menyimpan..." : "Simpan & Terima"}
-                    </button>
-                 </div>
+                {/* Tanggal Setor */}
+                <div className="px-5 py-3">
+                  {!isEditingSetoran ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CalendarCheck className={`w-4 h-4 ${row.tanggal_setor ? 'text-green-500' : 'text-gray-300'}`} />
+                        {row.tanggal_setor ? (
+                          <span className="text-gray-700">
+                            Disetor{row.nama_penyetor ? ` oleh <strong>${row.nama_penyetor}</strong>` : ''} •{' '}
+                            <span className="text-green-700 font-medium">
+                              {format(new Date(row.tanggal_setor), 'd MMM yyyy', { locale: idLocale })}
+                            </span>
+                            {row.jumlah_aktual != null && (
+                              <span className="ml-2 text-gray-500">({fmtRp(row.jumlah_aktual)})</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">Belum disetor</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setSetoranForm({
+                          asrama: row.asrama,
+                          jumlahAktual: row.jumlah_aktual != null ? String(row.jumlah_aktual) : String(row.total_nominal),
+                          namaPenyetor: row.nama_penyetor ?? '',
+                        })}
+                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        {row.tanggal_setor ? 'Edit' : 'Catat Setoran'}
+                      </button>
+                    </div>
+                  ) : (
+                    /* Form setoran inline */
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Nama penyetor"
+                          value={setoranForm.namaPenyetor}
+                          onChange={e => setSetoranForm(f => f ? { ...f, namaPenyetor: e.target.value } : f)}
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Jumlah aktual (Rp)"
+                          value={setoranForm.jumlahAktual}
+                          onChange={e => setSetoranForm(f => f ? { ...f, jumlahAktual: e.target.value } : f)}
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setSetoranForm(null)}
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                          <X className="w-3 h-3" /> Batal
+                        </button>
+                        <button
+                          onClick={handleSimpanSetoran}
+                          disabled={savingSetoran}
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                        >
+                          {savingSetoran
+                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                            : <Check className="w-3 h-3" />
+                          }
+                          Simpan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-              </form>
-           </div>
+      {/* ── Total keseluruhan di bawah ── */}
+      {!loading && data.length > 0 && !userAsrama && (
+        <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex flex-wrap gap-6 items-center">
+          <div>
+            <div className="text-xs text-gray-500">Total terkumpul</div>
+            <div className="text-xl font-bold text-emerald-700">{fmtRp(totalNominal)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Potensi (wajib × tarif)</div>
+            <div className="text-xl font-bold text-gray-800">{fmtRp(totalWajib * nominal)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Selisih</div>
+            <div className={`text-xl font-bold ${totalNominal >= totalWajib * nominal ? 'text-green-700' : 'text-red-600'}`}>
+              {fmtRp(totalNominal - totalWajib * nominal)}
+            </div>
+          </div>
+          <div className="ml-auto text-right">
+            <div className="text-xs text-gray-500">Kepatuhan keseluruhan</div>
+            <div className="text-2xl font-bold text-blue-700">{pctKeseluruhan}%</div>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-    if (status === 'MATCH') return <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold"><CheckCircle className="w-3 h-3"/> PAS</span>
-    if (status === 'MINUS') return <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold"><XCircle className="w-3 h-3"/> KURANG</span>
-    if (status === 'PLUS') return <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold"><DollarSign className="w-3 h-3"/> LEBIH</span>
-    if (status === 'EMPTY') return <span className="text-gray-400 text-[10px] italic">Kosong</span>
-    return <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-[10px] font-bold">BELUM</span>
+// ── Komponen kecil ──────────────────────────────────────────────────────────
+function StatBox({
+  icon, label, value, sub, color, small
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  sub?: string
+  color?: string
+  small?: boolean
+}) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        {icon}
+        <span className="text-xs text-gray-500 leading-tight">{label}</span>
+      </div>
+      <div className={`font-bold leading-tight ${small ? 'text-sm' : 'text-lg'} ${color ?? 'text-gray-800'}`}>
+        {value}
+      </div>
+      {sub && <div className="text-xs text-gray-400">{sub}</div>}
+    </div>
+  )
 }
