@@ -28,7 +28,7 @@ export async function tambahTahunAjaran(nama: string) {
 
   await execute('INSERT INTO tahun_ajaran (nama, is_active) VALUES (?, 0)', [nama])
 
-  revalidateTag('tahun-ajaran')
+  revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   revalidatePath('/dashboard/master/kelas')
   return { success: true }
@@ -38,7 +38,7 @@ export async function aktifkanTahunAjaran(id: number): Promise<{ success: boolea
   await execute('UPDATE tahun_ajaran SET is_active = 0', [])
   await execute('UPDATE tahun_ajaran SET is_active = 1 WHERE id = ?', [id])
 
-  revalidateTag('tahun-ajaran')
+  revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   revalidatePath('/dashboard/master/kelas')
   revalidatePath('/dashboard')
@@ -57,7 +57,7 @@ export async function hapusTahunAjaran(id: number): Promise<{ success: boolean }
 
   await execute('DELETE FROM tahun_ajaran WHERE id = ?', [id])
 
-  revalidateTag('tahun-ajaran')
+  revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   return { success: true }
 }
