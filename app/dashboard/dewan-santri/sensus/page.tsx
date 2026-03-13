@@ -5,7 +5,7 @@ import { getSensusData } from './actions'
 import { BarChart3, Users, Home, ArrowRightLeft, Loader2, BookOpen, Bed, X, User } from 'lucide-react'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
-type SantriKamar = { id: string; nama_lengkap: string; nis: string; sekolah: string | null; kelas_sekolah: string | null }
+type SantriKamar = { id: string; nama_lengkap: string; nis: string; kelas_pesantren: string | null; sekolah: string | null; kelas_sekolah: string | null }
 
 const MARHALAH_COLORS = ['#10b981','#34d399','#6ee7b7','#059669','#047857','#065f46','#064e3b','#022c22','#a7f3d0','#d1fae5']
 const JENJANG_COLORS  = { SLTP: '#3b82f6', SLTA: '#6366f1', KULIAH: '#8b5cf6', TIDAK_SEKOLAH: '#94a3b8', LAINNYA: '#cbd5e1' }
@@ -206,9 +206,9 @@ export default function SensusPage() {
           {/* Kiri: Pie jenjang + legend */}
           <div>
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-4">Jenjang</p>
-            <div className="flex gap-6 items-center">
-              <PieChart slices={jenjangSlices} size={130} donut={true}/>
-              <div className="flex-1 space-y-2.5">
+            <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-center">
+              <PieChart slices={jenjangSlices} size={160} donut={true}/>
+              <div className="flex-1 space-y-3 w-full">
                 {jenjangSlices.filter(d => d.value > 0).map(d => (
                   <LegendRow key={d.label} color={d.color} label={d.label} value={d.value} total={total}/>
                 ))}
@@ -249,9 +249,9 @@ export default function SensusPage() {
           <span className="w-1 h-4 bg-green-500 rounded-full inline-block"/>
           Sebaran Marhalah
         </h3>
-        <div className="flex flex-col sm:flex-row gap-8 items-center sm:items-start">
-          <PieChart slices={marhalahSlices} size={150} donut={false}/>
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 w-full">
+        <div className="flex flex-col sm:flex-row gap-8 items-center sm:items-center">
+          <PieChart slices={marhalahSlices} size={180} donut={false}/>
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 w-full">
             {marhalahSlices.map(d => (
               <LegendRow key={d.label} color={d.color} label={d.label} value={d.value} total={marhalahTotal}/>
             ))}
@@ -283,7 +283,7 @@ export default function SensusPage() {
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{nama}</span>
                   <span className="text-xs text-slate-400">({kamars.length} kamar · {tot} jiwa)</span>
                 </div>
-                <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
                   {kamars.map(kamar => {
                     const n = kamarData[kamar]
                     const cls = n >= 10 ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
@@ -291,13 +291,13 @@ export default function SensusPage() {
                               :           'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
                     return (
                       <button key={kamar} onClick={() => setModalKamar({ asrama: nama, kamar, list: santriData[kamar] || [] })}
-                        className={`${cls} border rounded-lg overflow-hidden text-left transition-all active:scale-95 cursor-pointer`}>
-                        <div className="bg-black/[0.04] border-b border-inherit px-1.5 py-0.5">
-                          <span className="text-[9px] font-bold opacity-70 leading-none">{kamar}</span>
+                        className={`${cls} border rounded-xl overflow-hidden text-left transition-all active:scale-95 cursor-pointer w-full`}>
+                        <div className="bg-black/[0.06] border-b border-inherit px-2.5 py-1.5">
+                          <span className="text-xs font-bold leading-none">Kamar {kamar}</span>
                         </div>
-                        <div className="px-1.5 py-1 flex items-baseline gap-0.5">
-                          <span className="text-sm font-extrabold leading-none tabular-nums">{n}</span>
-                          <span className="text-[8px] opacity-50 leading-none">jiwa</span>
+                        <div className="px-2.5 py-2 flex items-baseline gap-1">
+                          <span className="text-2xl font-black leading-none tabular-nums">{n}</span>
+                          <span className="text-[10px] opacity-50 leading-none">jiwa</span>
                         </div>
                       </button>
                     )
@@ -334,10 +334,13 @@ export default function SensusPage() {
                         <span className="w-5 text-[11px] text-gray-400 font-mono shrink-0 text-right">{i+1}</span>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-800 text-sm truncate">{s.nama_lengkap}</p>
-                          <p className="text-xs text-gray-400">
-                            {s.nis || '—'} · {s.sekolah || 'Tidak sekolah'}
-                            {s.kelas_sekolah ? ` Kelas ${s.kelas_sekolah}` : ''}
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {s.kelas_pesantren
+                              ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded">{s.kelas_pesantren}</span>
+                              : <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Belum masuk kelas</span>
+                            }
+                            <span className="text-[10px] text-gray-400">{s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` · Kelas ${s.kelas_sekolah}` : ''}</span>
+                          </div>
                         </div>
                       </div>
                     ))
