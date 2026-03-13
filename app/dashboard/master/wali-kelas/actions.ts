@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, batch } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCachedDataGuru } from '@/lib/cache/master'
@@ -27,7 +27,6 @@ export async function getDataMaster() {
     LEFT JOIN users u ON k.wali_kelas_id = u.id
   `)
 
-  // Pakai cache untuk daftar guru
   const guru = await getCachedDataGuru()
 
   const sortedKelas = kelas.sort((a: any, b: any) =>
@@ -42,17 +41,20 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
     'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
     [nama, gelar, kode]
   )
-  revalidateTag('data-guru')
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
 
 export async function hapusGuru(id: number): Promise<{ success: boolean } | { error: string }> {
-  const used = await queryOne<any>('SELECT id FROM kelas WHERE guru_shubuh_id = ? OR guru_ashar_id = ? OR guru_maghrib_id = ? LIMIT 1', [id, id, id])
+  const used = await queryOne<any>(
+    'SELECT id FROM kelas WHERE guru_shubuh_id = ? OR guru_ashar_id = ? OR guru_maghrib_id = ? LIMIT 1',
+    [id, id, id]
+  )
   if (used) return { error: 'Guru ini masih terdaftar sebagai pengajar di salah satu kelas.' }
 
   await query('DELETE FROM data_guru WHERE id = ?', [id])
-  revalidateTag('data-guru')
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -60,11 +62,14 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
 export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!ids.length) return { error: 'Tidak ada data.' }
   const placeholders = ids.map(() => '?').join(',')
-  const usedCheck = await query<any>(`SELECT id FROM kelas WHERE guru_shubuh_id IN (${placeholders}) OR guru_ashar_id IN (${placeholders}) OR guru_maghrib_id IN (${placeholders}) LIMIT 1`, [...ids, ...ids, ...ids])
+  const usedCheck = await query<any>(
+    `SELECT id FROM kelas WHERE guru_shubuh_id IN (${placeholders}) OR guru_ashar_id IN (${placeholders}) OR guru_maghrib_id IN (${placeholders}) LIMIT 1`,
+    [...ids, ...ids, ...ids]
+  )
   if (usedCheck.length > 0) return { error: 'Beberapa guru masih terdaftar sebagai pengajar aktif di kelas.' }
 
   await query(`DELETE FROM data_guru WHERE id IN (${placeholders})`, ids)
-  revalidateTag('data-guru')
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: ids.length }
 }
@@ -79,7 +84,7 @@ export async function importGuruMassal(dataExcel: any[]): Promise<{ success: boo
   let skipped = 0
 
   for (const row of dataExcel) {
-    const nama = String(row['NAMA'] || row['nama'] || '').trim()
+    const nama = String(row['NAMA'] || row['NAMA LENGKAP'] || row['nama'] || '').trim()
     const gelar = String(row['GELAR'] || row['gelar'] || '').trim()
     const kode = String(row['KODE'] || row['kode'] || '').trim()
     if (!nama) { skipped++; continue }
@@ -94,9 +99,30 @@ export async function importGuruMassal(dataExcel: any[]): Promise<{ success: boo
     await query('INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)', row)
   }
 
-  revalidateTag('data-guru')
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: toInsert.length, skipped }
+}
+
+export async function simpanJadwalBatch(
+  payload: { kelasId: string; shubuhId: number; asharId: number; maghribId: number }[]
+): Promise<{ success: boolean; count: number } | { error: string }> {
+  if (!payload.length) return { error: 'Tidak ada data.' }
+
+  await batch(
+    payload.map(p => ({
+      sql: `UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?`,
+      params: [
+        p.shubuhId || null,
+        p.asharId || null,
+        p.maghribId || null,
+        p.kelasId,
+      ],
+    }))
+  )
+
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true, count: payload.length }
 }
 
 export async function setWaliKelas(kelasId: string, userId: string | null) {
@@ -105,7 +131,12 @@ export async function setWaliKelas(kelasId: string, userId: string | null) {
   return { success: true }
 }
 
-export async function setGuruKelas(kelasId: string, guruShubuhId: string | null, guruAsharId: string | null, guruMaghribId: string | null) {
+export async function setGuruKelas(
+  kelasId: string,
+  guruShubuhId: string | null,
+  guruAsharId: string | null,
+  guruMaghribId: string | null
+) {
   await query(
     'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
     [guruShubuhId, guruAsharId, guruMaghribId, kelasId]

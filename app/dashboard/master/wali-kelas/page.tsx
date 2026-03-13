@@ -1,25 +1,24 @@
 'use client'
 
 import React from 'react'
-
 import { useState, useEffect } from 'react'
-import { getDataMaster, importDataGuru, tambahGuruManual, hapusGuru, hapusGuruBatch, simpanJadwalBatch } from './actions'
+import { getDataMaster, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
 import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 
 export default function ManajemenGuruPage() {
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
-  
+
   const [kelasList, setKelasList] = useState<any[]>([])
   const [localKelasList, setLocalKelasList] = useState<any[]>([])
-  
+
   const [guruList, setGuruList] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([])
   const [guruSearch, setGuruSearch] = useState("")
-  
+
   const [loading, setLoading] = useState(true)
   const [isSavingBatch, setIsSavingBatch] = useState(false)
   const [isDeletingBatch, setIsDeletingBatch] = useState(false)
@@ -49,12 +48,12 @@ export default function ManajemenGuruPage() {
     setLoading(false)
   }
 
-  const isGuruBusy = (guruId: string, session: 's'|'a'|'m', currentKelasId: string) => {
+  const isGuruBusy = (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
     if (!guruId) return false
     return localKelasList.some(k => k[session] == guruId && k.id !== currentKelasId)
   }
 
-  const handleChangeLocal = (kelasId: string, session: 's'|'a'|'m', guruId: string) => {
+  const handleChangeLocal = (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
     setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [session]: guruId } : k))
   }
 
@@ -71,7 +70,12 @@ export default function ManajemenGuruPage() {
     if (!confirm(`Terdapat ${changedClasses.length} perubahan jadwal. Simpan sekarang?`)) return
     setIsSavingBatch(true)
     const toastId = toast.loading(`Menyimpan ${changedClasses.length} jadwal...`)
-    const payload = changedClasses.map(k => ({ kelasId: k.id, shubuhId: Number(k.s) || 0, asharId: Number(k.a) || 0, maghribId: Number(k.m) || 0 }))
+    const payload = changedClasses.map(k => ({
+      kelasId: k.id,
+      shubuhId: Number(k.s) || 0,
+      asharId: Number(k.a) || 0,
+      maghribId: Number(k.m) || 0
+    }))
     const res = await simpanJadwalBatch(payload)
     setIsSavingBatch(false)
     toast.dismiss(toastId)
@@ -91,7 +95,7 @@ export default function ManajemenGuruPage() {
 
   const handleHapusGuru = async (id: string, nama: string) => {
     if (!confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
-    const res = await hapusGuru(id)
+    const res = await hapusGuru(id as any)
     if ((res as any).success) { toast.success("Guru dihapus"); loadData() }
     else toast.error((res as any).error)
   }
@@ -110,7 +114,7 @@ export default function ManajemenGuruPage() {
     if (!confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
     const toastId = toast.loading("Menghapus data...")
-    const res = await hapusGuruBatch(selectedGuruIds)
+    const res = await hapusGuruMassal(selectedGuruIds as any)
     setIsDeletingBatch(false)
     toast.dismiss(toastId)
     if ((res as any).success) { toast.success("Berhasil", { description: `${(res as any).count} guru dihapus.` }); loadData() }
@@ -147,13 +151,12 @@ export default function ManajemenGuruPage() {
     if (excelData.length === 0) return
     setIsProcessing(true)
     const toastId = toast.loading("Mengimport data guru...")
-    const res = await importDataGuru(excelData)
+    const res = await importGuruMassal(excelData)
     setIsProcessing(false)
     toast.dismiss(toastId)
     if ('error' in res) toast.error("Gagal import", { description: (res as any).error })
-    else if (res?.allDuplicate) toast.warning("Semua sudah terdaftar", { description: `${(res as any).skipped} nama ditolak karena sudah ada di database.` })
     else {
-      const skippedMsg = (res?.skipped ?? 0) > 0 ? ` (${res?.skipped} duplikat dilewati)` : ''
+      const skippedMsg = ((res as any).skipped ?? 0) > 0 ? ` (${(res as any).skipped} duplikat dilewati)` : ''
       toast.success(`Berhasil import ${(res as any).count} guru${skippedMsg}`)
       setExcelData([]); loadData(); setTab('JADWAL')
     }
@@ -166,6 +169,7 @@ export default function ManajemenGuruPage() {
   const filteredForDropdown = guruSearch
     ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
     : guruList
+
   const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
 
   return (
@@ -303,7 +307,7 @@ export default function ManajemenGuruPage() {
           {/* Preview Import */}
           {excelData.length > 0 && (() => {
             const previewRows = excelData.map(d => {
-              const nama = String(d['NAMA LENGKAP'] || d['nama'] || '').trim()
+              const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
               const isDuplikat = guruList.some(g => g.nama_lengkap.toLowerCase() === nama.toLowerCase())
               return { nama, gelar: d['GELAR'] || d['gelar'] || '-', isDuplikat }
             })
@@ -324,8 +328,7 @@ export default function ManajemenGuruPage() {
                   </button>
                 </div>
                 <div className="max-h-64 overflow-auto border rounded">
-                  <>
-                <table className="w-full text-sm text-left">
+                  <table className="w-full text-sm text-left">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
                     </thead>
@@ -343,15 +346,14 @@ export default function ManajemenGuruPage() {
                       ))}
                     </tbody>
                   </table>
-                <Pagination
-                  currentPage={safePageGuruList}
-                  totalPages={totalPagesGuruList}
-                  pageSize={pageSize}
-                  total={guruList.length}
-                  onPageChange={setPage}
-                  onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-                />
-                </>
+                  <Pagination
+                    currentPage={safePageGuruList}
+                    totalPages={totalPagesGuruList}
+                    pageSize={pageSize}
+                    total={guruList.length}
+                    onPageChange={setPage}
+                    onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                  />
                 </div>
               </div>
             )
