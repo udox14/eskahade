@@ -162,7 +162,7 @@ export async function generateDraft(
   try {
     const stmts = [
       db.prepare('DELETE FROM kamar_draft WHERE asrama = ?').bind(asrama),
-      ...shuffled.map(s =>
+      ...santriList.map(s =>
         db.prepare(`
           INSERT INTO kamar_draft (asrama, santri_id, kamar_lama, kamar_baru, applied)
           VALUES (?, ?, ?, ?, 0)
@@ -174,7 +174,7 @@ export async function generateDraft(
       await db.batch(stmts.slice(i, i + 100))
     }
     revalidatePath(REVALIDATE)
-    return { success: true, total: shuffled.length }
+    return { success: true, total: santriList.length }
   } catch (e: any) {
     return { error: e.message }
   }
