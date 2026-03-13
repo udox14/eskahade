@@ -15,6 +15,7 @@ const emptyStats = () => ({
   total: 0,
   keluar_bulan_ini: 0,
   masuk_bulan_ini: 0,
+  jenis_kelamin: { L: 0, P: 0 },
   jenjang: { SLTP: 0, SLTA: 0, KULIAH: 0, TIDAK_SEKOLAH: 0, LAINNYA: 0, detail: {} as Record<string, number> },
   kelas_sekolah: {} as Record<string, number>,
   marhalah: {} as Record<string, number>,
@@ -24,7 +25,7 @@ const emptyStats = () => ({
 
 export async function getSensusData(asramaFilter: string) {
   let sql = `
-    SELECT s.id, s.nama_lengkap, s.nis, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, s.sekolah, s.kelas_sekolah, s.asrama, s.kamar, s.created_at,
            rp.status_riwayat, m.nama AS marhalah_nama
     FROM santri s
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
@@ -58,6 +59,9 @@ export async function getSensusData(asramaFilter: string) {
   stats.masuk_bulan_ini = santriList.filter((s: any) => s.created_at >= startMonth).length
 
   santriList.forEach((s: any) => {
+    if (s.jenis_kelamin === 'L') stats.jenis_kelamin.L++
+    else if (s.jenis_kelamin === 'P') stats.jenis_kelamin.P++
+
     const jenjang = getJenjang(s.sekolah)
     // @ts-ignore
     if (stats.jenjang[jenjang] !== undefined) stats.jenjang[jenjang]++
