@@ -1,7 +1,7 @@
 {
-  "name": "Sukahideng App",
-  "short_name": "Sukahideng",
-  "description": "Sistem Informasi Manajemen Pondok Pesantren Sukahideng",
+  "name": "ESKAHADE",
+  "short_name": "ESKAHADE",
+  "description": "Sistem Informasi Manajemen Terpadu Pondok Pesantren Sukahideng",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait-primary",
