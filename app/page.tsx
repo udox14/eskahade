@@ -1,61 +1,137 @@
 import Link from "next/link";
-import { ArrowRight, School } from "lucide-react";
+import { ArrowRight, BookOpen, Users, ShieldCheck, BarChart3, GraduationCap, Star } from "lucide-react";
 
 export default function LandingPage() {
-  return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 font-sans">
-      
-      {/* BAGIAN KIRI: BRANDING */}
-      <div className="lg:w-1/2 bg-gradient-to-br from-green-800 to-emerald-950 text-white p-10 lg:p-20 flex flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
+  const features = [
+    { icon: Users, label: "Data Santri", desc: "Manajemen data induk lengkap" },
+    { icon: BookOpen, label: "Akademik", desc: "Nilai, rapor & absensi" },
+    { icon: ShieldCheck, label: "Keamanan", desc: "Perizinan & pelanggaran" },
+    { icon: BarChart3, label: "Keuangan", desc: "SPP & laporan keuangan" },
+    { icon: GraduationCap, label: "Asrama", desc: "Absen & layanan asrama" },
+    { icon: Star, label: "Multi-Role", desc: "Akses sesuai wewenang" },
+  ];
 
-        <div className="relative z-10 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="flex items-center gap-5 mb-8">
-             <img src="/logo.png" alt="Logo Pondok" className="w-20 h-20 object-contain drop-shadow-2xl" />
-            <div className="flex flex-col">
-              <span className="font-bold tracking-[0.2em] text-xs text-yellow-400 uppercase mb-1">Sistem Informasi Manajemen</span>
-              <span className="font-bold text-green-100 text-sm opacity-80">Terpadu & Terintegrasi</span>
-            </div>
+  return (
+    <div className="min-h-screen bg-[#0a1a0f] font-sans overflow-x-hidden" style={{ fontFamily: "'Georgia', serif" }}>
+
+      {/* ── Noise texture overlay ── */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
+
+      {/* ── Radial glow bg ── */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, #16a34a 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full opacity-10"
+          style={{ background: "radial-gradient(circle, #ca8a04 0%, transparent 70%)" }} />
+      </div>
+
+      {/* ── HERO ── */}
+      <main className="relative z-10 min-h-screen flex flex-col">
+
+        {/* Topbar */}
+        <nav className="flex items-center justify-between px-8 md:px-16 py-6">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-lg" />
+            <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase" style={{ fontFamily: "sans-serif" }}>
+              Sukahideng
+            </span>
           </div>
-          <h1 className="text-4xl lg:text-6xl font-serif font-bold leading-tight mb-6 drop-shadow-lg">
-            Pondok Pesantren <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500">Sukahideng</span>
+          <Link
+            href="/login"
+            className="flex items-center gap-2 text-sm font-semibold text-white/70 hover:text-white transition-colors border border-white/10 hover:border-emerald-500/50 px-4 py-2 rounded-full"
+            style={{ fontFamily: "sans-serif" }}
+          >
+            Masuk <ArrowRight className="w-4 h-4" />
+          </Link>
+        </nav>
+
+        {/* Hero content */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-emerald-950/80 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-4 py-1.5 rounded-full mb-10 tracking-widest uppercase"
+            style={{ fontFamily: "sans-serif" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Sistem Informasi Manajemen
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.05] mb-6 tracking-tight">
+            Pondok Pesantren
+            <br />
+            <span className="relative inline-block">
+              <span className="text-transparent bg-clip-text"
+                style={{ backgroundImage: "linear-gradient(135deg, #4ade80 0%, #fbbf24 50%, #4ade80 100%)", backgroundSize: "200% auto", animation: "shimmer 4s linear infinite" }}>
+                Sukahideng
+              </span>
+            </span>
           </h1>
-          <p className="text-green-50 text-lg max-w-md leading-relaxed opacity-90 border-l-4 border-yellow-500 pl-4">
-            Membangun generasi Qur'ani yang berakhlak mulia, cerdas, dan mandiri melalui sistem pendidikan terpadu.
+
+          {/* Subheading */}
+          <p className="text-white/50 text-lg md:text-xl max-w-2xl leading-relaxed mb-14"
+            style={{ fontFamily: "sans-serif", fontStyle: "italic" }}>
+            "Membangun generasi Qur'ani yang berakhlak mulia, cerdas, dan mandiri
+            melalui sistem pendidikan terpadu."
+          </p>
+
+          {/* CTA */}
+          <Link
+            href="/login"
+            className="group relative inline-flex items-center gap-3 px-10 py-4 rounded-2xl text-base font-bold text-white overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+            style={{
+              fontFamily: "sans-serif",
+              background: "linear-gradient(135deg, #15803d, #166534)",
+              boxShadow: "0 0 40px rgba(22,163,74,0.3)"
+            }}
+          >
+            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              style={{ background: "linear-gradient(135deg, #16a34a, #15803d)" }} />
+            <span className="relative">Masuk ke Dashboard</span>
+            <ArrowRight className="relative w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+
+          <p className="mt-5 text-xs text-white/25" style={{ fontFamily: "sans-serif" }}>
+            Khusus staf & pengurus yang berwenang
           </p>
         </div>
 
-        <div className="relative z-10 mt-10 lg:mt-0 text-xs text-green-300/60 font-mono">
-          &copy; 2024 Sukahideng App v1.0 • Built for excellence.
+        {/* ── Divider ── */}
+        <div className="relative px-8 md:px-16 mb-0">
+          <div className="h-px bg-gradient-to-r from-transparent via-emerald-800/50 to-transparent" />
         </div>
-      </div>
 
-      {/* BAGIAN KANAN: TOMBOL MASUK */}
-      <div className="lg:w-1/2 flex items-center justify-center p-6 lg:p-20 bg-white relative">
-        <div className="w-full max-w-md space-y-8 text-center animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
-          
-          <div>
-            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Selamat Datang</h2>
-            <p className="text-slate-500 mt-2">Silakan masuk untuk mengakses dashboard manajemen.</p>
+        {/* ── Features strip ── */}
+        <div className="relative z-10 bg-[#0d1f12]/80 backdrop-blur-sm border-t border-emerald-900/30 px-8 md:px-16 py-10">
+          <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {features.map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="flex flex-col items-center text-center gap-2 group">
+                <div className="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-800/50 flex items-center justify-center group-hover:border-emerald-500/50 group-hover:bg-emerald-900/50 transition-all duration-300">
+                  <Icon className="w-5 h-5 text-emerald-500 group-hover:text-emerald-400 transition-colors" />
+                </div>
+                <span className="text-white/80 text-xs font-bold" style={{ fontFamily: "sans-serif" }}>{label}</span>
+                <span className="text-white/30 text-[10px] leading-tight" style={{ fontFamily: "sans-serif" }}>{desc}</span>
+              </div>
+            ))}
           </div>
-
-          <div className="pt-4">
-            <Link 
-              href="/login"
-              className="w-full flex justify-center items-center gap-2 py-4 px-6 border border-transparent rounded-xl shadow-lg text-base font-bold text-white bg-green-700 hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all transform hover:-translate-y-1"
-            >
-              Masuk Aplikasi <ArrowRight className="w-5 h-5" />
-            </Link>
-            
-            <p className="mt-6 text-xs text-slate-400">
-               Hanya untuk staf & pengurus yang berwenang.
-            </p>
-          </div>
-
         </div>
-      </div>
+
+        {/* Footer */}
+        <div className="relative z-10 text-center py-5 border-t border-white/5">
+          <p className="text-white/20 text-xs" style={{ fontFamily: "sans-serif" }}>
+            © 2025 Pesantren Sukahideng · Powered by Sukahideng App
+          </p>
+        </div>
+
+      </main>
+
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+      `}</style>
+
     </div>
   );
 }
