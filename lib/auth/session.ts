@@ -29,6 +29,10 @@ function base64urlDecode(data: string): string {
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
 
+export async function createJWTToken(payload: object): Promise<string> {
+  return createJWT(payload)
+}
+
 async function createJWT(payload: object): Promise<string> {
   const secret = getJWTSecret()
   const header = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from "react"
-import { login } from "@/app/login/actions"
 import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -13,15 +12,28 @@ export default function LoginForm() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
-    const formData = new FormData(e.currentTarget)
-    const res = await login(formData)
-    if (res?.error) {
+    try {
+      const formData = new FormData(e.currentTarget)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.get('email'),
+          password: formData.get('password'),
+        }),
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setIsSubmitting(false)
+        toast.error("Login Gagal", { description: data.error ?? 'Terjadi kesalahan.' })
+        return
+      }
+      window.location.href = '/dashboard'
+    } catch (err) {
       setIsSubmitting(false)
-      toast.error("Login Gagal", { description: res.error })
-      return
+      toast.error("Login Gagal", { description: 'Tidak dapat terhubung ke server.' })
     }
-    // Pakai window.location — paling reliable di semua browser & mobile
-    window.location.href = '/dashboard'
   }
 
   return (
