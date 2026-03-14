@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { login } from "@/app/login/actions"
 import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
@@ -10,19 +9,19 @@ import Link from "next/link"
 export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const router = useRouter()
 
-  const handleLogin = async (formData: FormData) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
     setIsSubmitting(true)
+    const formData = new FormData(e.currentTarget)
     const res = await login(formData)
     if (res?.error) {
       setIsSubmitting(false)
       toast.error("Login Gagal", { description: res.error })
       return
     }
-    toast.success("Berhasil Login", { description: "Mengalihkan ke dashboard..." })
-    router.push("/dashboard")
-    router.refresh()
+    // Pakai window.location — paling reliable di semua browser & mobile
+    window.location.href = '/dashboard'
   }
 
   return (
@@ -133,7 +132,7 @@ export default function LoginForm() {
             </div>
 
             {/* Form */}
-            <form action={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-5">
 
               {/* Email */}
               <div>

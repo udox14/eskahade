@@ -3,7 +3,6 @@
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setSession } from '@/lib/auth/session'
-import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
@@ -12,10 +11,6 @@ export async function login(formData: FormData) {
   if (!email || !password) {
     return { error: 'Email dan password wajib diisi.' }
   }
-
-  // PENTING: letakkan semua logic di luar try/catch yang membungkus redirect()
-  // karena Next.js redirect() bekerja dengan melempar error NEXT_REDIRECT
-  // yang akan di-catch dan dianggap error biasa jika ada try/catch di luar
 
   let user: {
     id: string
@@ -66,6 +61,5 @@ export async function login(formData: FormData) {
     return { error: 'Gagal menyimpan sesi. Coba lagi.' }
   }
 
-  // redirect() HARUS di luar try/catch — ia melempar NEXT_REDIRECT error secara internal
-  redirect('/dashboard')
+  return { success: true }
 }
