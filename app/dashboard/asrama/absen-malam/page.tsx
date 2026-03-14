@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getSessionInfo, getDataAbsenMalam, batchSaveAbsenMalam } from './actions'
+import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam } from './actions'
 import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -15,12 +15,20 @@ export default function AbsenMalamPage() {
   const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
   const [asramaBinaan, setAsramaBinaan] = useState<string | null>(null)
   const [tanggal, setTanggal] = useState(todayStr())
-  const [santriList, setSantriList] = useState<any[]>([])
+
+  // Daftar kamar (ringan)
+  const [kamars, setKamars] = useState<string[]>([])
+  const [loadingKamars, setLoadingKamars] = useState(false)
+  const [kamarIdx, setKamarIdx] = useState(0)
+
+  // Data santri kamar aktif (lazy, dengan cache)
+  const [santriKamar, setSantriKamar] = useState<any[]>([])
+  const [loadingKamar, setLoadingKamar] = useState(false)
+  const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
+
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedKamars, setSavedKamars] = useState<Set<string>>(new Set())
-  const [kamarIdx, setKamarIdx] = useState(0)
 
   useEffect(() => {
     getSessionInfo().then(s => {
@@ -28,39 +36,59 @@ export default function AbsenMalamPage() {
     })
   }, [])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    const res = await getDataAbsenMalam(asrama, tanggal)
-    setSantriList(res)
-    const map: Record<string, string> = {}
-    res.forEach((s: any) => { map[s.id] = s.status })
-    setLocalStatus(map)
-    setSavedKamars(new Set())
+  // Load daftar kamar saat asrama/tanggal berubah
+  useEffect(() => {
+    if (!asrama) return
+    setLoadingKamars(true)
+    setKamars([])
+    setSantriKamar([])
+    setKamarCache({})
     setKamarIdx(0)
-    setLoading(false)
+    setSavedKamars(new Set())
+    getKamarsMalam(asrama).then(res => {
+      setKamars(res)
+      setLoadingKamars(false)
+    })
   }, [asrama, tanggal])
 
-  useEffect(() => { load() }, [load])
+  // Load santri kamar aktif — lazy, dengan cache per kamar+tanggal
+  useEffect(() => {
+    if (!kamars.length) return
+    const kamar = kamars[kamarIdx]
+    if (!kamar) return
 
-  const grouped = santriList.reduce((acc, s) => {
-    const k = s.kamar || 'Tanpa Kamar'
-    if (!acc[k]) acc[k] = []
-    acc[k].push(s)
-    return acc
-  }, {} as Record<string, any[]>)
+    const cacheKey = `${kamar}__${tanggal}`
+    if (kamarCache[cacheKey]) {
+      const cached = kamarCache[cacheKey]
+      setSantriKamar(cached)
+      // Restore localStatus dari cache
+      const map: Record<string, string> = {}
+      cached.forEach((s: any) => { map[s.id] = s.status })
+      setLocalStatus(prev => ({ ...prev, ...map }))
+      return
+    }
 
-  const kamars = Object.keys(grouped).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
-  const activeKamar = kamars[kamarIdx]
-  const santriKamar: any[] = activeKamar ? grouped[activeKamar] : []
+    setLoadingKamar(true)
+    setSantriKamar([])
+    getDataAbsenMalamKamar(asrama, kamar, tanggal).then(res => {
+      setSantriKamar(res)
+      setKamarCache(prev => ({ ...prev, [`${kamar}__${tanggal}`]: res }))
+      const map: Record<string, string> = {}
+      res.forEach((s: any) => { map[s.id] = s.status })
+      setLocalStatus(prev => ({ ...prev, ...map }))
+      setLoadingKamar(false)
+    })
+  }, [kamarIdx, kamars, tanggal])
 
-  const hadir = Object.values(localStatus).filter(v => v === 'HADIR').length
-  const alfa = Object.values(localStatus).filter(v => v === 'ALFA').length
-  const izin = Object.values(localStatus).filter(v => v === 'IZIN').length
+  const activeKamar = kamars[kamarIdx] ?? ''
+
+  const hadir = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'HADIR').length
+  const alfa  = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'ALFA').length
+  const izin  = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'IZIN').length
 
   const toggle = (id: string) => {
-    if (santriList.find(s => s.id === id)?.is_izin) return
+    if (santriKamar.find(s => s.id === id)?.is_izin) return
     setLocalStatus(prev => ({ ...prev, [id]: prev[id] === 'ALFA' ? 'HADIR' : 'ALFA' }))
-    // Mark kamar unsaved when changed
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
   }
 
@@ -73,8 +101,13 @@ export default function AbsenMalamPage() {
     setSaving(false)
     if ('error' in res) { toast.error(res.error); return }
     setSavedKamars(prev => new Set([...prev, activeKamar]))
+    // Update cache setelah save
+    const cacheKey = `${activeKamar}__${tanggal}`
+    setKamarCache(prev => ({
+      ...prev,
+      [cacheKey]: santriKamar.map(s => ({ ...s, status: localStatus[s.id] || 'HADIR' }))
+    }))
     toast.success(`Kamar ${activeKamar} tersimpan`)
-    // Auto advance to next unsaved kamar
     const nextIdx = kamars.findIndex((k, i) => i > kamarIdx && !savedKamars.has(k))
     if (nextIdx !== -1) setKamarIdx(nextIdx)
   }
@@ -104,6 +137,7 @@ export default function AbsenMalamPage() {
           <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
             className="bg-white/10 text-white text-sm px-3 py-1.5 rounded-xl outline-none border border-white/20 w-full cursor-pointer"/>
 
+          {/* Statistik kamar aktif saja */}
           <div className="flex gap-3">
             <div className="flex-1 bg-white/10 rounded-xl p-3 text-center">
               <p className="text-2xl font-black">{hadir}</p>
@@ -123,7 +157,9 @@ export default function AbsenMalamPage() {
       </div>
 
       {/* KAMAR NAV */}
-      {!loading && kamars.length > 0 && (
+      {loadingKamars ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-slate-400"/></div>
+      ) : kamars.length > 0 && (
         <div className="flex items-center gap-2 px-4 mb-3">
           <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
             className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
@@ -133,7 +169,8 @@ export default function AbsenMalamPage() {
             className="flex-1 bg-white border rounded-xl px-3 py-2 text-sm font-bold text-center outline-none shadow cursor-pointer">
             {kamars.map((k, i) => (
               <option key={k} value={i}>
-                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({grouped[k]?.length || 0} santri)
+                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({/* jumlah tidak diketahui sebelum dibuka */}
+                {kamarCache[`${k}__${tanggal}`]?.length ?? '?'} santri)
               </option>
             ))}
           </select>
@@ -145,15 +182,18 @@ export default function AbsenMalamPage() {
       )}
 
       {/* CONTENT */}
-      {loading ? (
+      {loadingKamar ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-slate-400"/></div>
-      ) : kamars.length === 0 ? (
+      ) : kamars.length === 0 && !loadingKamars ? (
         <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
           Tidak ada santri di asrama ini.
         </div>
-      ) : (
+      ) : santriKamar.length === 0 && !loadingKamar && activeKamar ? (
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
+          Pilih kamar untuk memuat data.
+        </div>
+      ) : santriKamar.length > 0 && (
         <div className="mx-4 bg-white rounded-2xl shadow border overflow-hidden" key={activeKamar}>
-          {/* Kamar header */}
           <div className="bg-slate-800 text-white px-4 py-3 flex justify-between items-center">
             <span className="font-black text-base">KAMAR {activeKamar}</span>
             <div className="flex items-center gap-2">
@@ -166,15 +206,13 @@ export default function AbsenMalamPage() {
             </div>
           </div>
 
-          {/* Santri list */}
           <div className="divide-y divide-slate-100">
             {santriKamar.map((s: any) => {
               const st = localStatus[s.id] || 'HADIR'
               const isAlfa = st === 'ALFA'
               const isIzin = s.is_izin
               return (
-                <button key={s.id} disabled={isIzin}
-                  onClick={() => toggle(s.id)}
+                <button key={s.id} disabled={isIzin} onClick={() => toggle(s.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
                     isAlfa ? 'bg-red-50' : isIzin ? 'bg-blue-50' : 'hover:bg-slate-50'
                   }`}>
@@ -201,8 +239,8 @@ export default function AbsenMalamPage() {
         </div>
       )}
 
-      {/* FIXED BOTTOM: SAVE + NAV */}
-      {!loading && kamars.length > 0 && (
+      {/* FIXED BOTTOM */}
+      {kamars.length > 0 && santriKamar.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
           <div className="max-w-lg mx-auto flex gap-3">
             <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
@@ -211,9 +249,7 @@ export default function AbsenMalamPage() {
             </button>
             <button onClick={saveKamar} disabled={saving}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 ${
-                savedKamars.has(activeKamar)
-                  ? 'bg-green-600 text-white'
-                  : 'bg-slate-900 text-white'
+                savedKamars.has(activeKamar) ? 'bg-green-600 text-white' : 'bg-slate-900 text-white'
               }`}>
               {saving
                 ? <Loader2 className="w-5 h-5 animate-spin"/>

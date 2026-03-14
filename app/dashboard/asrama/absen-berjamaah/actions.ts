@@ -13,19 +13,32 @@ export async function getSessionBerjamaah() {
   if (session.role === 'pengurus_asrama' && ASRAMA_PUTRI.includes(session.asrama_binaan || '')) {
     return { role: 'pengurus_asrama', asrama_binaan: session.asrama_binaan! }
   }
-  return null // Tidak punya akses
+  return null
 }
 
-export async function getDataAbsenBerjamaah(asrama: string, tanggal: string) {
+// Hanya ambil daftar kamar — ringan
+export async function getKamarsBerjamaah(asrama: string) {
+  const rows = await query<{ kamar: string }>(
+    `SELECT DISTINCT kamar
+     FROM santri
+     WHERE status_global = 'aktif' AND asrama = ?
+     ORDER BY CAST(kamar AS INTEGER), kamar`,
+    [asrama]
+  )
+  return rows.map(r => r.kamar)
+}
+
+// Ambil santri + status absen berjamaah hanya untuk 1 kamar
+export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, tanggal: string) {
   const session = await getSession()
   if (!session) return []
 
   const santriList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar
     FROM santri s
-    WHERE s.asrama = ? AND s.status_global = 'aktif'
-    ORDER BY CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
-  `, [asrama])
+    WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [asrama, kamar])
 
   if (!santriList.length) return []
 
@@ -45,14 +58,13 @@ export async function getDataAbsenBerjamaah(asrama: string, tanggal: string) {
 
   return santriList.map((s: any) => ({
     ...s,
-    shubuh: absenMap[s.id]?.shubuh || null,
-    ashar: absenMap[s.id]?.ashar || null,
-    maghrib: absenMap[s.id]?.maghrib || null,
-    isya: absenMap[s.id]?.isya || null,
+    shubuh:  absenMap[s.id]?.shubuh  ?? null,
+    ashar:   absenMap[s.id]?.ashar   ?? null,
+    maghrib: absenMap[s.id]?.maghrib ?? null,
+    isya:    absenMap[s.id]?.isya    ?? null,
   }))
 }
 
-// Batch save satu kamar: records per santri per tanggal
 export async function batchSaveAbsenBerjamaah(
   records: { santri_id: string; shubuh: string | null; ashar: string | null; maghrib: string | null; isya: string | null }[],
   tanggal: string
@@ -64,7 +76,6 @@ export async function batchSaveAbsenBerjamaah(
   const db = await getDB()
   const stmts: any[] = []
 
-  // Santri yang semua waktu hadir (semua null) → hapus record jika ada
   const allHadir = records.filter(r => !r.shubuh && !r.ashar && !r.maghrib && !r.isya).map(r => r.santri_id)
   const toUpsert = records.filter(r => r.shubuh || r.ashar || r.maghrib || r.isya)
 

@@ -12,7 +12,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
-// --- KONFIGURASI TEMA (PALET WARNA PREMIUM) ---
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
 const THEME_COLORS: Record<ThemeKey, any> = {
@@ -208,6 +207,7 @@ const menuNodes: MenuNode[] = [
     items: [
       { title: "Manajemen User", href: "/dashboard/pengaturan/users", icon: UserCog, roles: ['admin'] },
       { title: "Tahun Ajaran", href: "/dashboard/pengaturan/tahun-ajaran", icon: CalendarDays, roles: ['admin'] },
+      { title: "Manajemen Santri", href: "/dashboard/master/santri-tools", icon: Users, roles: ['admin'] },
       { title: "Manajemen Guru & Jadwal", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin'] },
       { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin'] },
       { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin'] },
@@ -227,10 +227,8 @@ interface SidebarProps {
 export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
 
-  // Role langsung dari props (sudah diambil dari JWT di server)
   const [activeRole] = useState<string>(userRole);
 
-  // STATE TEMA
   const [theme, setTheme] = useState<ThemeKey>('emerald');
   const [mounted, setMounted] = useState(false);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
@@ -273,7 +271,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
 
-      {/* Tombol Toggle */}
       <button
         onClick={toggleSidebar}
         className={cn(
@@ -285,13 +282,11 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         {isCollapsed ? <ChevronRight size={14} className="ml-0.5" /> : <ChevronLeft size={14} className="mr-0.5" />}
       </button>
 
-      {/* HEADER LOGO */}
       <div className={cn(
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-16 px-2" : "h-[72px] gap-2.5 px-4"
       )}>
         <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
-
         {isCollapsed ? (
           <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
@@ -305,13 +300,11 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         )}
       </div>
 
-      {/* MENU ITEMS */}
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {menuNodes.map((node, idx) => {
 
           if (!node.isGroup) {
             if (!node.roles?.includes(currentRole as Role)) return null;
-
             const isActive = pathname === node.href;
             return (
               <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
@@ -354,7 +347,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
 
           return (
             <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
-
               <button
                 onClick={() => toggleFolder(node.title)}
                 className={cn(
@@ -425,17 +417,14 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                   </div>
                 </div>
               )}
-
             </div>
           )
         })}
       </nav>
 
-      {/* FOOTER & THEME PICKER */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 shrink-0 bg-black/20 backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
-
           <div className="flex items-center justify-center gap-2 mb-4 relative z-10">
             <Palette className="w-4 h-4 text-white/40 mr-1" />
             {Object.keys(THEME_COLORS).map(t => (
@@ -452,7 +441,6 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
               />
             ))}
           </div>
-
           <div className="flex items-center justify-between relative z-10 px-2">
             <div className="flex flex-col">
               <span className={cn("text-[10px] uppercase tracking-wider mb-1 font-bold", c.mutedText)}>Login Akses:</span>

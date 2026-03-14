@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { getSessionBerjamaah, getDataAbsenBerjamaah, batchSaveAbsenBerjamaah } from './actions'
+import { useState, useEffect } from 'react'
+import { getSessionBerjamaah, getKamarsBerjamaah, getDataAbsenBerjamaahKamar, batchSaveAbsenBerjamaah } from './actions'
 import { Sun, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, ShieldOff } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -36,12 +36,21 @@ export default function AbsenBerjamaahPage() {
   const [sessionInfo, setSessionInfo] = useState<{ role: string; asrama_binaan: string | null } | null | 'loading'>('loading')
   const [asrama, setAsrama] = useState('')
   const [tanggal, setTanggal] = useState(todayStr())
-  const [santriList, setSantriList] = useState<SantriRow[]>([])
+
+  // Daftar kamar (ringan)
+  const [kamars, setKamars] = useState<string[]>([])
+  const [loadingKamars, setLoadingKamars] = useState(false)
+  const [kamarIdx, setKamarIdx] = useState(0)
+
+  // Data santri kamar aktif (lazy, dengan cache)
+  const [santriKamar, setSantriKamar] = useState<SantriRow[]>([])
+  const [loadingKamar, setLoadingKamar] = useState(false)
+  // Cache key: `${kamar}__${tanggal}`
+  const [kamarCache, setKamarCache] = useState<Record<string, SantriRow[]>>({})
+
   const [localData, setLocalData] = useState<Record<string, Record<Waktu, Status>>>({})
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedKamars, setSavedKamars] = useState<Set<string>>(new Set())
-  const [kamarIdx, setKamarIdx] = useState(0)
 
   useEffect(() => {
     getSessionBerjamaah().then(s => {
@@ -51,40 +60,56 @@ export default function AbsenBerjamaahPage() {
     })
   }, [])
 
-  const load = useCallback(async () => {
+  // Load daftar kamar saat asrama/tanggal berubah
+  useEffect(() => {
     if (!asrama) return
-    setLoading(true)
-    const res = await getDataAbsenBerjamaah(asrama, tanggal)
-    setSantriList(res as SantriRow[])
-    const map: Record<string, Record<Waktu, Status>> = {}
-    res.forEach((s: any) => {
-      map[s.id] = { shubuh: s.shubuh, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya }
-    })
-    setLocalData(map)
-    setSavedKamars(new Set())
+    setLoadingKamars(true)
+    setKamars([])
+    setSantriKamar([])
+    setKamarCache({})
     setKamarIdx(0)
-    setLoading(false)
+    setSavedKamars(new Set())
+    getKamarsBerjamaah(asrama).then(res => {
+      setKamars(res)
+      setLoadingKamars(false)
+    })
   }, [asrama, tanggal])
 
-  useEffect(() => { if (asrama) load() }, [load, asrama])
+  // Load santri kamar aktif — lazy, dengan cache
+  useEffect(() => {
+    if (!kamars.length || !asrama) return
+    const kamar = kamars[kamarIdx]
+    if (!kamar) return
 
-  const grouped = santriList.reduce((acc, s) => {
-    const k = s.kamar || 'Tanpa Kamar'
-    if (!acc[k]) acc[k] = []
-    acc[k].push(s)
-    return acc
-  }, {} as Record<string, SantriRow[]>)
+    const cacheKey = `${kamar}__${tanggal}`
+    if (kamarCache[cacheKey]) {
+      const cached = kamarCache[cacheKey]
+      setSantriKamar(cached)
+      const map: Record<string, Record<Waktu, Status>> = {}
+      cached.forEach(s => { map[s.id] = { shubuh: s.shubuh, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
+      setLocalData(prev => ({ ...prev, ...map }))
+      return
+    }
 
-  const kamars = Object.keys(grouped).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
-  const activeKamar = kamars[kamarIdx]
-  const santriKamar = activeKamar ? grouped[activeKamar] : []
+    setLoadingKamar(true)
+    setSantriKamar([])
+    getDataAbsenBerjamaahKamar(asrama, kamar, tanggal).then(res => {
+      setSantriKamar(res as SantriRow[])
+      setKamarCache(prev => ({ ...prev, [cacheKey]: res as SantriRow[] }))
+      const map: Record<string, Record<Waktu, Status>> = {}
+      res.forEach((s: any) => { map[s.id] = { shubuh: s.shubuh, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
+      setLocalData(prev => ({ ...prev, ...map }))
+      setLoadingKamar(false)
+    })
+  }, [kamarIdx, kamars, tanggal])
+
+  const activeKamar = kamars[kamarIdx] ?? ''
 
   const setStatus = (santriId: string, waktu: Waktu, val: Status) => {
     setLocalData(prev => ({ ...prev, [santriId]: { ...(prev[santriId] || { shubuh: null, ashar: null, maghrib: null, isya: null }), [waktu]: val } }))
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
   }
 
-  // Cycle through status on tap
   const cycleStatus = (santriId: string, waktu: Waktu) => {
     const curr = localData[santriId]?.[waktu] ?? null
     const opts = STATUS_OPTS.map(o => o.val)
@@ -96,24 +121,36 @@ export default function AbsenBerjamaahPage() {
     setSaving(true)
     const records = santriKamar.map(s => ({
       santri_id: s.id,
-      shubuh: localData[s.id]?.shubuh ?? null,
-      ashar: localData[s.id]?.ashar ?? null,
+      shubuh:  localData[s.id]?.shubuh  ?? null,
+      ashar:   localData[s.id]?.ashar   ?? null,
       maghrib: localData[s.id]?.maghrib ?? null,
-      isya: localData[s.id]?.isya ?? null,
+      isya:    localData[s.id]?.isya    ?? null,
     }))
     const res = await batchSaveAbsenBerjamaah(records, tanggal)
     setSaving(false)
     if ('error' in res) { toast.error(res.error); return }
     setSavedKamars(prev => new Set([...prev, activeKamar]))
+    // Update cache setelah save
+    const cacheKey = `${activeKamar}__${tanggal}`
+    setKamarCache(prev => ({
+      ...prev,
+      [cacheKey]: santriKamar.map(s => ({
+        ...s,
+        shubuh:  localData[s.id]?.shubuh  ?? null,
+        ashar:   localData[s.id]?.ashar   ?? null,
+        maghrib: localData[s.id]?.maghrib ?? null,
+        isya:    localData[s.id]?.isya    ?? null,
+      }))
+    }))
     toast.success(`Kamar ${activeKamar} tersimpan`)
     const nextIdx = kamars.findIndex((k, i) => i > kamarIdx && !savedKamars.has(k))
     if (nextIdx !== -1) setTimeout(() => setKamarIdx(nextIdx), 300)
   }
 
-  // Stats
+  // Statistik kamar aktif saja (murni dari localData, zero row reads)
   const countStatus = (waktu: Waktu, val: Status) =>
-    santriList.filter(s => (localData[s.id]?.[waktu] ?? null) === val).length
-  const totalSantri = santriList.length
+    santriKamar.filter(s => (localData[s.id]?.[waktu] ?? null) === val).length
+  const totalKamar = santriKamar.length
 
   if (sessionInfo === 'loading') return (
     <div className="flex h-screen items-center justify-center">
@@ -133,7 +170,7 @@ export default function AbsenBerjamaahPage() {
     <div className="max-w-lg mx-auto pb-32 select-none">
 
       {/* HEADER */}
-      <div className={`bg-gradient-to-br from-emerald-900 to-teal-900 text-white p-5 rounded-b-3xl shadow-xl mb-4 relative overflow-hidden`}>
+      <div className="bg-gradient-to-br from-emerald-900 to-teal-900 text-white p-5 rounded-b-3xl shadow-xl mb-4 relative overflow-hidden">
         <div className="relative z-10 space-y-3">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-bold flex items-center gap-2">
@@ -153,17 +190,17 @@ export default function AbsenBerjamaahPage() {
           <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
             className="bg-white/10 text-white text-sm px-3 py-1.5 rounded-xl outline-none border border-white/20 w-full cursor-pointer"/>
 
-          {/* Ringkasan 4 waktu */}
+          {/* Statistik kamar aktif saja — zero row reads */}
           <div className="grid grid-cols-4 gap-1.5">
             {WAKTU.map(w => {
-              const alfa = countStatus(w, 'A')
+              const alfa  = countStatus(w, 'A')
               const sakit = countStatus(w, 'S')
-              const hadir = totalSantri - (santriList.filter(s => (localData[s.id]?.[w] ?? null) !== null).length)
+              const hadir = totalKamar - (santriKamar.filter(s => (localData[s.id]?.[w] ?? null) !== null).length)
               return (
                 <div key={w} className="bg-white/10 rounded-xl p-2 text-center">
                   <p className="text-base">{WAKTU_META[w].icon}</p>
                   <p className="text-[10px] font-bold text-white/80 uppercase">{WAKTU_META[w].label}</p>
-                  <p className="text-sm font-black text-white tabular-nums">{hadir}/{totalSantri}</p>
+                  <p className="text-sm font-black text-white tabular-nums">{hadir}/{totalKamar}</p>
                   {(alfa > 0 || sakit > 0) && (
                     <p className="text-[9px] text-red-300 font-bold">A:{alfa} S:{sakit}</p>
                   )}
@@ -176,7 +213,9 @@ export default function AbsenBerjamaahPage() {
       </div>
 
       {/* KAMAR NAV */}
-      {!loading && kamars.length > 0 && (
+      {loadingKamars ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-teal-400"/></div>
+      ) : kamars.length > 0 && (
         <div className="flex items-center gap-2 px-4 mb-3">
           <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
             className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
@@ -186,7 +225,7 @@ export default function AbsenBerjamaahPage() {
             className="flex-1 bg-white border rounded-xl px-3 py-2 text-sm font-bold text-center outline-none shadow cursor-pointer">
             {kamars.map((k, i) => (
               <option key={k} value={i}>
-                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({grouped[k]?.length || 0})
+                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({kamarCache[`${k}__${tanggal}`]?.length ?? '?'} santri)
               </option>
             ))}
           </select>
@@ -198,15 +237,18 @@ export default function AbsenBerjamaahPage() {
       )}
 
       {/* CONTENT */}
-      {loading ? (
+      {loadingKamar ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-teal-400"/></div>
-      ) : kamars.length === 0 ? (
+      ) : kamars.length === 0 && !loadingKamars ? (
         <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
           Tidak ada santri di asrama ini.
         </div>
-      ) : (
+      ) : santriKamar.length === 0 && !loadingKamar && activeKamar ? (
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
+          Pilih kamar untuk memuat data.
+        </div>
+      ) : santriKamar.length > 0 && (
         <div className="mx-4 bg-white rounded-2xl shadow border overflow-hidden" key={activeKamar}>
-          {/* Kamar header */}
           <div className="bg-teal-900 text-white px-4 py-3 flex justify-between items-center">
             <span className="font-black text-base">KAMAR {activeKamar}</span>
             <div className="flex items-center gap-2">
@@ -264,7 +306,7 @@ export default function AbsenBerjamaahPage() {
       )}
 
       {/* FIXED BOTTOM */}
-      {!loading && kamars.length > 0 && (
+      {kamars.length > 0 && santriKamar.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
           <div className="max-w-lg mx-auto flex gap-3">
             <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
@@ -275,9 +317,12 @@ export default function AbsenBerjamaahPage() {
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 ${
                 savedKamars.has(activeKamar) ? 'bg-green-600 text-white' : 'bg-teal-900 text-white'
               }`}>
-              {saving ? <Loader2 className="w-5 h-5 animate-spin"/>
-                : savedKamars.has(activeKamar) ? <><CheckCircle className="w-5 h-5"/> TERSIMPAN</>
-                : <><Save className="w-5 h-5"/> SIMPAN KAMAR {activeKamar}</>}
+              {saving
+                ? <Loader2 className="w-5 h-5 animate-spin"/>
+                : savedKamars.has(activeKamar)
+                  ? <><CheckCircle className="w-5 h-5"/> TERSIMPAN</>
+                  : <><Save className="w-5 h-5"/> SIMPAN KAMAR {activeKamar}</>
+              }
             </button>
             <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
               className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">

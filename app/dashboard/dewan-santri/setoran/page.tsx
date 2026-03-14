@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
@@ -44,32 +44,31 @@ export default function MonitoringSetoranPage() {
   const [nominal, setNominal] = useState(70000)
   const [data, setData] = useState<AsramaRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
   const [setoranForm, setSetoranForm] = useState<SetoranFormState | null>(null)
   const [savingSetoran, setSavingSetoran] = useState(false)
 
   const tahunList = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true)
     try {
       const [rows, settings] = await Promise.all([
         getMonitoringSetoran(tahun, bulan),
         getSppSettings(tahun),
       ])
-      // Filter per asrama jika user terbatas
-      setData(userAsrama ? rows.filter(r => r.asrama === userAsrama) : rows)
+      setData(userAsrama ? rows.filter((r: AsramaRow) => r.asrama === userAsrama) : rows)
       setNominal(settings.nominal)
+      setHasLoaded(true)
     } finally {
       setLoading(false)
     }
-  }, [tahun, bulan, userAsrama])
+  }
 
   useEffect(() => {
     getClientRestriction().then(setUserAsrama)
   }, [])
-
-  useEffect(() => { load() }, [load])
 
   function prevBulan() {
     if (bulan === 1) { setBulan(12); setTahun(t => t - 1) }
@@ -176,10 +175,12 @@ export default function MonitoringSetoranPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              !hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700 shadow' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {loading ? 'Memuat...' : !hasLoaded ? 'Tampilkan' : 'Perbarui'}
           </button>
         </div>
       </div>
@@ -213,7 +214,22 @@ export default function MonitoringSetoranPage() {
           <span className="ml-2 text-gray-500">Memuat data...</span>
         </div>
       ) : data.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">Tidak ada data asrama</div>
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+          {!hasLoaded ? (
+            <>
+              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
+                <TrendingUp className="w-8 h-8 text-blue-300"/>
+              </div>
+              <p className="text-gray-500 font-semibold">Data belum dimuat</p>
+              <p className="text-sm text-gray-400">Pilih bulan &amp; tahun lalu tekan <strong>Tampilkan</strong>.</p>
+              <button onClick={load} className="mt-1 bg-blue-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all shadow">
+                Tampilkan Sekarang
+              </button>
+            </>
+          ) : (
+            <p className="text-gray-400">Tidak ada data asrama untuk periode ini.</p>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {data.map(row => {

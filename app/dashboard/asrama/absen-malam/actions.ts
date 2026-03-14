@@ -10,23 +10,35 @@ export async function getSessionInfo() {
   return { role: session.role, asrama_binaan: session.asrama_binaan ?? null }
 }
 
-export async function getDataAbsenMalam(asrama: string, tanggal: string) {
+// Hanya ambil daftar kamar — ringan, dipanggil saat halaman pertama dibuka
+export async function getKamarsMalam(asrama: string) {
+  const rows = await query<{ kamar: string }>(
+    `SELECT DISTINCT kamar
+     FROM santri
+     WHERE status_global = 'aktif' AND asrama = ?
+     ORDER BY CAST(kamar AS INTEGER), kamar`,
+    [asrama]
+  )
+  return rows.map(r => r.kamar)
+}
+
+// Ambil santri + status absen + izin hanya untuk 1 kamar
+export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tanggal: string) {
   const session = await getSession()
   if (!session) return []
 
   const santriList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar
     FROM santri s
-    WHERE s.asrama = ? AND s.status_global = 'aktif'
-    ORDER BY CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
-  `, [asrama])
+    WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [asrama, kamar])
 
   if (!santriList.length) return []
 
   const ids = santriList.map((s: any) => s.id)
   const ph = ids.map(() => '?').join(',')
 
-  // Graceful fallback jika tabel belum ada
   let absenList: any[] = []
   let izinList: any[] = []
 
