@@ -1,3 +1,4 @@
+import { guardRole } from '@/lib/auth/guard'
 import { getSession } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from './dashboards/admin-dashboard'
@@ -9,6 +10,7 @@ import { DewanSantriDashboard } from './dashboards/dewan-santri-dashboard'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
+  await guardRole()
   const session = await getSession()
   if (!session) redirect('/login')
 

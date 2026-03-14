@@ -1,3 +1,4 @@
+import { guardPage } from '@/lib/auth/guard'
 import { query, queryOne } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic'
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
 export default async function SantriPage(props: { searchParams: SearchParams }) {
+  await guardPage('/dashboard/santri')
   const searchParams = await props.searchParams
   const session = await getSession()
 

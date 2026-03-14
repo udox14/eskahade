@@ -1,3 +1,4 @@
+import { guardRole } from '@/lib/auth/guard'
 import { getSantriById, updateSantri } from './actions'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -17,6 +18,7 @@ const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500
 const labelCls = "block text-xs font-bold text-gray-500 uppercase mb-1"
 
 export default async function EditSantriPage({ params }: Props) {
+  await guardRole(['admin'])
   const { id } = await params
   const { data: santri, error } = await getSantriById(id)
 

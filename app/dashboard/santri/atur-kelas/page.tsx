@@ -1,3 +1,4 @@
+import { guardPage } from '@/lib/auth/guard'
 import { query } from '@/lib/db'
 import { FileText } from 'lucide-react'
 import { FormAturKelas } from './form-atur-kelas'
@@ -5,6 +6,7 @@ import { FormAturKelas } from './form-atur-kelas'
 export const dynamic = 'force-dynamic'
 
 export default async function AturKelasPage() {
+  await guardPage('/dashboard/santri/atur-kelas')
   const kelasRaw = await query<any>(
     'SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama FROM kelas k LEFT JOIN marhalah m ON m.id = k.marhalah_id', []
   )

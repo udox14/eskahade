@@ -1,8 +1,10 @@
+import { guardPage } from '@/lib/auth/guard'
 import { getCachedMasterPelanggaran } from '@/lib/cache/master'
 import { tambahJenisPelanggaran, hapusJenisPelanggaran } from './actions'
 import { Trash2, Plus } from 'lucide-react'
 
 export default async function MasterPelanggaranPage() {
+  await guardPage('/dashboard/master/pelanggaran')
   const list = await getCachedMasterPelanggaran()
 
   return (

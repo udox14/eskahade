@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { cn } from "@/lib/utils";
+import type { FiturAkses } from "@/lib/cache/fitur-akses";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -13,9 +14,10 @@ interface ClientLayoutProps {
   userEmail: string;
   userName: string;
   avatarUrl?: string | null;
+  fiturAkses: FiturAkses[];
 }
 
-export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl, fiturAkses }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
@@ -32,7 +34,8 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
         {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
         <div className="h-full w-full bg-slate-900 text-white">
            <Sidebar 
-             userRole={userRole} 
+             userRole={userRole}
+             fiturAkses={fiturAkses}
              isCollapsed={isCollapsed} 
              toggleSidebar={() => setIsCollapsed(!isCollapsed)} 
            />
@@ -55,7 +58,8 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
         )}
       >
          <Sidebar 
-            userRole={userRole} 
+            userRole={userRole}
+            fiturAkses={fiturAkses}
             isCollapsed={false}
             toggleSidebar={() => {}} 
             onMobileClose={() => setIsMobileOpen(false)} 

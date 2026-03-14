@@ -1,3 +1,4 @@
+import { guardPage } from '@/lib/auth/guard'
 import Link from 'next/link'
 import { Plus, AlertTriangle, Trash2 } from 'lucide-react'
 import { getDaftarPelanggaran, hapusPelanggaran } from './actions'
@@ -5,6 +6,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
 export default async function KeamananPage() {
+  await guardPage('/dashboard/keamanan')
   const pelanggaranList = await getDaftarPelanggaran()
 
   return (

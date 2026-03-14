@@ -1,16 +1,41 @@
 'use client'
 
 import React from 'react'
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, RefreshCw, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList
+  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList, ToggleRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import type { FiturAkses } from "@/lib/cache/fitur-akses";
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
+  Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
+  Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog,
+  Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
+  Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
+  ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight,
+  Flame, ClipboardList, ToggleRight,
+};
+
+function getIcon(name: string): React.ElementType {
+  return ICON_MAP[name] ?? Settings;
+}
+
+const GROUP_ICON: Record<string, React.ElementType> = {
+  '_standalone': LayoutDashboard,
+  'Kesantrian': ShieldAlert,
+  'Pengkelasan': School,
+  'Nilai & Rapor': BookOpen,
+  'Absensi': CalendarCheck,
+  'Keuangan': Coins,
+  'UPK': Package,
+  'Master Data': Database,
+};
 
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
@@ -27,7 +52,9 @@ const THEME_COLORS: Record<ThemeKey, any> = {
     folderActiveBg: "bg-black/20 border-emerald-500/20",
     folderOpenBg: "border-emerald-500/30",
     indicator: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    glowBg: "bg-emerald-400/10"
+    glowBg: "bg-emerald-400/10",
+    roleBadge: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
+    roleLabel: "text-emerald-400/70",
   },
   blue: {
     bg: "bg-gradient-to-b from-blue-950 via-blue-900 to-slate-950",
@@ -41,7 +68,9 @@ const THEME_COLORS: Record<ThemeKey, any> = {
     folderActiveBg: "bg-black/20 border-blue-500/20",
     folderOpenBg: "border-blue-500/30",
     indicator: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
-    glowBg: "bg-blue-400/10"
+    glowBg: "bg-blue-400/10",
+    roleBadge: "bg-blue-500/20 border-blue-400/30 text-blue-300",
+    roleLabel: "text-blue-400/70",
   },
   purple: {
     bg: "bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950",
@@ -55,7 +84,9 @@ const THEME_COLORS: Record<ThemeKey, any> = {
     folderActiveBg: "bg-black/20 border-purple-500/20",
     folderOpenBg: "border-purple-500/30",
     indicator: "bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)]",
-    glowBg: "bg-purple-400/10"
+    glowBg: "bg-purple-400/10",
+    roleBadge: "bg-purple-500/20 border-purple-400/30 text-purple-300",
+    roleLabel: "text-purple-400/70",
   },
   rose: {
     bg: "bg-gradient-to-b from-rose-950 via-rose-900 to-slate-950",
@@ -69,7 +100,9 @@ const THEME_COLORS: Record<ThemeKey, any> = {
     folderActiveBg: "bg-black/20 border-rose-500/20",
     folderOpenBg: "border-rose-500/30",
     indicator: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]",
-    glowBg: "bg-rose-400/10"
+    glowBg: "bg-rose-400/10",
+    roleBadge: "bg-rose-500/20 border-rose-400/30 text-rose-300",
+    roleLabel: "text-rose-400/70",
   },
   slate: {
     bg: "bg-gradient-to-b from-slate-950 via-slate-900 to-black",
@@ -83,152 +116,34 @@ const THEME_COLORS: Record<ThemeKey, any> = {
     folderActiveBg: "bg-black/30 border-slate-500/20",
     folderOpenBg: "border-slate-500/30",
     indicator: "bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.8)]",
-    glowBg: "bg-slate-400/10"
+    glowBg: "bg-slate-400/10",
+    roleBadge: "bg-slate-500/20 border-slate-400/30 text-slate-300",
+    roleLabel: "text-slate-400/70",
   }
 };
 
-type Role = 'admin' | 'keamanan' | 'sekpen' | 'dewan_santri' | 'pengurus_asrama' | 'wali_kelas' | 'bendahara';
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Administrator',
+  keamanan: 'Keamanan',
+  sekpen: 'Sekretaris Pen.',
+  dewan_santri: 'Dewan Santri',
+  pengurus_asrama: 'Pengurus Asrama',
+  wali_kelas: 'Wali Kelas',
+  bendahara: 'Bendahara',
+};
 
-interface MenuItem {
-  title: string;
-  href: string;
-  icon: React.ElementType;
-  roles: Role[];
-}
-
-interface MenuNode {
-  isGroup: boolean;
-  title: string;
-  icon: React.ElementType;
-  href?: string;
-  roles?: Role[];
-  items?: MenuItem[];
-}
-
-const menuNodes: MenuNode[] = [
-  {
-    isGroup: false,
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    roles: ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
-  },
-  {
-    isGroup: false,
-    title: "Data Santri",
-    href: "/dashboard/santri",
-    icon: Users,
-    roles: ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
-  },
-  {
-    isGroup: true,
-    title: "Kesantrian",
-    icon: ShieldAlert,
-    items: [
-      { title: "Sensus Penduduk", href: "/dashboard/dewan-santri/sensus", icon: BarChart3, roles: ['admin', 'dewan_santri'] },
-      { title: "Laporan Sensus", href: "/dashboard/dewan-santri/sensus/laporan", icon: Printer, roles: ['admin', 'dewan_santri'] },
-      { title: "Manajemen Foto", href: "/dashboard/santri/foto", icon: ImageIcon, roles: ['admin', 'dewan_santri'] },
-      { title: "Layanan Surat", href: "/dashboard/dewan-santri/surat", icon: Mail, roles: ['admin', 'dewan_santri'] },
-      { title: "Absen Malam", href: "/dashboard/asrama/absen-malam", icon: Moon, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Absen Berjamaah", href: "/dashboard/asrama/absen-berjamaah", icon: Flame, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Perpindahan Kamar", href: "/dashboard/asrama/perpindahan-kamar", icon: ArrowLeftRight, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Absen Sakit Pagi", href: "/dashboard/asrama/absen-sakit", icon: Stethoscope, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Katering & Laundry", href: "/dashboard/asrama/layanan", icon: Utensils, roles: ['admin', 'dewan_santri', 'pengurus_asrama'] },
-      { title: "Perizinan Santri", href: "/dashboard/keamanan/perizinan", icon: MapPin, roles: ['admin', 'dewan_santri'] },
-      { title: "Cetak Telat Datang", href: "/dashboard/keamanan/perizinan/cetak-telat", icon: Clock, roles: ['admin', 'keamanan'] },
-      { title: "Verifikasi Telat", href: "/dashboard/keamanan/perizinan/verifikasi-telat", icon: Gavel, roles: ['admin', 'keamanan'] },
-      { title: "Rekap Absen Asrama", href: "/dashboard/keamanan/rekap-asrama", icon: ClipboardList, roles: ['admin', 'keamanan', 'pengurus_asrama'] },
-      { title: "Pelanggaran & SP", href: "/dashboard/keamanan", icon: ShieldAlert, roles: ['admin', 'keamanan'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "Pengkelasan",
-    icon: School,
-    items: [
-      { title: "Tes Klasifikasi", href: "/dashboard/santri/tes-klasifikasi", icon: ClipboardCheck, roles: ['admin', 'sekpen'] },
-      { title: "Penempatan Kelas", href: "/dashboard/santri/atur-kelas", icon: UserPlus, roles: ['admin', 'sekpen'] },
-      { title: "Grading Santri", href: "/dashboard/akademik/grading", icon: BarChart3, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Kenaikan Kelas", href: "/dashboard/akademik/kenaikan", icon: ArrowUpCircle, roles: ['admin', 'sekpen'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "Nilai & Rapor",
-    icon: BookOpen,
-    items: [
-      { title: "Input Nilai", href: "/dashboard/akademik/nilai/input", icon: BookOpen, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Leger Nilai", href: "/dashboard/akademik/leger", icon: FileSpreadsheet, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Ranking & Prestasi", href: "/dashboard/akademik/ranking", icon: TrendingUp, roles: ['admin', 'sekpen', 'wali_kelas'] },
-      { title: "Cetak Rapor", href: "/dashboard/laporan/rapor", icon: FileText, roles: ['admin', 'sekpen', 'wali_kelas'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "Absensi",
-    icon: CalendarCheck,
-    items: [
-      { title: "Absen Pengajian", href: "/dashboard/akademik/absensi", icon: CalendarCheck, roles: ['admin', 'sekpen'] },
-      { title: "Rekap Absensi", href: "/dashboard/akademik/absensi/rekap", icon: Filter, roles: ['admin', 'sekpen', 'wali_kelas', 'keamanan', 'dewan_santri', 'pengurus_asrama'] },
-      { title: "Verifikasi Absen", href: "/dashboard/akademik/absensi/verifikasi", icon: UserCheck, roles: ['admin', 'sekpen'] },
-      { title: "Cetak Pemanggilan", href: "/dashboard/akademik/absensi/cetak", icon: Printer, roles: ['admin', 'sekpen'] },
-      { title: "Cetak Blanko Absen", href: "/dashboard/akademik/absensi/cetak-blanko", icon: FileText, roles: ['admin', 'sekpen'] },
-      { title: "Absen Guru", href: "/dashboard/akademik/absensi-guru", icon: Briefcase, roles: ['admin', 'sekpen'] },
-      { title: "Rekap Absen Guru", href: "/dashboard/akademik/absensi-guru/rekap", icon: UserCheck, roles: ['admin', 'sekpen'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "Keuangan",
-    icon: Coins,
-    items: [
-      { title: "Loket Pembayaran", href: "/dashboard/keuangan/pembayaran", icon: Coins, roles: ['admin', 'bendahara'] },
-      { title: "Laporan Keuangan", href: "/dashboard/keuangan/laporan", icon: FileText, roles: ['admin', 'bendahara'] },
-      { title: "Pembayaran SPP", href: "/dashboard/asrama/spp", icon: CreditCard, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Uang Jajan", href: "/dashboard/asrama/uang-jajan", icon: Wallet, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Status Setoran", href: "/dashboard/asrama/status-setoran", icon: LayoutList, roles: ['admin', 'pengurus_asrama'] },
-      { title: "Monitoring Setoran", href: "/dashboard/dewan-santri/setoran", icon: LayoutList, roles: ['admin', 'dewan_santri'] },
-      { title: "Pengaturan Tarif", href: "/dashboard/keuangan/tarif", icon: Settings, roles: ['admin', 'bendahara'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "UPK",
-    icon: Package,
-    items: [
-      { title: "Kasir UPK", href: "/dashboard/akademik/upk/kasir", icon: ShoppingCart, roles: ['admin', 'sekpen'] },
-      { title: "Manajemen UPK", href: "/dashboard/akademik/upk/manajemen", icon: Package, roles: ['admin', 'sekpen'] },
-    ]
-  },
-  {
-    isGroup: true,
-    title: "Master Data",
-    icon: Database,
-    items: [
-      { title: "Manajemen User", href: "/dashboard/pengaturan/users", icon: UserCog, roles: ['admin'] },
-      { title: "Tahun Ajaran", href: "/dashboard/pengaturan/tahun-ajaran", icon: CalendarDays, roles: ['admin'] },
-      { title: "Manajemen Santri", href: "/dashboard/master/santri-tools", icon: Users, roles: ['admin'] },
-      { title: "Manajemen Guru & Jadwal", href: "/dashboard/master/wali-kelas", icon: UserCheck, roles: ['admin'] },
-      { title: "Manajemen Kelas", href: "/dashboard/master/kelas", icon: Database, roles: ['admin'] },
-      { title: "Manajemen Kitab", href: "/dashboard/master/kitab", icon: Book, roles: ['admin'] },
-      { title: "Master Pelanggaran", href: "/dashboard/master/pelanggaran", icon: Settings, roles: ['admin'] },
-      { title: "Arsip Alumni", href: "/dashboard/santri/arsip", icon: Archive, roles: ['admin'] },
-    ]
-  }
-];
+const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'Master Data'];
 
 interface SidebarProps {
   userRole?: string;
+  fiturAkses: FiturAkses[];
   isCollapsed: boolean;
   toggleSidebar: () => void;
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
+export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-
-  const [activeRole] = useState<string>(userRole);
-
   const [theme, setTheme] = useState<ThemeKey>('emerald');
   const [mounted, setMounted] = useState(false);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
@@ -236,22 +151,33 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('app-theme') as ThemeKey;
-    if (savedTheme && THEME_COLORS[savedTheme]) {
-      setTheme(savedTheme);
-    }
+    if (savedTheme && THEME_COLORS[savedTheme]) setTheme(savedTheme);
   }, []);
+
+  // Build grouped menu dari fiturAkses
+  const groupMap = new Map<string, FiturAkses[]>();
+  for (const f of fiturAkses) {
+    if (!groupMap.has(f.group_name)) groupMap.set(f.group_name, []);
+    groupMap.get(f.group_name)!.push(f);
+  }
+  const groupedMenu = GROUP_ORDER
+    .filter(g => groupMap.has(g))
+    .map(g => ({ group: g, items: groupMap.get(g)! }));
+
+  useEffect(() => {
+    const activeGroup = groupedMenu.find(g =>
+      g.group !== '_standalone' && g.items.some(i => i.href === pathname)
+    );
+    if (activeGroup) {
+      setOpenFolders(prev => ({ ...prev, [activeGroup.group]: true }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const changeTheme = (newTheme: ThemeKey) => {
     setTheme(newTheme);
     localStorage.setItem('app-theme', newTheme);
   };
-
-  useEffect(() => {
-    const activeGroup = menuNodes.find(n => n.isGroup && n.items?.some(i => i.href === pathname));
-    if (activeGroup) {
-      setOpenFolders(prev => ({ ...prev, [activeGroup.title]: true }));
-    }
-  }, [pathname]);
 
   const toggleFolder = (title: string) => {
     if (isCollapsed) {
@@ -262,11 +188,8 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
     }
   };
 
-  const normalizedRole = (activeRole || 'wali_kelas').trim().toLowerCase();
-  const validRoles: Role[] = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara'];
-  const currentRole = validRoles.includes(normalizedRole as Role) ? (normalizedRole as Role) : 'wali_kelas';
-
-  const c = mounted ? THEME_COLORS[theme as ThemeKey] : THEME_COLORS['emerald'];
+  const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
+  const roleLabel = ROLE_LABEL[userRole] ?? userRole.replace('_', ' ');
 
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
@@ -286,7 +209,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-16 px-2" : "h-[72px] gap-2.5 px-4"
       )}>
-        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)}></div>
+        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)} />
         {isCollapsed ? (
           <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
@@ -301,54 +224,54 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
       </div>
 
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
-        {menuNodes.map((node, idx) => {
+        {groupedMenu.map(({ group, items }) => {
 
-          if (!node.isGroup) {
-            if (!node.roles?.includes(currentRole as Role)) return null;
-            const isActive = pathname === node.href;
-            return (
-              <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
-                <Link
-                  href={node.href!}
-                  onClick={onMobileClose}
-                  className={cn(
-                    "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
-                    isCollapsed ? "justify-center p-3 mb-2" : "justify-start px-4 py-3.5 mb-1",
-                    isActive
-                      ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
-                      : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
-                  )}
-                >
-                  <div className="flex items-center space-x-3">
-                    <node.icon className={cn(
-                      "flex-shrink-0 transition-all duration-300",
-                      isCollapsed ? "w-6 h-6" : "w-5 h-5",
-                      isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
-                    )} />
-                    {!isCollapsed && (
-                      <span className={cn(
-                        "text-sm tracking-wide transition-colors duration-300",
-                        isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
-                      )}>
-                        {node.title}
-                      </span>
+          if (group === '_standalone') {
+            return items.map((fitur) => {
+              const Icon = getIcon(fitur.icon);
+              const isActive = pathname === fitur.href;
+              return (
+                <div key={fitur.href} className="animate-in fade-in slide-in-from-left-2 duration-500">
+                  <Link
+                    href={fitur.href}
+                    onClick={onMobileClose}
+                    className={cn(
+                      "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
+                      isCollapsed ? "justify-center p-3 mb-2" : "justify-start px-4 py-3.5 mb-1",
+                      isActive
+                        ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
+                        : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
                     )}
-                  </div>
-                </Link>
-              </div>
-            )
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Icon className={cn(
+                        "flex-shrink-0 transition-all duration-300",
+                        isCollapsed ? "w-6 h-6" : "w-5 h-5",
+                        isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
+                      )} />
+                      {!isCollapsed && (
+                        <span className={cn(
+                          "text-sm tracking-wide transition-colors duration-300",
+                          isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
+                        )}>
+                          {fitur.title}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </div>
+              );
+            });
           }
 
-          const allowedItems = node.items!.filter(item => item.roles.includes(currentRole as any));
-          if (allowedItems.length === 0) return null;
-
-          const isOpen = openFolders[node.title];
-          const hasActiveChild = allowedItems.some(i => i.href === pathname);
+          const GroupIcon = GROUP_ICON[group] ?? Settings;
+          const isOpen = openFolders[group];
+          const hasActiveChild = items.some(i => i.href === pathname);
 
           return (
-            <div key={idx} className="animate-in fade-in slide-in-from-left-2 duration-500">
+            <div key={group} className="animate-in fade-in slide-in-from-left-2 duration-500">
               <button
-                onClick={() => toggleFolder(node.title)}
+                onClick={() => toggleFolder(group)}
                 className={cn(
                   "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
                   isCollapsed ? "justify-center p-3 mb-2" : "justify-between px-4 py-3.5 mb-1",
@@ -361,7 +284,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                 )}
               >
                 <div className="flex items-center space-x-3">
-                  <node.icon className={cn(
+                  <GroupIcon className={cn(
                     "flex-shrink-0 transition-all duration-300",
                     isCollapsed ? "w-6 h-6" : "w-5 h-5",
                     hasActiveChild ? c.glowText : `opacity-80 group-hover:text-white group-hover:opacity-100`
@@ -371,7 +294,7 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                       "font-semibold text-sm tracking-wide transition-colors",
                       hasActiveChild || isOpen ? "text-white" : `${c.mutedText} group-hover:text-white`
                     )}>
-                      {node.title}
+                      {group}
                     </span>
                   )}
                 </div>
@@ -392,12 +315,13 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                   isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
                 )}>
                   <div className="pl-4 space-y-1.5 relative before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 before:rounded-full">
-                    {allowedItems.map((item) => {
-                      const isActive = pathname === item.href;
+                    {items.map((fitur) => {
+                      const ItemIcon = getIcon(fitur.icon);
+                      const isActive = pathname === fitur.href;
                       return (
                         <Link
-                          key={item.href}
-                          href={item.href}
+                          key={fitur.href}
+                          href={fitur.href}
                           onClick={onMobileClose}
                           className={cn(
                             "flex items-center pl-7 pr-4 py-2.5 rounded-r-xl text-sm transition-all duration-300 relative group overflow-hidden",
@@ -406,46 +330,61 @@ export function Sidebar({ userRole = 'wali_kelas', isCollapsed, toggleSidebar, o
                               : `${c.mutedText} hover:text-white ${c.hoverBg} font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-white/20 before:rounded-full hover:before:bg-white/60`
                           )}
                         >
-                          <item.icon className={cn(
+                          <ItemIcon className={cn(
                             "w-4 h-4 mr-3 flex-shrink-0 transition-all duration-300",
                             isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
                           )} />
-                          <span className="truncate">{item.title}</span>
+                          <span className="truncate">{fitur.title}</span>
                         </Link>
-                      )
+                      );
                     })}
                   </div>
                 </div>
               )}
             </div>
-          )
+          );
         })}
       </nav>
 
+      {/* Footer */}
       {!isCollapsed && (
         <div className="p-4 border-t border-white/10 shrink-0 bg-black/20 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
-          <div className="flex items-center justify-center gap-2 mb-4 relative z-10">
-            <Palette className="w-4 h-4 text-white/40 mr-1" />
-            {Object.keys(THEME_COLORS).map(t => (
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Theme switcher */}
+          <div className="flex items-center justify-center gap-2 mb-3 relative z-10">
+            <Palette className="w-3.5 h-3.5 text-white/30" />
+            {(Object.keys(THEME_COLORS) as ThemeKey[]).map(t => (
               <button
                 key={t}
-                onClick={() => changeTheme(t as ThemeKey)}
+                onClick={() => changeTheme(t)}
+                title={t.charAt(0).toUpperCase() + t.slice(1)}
                 className={cn(
-                  "w-4 h-4 rounded-full border-2 transition-all duration-300",
+                  "w-3.5 h-3.5 rounded-full border-2 transition-all duration-300",
                   theme === t ? "border-white scale-125" : "border-transparent opacity-40 hover:opacity-100 hover:scale-110"
                 )}
                 style={{
-                  backgroundColor: t === 'emerald' ? '#10b981' : t === 'blue' ? '#3b82f6' : t === 'purple' ? '#a855f7' : t === 'rose' ? '#f43f5e' : '#475569'
+                  backgroundColor:
+                    t === 'emerald' ? '#10b981' :
+                    t === 'blue'    ? '#3b82f6' :
+                    t === 'purple'  ? '#a855f7' :
+                    t === 'rose'    ? '#f43f5e' : '#475569'
                 }}
               />
             ))}
           </div>
-          <div className="flex items-center justify-between relative z-10 px-2">
-            <div className="flex flex-col">
-              <span className={cn("text-[10px] uppercase tracking-wider mb-1 font-bold", c.mutedText)}>Login Akses:</span>
-              <span className="font-bold text-xs text-white capitalize bg-white/10 px-2.5 py-1 rounded-md border border-white/5 inline-block w-fit">
-                {currentRole.replace('_', ' ')}
+
+          {/* Role badge */}
+          <div className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 border relative z-10", c.roleBadge)}>
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+              <UserCog className="w-3.5 h-3.5 text-white/70" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className={cn("text-[9px] uppercase tracking-widest font-semibold leading-none mb-0.5", c.roleLabel)}>
+                Akses
+              </span>
+              <span className="text-xs font-bold text-white truncate capitalize leading-tight">
+                {roleLabel}
               </span>
             </div>
           </div>

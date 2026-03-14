@@ -1,3 +1,4 @@
+import { guardRole } from '@/lib/auth/guard'
 import { getSantriDetail, getRiwayatAkademik, getRiwayatPelanggaran, getRiwayatPerizinan, getRiwayatSPP, getRiwayatTabungan } from './actions'
 import { SantriProfileView } from './profile-view'
 import { notFound } from 'next/navigation'
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function SantriDetailPage({ params }: Props) {
+  await guardRole()
   // Await params terlebih dahulu (Wajib di Next.js 15)
   const { id } = await params;
 
