@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah } from './actions'
-import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -45,6 +45,8 @@ export default function RekapAsramaPage() {
   const [bulan, setBulan] = useState(bulanIni())
   const [tab, setTab] = useState<'malam' | 'berjamaah'>('malam')
   const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
 
   // Malam data
   const [malamSantri, setMalamSantri] = useState<any[]>([])
@@ -61,13 +63,14 @@ export default function RekapAsramaPage() {
     getSessionRekap().then(s => {
       setSessionInfo(s)
       if (s?.asrama_binaan) setAsrama(s.asrama_binaan)
+      setSessionReady(true)
     })
   }, [])
 
   const load = useCallback(async () => {
-    if (!asrama || !sessionInfo) return
+    if (!sessionReady) return
     setLoading(true)
-    const hideHaid = !sessionInfo.isPutri || sessionInfo.role === 'keamanan'
+    const hideHaid = !sessionInfo?.isPutri || sessionInfo?.role === 'keamanan'
     const [malam, bj] = await Promise.all([
       getRekapAbsenMalam(asrama, bulan),
       ASRAMA_PUTRI.includes(asrama) ? getRekapAbsenBerjamaah(asrama, bulan, hideHaid) : Promise.resolve({ santriList: [], detail: {} })
@@ -78,10 +81,11 @@ export default function RekapAsramaPage() {
     setBjSantri(bj.santriList)
     setBjDetail(bj.detail)
     setExpandedSantri(null)
+    setHasLoaded(true)
     setLoading(false)
-  }, [asrama, bulan, sessionInfo])
+  }, [asrama, bulan, sessionReady])
 
-  useEffect(() => { load() }, [load])
+
 
   const days = getDaysInMonth(bulan)
   const daysArr = Array.from({ length: days }, (_, i) => {
@@ -133,6 +137,20 @@ export default function RekapAsramaPage() {
                 {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
           }
+
+          {/* Tombol Tampilkan */}
+          <button
+            onClick={load}
+            disabled={loading || !sessionReady}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
+              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+              : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
+            }
+          </button>
         </div>
       </div>
 
@@ -150,7 +168,24 @@ export default function RekapAsramaPage() {
         )}
       </div>
 
-      {loading ? (
+      {!hasLoaded && !loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
+            <BarChart3 className="w-10 h-10 text-indigo-300"/>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-gray-500">Data belum dimuat</p>
+            <p className="text-sm text-gray-400 mt-1">Pilih asrama &amp; bulan lalu tekan <strong>Tampilkan</strong>.</p>
+          </div>
+          <button
+            onClick={load}
+            disabled={!sessionReady}
+            className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow disabled:opacity-50"
+          >
+            Tampilkan Sekarang
+          </button>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-indigo-400"/></div>
       ) : (
 
