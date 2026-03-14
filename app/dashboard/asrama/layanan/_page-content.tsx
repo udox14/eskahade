@@ -10,13 +10,15 @@ import {
     simpanBatchLayanan, 
     tambahMasterJasa,
     tambahMasterJasaBatch, 
-    hapusMasterJasa 
+    hapusMasterJasa,
+    getClientRestriction
 } from "./actions";
 
 export default function LayananAsramaPage() {
     // --- STATE FILTER ---
     const [asramaList, setAsramaList] = useState<string[]>([]);
     const [kamarList, setKamarList] = useState<string[]>([]);
+    const [restrictedAsrama, setRestrictedAsrama] = useState<string | null>(null);
     const [selectedAsrama, setSelectedAsrama] = useState<string>("");
     const [selectedKamar, setSelectedKamar] = useState<string>("");
     const [belumDitempatkan, setBelumDitempatkan] = useState<boolean>(false);
@@ -48,8 +50,16 @@ export default function LayananAsramaPage() {
 
     // 1. Initial Load
     useEffect(() => {
-        getDaftarAsrama().then(setAsramaList).catch(console.error);
+        getDaftarAsrama().then(list => {
+            setAsramaList(list);
+            // Kalau hanya 1 asrama (pengurus_asrama) → langsung set
+            if (list.length === 1) setSelectedAsrama(list[0]);
+        }).catch(console.error);
         getMasterJasa().then(setMasterJasa).catch(console.error);
+        // Cek restriction
+        getClientRestriction().then(r => {
+            if (r) setRestrictedAsrama(r);
+        }).catch(console.error);
     }, []);
 
     // 2. Refresh Kamar jika Asrama Berubah

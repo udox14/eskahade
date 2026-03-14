@@ -1,12 +1,12 @@
 import { guardRole } from '@/lib/auth/guard'
+import { getSession } from '@/lib/auth/session'
 import { getSantriDetail, getRiwayatAkademik, getRiwayatPelanggaran, getRiwayatPerizinan, getRiwayatSPP, getRiwayatTabungan } from './actions'
 import { SantriProfileView } from './profile-view'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import { Metadata } from 'next'
 
-// Force dynamic rendering agar data selalu fresh dan menghindari error statis
 export const dynamic = 'force-dynamic'
 
 type Props = {
@@ -22,13 +22,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function SantriDetailPage({ params }: Props) {
-  await guardRole()
-  // Await params terlebih dahulu (Wajib di Next.js 15)
-  const { id } = await params;
+  const session = await guardRole()
+  const { id } = await params
 
-  // FETCH SEMUA DATA PARALLEL
-  const [santri, akademik, pelanggaran, perizinan, spp, tabungan] = await Promise.all([
-    getSantriDetail(id),
+  const santri = await getSantriDetail(id)
+
+  if (!santri) return notFound()
+
+  // Pengurus asrama hanya boleh lihat santri dari asrama binaannya
+  if (session.role === 'pengurus_asrama') {
+    if (!session.asrama_binaan || santri.asrama !== session.asrama_binaan) {
+      redirect('/dashboard/santri')
+    }
+  }
+
+  // Fetch data lain parallel (setelah santri dipastikan ada & boleh diakses)
+  const [akademik, pelanggaran, perizinan, spp, tabungan] = await Promise.all([
     getRiwayatAkademik(id),
     getRiwayatPelanggaran(id),
     getRiwayatPerizinan(id),
@@ -36,13 +45,11 @@ export default async function SantriDetailPage({ params }: Props) {
     getRiwayatTabungan(id)
   ])
 
-  if (!santri) {
-    return notFound()
-  }
+  const isReadOnly = session.role === 'pengurus_asrama'
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      
+
       {/* HEADER PAGE */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -55,23 +62,25 @@ export default async function SantriDetailPage({ params }: Props) {
           </div>
         </div>
 
-        <Link 
-          href={`/dashboard/santri/${santri.id}/edit`}
-          className="inline-flex items-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm"
-        >
-          <Pencil className="w-4 h-4" />
-          Edit Data
-        </Link>
+        {!isReadOnly && (
+          <Link
+            href={`/dashboard/santri/${santri.id}/edit`}
+            className="inline-flex items-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit Data
+          </Link>
+        )}
       </div>
 
-      {/* RENDER VIEW (CLIENT COMPONENT) */}
-      <SantriProfileView 
-         santri={santri}
-         akademik={akademik}
-         pelanggaran={pelanggaran}
-         perizinan={perizinan}
-         spp={spp}
-         tabungan={tabungan}
+      {/* RENDER VIEW */}
+      <SantriProfileView
+        santri={santri}
+        akademik={akademik}
+        pelanggaran={pelanggaran}
+        perizinan={perizinan}
+        spp={spp}
+        tabungan={tabungan}
       />
 
     </div>

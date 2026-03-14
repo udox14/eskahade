@@ -59,6 +59,9 @@ export default function RekapAsramaPage() {
   useEffect(() => { asramaRef.current = asrama }, [asrama])
   useEffect(() => { bulanRef.current = bulan }, [bulan])
 
+  // Flag untuk auto-load setelah session tersedia
+  const [sessionReady, setSessionReady] = useState(false)
+
   useEffect(() => {
     getSessionRekap().then(s => {
       setSessionInfo(s)
@@ -67,8 +70,18 @@ export default function RekapAsramaPage() {
         setAsrama(s.asrama_binaan)
         asramaRef.current = s.asrama_binaan
       }
+      setSessionReady(true)
     })
   }, [])
+
+  // Auto-load untuk pengurus_asrama setelah session + asrama siap
+  // Pakai ref (bukan state) karena state belum ter-update saat useEffect jalan
+  useEffect(() => {
+    if (sessionReady && sessionInfoRef.current?.asrama_binaan) {
+      load()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionReady])
 
   async function load() {
     setLoading(true)
