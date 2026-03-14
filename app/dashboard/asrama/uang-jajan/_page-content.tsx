@@ -85,9 +85,21 @@ export default function UangJajanPage() {
 
   const activeKamar = kamars[kamarIdx] ?? ''
 
-  // Invalidate cache + reload stats setelah mutasi
+  // Invalidate cache + reload stats + reload santri kamar aktif setelah mutasi
   const refreshAfterMutasi = (kamar?: string) => {
-    if (kamar) setKamarCache(prev => { const n = { ...prev }; delete n[kamar]; return n })
+    const targetKamar = kamar || activeKamar
+    // Hapus cache kamar yang dimutasi
+    if (targetKamar) {
+      setKamarCache(prev => { const n = { ...prev }; delete n[targetKamar]; return n })
+      // Reload santri kamar aktif langsung (bukan tunggu useEffect)
+      setLoadingKamar(true)
+      getSantriKamarTabungan(asrama, targetKamar).then(res => {
+        setSantriKamar(res)
+        setKamarCache(prev => ({ ...prev, [targetKamar]: res }))
+        setLoadingKamar(false)
+      })
+    }
+    // Refresh stats header
     getStatsTabungan(asrama).then(setStats)
   }
 
@@ -157,7 +169,12 @@ export default function UangJajanPage() {
     else {
       toast.success('Topup Berhasil')
       setTopupNominal('')
-      openModal(selectedSantri)
+      // Update saldo selectedSantri langsung di state supaya modal tampilkan angka baru
+      const newSaldo = selectedSantri.saldo + nominal
+      setSelectedSantri((prev: any) => ({ ...prev, saldo: newSaldo }))
+      // Reload riwayat di modal
+      setLoadingHistory(true)
+      getRiwayatTabunganSantri(selectedSantri.id).then(h => { setHistory(h); setLoadingHistory(false) })
       refreshAfterMutasi(activeKamar)
     }
   }
