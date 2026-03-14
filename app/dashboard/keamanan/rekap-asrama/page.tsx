@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah } from './actions'
 import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
@@ -22,13 +22,11 @@ function formatBulan(bulan: string) {
 }
 function prevBulan(b: string) {
   const [y, m] = b.split('-').map(Number)
-  const d = new Date(y, m - 2)
-  return d.toISOString().slice(0, 7)
+  return new Date(y, m - 2).toISOString().slice(0, 7)
 }
 function nextBulan(b: string) {
   const [y, m] = b.split('-').map(Number)
-  const d = new Date(y, m)
-  return d.toISOString().slice(0, 7)
+  return new Date(y, m).toISOString().slice(0, 7)
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -46,46 +44,59 @@ export default function RekapAsramaPage() {
   const [tab, setTab] = useState<'malam' | 'berjamaah'>('malam')
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const [sessionReady, setSessionReady] = useState(false)
 
-  // Malam data
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
   const [malamDetail, setMalamDetail] = useState<Record<string, Record<string, string>>>({})
-
-  // Berjamaah data
   const [bjSantri, setBjSantri] = useState<any[]>([])
   const [bjDetail, setBjDetail] = useState<Record<string, Record<string, any>>>({})
 
-  const [expandedSantri, setExpandedSantri] = useState<string | null>(null)
+  // Refs untuk akses nilai terbaru di dalam load() tanpa stale closure
+  const sessionInfoRef = useRef<any>(null)
+  const asramaRef = useRef(asrama)
+  const bulanRef = useRef(bulan)
+
+  useEffect(() => { asramaRef.current = asrama }, [asrama])
+  useEffect(() => { bulanRef.current = bulan }, [bulan])
 
   useEffect(() => {
     getSessionRekap().then(s => {
       setSessionInfo(s)
-      if (s?.asrama_binaan) setAsrama(s.asrama_binaan)
-      setSessionReady(true)
+      sessionInfoRef.current = s
+      if (s?.asrama_binaan) {
+        setAsrama(s.asrama_binaan)
+        asramaRef.current = s.asrama_binaan
+      }
     })
   }, [])
 
-  const load = useCallback(async () => {
-    if (!sessionReady) return
+  async function load() {
     setLoading(true)
-    const hideHaid = !sessionInfo?.isPutri || sessionInfo?.role === 'keamanan'
-    const [malam, bj] = await Promise.all([
-      getRekapAbsenMalam(asrama, bulan),
-      ASRAMA_PUTRI.includes(asrama) ? getRekapAbsenBerjamaah(asrama, bulan, hideHaid) : Promise.resolve({ santriList: [], detail: {} })
-    ])
-    setMalamSantri(malam.santriList)
-    setMalamAlfa(malam.alfaPerSantri)
-    setMalamDetail(malam.detailPerSantri)
-    setBjSantri(bj.santriList)
-    setBjDetail(bj.detail)
-    setExpandedSantri(null)
-    setHasLoaded(true)
-    setLoading(false)
-  }, [asrama, bulan, sessionReady])
+    try {
+      const currentAsrama = asramaRef.current
+      const currentBulan = bulanRef.current
+      const si = sessionInfoRef.current
+      const hideHaid = !si?.isPutri || si?.role === 'keamanan'
+      const isPutriAsrama = ASRAMA_PUTRI.includes(currentAsrama)
 
+      const [malam, bj] = await Promise.all([
+        getRekapAbsenMalam(currentAsrama, currentBulan),
+        isPutriAsrama
+          ? getRekapAbsenBerjamaah(currentAsrama, currentBulan, hideHaid)
+          : Promise.resolve({ santriList: [], detail: {} })
+      ])
 
+      setMalamSantri(malam.santriList)
+      setMalamAlfa(malam.alfaPerSantri)
+      setMalamDetail(malam.detailPerSantri)
+      setBjSantri(bj.santriList)
+      setBjDetail(bj.detail)
+      setHasLoaded(true)
+      if (!isPutriAsrama) setTab('malam')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const days = getDaysInMonth(bulan)
   const daysArr = Array.from({ length: days }, (_, i) => {
@@ -103,6 +114,8 @@ export default function RekapAsramaPage() {
   const sortedKamars = (list: any[]) =>
     Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
 
+  const isPutri = ASRAMA_PUTRI.includes(asrama)
+
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16">
 
@@ -115,19 +128,18 @@ export default function RekapAsramaPage() {
           <p className="text-sm text-gray-500">Absen malam & shalat berjamaah</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Bulan nav */}
+
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <button onClick={() => setBulan(prevBulan(bulan))} className="p-1.5 hover:bg-gray-100 rounded-lg">
+            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-gray-100 rounded-lg">
               <ChevronLeft className="w-4 h-4"/>
             </button>
             <span className="text-sm font-bold text-gray-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <button onClick={() => setBulan(nextBulan(bulan))} disabled={bulan >= bulanIni()}
+            <button onClick={() => setBulan(b => nextBulan(b))} disabled={bulan >= bulanIni()}
               className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30">
               <ChevronRight className="w-4 h-4"/>
             </button>
           </div>
 
-          {/* Asrama */}
           {sessionInfo?.asrama_binaan
             ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
                 <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
@@ -138,11 +150,10 @@ export default function RekapAsramaPage() {
               </select>
           }
 
-          {/* Tombol Tampilkan */}
           <button
             onClick={load}
-            disabled={loading || !sessionReady}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
+            disabled={loading}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
               !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -154,20 +165,23 @@ export default function RekapAsramaPage() {
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-        <button onClick={() => setTab('malam')}
-          className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-gray-500 hover:text-gray-700'}`}>
-          <Moon className="w-4 h-4"/> Absen Malam
-        </button>
-        {ASRAMA_PUTRI.includes(asrama) && (
-          <button onClick={() => setTab('berjamaah')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-gray-500 hover:text-gray-700'}`}>
-            <Sun className="w-4 h-4"/> Berjamaah
+      {/* TABS — muncul hanya setelah ada data */}
+      {hasLoaded && !loading && (
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+          <button onClick={() => setTab('malam')}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Moon className="w-4 h-4"/> Absen Malam
           </button>
-        )}
-      </div>
+          {isPutri && (
+            <button onClick={() => setTab('berjamaah')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Sun className="w-4 h-4"/> Berjamaah
+            </button>
+          )}
+        </div>
+      )}
 
+      {/* KONTEN */}
       {!hasLoaded && !loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
@@ -175,25 +189,24 @@ export default function RekapAsramaPage() {
           </div>
           <div>
             <p className="text-lg font-bold text-gray-500">Data belum dimuat</p>
-            <p className="text-sm text-gray-400 mt-1">Pilih asrama &amp; bulan lalu tekan <strong>Tampilkan</strong>.</p>
+            <p className="text-sm text-gray-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
-          <button
-            onClick={load}
-            disabled={!sessionReady}
-            className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow disabled:opacity-50"
-          >
+          <button onClick={load}
+            className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow">
             Tampilkan Sekarang
           </button>
         </div>
-      ) : loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-indigo-400"/></div>
-      ) : (
 
+      ) : loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-400"/>
+        </div>
+
+      ) : (
         <>
-          {/* ── ABSEN MALAM ── */}
+          {/* ABSEN MALAM */}
           {tab === 'malam' && (
             <div className="space-y-4">
-              {/* Summary cards */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
                   <p className="text-2xl font-black text-gray-800">{malamSantri.length}</p>
@@ -213,8 +226,11 @@ export default function RekapAsramaPage() {
                 </div>
               </div>
 
-              {/* Per kamar */}
-              {sortedKamars(malamSantri).map(kamar => {
+              {malamSantri.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 bg-white border rounded-2xl">
+                  Tidak ada data absen malam untuk periode ini.
+                </div>
+              ) : sortedKamars(malamSantri).map(kamar => {
                 const santriKamar = grouped(malamSantri)[kamar]
                 return (
                   <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
@@ -229,9 +245,7 @@ export default function RekapAsramaPage() {
                             <th className="px-3 py-2 text-left sticky left-0 bg-slate-50 z-10 w-40">Nama</th>
                             <th className="px-2 py-2 text-center font-bold text-red-600 w-10">Σ Alfa</th>
                             {daysArr.map(d => (
-                              <th key={d} className="px-1 py-2 text-center text-slate-400 font-normal w-7">
-                                {d.slice(8)}
-                              </th>
+                              <th key={d} className="px-1 py-2 text-center text-slate-400 font-normal w-7">{d.slice(8)}</th>
                             ))}
                           </tr>
                         </thead>
@@ -273,22 +287,17 @@ export default function RekapAsramaPage() {
             </div>
           )}
 
-          {/* ── ABSEN BERJAMAAH ── */}
+          {/* ABSEN BERJAMAAH */}
           {tab === 'berjamaah' && (
             <div className="space-y-4">
-              {!ASRAMA_PUTRI.includes(asrama) ? (
+              {bjSantri.length === 0 ? (
                 <div className="py-12 text-center text-gray-400 bg-white border rounded-2xl">
-                  Absen berjamaah hanya untuk asrama putri (ASY-SYIFA 1–4).
+                  Tidak ada data absen berjamaah untuk periode ini.
                 </div>
               ) : (
                 <>
-                  {/* Summary 4 waktu */}
                   <div className="grid grid-cols-4 gap-3">
                     {WAKTU.map(w => {
-                      const total = bjSantri.length * days
-                      const nonHadir = bjSantri.reduce((s, santri) => {
-                        return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] !== null).length
-                      }, 0)
                       const alfa = bjSantri.reduce((s, santri) => {
                         return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] === 'A').length
                       }, 0)
@@ -302,7 +311,6 @@ export default function RekapAsramaPage() {
                     })}
                   </div>
 
-                  {/* Per kamar — grid 4 waktu */}
                   {sortedKamars(bjSantri).map(kamar => {
                     const santriKamar = grouped(bjSantri)[kamar]
                     return (
@@ -320,16 +328,13 @@ export default function RekapAsramaPage() {
                                   <th key={w} className="px-1 py-2 text-center font-bold text-slate-500 w-10">{WAKTU_LABEL[w]}</th>
                                 ))}
                                 {daysArr.map(d => (
-                                  <th key={d} className="px-0.5 py-2 text-center text-slate-400 font-normal w-5 text-[10px]">
-                                    {d.slice(8)}
-                                  </th>
+                                  <th key={d} className="px-0.5 py-2 text-center text-slate-400 font-normal w-5 text-[10px]">{d.slice(8)}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody className="divide-y">
                               {santriKamar.map((s: any) => {
                                 const detail = bjDetail[s.id] || {}
-                                // Count per waktu
                                 const counts: Record<Waktu, Record<string, number>> = {
                                   shubuh: {}, ashar: {}, maghrib: {}, isya: {}
                                 }
@@ -360,7 +365,11 @@ export default function RekapAsramaPage() {
                                     {daysArr.map(d => {
                                       const dayData = detail[d]
                                       const hasIssue = dayData && WAKTU.some(w => dayData[w] !== null)
-                                      if (!hasIssue) return <td key={d} className="px-0.5 py-2 text-center"><span className="text-slate-200 text-[9px]">·</span></td>
+                                      if (!hasIssue) return (
+                                        <td key={d} className="px-0.5 py-2 text-center">
+                                          <span className="text-slate-200 text-[9px]">·</span>
+                                        </td>
+                                      )
                                       return (
                                         <td key={d} className="px-0.5 py-1 text-center">
                                           <div className="flex flex-col gap-0.5 items-center">
