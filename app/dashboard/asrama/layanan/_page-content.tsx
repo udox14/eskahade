@@ -14,7 +14,6 @@ import {
 } from "./actions";
 
 export default function LayananAsramaPage() {
-  await guardPage('/dashboard/asrama/layanan')
     // --- STATE FILTER ---
     const [asramaList, setAsramaList] = useState<string[]>([]);
     const [kamarList, setKamarList] = useState<string[]>([]);
