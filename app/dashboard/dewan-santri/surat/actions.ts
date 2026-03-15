@@ -70,10 +70,14 @@ export async function catatSuratKeluar(santriId: string, jenis: string, detail: 
 }
 
 export async function getRiwayatSurat(bulan: number, tahun: number) {
-  const startDate = new Date(tahun, bulan - 1, 1).toISOString()
-  const endDate = new Date(tahun, bulan, 0, 23, 59, 59).toISOString()
+  // Pakai format YYYY-MM-DD agar cocok dengan datetime('now') di SQLite
+  // yang menyimpan dalam format '2026-03-15 10:30:00' bukan ISO
+  const mm = String(bulan).padStart(2, '0')
+  const lastDay = new Date(tahun, bulan, 0).getDate()
+  const startDate = `${tahun}-${mm}-01`
+  const endDate = `${tahun}-${mm}-${String(lastDay).padStart(2, '0')} 23:59:59`
 
-  return query<any>(`
+  const rows = await query<any>(`
     SELECT rs.id, rs.jenis_surat, rs.detail_info, rs.created_at,
            s.nama_lengkap, s.asrama,
            u.full_name AS admin_nama
@@ -83,6 +87,13 @@ export async function getRiwayatSurat(bulan: number, tahun: number) {
     WHERE rs.created_at >= ? AND rs.created_at <= ?
     ORDER BY rs.created_at DESC
   `, [startDate, endDate])
+
+  // Normalkan struktur agar konsisten di frontend
+  return rows.map((r: any) => ({
+    ...r,
+    santri: { nama_lengkap: r.nama_lengkap, asrama: r.asrama },
+    admin: { full_name: r.admin_nama },
+  }))
 }
 
 export async function hapusRiwayatSurat(id: string): Promise<{ success: boolean } | { error: string }> {
