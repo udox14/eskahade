@@ -1,9 +1,13 @@
 // lib/cache/fitur-akses.ts
-// Cache terpusat untuk konfigurasi fitur akses per role.
-// TTL 5 menit — cukup responsif setelah admin ubah, tanpa hammering DB.
-// Invalidasi: panggil revalidateTag('fitur-akses') di action update.
+//
+// CATATAN PENTING:
+// unstable_cache dari Next.js TIDAK reliable di Cloudflare Workers dengan OpenNext.
+// Penggunaan unstable_cache menyebabkan canAccessHref() selalu return false untuk
+// semua non-admin → redirect loop ke /login tanpa pesan error apapun.
+//
+// Fix: query langsung ke D1 per request. D1 sudah sangat cepat, dan semua halaman
+// dashboard sudah pakai `force-dynamic` sehingga tidak ada ISR overhead.
 
-import { unstable_cache } from 'next/cache'
 import { query } from '@/lib/db'
 
 export interface FiturAkses {
@@ -29,22 +33,20 @@ interface FiturAksesRow {
   urutan: number
 }
 
-// Ambil SEMUA fitur — satu query, di-cache, lalu filter di memory per kebutuhan
-export const getCachedFiturAkses = unstable_cache(
-  async (): Promise<FiturAkses[]> => {
-    const rows = await query<FiturAksesRow>(
-      'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan',
-      []
-    )
-    return rows.map(r => ({
-      ...r,
-      roles: JSON.parse(r.roles) as string[],
-      is_active: r.is_active === 1,
-    }))
-  },
-  ['fitur-akses-all'],
-  { tags: ['fitur-akses'], revalidate: 300 } // 5 menit
-)
+// Ambil SEMUA fitur — query langsung ke D1 (tanpa unstable_cache)
+export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
+  const rows = await query<FiturAksesRow>(
+    'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan',
+    []
+  )
+  return rows.map(r => ({
+    ...r,
+    roles: (() => {
+      try { return JSON.parse(r.roles) as string[] } catch { return [] }
+    })(),
+    is_active: r.is_active === 1,
+  }))
+}
 
 // Helper: filter hanya fitur yang aktif DAN role user ada di dalamnya
 export async function getFiturForRole(role: string): Promise<FiturAkses[]> {
