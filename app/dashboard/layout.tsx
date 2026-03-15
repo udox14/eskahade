@@ -13,19 +13,45 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
 
-  const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null }>(
-    'SELECT full_name, role, avatar_url FROM users WHERE id = ?',
-    [session.id]
-  );
+  if (!session) {
+    console.log('[layout] session null → redirect /login')
+    redirect("/login");
+  }
 
-  const userRole = user?.role || 'wali_kelas';
-  const userName = user?.full_name || 'User';
-  const avatarUrl = user?.avatar_url || null;
+  console.log('[layout] session OK, role:', session.role, 'id:', session.id?.substring(0, 8))
 
-  // Ambil fitur yang boleh diakses role ini (satu cache query, hemat row reads)
-  const fiturAkses: FiturAkses[] = await getFiturForRole(userRole);
+  // Ambil data user dari DB — pakai try-catch agar tidak crash kalau kolom belum ada
+  let userName = session.full_name || 'User'
+  let userRole = session.role || 'wali_kelas'
+  let avatarUrl: string | null = null
+
+  try {
+    const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null }>(
+      'SELECT full_name, role, avatar_url FROM users WHERE id = ?',
+      [session.id]
+    );
+    if (user) {
+      userName = user.full_name || userName
+      userRole = user.role || userRole
+      avatarUrl = user.avatar_url ?? null
+    }
+  } catch (err: any) {
+    console.error('[layout] queryOne users ERROR:', err?.message)
+    // Lanjut pakai data dari session JWT
+  }
+
+  console.log('[layout] userRole:', userRole)
+
+  // Ambil fitur yang boleh diakses role ini
+  let fiturAkses: FiturAkses[] = []
+  try {
+    fiturAkses = await getFiturForRole(userRole)
+  } catch (err: any) {
+    console.error('[layout] getFiturForRole ERROR:', err?.message)
+  }
+
+  console.log('[layout] fiturAkses count:', fiturAkses.length)
 
   return (
     <ClientLayout

@@ -2,11 +2,9 @@
 //
 // CATATAN PENTING:
 // unstable_cache dari Next.js TIDAK reliable di Cloudflare Workers dengan OpenNext.
-// Penggunaan unstable_cache menyebabkan canAccessHref() selalu return false untuk
-// semua non-admin → redirect loop ke /login tanpa pesan error apapun.
-//
-// Fix: query langsung ke D1 per request. D1 sudah sangat cepat, dan semua halaman
-// dashboard sudah pakai `force-dynamic` sehingga tidak ada ISR overhead.
+// Fix: query langsung ke D1 per request, dengan try-catch defensif.
+// Kalau tabel fitur_akses belum ada / query gagal → return [] bukan throw,
+// supaya tidak menyebabkan redirect loop ke /login.
 
 import { query } from '@/lib/db'
 
@@ -33,19 +31,24 @@ interface FiturAksesRow {
   urutan: number
 }
 
-// Ambil SEMUA fitur — query langsung ke D1 (tanpa unstable_cache)
+// Ambil SEMUA fitur — query langsung ke D1, dengan fallback aman kalau DB error
 export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
-  const rows = await query<FiturAksesRow>(
-    'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan',
-    []
-  )
-  return rows.map(r => ({
-    ...r,
-    roles: (() => {
-      try { return JSON.parse(r.roles) as string[] } catch { return [] }
-    })(),
-    is_active: r.is_active === 1,
-  }))
+  try {
+    const rows = await query<FiturAksesRow>(
+      'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan',
+      []
+    )
+    return rows.map(r => ({
+      ...r,
+      roles: (() => {
+        try { return JSON.parse(r.roles) as string[] } catch { return [] }
+      })(),
+      is_active: r.is_active === 1,
+    }))
+  } catch (err: any) {
+    console.error('[fitur-akses] getCachedFiturAkses ERROR:', err?.message)
+    return []
+  }
 }
 
 // Helper: filter hanya fitur yang aktif DAN role user ada di dalamnya
