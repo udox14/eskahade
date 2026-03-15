@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
+import { login } from "./actions"
 
 export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -14,21 +15,15 @@ export default function LoginForm() {
     setIsSubmitting(true)
     try {
       const formData = new FormData(e.currentTarget)
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.get('email'),
-          password: formData.get('password'),
-        }),
-        credentials: 'include',
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) {
+      const result = await login(formData)
+
+      if (result?.error) {
         setIsSubmitting(false)
-        toast.error("Login Gagal", { description: data.error ?? 'Terjadi kesalahan.' })
+        toast.error("Login Gagal", { description: result.error })
         return
       }
+
+      // Login berhasil — server action sudah set cookie via next/headers
       window.location.href = '/dashboard'
     } catch (err) {
       setIsSubmitting(false)
