@@ -12,18 +12,42 @@ export async function getClientRestriction() {
 
 // ─── Tarif SPP aktif untuk tahun tertentu ────────────────────────────────
 export async function getSppSettings(tahun: number) {
-  const row = await queryOne<{ nominal: number; tahun_kalender: number }>(
-    `SELECT nominal, tahun_kalender FROM spp_settings
-     WHERE tahun_kalender = ? AND is_active = 1
+  const row = await queryOne<{ nominal: number; tahun_kalender: number; tanggal_tutup_buku: number }>(
+    `SELECT nominal, tahun_kalender, COALESCE(tanggal_tutup_buku, 10) as tanggal_tutup_buku
+     FROM spp_settings WHERE tahun_kalender = ? AND is_active = 1
      ORDER BY id DESC LIMIT 1`,
     [tahun]
   )
-  return row ?? { nominal: 70000, tahun_kalender: tahun }
+  return row ?? { nominal: 70000, tahun_kalender: tahun, tanggal_tutup_buku: 10 }
 }
 
-// ─── Monitoring setoran: CTE flat, tidak ada correlated subquery ──────────
-// Row reads: santri aktif + spp_log bulan ini + bulan lalu (via composite index)
-// Jauh lebih efisien dari versi EXISTS per-row sebelumnya.
+// ─── Update tanggal tutup buku ────────────────────────────────────────────
+export async function updateTanggalTutupBuku(tahun: number, tanggal: number): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (!session || !['admin', 'dewan_santri', 'bendahara'].includes(session.role)) {
+    return { error: 'Akses ditolak' }
+  }
+  // Cek apakah settings untuk tahun ini sudah ada
+  const existing = await queryOne<{ id: number }>(
+    `SELECT id FROM spp_settings WHERE tahun_kalender = ? AND is_active = 1 LIMIT 1`,
+    [tahun]
+  )
+  if (existing) {
+    await execute(
+      `UPDATE spp_settings SET tanggal_tutup_buku = ? WHERE tahun_kalender = ? AND is_active = 1`,
+      [tanggal, tahun]
+    )
+  } else {
+    await execute(
+      `INSERT INTO spp_settings (tahun_kalender, nominal, is_active, tanggal_tutup_buku) VALUES (?, 70000, 1, ?)`,
+      [tahun, tanggal]
+    )
+  }
+  revalidatePath('/dashboard/dewan-santri/setoran')
+  return { success: true }
+}
+
+// ─── Monitoring setoran per asrama ───────────────────────────────────────
 export async function getMonitoringSetoran(tahun: number, bulan: number) {
   const bulanSebelumnya = bulan === 1 ? 12 : bulan - 1
   const tahunSebelumnya = bulan === 1 ? tahun - 1 : tahun
@@ -77,13 +101,32 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     tahun, bulan,
   ])
 
+  // Ambil data setoran yang sudah dikirim pengurus
   const setoranRows = await query<{
     asrama: string
-    tanggal_terima: string
+    tanggal_setor: string | null
+    tanggal_terima: string | null
     nama_penyetor: string | null
     jumlah_aktual: number
+    jumlah_bulan_ini: number
+    jumlah_tunggakan_bayar: number
+    orang_bulan_ini: number
+    orang_tunggakan: number
+    status: string
+    konfirmasi_bulan_ini_at: string | null
+    konfirmasi_tunggakan_at: string | null
+    aktual_bulan_ini: number
+    aktual_tunggakan: number
   }>(
-    `SELECT asrama, tanggal_terima, nama_penyetor, jumlah_aktual
+    `SELECT asrama, tanggal_setor, tanggal_terima, nama_penyetor, jumlah_aktual,
+            COALESCE(jumlah_bulan_ini, 0) as jumlah_bulan_ini,
+            COALESCE(jumlah_tunggakan_bayar, 0) as jumlah_tunggakan_bayar,
+            COALESCE(orang_bulan_ini, 0) as orang_bulan_ini,
+            COALESCE(orang_tunggakan, 0) as orang_tunggakan,
+            COALESCE(status, 'terkirim') as status,
+            konfirmasi_bulan_ini_at, konfirmasi_tunggakan_at,
+            COALESCE(aktual_bulan_ini, 0) as aktual_bulan_ini,
+            COALESCE(aktual_tunggakan, 0) as aktual_tunggakan
      FROM spp_setoran WHERE tahun = ? AND bulan = ?`,
     [tahun, bulan]
   )
@@ -99,14 +142,69 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       ...r,
       penunggak,
       persentase: pct,
-      tanggal_setor: setoran?.tanggal_terima ?? null,
+      tanggal_setor: setoran?.tanggal_setor ?? null,
+      tanggal_terima: setoran?.tanggal_terima ?? null,
       nama_penyetor: setoran?.nama_penyetor ?? null,
       jumlah_aktual: setoran?.jumlah_aktual ?? null,
+      jumlah_bulan_ini: setoran?.jumlah_bulan_ini ?? 0,
+      jumlah_tunggakan_bayar: setoran?.jumlah_tunggakan_bayar ?? 0,
+      orang_bulan_ini: setoran?.orang_bulan_ini ?? 0,
+      orang_tunggakan: setoran?.orang_tunggakan ?? 0,
+      status_setoran: setoran?.status ?? null,
+      konfirmasi_bulan_ini_at: setoran?.konfirmasi_bulan_ini_at ?? null,
+      konfirmasi_tunggakan_at: setoran?.konfirmasi_tunggakan_at ?? null,
+      aktual_bulan_ini: setoran?.aktual_bulan_ini ?? 0,
+      aktual_tunggakan: setoran?.aktual_tunggakan ?? 0,
     }
   })
 }
 
-// ─── Simpan tanggal setoran per asrama ───────────────────────────────────
+// ─── Konfirmasi terima setoran (bulan ini atau tunggakan) ─────────────────
+export async function konfirmasiSetoran(
+  asrama: string,
+  tahun: number,
+  bulan: number,
+  tipe: 'bulan_ini' | 'tunggakan',
+  jumlahAktual: number
+): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM spp_setoran WHERE asrama = ? AND tahun = ? AND bulan = ?`,
+    [asrama, tahun, bulan]
+  )
+  if (!existing) return { error: 'Data setoran tidak ditemukan' }
+
+  if (tipe === 'bulan_ini') {
+    await execute(
+      `UPDATE spp_setoran SET
+        aktual_bulan_ini = ?,
+        konfirmasi_bulan_ini_by = ?,
+        konfirmasi_bulan_ini_at = datetime('now'),
+        tanggal_terima = datetime('now'),
+        status = CASE WHEN konfirmasi_tunggakan_at IS NOT NULL THEN 'dikonfirmasi' ELSE status END
+       WHERE id = ?`,
+      [jumlahAktual, session.id, existing.id]
+    )
+  } else {
+    await execute(
+      `UPDATE spp_setoran SET
+        aktual_tunggakan = ?,
+        konfirmasi_tunggakan_by = ?,
+        konfirmasi_tunggakan_at = datetime('now'),
+        tanggal_terima = datetime('now'),
+        status = CASE WHEN konfirmasi_bulan_ini_at IS NOT NULL THEN 'dikonfirmasi' ELSE status END
+       WHERE id = ?`,
+      [jumlahAktual, session.id, existing.id]
+    )
+  }
+
+  revalidatePath('/dashboard/dewan-santri/setoran')
+  return { success: true }
+}
+
+// ─── Simpan setoran manual (legacy / fallback) ───────────────────────────
 export async function simpanSetoran(
   asrama: string,
   tahun: number,
@@ -121,43 +219,122 @@ export async function simpanSetoran(
       params: [asrama, tahun, bulan],
     },
     {
-      sql: `INSERT INTO spp_setoran (id, asrama, bulan, tahun, tanggal_terima, penerima_id, jumlah_aktual, nama_penyetor)
-            VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?)`,
+      sql: `INSERT INTO spp_setoran (id, asrama, bulan, tahun, tanggal_terima, penerima_id, jumlah_aktual, nama_penyetor, status, tanggal_setor)
+            VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, 'dikonfirmasi', datetime('now'))`,
       params: [generateId(), asrama, bulan, tahun, session?.id ?? null, jumlahAktual, namaPenyetor],
     },
   ])
-  revalidatePath('/dashboard/asrama/spp/monitoring')
+  revalidatePath('/dashboard/dewan-santri/setoran')
   return { success: true }
 }
 
-// ─── Fungsi lama — tetap untuk halaman input pembayaran ──────────────────
+// ─── Daftar penunggak bulan tertentu ─────────────────────────────────────
+export async function getDaftarPenunggak(
+  tahun: number,
+  bulan: number,
+  asramaFilter?: string,
+  kamarFilter?: string
+) {
+  const params: any[] = [tahun, bulan]
+  let asramaClause = ''
+  let kamarClause = ''
 
+  if (asramaFilter && asramaFilter !== 'SEMUA') {
+    asramaClause = 'AND s.asrama = ?'
+    params.push(asramaFilter)
+  }
+  if (kamarFilter && kamarFilter !== 'SEMUA') {
+    kamarClause = 'AND s.kamar = ?'
+    params.push(kamarFilter)
+  }
+
+  const rows = await query<{
+    id: string
+    nama_lengkap: string
+    nis: string
+    asrama: string
+    kamar: string
+    sekolah: string | null
+    kelas_sekolah: string | null
+    nama_kelas: string | null
+    marhalah_nama: string | null
+    alasan: string | null
+  }>(`
+    SELECT
+      s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+      s.sekolah, s.kelas_sekolah,
+      k.nama_kelas,
+      m.nama AS marhalah_nama,
+      ta.alasan
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN spp_tunggakan_alasan ta ON ta.santri_id = s.id AND ta.bulan = ? AND ta.tahun = ?
+    WHERE s.status_global = 'aktif'
+      AND s.bebas_spp = 0
+      ${asramaClause}
+      ${kamarClause}
+      AND NOT EXISTS (
+        SELECT 1 FROM spp_log sl
+        WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
+      )
+    ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
+  `, [bulan, tahun, ...params.slice(2), tahun, bulan])
+
+  return rows
+}
+
+// ─── Daftar asrama untuk filter ──────────────────────────────────────────
+export async function getAsramaList() {
+  const rows = await query<{ asrama: string }>(
+    `SELECT DISTINCT asrama FROM santri WHERE status_global = 'aktif' AND asrama IS NOT NULL ORDER BY asrama`
+  )
+  return rows.map(r => r.asrama)
+}
+
+// ─── Daftar kamar per asrama untuk filter ────────────────────────────────
+export async function getKamarList(asrama: string) {
+  const rows = await query<{ kamar: string }>(
+    `SELECT DISTINCT kamar FROM santri WHERE status_global = 'aktif' AND asrama = ? ORDER BY CAST(kamar AS INTEGER), kamar`,
+    [asrama]
+  )
+  return rows.map(r => r.kamar)
+}
+
+// ─── Simpan/update alasan penunggak ──────────────────────────────────────
+export async function simpanAlasanPenunggak(
+  santriId: string,
+  tahun: number,
+  bulan: number,
+  alasan: string
+): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  await execute(
+    `INSERT INTO spp_tunggakan_alasan (id, santri_id, bulan, tahun, alasan, updated_by, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(santri_id, bulan, tahun) DO UPDATE SET
+       alasan = excluded.alasan,
+       updated_by = excluded.updated_by,
+       updated_at = excluded.updated_at`,
+    [generateId(), santriId, bulan, tahun, alasan, session.id]
+  )
+  return { success: true }
+}
+
+// ─── Fungsi lama ──────────────────────────────────────────────────────────
 export async function getNominalSPP() {
   const s = await getSppSettings(new Date().getFullYear())
   return s.nominal
 }
 
-export async function getRingkasanTunggakan(asramaFilter?: string) {
-  const tahun = new Date().getFullYear()
-  const currentMonth = new Date().getMonth() + 1
-  const asramaClause = (asramaFilter && asramaFilter !== 'SEMUA') ? 'AND s.asrama = ?' : ''
-  const params: any[] = [tahun, currentMonth, currentMonth]
-  if (asramaFilter && asramaFilter !== 'SEMUA') params.push(asramaFilter)
-  const result = await queryOne<{ penunggak: number }>(`
-    SELECT COUNT(*) AS penunggak
-    FROM santri s
-    WHERE s.status_global = 'aktif'
-      AND s.bebas_spp = 0
-      ${asramaClause}
-      AND (
-        SELECT COUNT(DISTINCT sl.bulan)
-        FROM spp_log sl
-        WHERE sl.santri_id = s.id
-          AND sl.tahun = ?
-          AND sl.bulan BETWEEN 1 AND ?
-      ) < ?
-  `, params)
-  return result?.penunggak ?? 0
+export async function getStatusSPP(santriId: string, tahun: number) {
+  return query<any>(
+    `SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?`,
+    [santriId, tahun]
+  )
 }
 
 export async function getDashboardSPP(tahun: number, asrama: string) {
@@ -190,13 +367,6 @@ export async function getDashboardSPP(tahun: number, asrama: string) {
     jumlah_tunggakan: s.bebas_spp ? 0 : Math.max(0, maxCheck - (s.jumlah_bayar ?? 0)),
     kamar_num: s.kamar_num || 999,
   }))
-}
-
-export async function getStatusSPP(santriId: string, tahun: number) {
-  return query<any>(
-    `SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?`,
-    [santriId, tahun]
-  )
 }
 
 export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number): Promise<{ success: boolean } | { error: string }> {

@@ -269,7 +269,7 @@ export default function LayananSuratPage() {
                         <tbody className="divide-y">
                             {riwayat.map((row) => (
                                 <tr key={row.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-mono text-xs text-gray-500">{format(new Date(row.created_at), 'dd/MM/yyyy HH:mm', {locale:id})}</td>
+                                    <td className="px-6 py-3 font-mono text-xs text-gray-500">{format(new Date((row.created_at ?? '').replace(' ', 'T')), 'dd/MM/yyyy HH:mm', {locale:id})}</td>
                                     <td className="px-6 py-3">
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
                                             row.jenis_surat === 'IZIN' ? 'bg-purple-50 text-purple-700 border-purple-200' :
