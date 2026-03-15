@@ -15,17 +15,21 @@ export default function LoginForm() {
     setIsSubmitting(true)
     try {
       const formData = new FormData(e.currentTarget)
+      // Server action akan redirect('/dashboard') langsung dari server
+      // jika error, return { error: '...' }
       const result = await login(formData)
 
+      // Kalau sampai sini berarti ada error (redirect tidak throw ke sini)
       if (result?.error) {
         setIsSubmitting(false)
         toast.error("Login Gagal", { description: result.error })
+      }
+    } catch (err: any) {
+      // Next.js redirect() melempar NEXT_REDIRECT — ini normal, bukan error
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+        // Redirect sedang berjalan, biarkan
         return
       }
-
-      // Login berhasil — server action sudah set cookie via next/headers
-      window.location.href = '/dashboard'
-    } catch (err) {
       setIsSubmitting(false)
       toast.error("Login Gagal", { description: 'Tidak dapat terhubung ke server.' })
     }

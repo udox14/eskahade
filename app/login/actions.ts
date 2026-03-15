@@ -3,6 +3,7 @@
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setSession } from '@/lib/auth/session'
+import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
@@ -68,6 +69,8 @@ export async function login(formData: FormData) {
     return { error: 'Gagal menyimpan sesi: ' + err?.message }
   }
 
-  console.log('[LOGIN] Step 5: returning success')
-  return { success: true }
+  console.log('[LOGIN] Step 5: redirecting to /dashboard')
+  // Redirect dari server — ini yang memastikan Set-Cookie header
+  // dikirim bersamaan dengan response redirect ke browser
+  redirect('/dashboard')
 }
