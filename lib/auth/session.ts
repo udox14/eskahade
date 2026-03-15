@@ -72,15 +72,21 @@ async function verifyJWT(token: string): Promise<SessionUser | null> {
       false, ['verify']
     )
 
-    let sigBytes: Uint8Array
+    // Fix TypeScript: buat ArrayBuffer eksplisit agar kompatibel dengan crypto.subtle.verify
+    let sigBuffer: ArrayBuffer
     try {
-      sigBytes = Uint8Array.from(base64urlDecode(sig).split('').map(c => c.charCodeAt(0)))
+      const sigDecoded = base64urlDecode(sig)
+      const sigArr = new Uint8Array(sigDecoded.length)
+      for (let i = 0; i < sigDecoded.length; i++) {
+        sigArr[i] = sigDecoded.charCodeAt(i)
+      }
+      sigBuffer = sigArr.buffer as ArrayBuffer
     } catch (e: any) {
       console.error('[verifyJWT] base64urlDecode sig ERROR:', e?.message)
       return null
     }
 
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(`${header}.${body}`))
+    const valid = await crypto.subtle.verify('HMAC', key, sigBuffer, enc.encode(`${header}.${body}`))
     if (!valid) {
       console.error('[verifyJWT] signature TIDAK VALID — JWT_SECRET mungkin berbeda saat sign vs verify')
       return null
