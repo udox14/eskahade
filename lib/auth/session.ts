@@ -4,8 +4,6 @@ import { cookies } from 'next/headers'
 
 const SESSION_COOKIE = 'eskahade_session'
 
-// Di Cloudflare Workers (via OpenNext), secrets yang di-set via `wrangler secret put`
-// langsung tersedia di process.env — tidak perlu getCloudflareContext()
 function getJWTSecret(): string {
   const secret = process.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET tidak ditemukan di environment variables')
@@ -56,8 +54,16 @@ async function createJWT(payload: object): Promise<string> {
 async function verifyJWT(token: string): Promise<SessionUser | null> {
   try {
     const secret = getJWTSecret()
-    const [header, body, sig] = token.split('.')
-    if (!header || !body || !sig) return null
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      console.error('[verifyJWT] token parts invalid, count:', parts.length)
+      return null
+    }
+    const [header, body, sig] = parts
+    if (!header || !body || !sig) {
+      console.error('[verifyJWT] header/body/sig kosong')
+      return null
+    }
 
     const enc = new TextEncoder()
     const key = await crypto.subtle.importKey(
@@ -65,39 +71,70 @@ async function verifyJWT(token: string): Promise<SessionUser | null> {
       { name: 'HMAC', hash: 'SHA-256' },
       false, ['verify']
     )
-    const sigBytes = Uint8Array.from(base64urlDecode(sig).split('').map(c => c.charCodeAt(0)))
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(`${header}.${body}`))
-    if (!valid) return null
 
-    const payload = JSON.parse(base64urlDecode(body))
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
+    let sigBytes: Uint8Array
+    try {
+      sigBytes = Uint8Array.from(base64urlDecode(sig).split('').map(c => c.charCodeAt(0)))
+    } catch (e: any) {
+      console.error('[verifyJWT] base64urlDecode sig ERROR:', e?.message)
+      return null
+    }
+
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(`${header}.${body}`))
+    if (!valid) {
+      console.error('[verifyJWT] signature TIDAK VALID — JWT_SECRET mungkin berbeda saat sign vs verify')
+      return null
+    }
+
+    let payload: any
+    try {
+      payload = JSON.parse(base64urlDecode(body))
+    } catch (e: any) {
+      console.error('[verifyJWT] JSON.parse body ERROR:', e?.message)
+      return null
+    }
+
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      console.error('[verifyJWT] token EXPIRED')
+      return null
+    }
+
+    console.log('[verifyJWT] OK, role:', payload.role)
     return payload as SessionUser
-  } catch {
+  } catch (e: any) {
+    console.error('[verifyJWT] unexpected ERROR:', e?.message)
     return null
   }
 }
 
 export async function setSession(user: SessionUser): Promise<void> {
   const token = await createJWT(user)
+  console.log('[setSession] token length:', token.length, 'role:', user.role)
   const cookieStore = await cookies()
   cookieStore.set({
     name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7
   })
+  console.log('[setSession] cookie set OK')
 }
 
 export async function getSession(): Promise<SessionUser | null> {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get(SESSION_COOKIE)?.value
-    if (!token) return null
+    if (!token) {
+      console.log('[getSession] cookie tidak ada')
+      return null
+    }
+    console.log('[getSession] token ditemukan, length:', token.length)
     return await verifyJWT(token)
-  } catch {
+  } catch (e: any) {
+    console.error('[getSession] ERROR:', e?.message)
     return null
   }
 }
