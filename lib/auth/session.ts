@@ -23,7 +23,10 @@ function base64urlEncode(data: string): string {
 }
 
 function base64urlDecode(data: string): string {
-  const padded = data + '=='.slice((data.length + 3) % 4)
+  // FIX: padding yang benar untuk base64url
+  // Formula lama '=='.slice((data.length + 3) % 4) salah untuk panjang non-kelipatan 4
+  const pad = (4 - (data.length % 4)) % 4
+  const padded = data + '='.repeat(pad)
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
 
@@ -54,16 +57,8 @@ async function createJWT(payload: object): Promise<string> {
 async function verifyJWT(token: string): Promise<SessionUser | null> {
   try {
     const secret = getJWTSecret()
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      console.error('[verifyJWT] token parts invalid, count:', parts.length)
-      return null
-    }
-    const [header, body, sig] = parts
-    if (!header || !body || !sig) {
-      console.error('[verifyJWT] header/body/sig kosong')
-      return null
-    }
+    const [header, body, sig] = token.split('.')
+    if (!header || !body || !sig) return null
 
     const enc = new TextEncoder()
     const key = await crypto.subtle.importKey(
@@ -72,50 +67,27 @@ async function verifyJWT(token: string): Promise<SessionUser | null> {
       false, ['verify']
     )
 
-    // Fix TypeScript: buat ArrayBuffer eksplisit agar kompatibel dengan crypto.subtle.verify
-    let sigBuffer: ArrayBuffer
-    try {
-      const sigDecoded = base64urlDecode(sig)
-      const sigArr = new Uint8Array(sigDecoded.length)
-      for (let i = 0; i < sigDecoded.length; i++) {
-        sigArr[i] = sigDecoded.charCodeAt(i)
-      }
-      sigBuffer = sigArr.buffer as ArrayBuffer
-    } catch (e: any) {
-      console.error('[verifyJWT] base64urlDecode sig ERROR:', e?.message)
-      return null
+    const sigDecoded = base64urlDecode(sig)
+    const sigArr = new Uint8Array(sigDecoded.length)
+    for (let i = 0; i < sigDecoded.length; i++) {
+      sigArr[i] = sigDecoded.charCodeAt(i)
     }
+    const sigBuffer = sigArr.buffer as ArrayBuffer
 
     const valid = await crypto.subtle.verify('HMAC', key, sigBuffer, enc.encode(`${header}.${body}`))
-    if (!valid) {
-      console.error('[verifyJWT] signature TIDAK VALID — JWT_SECRET mungkin berbeda saat sign vs verify')
-      return null
-    }
+    if (!valid) return null
 
-    let payload: any
-    try {
-      payload = JSON.parse(base64urlDecode(body))
-    } catch (e: any) {
-      console.error('[verifyJWT] JSON.parse body ERROR:', e?.message)
-      return null
-    }
+    const payload = JSON.parse(base64urlDecode(body))
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
 
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      console.error('[verifyJWT] token EXPIRED')
-      return null
-    }
-
-    console.log('[verifyJWT] OK, role:', payload.role)
     return payload as SessionUser
-  } catch (e: any) {
-    console.error('[verifyJWT] unexpected ERROR:', e?.message)
+  } catch {
     return null
   }
 }
 
 export async function setSession(user: SessionUser): Promise<void> {
   const token = await createJWT(user)
-  console.log('[setSession] token length:', token.length, 'role:', user.role)
   const cookieStore = await cookies()
   cookieStore.set({
     name: SESSION_COOKIE,
@@ -126,21 +98,15 @@ export async function setSession(user: SessionUser): Promise<void> {
     path: '/',
     maxAge: 60 * 60 * 24 * 7
   })
-  console.log('[setSession] cookie set OK')
 }
 
 export async function getSession(): Promise<SessionUser | null> {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get(SESSION_COOKIE)?.value
-    if (!token) {
-      console.log('[getSession] cookie tidak ada')
-      return null
-    }
-    console.log('[getSession] token ditemukan, length:', token.length)
+    if (!token) return null
     return await verifyJWT(token)
-  } catch (e: any) {
-    console.error('[getSession] ERROR:', e?.message)
+  } catch {
     return null
   }
 }
