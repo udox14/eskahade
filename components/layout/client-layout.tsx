@@ -28,7 +28,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
       <div 
         className={cn(
           "no-print hidden md:flex flex-col fixed inset-y-0 z-50 shadow-2xl transition-all duration-300 ease-in-out",
-          isCollapsed ? "w-20" : "w-64"
+          isCollapsed ? "w-16" : "w-60"
         )}
       >
         {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
@@ -53,7 +53,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
       {/* Drawer Sidebar */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 w-60 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -70,7 +70,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
       <div 
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out h-full",
-          isCollapsed ? "md:pl-20" : "md:pl-64"
+          isCollapsed ? "md:pl-16" : "md:pl-60"
         )}
       >
         {/* HEADER */}

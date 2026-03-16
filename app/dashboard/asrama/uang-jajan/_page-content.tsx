@@ -247,9 +247,17 @@ export default function UangJajanPage() {
             className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 text-gray-600">
             <ChevronLeft className="w-6 h-6"/>
           </button>
-          <div className="text-center">
-            <span className="text-xs text-gray-500 uppercase font-bold">KAMAR</span>
-            <p className="font-bold text-lg text-gray-800">{activeKamar}</p>
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Kamar</span>
+            <select
+              value={kamarIdx}
+              onChange={e => setKamarIdx(Number(e.target.value))}
+              className="font-bold text-lg text-slate-800 text-center outline-none bg-transparent cursor-pointer"
+            >
+              {kamars.map((k, idx) => (
+                <option key={k} value={idx}>{k}</option>
+              ))}
+            </select>
           </div>
           <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
             className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 text-gray-600">

@@ -11,7 +11,7 @@ import {
   Banknote, RefreshCw, UserCheck, UserX, ArrowLeftRight, Pencil, X, Check,
   Settings, Download, FileSpreadsheet, Printer, Search, Filter,
   TrendingUp, ShieldCheck, CalendarCheck, Clock, BadgeCheck, SendHorizonal,
-  ChevronDown
+  ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -538,6 +538,9 @@ function TabMonitoring({
 // ── Tab Daftar Penunggak ──────────────────────────────────────────────────
 function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
   const [data, setData] = useState<Penunggak[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [asramaList, setAsramaList] = useState<string[]>([])
@@ -562,19 +565,23 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
     }
   }, [filterAsrama])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pg = 1) => {
     setLoading(true)
     try {
-      const rows = await getDaftarPenunggak(
+      const res = await getDaftarPenunggak({
         tahun, bulan,
-        filterAsrama !== 'SEMUA' ? filterAsrama : undefined,
-        filterKamar !== 'SEMUA' ? filterKamar : undefined,
-      )
-      setData(rows)
+        asramaFilter: filterAsrama !== 'SEMUA' ? filterAsrama : undefined,
+        kamarFilter:  filterKamar  !== 'SEMUA' ? filterKamar  : undefined,
+        page: pg,
+      })
+      setData(res.rows)
+      setTotal(res.total)
+      setTotalPages(res.totalPages)
+      setPage(pg)
       // Init alasan draft dari DB
       const init: Record<string, string> = {}
-      rows.forEach(r => { if (r.alasan) init[r.id] = r.alasan })
-      setAlasanDraft(init)
+      res.rows.forEach(r => { if (r.alasan) init[r.id] = r.alasan })
+      setAlasanDraft(prev => ({ ...prev, ...init }))
       setHasLoaded(true)
     } finally {
       setLoading(false)
@@ -593,7 +600,7 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
     if (typeof XLSX === 'undefined') return toast.error('SheetJS belum dimuat')
     const wsData = [
       ['No', 'Nama Santri', 'Asrama', 'Kamar', 'Kelas Pesantren', 'Sekolah', 'Kelas Sekolah', 'Alasan'],
-      ...filtered.map((r, i) => [
+      ...data.map((r, i) => [
         i + 1, r.nama_lengkap, r.asrama, r.kamar,
         r.nama_kelas ? `${r.marhalah_nama ?? ''} - ${r.nama_kelas}` : '—',
         r.sekolah ?? '—', r.kelas_sekolah ?? '—',
@@ -672,7 +679,7 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-sm text-slate-500">
-              <span className="font-bold text-slate-800">{filtered.length}</span> penunggak
+              <span className="font-bold text-slate-800">{data.length}</span> dari <span className="font-bold text-slate-800">{total}</span> penunggak
               {filterAsrama !== 'SEMUA' && <span> · {filterAsrama}</span>}
               {filterKamar !== 'SEMUA' && <span> · Kamar {filterKamar}</span>}
             </div>
@@ -688,7 +695,7 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {data.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
               <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-300" />
               <p className="font-medium">Tidak ada penunggak!</p>
@@ -717,7 +724,7 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filtered.map((r, i) => (
+                    {data.map((r, i) => (
                       <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                         <td className="px-4 py-3">
@@ -765,6 +772,35 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <button onClick={() => load(page - 1)} disabled={page <= 1 || loading}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                <ChevronLeft className="w-4 h-4" /> Sebelumnya
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pg = i + 1
+                  if (totalPages > 5) {
+                    if (page <= 3) pg = i + 1
+                    else if (page >= totalPages - 2) pg = totalPages - 4 + i
+                    else pg = page - 2 + i
+                  }
+                  return (
+                    <button key={pg} onClick={() => load(pg)} disabled={loading}
+                      className={`w-9 h-9 rounded-xl text-sm font-bold transition-all ${
+                        pg === page ? 'bg-emerald-600 text-white shadow-sm' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}>{pg}</button>
+                  )
+                })}
+              </div>
+              <button onClick={() => load(page + 1)} disabled={page >= totalPages || loading}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                Berikutnya <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           )}
         </>

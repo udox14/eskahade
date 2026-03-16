@@ -197,7 +197,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
       <button
         onClick={toggleSidebar}
         className={cn(
-          "absolute -right-3 top-24 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
+          "absolute -right-3 top-16 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
           c.toggleBtn
         )}
         title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
@@ -207,11 +207,11 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
 
       <div className={cn(
         "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
-        isCollapsed ? "h-16 px-2" : "h-[72px] gap-2.5 px-4"
+        isCollapsed ? "h-12 px-0 justify-center" : "h-12 gap-2.5 px-4"
       )}>
         <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)} />
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
+          <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
             <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-xl relative z-10 shrink-0" />
@@ -223,7 +223,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
         )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {groupedMenu.map(({ group, items }) => {
 
           if (group === '_standalone') {
@@ -237,7 +237,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                     onClick={onMobileClose}
                     className={cn(
                       "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
-                      isCollapsed ? "justify-center p-3 mb-2" : "justify-start px-4 py-3.5 mb-1",
+                      isCollapsed ? "justify-center p-2.5 mb-1" : "justify-start px-4 py-3 mb-1",
                       isActive
                         ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
                         : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
@@ -246,7 +246,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                     <div className="flex items-center space-x-3">
                       <Icon className={cn(
                         "flex-shrink-0 transition-all duration-300",
-                        isCollapsed ? "w-6 h-6" : "w-5 h-5",
+                        isCollapsed ? "w-5 h-5" : "w-5 h-5",
                         isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
                       )} />
                       {!isCollapsed && (
@@ -274,7 +274,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                 onClick={() => toggleFolder(group)}
                 className={cn(
                   "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
-                  isCollapsed ? "justify-center p-3 mb-2" : "justify-between px-4 py-3.5 mb-1",
+                  isCollapsed ? "justify-center p-2.5 mb-1" : "justify-between px-4 py-3 mb-1",
                   hasActiveChild && !isOpen && isCollapsed
                     ? `${c.folderActiveBg} text-white shadow-lg border`
                     : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1`,
@@ -286,7 +286,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                 <div className="flex items-center space-x-3">
                   <GroupIcon className={cn(
                     "flex-shrink-0 transition-all duration-300",
-                    isCollapsed ? "w-6 h-6" : "w-5 h-5",
+                    isCollapsed ? "w-5 h-5" : "w-5 h-5",
                     hasActiveChild ? c.glowText : `opacity-80 group-hover:text-white group-hover:opacity-100`
                   )} />
                   {!isCollapsed && (
