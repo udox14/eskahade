@@ -96,8 +96,8 @@ function TabPerFitur({
   return (
     <div className="space-y-4">
       {/* Legend role */}
-      <div className="flex flex-wrap gap-2 items-center bg-white border border-gray-200 rounded-xl px-4 py-3">
-        <span className="text-xs text-gray-500 font-semibold mr-1">Role:</span>
+      <div className="flex flex-wrap gap-2 items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <span className="text-xs text-slate-500 font-semibold mr-1">Role:</span>
         {ALL_ROLES.map(r => (
           <span key={r} className={cn("text-xs px-2.5 py-1 rounded-full border font-medium", ROLE_COLOR[r])}>
             {ROLE_LABEL[r]}
@@ -106,30 +106,30 @@ function TabPerFitur({
       </div>
 
       {groups.map(group => (
-        <div key={group} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-gray-400" />
-            <h2 className="font-semibold text-gray-700 text-sm">
+        <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-slate-400" />
+            <h2 className="font-semibold text-slate-700 text-sm">
               {group === '_standalone' ? 'Menu Utama' : group}
             </h2>
-            <span className="ml-auto text-xs text-gray-400">{grouped.get(group)!.length} fitur</span>
+            <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Fitur</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Akses Role</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Status</th>
+                <tr className="border-b border-slate-100">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Fitur</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Akses Role</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {grouped.get(group)!.map(fitur => (
-                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-gray-50/80 opacity-60")}>
+                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-800">{fitur.title}</div>
-                      <div className="text-xs text-gray-400 font-mono mt-0.5 truncate max-w-[180px]">{fitur.href}</div>
+                      <div className="font-medium text-slate-800">{fitur.title}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[180px]">{fitur.href}</div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-1.5">
@@ -150,7 +150,7 @@ function TabPerFitur({
                                   ? "cursor-not-allowed opacity-80 " + ROLE_COLOR[role]
                                   : hasRole
                                     ? cn(ROLE_COLOR[role], "hover:opacity-75 hover:scale-95")
-                                    : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
+                                    : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200"
                               )}
                             >
                               {isLoading ? '...' : ROLE_LABEL[role]}
@@ -219,11 +219,11 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
               className={cn(
                 "flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 text-center transition-all duration-200",
                 isSelected
-                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-md scale-105`
+                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm scale-105`
                   : `bg-white ${ROLE_BG_SOFT[role]} hover:scale-102 hover:shadow-sm`
               )}
             >
-              <span className={cn("text-xs font-bold", isSelected ? "text-white" : "text-gray-700")}>
+              <span className={cn("text-xs font-bold", isSelected ? "text-white" : "text-slate-700")}>
                 {ROLE_LABEL_FULL[role]}
               </span>
               <span className={cn(
@@ -232,7 +232,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
               )}>
                 {count}
               </span>
-              <span className={cn("text-[10px]", isSelected ? "text-white/70" : "text-gray-400")}>
+              <span className={cn("text-[10px]", isSelected ? "text-white/70" : "text-slate-400")}>
                 fitur aktif
               </span>
             </button>
@@ -249,8 +249,8 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
           <Users className="w-4 h-4 text-white" />
         </div>
         <div>
-          <div className="font-bold text-gray-800 text-sm">{ROLE_LABEL_FULL[selectedRole]}</div>
-          <div className="text-xs text-gray-500">
+          <div className="font-bold text-slate-800 text-sm">{ROLE_LABEL_FULL[selectedRole]}</div>
+          <div className="text-xs text-slate-500">
             {fiturForRole.length} fitur diberikan akses
           </div>
         </div>
@@ -270,18 +270,18 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
 
       {/* Daftar fitur per grup untuk role terpilih */}
       {fiturForRole.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl px-6 py-12 text-center text-gray-400 text-sm">
+        <div className="bg-white border border-slate-200 rounded-xl px-6 py-12 text-center text-slate-400 text-sm">
           Role ini belum punya akses ke fitur apapun.
         </div>
       ) : (
         <div className="space-y-3">
           {groups.map(group => (
-            <div key={group} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="bg-gray-50 border-b border-gray-100 px-5 py-2.5 flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-100 px-5 py-2.5 flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   {group === '_standalone' ? 'Menu Utama' : group}
                 </span>
-                <span className="ml-auto text-xs text-gray-400">{grouped.get(group)!.length} fitur</span>
+                <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
               </div>
               <div className="divide-y divide-gray-50">
                 {grouped.get(group)!.map(fitur => (
@@ -300,8 +300,8 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
 
                     {/* Nama fitur */}
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-gray-800">{fitur.title}</span>
-                      <span className="text-xs text-gray-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
+                      <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
+                      <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
                     </div>
 
                     {/* Badge status */}
@@ -327,17 +327,17 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
         if (tidakPunya.length === 0) return null
         return (
           <details className="group">
-            <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 font-medium px-1 py-2 flex items-center gap-1.5 select-none">
+            <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 font-medium px-1 py-2 flex items-center gap-1.5 select-none">
               <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
               Lihat {tidakPunya.length} fitur yang tidak dapat diakses role ini
             </summary>
-            <div className="mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden opacity-50">
+            <div className="mt-2 bg-white border border-slate-200 rounded-xl overflow-hidden opacity-50">
               <div className="divide-y divide-gray-50">
                 {tidakPunya.map(fitur => (
                   <div key={fitur.id} className="flex items-center gap-3 px-5 py-2.5">
                     <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
-                    <span className="text-sm text-gray-500">{fitur.title}</span>
-                    <span className="text-xs text-gray-400 font-mono ml-auto hidden sm:inline">{fitur.href}</span>
+                    <span className="text-sm text-slate-500">{fitur.title}</span>
+                    <span className="text-xs text-slate-400 font-mono ml-auto hidden sm:inline">{fitur.href}</span>
                   </div>
                 ))}
               </div>
@@ -412,7 +412,7 @@ export function FiturAksesClient({ fiturList: initial }: Props) {
       {/* Toast */}
       {toast && (
         <div className={cn(
-          "fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in slide-in-from-top-2 duration-300",
+          "fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-sm text-sm font-medium animate-in slide-in-from-top-2 duration-300",
           toast.type === 'success' ? "bg-green-600 text-white" : "bg-red-600 text-white"
         )}>
           {toast.msg}
@@ -429,14 +429,14 @@ export function FiturAksesClient({ fiturList: initial }: Props) {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
         <button
           onClick={() => setActiveTab('fitur')}
           className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
             activeTab === 'fitur'
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
           )}
         >
           <LayoutGrid className="w-4 h-4" />
@@ -447,8 +447,8 @@ export function FiturAksesClient({ fiturList: initial }: Props) {
           className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
             activeTab === 'role'
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
           )}
         >
           <Users className="w-4 h-4" />

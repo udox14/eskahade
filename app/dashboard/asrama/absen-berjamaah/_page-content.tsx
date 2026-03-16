@@ -160,9 +160,9 @@ export default function AbsenBerjamaahPage() {
 
   if (!sessionInfo) return (
     <div className="flex flex-col h-screen items-center justify-center gap-4 p-8 text-center">
-      <ShieldOff className="w-16 h-16 text-gray-300"/>
-      <h2 className="text-xl font-bold text-gray-500">Akses Ditolak</h2>
-      <p className="text-sm text-gray-400">Fitur ini hanya untuk Pengurus Asrama ASY-SYIFA 1–4.</p>
+      <ShieldOff className="w-16 h-16 text-slate-300"/>
+      <h2 className="text-xl font-bold text-slate-500">Akses Ditolak</h2>
+      <p className="text-sm text-slate-400">Fitur ini hanya untuk Pengurus Asrama ASY-SYIFA 1–4.</p>
     </div>
   )
 
@@ -314,7 +314,7 @@ export default function AbsenBerjamaahPage() {
               <ChevronLeft className="w-5 h-5 text-slate-600"/>
             </button>
             <button onClick={saveKamar} disabled={saving}
-              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-sm transition-all active:scale-95 ${
                 savedKamars.has(activeKamar) ? 'bg-green-600 text-white' : 'bg-teal-900 text-white'
               }`}>
               {saving

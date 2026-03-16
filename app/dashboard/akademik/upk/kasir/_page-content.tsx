@@ -147,8 +147,8 @@ export default function KasirUPKPage() {
             <ShoppingCart className="w-6 h-6"/>
         </div>
         <div>
-            <h1 className="text-2xl font-bold text-gray-800">Kasir UPK</h1>
-            <p className="text-gray-500 text-sm">Pemesanan & Distribusi Kitab.</p>
+            <h1 className="text-2xl font-bold text-slate-800">Kasir UPK</h1>
+            <p className="text-slate-500 text-sm">Pemesanan & Distribusi Kitab.</p>
         </div>
       </div>
 
@@ -167,12 +167,12 @@ export default function KasirUPKPage() {
 
             {/* 1. DATA PEMESAN */}
             <div className="bg-white p-4 md:p-5 rounded-xl border shadow-sm ring-1 ring-blue-100">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
+                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
                     <User className="w-4 h-4 text-blue-500"/> Identitas
                 </h3>
-                <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
-                    <button onClick={() => setModeUser('SANTRI')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'SANTRI' ? 'bg-white shadow text-blue-700' : 'text-gray-500'}`}>Santri</button>
-                    <button onClick={() => setModeUser('UMUM')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'UMUM' ? 'bg-white shadow text-blue-700' : 'text-gray-500'}`}>Umum/Guru</button>
+                <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg">
+                    <button onClick={() => setModeUser('SANTRI')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'SANTRI' ? 'bg-white shadow text-blue-700' : 'text-slate-500'}`}>Santri</button>
+                    <button onClick={() => setModeUser('UMUM')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'UMUM' ? 'bg-white shadow text-blue-700' : 'text-slate-500'}`}>Umum/Guru</button>
                 </div>
 
                 {modeUser === 'SANTRI' ? (
@@ -187,11 +187,11 @@ export default function KasirUPKPage() {
                             />
                             <button onClick={handleSearch} className="absolute right-1 top-1 bottom-1 px-3 bg-blue-600 text-white rounded-lg"><Search className="w-4 h-4"/></button>
                             {hasilCari.length > 0 && (
-                                <div className="absolute top-12 w-full bg-white border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                <div className="absolute top-12 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
                                     {hasilCari.map(s => (
-                                        <div key={s.id} onClick={() => { setSelectedSantri(s); setHasilCari([]); setSearch(''); }} className="p-3 hover:bg-gray-50 cursor-pointer border-b text-sm last:border-0">
-                                            <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
-                                            <p className="text-xs text-gray-500">{s.asrama}</p>
+                                        <div key={s.id} onClick={() => { setSelectedSantri(s); setHasilCari([]); setSearch(''); }} className="p-3 hover:bg-slate-50 cursor-pointer border-b text-sm last:border-0">
+                                            <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
+                                            <p className="text-xs text-slate-500">{s.asrama}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -219,27 +219,27 @@ export default function KasirUPKPage() {
             {/* Tombol Buka Katalog (Mobile Only) */}
             <button 
                 onClick={() => setMobileView('CATALOG')}
-                className="lg:hidden w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md flex items-center justify-center gap-2"
+                className="lg:hidden w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-sm flex items-center justify-center gap-2"
             >
                 <BookOpen className="w-5 h-5"/> Pilih Kitab (Katalog)
             </button>
 
             {/* 2. RINCIAN BELANJA (CART) */}
             <div className="bg-white p-0 rounded-xl border shadow-sm overflow-hidden flex flex-col h-auto lg:h-[500px]">
-                <div className="bg-gray-50 p-3 border-b font-bold text-gray-700 text-sm flex justify-between items-center">
+                <div className="bg-slate-50 p-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
                     <span>Keranjang</span>
                     <span className="bg-white px-2 py-0.5 rounded text-xs border">{cart.length} Item</span>
                 </div>
                 
                 {/* List Item */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[150px]">
-                    {cart.length === 0 && <div className="text-center text-gray-400 py-10 text-sm flex flex-col items-center gap-2"><ShoppingCart className="w-8 h-8 opacity-20"/>Belum ada kitab</div>}
+                    {cart.length === 0 && <div className="text-center text-slate-400 py-10 text-sm flex flex-col items-center gap-2"><ShoppingCart className="w-8 h-8 opacity-20"/>Belum ada kitab</div>}
                     {cart.map(item => (
                         <div key={item.id} className={`p-3 rounded-lg border flex justify-between items-center shadow-sm ${item.isGratis ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
                             <div className="flex-1">
-                                <p className="text-sm font-bold text-gray-800">{item.nama}</p>
+                                <p className="text-sm font-bold text-slate-800">{item.nama}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                    <p className={`text-xs font-mono ${item.isGratis ? 'line-through text-gray-400' : 'text-gray-600 font-bold'}`}>
+                                    <p className={`text-xs font-mono ${item.isGratis ? 'line-through text-slate-400' : 'text-slate-600 font-bold'}`}>
                                         Rp {item.hargaAsli.toLocaleString()}
                                     </p>
                                     {item.isGratis && <span className="text-[10px] bg-green-200 text-green-800 px-1.5 rounded font-bold">GRATIS</span>}
@@ -248,7 +248,7 @@ export default function KasirUPKPage() {
                             <div className="flex items-center gap-1">
                                 <button 
                                     onClick={() => toggleGratis(item.id)}
-                                    className={`p-2 rounded-lg transition-colors ${item.isGratis ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'}`}
+                                    className={`p-2 rounded-lg transition-colors ${item.isGratis ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-green-100 hover:text-green-600'}`}
                                     title="Gratiskan Item Ini"
                                 >
                                     <Gift className="w-4 h-4"/>
@@ -262,16 +262,16 @@ export default function KasirUPKPage() {
                 </div>
 
                 {/* FOOTER BAYAR (DESKTOP & MOBILE CART VIEW) */}
-                <div className="bg-gray-50 p-4 border-t space-y-4">
-                    <div className="flex justify-between items-center text-lg font-bold text-gray-800">
+                <div className="bg-slate-50 p-4 border-t space-y-4">
+                    <div className="flex justify-between items-center text-lg font-bold text-slate-800">
                         <span>Total Tagihan</span>
                         <span>Rp {totalTagihan.toLocaleString()}</span>
                     </div>
                     
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 uppercase">Uang Diterima</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Uang Diterima</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
                             <input 
                                 type="number" 
                                 className="w-full pl-10 pr-3 py-3 border rounded-xl font-mono text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -292,7 +292,7 @@ export default function KasirUPKPage() {
                     <button 
                         onClick={handleSimpan}
                         disabled={isSaving}
-                        className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                        className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold shadow-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95 transition-transform"
                     >
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} 
                         SIMPAN TRANSAKSI
@@ -308,7 +308,7 @@ export default function KasirUPKPage() {
             
             {/* Navigasi Mobile Back */}
             <div className="lg:hidden flex items-center gap-2 mb-4">
-                <button onClick={() => setMobileView('CART')} className="flex items-center gap-2 text-sm font-bold text-gray-600 bg-gray-100 px-3 py-2 rounded-lg">
+                <button onClick={() => setMobileView('CART')} className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">
                     <ArrowLeft className="w-4 h-4"/> Kembali ke Kasir
                 </button>
                 <div className="flex-1 text-right text-xs text-blue-600 font-bold">
@@ -317,17 +317,17 @@ export default function KasirUPKPage() {
             </div>
 
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="bg-gray-50 p-4 border-b font-bold text-gray-700 flex justify-between items-center sticky top-0 z-10">
+                <div className="bg-slate-50 p-4 border-b font-bold text-slate-700 flex justify-between items-center sticky top-0 z-10">
                     <span>Katalog Kitab</span>
                     <span className="text-xs font-normal bg-white border px-2 py-1 rounded hidden sm:inline-block">Klik untuk tambah</span>
                 </div>
                 
                 <div className="p-2 md:p-4 h-[calc(100vh-200px)] lg:h-[600px] overflow-y-auto space-y-4 md:space-y-6 scroll-smooth">
                     {loadingKatalog ? (
-                        <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400"/></div>
+                        <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
                     ) : (
                         Object.entries(katalog).map(([marhalah, items]) => (
-                            <div key={marhalah} className="border rounded-lg overflow-hidden shadow-sm">
+                            <div key={marhalah} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                 <div className="bg-blue-50/80 p-3 flex justify-between items-center px-4">
                                     <h3 className="font-bold text-blue-900 text-sm">{marhalah}</h3>
                                     <button 
@@ -344,14 +344,14 @@ export default function KasirUPKPage() {
                                             <div 
                                                 key={k.id} 
                                                 onClick={() => !isInCart && addToCart(k)}
-                                                className={`p-3 md:p-4 flex justify-between items-center cursor-pointer transition-colors active:bg-blue-50 ${isInCart ? 'bg-gray-50/80 opacity-60 cursor-default' : 'hover:bg-blue-50'}`}
+                                                className={`p-3 md:p-4 flex justify-between items-center cursor-pointer transition-colors active:bg-blue-50 ${isInCart ? 'bg-slate-50/80 opacity-60 cursor-default' : 'hover:bg-blue-50'}`}
                                             >
-                                                <span className="text-sm font-medium text-gray-800 line-clamp-2">{k.nama}</span>
+                                                <span className="text-sm font-medium text-slate-800 line-clamp-2">{k.nama}</span>
                                                 <div className="flex items-center gap-2 md:gap-3 flex-shrink-0 ml-2">
-                                                    <span className="text-sm font-mono font-bold text-gray-600">
+                                                    <span className="text-sm font-mono font-bold text-slate-600">
                                                         {k.harga > 0 ? (k.harga / 1000) + 'k' : 'Free'}
                                                     </span>
-                                                    {isInCart ? <Check className="w-5 h-5 text-green-600"/> : <div className="w-5 h-5 rounded-full border border-gray-300"></div>}
+                                                    {isInCart ? <Check className="w-5 h-5 text-green-600"/> : <div className="w-5 h-5 rounded-full border border-slate-300"></div>}
                                                 </div>
                                             </div>
                                         )

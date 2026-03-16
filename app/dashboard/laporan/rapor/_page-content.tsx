@@ -81,17 +81,17 @@ export default function CetakRaporPage() {
       {/* HEADER NO-PRINT */}
       <div className="flex justify-between items-center print:hidden flex-none">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Cetak Rapor Santri</h1>
-          <p className="text-gray-500 text-sm">Preview dan cetak rapor hasil belajar (Format A4).</p>
+          <h1 className="text-2xl font-bold text-slate-800">Cetak Rapor Santri</h1>
+          <p className="text-slate-500 text-sm">Preview dan cetak rapor hasil belajar (Format A4).</p>
         </div>
       </div>
 
       {/* FILTER BAR NO-PRINT */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end print:hidden flex-none">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end print:hidden flex-none">
         <div className="w-full md:w-auto">
-          <label className="text-sm font-medium text-gray-700 block mb-1">Kelas</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1">Kelas</label>
           <select 
-            className="p-2 border rounded-md w-full md:w-48 bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="p-2 border border-slate-200 rounded-xl w-full md:w-48 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
             value={selectedKelas}
             onChange={(e) => setSelectedKelas(e.target.value)}
           >
@@ -101,9 +101,9 @@ export default function CetakRaporPage() {
         </div>
         
         <div className="w-full md:w-auto">
-          <label className="text-sm font-medium text-gray-700 block mb-1">Semester</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1">Semester</label>
           <select 
-            className="p-2 border rounded-md w-full md:w-32 bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="p-2 border border-slate-200 rounded-xl w-full md:w-32 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
           >
@@ -124,7 +124,7 @@ export default function CetakRaporPage() {
         {dataRapor.length > 0 && (
           <button 
             onClick={triggerPrint}
-            className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-800 ml-auto font-bold shadow-md transition-all active:scale-95 w-full md:w-auto"
+            className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-800 ml-auto font-bold shadow-sm transition-all active:scale-95 w-full md:w-auto"
           >
             <Printer className="w-4 h-4"/> Cetak PDF (Semua)
           </button>
@@ -134,13 +134,13 @@ export default function CetakRaporPage() {
       {/* AREA PREVIEW & PRINT (Scrollable) */}
       <div className="bg-slate-100 p-8 rounded-xl border flex-1 overflow-y-auto overflow-x-hidden flex justify-center relative">
         {loading ? (
-          <div className="flex flex-col items-center justify-center text-gray-400">
+          <div className="flex flex-col items-center justify-center text-slate-400">
             <Loader2 className="w-10 h-10 animate-spin mb-3 text-blue-500"/>
             <p>Sedang menyusun rapor...</p>
           </div>
         ) : dataRapor.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-gray-400">
-            <FileText className="w-12 h-12 mb-3 text-gray-300"/>
+          <div className="flex flex-col items-center justify-center text-slate-400">
+            <FileText className="w-12 h-12 mb-3 text-slate-300"/>
             <p className="font-medium">Belum ada data ditampilkan.</p>
             <p className="text-sm">Silakan pilih kelas dan klik tombol Tampilkan.</p>
           </div>
@@ -156,8 +156,8 @@ export default function CetakRaporPage() {
                       semester={Number(selectedSemester)} 
                     />
                     {/* Pembatas Visual di Layar (Tidak ikut diprint) */}
-                    <div className="h-4 bg-slate-100 w-full print:hidden border-y border-dashed border-gray-300 relative top-5 flex items-center justify-center">
-                        <span className="bg-slate-100 px-2 text-[10px] text-gray-400">Halaman Berikutnya</span>
+                    <div className="h-4 bg-slate-100 w-full print:hidden border-y border-dashed border-slate-300 relative top-5 flex items-center justify-center">
+                        <span className="bg-slate-100 px-2 text-[10px] text-slate-400">Halaman Berikutnya</span>
                     </div>
                   </div>
                 ))}

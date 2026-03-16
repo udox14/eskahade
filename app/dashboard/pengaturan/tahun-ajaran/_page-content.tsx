@@ -71,11 +71,11 @@ export default function TahunAjaranPage() {
 
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <CalendarDays className="w-7 h-7 text-green-700" />
           Tahun Ajaran
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-slate-500 text-sm mt-1">
           Kelola tahun ajaran. Hanya satu yang bisa aktif dalam satu waktu. Kelas baru otomatis terhubung ke tahun ajaran yang sedang aktif.
         </p>
       </div>
@@ -95,14 +95,14 @@ export default function TahunAjaranPage() {
 
       {/* FORM TAMBAH */}
       <div className="bg-white border rounded-xl shadow-sm p-6">
-        <h2 className="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Tambah Tahun Ajaran Baru</h2>
+        <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">Tambah Tahun Ajaran Baru</h2>
         <div className="flex gap-3">
           <input
             value={nama}
             onChange={e => setNama(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleTambah()}
             placeholder="Contoh: 2025/2026"
-            className="flex-1 p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500"
+            className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500"
           />
           <button
             onClick={handleTambah}
@@ -113,43 +113,43 @@ export default function TahunAjaranPage() {
             Tambah
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">Format yang disarankan: <span className="font-mono">2025/2026</span></p>
+        <p className="text-xs text-slate-400 mt-2">Format yang disarankan: <span className="font-mono">2025/2026</span></p>
       </div>
 
       {/* DAFTAR TAHUN AJARAN */}
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50">
-          <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Daftar Tahun Ajaran</h2>
+        <div className="px-6 py-4 border-b bg-slate-50">
+          <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Daftar Tahun Ajaran</h2>
         </div>
 
         {loading ? (
           <div className="p-12 flex justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
           </div>
         ) : list.length === 0 ? (
           <div className="p-12 text-center">
-            <CalendarDays className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">Belum ada tahun ajaran. Tambahkan di atas.</p>
+            <CalendarDays className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Belum ada tahun ajaran. Tambahkan di atas.</p>
           </div>
         ) : (
           <div className="divide-y">
             {list.map(ta => (
               <div
                 key={ta.id}
-                className={`px-6 py-4 flex items-center gap-4 transition-colors ${ta.is_active ? 'bg-green-50/60' : 'hover:bg-gray-50'}`}
+                className={`px-6 py-4 flex items-center gap-4 transition-colors ${ta.is_active ? 'bg-green-50/60' : 'hover:bg-slate-50'}`}
               >
                 {/* STATUS ICON */}
                 <div className="flex-shrink-0">
                   {ta.is_active
                     ? <CheckCircle className="w-6 h-6 text-green-600" />
-                    : <Circle className="w-6 h-6 text-gray-300" />
+                    : <Circle className="w-6 h-6 text-slate-300" />
                   }
                 </div>
 
                 {/* INFO */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`font-bold text-base ${ta.is_active ? 'text-green-800' : 'text-gray-700'}`}>
+                    <span className={`font-bold text-base ${ta.is_active ? 'text-green-800' : 'text-slate-700'}`}>
                       {ta.nama}
                     </span>
                     {ta.is_active && (
@@ -158,7 +158,7 @@ export default function TahunAjaranPage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
                     <span className="flex items-center gap-1">
                       <BookOpen className="w-3 h-3" />
                       {ta.jumlah_kelas} kelas

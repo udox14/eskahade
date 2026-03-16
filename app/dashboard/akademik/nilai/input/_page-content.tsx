@@ -139,12 +139,12 @@ export default function InputNilaiPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/akademik" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <Link href="/dashboard/akademik" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Input Nilai Akademik</h1>
-          <p className="text-gray-500 text-sm">Download template per kelas, isi nilai, lalu upload kembali.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Input Nilai Akademik</h1>
+          <p className="text-slate-500 text-sm">Download template per kelas, isi nilai, lalu upload kembali.</p>
         </div>
       </div>
 
@@ -152,11 +152,11 @@ export default function InputNilaiPage() {
         
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-            <h3 className="font-semibold text-gray-800 border-b pb-2">1. Pilih Konteks</h3>
+            <h3 className="font-semibold text-slate-800 border-b pb-2">1. Pilih Konteks</h3>
             <div>
-              <label className="text-sm text-gray-600 block mb-1">Semester</label>
+              <label className="text-sm text-slate-600 block mb-1">Semester</label>
               <select 
-                className="w-full p-2 border rounded-md bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
               >
@@ -165,9 +165,9 @@ export default function InputNilaiPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm text-gray-600 block mb-1">Kelas</label>
+              <label className="text-sm text-slate-600 block mb-1">Kelas</label>
               <select 
-                className="w-full p-2 border rounded-md outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 value={selectedKelas}
                 onChange={(e) => setSelectedKelas(e.target.value)}
               >
@@ -196,9 +196,9 @@ export default function InputNilaiPage() {
         </div>
 
         <div className="md:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
-            <h3 className="font-semibold text-gray-800 mb-4 text-left">3. Upload Excel yang Sudah Diisi</h3>
-            <div className={`border-2 border-dashed rounded-lg p-8 transition-colors relative ${!selectedKelas ? 'bg-gray-100 border-gray-300' : 'border-blue-300 bg-blue-50/30 hover:bg-blue-50'}`}>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+            <h3 className="font-semibold text-slate-800 mb-4 text-left">3. Upload Excel yang Sudah Diisi</h3>
+            <div className={`border-2 border-dashed rounded-lg p-8 transition-colors relative ${!selectedKelas ? 'bg-slate-100 border-slate-300' : 'border-blue-300 bg-blue-50/30 hover:bg-blue-50'}`}>
               <input 
                 id="file-upload"
                 type="file" 
@@ -207,8 +207,8 @@ export default function InputNilaiPage() {
                 disabled={!selectedKelas} 
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               />
-              <Upload className={`w-10 h-10 mx-auto mb-3 ${!selectedKelas ? 'text-gray-400' : 'text-blue-500'}`} />
-              <p className={`font-medium ${!selectedKelas ? 'text-gray-400' : 'text-gray-700'}`}>
+              <Upload className={`w-10 h-10 mx-auto mb-3 ${!selectedKelas ? 'text-slate-400' : 'text-blue-500'}`} />
+              <p className={`font-medium ${!selectedKelas ? 'text-slate-400' : 'text-slate-700'}`}>
                 {!selectedKelas ? "Pilih kelas di sebelah kiri dulu" : "Klik untuk upload file nilai"}
               </p>
             </div>
@@ -216,8 +216,8 @@ export default function InputNilaiPage() {
 
           {excelData.length > 0 && (
             <div className="bg-white border rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-              <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   Preview Data ({excelData.length} Santri)
                 </h3>
@@ -233,18 +233,18 @@ export default function InputNilaiPage() {
               
               <div className="max-h-80 overflow-auto">
                 <table className="w-full text-sm text-left whitespace-nowrap">
-                  <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                  <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-4 py-2 border-b">NIS</th>
                       <th className="px-4 py-2 border-b">Nama Santri</th>
                       {refData.mapel.map(m => (
-                        <th key={m.id} className="px-4 py-2 border-b text-center bg-gray-100 border-l border-gray-200">{m.nama}</th>
+                        <th key={m.id} className="px-4 py-2 border-b text-center bg-slate-100 border-l border-slate-200">{m.nama}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {excelData.slice(0, 50).map((row, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
+                      <tr key={i} className="hover:bg-slate-50">
                         <td className="px-4 py-2 font-mono text-xs">{row['NIS'] || row['nis']}</td>
                         <td className="px-4 py-2 font-medium">{row['NAMA SANTRI']}</td>
                         {refData.mapel.map(m => {
@@ -262,7 +262,7 @@ export default function InputNilaiPage() {
                   </tbody>
                 </table>
                 {excelData.length > 50 && (
-                  <div className="p-2 text-center text-xs text-gray-500 bg-gray-50 border-t">
+                  <div className="p-2 text-center text-xs text-slate-500 bg-slate-50 border-t">
                     ... dan {excelData.length - 50} data lainnya
                   </div>
                 )}

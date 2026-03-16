@@ -65,22 +65,22 @@ export default function VerifikasiPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-32">
       <div className="flex items-center gap-4">
         {/* FIX: Ganti Link href ke button router.back() */}
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Verifikasi Hasil Sidang</h1>
-          <p className="text-gray-500 text-xs md:text-sm">Mode Cepat: Pilih status, lalu simpan sekaligus.</p>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-800">Verifikasi Hasil Sidang</h1>
+          <p className="text-slate-500 text-xs md:text-sm">Mode Cepat: Pilih status, lalu simpan sekaligus.</p>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400"/></div>
+        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
       ) : list.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-dashed">
           <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3"/>
-          <h3 className="text-lg font-bold text-gray-700">Semua Beres!</h3>
-          <p className="text-gray-500">Tidak ada antrian santri yang perlu diverifikasi.</p>
+          <h3 className="text-lg font-bold text-slate-700">Semua Beres!</h3>
+          <p className="text-slate-500">Tidak ada antrian santri yang perlu diverifikasi.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -101,13 +101,13 @@ export default function VerifikasiPage() {
                 <div key={item.santri_id} className={`bg-white p-4 md:p-5 rounded-xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 transition-all ${currentVonis ? 'ring-2 ring-green-500 bg-green-50/30' : ''}`}>
                   
                   <div className="flex items-start gap-3 md:gap-4 flex-1">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Gavel className="w-5 h-5 md:w-6 md:h-6 text-gray-500" />
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      <Gavel className="w-5 h-5 md:w-6 md:h-6 text-slate-500" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-base md:text-lg text-gray-800 leading-tight">{item.nama}</h4>
-                      <p className="text-xs md:text-sm text-gray-500 font-mono mb-1">{item.nis}</p>
-                      <p className="text-[10px] md:text-xs text-gray-500 bg-gray-50 inline-block px-2 py-1 rounded border truncate max-w-[200px]">
+                      <h4 className="font-bold text-base md:text-lg text-slate-800 leading-tight">{item.nama}</h4>
+                      <p className="text-xs md:text-sm text-slate-500 font-mono mb-1">{item.nis}</p>
+                      <p className="text-[10px] md:text-xs text-slate-500 bg-slate-50 inline-block px-2 py-1 rounded border truncate max-w-[200px]">
                         {item.info}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -128,7 +128,7 @@ export default function VerifikasiPage() {
                       onClick={() => handleSelectVonis(item.santri_id, 'ALFA_MURNI')}
                       className={`w-full py-3 md:py-2 px-4 rounded-lg font-bold text-sm transition-all shadow-sm active:scale-95 touch-manipulation ${
                         currentVonis === 'ALFA_MURNI' 
-                          ? 'bg-red-700 text-white shadow-md scale-[1.02]' 
+                          ? 'bg-red-700 text-white shadow-sm scale-[1.02]' 
                           : 'bg-red-100 text-red-700 hover:bg-red-200'
                       }`}
                     >
@@ -140,7 +140,7 @@ export default function VerifikasiPage() {
                         onClick={() => handleSelectVonis(item.santri_id, 'IZIN')}
                         className={`py-3 md:py-2 px-3 rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                           currentVonis === 'IZIN' 
-                            ? 'bg-blue-600 text-white shadow-md' 
+                            ? 'bg-blue-600 text-white shadow-sm' 
                             : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                         }`}
                       >
@@ -150,7 +150,7 @@ export default function VerifikasiPage() {
                         onClick={() => handleSelectVonis(item.santri_id, 'SAKIT')}
                         className={`py-3 md:py-2 px-3 rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                           currentVonis === 'SAKIT' 
-                            ? 'bg-yellow-500 text-white shadow-md' 
+                            ? 'bg-yellow-500 text-white shadow-sm' 
                             : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200'
                         }`}
                       >
@@ -163,8 +163,8 @@ export default function VerifikasiPage() {
                         onClick={() => handleSelectVonis(item.santri_id, 'BELUM')}
                         className={`py-3 md:py-2 px-3 rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                           currentVonis === 'BELUM' 
-                            ? 'bg-gray-800 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                            ? 'bg-gray-800 text-white shadow-sm' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
                         }`}
                       >
                         TDK HADIR
@@ -173,8 +173,8 @@ export default function VerifikasiPage() {
                         onClick={() => handleSelectVonis(item.santri_id, 'KESALAHAN')}
                         className={`py-3 md:py-2 px-3 rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                           currentVonis === 'KESALAHAN' 
-                            ? 'bg-purple-600 text-white shadow-md' 
-                            : 'bg-white text-gray-400 hover:bg-gray-50 border border-gray-200'
+                            ? 'bg-purple-600 text-white shadow-sm' 
+                            : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-200'
                         }`}
                       >
                         Salah Input
@@ -188,12 +188,12 @@ export default function VerifikasiPage() {
 
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-4 pt-4 pb-20">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-3 md:p-2 rounded-full bg-white border shadow-sm hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform">
-                <ChevronLeft className="w-6 h-6 text-gray-600"/>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-3 md:p-2 rounded-full bg-white border shadow-sm hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform">
+                <ChevronLeft className="w-6 h-6 text-slate-600"/>
               </button>
-              <span className="font-bold text-gray-600 text-sm md:text-base">Halaman {page} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-3 md:p-2 rounded-full bg-white border shadow-sm hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform">
-                <ChevronRight className="w-6 h-6 text-gray-600"/>
+              <span className="font-bold text-slate-600 text-sm md:text-base">Halaman {page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-3 md:p-2 rounded-full bg-white border shadow-sm hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform">
+                <ChevronRight className="w-6 h-6 text-slate-600"/>
               </button>
             </div>
           )}
@@ -207,7 +207,7 @@ export default function VerifikasiPage() {
               <div className="bg-green-500 text-black font-bold w-8 h-8 rounded-full flex items-center justify-center">{totalDrafts}</div>
               <div className="text-left leading-tight">
                 <span className="block font-bold text-sm">Simpan Perubahan</span>
-                <span className="text-xs text-gray-400">Klik untuk memproses data terpilih</span>
+                <span className="text-xs text-slate-400">Klik untuk memproses data terpilih</span>
               </div>
             </div>
             {isSaving ? <Loader2 className="w-6 h-6 animate-spin"/> : <Save className="w-6 h-6 text-green-400"/>}

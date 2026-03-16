@@ -64,19 +64,19 @@ export default function LaporanKeuanganPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <FileText className="w-6 h-6 text-emerald-600"/> Laporan Keuangan
           </h1>
-          <p className="text-gray-500 text-sm">Rekapitulasi Arus Kas & Monitoring Tagihan.</p>
+          <p className="text-slate-500 text-sm">Rekapitulasi Arus Kas & Monitoring Tagihan.</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center bg-white border rounded-lg p-1 shadow-sm">
-            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold text-gray-600">-</button>
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">-</button>
             <span className="px-2 font-mono font-bold text-emerald-700 flex items-center gap-2">
               <Calendar className="w-4 h-4"/> {tahun}
             </span>
-            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold text-gray-600">+</button>
+            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">+</button>
           </div>
 
           <button
@@ -85,7 +85,7 @@ export default function LaporanKeuanganPage() {
             className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
               isDirty || !data
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {loading
@@ -97,7 +97,7 @@ export default function LaporanKeuanganPage() {
           <button
             onClick={handleExport}
             disabled={!data?.list?.length}
-            className="bg-white border text-gray-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-gray-50"
+            className="bg-white border text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-slate-50"
           >
             <Download className="w-4 h-4"/> Export Excel
           </button>
@@ -111,8 +111,8 @@ export default function LaporanKeuanganPage() {
             <FileText className="w-10 h-10 text-emerald-300"/>
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-500">Laporan belum dimuat</p>
-            <p className="text-sm text-gray-400 mt-1">Pilih tahun lalu tekan <strong>Tampilkan</strong> untuk memuat laporan keuangan.</p>
+            <p className="text-lg font-bold text-slate-500">Laporan belum dimuat</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih tahun lalu tekan <strong>Tampilkan</strong> untuk memuat laporan keuangan.</p>
           </div>
           <button onClick={loadData}
             className="mt-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 active:scale-95 transition-all shadow">
@@ -124,7 +124,7 @@ export default function LaporanKeuanganPage() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <Loader2 className="w-10 h-10 animate-spin mx-auto text-emerald-500"/>
-          <p className="text-sm text-gray-500">Memuat laporan tahun {tahun}...</p>
+          <p className="text-sm text-slate-500">Memuat laporan tahun {tahun}...</p>
         </div>
       )}
 
@@ -134,7 +134,7 @@ export default function LaporanKeuanganPage() {
 
           {/* CASH FLOW */}
           <div>
-            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
+            <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
               <TrendingUp className="w-4 h-4"/> Arus Kas Masuk (Cash Flow)
             </h3>
             <div className="bg-white p-6 rounded-xl border border-emerald-100 shadow-sm flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
@@ -150,7 +150,7 @@ export default function LaporanKeuanganPage() {
 
           {/* ANALISA TARGET */}
           <div>
-            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
+            <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
               <Building2 className="w-4 h-4"/> Analisa Tagihan & Piutang
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -163,12 +163,12 @@ export default function LaporanKeuanganPage() {
 
           {/* TABEL RINCIAN */}
           <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-3 border-b text-xs font-bold text-gray-500 uppercase flex flex-col md:flex-row justify-between items-center gap-2">
+            <div className="bg-slate-50 px-6 py-3 border-b text-xs font-bold text-slate-500 uppercase flex flex-col md:flex-row justify-between items-center gap-2">
               <span>Rincian Transaksi (Total: {totalItems})</span>
               <div className="flex items-center gap-2">
                 <span>Tampilkan:</span>
                 <select value={limit} onChange={e => { setLimit(Number(e.target.value)); setPage(1) }}
-                  className="bg-white border border-gray-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                  className="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
                   <option value="10">10</option>
                   <option value="20">20</option>
                   <option value="50">50</option>
@@ -179,7 +179,7 @@ export default function LaporanKeuanganPage() {
 
             <div className="overflow-x-auto min-h-[300px]">
               <table className="w-full text-sm text-left">
-                <thead className="bg-white text-gray-600 font-bold sticky top-0 shadow-sm z-10">
+                <thead className="bg-white text-slate-600 font-bold sticky top-0 shadow-sm z-10">
                   <tr>
                     <th className="px-6 py-3 border-b">Tanggal</th>
                     <th className="px-6 py-3 border-b">Nama Santri</th>
@@ -190,27 +190,27 @@ export default function LaporanKeuanganPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {getPaginatedData().length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-10 text-gray-400">Belum ada transaksi.</td></tr>
+                    <tr><td colSpan={5} className="text-center py-10 text-slate-400">Belum ada transaksi.</td></tr>
                   ) : getPaginatedData().map((item: any) => (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-3 text-xs text-gray-500 font-mono">
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-3 text-xs text-slate-500 font-mono">
                         {format(new Date(item.tanggal_bayar), 'dd MMM yyyy HH:mm', { locale: id })}
                       </td>
                       <td className="px-6 py-3">
-                        <p className="font-bold text-gray-800">{item.santri?.nama_lengkap}</p>
-                        <p className="text-[10px] text-gray-400">{item.santri?.asrama} ({item.santri?.nis})</p>
+                        <p className="font-bold text-slate-800">{item.santri?.nama_lengkap}</p>
+                        <p className="text-[10px] text-slate-400">{item.santri?.asrama} ({item.santri?.nis})</p>
                       </td>
                       <td className="px-6 py-3">
                         <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                          item.jenis_biaya === 'BANGUNAN' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-gray-200'
+                          item.jenis_biaya === 'BANGUNAN' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200'
                         }`}>
                           {item.jenis_biaya} {item.tahun_tagihan ? `(${item.tahun_tagihan})` : ''}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-right font-mono font-bold text-gray-700">
+                      <td className="px-6 py-3 text-right font-mono font-bold text-slate-700">
                         Rp {item.nominal_bayar.toLocaleString('id-ID')}
                       </td>
-                      <td className="px-6 py-3 text-xs text-gray-500">
+                      <td className="px-6 py-3 text-xs text-slate-500">
                         {item.penerima?.full_name?.split(' ')[0]}
                       </td>
                     </tr>
@@ -220,15 +220,15 @@ export default function LaporanKeuanganPage() {
             </div>
 
             {totalItems > limit && (
-              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-between items-center">
-                <span className="text-xs text-gray-500">Hal {page} dari {totalPages}</span>
+              <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-xs text-slate-500">Hal {page} dari {totalPages}</span>
                 <div className="flex gap-2">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                    className="p-2 bg-white border rounded hover:bg-gray-100 disabled:opacity-50">
+                    className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50">
                     <ChevronLeft className="w-4 h-4"/>
                   </button>
                   <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                    className="p-2 bg-white border rounded hover:bg-gray-100 disabled:opacity-50">
+                    className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50">
                     <ChevronRight className="w-4 h-4"/>
                   </button>
                 </div>
@@ -247,8 +247,8 @@ function StatCard({ label, icon: Icon, color, textColor, stats, info }: any) {
     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
       <div className="flex justify-between items-start mb-4">
         <div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</p>
-          <p className="text-[10px] text-gray-300 mt-0.5">{info}</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{label}</p>
+          <p className="text-[10px] text-slate-300 mt-0.5">{info}</p>
         </div>
         <div className={`p-2 rounded-full ${color} ${textColor}`}>
           <Icon className="w-5 h-5"/>
@@ -257,15 +257,15 @@ function StatCard({ label, icon: Icon, color, textColor, stats, info }: any) {
       <div>
         <div className="flex justify-between items-end mb-1">
           <span className={`text-xl font-extrabold ${textColor}`}>
-            {percent}% <span className="text-xs font-normal text-gray-400">Lunas</span>
+            {percent}% <span className="text-xs font-normal text-slate-400">Lunas</span>
           </span>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
+        <div className="w-full bg-slate-100 rounded-full h-2 mb-3">
           <div className={`h-2 rounded-full ${color}`} style={{ width: `${percent}%`, backgroundColor: 'currentColor' }}/>
         </div>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-500">Target:</span>
+            <span className="text-slate-500">Target:</span>
             <span className="font-mono font-bold">Rp {stats.target.toLocaleString('id-ID')}</span>
           </div>
           <div className="flex justify-between text-red-600">

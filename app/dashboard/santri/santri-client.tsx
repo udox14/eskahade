@@ -34,11 +34,11 @@ export function SearchInput() {
 
   return (
     <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
       <input
         type="text"
         placeholder="Cari nama atau NIS..."
-        className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm bg-gray-50 focus:bg-white transition-colors"
+        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm bg-slate-50 focus:bg-white transition-colors"
         value={text}
         onChange={e => setText(e.target.value)}
       />
@@ -63,7 +63,7 @@ export function LimitSelector() {
     <select
       value={limit}
       onChange={handleChange}
-      className="border border-gray-200 rounded-xl px-2.5 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-gray-50 focus:bg-white transition-colors"
+      className="border border-slate-200 rounded-xl px-2.5 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50 focus:bg-white transition-colors"
     >
       <option value="10">10</option>
       <option value="20">20</option>
@@ -88,16 +88,16 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
 
   return (
     <div className="flex items-center justify-between">
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-slate-500">
         Hal. <b>{page}</b>/<b>{totalPages}</b> · {total} santri
       </p>
       <div className="flex gap-1.5">
         <button
           onClick={() => go(Math.max(1, page - 1))}
           disabled={page === 1}
-          className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeft className="w-4 h-4 text-gray-600" />
+          <ChevronLeft className="w-4 h-4 text-slate-600" />
         </button>
         {/* Halaman sekitar current */}
         {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -110,7 +110,7 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
               className={`w-8 h-8 text-xs rounded-lg border transition-colors font-medium ${
                 p === page
                   ? 'bg-green-600 text-white border-green-600'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
               {p}
@@ -120,9 +120,9 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
         <button
           onClick={() => go(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
-          className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronRight className="w-4 h-4 text-gray-600" />
+          <ChevronRight className="w-4 h-4 text-slate-600" />
         </button>
       </div>
     </div>
@@ -178,7 +178,7 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
         className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
           activeCount > 0
             ? 'bg-blue-50 border-blue-300 text-blue-700'
-            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-white'
+            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
         }`}
       >
         <SlidersHorizontal className="w-4 h-4" />
@@ -210,14 +210,14 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
             {/* Header */}
             <div className="flex justify-between items-center px-5 py-4 border-b">
               <div>
-                <h3 className="font-bold text-gray-800">Filter Santri</h3>
+                <h3 className="font-bold text-slate-800">Filter Santri</h3>
                 {activeCount > 0 && (
                   <p className="text-xs text-blue-600 mt-0.5">{activeCount} filter aktif</p>
                 )}
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
+                className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -227,13 +227,13 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
             <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
               {/* Tempat Tinggal */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tempat Tinggal</p>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Tempat Tinggal</p>
                 <div className="space-y-2">
                   <select
                     value={asrama}
                     onChange={e => { setAsrama(e.target.value); setKamar('') }}
-                    className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
                     <option value="">Semua Asrama</option>
                     {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
@@ -242,7 +242,7 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
                     value={kamar}
                     onChange={e => setKamar(e.target.value)}
                     disabled={!asrama}
-                    className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">Semua Kamar</option>
                     {Array.from({ length: 50 }, (_, i) => i + 1).map(n => (
@@ -290,7 +290,7 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
                     value={kelasPesantren}
                     onChange={e => setKelasPesantren(e.target.value)}
                     disabled={!marhalah}
-                    className="w-full p-2.5 border border-green-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                    className="w-full p-2.5 border border-green-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">Semua Kelas</option>
                     {filteredKelas.map((k: any) => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
@@ -301,10 +301,10 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t bg-gray-50 rounded-b-2xl flex gap-3">
+            <div className="px-5 py-4 border-t bg-slate-50 rounded-b-2xl flex gap-3">
               <button
                 onClick={handleReset}
-                className="flex-1 py-3 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 Reset
               </button>

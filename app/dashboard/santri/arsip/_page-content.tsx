@@ -238,14 +238,14 @@ export default function ArsipSantriPage() {
 
       {/* HEADER */}
       <div className="flex items-center gap-4 border-b pb-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Archive className="w-6 h-6 text-purple-600" /> Arsip Alumni
           </h1>
-          <p className="text-gray-500 text-sm">Jadikan santri alumni, restore, atau hapus arsip untuk hemat storage.</p>
+          <p className="text-slate-500 text-sm">Jadikan santri alumni, restore, atau hapus arsip untuk hemat storage.</p>
         </div>
         <div className="flex gap-3 text-sm">
           <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-center">
@@ -260,11 +260,11 @@ export default function ArsipSantriPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
-        <button onClick={() => setTab('ARSIPKAN')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'ARSIPKAN' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+      <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+        <button onClick={() => setTab('ARSIPKAN')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'ARSIPKAN' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <GraduationCap className="w-4 h-4" /> Jadikan Alumni
         </button>
-        <button onClick={() => setTab('DAFTAR_ARSIP')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'DAFTAR_ARSIP' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+        <button onClick={() => setTab('DAFTAR_ARSIP')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'DAFTAR_ARSIP' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <RotateCcw className="w-4 h-4" /> Daftar Arsip & Restore
           {grupList.length > 0 && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{grupList.length}</span>}
         </button>
@@ -282,16 +282,16 @@ export default function ArsipSantriPage() {
           <div className="bg-white border rounded-xl p-4 space-y-3 shadow-sm">
             <div className="flex flex-col md:flex-row gap-3">
               <div className="flex-1">
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Catatan Arsip (Opsional)</label>
-                <input value={catatanArsip} onChange={e => setCatatanArsip(e.target.value)} placeholder="Contoh: Wisuda Angkatan 2024" className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Catatan Arsip (Opsional)</label>
+                <input value={catatanArsip} onChange={e => setCatatanArsip(e.target.value)} placeholder="Contoh: Wisuda Angkatan 2024" className="w-full p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
               </div>
               <div className="relative md:w-64">
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cari</label>
-                <Search className="absolute left-3 bottom-2.5 text-gray-400 w-4 h-4" />
-                <input value={filterSantri.search} onChange={e => handleFilterSantriChange('search', e.target.value)} placeholder="Nama / NIS..." className="w-full pl-9 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari</label>
+                <Search className="absolute left-3 bottom-2.5 text-slate-400 w-4 h-4" />
+                <input value={filterSantri.search} onChange={e => handleFilterSantriChange('search', e.target.value)} placeholder="Nama / NIS..." className="w-full pl-9 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
               </div>
               <div className="flex items-end">
-                <button onClick={() => setShowFilterSantri(p => !p)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border transition-colors ${showFilterSantri || activeFilterCount > 0 ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                <button onClick={() => setShowFilterSantri(p => !p)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border transition-colors ${showFilterSantri || activeFilterCount > 0 ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                   <Filter className="w-4 h-4" /> Filter
                   {activeFilterCount > 0 && <span className="bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFilterCount}</span>}
                 </button>
@@ -300,26 +300,26 @@ export default function ArsipSantriPage() {
             {showFilterSantri && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t animate-in fade-in">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Asrama</label>
-                  <select value={filterSantri.asrama} onChange={e => handleFilterSantriChange('asrama', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Asrama</label>
+                  <select value={filterSantri.asrama} onChange={e => handleFilterSantriChange('asrama', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                     <option value="">Semua</option>
                     {optsSantri.asramaList.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Sekolah</label>
-                  <select value={filterSantri.sekolah} onChange={e => handleFilterSantriChange('sekolah', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
+                  <select value={filterSantri.sekolah} onChange={e => handleFilterSantriChange('sekolah', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                     <option value="">Semua</option>
                     {optsSantri.sekolahList.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Kelas Sekolah</label>
-                  <input value={filterSantri.kelas_sekolah} onChange={e => handleFilterSantriChange('kelas_sekolah', e.target.value)} placeholder="Contoh: 9A" className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Kelas Sekolah</label>
+                  <input value={filterSantri.kelas_sekolah} onChange={e => handleFilterSantriChange('kelas_sekolah', e.target.value)} placeholder="Contoh: 9A" className="w-full p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Kelas Pesantren</label>
-                  <select value={filterSantri.kelas_pesantren} onChange={e => handleFilterSantriChange('kelas_pesantren', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Kelas Pesantren</label>
+                  <select value={filterSantri.kelas_pesantren} onChange={e => handleFilterSantriChange('kelas_pesantren', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                     <option value="">Semua</option>
                     {optsSantri.kelasList.map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
@@ -335,26 +335,26 @@ export default function ArsipSantriPage() {
 
           {/* Tabel santri aktif */}
           <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
               <div className="flex items-center gap-3">
-                <button onClick={toggleSelectAllSantri} className="text-gray-500 hover:text-purple-600">
+                <button onClick={toggleSelectAllSantri} className="text-slate-500 hover:text-purple-600">
                   {selectedArsip.size === santriList.length && santriList.length > 0 ? <CheckSquare className="w-5 h-5 text-purple-600" /> : <Square className="w-5 h-5" />}
                 </button>
-                <span className="text-sm font-bold text-gray-600">
+                <span className="text-sm font-bold text-slate-600">
                   {santriList.length} dari {santriTotal} santri{selectedArsip.size > 0 && ` • ${selectedArsip.size} dipilih`}
                 </span>
               </div>
-              {selectedArsip.size > 0 && <button onClick={() => setSelectedArsip(new Set())} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" /> Batal pilih</button>}
+              {selectedArsip.size > 0 && <button onClick={() => setSelectedArsip(new Set())} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" /> Batal pilih</button>}
             </div>
             <div className="max-h-[450px] overflow-y-auto">
               {loadingSantri ? (
-                <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /></div>
+                <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
               ) : santriList.length === 0 ? (
-                <div className="py-16 text-center text-gray-400"><Users className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p>Tidak ada santri ditemukan</p></div>
+                <div className="py-16 text-center text-slate-400"><Users className="w-10 h-10 mx-auto mb-2 text-slate-300" /><p>Tidak ada santri ditemukan</p></div>
               ) : (
                 <>
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 z-10 border-b">
+                    <thead className="bg-slate-50 text-xs text-slate-500 uppercase sticky top-0 z-10 border-b">
                       <tr>
                         <th className="px-4 py-2 w-10"></th>
                         <th className="px-2 py-2">Nama / NIS</th>
@@ -369,15 +369,15 @@ export default function ArsipSantriPage() {
                         const isSelected = selectedArsip.has(s.id)
                         const kelasPesantren = s.riwayat_pendidikan?.[0]?.kelas?.nama_kelas
                         return (
-                          <tr key={s.id} onClick={() => toggleSelectArsip(s.id)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
-                            <td className="px-4 py-3">{isSelected ? <CheckSquare className="w-5 h-5 text-purple-600" /> : <Square className="w-5 h-5 text-gray-300" />}</td>
+                          <tr key={s.id} onClick={() => toggleSelectArsip(s.id)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-purple-50' : 'hover:bg-slate-50'}`}>
+                            <td className="px-4 py-3">{isSelected ? <CheckSquare className="w-5 h-5 text-purple-600" /> : <Square className="w-5 h-5 text-slate-300" />}</td>
                             <td className="px-2 py-3">
-                              <p className={`font-bold ${isSelected ? 'text-purple-800' : 'text-gray-800'}`}>{s.nama_lengkap}</p>
-                              <p className="text-xs text-gray-400 font-mono">{s.nis}</p>
+                              <p className={`font-bold ${isSelected ? 'text-purple-800' : 'text-slate-800'}`}>{s.nama_lengkap}</p>
+                              <p className="text-xs text-slate-400 font-mono">{s.nis}</p>
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">{s.asrama || '-'}</td>
-                            <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">{s.sekolah || '-'}</td>
-                            <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">{s.kelas_sekolah || '-'}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{s.asrama || '-'}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{s.sekolah || '-'}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{s.kelas_sekolah || '-'}</td>
                             <td className="px-4 py-3 hidden md:table-cell">
                               {kelasPesantren && <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">{kelasPesantren}</span>}
                             </td>
@@ -388,7 +388,7 @@ export default function ArsipSantriPage() {
                   </table>
                   {santriHasMore && (
                     <div className="p-4 text-center border-t">
-                      <button onClick={() => loadSantri(santriPage + 1, filterSantri, true)} disabled={loadingMoreSantri} className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
+                      <button onClick={() => loadSantri(santriPage + 1, filterSantri, true)} disabled={loadingMoreSantri} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
                         {loadingMoreSantri && <Loader2 className="w-4 h-4 animate-spin" />}
                         {loadingMoreSantri ? 'Memuat...' : `Muat lebih banyak (sisa ${santriTotal - santriList.length})`}
                       </button>
@@ -414,38 +414,38 @@ export default function ArsipSantriPage() {
               </div>
 
               {loadingGrup ? (
-                <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /></div>
+                <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
               ) : grupList.length === 0 ? (
-                <div className="py-16 text-center text-gray-400">
-                  <Archive className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <div className="py-16 text-center text-slate-400">
+                  <Archive className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                   <p>Belum ada data alumni di arsip</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {grupList.map(g => (
                     <button key={g.key} onClick={() => bukaGrup(g)}
-                      className="w-full bg-white border rounded-xl p-4 flex items-center gap-4 hover:shadow-md hover:border-purple-200 transition-all text-left group">
+                      className="w-full bg-white border rounded-xl p-4 flex items-center gap-4 hover:shadow-sm hover:border-purple-200 transition-all text-left group">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${g.angkatan ? 'bg-purple-100' : 'bg-blue-100'}`}>
                         {g.angkatan
                           ? <BookOpen className="w-6 h-6 text-purple-600" />
                           : <Calendar className="w-6 h-6 text-blue-600" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-800 group-hover:text-purple-700 transition-colors">{labelGrup(g)}</p>
+                        <p className="font-bold text-slate-800 group-hover:text-purple-700 transition-colors">{labelGrup(g)}</p>
                         <div className="flex gap-3 mt-1 flex-wrap">
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
                             <Users className="w-3 h-3" /> {g.jumlah} santri
                           </span>
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {new Date(g.tanggal_arsip).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                           </span>
                           {g.asramaList.slice(0, 3).map(a => (
-                            <span key={a} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{a}</span>
+                            <span key={a} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{a}</span>
                           ))}
-                          {g.asramaList.length > 3 && <span className="text-[10px] text-gray-400">+{g.asramaList.length - 3} asrama</span>}
+                          {g.asramaList.length > 3 && <span className="text-[10px] text-slate-400">+{g.asramaList.length - 3} asrama</span>}
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-purple-400 flex-shrink-0 transition-colors" />
+                      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-purple-400 flex-shrink-0 transition-colors" />
                     </button>
                   ))}
                 </div>
@@ -458,26 +458,26 @@ export default function ArsipSantriPage() {
             <>
               {/* Breadcrumb */}
               <div className="flex items-center gap-2">
-                <button onClick={() => setActiveGrup(null)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-purple-600 font-bold transition-colors">
+                <button onClick={() => setActiveGrup(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-purple-600 font-bold transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Daftar Arsip
                 </button>
-                <span className="text-gray-300">/</span>
-                <span className="text-sm font-bold text-gray-800">{labelGrup(activeGrup)}</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-sm font-bold text-slate-800">{labelGrup(activeGrup)}</span>
               </div>
 
               {/* Filter + aksi */}
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input value={filterSantriArsip.search} onChange={e => handleFilterSantriArsipChange('search', e.target.value)} placeholder="Cari nama / NIS..." className="w-full pl-9 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input value={filterSantriArsip.search} onChange={e => handleFilterSantriArsipChange('search', e.target.value)} placeholder="Cari nama / NIS..." className="w-full pl-9 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
                 </div>
                 {optsArsipAsrama.length > 1 && (
-                  <select value={filterSantriArsip.asrama} onChange={e => handleFilterSantriArsipChange('asrama', e.target.value)} className="p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
+                  <select value={filterSantriArsip.asrama} onChange={e => handleFilterSantriArsipChange('asrama', e.target.value)} className="p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
                     <option value="">Semua Asrama</option>
                     {optsArsipAsrama.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 )}
-                <button onClick={handleDownload} disabled={isDownloading} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-2 shadow-sm">
+                <button onClick={handleDownload} disabled={isDownloading} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 flex items-center gap-2 shadow-sm">
                   {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   {selectedRestore.size > 0 ? `Download Terpilih (${selectedRestore.size})` : 'Download Semua'}
                 </button>
@@ -485,26 +485,26 @@ export default function ArsipSantriPage() {
 
               {/* Tabel santri arsip */}
               <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
                   <div className="flex items-center gap-3">
-                    <button onClick={toggleSelectAllRestore} className="text-gray-500 hover:text-green-600">
+                    <button onClick={toggleSelectAllRestore} className="text-slate-500 hover:text-green-600">
                       {selectedRestore.size === santriArsipList.length && santriArsipList.length > 0 ? <CheckSquare className="w-5 h-5 text-green-600" /> : <Square className="w-5 h-5" />}
                     </button>
-                    <span className="text-sm font-bold text-gray-600">
+                    <span className="text-sm font-bold text-slate-600">
                       {santriArsipList.length} dari {santriArsipTotal} santri{selectedRestore.size > 0 && ` • ${selectedRestore.size} dipilih`}
                     </span>
                   </div>
-                  {selectedRestore.size > 0 && <button onClick={() => setSelectedRestore(new Set())} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" /> Batal pilih</button>}
+                  {selectedRestore.size > 0 && <button onClick={() => setSelectedRestore(new Set())} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" /> Batal pilih</button>}
                 </div>
                 <div className="max-h-[500px] overflow-y-auto">
                   {loadingSantriArsip ? (
-                    <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /></div>
+                    <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
                   ) : santriArsipList.length === 0 ? (
-                    <div className="py-16 text-center text-gray-400"><Users className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p>Tidak ada santri ditemukan</p></div>
+                    <div className="py-16 text-center text-slate-400"><Users className="w-10 h-10 mx-auto mb-2 text-slate-300" /><p>Tidak ada santri ditemukan</p></div>
                   ) : (
                     <>
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 z-10 border-b">
+                        <thead className="bg-slate-50 text-xs text-slate-500 uppercase sticky top-0 z-10 border-b">
                           <tr>
                             <th className="px-4 py-2 w-10"></th>
                             <th className="px-2 py-2">Nama / NIS</th>
@@ -516,19 +516,19 @@ export default function ArsipSantriPage() {
                           {santriArsipList.map(a => {
                             const isSelected = selectedRestore.has(a.id)
                             return (
-                              <tr key={a.id} className={`transition-colors ${isSelected ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
+                              <tr key={a.id} className={`transition-colors ${isSelected ? 'bg-green-50' : 'hover:bg-slate-50'}`}>
                                 <td className="px-4 py-3">
                                   <button onClick={() => toggleSelectRestore(a.id)}>
-                                    {isSelected ? <CheckSquare className="w-5 h-5 text-green-600" /> : <Square className="w-5 h-5 text-gray-300" />}
+                                    {isSelected ? <CheckSquare className="w-5 h-5 text-green-600" /> : <Square className="w-5 h-5 text-slate-300" />}
                                   </button>
                                 </td>
                                 <td className="px-2 py-3">
-                                  <p className={`font-bold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}>{a.nama_lengkap}</p>
-                                  <p className="text-xs text-gray-400 font-mono">{a.nis}</p>
+                                  <p className={`font-bold ${isSelected ? 'text-green-800' : 'text-slate-800'}`}>{a.nama_lengkap}</p>
+                                  <p className="text-xs text-slate-400 font-mono">{a.nis}</p>
                                 </td>
-                                <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">{a.asrama || '-'}</td>
+                                <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{a.asrama || '-'}</td>
                                 <td className="px-4 py-3">
-                                  <button onClick={() => handleHapusSatu(a.id, a.nama_lengkap)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Hapus permanen">
+                                  <button onClick={() => handleHapusSatu(a.id, a.nama_lengkap)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Hapus permanen">
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 </td>
@@ -539,7 +539,7 @@ export default function ArsipSantriPage() {
                       </table>
                       {santriArsipHasMore && (
                         <div className="p-4 text-center border-t">
-                          <button onClick={() => loadSantriGrup(santriArsipPage + 1, filterSantriArsip, true)} disabled={loadingMoreSantriArsip} className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
+                          <button onClick={() => loadSantriGrup(santriArsipPage + 1, filterSantriArsip, true)} disabled={loadingMoreSantriArsip} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
                             {loadingMoreSantriArsip && <Loader2 className="w-4 h-4 animate-spin" />}
                             {loadingMoreSantriArsip ? 'Memuat...' : `Muat lebih banyak (sisa ${santriArsipTotal - santriArsipList.length})`}
                           </button>
@@ -562,7 +562,7 @@ export default function ArsipSantriPage() {
               <div className="bg-purple-500 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm">{selectedArsip.size}</div>
               <div className="leading-tight">
                 <p className="font-bold text-sm">Siap dijadikan alumni</p>
-                <p className="text-xs text-gray-400">Data akan dipindah ke arsip</p>
+                <p className="text-xs text-slate-400">Data akan dipindah ke arsip</p>
               </div>
             </div>
             <button onClick={handleArsipkan} disabled={isArsipkan} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
@@ -580,7 +580,7 @@ export default function ArsipSantriPage() {
               <div className="bg-green-500 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">{selectedRestore.size}</div>
               <div className="leading-tight">
                 <p className="font-bold text-sm">Terpilih</p>
-                <p className="text-xs text-gray-400">Restore atau hapus permanen</p>
+                <p className="text-xs text-slate-400">Restore atau hapus permanen</p>
               </div>
             </div>
             <div className="flex gap-2">

@@ -214,31 +214,31 @@ export default function AbsensiGuruPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <Briefcase className="w-6 h-6 text-indigo-600"/> Absensi Guru (Jurnal)
            </h1>
-           <p className="text-gray-500 text-sm">Input kehadiran mengajar mingguan.</p>
+           <p className="text-slate-500 text-sm">Input kehadiran mengajar mingguan.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-             <div className="bg-white p-1.5 border rounded-lg flex items-center gap-2 shadow-sm">
-                <Filter className="w-4 h-4 text-gray-400 ml-2"/>
+             <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex items-center gap-2 shadow-sm">
+                <Filter className="w-4 h-4 text-slate-400 ml-2"/>
                 <select 
                     value={selectedMarhalah} 
                     onChange={e => setSelectedMarhalah(e.target.value)}
-                    className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer pr-2"
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer pr-2"
                 >
                     <option value="">Semua Tingkat</option>
                     {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                 </select>
             </div>
 
-            <div className="bg-white p-1 border rounded-lg shadow-sm">
+            <div className="bg-white p-1 border border-slate-200 rounded-xl shadow-sm">
                 <input 
                     type="date" 
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="p-2 text-sm font-bold text-gray-700 outline-none"
+                    className="p-2 text-sm font-bold text-slate-700 outline-none"
                 />
             </div>
 
@@ -263,18 +263,18 @@ export default function AbsensiGuruPage() {
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg border border-blue-100 flex flex-wrap gap-4">
+      <div className="text-xs text-slate-500 bg-blue-50 p-3 rounded-lg border border-blue-100 flex flex-wrap gap-4">
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-green-100 text-green-700 font-bold border rounded flex items-center justify-center">H</span> Hadir</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-yellow-100 text-yellow-700 font-bold border rounded flex items-center justify-center">B</span> Badal</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-red-100 text-red-700 font-bold border rounded flex items-center justify-center">A</span> Kosong</span>
-        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-gray-200 text-gray-500 font-bold border rounded flex items-center justify-center">L</span> Libur</span>
+        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-slate-200 text-slate-500 font-bold border rounded flex items-center justify-center">L</span> Libur</span>
         <span className="ml-auto italic">* Navigasi panah kanan/kiri terkunci per baris</span>
       </div>
 
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
         {!hasLoaded ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                <Search className="w-16 h-16 mb-4 text-gray-200"/>
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <Search className="w-16 h-16 mb-4 text-slate-200"/>
                 <p>Silakan pilih tingkat dan tanggal, lalu klik <b>Tampilkan</b>.</p>
             </div>
         ) : loading ? (
@@ -282,25 +282,25 @@ export default function AbsensiGuruPage() {
         ) : (
              <div className="overflow-auto flex-1">
              <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-100 sticky top-0 z-20 shadow-sm">
+                <thead className="bg-slate-100 sticky top-0 z-20 shadow-sm">
                    <tr>
-                      <th className="p-3 text-left border bg-gray-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Kelas</th>
-                      <th className="p-3 text-left border bg-gray-100 z-30 w-48 min-w-[12rem] shadow-sm md:sticky md:left-48">Guru Pengajar</th>
+                      <th className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Kelas</th>
+                      <th className="p-3 text-left border bg-slate-100 z-30 w-48 min-w-[12rem] shadow-sm md:sticky md:left-48">Guru Pengajar</th>
                       {days.map(day => (
                         <th key={day.dateStr} colSpan={3} className="border text-center py-2 px-1 min-w-[6rem]">
-                            <div className="font-bold text-gray-800">{day.label}</div>
-                            <div className="text-[10px] text-gray-500 font-normal">{day.shortDate}</div>
+                            <div className="font-bold text-slate-800">{day.label}</div>
+                            <div className="text-[10px] text-slate-500 font-normal">{day.shortDate}</div>
                         </th>
                       ))}
                    </tr>
                    <tr>
-                      <th className="border bg-gray-100 sticky left-0 z-30 shadow-sm"></th>
-                      <th className="border bg-gray-100 md:sticky md:left-48 z-30"></th>
+                      <th className="border bg-slate-100 sticky left-0 z-30 shadow-sm"></th>
+                      <th className="border bg-slate-100 md:sticky md:left-48 z-30"></th>
                       {days.map(day => (
                         <React.Fragment key={day.dateStr + 'h'}>
-                            <th className="border text-center text-[9px] text-gray-500 bg-gray-50 w-8" title="Shubuh">S</th>
-                            <th className="border text-center text-[9px] text-gray-500 bg-gray-50 w-8" title="Ashar">A</th>
-                            <th className="border text-center text-[9px] text-gray-500 bg-gray-50 w-8" title="Maghrib">M</th>
+                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Shubuh">S</th>
+                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Ashar">A</th>
+                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Maghrib">M</th>
                         </React.Fragment>
                       ))}
                    </tr>
@@ -313,16 +313,16 @@ export default function AbsensiGuruPage() {
                             {/* KOLOM KELAS */}
                             {row.isFirst && (
                                 <td 
-                                    className="p-3 border sticky left-0 bg-white group-hover:bg-indigo-50 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] align-top font-bold text-gray-800"
+                                    className="p-3 border sticky left-0 bg-white group-hover:bg-indigo-50 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] align-top font-bold text-slate-800"
                                     rowSpan={row.rowSpan}
                                 >
                                     {row.kelas.nama_kelas}
-                                    <div className="text-[10px] font-normal text-gray-400 mt-1">{row.kelas.marhalah?.nama}</div>
+                                    <div className="text-[10px] font-normal text-slate-400 mt-1">{row.kelas.marhalah?.nama}</div>
                                 </td>
                             )}
 
                             {/* KOLOM GURU */}
-                            <td className="p-2 border bg-white z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] md:sticky md:left-48 text-xs font-medium text-gray-700 flex items-center gap-2 h-full min-h-[40px]">
+                            <td className="p-2 border bg-white z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] md:sticky md:left-48 text-xs font-medium text-slate-700 flex items-center gap-2 h-full min-h-[40px]">
                                 <User className="w-3 h-3 text-indigo-400"/> {row.guru.name}
                             </td>
 
@@ -377,16 +377,16 @@ const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: {
     disabled?: boolean, 
     onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void 
 }) => {
-    let color = 'bg-white text-gray-800'
+    let color = 'bg-white text-slate-800'
     if (value === 'H') color = 'bg-green-100 text-green-700 font-bold'
     if (value === 'A') color = 'bg-red-100 text-red-700 font-bold'
     if (value === 'B') color = 'bg-yellow-100 text-yellow-700 font-bold'
-    if (value === 'L') color = 'bg-gray-100 text-gray-400'
+    if (value === 'L') color = 'bg-slate-100 text-slate-400'
 
-    if (disabled) color = 'bg-gray-200/50 text-gray-300 cursor-not-allowed'
+    if (disabled) color = 'bg-slate-200/50 text-slate-300 cursor-not-allowed'
 
     return (
-        <td className={`border p-0 h-full align-middle ${disabled ? 'bg-gray-100' : ''}`}>
+        <td className={`border p-0 h-full align-middle ${disabled ? 'bg-slate-100' : ''}`}>
             <input 
                 id={id}
                 type="text" 

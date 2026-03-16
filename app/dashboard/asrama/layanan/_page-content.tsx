@@ -349,7 +349,7 @@ export default function LayananAsramaPage() {
                                         </td>
                                         <td className="p-4">
                                             <select 
-                                                className={`w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${pendingChanges[santri.id]?.tempat_makan_id !== undefined ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}
+                                                className={`w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${pendingChanges[santri.id]?.tempat_makan_id !== undefined ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}
                                                 value={getDisplayValue(santri.id, 'tempat_makan_id', santri.tempat_makan_id)}
                                                 onChange={e => handleSelectChange(santri.id, 'tempat_makan_id', e.target.value)}
                                             >
@@ -359,7 +359,7 @@ export default function LayananAsramaPage() {
                                         </td>
                                         <td className="p-4">
                                             <select 
-                                                className={`w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${pendingChanges[santri.id]?.tempat_mencuci_id !== undefined ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}
+                                                className={`w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${pendingChanges[santri.id]?.tempat_mencuci_id !== undefined ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}
                                                 value={getDisplayValue(santri.id, 'tempat_mencuci_id', santri.tempat_mencuci_id)}
                                                 onChange={e => handleSelectChange(santri.id, 'tempat_mencuci_id', e.target.value)}
                                             >
@@ -454,7 +454,7 @@ export default function LayananAsramaPage() {
 
             {/* TOAST NOTIFICATION */}
             {toastMsg && (
-                <div className="fixed top-4 right-4 bg-emerald-100 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-in slide-in-from-top-5">
+                <div className="fixed top-4 right-4 bg-emerald-100 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-sm flex items-center gap-3 z-50 animate-in slide-in-from-top-5">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     <span className="font-semibold">{toastMsg}</span>
                 </div>

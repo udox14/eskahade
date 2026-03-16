@@ -26,7 +26,7 @@ type KetuaItem = { nomor_kamar: string; santri_id: string; nama_lengkap: string 
 
 // ── Badge status kamar ────────────────────────────────────────────────────────
 function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
-  if (isi === 0) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">Kosong</span>
+  if (isi === 0) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">Kosong</span>
   if (isi > kuota) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">Over</span>
   if (isi === kuota) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 font-semibold">Penuh</span>
   return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-600 font-semibold">Normal</span>
@@ -235,15 +235,15 @@ export default function PerpindahanClient({
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Home className="w-7 h-7 text-indigo-600"/> Perpindahan Kamar
           </h1>
-          <p className="text-sm text-gray-500">Setup distribusi kamar santri menjelang tahun ajaran baru</p>
+          <p className="text-sm text-slate-500">Setup distribusi kamar santri menjelang tahun ajaran baru</p>
         </div>
         <div className="flex items-center gap-2">
           {!asramaBinaan && (
             <select value={asrama} onChange={e => { setAsrama(e.target.value); setStep('config') }}
-              className="border rounded-lg px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
               {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           )}
@@ -260,10 +260,10 @@ export default function PerpindahanClient({
       ) : (
         <>
           {/* TABS */}
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
             {(['plotting', 'monitoring'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}>
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? 'bg-white shadow text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>
                 {t === 'plotting' ? '⚙️ Plotting & Setup' : '📊 Monitoring Kamar'}
               </button>
             ))}
@@ -280,21 +280,21 @@ export default function PerpindahanClient({
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors ${
                       step === s ? 'bg-indigo-600 text-white' :
                       (['config','generate','plotting'].indexOf(step) > i) ? 'bg-green-500 text-white' :
-                      'bg-gray-200 text-gray-400'
+                      'bg-slate-200 text-slate-400'
                     }`}>{i + 1}</div>
-                    <span className={`hidden sm:block font-medium ${step === s ? 'text-indigo-700' : 'text-gray-400'}`}>
+                    <span className={`hidden sm:block font-medium ${step === s ? 'text-indigo-700' : 'text-slate-400'}`}>
                       {s === 'config' ? 'Konfigurasi Kamar' : s === 'generate' ? 'Generate Draft' : 'Review & Apply'}
                     </span>
-                    {i < 2 && <ArrowRight className="w-3 h-3 text-gray-300"/>}
+                    {i < 2 && <ArrowRight className="w-3 h-3 text-slate-300"/>}
                   </div>
                 ))}
               </div>
 
               {/* ─ STEP 1: KONFIGURASI ─ */}
               <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50 cursor-pointer"
+                <div className="flex items-center justify-between px-5 py-3 border-b bg-slate-50 cursor-pointer"
                   onClick={() => setConfigOpen(v => !v)}>
-                  <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
                     <Settings className="w-4 h-4 text-indigo-500"/>
                     Step 1 — Konfigurasi Kamar
                     {configs.length > 0 && !configOpen && (
@@ -304,14 +304,14 @@ export default function PerpindahanClient({
                     )}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{localKamar.length} kamar dikonfigurasi</span>
-                    {configOpen ? <ChevronUp className="w-4 h-4 text-gray-400"/> : <ChevronDown className="w-4 h-4 text-gray-400"/>}
+                    <span className="text-xs text-slate-400">{localKamar.length} kamar dikonfigurasi</span>
+                    {configOpen ? <ChevronUp className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>}
                   </div>
                 </div>
                 {configOpen && (
                   <div className="p-5 space-y-4">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-500">Tentukan daftar kamar dan kuota masing-masing.</p>
+                      <p className="text-sm text-slate-500">Tentukan daftar kamar dan kuota masing-masing.</p>
                       <button onClick={() => setLocalKamar(prev => [...prev, { nomor_kamar: String(prev.length + 1), kuota: 10, blok: '' }])}
                         className="flex items-center gap-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                         <Plus className="w-3.5 h-3.5"/> Tambah Kamar
@@ -320,23 +320,23 @@ export default function PerpindahanClient({
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                       {localKamar.map((k, i) => (
-                        <div key={i} className="border rounded-xl p-3 space-y-2 bg-gray-50">
+                        <div key={i} className="border rounded-xl p-3 space-y-2 bg-slate-50">
                           <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase">Kamar</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">Kamar</label>
                             <button onClick={() => setLocalKamar(prev => prev.filter((_, j) => j !== i))}
                               className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button>
                           </div>
                           <input value={k.nomor_kamar} onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, nomor_kamar: e.target.value} : x))}
-                            className="w-full border rounded-lg px-2 py-1.5 text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none"
+                            className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none"
                             placeholder="No. Kamar"/>
                           <div className="flex items-center gap-1">
-                            <label className="text-[10px] text-gray-400 shrink-0">Kuota:</label>
+                            <label className="text-[10px] text-slate-400 shrink-0">Kuota:</label>
                             <input type="number" min={1} max={50} value={k.kuota}
                               onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, kuota: Number(e.target.value)} : x))}
                               className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
                           </div>
                           <div className="flex items-center gap-1">
-                            <label className="text-[10px] text-gray-400 shrink-0">Blok:</label>
+                            <label className="text-[10px] text-slate-400 shrink-0">Blok:</label>
                             <input value={k.blok || ''} placeholder="A/B/C (opt)"
                               onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, blok: e.target.value.toUpperCase()} : x))}
                               className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
@@ -360,17 +360,17 @@ export default function PerpindahanClient({
               {/* ─ STEP 2: GENERATE ─ */}
               {configs.length > 0 && (
                 <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden`}>
-                  <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50 cursor-pointer"
+                  <div className="flex items-center justify-between px-5 py-3 border-b bg-slate-50 cursor-pointer"
                     onClick={() => setStep('generate')}>
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
                       <Play className="w-4 h-4 text-green-500"/>
                       Step 2 — Generate Draft Otomatis
                     </h3>
-                    <span className="text-xs text-gray-400">{santriList.length} santri di asrama ini</span>
+                    <span className="text-xs text-slate-400">{santriList.length} santri di asrama ini</span>
                   </div>
                   {step === 'generate' && (
                     <div className="p-5 space-y-4">
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-slate-500">
                         Sistem akan mendistribusikan santri secara proporsional berdasarkan kelas sekolah.
                         Sebagian slot dikosongkan untuk santri baru.
                       </p>
@@ -391,7 +391,7 @@ export default function PerpindahanClient({
                                   )
                                 })}
                                 {configs.filter((k:any) => !k.blok).length > 0 && (
-                                  <span className="text-[10px] bg-white border border-gray-200 text-gray-500 font-medium px-2 py-0.5 rounded-lg">
+                                  <span className="text-[10px] bg-white border border-slate-200 text-slate-500 font-medium px-2 py-0.5 rounded-lg">
                                     Tanpa blok: Kamar {configs.filter((k:any) => !k.blok).map((k:any) => k.nomor_kamar).join(', ')}
                                   </span>
                                 )}
@@ -399,7 +399,7 @@ export default function PerpindahanClient({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-500">
+                          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-500">
                             <span>ℹ️</span> Tidak ada blok dikonfigurasi — semua santri didistribusikan bebas ke semua kamar.
                             <button onClick={() => setConfigOpen(true)} className="text-indigo-600 font-semibold hover:underline ml-1">Set blok →</button>
                           </div>
@@ -426,19 +426,19 @@ export default function PerpindahanClient({
                       </div>
 
                       <div className="grid grid-cols-3 gap-3 text-center">
-                        <div className="bg-gray-50 rounded-xl p-3 border">
-                          <p className="text-lg font-black text-gray-800">{santriList.length}</p>
-                          <p className="text-xs text-gray-400">Santri akan dipindah</p>
+                        <div className="bg-slate-50 rounded-xl p-3 border">
+                          <p className="text-lg font-black text-slate-800">{santriList.length}</p>
+                          <p className="text-xs text-slate-400">Santri akan dipindah</p>
                         </div>
-                        <div className="bg-gray-50 rounded-xl p-3 border">
-                          <p className="text-lg font-black text-gray-800">{configs.length}</p>
-                          <p className="text-xs text-gray-400">Kamar tersedia</p>
+                        <div className="bg-slate-50 rounded-xl p-3 border">
+                          <p className="text-lg font-black text-slate-800">{configs.length}</p>
+                          <p className="text-xs text-slate-400">Kamar tersedia</p>
                         </div>
-                        <div className="bg-gray-50 rounded-xl p-3 border">
-                          <p className="text-lg font-black text-gray-800">
+                        <div className="bg-slate-50 rounded-xl p-3 border">
+                          <p className="text-lg font-black text-slate-800">
                             {Math.floor(configs.reduce((s, k) => s + k.kuota, 0) * (1 - persenBaru / 100))}
                           </p>
-                          <p className="text-xs text-gray-400">Slot efektif</p>
+                          <p className="text-xs text-slate-400">Slot efektif</p>
                         </div>
                       </div>
 
@@ -463,15 +463,15 @@ export default function PerpindahanClient({
               {/* ─ STEP 3: PLOTTING ─ */}
               {Object.keys(draftMap).length > 0 && (
                 <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-3 border-b bg-gray-50 gap-2">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-3 border-b bg-slate-50 gap-2">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
                       <Users className="w-4 h-4 text-blue-500"/>
                       Step 3 — Review & Koreksi Manual
                       {isApplied && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">SUDAH DIAPPLY</span>}
                     </h3>
                     <div className="flex items-center gap-2 flex-wrap">
                       <button onClick={() => handlePrint('all')}
-                        className="flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600">
+                        className="flex items-center gap-1.5 text-xs border border-slate-200 rounded-xl px-3 py-1.5 hover:bg-slate-50 text-slate-600">
                         <Printer className="w-3.5 h-3.5"/> Cetak Semua
                       </button>
                       <button onClick={handleReset}
@@ -506,12 +506,12 @@ export default function PerpindahanClient({
                           onDragOver={e => { e.preventDefault(); setDragOverKamar(cfg.nomor_kamar) }}
                           onDrop={() => handleDrop(cfg.nomor_kamar)}
                           onDragLeave={() => setDragOverKamar(null)}
-                          className={`border rounded-xl transition-all ${dragOverKamar === cfg.nomor_kamar ? 'border-indigo-400 bg-indigo-50 shadow-md' : isOver ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-gray-50/50'}`}
+                          className={`border rounded-xl transition-all ${dragOverKamar === cfg.nomor_kamar ? 'border-indigo-400 bg-indigo-50 shadow-sm' : isOver ? 'border-red-200 bg-red-50/30' : 'border-slate-200 bg-slate-50/50'}`}
                         >
                           {/* Kamar header */}
                           <div className="flex items-center justify-between px-3 py-2 border-b border-inherit bg-white rounded-t-xl">
                             <div className="flex items-center gap-2">
-                              <span className="font-black text-gray-800">Kamar {cfg.nomor_kamar}</span>
+                              <span className="font-black text-slate-800">Kamar {cfg.nomor_kamar}</span>
                               {(cfg as any).blok && (
                                 <span className="text-[9px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded">
                                   Blok {(cfg as any).blok}
@@ -520,11 +520,11 @@ export default function PerpindahanClient({
                               <KamarStatusBadge isi={santriKamar.length} kuota={cfg.kuota}/>
                             </div>
                             <div className="flex items-center gap-2 text-xs">
-                              <span className={`font-bold tabular-nums ${isOver ? 'text-red-500' : 'text-gray-600'}`}>
+                              <span className={`font-bold tabular-nums ${isOver ? 'text-red-500' : 'text-slate-600'}`}>
                                 {santriKamar.length}/{cfg.kuota}
                               </span>
                               <button onClick={() => handlePrint(cfg.nomor_kamar)}
-                                className="text-gray-400 hover:text-gray-600"><Printer className="w-3.5 h-3.5"/></button>
+                                className="text-slate-400 hover:text-slate-600"><Printer className="w-3.5 h-3.5"/></button>
                             </div>
                           </div>
 
@@ -546,7 +546,7 @@ export default function PerpindahanClient({
                           {/* Daftar santri */}
                           <div className="p-2 space-y-1 max-h-52 overflow-y-auto">
                             {santriKamar.length === 0 ? (
-                              <p className="text-center text-xs text-gray-400 py-4">Drag santri ke sini</p>
+                              <p className="text-center text-xs text-slate-400 py-4">Drag santri ke sini</p>
                             ) : (
                               santriKamar.map(s => {
                                 const isLama = draftMap[s.id]?.kamar_lama === cfg.nomor_kamar
@@ -559,13 +559,13 @@ export default function PerpindahanClient({
                                     className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing select-none transition-all ${
                                       dragSantriId === s.id ? 'opacity-40' :
                                       isKetua ? 'bg-amber-50 border border-amber-200' :
-                                      isLama ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-gray-100 hover:border-indigo-200'
+                                      isLama ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-slate-100 hover:border-indigo-200'
                                     }`}
                                   >
-                                    <GripVertical className="w-3 h-3 text-gray-300 shrink-0"/>
+                                    <GripVertical className="w-3 h-3 text-slate-300 shrink-0"/>
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold text-gray-800 truncate">{s.nama_lengkap}</p>
-                                      <p className="text-[10px] text-gray-400 truncate">{s.nama_kelas || s.kelas_sekolah || '-'}</p>
+                                      <p className="text-xs font-semibold text-slate-800 truncate">{s.nama_lengkap}</p>
+                                      <p className="text-[10px] text-slate-400 truncate">{s.nama_kelas || s.kelas_sekolah || '-'}</p>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       {isKetua && <Crown className="w-3 h-3 text-amber-500"/>}
@@ -574,7 +574,7 @@ export default function PerpindahanClient({
                                       </span>
                                       {/* Dropdown pindah */}
                                       <select onChange={e => { if (e.target.value) handlePindah(s.id, e.target.value); e.target.value = '' }}
-                                        className="text-[9px] border rounded px-1 py-0.5 outline-none bg-white cursor-pointer text-gray-500 max-w-[60px]"
+                                        className="text-[9px] border rounded px-1 py-0.5 outline-none bg-white cursor-pointer text-slate-500 max-w-[60px]"
                                         title="Pindah ke kamar lain" defaultValue="">
                                         <option value="" disabled>⇄</option>
                                         {configs.filter(c => c.nomor_kamar !== cfg.nomor_kamar).map(c => (
@@ -600,8 +600,8 @@ export default function PerpindahanClient({
           {tab === 'monitoring' && (
             <div className="space-y-4">
               {configs.length === 0 ? (
-                <div className="text-center py-16 text-gray-400">
-                  <Home className="w-10 h-10 mx-auto mb-3 text-gray-300"/>
+                <div className="text-center py-16 text-slate-400">
+                  <Home className="w-10 h-10 mx-auto mb-3 text-slate-300"/>
                   <p>Belum ada konfigurasi kamar. Setup dulu di tab Plotting.</p>
                 </div>
               ) : (
@@ -609,29 +609,29 @@ export default function PerpindahanClient({
                   {/* Summary cards */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                      <p className="text-2xl font-black text-gray-800">{configs.length}</p>
-                      <p className="text-xs text-gray-400 mt-1">Total Kamar</p>
+                      <p className="text-2xl font-black text-slate-800">{configs.length}</p>
+                      <p className="text-xs text-slate-400 mt-1">Total Kamar</p>
                     </div>
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
                       <p className="text-2xl font-black text-indigo-700">{santriList.length}</p>
-                      <p className="text-xs text-gray-400 mt-1">Total Santri</p>
+                      <p className="text-xs text-slate-400 mt-1">Total Santri</p>
                     </div>
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
                       <p className="text-2xl font-black text-green-600">
                         {configs.reduce((s, k) => s + k.kuota, 0) - santriList.length}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">Slot Kosong</p>
+                      <p className="text-xs text-slate-400 mt-1">Slot Kosong</p>
                     </div>
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
                       <p className="text-2xl font-black text-amber-600">{Object.keys(ketuaMap).length}</p>
-                      <p className="text-xs text-gray-400 mt-1">Ketua Ditentukan</p>
+                      <p className="text-xs text-slate-400 mt-1">Ketua Ditentukan</p>
                     </div>
                   </div>
 
                   {/* Tabel monitoring */}
                   <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b text-xs text-gray-500 uppercase font-bold">
+                      <thead className="bg-slate-50 border-b text-xs text-slate-500 uppercase font-bold">
                         <tr>
                           <th className="px-4 py-3 text-left">Kamar</th>
                           <th className="px-4 py-3 text-center">Blok</th>
@@ -649,16 +649,16 @@ export default function PerpindahanClient({
                           const isi = santriKamar.length
                           const ketua = ketuaMap[cfg.nomor_kamar]
                           return (
-                            <tr key={cfg.nomor_kamar} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-bold text-gray-800">Kamar {cfg.nomor_kamar}</td>
-                              <td className="px-4 py-3 text-center text-xs">{(cfg as any).blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{(cfg as any).blok}</span> : <span className="text-gray-300">—</span>}</td>
-                              <td className="px-4 py-3 text-center text-gray-600">{cfg.kuota}</td>
+                            <tr key={cfg.nomor_kamar} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 font-bold text-slate-800">Kamar {cfg.nomor_kamar}</td>
+                              <td className="px-4 py-3 text-center text-xs">{(cfg as any).blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{(cfg as any).blok}</span> : <span className="text-slate-300">—</span>}</td>
+                              <td className="px-4 py-3 text-center text-slate-600">{cfg.kuota}</td>
                               <td className="px-4 py-3 text-center font-bold">{isi}</td>
                               <td className={`px-4 py-3 text-center font-bold ${cfg.kuota - isi < 0 ? 'text-red-500' : 'text-green-600'}`}>
                                 {cfg.kuota - isi}
                               </td>
-                              <td className="px-4 py-3 text-center text-xs text-gray-500">
-                                {ketua ? <span className="flex items-center justify-center gap-1"><Crown className="w-3 h-3 text-amber-400"/>{ketua.nama_lengkap}</span> : <span className="text-gray-300">—</span>}
+                              <td className="px-4 py-3 text-center text-xs text-slate-500">
+                                {ketua ? <span className="flex items-center justify-center gap-1"><Crown className="w-3 h-3 text-amber-400"/>{ketua.nama_lengkap}</span> : <span className="text-slate-300">—</span>}
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <KamarStatusBadge isi={isi} kuota={cfg.kuota}/>
@@ -670,7 +670,7 @@ export default function PerpindahanClient({
                                     <Eye className="w-3 h-3"/> Lihat
                                   </button>
                                   <button onClick={() => handlePrint(cfg.nomor_kamar)}
-                                    className="text-xs flex items-center gap-1 text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg font-medium transition-colors">
+                                    className="text-xs flex items-center gap-1 text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-lg font-medium transition-colors">
                                     <Printer className="w-3 h-3"/> Cetak
                                   </button>
                                 </div>
@@ -700,18 +700,18 @@ export default function PerpindahanClient({
               onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
                 <div>
-                  <h3 className="font-bold text-gray-800 text-lg">Kamar {modalKamar}</h3>
+                  <h3 className="font-bold text-slate-800 text-lg">Kamar {modalKamar}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-500">Asrama {asrama}</span>
+                    <span className="text-xs text-slate-500">Asrama {asrama}</span>
                     <KamarStatusBadge isi={santriKamar.length} kuota={cfg?.kuota || 0}/>
-                    <span className="text-xs text-gray-400">{santriKamar.length}/{cfg?.kuota} jiwa</span>
+                    <span className="text-xs text-slate-400">{santriKamar.length}/{cfg?.kuota} jiwa</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => handlePrint(modalKamar)}
-                    className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><Printer className="w-4 h-4"/></button>
+                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><Printer className="w-4 h-4"/></button>
                   <button onClick={() => setModalKamar(null)}
-                    className="p-1.5 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-400"/></button>
+                    className="p-1.5 hover:bg-slate-100 rounded-full"><X className="w-5 h-5 text-slate-400"/></button>
                 </div>
               </div>
               {ketua && (
@@ -722,7 +722,7 @@ export default function PerpindahanClient({
               )}
               <div className="overflow-y-auto flex-1 divide-y">
                 {santriKamar.length === 0 ? (
-                  <div className="py-12 text-center text-gray-400 text-sm">Belum ada santri di kamar ini.</div>
+                  <div className="py-12 text-center text-slate-400 text-sm">Belum ada santri di kamar ini.</div>
                 ) : (
                   santriKamar
                     .sort((a, b) => {
@@ -735,13 +735,13 @@ export default function PerpindahanClient({
                       const isKetua = ketua?.santri_id === s.id
                       return (
                         <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${isKetua ? 'bg-amber-50' : ''}`}>
-                          <span className="w-5 text-xs text-gray-400 font-mono shrink-0 text-right">{i + 1}</span>
+                          <span className="w-5 text-xs text-slate-400 font-mono shrink-0 text-right">{i + 1}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="font-semibold text-gray-800 text-sm truncate">{s.nama_lengkap}</p>
+                              <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
                               {isKetua && <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0"/>}
                             </div>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-slate-400">
                               {s.nama_kelas || 'Belum masuk kelas'} · {s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` Kls ${s.kelas_sekolah}` : ''}
                             </p>
                           </div>

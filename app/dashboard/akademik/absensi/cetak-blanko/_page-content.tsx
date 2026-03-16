@@ -52,7 +52,7 @@ function BlankoSheet({ data }: { data: any }) {
 
       {/* TABEL SANTRI */}
       <table className="print-table w-full mb-4 text-[10px]">
-          <thead className="bg-gray-100 font-bold text-center">
+          <thead className="bg-slate-100 font-bold text-center">
               <tr>
                   <th rowSpan={2} className="w-5">NO</th>
                   <th rowSpan={2} className="w-[12rem] text-left px-2">NAMA SANTRI</th>
@@ -66,7 +66,7 @@ function BlankoSheet({ data }: { data: any }) {
           </thead>
           <tbody>
               {data.santriList.length === 0 ? (
-                  <tr><td colSpan={21} className="text-center py-4 italic text-gray-500">Tidak ada data santri</td></tr>
+                  <tr><td colSpan={21} className="text-center py-4 italic text-slate-500">Tidak ada data santri</td></tr>
               ) : data.santriList.map((s: any, idx: number) => (
                   <tr key={s.id || idx}>
                       <td className="text-center">{idx + 1}</td>
@@ -87,12 +87,12 @@ function BlankoSheet({ data }: { data: any }) {
             { label: 'MAGHRIB', guru: data.kelas.guru_maghrib, days: agendaMaghrib }
           ].map((sesi, idx) => (
             <div key={idx} className="flex-1">
-                <div className="font-bold mb-0.5 border border-black p-0.5 text-center bg-gray-100 text-[9px]">
+                <div className="font-bold mb-0.5 border border-black p-0.5 text-center bg-slate-100 text-[9px]">
                     {sesi.label}<br/><span className="font-normal normal-case">{getNamaGuru(sesi.guru)}</span>
                 </div>
                 <table className="print-table w-full text-center text-[9px]">
                     <thead>
-                        <tr className="bg-gray-50">
+                        <tr className="bg-slate-50">
                             <th className="w-14">Hari/Tanggal</th>
                             <th className="w-14">Pelajaran</th>
                             <th>Materi</th>
@@ -117,7 +117,7 @@ function BlankoSheet({ data }: { data: any }) {
             </div>
           ))}
       </div>
-      <div className="mt-2 text-[8px] text-right italic text-gray-500 no-print">Dicetak pada {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+      <div className="mt-2 text-[8px] text-right italic text-slate-500 no-print">Dicetak pada {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
     </div>
   )
 }
@@ -196,23 +196,23 @@ export default function CetakBlankoPage() {
       <div className="no-print bg-white p-6 rounded-xl border shadow-sm space-y-4">
          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b pb-4">
              <div>
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                   <FileText className="w-6 h-6 text-indigo-600"/> Cetak Blanko Absen
                 </h1>
-                <p className="text-gray-500 text-sm">Pilih mode cetak: Satuan per kelas atau Massal per marhalah.</p>
+                <p className="text-slate-500 text-sm">Pilih mode cetak: Satuan per kelas atau Massal per marhalah.</p>
              </div>
              
              {/* MODE TOGGLE */}
-             <div className="flex bg-gray-100 p-1 rounded-lg">
+             <div className="flex bg-slate-100 p-1 rounded-lg">
                 <button 
                     onClick={() => { setMode('SATUAN'); setSingleData(null); setMassalData(null); }}
-                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'SATUAN' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'SATUAN' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <List className="w-4 h-4"/> Per Kelas
                 </button>
                 <button 
                     onClick={() => { setMode('MASSAL'); setSingleData(null); setMassalData(null); }}
-                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'MASSAL' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'MASSAL' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <Layers className="w-4 h-4"/> Per marhalah
                 </button>
@@ -223,11 +223,11 @@ export default function CetakBlankoPage() {
          <div className="flex flex-col md:flex-row gap-4 items-end">
              {mode === 'SATUAN' ? (
                  <div className="flex-1 w-full">
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Pilih Kelas</label>
+                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Pilih Kelas</label>
                      <select 
                         value={selectedKelas} 
                         onChange={e => setSelectedKelas(e.target.value)}
-                        className="w-full p-2.5 border rounded-lg text-sm bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                      >
                          <option value="">-- Pilih Kelas --</option>
                          {kelasList.map(k => (
@@ -237,11 +237,11 @@ export default function CetakBlankoPage() {
                  </div>
              ) : (
                  <div className="flex-1 w-full">
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Pilih Tingkat (Marhalah)</label>
+                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Pilih Tingkat (Marhalah)</label>
                      <select 
                         value={selectedMarhalah} 
                         onChange={e => setSelectedMarhalah(e.target.value)}
-                        className="w-full p-2.5 border rounded-lg text-sm bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-green-500"
                      >
                          <option value="">-- Pilih Tingkat --</option>
                          {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}

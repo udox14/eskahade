@@ -154,14 +154,14 @@ export default function RekapAbsensiGuruPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/akademik/absensi-guru" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6 text-gray-600"/>
+          <Link href="/dashboard/akademik/absensi-guru" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6 text-slate-600"/>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
               <Briefcase className="w-6 h-6 text-indigo-600"/> Rekap Kinerja Guru
             </h1>
-            <p className="text-gray-500 text-sm">Evaluasi kehadiran pengajar berdasarkan jadwal kelas.</p>
+            <p className="text-slate-500 text-sm">Evaluasi kehadiran pengajar berdasarkan jadwal kelas.</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -175,17 +175,17 @@ export default function RekapAbsensiGuruPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2 flex gap-2 items-end">
             <div className="flex-1">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Dari</label>
-              <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm"/>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Dari</label>
+              <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm"/>
             </div>
             <div className="flex-1">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Sampai</label>
-              <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm"/>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sampai</label>
+              <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm"/>
             </div>
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filter Tingkat</label>
-            <select value={selectedMarhalah} onChange={e=>setSelectedMarhalah(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Tingkat</label>
+            <select value={selectedMarhalah} onChange={e=>setSelectedMarhalah(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
               <option value="">Semua Tingkat</option>
               {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
             </select>
@@ -197,16 +197,16 @@ export default function RekapAbsensiGuruPage() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-          <span className="text-sm font-bold text-gray-700 flex items-center gap-2"><Filter className="w-4 h-4"/> Opsi Perhitungan:</span>
+        <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <span className="text-sm font-bold text-slate-700 flex items-center gap-2"><Filter className="w-4 h-4"/> Opsi Perhitungan:</span>
           <div className="flex gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="badalOpt" checked={badalAsHadir === true} onChange={() => setBadalAsHadir(true)} className="accent-indigo-600 w-4 h-4"/>
-              <span className="text-sm text-gray-600">Badal = <b className="text-green-600">Terisi (Hadir)</b></span>
+              <span className="text-sm text-slate-600">Badal = <b className="text-green-600">Terisi (Hadir)</b></span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="badalOpt" checked={badalAsHadir === false} onChange={() => setBadalAsHadir(false)} className="accent-red-600 w-4 h-4"/>
-              <span className="text-sm text-gray-600">Badal = <b className="text-red-600">Kosong (Alfa)</b></span>
+              <span className="text-sm text-slate-600">Badal = <b className="text-red-600">Kosong (Alfa)</b></span>
             </label>
           </div>
         </div>
@@ -217,35 +217,35 @@ export default function RekapAbsensiGuruPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border shadow-sm">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 uppercase">Urutkan:</span>
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="text-sm border rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500">
+              <span className="text-xs font-bold text-slate-500 uppercase">Urutkan:</span>
+              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="text-sm border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500">
                 {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 uppercase">Sesi:</span>
-              <select value={filterSesi} onChange={e=>setFilterSesi(e.target.value)} className="text-sm border rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500">
+              <span className="text-xs font-bold text-slate-500 uppercase">Sesi:</span>
+              <select value={filterSesi} onChange={e=>setFilterSesi(e.target.value)} className="text-sm border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500">
                 {SESI_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <span className="text-xs text-gray-400">{processedData.length} guru</span>
+            <span className="text-xs text-slate-400">{processedData.length} guru</span>
           </div>
 
           {/* TOMBOL PRINT + TOGGLE MODE */}
           <div className="flex items-center gap-2">
             {/* Toggle Colorful / BW */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
+            <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-1">
               <button
                 onClick={() => setPrintMode('colorful')}
                 title="Cetak Berwarna"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${printMode === 'colorful' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${printMode === 'colorful' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <Palette className="w-3.5 h-3.5"/> Berwarna
               </button>
               <button
                 onClick={() => setPrintMode('bw')}
                 title="Cetak Hitam Putih"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${printMode === 'bw' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${printMode === 'bw' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <Circle className="w-3.5 h-3.5"/> Hitam Putih
               </button>
@@ -263,14 +263,14 @@ export default function RekapAbsensiGuruPage() {
       {/* TABEL HASIL (LAYAR) */}
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden min-h-[400px]">
         {!hasSearched ? (
-          <div className="flex flex-col items-center justify-center h-full py-32 text-gray-400">
-            <Search className="w-16 h-16 mb-4 text-gray-200"/>
+          <div className="flex flex-col items-center justify-center h-full py-32 text-slate-400">
+            <Search className="w-16 h-16 mb-4 text-slate-200"/>
             <p>Silakan atur filter dan klik <b>Tampilkan Rekap</b>.</p>
           </div>
         ) : loading ? (
           <div className="py-32 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-500"/></div>
         ) : processedData.length === 0 ? (
-          <div className="py-32 text-center text-gray-400">Tidak ada data untuk filter yang dipilih.</div>
+          <div className="py-32 text-center text-slate-400">Tidak ada data untuk filter yang dipilih.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -289,10 +289,10 @@ export default function RekapAbsensiGuruPage() {
               <tbody className="divide-y divide-gray-100">
                 {processedData.map((row, idx) => (
                   <tr key={row.id} className="hover:bg-indigo-50/30 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 text-xs">{idx+1}</td>
-                    <td className="px-4 py-3 font-bold text-gray-800">{row.nama}</td>
-                    <td className="px-4 py-3 text-[11px] text-gray-500 max-w-xs">{row.kelas_ajar}</td>
-                    <td className="px-4 py-3 text-center font-bold text-gray-700">{row.total_wajib}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{idx+1}</td>
+                    <td className="px-4 py-3 font-bold text-slate-800">{row.nama}</td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500 max-w-xs">{row.kelas_ajar}</td>
+                    <td className="px-4 py-3 text-center font-bold text-slate-700">{row.total_wajib}</td>
                     <td className="px-4 py-3 text-center bg-green-50/30">
                       <p className="font-bold text-green-600">{row.hadir}</p>
                       <p className="text-[10px] text-green-400">{row.pct_hadir}%</p>
@@ -310,7 +310,7 @@ export default function RekapAbsensiGuruPage() {
                         <span className="text-lg font-extrabold" style={{color: getColorPerforma(row.persentase)}}>
                           {row.persentase}%
                         </span>
-                        <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                           <div className="h-full rounded-full" style={{width:`${row.persentase}%`, backgroundColor: getColorPerforma(row.persentase)}}/>
                         </div>
                       </div>

@@ -84,8 +84,8 @@ export default function LegerNilaiPage() {
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800">Leger Nilai</h1>
-           <p className="text-gray-500 text-sm">Rekapitulasi nilai per kelas (Matrix View).</p>
+           <h1 className="text-2xl font-bold text-slate-800">Leger Nilai</h1>
+           <p className="text-slate-500 text-sm">Rekapitulasi nilai per kelas (Matrix View).</p>
         </div>
         
         <div className="flex gap-2">
@@ -110,9 +110,9 @@ export default function LegerNilaiPage() {
 
       <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
         <div className="w-full md:w-auto">
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kelas</label>
+          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas</label>
           <select 
-            className="p-2 border rounded-md w-64 bg-gray-50 outline-none"
+            className="p-2 border border-slate-200 rounded-xl w-64 bg-slate-50 outline-none"
             value={selectedKelas}
             onChange={(e) => setSelectedKelas(e.target.value)}
           >
@@ -120,9 +120,9 @@ export default function LegerNilaiPage() {
           </select>
         </div>
         <div>
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Semester</label>
+          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Semester</label>
           <select 
-            className="p-2 border rounded-md w-32 bg-gray-50 outline-none"
+            className="p-2 border border-slate-200 rounded-xl w-32 bg-slate-50 outline-none"
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
           >
@@ -137,11 +137,11 @@ export default function LegerNilaiPage() {
         {loading ? (
             <div className="text-center py-20"><Loader2 className="w-10 h-10 animate-spin mx-auto text-blue-500"/></div>
         ) : !dataLeger || dataLeger.siswa.length === 0 ? (
-            <div className="text-center py-20 text-gray-400 italic">Data kosong.</div>
+            <div className="text-center py-20 text-slate-400 italic">Data kosong.</div>
         ) : (
             <div className="overflow-x-auto pb-4"> 
                 <table className="w-full text-sm text-left border-collapse">
-                    <thead className="bg-slate-800 text-white font-bold sticky top-0 z-20 shadow-md">
+                    <thead className="bg-slate-800 text-white font-bold sticky top-0 z-20 shadow-sm">
                         <tr>
                             <th className="p-2 border border-slate-600 w-10 text-center sticky left-0 bg-slate-800 z-30">No</th>
                             <th className="p-2 border border-slate-600 w-24 sticky left-10 bg-slate-800 z-30">NIS</th>
@@ -169,7 +169,7 @@ export default function LegerNilaiPage() {
                             <tr key={s.id} className="hover:bg-yellow-50 transition-colors group">
                                 <td className="p-2 border text-center sticky left-0 bg-white group-hover:bg-yellow-50 z-10">{idx + 1}</td>
                                 <td className="p-2 border font-mono text-xs sticky left-10 bg-white group-hover:bg-yellow-50 z-10">{s.nis}</td>
-                                <td className="p-2 border font-bold text-gray-800 sticky left-[8.5rem] bg-white group-hover:bg-yellow-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] truncate max-w-xs">{s.nama}</td>
+                                <td className="p-2 border font-bold text-slate-800 sticky left-[8.5rem] bg-white group-hover:bg-yellow-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] truncate max-w-xs">{s.nama}</td>
 
                                 {/* Loop Nilai */}
                                 {dataLeger.mapel.map((m: any) => {

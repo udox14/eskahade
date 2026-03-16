@@ -47,37 +47,37 @@ export default function CetakTelatPage() {
       {/* HEADER NO-PRINT */}
       <div className="flex items-center gap-4 print:hidden">
         {/* FIX: Ganti Link href ke button router.back() */}
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Cetak Santri Terlambat</h1>
-          <p className="text-gray-500 text-sm">Daftar santri yang belum kembali melebihi batas izin (Per Minggu).</p>
+          <h1 className="text-2xl font-bold text-slate-800">Cetak Santri Terlambat</h1>
+          <p className="text-slate-500 text-sm">Daftar santri yang belum kembali melebihi batas izin (Per Minggu).</p>
         </div>
       </div>
 
       {/* CONTROL BAR */}
       <div className="bg-white p-6 rounded-xl border flex flex-col md:flex-row gap-6 items-end shadow-sm print:hidden">
         <div className="w-full md:w-1/3">
-          <label className="text-sm font-bold text-gray-700 block mb-1">1. Pilih Minggu (Tanggal Referensi)</label>
+          <label className="text-sm font-bold text-slate-700 block mb-1">1. Pilih Minggu (Tanggal Referensi)</label>
           <input 
             type="date" 
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             value={tglRef}
             onChange={(e) => setTglRef(e.target.value)}
           />
-          <p className="text-xs text-gray-500 mt-1">Sistem otomatis mendeteksi periode Rabu - Selasa.</p>
+          <p className="text-xs text-slate-500 mt-1">Sistem otomatis mendeteksi periode Rabu - Selasa.</p>
         </div>
 
         <div className="w-full md:w-1/3">
-          <label className="text-sm font-bold text-gray-700 block mb-1">2. Tanggal Pemanggilan (Sidang)</label>
+          <label className="text-sm font-bold text-slate-700 block mb-1">2. Tanggal Pemanggilan (Sidang)</label>
           <input 
             type="date" 
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             value={tglPanggil}
             onChange={(e) => setTglPanggil(e.target.value)}
           />
-          <p className="text-xs text-gray-500 mt-1">Tanggal ini akan tertulis di surat.</p>
+          <p className="text-xs text-slate-500 mt-1">Tanggal ini akan tertulis di surat.</p>
         </div>
 
         <div className="flex gap-2 items-center flex-1 justify-end">
@@ -102,18 +102,18 @@ export default function CetakTelatPage() {
       </div>
 
       {/* PREVIEW AREA */}
-      <div className="bg-gray-100 p-8 rounded-xl border overflow-auto min-h-[500px] flex justify-center items-start">
+      <div className="bg-slate-100 p-8 rounded-xl border overflow-auto min-h-[500px] flex justify-center items-start">
         {!hasSearched ? (
-          <div className="text-center text-gray-400 py-32 flex flex-col items-center">
-            <Search className="w-12 h-12 mb-3 text-gray-300"/>
+          <div className="text-center text-slate-400 py-32 flex flex-col items-center">
+            <Search className="w-12 h-12 mb-3 text-slate-300"/>
             <p className="font-medium">Siap Mencari Data</p>
             <p className="text-sm">Silakan pilih tanggal dan klik tombol "Tampilkan Data".</p>
           </div>
         ) : loading ? (
           <div className="text-center py-32"><Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto"/></div>
         ) : !data || totalSantri === 0 ? (
-          <div className="text-center text-gray-400 py-32 flex flex-col items-center bg-white p-10 rounded-xl border border-dashed">
-            <p className="font-bold text-gray-600">Tidak Ada Data</p>
+          <div className="text-center text-slate-400 py-32 flex flex-col items-center bg-white p-10 rounded-xl border border-dashed">
+            <p className="font-bold text-slate-600">Tidak Ada Data</p>
             <p className="text-sm">Tidak ditemukan santri terlambat pada periode minggu tersebut.</p>
           </div>
         ) : (

@@ -47,11 +47,11 @@ function HBarRow({ label, value, max, color }: { label: string; value: number; m
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div className="flex items-center gap-2.5 text-xs">
-      <span className="w-36 shrink-0 truncate text-gray-600 text-right">{label}</span>
-      <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+      <span className="w-36 shrink-0 truncate text-slate-600 text-right">{label}</span>
+      <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color }} />
       </div>
-      <span className="w-7 shrink-0 font-bold text-gray-800 text-right">{value}</span>
+      <span className="w-7 shrink-0 font-bold text-slate-800 text-right">{value}</span>
     </div>
   )
 }
@@ -61,9 +61,9 @@ function LegendRow({ color, label, value, total }: { color: string; label: strin
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-      <span className="flex-1 text-gray-600 truncate">{label}</span>
-      <span className="font-bold text-gray-800 tabular-nums">{value}</span>
-      <span className="text-gray-400 w-9 text-right tabular-nums">{pct}%</span>
+      <span className="flex-1 text-slate-600 truncate">{label}</span>
+      <span className="font-bold text-slate-800 tabular-nums">{value}</span>
+      <span className="text-slate-400 w-9 text-right tabular-nums">{pct}%</span>
     </div>
   )
 }
@@ -115,18 +115,18 @@ export default function SensusPage() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-blue-600"/> Sensus Penduduk
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             Statistik demografi santri {asrama !== 'SEMUA' ? `Asrama ${asrama}` : 'Se-Pesantren'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1.5 shadow-sm">
-            <Home className="w-4 h-4 text-gray-400"/>
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+            <Home className="w-4 h-4 text-slate-400"/>
             <select value={asrama} onChange={e => setAsrama(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-gray-700 outline-none cursor-pointer">
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer">
               {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
@@ -136,7 +136,7 @@ export default function SensusPage() {
             className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
               isDirty || !data
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {loading
@@ -154,8 +154,8 @@ export default function SensusPage() {
             <BarChart3 className="w-10 h-10 text-blue-300"/>
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-500">Data belum dimuat</p>
-            <p className="text-sm text-gray-400 mt-1">Pilih filter lalu tekan <strong>Tampilkan</strong> untuk menghitung statistik santri.</p>
+            <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih filter lalu tekan <strong>Tampilkan</strong> untuk menghitung statistik santri.</p>
           </div>
           <button onClick={loadData}
             className="mt-2 bg-blue-600 text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all shadow">
@@ -167,7 +167,7 @@ export default function SensusPage() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <Loader2 className="w-10 h-10 animate-spin text-blue-600"/>
-          <p className="text-sm text-gray-500">Menghitung data sensus...</p>
+          <p className="text-sm text-slate-500">Menghitung data sensus...</p>
         </div>
       )}
 
@@ -177,7 +177,7 @@ export default function SensusPage() {
 
           {/* STAT CARDS */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl p-5 shadow-md flex flex-col justify-between">
+            <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl p-5 shadow-sm flex flex-col justify-between">
               <Users className="w-6 h-6 opacity-70"/>
               <div className="mt-3">
                 <p className="text-4xl font-black tabular-nums">{total}</p>
@@ -190,7 +190,7 @@ export default function SensusPage() {
               </div>
               <div className="mt-3">
                 <p className="text-3xl font-black text-blue-700 tabular-nums">{laki}</p>
-                <p className="text-xs text-gray-500 mt-0.5 font-medium">Laki-laki</p>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Laki-laki</p>
                 <p className="text-xs text-blue-400">{total > 0 ? Math.round(laki/total*100) : 0}%</p>
               </div>
             </div>
@@ -200,35 +200,35 @@ export default function SensusPage() {
               </div>
               <div className="mt-3">
                 <p className="text-3xl font-black text-pink-600 tabular-nums">{perempuan}</p>
-                <p className="text-xs text-gray-500 mt-0.5 font-medium">Perempuan</p>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Perempuan</p>
                 <p className="text-xs text-pink-400">{total > 0 ? Math.round(perempuan/total*100) : 0}%</p>
               </div>
             </div>
             <div className="bg-white border rounded-2xl p-5 shadow-sm flex flex-col gap-3 justify-center">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-400 font-medium">Masuk</p>
+                  <p className="text-xs text-slate-400 font-medium">Masuk</p>
                   <p className="text-xl font-black text-green-600 tabular-nums">{data.masuk_bulan_ini}</p>
                 </div>
-                <ArrowRightLeft className="w-4 h-4 text-gray-300"/>
+                <ArrowRightLeft className="w-4 h-4 text-slate-300"/>
                 <div className="text-right">
-                  <p className="text-xs text-gray-400 font-medium">Keluar</p>
+                  <p className="text-xs text-slate-400 font-medium">Keluar</p>
                   <p className="text-xl font-black text-red-500 tabular-nums">{data.keluar_bulan_ini}</p>
                 </div>
               </div>
-              <p className="text-[10px] text-center text-gray-400 border-t pt-2">Pergerakan bulan ini</p>
+              <p className="text-[10px] text-center text-slate-400 border-t pt-2">Pergerakan bulan ini</p>
             </div>
           </div>
 
           {/* PENDIDIKAN FORMAL */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
+            <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-blue-500 rounded-full inline-block"/>
               Pendidikan Formal
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-4">Jenjang</p>
+                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-4">Jenjang</p>
                 <div className="flex flex-col sm:flex-row gap-6 items-center">
                   <PieChart slices={jenjangSlices} size={160} donut={true}/>
                   <div className="flex-1 space-y-3 w-full">
@@ -240,7 +240,7 @@ export default function SensusPage() {
               </div>
               <div className="space-y-5">
                 <div>
-                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-3">Rincian Sekolah</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Rincian Sekolah</p>
                   <div className="space-y-2">
                     {sekolahBar.map(([k, v]: any, i) => (
                       <HBarRow key={k} label={k} value={v} max={sekolahMax}
@@ -249,7 +249,7 @@ export default function SensusPage() {
                   </div>
                 </div>
                 <div className="border-t pt-4">
-                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-3">Detail Kelas Sekolah</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Detail Kelas Sekolah</p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                     {kelasBar.map(([k, v]: any) => (
                       <div key={k} className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center hover:bg-slate-100 transition-colors">
@@ -265,7 +265,7 @@ export default function SensusPage() {
 
           {/* MARHALAH */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
+            <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-green-500 rounded-full inline-block"/>
               Sebaran Marhalah
             </h3>
@@ -281,10 +281,10 @@ export default function SensusPage() {
 
           {/* KAMAR */}
           <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
+            <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-indigo-500 rounded-full inline-block"/>
               Kepadatan per Kamar
-              <span className="ml-auto text-[10px] font-normal text-gray-400 normal-case tracking-normal">
+              <span className="ml-auto text-[10px] font-normal text-slate-400 normal-case tracking-normal">
                 <span className="text-red-400 font-bold">■</span> ≥10 &nbsp;
                 <span className="text-orange-400 font-bold">■</span> 7–9 &nbsp;
                 <span className="text-indigo-400 font-bold">■</span> &lt;7
@@ -340,29 +340,29 @@ export default function SensusPage() {
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
               <div>
-                <h3 className="font-bold text-gray-800">Kamar {modalKamar.kamar}</h3>
-                <p className="text-xs text-gray-500">Asrama {modalKamar.asrama} · {modalKamar.list.length} santri</p>
+                <h3 className="font-bold text-slate-800">Kamar {modalKamar.kamar}</h3>
+                <p className="text-xs text-slate-500">Asrama {modalKamar.asrama} · {modalKamar.list.length} santri</p>
               </div>
-              <button onClick={() => setModalKamar(null)} className="p-1.5 hover:bg-gray-100 rounded-full">
-                <X className="w-5 h-5 text-gray-400"/>
+              <button onClick={() => setModalKamar(null)} className="p-1.5 hover:bg-slate-100 rounded-full">
+                <X className="w-5 h-5 text-slate-400"/>
               </button>
             </div>
             <div className="overflow-y-auto flex-1 divide-y">
               {modalKamar.list.length === 0
-                ? <div className="py-12 text-center text-gray-400 text-sm">Tidak ada data santri.</div>
+                ? <div className="py-12 text-center text-slate-400 text-sm">Tidak ada data santri.</div>
                 : modalKamar.list
                     .sort((a,b) => a.nama_lengkap.localeCompare(b.nama_lengkap))
                     .map((s, i) => (
-                      <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
-                        <span className="w-5 text-[11px] text-gray-400 font-mono shrink-0 text-right">{i+1}</span>
+                      <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                        <span className="w-5 text-[11px] text-slate-400 font-mono shrink-0 text-right">{i+1}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-800 text-sm truncate">{s.nama_lengkap}</p>
+                          <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             {s.kelas_pesantren
                               ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded">{s.kelas_pesantren}</span>
-                              : <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Belum masuk kelas</span>
+                              : <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">Belum masuk kelas</span>
                             }
-                            <span className="text-[10px] text-gray-400">{s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` · Kelas ${s.kelas_sekolah}` : ''}</span>
+                            <span className="text-[10px] text-slate-400">{s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` · Kelas ${s.kelas_sekolah}` : ''}</span>
                           </div>
                         </div>
                       </div>

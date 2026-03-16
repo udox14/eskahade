@@ -210,7 +210,7 @@ export default function AbsensiPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">Absensi Mingguan (Rapel)</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Absensi Mingguan (Rapel)</h1>
         <button 
           onClick={handleSimpan} 
           disabled={saving || !selectedKelas}
@@ -223,9 +223,9 @@ export default function AbsensiPage() {
 
       <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
         <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">Pilih Kelas</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1">Pilih Kelas</label>
           <select 
-            className="p-2 border rounded-md w-full md:w-48 focus:ring-2 focus:ring-green-500 outline-none"
+            className="p-2 border border-slate-200 rounded-xl w-full md:w-48 focus:ring-2 focus:ring-green-500 outline-none"
             value={selectedKelas}
             onChange={(e) => setSelectedKelas(e.target.value)}
           >
@@ -234,23 +234,23 @@ export default function AbsensiPage() {
           </select>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">Tanggal (Pewakil Pekan)</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1">Tanggal (Pewakil Pekan)</label>
           <input 
             type="date" 
-            className="p-2 border rounded-md focus:ring-2 focus:ring-green-500 outline-none"
+            className="p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
         </div>
-        <div className="text-sm text-gray-500 pb-2">
+        <div className="text-sm text-slate-500 pb-2">
           {days[0].shortDate} s.d. {days[6].shortDate}
         </div>
       </div>
 
       {!selectedKelas ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
-          <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
-          <p className="text-gray-500">Pilih kelas untuk mulai mengabsen.</p>
+        <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed">
+          <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2"/>
+          <p className="text-slate-500">Pilih kelas untuk mulai mengabsen.</p>
         </div>
       ) : loading ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-green-600"/></div>
@@ -258,25 +258,25 @@ export default function AbsensiPage() {
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
           <div className="overflow-auto flex-1">
             <table className="w-full text-sm border-collapse">
-              <thead className="bg-gray-100 sticky top-0 z-20 shadow-sm">
+              <thead className="bg-slate-100 sticky top-0 z-20 shadow-sm">
                 <tr>
-                  <th className="p-3 text-left border bg-gray-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Nama Santri</th>
-                  <th className="p-2 text-center border bg-gray-100 z-30 w-32 min-w-[8rem] shadow-sm md:sticky md:left-48">Aksi Cepat</th>
+                  <th className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Nama Santri</th>
+                  <th className="p-2 text-center border bg-slate-100 z-30 w-32 min-w-[8rem] shadow-sm md:sticky md:left-48">Aksi Cepat</th>
                   {days.map(day => (
                     <th key={day.dateStr} colSpan={3} className="border text-center py-2 px-1 min-w-[9rem]">
-                      <div className="font-bold text-gray-800">{day.label}</div>
-                      <div className="text-xs text-gray-500 font-normal">{day.shortDate}</div>
+                      <div className="font-bold text-slate-800">{day.label}</div>
+                      <div className="text-xs text-slate-500 font-normal">{day.shortDate}</div>
                     </th>
                   ))}
                 </tr>
                 <tr>
-                  <th className="border bg-gray-100 sticky left-0 z-30 shadow-sm"></th>
-                  <th className="border bg-gray-100 z-30 shadow-sm md:sticky md:left-48"></th>
+                  <th className="border bg-slate-100 sticky left-0 z-30 shadow-sm"></th>
+                  <th className="border bg-slate-100 z-30 shadow-sm md:sticky md:left-48"></th>
                   {days.map(day => (
                     <React.Fragment key={day.dateStr + 'header'}>
-                      <th className={`border text-center text-xs text-gray-500 w-10 ${isHoliday(day.label, 'shubuh') ? 'bg-gray-200' : 'bg-gray-50'}`}>S</th>
-                      <th className={`border text-center text-xs text-gray-500 w-10 ${isHoliday(day.label, 'ashar') ? 'bg-gray-200' : 'bg-gray-50'}`}>A</th>
-                      <th className={`border text-center text-xs text-gray-500 w-10 ${isHoliday(day.label, 'maghrib') ? 'bg-gray-200' : 'bg-gray-50'}`}>M</th>
+                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'shubuh') ? 'bg-slate-200' : 'bg-slate-50'}`}>S</th>
+                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'ashar') ? 'bg-slate-200' : 'bg-slate-50'}`}>A</th>
+                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'maghrib') ? 'bg-slate-200' : 'bg-slate-50'}`}>M</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -285,7 +285,7 @@ export default function AbsensiPage() {
                 {dataSantri.map((s, rowIdx) => {
                   let currentCellIndex = 0; 
                   return (
-                    <tr key={s.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={s.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                       <td className="p-2 border sticky left-0 bg-inherit font-medium truncate z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                         {s.nama_lengkap}
                       </td>
@@ -315,7 +315,7 @@ export default function AbsensiPage() {
                           </button>
                           <button 
                             onClick={() => handleFillRow(s.id, 'H')}
-                            className="w-6 h-6 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center border border-gray-200"
+                            className="w-6 h-6 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center border border-slate-200"
                             title="Reset / Hapus Baris"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -373,13 +373,13 @@ function CellInput({
   onKeyDown: (e: React.KeyboardEvent) => void
 }) {
   let bgColor = ''
-  if (isHoliday) bgColor = 'bg-gray-200 text-gray-400 cursor-not-allowed'
+  if (isHoliday) bgColor = 'bg-slate-200 text-slate-400 cursor-not-allowed'
   else if (value === 'S') bgColor = 'bg-yellow-100 text-yellow-800'
   else if (value === 'I') bgColor = 'bg-blue-100 text-blue-800'
   else if (value === 'A') bgColor = 'bg-red-100 text-red-800 font-bold'
 
   return (
-    <td className={`border p-0 h-8 ${isHoliday ? 'bg-gray-200' : ''}`}>
+    <td className={`border p-0 h-8 ${isHoliday ? 'bg-slate-200' : ''}`}>
       <input 
         id={id}
         type="text" 

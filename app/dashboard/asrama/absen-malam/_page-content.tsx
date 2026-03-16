@@ -248,7 +248,7 @@ export default function AbsenMalamPage() {
               <ChevronLeft className="w-5 h-5 text-slate-600"/>
             </button>
             <button onClick={saveKamar} disabled={saving}
-              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-sm transition-all active:scale-95 ${
                 savedKamars.has(activeKamar) ? 'bg-green-600 text-white' : 'bg-slate-900 text-white'
               }`}>
               {saving

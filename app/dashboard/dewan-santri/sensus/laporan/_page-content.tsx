@@ -89,16 +89,16 @@ export default function CetakLaporanSensus() {
       {/* KONTROL PANEL */}
       <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
           <div>
-              <h1 className="text-xl font-bold text-gray-800">Cetak Laporan Bulanan</h1>
-              <p className="text-sm text-gray-500">Laporan Sensus Penduduk (F4 Landscape)</p>
+              <h1 className="text-xl font-bold text-slate-800">Cetak Laporan Bulanan</h1>
+              <p className="text-sm text-slate-500">Laporan Sensus Penduduk (F4 Landscape)</p>
           </div>
           <div className="flex gap-2">
-              <select value={bulan} onChange={e=>setBulan(Number(e.target.value))} className="p-2 border rounded font-bold text-gray-700">
+              <select value={bulan} onChange={e=>setBulan(Number(e.target.value))} className="p-2 border rounded font-bold text-slate-700">
                 {Array.from({length:12},(_,i)=>i+1).map(b => (
                     <option key={b} value={b}>{format(new Date(2024, b-1, 1), 'MMMM', {locale:id})}</option>
                 ))}
               </select>
-              <select value={tahun} onChange={e=>setTahun(Number(e.target.value))} className="p-2 border rounded font-bold text-gray-700">
+              <select value={tahun} onChange={e=>setTahun(Number(e.target.value))} className="p-2 border rounded font-bold text-slate-700">
                  <option value={2024}>2024</option>
                  <option value={2025}>2025</option>
                  <option value={2026}>2026</option>
@@ -116,7 +116,7 @@ export default function CetakLaporanSensus() {
 
       {/* AREA PREVIEW (YANG AKAN DICETAK) */}
       {data && (
-          <div className="overflow-auto bg-gray-100 p-8 border rounded-xl flex justify-center">
+          <div className="overflow-auto bg-slate-100 p-8 border rounded-xl flex justify-center">
             
             {/* CONTAINER KHUSUS PRINT */}
             <div ref={printRef} className="bg-white text-black font-serif shadow-2xl">
@@ -213,11 +213,11 @@ export default function CetakLaporanSensus() {
                                           <td>{idx + 1}</td>
                                           <td className="text-left font-bold pl-1">{asrama}</td>
                                           {ROOM_NUMBERS.map(num => (
-                                              <td key={num} className={info.kamar[num] ? 'font-bold' : 'text-gray-300'}>
+                                              <td key={num} className={info.kamar[num] ? 'font-bold' : 'text-slate-300'}>
                                                   {fmt(info.kamar[num])}
                                               </td>
                                           ))}
-                                          <td className="font-bold bg-gray-100">{info.total}</td>
+                                          <td className="font-bold bg-slate-100">{info.total}</td>
                                           <td>{fmt(info.masuk)}</td>
                                           <td>{fmt(info.keluar)}</td>
                                       </tr>
@@ -225,7 +225,7 @@ export default function CetakLaporanSensus() {
                               })}
                               <tr className="bg-gray font-bold">
                                   <td colSpan={2} className="text-right pr-2">TOTAL</td>
-                                  <td colSpan={37} className="bg-gray-200"></td> 
+                                  <td colSpan={37} className="bg-slate-200"></td> 
                                   <td>{data.total_santri}</td>
                                   <td>{data.mutasi.filter((m:any) => m.tipe === 'MASUK').length}</td>
                                   <td>{data.mutasi.filter((m:any) => m.tipe === 'KELUAR').length}</td>
@@ -279,7 +279,7 @@ export default function CetakLaporanSensus() {
                                           <td>{fmt(s.MA[10])}</td><td>{fmt(s.MA[11])}</td><td>{fmt(s.MA[12])}</td>
                                           <td>{fmt(s.SMA[10])}</td><td>{fmt(s.SMA[11])}</td><td>{fmt(s.SMA[12])}</td>
                                           <td>{fmt(s.SADESA)}</td>
-                                          <td className="font-bold bg-gray-100">{s.TOTAL}</td>
+                                          <td className="font-bold bg-slate-100">{s.TOTAL}</td>
                                       </tr>
                                   )
                               })}
@@ -293,7 +293,7 @@ export default function CetakLaporanSensus() {
                                   <td>{getTotalSekolah('MA', 10)}</td><td>{getTotalSekolah('MA', 11)}</td><td>{getTotalSekolah('MA', 12)}</td>
                                   <td>{getTotalSekolah('SMA', 10)}</td><td>{getTotalSekolah('SMA', 11)}</td><td>{getTotalSekolah('SMA', 12)}</td>
                                   <td>{getTotalSekolah('SADESA')}</td>
-                                  <td className="bg-gray-200">{data.total_santri}</td>
+                                  <td className="bg-slate-200">{data.total_santri}</td>
                               </tr>
                           </tbody>
                       </table>

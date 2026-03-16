@@ -156,21 +156,21 @@ export default function InputSantriPage() {
 
       {/* HEADER */}
       <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
           <ArrowLeft className="w-6 h-6" />
         </button>
         <div>
           <h1 className="text-2xl font-bold">Tambah Data Santri</h1>
-          <p className="text-gray-500 text-sm">Input satu per satu atau sekaligus via Excel.</p>
+          <p className="text-slate-500 text-sm">Input satu per satu atau sekaligus via Excel.</p>
         </div>
       </div>
 
       {/* TAB SWITCHER */}
-      <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
-        <button onClick={() => setTab('FORM')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'FORM' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+      <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+        <button onClick={() => setTab('FORM')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'FORM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <UserPlus className="w-4 h-4" /> Form Satu-Satu
         </button>
-        <button onClick={() => setTab('EXCEL')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'EXCEL' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+        <button onClick={() => setTab('EXCEL')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'EXCEL' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <FileSpreadsheet className="w-4 h-4" /> Import Excel (Massal)
         </button>
       </div>
@@ -181,31 +181,31 @@ export default function InputSantriPage() {
 
           {/* SEKSI: IDENTITAS */}
           <div className="px-6 pt-6 pb-4 border-b bg-blue-50/40">
-            <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide text-blue-800">Identitas Santri</h2>
+            <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wide text-blue-800">Identitas Santri</h2>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             {/* NIS */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">NIS <span className="text-red-500">*</span></label>
-              <input value={form.nis} onChange={e => set('nis', e.target.value)} placeholder="Nomor Induk Santri" required className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">NIS <span className="text-red-500">*</span></label>
+              <input value={form.nis} onChange={e => set('nis', e.target.value)} placeholder="Nomor Induk Santri" required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             {/* Nama */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Lengkap <span className="text-red-500">*</span></label>
-              <input value={form.nama_lengkap} onChange={e => set('nama_lengkap', e.target.value)} placeholder="Nama lengkap santri" required className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap <span className="text-red-500">*</span></label>
+              <input value={form.nama_lengkap} onChange={e => set('nama_lengkap', e.target.value)} placeholder="Nama lengkap santri" required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             {/* NIK */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">NIK</label>
-              <input value={form.nik} onChange={e => set('nik', e.target.value)} placeholder="Nomor Induk Kependudukan" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">NIK</label>
+              <input value={form.nik} onChange={e => set('nik', e.target.value)} placeholder="Nomor Induk Kependudukan" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             {/* Jenis Kelamin */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Jenis Kelamin <span className="text-red-500">*</span></label>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jenis Kelamin <span className="text-red-500">*</span></label>
               <div className="flex gap-3">
                 {(['L', 'P'] as const).map(jk => (
                   <button type="button" key={jk} onClick={() => set('jenis_kelamin', jk)}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-colors ${form.jenis_kelamin === jk ? (jk === 'L' ? 'bg-blue-600 text-white border-blue-600' : 'bg-pink-500 text-white border-pink-500') : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}>
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-colors ${form.jenis_kelamin === jk ? (jk === 'L' ? 'bg-blue-600 text-white border-blue-600' : 'bg-pink-500 text-white border-pink-500') : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>
                     {jk === 'L' ? '👦 Laki-laki' : '👧 Perempuan'}
                   </button>
                 ))}
@@ -213,26 +213,26 @@ export default function InputSantriPage() {
             </div>
             {/* Tempat Lahir */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tempat Lahir</label>
-              <input value={form.tempat_lahir} onChange={e => set('tempat_lahir', e.target.value)} placeholder="Kota/Kabupaten" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tempat Lahir</label>
+              <input value={form.tempat_lahir} onChange={e => set('tempat_lahir', e.target.value)} placeholder="Kota/Kabupaten" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             {/* Tanggal Lahir */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Lahir</label>
-              <input type="date" value={form.tanggal_lahir} onChange={e => set('tanggal_lahir', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tanggal Lahir</label>
+              <input type="date" value={form.tanggal_lahir} onChange={e => set('tanggal_lahir', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
             {/* Golongan Darah */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Golongan Darah</label>
-              <select value={form.gol_darah} onChange={e => set('gol_darah', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-400">
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Golongan Darah</label>
+              <select value={form.gol_darah} onChange={e => set('gol_darah', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-400">
                 <option value="">-- Tidak Diketahui --</option>
                 {['A','B','AB','O'].map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             {/* Alamat ringkas */}
             <div className="md:col-span-2">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Alamat (Ringkas)</label>
-              <textarea value={form.alamat} onChange={e => set('alamat', e.target.value)} placeholder="Alamat singkat" rows={2} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Alamat (Ringkas)</label>
+              <textarea value={form.alamat} onChange={e => set('alamat', e.target.value)} placeholder="Alamat singkat" rows={2} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
             </div>
           </div>
 
@@ -242,24 +242,24 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div className="md:col-span-2">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Alamat Lengkap (Jalan/Kampung, RT/RW, Desa)</label>
-              <textarea value={form.alamat_lengkap} onChange={e => set('alamat_lengkap', e.target.value)} placeholder="Contoh: Kp. Sukarame RT 01/02 Desa Sukahideng" rows={2} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400 resize-none" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Alamat Lengkap (Jalan/Kampung, RT/RW, Desa)</label>
+              <textarea value={form.alamat_lengkap} onChange={e => set('alamat_lengkap', e.target.value)} placeholder="Contoh: Kp. Sukarame RT 01/02 Desa Sukahideng" rows={2} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-yellow-400 resize-none" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kecamatan</label>
-              <input value={form.kecamatan} onChange={e => set('kecamatan', e.target.value)} placeholder="Nama kecamatan" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kecamatan</label>
+              <input value={form.kecamatan} onChange={e => set('kecamatan', e.target.value)} placeholder="Nama kecamatan" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kab/Kota</label>
-              <input value={form.kab_kota} onChange={e => set('kab_kota', e.target.value)} placeholder="Kabupaten atau Kota" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kab/Kota</label>
+              <input value={form.kab_kota} onChange={e => set('kab_kota', e.target.value)} placeholder="Kabupaten atau Kota" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Provinsi</label>
-              <input value={form.provinsi} onChange={e => set('provinsi', e.target.value)} placeholder="Nama provinsi" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Provinsi</label>
+              <input value={form.provinsi} onChange={e => set('provinsi', e.target.value)} placeholder="Nama provinsi" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Jemaah</label>
-              <input value={form.jemaah} onChange={e => set('jemaah', e.target.value)} placeholder="Pengelompokan wilayah/jemaah" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jemaah</label>
+              <input value={form.jemaah} onChange={e => set('jemaah', e.target.value)} placeholder="Pengelompokan wilayah/jemaah" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
             </div>
           </div>
 
@@ -269,16 +269,16 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Ayah</label>
-              <input value={form.nama_ayah} onChange={e => set('nama_ayah', e.target.value)} placeholder="Nama ayah kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Ayah</label>
+              <input value={form.nama_ayah} onChange={e => set('nama_ayah', e.target.value)} placeholder="Nama ayah kandung" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Ibu</label>
-              <input value={form.nama_ibu} onChange={e => set('nama_ibu', e.target.value)} placeholder="Nama ibu kandung" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Ibu</label>
+              <input value={form.nama_ibu} onChange={e => set('nama_ibu', e.target.value)} placeholder="Nama ibu kandung" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">No. WhatsApp Orang Tua</label>
-              <input value={form.no_wa_ortu} onChange={e => set('no_wa_ortu', e.target.value)} placeholder="Contoh: 08123456789" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">No. WhatsApp Orang Tua</label>
+              <input value={form.no_wa_ortu} onChange={e => set('no_wa_ortu', e.target.value)} placeholder="Contoh: 08123456789" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
           </div>
 
@@ -288,15 +288,15 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Sekolah</label>
-              <select value={form.sekolah} onChange={e => set('sekolah', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sekolah</label>
+              <select value={form.sekolah} onChange={e => set('sekolah', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
                 <option value="">-- Pilih Sekolah --</option>
                 {SEKOLAH_LIST.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kelas Sekolah</label>
-              <input value={form.kelas_sekolah} onChange={e => set('kelas_sekolah', e.target.value)} placeholder="Contoh: 7A, 8B" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas Sekolah</label>
+              <input value={form.kelas_sekolah} onChange={e => set('kelas_sekolah', e.target.value)} placeholder="Contoh: 7A, 8B" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
             </div>
           </div>
 
@@ -306,48 +306,48 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Asrama</label>
-              <select value={form.asrama} onChange={e => set('asrama', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Asrama</label>
+              <select value={form.asrama} onChange={e => set('asrama', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                 <option value="">-- Pilih Asrama --</option>
                 {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kamar</label>
-              <input value={form.kamar} onChange={e => set('kamar', e.target.value)} placeholder="Nomor kamar" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kamar</label>
+              <input value={form.kamar} onChange={e => set('kamar', e.target.value)} placeholder="Nomor kamar" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kelas Pesantren</label>
-              <select value={form.kelas_pesantren} onChange={e => set('kelas_pesantren', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas Pesantren</label>
+              <select value={form.kelas_pesantren} onChange={e => set('kelas_pesantren', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                 <option value="">-- Pilih Kelas --</option>
                 {kelasList.map(k => <option key={k.id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Masuk <span className="text-gray-400 font-normal normal-case">(tahun masuk otomatis)</span></label>
-              <input type="date" value={form.tanggal_masuk} onChange={e => set('tanggal_masuk', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tanggal Masuk <span className="text-slate-400 font-normal normal-case">(tahun masuk otomatis)</span></label>
+              <input type="date" value={form.tanggal_masuk} onChange={e => set('tanggal_masuk', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tanggal Keluar <span className="text-gray-400 font-normal normal-case">(isi jika keluar sebelum lulus)</span></label>
-              <input type="date" value={form.tanggal_keluar} onChange={e => set('tanggal_keluar', e.target.value)} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tanggal Keluar <span className="text-slate-400 font-normal normal-case">(isi jika keluar sebelum lulus)</span></label>
+              <input type="date" value={form.tanggal_keluar} onChange={e => set('tanggal_keluar', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
-                🍽️ Tempat Makan <span className="text-gray-400 font-normal normal-case">(auto-sync ke Katering)</span>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">
+                🍽️ Tempat Makan <span className="text-slate-400 font-normal normal-case">(auto-sync ke Katering)</span>
               </label>
-              <input value={form.nama_tempat_makan} onChange={e => set('nama_tempat_makan', e.target.value)} placeholder="Contoh: Bi Ade" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <input value={form.nama_tempat_makan} onChange={e => set('nama_tempat_makan', e.target.value)} placeholder="Contoh: Bi Ade" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
-                👕 Tempat Cuci <span className="text-gray-400 font-normal normal-case">(auto-sync ke Laundry)</span>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">
+                👕 Tempat Cuci <span className="text-slate-400 font-normal normal-case">(auto-sync ke Laundry)</span>
               </label>
-              <input value={form.nama_tempat_cuci} onChange={e => set('nama_tempat_cuci', e.target.value)} placeholder="Contoh: Bi Hani" className="w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <input value={form.nama_tempat_cuci} onChange={e => set('nama_tempat_cuci', e.target.value)} placeholder="Contoh: Bi Hani" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
 
           {/* FOOTER TOMBOL */}
-          <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
-            <button type="button" onClick={() => setForm(FORM_INIT)} className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100">
+          <div className="px-6 py-4 bg-slate-50 border-t flex justify-end gap-3">
+            <button type="button" onClick={() => setForm(FORM_INIT)} className="px-5 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">
               Reset Form
             </button>
             <button type="submit" disabled={isSavingForm} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 disabled:opacity-50 shadow-sm">
@@ -373,25 +373,25 @@ export default function InputSantriPage() {
           </div>
 
           {/* UPLOAD */}
-          <div className="border-2 border-dashed p-8 text-center relative hover:bg-gray-50 transition-colors rounded-lg">
+          <div className="border-2 border-dashed p-8 text-center relative hover:bg-slate-50 transition-colors rounded-lg">
             <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-            <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-            <p className="text-gray-600 font-medium">Klik untuk upload Excel</p>
-            <p className="text-xs text-gray-400 mt-1">Format .xlsx sesuai template</p>
+            <Upload className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <p className="text-slate-600 font-medium">Klik untuk upload Excel</p>
+            <p className="text-xs text-slate-400 mt-1">Format .xlsx sesuai template</p>
           </div>
 
           {/* PREVIEW */}
           {excelData.length > 0 && (
             <div className="space-y-4 animate-in fade-in">
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-gray-700 flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" /> Preview Data ({excelData.length} baris)</h3>
+                <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" /> Preview Data ({excelData.length} baris)</h3>
                 <button onClick={handleSaveExcel} disabled={isSavingExcel} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 disabled:opacity-50">
                   {isSavingExcel ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />} Simpan Semua
                 </button>
               </div>
-              <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto overflow-x-auto">
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto overflow-x-auto">
                 <table className="w-full text-sm text-left whitespace-nowrap">
-                  <thead className="bg-gray-50 sticky top-0 font-bold text-gray-600">
+                  <thead className="bg-slate-50 sticky top-0 font-bold text-slate-600">
                     <tr>
                       <th className="p-3 border-b">NIS</th>
                       <th className="p-3 border-b">Nama</th>
@@ -406,22 +406,22 @@ export default function InputSantriPage() {
                   </thead>
                   <tbody className="divide-y">
                     {excelData.slice(0, 50).map((r, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
+                      <tr key={i} className="hover:bg-slate-50">
                         <td className="p-3 font-mono text-xs">{r.nis}</td>
                         <td className="p-3 font-medium">{r.nama_lengkap}</td>
-                        <td className="p-3 font-bold text-green-700 bg-green-50/30">{r.kelas_pesantren || <span className="text-gray-400 font-normal italic">Kosong</span>}</td>
-                        <td className="p-3 text-gray-500">{r.asrama}</td>
+                        <td className="p-3 font-bold text-green-700 bg-green-50/30">{r.kelas_pesantren || <span className="text-slate-400 font-normal italic">Kosong</span>}</td>
+                        <td className="p-3 text-slate-500">{r.asrama}</td>
                         <td className="p-3 text-blue-600">{r.sekolah}</td>
-                        <td className="p-3 text-gray-500">{r.kab_kota}</td>
-                        <td className="p-3 text-gray-500">{r.jemaah}</td>
-                        <td className="p-3 text-gray-500">{r.no_wa_ortu}</td>
-                        <td className="p-3 text-gray-500">{r.tanggal_masuk}</td>
+                        <td className="p-3 text-slate-500">{r.kab_kota}</td>
+                        <td className="p-3 text-slate-500">{r.jemaah}</td>
+                        <td className="p-3 text-slate-500">{r.no_wa_ortu}</td>
+                        <td className="p-3 text-slate-500">{r.tanggal_masuk}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {excelData.length > 50 && <p className="text-xs text-center text-gray-400">Menampilkan 50 baris pertama dari {excelData.length} total.</p>}
+              {excelData.length > 50 && <p className="text-xs text-center text-slate-400">Menampilkan 50 baris pertama dari {excelData.length} total.</p>}
             </div>
           )}
         </div>

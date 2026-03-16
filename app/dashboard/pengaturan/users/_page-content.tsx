@@ -277,8 +277,8 @@ export default function ManajemenUserPage() {
             <UserCog className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Manajemen Pengguna</h1>
-            <p className="text-gray-500 text-sm">Kelola akun, reset password, dan hak akses.</p>
+            <h1 className="text-2xl font-bold text-slate-800">Manajemen Pengguna</h1>
+            <p className="text-slate-500 text-sm">Kelola akun, reset password, dan hak akses.</p>
           </div>
         </div>
         
@@ -288,12 +288,12 @@ export default function ManajemenUserPage() {
                 <select 
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
-                    className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-3 pr-8 rounded-lg font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                    className="appearance-none bg-white border border-slate-300 text-slate-700 py-2 pl-3 pr-8 rounded-lg font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                 >
                     <option value="SEMUA">Semua Role</option>
                     {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
-                <Filter className="w-4 h-4 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                <Filter className="w-4 h-4 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"/>
             </div>
 
             <button 
@@ -317,7 +317,7 @@ export default function ManajemenUserPage() {
         <div className="overflow-x-auto">
           <>
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-600 font-bold border-b">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
                 <th className="px-6 py-4">Nama Lengkap & Email</th>
                 <th className="px-6 py-4">Role / Hak Akses</th>
@@ -332,21 +332,21 @@ export default function ManajemenUserPage() {
                 <tr><td colSpan={4} className="text-center py-10">Data user tidak ditemukan.</td></tr>
               ) : (
                 pagedUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
-                      <p className="font-bold text-gray-800">{u.full_name || "Tanpa Nama"}</p>
-                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <p className="font-bold text-slate-800">{u.full_name || "Tanpa Nama"}</p>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                         <Mail className="w-3 h-3"/> {u.email}
                       </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <select 
-                          className={`p-2 border rounded-lg text-sm w-48 outline-none cursor-pointer font-bold transition-colors ${
+                          className={`p-2 border border-slate-200 rounded-xl text-sm w-48 outline-none cursor-pointer font-bold transition-colors ${
                             u.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             u.role === 'pengurus_asrama' ? 'bg-orange-50 text-orange-700 border-orange-200' :
                             u.role === 'bendahara' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            'bg-white text-gray-700'
+                            'bg-white text-slate-700'
                           }`}
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
@@ -371,7 +371,7 @@ export default function ManajemenUserPage() {
                           <Home className="w-3 h-3"/> {u.asrama_binaan || "Pilih Asrama"}
                         </button>
                       ) : (
-                        <span className="text-gray-400 text-xs">-</span>
+                        <span className="text-slate-400 text-xs">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -382,7 +382,7 @@ export default function ManajemenUserPage() {
                             setUserToEdit({ id: u.id, name: u.full_name, email: u.email })
                             setIsOpenEdit(true)
                           }}
-                          className="text-gray-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                          className="text-slate-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
                           title="Edit Detail"
                         >
                           <Edit className="w-4 h-4"/>
@@ -393,7 +393,7 @@ export default function ManajemenUserPage() {
                             setUserToReset({ id: u.id, name: u.full_name })
                             setIsOpenReset(true)
                           }}
-                          className="text-gray-500 hover:text-orange-600 p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                          className="text-slate-500 hover:text-orange-600 p-2 rounded-lg hover:bg-orange-50 transition-colors"
                           title="Reset Password"
                         >
                           <Key className="w-4 h-4"/>
@@ -404,7 +404,7 @@ export default function ManajemenUserPage() {
                             setUserToDelete({ id: u.id, name: u.full_name })
                             setIsOpenDelete(true)
                           }}
-                          className="text-gray-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          className="text-slate-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
                           title="Hapus Akun"
                         >
                           <Trash2 className="w-4 h-4"/>
@@ -438,32 +438,32 @@ export default function ManajemenUserPage() {
       {isOpenAdd && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800">Tambah Pengguna Baru</h3>
-              <button onClick={() => setIsOpenAdd(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800">Tambah Pengguna Baru</h3>
+              <button onClick={() => setIsOpenAdd(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
             </div>
             
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Lengkap</label>
-                <input name="full_name" required placeholder="Contoh: Ustadz Ahmad" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                <input name="full_name" required placeholder="Contoh: Ustadz Ahmad" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Login</label>
-                <input name="email" type="email" required placeholder="email@pesantren.com" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
+                <input name="email" type="email" required placeholder="email@pesantren.com" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
-                <input name="password" type="password" required minLength={6} placeholder="Minimal 6 karakter" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                <input name="password" type="password" required minLength={6} placeholder="Minimal 6 karakter" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role / Hak Akses</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role / Hak Akses</label>
                 <select 
                   name="role" 
-                  className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
                 >
@@ -476,7 +476,7 @@ export default function ManajemenUserPage() {
               {newRole === 'pengurus_asrama' && (
                 <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 animate-in slide-in-from-top-2">
                   <label className="block text-xs font-bold text-orange-800 uppercase mb-1">Pilih Asrama Binaan</label>
-                  <select name="asrama_binaan" required className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-orange-500 outline-none">
+                  <select name="asrama_binaan" required className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500 outline-none">
                     <option value="">-- Pilih Asrama --</option>
                     {ASRAMA_LIST.map(a => (
                       <option key={a} value={a}>{a}</option>
@@ -489,7 +489,7 @@ export default function ManajemenUserPage() {
                 <button 
                   type="submit" 
                   disabled={isCreating}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center gap-2 disabled:opacity-70"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-sm flex justify-center items-center gap-2 disabled:opacity-70"
                 >
                   {isCreating ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
                   {isCreating ? "Membuat Akun..." : "Buat Akun Sekarang"}
@@ -504,14 +504,14 @@ export default function ManajemenUserPage() {
       {isAsramaModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-100 transition-all">
-            <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+            <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Home className="w-5 h-5 text-orange-600"/> Pilih Asrama Binaan</h3>
-                <p className="text-xs text-gray-500 mt-1">Klik asrama yang akan dikelola user ini.</p>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Home className="w-5 h-5 text-orange-600"/> Pilih Asrama Binaan</h3>
+                <p className="text-xs text-slate-500 mt-1">Klik asrama yang akan dikelola user ini.</p>
               </div>
               <button 
                 onClick={() => { setIsAsramaModalOpen(false); setPendingRoleUpdate(null); }}
-                className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-6 h-6"/>
               </button>
@@ -522,9 +522,9 @@ export default function ManajemenUserPage() {
                 <button
                   key={asrama}
                   onClick={() => handleSelectAsrama(asrama)}
-                  className="p-4 rounded-xl border-2 border-gray-100 hover:border-orange-500 hover:bg-orange-50 text-gray-700 hover:text-orange-800 font-bold text-sm transition-all text-center flex flex-col items-center gap-2 group"
+                  className="p-4 rounded-xl border-2 border-slate-100 hover:border-orange-500 hover:bg-orange-50 text-slate-700 hover:text-orange-800 font-bold text-sm transition-all text-center flex flex-col items-center gap-2 group"
                 >
-                  <Home className="w-6 h-6 text-gray-300 group-hover:text-orange-500 transition-colors"/>
+                  <Home className="w-6 h-6 text-slate-300 group-hover:text-orange-500 transition-colors"/>
                   {asrama}
                 </button>
               ))}
@@ -543,12 +543,12 @@ export default function ManajemenUserPage() {
             </div>
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password Baru</label>
-                <input name="new_password" type="text" required minLength={6} placeholder="Min 6 karakter" className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-red-500 outline-none text-center font-bold text-lg" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password Baru</label>
+                <input name="new_password" type="text" required minLength={6} placeholder="Min 6 karakter" className="w-full p-3 border-2 border-slate-200 rounded-lg focus:border-red-500 outline-none text-center font-bold text-lg" />
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <button type="button" onClick={() => setIsOpenReset(false)} className="py-2 rounded-lg border border-gray-300 text-gray-600 font-bold hover:bg-gray-50">Batal</button>
-                <button type="submit" className="py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 shadow-md">Simpan Password</button>
+                <button type="button" onClick={() => setIsOpenReset(false)} className="py-2 rounded-lg border border-slate-300 text-slate-600 font-bold hover:bg-slate-50">Batal</button>
+                <button type="submit" className="py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 shadow-sm">Simpan Password</button>
               </div>
             </form>
           </div>
@@ -561,20 +561,20 @@ export default function ManajemenUserPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-5 border-b bg-blue-50 flex justify-between items-center">
               <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2"><Edit className="w-5 h-5"/> Edit User</h3>
-              <button onClick={() => setIsOpenEdit(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
+              <button onClick={() => setIsOpenEdit(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
             </div>
             <form onSubmit={handleEditUser} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Lengkap</label>
-                <input name="full_name" defaultValue={userToEdit.name} required className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                <input name="full_name" defaultValue={userToEdit.name} required className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Login</label>
-                <input name="email" type="email" defaultValue={userToEdit.email} required className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
+                <input name="email" type="email" defaultValue={userToEdit.email} required className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsOpenEdit(false)} className="px-4 py-2 border rounded-lg text-gray-600 font-bold hover:bg-gray-50">Batal</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md">Simpan Perubahan</button>
+                <button type="button" onClick={() => setIsOpenEdit(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50">Batal</button>
+                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-sm">Simpan Perubahan</button>
               </div>
             </form>
           </div>
@@ -585,9 +585,9 @@ export default function ManajemenUserPage() {
       {isOpenImport && (
          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-             <div className="p-4 border-b bg-gray-50 flex justify-between items-center sticky top-0 bg-gray-50 z-10">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-green-600"/> Import User Massal</h3>
-                <button onClick={() => { setIsOpenImport(false); setExcelData([]) }}><X className="w-6 h-6 text-gray-400 hover:text-gray-600"/></button>
+             <div className="p-4 border-b bg-slate-50 flex justify-between items-center sticky top-0 bg-slate-50 z-10">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-green-600"/> Import User Massal</h3>
+                <button onClick={() => { setIsOpenImport(false); setExcelData([]) }}><X className="w-6 h-6 text-slate-400 hover:text-slate-600"/></button>
              </div>
 
              <div className="p-6 space-y-6">
@@ -604,16 +604,16 @@ export default function ManajemenUserPage() {
                 </div>
 
                 {/* 2. UPLOAD */}
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 relative hover:bg-gray-100 transition-colors">
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 relative hover:bg-slate-100 transition-colors">
                    <input type="file" accept=".xlsx" onChange={handleUploadExcel} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
-                   <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2"/>
-                   <p className="text-sm font-bold text-gray-600">Klik untuk upload file Excel</p>
+                   <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2"/>
+                   <p className="text-sm font-bold text-slate-600">Klik untuk upload file Excel</p>
                 </div>
 
                 {/* 3. PREVIEW */}
                 {excelData.length > 0 && (
-                   <div className="border rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 px-4 py-2 border-b text-xs font-bold text-gray-600 flex justify-between">
+                   <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-2 border-b text-xs font-bold text-slate-600 flex justify-between">
                          <span>Preview Data ({excelData.length})</span>
                          <span className="text-green-600">Valid: {excelData.filter(d=>d.isValid).length}</span>
                       </div>
@@ -629,7 +629,7 @@ export default function ManajemenUserPage() {
                             </thead>
                             <tbody>
                                {excelData.map((row, idx) => (
-                                  <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
+                                  <tr key={idx} className="border-b last:border-0 hover:bg-slate-50">
                                      <td className="p-2">{row.full_name}</td>
                                      <td className="p-2">{row.email}</td>
                                      <td className="p-2 uppercase">{row.role}</td>
@@ -641,7 +641,7 @@ export default function ManajemenUserPage() {
                             </tbody>
                          </table>
                       </div>
-                      <div className="p-4 bg-gray-50 border-t text-right">
+                      <div className="p-4 bg-slate-50 border-t text-right">
                          <button 
                             onClick={handleSimpanBatch}
                             disabled={isImporting || excelData.filter(d=>d.isValid).length === 0}
@@ -665,14 +665,14 @@ export default function ManajemenUserPage() {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Hapus Akun?</h3>
-            <p className="text-sm text-gray-500 mb-6">
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Hapus Akun?</h3>
+            <p className="text-sm text-slate-500 mb-6">
               Apakah Anda yakin ingin menghapus akun <b>{userToDelete.name}</b>?
               <br/>Tindakan ini tidak dapat dibatalkan.
             </p>
             <div className="grid grid-cols-2 gap-3">
-               <button onClick={() => setIsOpenDelete(false)} className="py-2.5 rounded-xl border border-gray-300 font-bold text-gray-600 hover:bg-gray-50">Batal</button>
-               <button onClick={handleDeleteUser} className="py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-md flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Hapus</button>
+               <button onClick={() => setIsOpenDelete(false)} className="py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50">Batal</button>
+               <button onClick={handleDeleteUser} className="py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-sm flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Hapus</button>
             </div>
           </div>
         </div>

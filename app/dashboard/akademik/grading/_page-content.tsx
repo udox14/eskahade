@@ -210,19 +210,19 @@ export default function GradingKelasPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
             <TrendingUp className="w-7 h-7 text-indigo-600" />
             Grading
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Sistem Rekomendasi Penentuan Grade Nahwu & Sharaf (A/B/C)</p>
+          <p className="text-slate-500 text-sm mt-1">Sistem Rekomendasi Penentuan Grade Nahwu & Sharaf (A/B/C)</p>
         </div>
       </div>
 
       {/* FILTER KELAS */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-        <label className="block text-sm font-bold text-gray-700 mb-2">Pilih Kelas</label>
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+        <label className="block text-sm font-bold text-slate-700 mb-2">Pilih Kelas</label>
         <select 
-          className="w-full md:w-1/3 border border-gray-300 rounded-xl p-3 bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+          className="w-full md:w-1/3 border border-slate-300 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
           value={selectedKelas}
           onChange={e => setSelectedKelas(e.target.value)}
         >
@@ -235,17 +235,17 @@ export default function GradingKelasPage() {
 
       {/* CONTENT */}
       {!selectedKelas ? (
-        <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-          <Filter className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-gray-500">Pilih kelas untuk mulai melakukan grading</h3>
+        <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+          <Filter className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-slate-500">Pilih kelas untuk mulai melakukan grading</h3>
         </div>
       ) : loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm">
            <Loader2 className="w-8 h-8 animate-spin mb-3 text-indigo-600"/>
            <p className="font-medium">Mengkalkulasi rata-rata 2 semester...</p>
         </div>
       ) : dataGrading.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm text-gray-400">
+        <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm text-slate-400">
           <p className="font-medium">Tidak ada data santri aktif di kelas ini.</p>
         </div>
       ) : (
@@ -267,8 +267,8 @@ export default function GradingKelasPage() {
             </div>
 
             {/* Excel Actions */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-3 shrink-0 shadow-sm">
-              <div className="text-sm font-bold text-gray-700 w-full sm:w-auto flex items-center gap-2 mb-2 sm:mb-0 mr-2 border-b sm:border-b-0 sm:border-r border-gray-200 pb-2 sm:pb-0 sm:pr-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-3 shrink-0 shadow-sm">
+              <div className="text-sm font-bold text-slate-700 w-full sm:w-auto flex items-center gap-2 mb-2 sm:mb-0 mr-2 border-b sm:border-b-0 sm:border-r border-slate-200 pb-2 sm:pb-0 sm:pr-4">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-600"/>
                 Excel Mode
               </div>
@@ -303,14 +303,14 @@ export default function GradingKelasPage() {
           </div>
 
           {/* DESKTOP VIEW (Table) */}
-          <div className="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b border-gray-200 font-bold text-gray-600 uppercase text-xs tracking-wider">
+              <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Nama Santri & NIS</th>
                   <th className="px-6 py-4 text-center">Rata-rata<br/>(Nahwu/Sharaf)</th>
                   <th className="px-6 py-4 text-center">Rekomendasi<br/>Sistem</th>
-                  <th className="px-6 py-4">Keputusan Final <br/><span className="text-[10px] text-gray-400 font-normal lowercase">(Hak Veto Wali Kelas)</span></th>
+                  <th className="px-6 py-4">Keputusan Final <br/><span className="text-[10px] text-slate-400 font-normal lowercase">(Hak Veto Wali Kelas)</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -324,8 +324,8 @@ export default function GradingKelasPage() {
                         <div className="flex items-center gap-2">
                            {pendingChanges[s.riwayat_id] && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>}
                            <div>
-                              <p className="font-bold text-gray-900 text-base">{s.nama}</p>
-                              <p className="text-gray-500 font-mono text-xs mt-0.5">{s.nis}</p>
+                              <p className="font-bold text-slate-900 text-base">{s.nama}</p>
+                              <p className="text-slate-500 font-mono text-xs mt-0.5">{s.nis}</p>
                            </div>
                         </div>
                       </td>
@@ -333,13 +333,13 @@ export default function GradingKelasPage() {
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex flex-col items-center">
                           <span className="font-black text-lg text-indigo-700">{s.rata_rata}</span>
-                          <span className="text-[10px] text-gray-400 font-medium">Dari {s.jumlah_komponen_nilai} Nilai</span>
+                          <span className="text-[10px] text-slate-400 font-medium">Dari {s.jumlah_komponen_nilai} Nilai</span>
                         </div>
                       </td>
 
                       <td className="px-6 py-4 text-center">
                         {s.rekomendasi === '-' ? (
-                          <span className="text-xs text-gray-400 italic">Nilai Kosong</span>
+                          <span className="text-xs text-slate-400 italic">Nilai Kosong</span>
                         ) : (
                           <span className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${
                             s.rekomendasi === 'Grade A' ? 'bg-green-50 text-green-700 border-green-200' :
@@ -351,12 +351,12 @@ export default function GradingKelasPage() {
                         )}
                       </td>
 
-                      <td className="px-6 py-4 bg-gray-50/50">
+                      <td className="px-6 py-4 bg-slate-50/50">
                         <div className="flex items-center gap-3">
                           <select 
                             className={`p-2.5 border rounded-xl text-sm font-bold shadow-sm focus:ring-2 outline-none transition-all cursor-pointer ${
                               pendingChanges[s.riwayat_id] ? 'border-amber-400 ring-4 ring-amber-100 text-amber-900 bg-amber-50' : 
-                              'border-gray-300 focus:border-indigo-500 focus:ring-indigo-100 text-gray-800 bg-white'
+                              'border-slate-300 focus:border-indigo-500 focus:ring-indigo-100 text-slate-800 bg-white'
                             }`}
                             value={currentGrade}
                             onChange={e => handleGradeChange(s.riwayat_id, e.target.value)}
@@ -388,24 +388,24 @@ export default function GradingKelasPage() {
               const isOverridden = currentGrade !== s.rekomendasi && s.rekomendasi !== '-'
 
               return (
-                <div key={s.riwayat_id} className={`bg-white rounded-2xl border p-4 shadow-sm relative overflow-hidden transition-all ${pendingChanges[s.riwayat_id] ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-200'}`}>
+                <div key={s.riwayat_id} className={`bg-white rounded-2xl border p-4 shadow-sm relative overflow-hidden transition-all ${pendingChanges[s.riwayat_id] ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200'}`}>
                   
                   {pendingChanges[s.riwayat_id] && <div className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></div>}
                   
-                  <div className="border-b border-gray-100 pb-3 mb-3">
-                    <h3 className="font-bold text-gray-900 text-base leading-tight pr-4">{s.nama}</h3>
-                    <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded mt-1 inline-block">{s.nis}</span>
+                  <div className="border-b border-slate-100 pb-3 mb-3">
+                    <h3 className="font-bold text-slate-900 text-base leading-tight pr-4">{s.nama}</h3>
+                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mt-1 inline-block">{s.nis}</span>
                   </div>
 
                   <div className="flex justify-between items-center bg-indigo-50/50 p-3 rounded-xl border border-indigo-50 mb-3">
                     <div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Rata-rata</p>
                       <p className="font-black text-xl text-indigo-700">{s.rata_rata}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">Sistem</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-0.5">Sistem</p>
                       {s.rekomendasi === '-' ? (
-                        <span className="text-xs text-gray-400 italic">Kosong</span>
+                        <span className="text-xs text-slate-400 italic">Kosong</span>
                       ) : (
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
                           s.rekomendasi === 'Grade A' ? 'bg-green-100 text-green-700 border-green-200' :
@@ -419,13 +419,13 @@ export default function GradingKelasPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-gray-700 flex justify-between items-center mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex justify-between items-center mb-1.5">
                       <span>Keputusan Final Wali Kelas:</span>
                       {isOverridden && <span className="text-[9px] font-bold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">VETO</span>}
                     </label>
                     <select 
                       className={`w-full p-3 border rounded-xl text-sm font-bold shadow-sm focus:ring-2 outline-none transition-all cursor-pointer ${
-                        pendingChanges[s.riwayat_id] ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-gray-200 bg-white text-gray-800'
+                        pendingChanges[s.riwayat_id] ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-800'
                       }`}
                       value={currentGrade}
                       onChange={e => handleGradeChange(s.riwayat_id, e.target.value)}
@@ -463,7 +463,7 @@ export default function GradingKelasPage() {
             <button 
               onClick={handleSimpanBatch}
               disabled={isSaving}
-              className="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2.5 md:py-2 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50 text-xs md:text-sm shadow-lg shadow-indigo-500/30"
+              className="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2.5 md:py-2 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50 text-xs md:text-sm shadow-sm shadow-indigo-500/30"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>Simpan Data</span>
@@ -474,7 +474,7 @@ export default function GradingKelasPage() {
 
       {/* TOAST NOTIFICATION */}
       {toastMsg && (
-        <div className="fixed top-4 right-4 bg-emerald-100 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-in slide-in-from-top-5">
+        <div className="fixed top-4 right-4 bg-emerald-100 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-sm flex items-center gap-3 z-50 animate-in slide-in-from-top-5">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span className="font-bold text-sm">{toastMsg}</span>
         </div>

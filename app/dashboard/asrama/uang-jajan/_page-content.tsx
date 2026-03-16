@@ -197,7 +197,7 @@ export default function UangJajanPage() {
     <div className="space-y-6 max-w-lg mx-auto pb-32">
 
       {/* HEADER & STATS */}
-      <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+      <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -244,23 +244,15 @@ export default function UangJajanPage() {
       ) : kamars.length > 0 && (
         <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
           <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 text-gray-600">
+            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
             <ChevronLeft className="w-6 h-6"/>
           </button>
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Kamar</span>
-            <select
-              value={kamarIdx}
-              onChange={e => setKamarIdx(Number(e.target.value))}
-              className="font-bold text-lg text-slate-800 text-center outline-none bg-transparent cursor-pointer"
-            >
-              {kamars.map((k, idx) => (
-                <option key={k} value={idx}>{k}</option>
-              ))}
-            </select>
+          <div className="text-center">
+            <span className="text-xs text-slate-500 uppercase font-bold">KAMAR</span>
+            <p className="font-bold text-lg text-slate-800">{activeKamar}</p>
           </div>
           <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 text-gray-600">
+            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
             <ChevronRight className="w-6 h-6"/>
           </button>
         </div>
@@ -270,7 +262,7 @@ export default function UangJajanPage() {
       {loadingKamar ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600"/></div>
       ) : santriKamar.length === 0 && !loadingKamar && activeKamar ? (
-        <div className="text-center py-12 text-gray-400 border-2 border-dashed rounded-xl">Kamar Kosong.</div>
+        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">Kamar Kosong.</div>
       ) : santriKamar.length > 0 && (
         <div className="bg-white rounded-xl border shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4">
           <div className="divide-y">
@@ -281,11 +273,11 @@ export default function UangJajanPage() {
               const isManual = manualMode[s.id]
 
               return (
-                <div key={s.id} className={`p-4 ${draftVal ? 'bg-orange-50' : 'hover:bg-gray-50'} transition-colors`}>
+                <div key={s.id} className={`p-4 ${draftVal ? 'bg-orange-50' : 'hover:bg-slate-50'} transition-colors`}>
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
-                      <p className="text-xs text-gray-500 font-mono">{s.nis}</p>
+                      <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
+                      <p className="text-xs text-slate-500 font-mono">{s.nis}</p>
                     </div>
                     <div className="text-right">
                       <p className={`font-mono font-bold ${finalSaldo < 0 ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-emerald-700'}`}>
@@ -302,11 +294,11 @@ export default function UangJajanPage() {
                     {isManual ? (
                       <div className="flex-1 flex gap-2 items-center animate-in fade-in">
                         <input type="number" placeholder="0"
-                          className="w-full border rounded-lg px-2 py-1.5 text-sm font-bold focus:ring-2 focus:ring-orange-500 outline-none"
+                          className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm font-bold focus:ring-2 focus:ring-orange-500 outline-none"
                           autoFocus
                           onChange={e => handleManualInput(s.id, e.target.value, s.saldo)}
                         />
-                        <button onClick={() => toggleManualMode(s.id)} className="text-xs text-gray-500 underline whitespace-nowrap">Batal</button>
+                        <button onClick={() => toggleManualMode(s.id)} className="text-xs text-slate-500 underline whitespace-nowrap">Batal</button>
                       </div>
                     ) : (
                       <>
@@ -316,15 +308,15 @@ export default function UangJajanPage() {
                               disabled={s.saldo < opt}
                               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex-shrink-0 ${
                                 draftVal === opt
-                                  ? 'bg-orange-600 text-white border-orange-600 shadow-md scale-105'
-                                  : 'bg-white text-gray-600 border-gray-200 hover:border-orange-400 disabled:opacity-30 disabled:bg-gray-50'
+                                  ? 'bg-orange-600 text-white border-orange-600 shadow-sm scale-105'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-orange-400 disabled:opacity-30 disabled:bg-slate-50'
                               }`}>
                               {opt / 1000}k
                             </button>
                           ))}
                         </div>
                         <button onClick={() => toggleManualMode(s.id)}
-                          className="px-2 py-1.5 rounded-lg text-xs font-bold border border-dashed border-gray-300 text-gray-500 hover:bg-gray-100">
+                          className="px-2 py-1.5 rounded-lg text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:bg-slate-100">
                           Manual
                         </button>
                       </>
@@ -358,9 +350,9 @@ export default function UangJajanPage() {
       {isModalOpen && selectedSantri && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="p-5 border-b bg-gray-50">
-              <h3 className="text-lg font-bold text-gray-800 mb-1">{selectedSantri.nama_lengkap}</h3>
-              <p className="text-sm text-gray-500 font-mono">Saldo: Rp {selectedSantri.saldo.toLocaleString()}</p>
+            <div className="p-5 border-b bg-slate-50">
+              <h3 className="text-lg font-bold text-slate-800 mb-1">{selectedSantri.nama_lengkap}</h3>
+              <p className="text-sm text-slate-500 font-mono">Saldo: Rp {selectedSantri.saldo.toLocaleString()}</p>
             </div>
 
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
@@ -371,7 +363,7 @@ export default function UangJajanPage() {
                 <form onSubmit={handleTopup}>
                   <div className="flex gap-2">
                     <input type="number" placeholder="Nominal Rp..."
-                      className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 p-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                       value={topupNominal}
                       onChange={e => setTopupNominal(e.target.value)}
                     />
@@ -383,27 +375,27 @@ export default function UangJajanPage() {
               </div>
 
               <div>
-                <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                   <History className="w-4 h-4"/> Riwayat Terakhir
                 </h4>
                 {loadingHistory ? (
-                  <div className="text-center py-4"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400"/></div>
+                  <div className="text-center py-4"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400"/></div>
                 ) : history.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic text-center">Belum ada transaksi.</p>
+                  <p className="text-xs text-slate-400 italic text-center">Belum ada transaksi.</p>
                 ) : (
                   <div className="space-y-2">
                     {history.map(h => (
-                      <div key={h.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50 hover:bg-white transition-colors">
+                      <div key={h.id} className="flex justify-between items-center p-3 border border-slate-200 rounded-xl bg-slate-50 hover:bg-white transition-colors">
                         <div>
                           <p className={`text-sm font-bold ${h.jenis === 'MASUK' ? 'text-green-600' : 'text-orange-600'}`}>
                             {h.jenis === 'MASUK' ? '+' : '-'} Rp {h.nominal.toLocaleString()}
                           </p>
-                          <p className="text-[10px] text-gray-500">
+                          <p className="text-[10px] text-slate-500">
                             {format(new Date(h.created_at), 'dd MMM HH:mm', { locale: id })} • {h.keterangan}
                           </p>
                         </div>
                         <button onClick={() => handleDeleteHistory(h.id)}
-                          className="text-gray-300 hover:text-red-500 p-2" title="Hapus (Koreksi)">
+                          className="text-slate-300 hover:text-red-500 p-2" title="Hapus (Koreksi)">
                           <Trash2 className="w-4 h-4"/>
                         </button>
                       </div>
@@ -413,8 +405,8 @@ export default function UangJajanPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t bg-gray-50 text-center">
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 font-bold hover:text-gray-800 text-sm">Tutup</button>
+            <div className="p-4 border-t bg-slate-50 text-center">
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 font-bold hover:text-slate-800 text-sm">Tutup</button>
             </div>
           </div>
         </div>

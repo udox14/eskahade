@@ -23,7 +23,7 @@ const ROLE_COLOR: Record<string, string> = {
 
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
   return (
-    <div className={`fixed top-4 right-4 z-[999] flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold ${
+    <div className={`fixed top-4 right-4 z-[999] flex items-center gap-2 px-4 py-3 rounded-xl shadow-sm text-sm font-semibold ${
       type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
     }`}>
       {type === 'success' ? <CheckCircle className="w-4 h-4" /> : '⚠️'} {msg}
@@ -117,7 +117,7 @@ export default function ProfilPage() {
           <div className="px-5 pb-5 -mt-10">
             <div className="flex items-end justify-between">
               <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-900 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full border-4 border-white shadow-sm overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-900 flex items-center justify-center">
                   {avatarPreview
                     ? <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                     : <span className="text-white text-xl font-black">{initials}</span>
@@ -135,7 +135,7 @@ export default function ProfilPage() {
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
               </div>
               <div className="mb-1">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${ROLE_COLOR[profil?.role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${ROLE_COLOR[profil?.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                   <Shield className="w-3 h-3" />{ROLE_LABEL[profil?.role] || profil?.role}
                 </span>
               </div>

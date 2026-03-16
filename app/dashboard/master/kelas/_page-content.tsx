@@ -105,14 +105,14 @@ export default function MasterKelasPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800">Manajemen Kelas & Ruangan</h1>
-           <p className="text-gray-500 text-sm">Atur struktur kelas per tahun ajaran.</p>
+           <h1 className="text-2xl font-bold text-slate-800">Manajemen Kelas & Ruangan</h1>
+           <p className="text-slate-500 text-sm">Atur struktur kelas per tahun ajaran.</p>
         </div>
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-           <button onClick={() => setMode('manual')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+        <div className="flex bg-slate-100 p-1 rounded-lg">
+           <button onClick={() => setMode('manual')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
              <List className="w-4 h-4"/> Daftar & Manual
            </button>
-           <button onClick={() => setMode('excel')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'excel' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+           <button onClick={() => setMode('excel')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'excel' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
              <FileSpreadsheet className="w-4 h-4"/> Import Excel
            </button>
         </div>
@@ -142,22 +142,22 @@ export default function MasterKelasPage() {
 
       {mode === 'manual' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2 uppercase tracking-wide">Tambah Kelas Satuan</h3>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2 uppercase tracking-wide">Tambah Kelas Satuan</h3>
             <form id="form-manual" action={handleTambahManual} className="flex flex-col md:flex-row gap-4 items-end">
               <div className="w-full md:w-1/3">
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tingkat (Marhalah)</label>
-                <select name="marhalah_id" required className="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tingkat (Marhalah)</label>
+                <select name="marhalah_id" required className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                   {marhalahList?.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                 </select>
               </div>
               <div className="w-full md:w-1/3">
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nama Kelas (Ex: 1-B)</label>
-                <input type="text" name="nama_kelas" required placeholder="Contoh: 1-14" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Kelas (Ex: 1-B)</label>
+                <input type="text" name="nama_kelas" required placeholder="Contoh: 1-14" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
               </div>
               <div className="w-full md:w-1/4">
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Jenis Kelamin</label>
-                <select name="jenis_kelamin" className="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jenis Kelamin</label>
+                <select name="jenis_kelamin" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                   <option value="L">Putra (L)</option><option value="P">Putri (P)</option><option value="C">Campuran (L & P)</option>
                 </select>
               </div>
@@ -167,20 +167,20 @@ export default function MasterKelasPage() {
             </form>
           </div>
           <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-3 border-b text-xs font-bold text-gray-500 uppercase flex justify-between items-center">
-               <span>Daftar Kelas Tersedia</span><span className="bg-white border px-2 py-0.5 rounded text-gray-600">{kelasList.length} Rombel</span>
+            <div className="bg-slate-50 px-6 py-3 border-b text-xs font-bold text-slate-500 uppercase flex justify-between items-center">
+               <span>Daftar Kelas Tersedia</span><span className="bg-white border px-2 py-0.5 rounded text-slate-600">{kelasList.length} Rombel</span>
             </div>
             <table className="w-full text-sm text-left">
-              <thead className="bg-white text-gray-600 font-bold border-b">
+              <thead className="bg-white text-slate-600 font-bold border-b">
                 <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {kelasList?.map((k) => (
-                  <tr key={k.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-3 font-medium text-gray-800">{k.nama_kelas}</td>
-                    <td className="px-6 py-3 text-gray-500">{k.marhalah?.nama}</td>
+                  <tr key={k.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
+                    <td className="px-6 py-3 text-slate-500">{k.marhalah?.nama}</td>
                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
-                    <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-gray-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                    <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -200,19 +200,19 @@ export default function MasterKelasPage() {
                 <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex flex-col justify-center items-center text-center space-y-4">
                    <div className="bg-green-100 p-3 rounded-full text-green-600"><Upload className="w-6 h-6"/></div>
                    <div><h3 className="font-bold text-green-900">2. Upload File</h3><p className="text-xs text-green-600 max-w-xs mx-auto mt-1">Upload file Excel yang sudah diisi di sini.</p></div>
-                   <div className="relative"><input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/><button className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-green-700">Pilih File Excel</button></div>
+                   <div className="relative"><input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/><button className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-green-700">Pilih File Excel</button></div>
                 </div>
             </div>
             {excelData.length > 0 && (
                 <div className="bg-white border rounded-xl shadow-sm overflow-hidden animate-in slide-in-from-bottom-2">
-                    <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                        <h3 className="font-bold text-gray-700 flex items-center gap-2"><FileSpreadsheet className="w-4 h-4"/> Preview ({excelData.length} Kelas)</h3>
+                    <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileSpreadsheet className="w-4 h-4"/> Preview ({excelData.length} Kelas)</h3>
                         <button onClick={handleSimpanExcel} disabled={isProcessing} className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-green-800 disabled:opacity-50 flex items-center gap-2">
                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Simpan Semua
                         </button>
                     </div>
                     <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-sm text-left"><thead className="bg-gray-100 text-gray-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
+                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
                     </div>
                 </div>
             )}

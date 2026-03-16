@@ -139,16 +139,16 @@ export default function LayananSuratPage() {
        {/* HEADER (Sembunyikan saat print) */}
        <div className="flex items-center gap-4 print:hidden">
         {step > 1 && (
-            <button onClick={() => setStep(step - 1)} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft className="w-6 h-6 text-gray-600"/></button>
+            <button onClick={() => setStep(step - 1)} className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft className="w-6 h-6 text-slate-600"/></button>
         )}
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Layanan Surat</h1>
-          <p className="text-gray-500 text-sm">Generator surat otomatis & Arsip surat keluar.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Layanan Surat</h1>
+          <p className="text-slate-500 text-sm">Generator surat otomatis & Arsip surat keluar.</p>
         </div>
       </div>
 
       {/* --- BAGIAN GENERATOR --- */}
-      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 print:border-none print:p-0 print:bg-white">
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 print:border-none print:p-0 print:bg-white">
           
           {/* STEP 1: PILIH JENIS (Sembunyikan saat print) */}
           {step === 1 && (
@@ -165,14 +165,14 @@ export default function LayananSuratPage() {
             <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4 print:hidden">
                 <h3 className="font-bold text-lg mb-4 text-center">Cari Santri</h3>
                 <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nama / NIS..." className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"/>
+                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nama / NIS..." className="flex-1 p-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"/>
                     <button disabled={loading} className="bg-blue-600 text-white px-4 rounded-lg">{loading ? <Loader2 className="animate-spin w-5 h-5"/> : <Search className="w-5 h-5"/>}</button>
                 </form>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                     {hasilCari.map(s => (
                         <div key={s.id} onClick={() => selectSantri(s)} className="p-3 border rounded hover:bg-blue-50 cursor-pointer">
                             <p className="font-bold">{s.nama_lengkap}</p>
-                            <p className="text-xs text-gray-500">{s.asrama} - Kamar {s.kamar}</p>
+                            <p className="text-xs text-slate-500">{s.asrama} - Kamar {s.kamar}</p>
                         </div>
                     ))}
                 </div>
@@ -187,14 +187,14 @@ export default function LayananSuratPage() {
                     {jenisSurat === 'IZIN' && (
                         <>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-gray-500">Dari Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglMulai: e.target.value})} className="w-full p-2 border rounded"/></div>
-                                <div><label className="text-xs font-bold text-gray-500">Sampai Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglSelesai: e.target.value})} className="w-full p-2 border rounded"/></div>
+                                <div><label className="text-xs font-bold text-slate-500">Dari Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglMulai: e.target.value})} className="w-full p-2 border rounded"/></div>
+                                <div><label className="text-xs font-bold text-slate-500">Sampai Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglSelesai: e.target.value})} className="w-full p-2 border rounded"/></div>
                             </div>
-                            <div><label className="text-xs font-bold text-gray-500">Keperluan</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
+                            <div><label className="text-xs font-bold text-slate-500">Keperluan</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
                         </>
                     )}
                     {jenisSurat === 'BERHENTI' && (
-                        <div><label className="text-xs font-bold text-gray-500">Alasan Berhenti</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
+                        <div><label className="text-xs font-bold text-slate-500">Alasan Berhenti</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
                     )}
                     <button className="w-full bg-green-600 text-white py-2 rounded-lg font-bold">Lanjut Preview</button>
                 </form>
@@ -206,14 +206,14 @@ export default function LayananSuratPage() {
             <div className="flex flex-col items-center gap-4 animate-in fade-in">
                 {/* Tombol Aksi (Sembunyikan saat print) */}
                 <div className="flex gap-4 print:hidden">
-                    <button onClick={() => setStep(1)} disabled={isPrinting} className="px-4 py-2 border bg-white rounded-lg hover:bg-gray-50">Batal / Ganti</button>
+                    <button onClick={() => setStep(1)} disabled={isPrinting} className="px-4 py-2 border bg-white rounded-lg hover:bg-slate-50">Batal / Ganti</button>
                     <button onClick={() => handlePrintProcess()} disabled={isPrinting} className="px-6 py-2 bg-green-700 text-white rounded-lg font-bold shadow hover:bg-green-800 flex items-center gap-2 disabled:opacity-50">
                         {isPrinting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Printer className="w-4 h-4"/>} Cetak & Simpan
                     </button>
                 </div>
                 
                 {/* Dokumen yang akan dicetak */}
-                <div className="bg-gray-200 p-8 border rounded-xl overflow-auto max-w-full print:p-0 print:bg-white print:border-none print:w-full print:overflow-visible">
+                <div className="bg-slate-200 p-8 border rounded-xl overflow-auto max-w-full print:p-0 print:bg-white print:border-none print:w-full print:overflow-visible">
                     <div ref={printRef} className="bg-white shadow-2xl print:shadow-none print:w-full">
                         <SuratView 
                             jenis={jenisSurat!} 
@@ -230,16 +230,16 @@ export default function LayananSuratPage() {
       {/* --- BAGIAN RIWAYAT (TABEL BAWAH) (Sembunyikan saat print) --- */}
       <div className="border-t pt-8 print:hidden">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <History className="w-6 h-6 text-orange-600"/> Agenda Surat Keluar
               </h2>
               
               {/* Filter */}
               <div className="flex gap-2">
-                  <select value={filterBulan} onChange={e => setFilterBulan(Number(e.target.value))} className="p-2 border rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
+                  <select value={filterBulan} onChange={e => setFilterBulan(Number(e.target.value))} className="p-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
                       {BULAN_LIST.map((b, i) => <option key={i} value={i+1}>{b}</option>)}
                   </select>
-                  <select value={filterTahun} onChange={e => setFilterTahun(Number(e.target.value))} className="p-2 border rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
+                  <select value={filterTahun} onChange={e => setFilterTahun(Number(e.target.value))} className="p-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="2024">2024</option>
                       <option value="2025">2025</option>
                       <option value="2026">2026</option>
@@ -249,9 +249,9 @@ export default function LayananSuratPage() {
 
           <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
              {loadingRiwayat ? (
-                 <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400"/></div>
+                 <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
              ) : riwayat.length === 0 ? (
-                 <div className="text-center py-12 text-gray-400 text-sm">Belum ada surat keluar bulan ini.</div>
+                 <div className="text-center py-12 text-slate-400 text-sm">Belum ada surat keluar bulan ini.</div>
              ) : (
                  <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -269,7 +269,7 @@ export default function LayananSuratPage() {
                         <tbody className="divide-y">
                             {riwayat.map((row) => (
                                 <tr key={row.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-mono text-xs text-gray-500">{format(new Date((row.created_at ?? '').replace(' ', 'T')), 'dd/MM/yyyy HH:mm', {locale:id})}</td>
+                                    <td className="px-6 py-3 font-mono text-xs text-slate-500">{format(new Date(row.created_at), 'dd/MM/yyyy HH:mm', {locale:id})}</td>
                                     <td className="px-6 py-3">
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
                                             row.jenis_surat === 'IZIN' ? 'bg-purple-50 text-purple-700 border-purple-200' :
@@ -279,14 +279,14 @@ export default function LayananSuratPage() {
                                             {row.jenis_surat}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-3 font-bold text-gray-800">{row.santri?.nama_lengkap}</td>
-                                    <td className="px-6 py-3 text-xs text-gray-500">{row.santri?.asrama}</td>
-                                    <td className="px-6 py-3 text-xs italic text-gray-600 max-w-xs truncate">{row.detail_info}</td>
-                                    <td className="px-6 py-3 text-xs text-gray-500">{row.admin?.full_name}</td>
+                                    <td className="px-6 py-3 font-bold text-slate-800">{row.santri?.nama_lengkap}</td>
+                                    <td className="px-6 py-3 text-xs text-slate-500">{row.santri?.asrama}</td>
+                                    <td className="px-6 py-3 text-xs italic text-slate-600 max-w-xs truncate">{row.detail_info}</td>
+                                    <td className="px-6 py-3 text-xs text-slate-500">{row.admin?.full_name}</td>
                                     <td className="px-6 py-3 text-right">
                                         <button 
                                             onClick={() => handleDeleteRiwayat(row.id)}
-                                            className="text-gray-400 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors"
+                                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors"
                                             title="Hapus Arsip"
                                         >
                                             <Trash2 className="w-4 h-4"/>
@@ -307,7 +307,7 @@ export default function LayananSuratPage() {
 
 function MenuCard({ title, desc, icon: Icon, color, onClick }: any) {
   return (
-    <div onClick={onClick} className={`${color} text-white p-6 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-transform flex flex-col items-center text-center justify-center h-40`}>
+    <div onClick={onClick} className={`${color} text-white p-6 rounded-2xl shadow-sm cursor-pointer hover:scale-105 transition-transform flex flex-col items-center text-center justify-center h-40`}>
        <Icon className="w-10 h-10 mb-3 opacity-80"/>
        <h3 className="font-bold text-lg">{title}</h3>
        <p className="text-xs opacity-80">{desc}</p>

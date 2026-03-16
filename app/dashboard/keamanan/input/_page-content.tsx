@@ -69,12 +69,12 @@ export default function InputPelanggaranPage() {
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4">
         {/* FIX: Ganti Link href ke button router.back() */}
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Input Pelanggaran</h1>
-          <p className="text-gray-500 text-sm">Pilih jenis pelanggaran dari daftar master.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Input Pelanggaran</h1>
+          <p className="text-slate-500 text-sm">Pilih jenis pelanggaran dari daftar master.</p>
         </div>
       </div>
 
@@ -83,12 +83,12 @@ export default function InputPelanggaranPage() {
         {/* 1. CARI SANTRI */}
         {!selectedSantri ? (
           <div className="space-y-4">
-            <h3 className="font-semibold text-gray-700 border-b pb-2">1. Cari Santri</h3>
+            <h3 className="font-semibold text-slate-700 border-b pb-2">1. Cari Santri</h3>
             <form onSubmit={handleSearch} className="flex gap-2">
               <input 
                 type="text" 
                 placeholder="Ketik Nama atau NIS..." 
-                className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                className="flex-1 p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
               />
@@ -101,11 +101,11 @@ export default function InputPelanggaranPage() {
                 <div 
                   key={s.id}
                   onClick={() => { setSelectedSantri(s); setHasilCari([]); }}
-                  className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center group"
+                  className="p-3 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer flex justify-between items-center group"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">{s.nama_lengkap}</p>
-                    <p className="text-xs text-gray-500">{s.nis} • {s.asrama}</p>
+                    <p className="font-medium text-slate-900">{s.nama_lengkap}</p>
+                    <p className="text-xs text-slate-500">{s.nis} • {s.asrama}</p>
                   </div>
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full group-hover:bg-green-200">Pilih</span>
                 </div>
@@ -132,24 +132,24 @@ export default function InputPelanggaranPage() {
         {/* 2. FORM DETAIL */}
         {selectedSantri && (
           <form onSubmit={handleSubmit} className="space-y-5 animate-in slide-in-from-bottom-2 fade-in">
-            <h3 className="font-semibold text-gray-700 border-b pb-2 pt-2">2. Detail Pelanggaran</h3>
+            <h3 className="font-semibold text-slate-700 border-b pb-2 pt-2">2. Detail Pelanggaran</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal</label>
                 <input 
                   type="date" 
                   name="tanggal" 
                   required 
                   defaultValue={new Date().toISOString().split('T')[0]} 
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none" 
+                  className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" 
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
                 <select 
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+                  className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 bg-white"
                   value={selectedKategori}
                   onChange={(e) => {
                     setSelectedKategori(e.target.value)
@@ -164,9 +164,9 @@ export default function InputPelanggaranPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Pelanggaran</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Jenis Pelanggaran</label>
               <select 
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+                className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 bg-white"
                 value={selectedMasterId}
                 onChange={(e) => setSelectedMasterId(e.target.value)}
                 required
@@ -187,13 +187,13 @@ export default function InputPelanggaranPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kronologi / Detail</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Kronologi / Detail</label>
               <textarea 
                 name="deskripsi"
                 required
                 rows={3}
                 placeholder="Ceritakan detail kejadian..."
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
               ></textarea>
             </div>
 
@@ -211,7 +211,7 @@ export default function InputPelanggaranPage() {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-red-700 text-white py-3 rounded-lg hover:bg-red-800 font-bold shadow-md transition-transform active:scale-95 flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full bg-red-700 text-white py-3 rounded-lg hover:bg-red-800 font-bold shadow-sm transition-transform active:scale-95 flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {loading ? <RefreshCw className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
                 {loading ? "Menyimpan..." : "SIMPAN LAPORAN"}

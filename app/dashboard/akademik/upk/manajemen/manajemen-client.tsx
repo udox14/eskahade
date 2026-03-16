@@ -100,10 +100,10 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
       {/* HEADER & TABS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <Package className="w-6 h-6 text-orange-600"/> Manajemen UPK
            </h1>
-           <p className="text-gray-500 text-sm">Distribusi kitab, penyelesaian keuangan, dan rekap belanja.</p>
+           <p className="text-slate-500 text-sm">Distribusi kitab, penyelesaian keuangan, dan rekap belanja.</p>
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -130,11 +130,11 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
             </button>
           )}
 
-          <div className="flex bg-gray-100 p-1 rounded-lg flex-1 md:flex-none">
-             <button onClick={() => setTab('DISTRIBUSI')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${tab === 'DISTRIBUSI' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          <div className="flex bg-slate-100 p-1 rounded-lg flex-1 md:flex-none">
+             <button onClick={() => setTab('DISTRIBUSI')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${tab === 'DISTRIBUSI' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <Truck className="w-4 h-4"/> Distribusi
              </button>
-             <button onClick={() => setTab('GUDANG')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${tab === 'GUDANG' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setTab('GUDANG')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${tab === 'GUDANG' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <ShoppingBag className="w-4 h-4"/> Gudang
              </button>
           </div>
@@ -148,45 +148,45 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
            {/* FILTER */}
            <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                   <input 
                     placeholder="Cari Pemesan..." 
-                    className="w-full pl-9 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && loadDistribusi()}
                   />
               </div>
               <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-                 <button onClick={()=>setFilterStatus('SEMUA')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'SEMUA' ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white text-gray-500'}`}>Semua</button>
-                 <button onClick={()=>setFilterStatus('PENDING_BARANG')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'PENDING_BARANG' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white text-gray-500'}`}>Belum Terima</button>
-                 <button onClick={()=>setFilterStatus('HUTANG')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'HUTANG' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white text-gray-500'}`}>Hutang</button>
-                 <button onClick={()=>setFilterStatus('KEMBALIAN')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'KEMBALIAN' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white text-gray-500'}`}>Kembalian</button>
+                 <button onClick={()=>setFilterStatus('SEMUA')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'SEMUA' ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white text-slate-500'}`}>Semua</button>
+                 <button onClick={()=>setFilterStatus('PENDING_BARANG')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'PENDING_BARANG' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white text-slate-500'}`}>Belum Terima</button>
+                 <button onClick={()=>setFilterStatus('HUTANG')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'HUTANG' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white text-slate-500'}`}>Hutang</button>
+                 <button onClick={()=>setFilterStatus('KEMBALIAN')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap flex-shrink-0 ${filterStatus === 'KEMBALIAN' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white text-slate-500'}`}>Kembalian</button>
               </div>
-              <button onClick={loadDistribusi} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><RefreshCw className="w-4 h-4 text-gray-600"/></button>
+              <button onClick={loadDistribusi} className="p-2 bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-4 h-4 text-slate-600"/></button>
            </div>
 
            {/* LIST TRANSAKSI */}
            {loading ? (
                <div className="text-center py-20 bg-white rounded-xl border"><Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-500"/></div>
            ) : listTrx.length === 0 ? (
-               <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed">Data tidak ditemukan.</div>
+               <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-dashed">Data tidak ditemukan.</div>
            ) : (
                <div className="grid grid-cols-1 gap-4">
                   {listTrx.map(trx => (
-                      <div key={trx.id} className="bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+                      <div key={trx.id} className="bg-white p-4 rounded-xl border shadow-sm hover:shadow-sm transition-shadow">
                           {/* Header Card */}
                           <div className="flex justify-between items-start mb-3">
                               <div>
-                                  <h3 className="font-bold text-gray-800 text-lg">{trx.nama_pemesan}</h3>
-                                  <p className="text-xs text-gray-500">{trx.info_tambahan}</p>
+                                  <h3 className="font-bold text-slate-800 text-lg">{trx.nama_pemesan}</h3>
+                                  <p className="text-xs text-slate-500">{trx.info_tambahan}</p>
                               </div>
                               <div className="text-right">
-                                  <span className="text-[10px] text-gray-400 flex items-center gap-1 justify-end">
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-1 justify-end">
                                     <Calendar className="w-3 h-3"/> {format(new Date(trx.created_at), 'dd MMM yy')}
                                   </span>
                                   {trx.sisa_tunggakan === 0 && trx.sisa_kembalian === 0 && trx.item_belum === 0 && (
-                                     <span className="inline-block mt-1 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold">SELESAI</span>
+                                     <span className="inline-block mt-1 text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold">SELESAI</span>
                                   )}
                               </div>
                           </div>
@@ -271,7 +271,7 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
                 {/* Tampilan Desktop: Tabel */}
                 <div className="hidden md:block">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-700 font-bold border-b">
+                        <thead className="bg-slate-50 text-slate-700 font-bold border-b">
                             <tr>
                                 <th className="p-4">Nama Kitab</th>
                                 <th className="p-4">Marhalah</th>
@@ -281,17 +281,17 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
                         </thead>
                         <tbody className="divide-y">
                             {loading ? <tr><td colSpan={4} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></td></tr> : 
-                             rekapGudang.length === 0 ? <tr><td colSpan={4} className="text-center py-10 text-gray-400">Stok Aman.</td></tr> :
+                             rekapGudang.length === 0 ? <tr><td colSpan={4} className="text-center py-10 text-slate-400">Stok Aman.</td></tr> :
                              rekapGudang.map((item: any) => (
-                                 <tr key={item.id} className="hover:bg-gray-50">
-                                     <td className="p-4 font-bold text-gray-800">{item.nama}</td>
-                                     <td className="p-4 text-gray-500">{item.marhalah}</td>
+                                 <tr key={item.id} className="hover:bg-slate-50">
+                                     <td className="p-4 font-bold text-slate-800">{item.nama}</td>
+                                     <td className="p-4 text-slate-500">{item.marhalah}</td>
                                      <td className="p-4 text-center">
                                          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-extrabold text-sm">
                                             {item.total_butuh} Pcs
                                          </span>
                                      </td>
-                                     <td className="p-4 text-center text-gray-500">
+                                     <td className="p-4 text-center text-slate-500">
                                          {item.total_gratis > 0 ? <span className="text-green-600 font-bold">{item.total_gratis} Gratis</span> : '-'}
                                      </td>
                                  </tr>
@@ -304,12 +304,12 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
                 {/* Tampilan Mobile: List Card Simple */}
                 <div className="md:hidden divide-y">
                     {loading ? <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></div> : 
-                     rekapGudang.length === 0 ? <div className="text-center py-10 text-gray-400">Stok Aman.</div> :
+                     rekapGudang.length === 0 ? <div className="text-center py-10 text-slate-400">Stok Aman.</div> :
                      rekapGudang.map((item: any) => (
                          <div key={item.id} className="p-4 flex justify-between items-center">
                              <div>
-                                 <p className="font-bold text-gray-800">{item.nama}</p>
-                                 <p className="text-xs text-gray-500">{item.marhalah}</p>
+                                 <p className="font-bold text-slate-800">{item.nama}</p>
+                                 <p className="text-xs text-slate-500">{item.marhalah}</p>
                                  {item.total_gratis > 0 && <p className="text-[10px] text-green-600 mt-1">Termasuk {item.total_gratis} gratis</p>}
                              </div>
                              <div className="text-right">
@@ -329,12 +329,12 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
       {isModalOpen && selectedTrx && (
          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
-              <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+              <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
                  <div>
-                    <h3 className="text-lg font-bold text-gray-800">Serah Terima Kitab</h3>
-                    <p className="text-xs text-gray-500">{selectedTrx.nama_pemesan}</p>
+                    <h3 className="text-lg font-bold text-slate-800">Serah Terima Kitab</h3>
+                    <p className="text-xs text-slate-500">{selectedTrx.nama_pemesan}</p>
                  </div>
-                 <button onClick={() => setIsModalOpen(false)}><X className="w-5 h-5 text-gray-400"/></button>
+                 <button onClick={() => setIsModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
               </div>
               
               <div className="p-4 overflow-y-auto flex-1 space-y-2">
@@ -345,12 +345,12 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
                         <div 
                             key={item.id} 
                             onClick={() => toggleItemSelection(item.id)}
-                            className={`p-3 border rounded-lg cursor-pointer flex justify-between items-center transition-colors ${selectedItems.includes(item.id) ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                            className={`p-3 border border-slate-200 rounded-xl cursor-pointer flex justify-between items-center transition-colors ${selectedItems.includes(item.id) ? 'bg-blue-50 border-blue-500' : 'hover:bg-slate-50'}`}
                         >
-                            <span className="text-sm font-medium text-gray-700">{item.kitab?.nama_kitab}</span>
+                            <span className="text-sm font-medium text-slate-700">{item.kitab?.nama_kitab}</span>
                             {selectedItems.includes(item.id) 
                                 ? <CheckSquare className="w-5 h-5 text-blue-600"/>
-                                : <Square className="w-5 h-5 text-gray-300"/>
+                                : <Square className="w-5 h-5 text-slate-300"/>
                             }
                         </div>
                     ))
@@ -360,8 +360,8 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
                  )}
               </div>
 
-              <div className="p-4 border-t bg-gray-50 flex gap-2">
-                  <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 text-gray-600 font-bold border rounded-lg hover:bg-gray-100 text-sm">Batal</button>
+              <div className="p-4 border-t bg-slate-50 flex gap-2">
+                  <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 text-slate-600 font-bold border border-slate-200 rounded-xl hover:bg-slate-100 text-sm">Batal</button>
                   <button 
                     onClick={handleProcessSerah} 
                     disabled={isProcessing || selectedItems.length === 0}

@@ -31,20 +31,20 @@ export default function StatusSetoranPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <Home className="w-6 h-6 text-indigo-600"/> Status Setoran Asrama
            </h1>
-           <p className="text-gray-500 text-sm">
+           <p className="text-slate-500 text-sm">
              Rekapitulasi setoran SPP {statusData?.asrama ? `Asrama ${statusData.asrama}` : ''} ke Pusat.
            </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-white border rounded-lg p-1 shadow-sm">
-            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold">-</button>
-            <span className="px-2 font-mono font-bold text-gray-700 flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">-</button>
+            <span className="px-2 font-mono font-bold text-slate-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4"/> {tahun}
             </span>
-            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-gray-100 rounded text-sm font-bold">+</button>
+            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">+</button>
         </div>
       </div>
 

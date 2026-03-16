@@ -146,17 +146,17 @@ export default function MasterKitabPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab & Harga
            </h1>
-           <p className="text-gray-500 text-sm">Database kitab kuning dan harga jual (UPK) per tahun ajaran.</p>
+           <p className="text-slate-500 text-sm">Database kitab kuning dan harga jual (UPK) per tahun ajaran.</p>
         </div>
         
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-           <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+        <div className="flex bg-slate-100 p-1 rounded-lg">
+           <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
              <List className="w-4 h-4"/> Daftar Kitab
            </button>
-           <button onClick={() => setTab('IMPORT')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'IMPORT' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+           <button onClick={() => setTab('IMPORT')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'IMPORT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
              <FileSpreadsheet className="w-4 h-4"/> Import Excel
            </button>
         </div>
@@ -191,29 +191,29 @@ export default function MasterKitabPage() {
             {/* FORM INPUT */}
             <div className="md:col-span-1">
                 <div className="bg-white p-5 rounded-xl border shadow-sm sticky top-4">
-                    <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><Plus className="w-4 h-4"/> Tambah Kitab</h3>
+                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Plus className="w-4 h-4"/> Tambah Kitab</h3>
                     <form onSubmit={handleTambah} className="space-y-3">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nama Kitab</label>
-                            <input name="nama_kitab" required className="w-full p-2 border rounded-lg text-sm" placeholder="Contoh: Jurumiyah"/>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Nama Kitab</label>
+                            <input name="nama_kitab" required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="Contoh: Jurumiyah"/>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Tingkat (Marhalah)</label>
-                            <select name="marhalah_id" required className="w-full p-2 border rounded-lg text-sm bg-white">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Tingkat (Marhalah)</label>
+                            <select name="marhalah_id" required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
                                 <option value="">-- Pilih --</option>
                                 {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Mata Pelajaran</label>
-                            <select name="mapel_id" required className="w-full p-2 border rounded-lg text-sm bg-white">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Mata Pelajaran</label>
+                            <select name="mapel_id" required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
                                 <option value="">-- Pilih --</option>
                                 {mapelList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Harga (Rp)</label>
-                            <input name="harga" type="number" required className="w-full p-2 border rounded-lg text-sm" placeholder="0"/>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Harga (Rp)</label>
+                            <input name="harga" type="number" required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="0"/>
                         </div>
                         <button className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold shadow hover:bg-emerald-700">Simpan</button>
                     </form>
@@ -224,11 +224,11 @@ export default function MasterKitabPage() {
             <div className="md:col-span-2 space-y-4">
                 {/* Filter */}
                 <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
-                    <span className="text-xs font-bold text-gray-500 ml-2">Filter:</span>
+                    <span className="text-xs font-bold text-slate-500 ml-2">Filter:</span>
                     <select 
                         value={filterMarhalah} 
                         onChange={(e) => setFilterMarhalah(e.target.value)}
-                        className="flex-1 bg-transparent text-sm font-bold text-gray-700 outline-none"
+                        className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none"
                     >
                         <option value="">Semua Marhalah</option>
                         {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
@@ -238,7 +238,7 @@ export default function MasterKitabPage() {
                 <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
                     <>
 <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-600 font-bold border-b">
+                        <thead className="bg-slate-50 text-slate-600 font-bold border-b">
                             <tr>
                                 <th className="px-4 py-3">Nama Kitab</th>
                                 <th className="px-4 py-3 text-right">Harga</th>
@@ -247,15 +247,15 @@ export default function MasterKitabPage() {
                         </thead>
                         <tbody className="divide-y">
                             {loading ? (
-                                <tr><td colSpan={3} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400"/></td></tr>
+                                <tr><td colSpan={3} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400"/></td></tr>
                             ) : kitabList.length === 0 ? (
-                                <tr><td colSpan={3} className="text-center py-10 text-gray-400">Belum ada data.</td></tr>
+                                <tr><td colSpan={3} className="text-center py-10 text-slate-400">Belum ada data.</td></tr>
                             ) : (
                                 pagedKitabList.map(k => (
-                                    <tr key={k.id} className="hover:bg-gray-50">
+                                    <tr key={k.id} className="hover:bg-slate-50">
                                         <td className="px-4 py-3">
-                                            <p className="font-bold text-gray-800">{k.nama_kitab}</p>
-                                            <p className="text-xs text-gray-500">{k.marhalah?.nama} • {k.mapel?.nama}</p>
+                                            <p className="font-bold text-slate-800">{k.nama_kitab}</p>
+                                            <p className="text-xs text-slate-500">{k.marhalah?.nama} • {k.mapel?.nama}</p>
                                         </td>
                                         <td className="px-4 py-3 text-right font-mono text-emerald-700 font-bold">
                                             {editingId === k.id ? (
@@ -328,14 +328,14 @@ export default function MasterKitabPage() {
              {excelData.length > 0 && (
                 <div className="bg-white border rounded-xl p-4">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-gray-700 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500"/> Preview ({excelData.length})</h3>
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500"/> Preview ({excelData.length})</h3>
                         <button onClick={handleSimpanImport} disabled={isProcessing} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
                             {isProcessing ? "Menyimpan..." : "Simpan Semua"}
                         </button>
                     </div>
                     <div className="max-h-64 overflow-auto border rounded">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 sticky top-0">
+                            <thead className="bg-slate-100 sticky top-0">
                                 <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Harga</th></tr>
                             </thead>
                             <tbody>

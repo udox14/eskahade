@@ -74,8 +74,8 @@ export default function TarifPage() {
           <Settings className="w-6 h-6"/>
         </div>
         <div>
-           <h1 className="text-2xl font-bold text-gray-800">Pengaturan Tarif Angkatan</h1>
-           <p className="text-gray-500 text-sm">Tentukan besaran biaya masuk & tahunan berdasarkan tahun masuk santri.</p>
+           <h1 className="text-2xl font-bold text-slate-800">Pengaturan Tarif Angkatan</h1>
+           <p className="text-slate-500 text-sm">Tentukan besaran biaya masuk & tahunan berdasarkan tahun masuk santri.</p>
         </div>
       </div>
 
@@ -83,8 +83,8 @@ export default function TarifPage() {
          
          {/* KOLOM KIRI: FORM INPUT */}
          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm sticky top-24">
-                <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-4">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
+                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
                     <Edit className="w-5 h-5 text-emerald-600"/> Edit / Baru
                 </h3>
                 
@@ -92,16 +92,16 @@ export default function TarifPage() {
                     
                     {/* Tahun Selector */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
                         <div className="flex gap-2">
-                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">-</button>
+                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">-</button>
                             <input 
                                 type="number" 
-                                className="flex-1 text-center font-bold text-lg border rounded bg-gray-50 outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="flex-1 text-center font-bold text-lg border rounded bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={tahunInput}
                                 onChange={(e) => setTahunInput(Number(e.target.value))}
                             />
-                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">+</button>
+                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">+</button>
                         </div>
                     </div>
 
@@ -109,7 +109,7 @@ export default function TarifPage() {
 
                     {/* Input Biaya */}
                     {loading ? (
-                        <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400"/></div>
+                        <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
                     ) : (
                         <>
                             <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({...nominal, BANGUNAN: v})} />
@@ -121,7 +121,7 @@ export default function TarifPage() {
 
                     <button 
                         disabled={isSaving || loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
                     >
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
                         SIMPAN TARIF
@@ -134,18 +134,18 @@ export default function TarifPage() {
          {/* KOLOM KANAN: TABEL RIWAYAT */}
          <div className="lg:col-span-2">
             <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                <div className="p-5 bg-gray-50 border-b flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                <div className="p-5 bg-slate-50 border-b flex justify-between items-center">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
                         <History className="w-5 h-5"/> Daftar Tarif Tersimpan
                     </h3>
                 </div>
                 
                 {listTarif.length === 0 ? (
-                    <div className="p-10 text-center text-gray-400 italic">Belum ada data tarif yang diatur.</div>
+                    <div className="p-10 text-center text-slate-400 italic">Belum ada data tarif yang diatur.</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-white text-gray-500 border-b uppercase text-xs">
+                            <thead className="bg-white text-slate-500 border-b uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">Angkatan</th>
                                     <th className="px-6 py-4 text-right">Bangunan</th>
@@ -189,14 +189,14 @@ export default function TarifPage() {
 function InputDuit({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) {
     return (
         <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{label}</label>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-400 font-bold">Rp</span>
+                    <span className="text-slate-400 font-bold">Rp</span>
                 </div>
                 <input 
                     type="text" // Text biar bisa format ribuan kalau mau (tapi raw number dulu biar simpel)
-                    className="w-full pl-10 pr-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
+                    className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
                     value={value}
                     onChange={(e) => onChange(Number(e.target.value))}
                     onFocus={(e) => e.target.select()}

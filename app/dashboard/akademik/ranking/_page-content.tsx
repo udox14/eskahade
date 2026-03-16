@@ -65,20 +65,20 @@ export default function JuaraUmumPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
             <Medal className="w-8 h-8 text-yellow-500" />
             Kejuaraan & Prestasi
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Rekapitulasi dan Cetak Lampiran Juara Umum 1, 2, dan 3 Seluruh Kelas.</p>
+          <p className="text-slate-500 text-sm mt-1">Rekapitulasi dan Cetak Lampiran Juara Umum 1, 2, dan 3 Seluruh Kelas.</p>
         </div>
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-end gap-4">
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-end gap-4">
         <div className="w-full sm:w-auto">
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Pilih Semester EHB</label>
+          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Pilih Semester EHB</label>
           <select 
-            className="w-full p-3 border border-gray-300 rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+            className="w-full p-3 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
           >
@@ -99,7 +99,7 @@ export default function JuaraUmumPage() {
         {rankingData.length > 0 && (
           <button 
             onClick={handlePrint}
-            className="w-full sm:w-auto ml-auto bg-blue-600 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg font-bold"
+            className="w-full sm:w-auto ml-auto bg-blue-600 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm font-bold"
           >
             <Printer className="w-5 h-5"/>
             Cetak PDF / Print
@@ -109,17 +109,17 @@ export default function JuaraUmumPage() {
 
       {/* EMPTY STATE / LOADING */}
       {loading ? (
-         <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-500 mb-3"/> <p className="text-gray-500 font-medium">Memindai data juara...</p></div>
+         <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-500 mb-3"/> <p className="text-slate-500 font-medium">Memindai data juara...</p></div>
       ) : rankingData.length === 0 ? (
-         <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-           <Trophy className="w-14 h-14 text-gray-300 mx-auto mb-3"/>
-           <h3 className="text-lg font-bold text-gray-600">Pilih semester dan klik Tarik Data.</h3>
-           <p className="text-sm text-gray-500">Pastikan Wali Kelas sudah mengkalkulasi ranking di fitur Leger Nilai.</p>
+         <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+           <Trophy className="w-14 h-14 text-slate-300 mx-auto mb-3"/>
+           <h3 className="text-lg font-bold text-slate-600">Pilih semester dan klik Tarik Data.</h3>
+           <p className="text-sm text-slate-500">Pastikan Wali Kelas sudah mengkalkulasi ranking di fitur Leger Nilai.</p>
          </div>
       ) : (
          
          /* PREVIEW AREA (KERTAS F4 SIMULASI NARROW MARGIN) */
-         <div className="bg-gray-200 p-4 md:p-8 rounded-2xl overflow-x-auto shadow-inner border border-gray-300">
+         <div className="bg-slate-200 p-4 md:p-8 rounded-2xl overflow-x-auto shadow-inner border border-slate-300">
             <div className="text-center mb-4">
                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-200">Preview Dokumen Cetak</span>
             </div>
@@ -160,7 +160,7 @@ export default function JuaraUmumPage() {
                 {/* TABEL DATA JUARA */}
                 <table className="w-full border-collapse border border-black">
                     <thead>
-                        <tr className="bg-gray-100">
+                        <tr className="bg-slate-100">
                             <th className="border border-black p-2 w-[5%] text-center">No</th>
                             <th className="border border-black p-2 w-[20%] text-center">Tingkat / Kelas</th>
                             <th className="border border-black p-2 w-[5%] text-center">Juara</th>
@@ -183,7 +183,7 @@ export default function JuaraUmumPage() {
                                 {item.isFirst && (
                                     <td rowSpan={item.rowSpan} className="border border-black p-2 align-top text-center whitespace-nowrap">
                                         <div>{item.kelas_nama}</div>
-                                        <div className="text-[9pt] mt-1 capitalize text-gray-800">{item.wali_kelas}</div>
+                                        <div className="text-[9pt] mt-1 capitalize text-slate-800">{item.wali_kelas}</div>
                                     </td>
                                 )}
                                 

@@ -135,20 +135,20 @@ export default function RekapAsramaPage() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-indigo-600"/> Rekap Absen Asrama
           </h1>
-          <p className="text-sm text-gray-500">Absen malam & shalat berjamaah</p>
+          <p className="text-sm text-slate-500">Absen malam & shalat berjamaah</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
 
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-gray-100 rounded-lg">
+            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-slate-100 rounded-lg">
               <ChevronLeft className="w-4 h-4"/>
             </button>
-            <span className="text-sm font-bold text-gray-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
+            <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
             <button onClick={() => setBulan(b => nextBulan(b))} disabled={bulan >= bulanIni()}
-              className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30">
+              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
               <ChevronRight className="w-4 h-4"/>
             </button>
           </div>
@@ -167,7 +167,7 @@ export default function RekapAsramaPage() {
             onClick={load}
             disabled={loading}
             className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
-              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {loading
@@ -180,14 +180,14 @@ export default function RekapAsramaPage() {
 
       {/* TABS — muncul hanya setelah ada data */}
       {hasLoaded && !loading && (
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
           <button onClick={() => setTab('malam')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
             <Moon className="w-4 h-4"/> Absen Malam
           </button>
           {isPutri && (
             <button onClick={() => setTab('berjamaah')}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-gray-500 hover:text-gray-700'}`}>
+              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-slate-500 hover:text-slate-700'}`}>
               <Sun className="w-4 h-4"/> Berjamaah
             </button>
           )}
@@ -201,8 +201,8 @@ export default function RekapAsramaPage() {
             <BarChart3 className="w-10 h-10 text-indigo-300"/>
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-500">Data belum dimuat</p>
-            <p className="text-sm text-gray-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
+            <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
           <button onClick={load}
             className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow">
@@ -222,8 +222,8 @@ export default function RekapAsramaPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-black text-gray-800">{malamSantri.length}</p>
-                  <p className="text-xs text-gray-400 mt-1">Total Santri</p>
+                  <p className="text-2xl font-black text-slate-800">{malamSantri.length}</p>
+                  <p className="text-xs text-slate-400 mt-1">Total Santri</p>
                 </div>
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
                   <p className="text-2xl font-black text-red-600">
@@ -240,7 +240,7 @@ export default function RekapAsramaPage() {
               </div>
 
               {malamSantri.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 bg-white border rounded-2xl">
+                <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
                   Tidak ada data absen malam untuk periode ini.
                 </div>
               ) : sortedKamars(malamSantri).map(kamar => {
@@ -269,7 +269,7 @@ export default function RekapAsramaPage() {
                             return (
                               <tr key={s.id} className="hover:bg-slate-50">
                                 <td className="px-3 py-2 sticky left-0 bg-white z-10">
-                                  <p className="font-semibold text-gray-800 truncate max-w-[150px]">{s.nama_lengkap}</p>
+                                  <p className="font-semibold text-slate-800 truncate max-w-[150px]">{s.nama_lengkap}</p>
                                 </td>
                                 <td className="px-2 py-2 text-center">
                                   {alfa > 0
@@ -304,7 +304,7 @@ export default function RekapAsramaPage() {
           {tab === 'berjamaah' && (
             <div className="space-y-4">
               {bjSantri.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 bg-white border rounded-2xl">
+                <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
                   Tidak ada data absen berjamaah untuk periode ini.
                 </div>
               ) : (
@@ -316,9 +316,9 @@ export default function RekapAsramaPage() {
                       }, 0)
                       return (
                         <div key={w} className="bg-white border rounded-xl p-3 text-center shadow-sm">
-                          <p className="text-sm text-gray-500 font-semibold capitalize">{w}</p>
+                          <p className="text-sm text-slate-500 font-semibold capitalize">{w}</p>
                           <p className="text-xl font-black text-red-600 tabular-nums">{alfa}</p>
-                          <p className="text-[10px] text-gray-400">alfa bulan ini</p>
+                          <p className="text-[10px] text-slate-400">alfa bulan ini</p>
                         </div>
                       )
                     })}
@@ -359,7 +359,7 @@ export default function RekapAsramaPage() {
                                 return (
                                   <tr key={s.id} className="hover:bg-slate-50">
                                     <td className="px-3 py-2 sticky left-0 bg-white z-10">
-                                      <p className="font-semibold text-gray-800 truncate max-w-[130px]">{s.nama_lengkap}</p>
+                                      <p className="font-semibold text-slate-800 truncate max-w-[130px]">{s.nama_lengkap}</p>
                                     </td>
                                     {WAKTU.map(w => {
                                       const a = counts[w]['A'] || 0
@@ -390,7 +390,7 @@ export default function RekapAsramaPage() {
                                               const st = dayData?.[w]
                                               if (!st) return null
                                               return (
-                                                <span key={w} className={`inline-block text-[8px] font-black w-4 h-4 rounded leading-4 text-center ${STATUS_COLOR[st] || 'bg-gray-200 text-gray-600'}`}>
+                                                <span key={w} className={`inline-block text-[8px] font-black w-4 h-4 rounded leading-4 text-center ${STATUS_COLOR[st] || 'bg-slate-200 text-slate-600'}`}>
                                                   {st}
                                                 </span>
                                               )

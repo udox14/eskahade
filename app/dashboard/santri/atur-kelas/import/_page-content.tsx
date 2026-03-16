@@ -79,12 +79,12 @@ export default function ImportKelasPage() {
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
       <div className="flex items-center gap-4">
         {/* FIX: Ganti Link href ke button router.back() */}
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Import Batch Penempatan Kelas</h1>
-          <p className="text-gray-500 text-sm">Upload hasil rapat pembagian kelas (Excel).</p>
+          <h1 className="text-2xl font-bold text-slate-800">Import Batch Penempatan Kelas</h1>
+          <p className="text-slate-500 text-sm">Upload hasil rapat pembagian kelas (Excel).</p>
         </div>
       </div>
 
@@ -101,17 +101,17 @@ export default function ImportKelasPage() {
         </div>
 
         {/* Step 2 */}
-        <div className="mb-6 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center relative hover:bg-gray-50 transition-colors">
+        <div className="mb-6 border-2 border-dashed border-slate-300 rounded-lg p-8 text-center relative hover:bg-slate-50 transition-colors">
             <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-            <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-600">Klik untuk upload Excel hasil rapat</p>
+            <Upload className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-600">Klik untuk upload Excel hasil rapat</p>
         </div>
 
         {/* Step 3: Preview */}
         {excelData.length > 0 && (
           <div className="animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600"/> Preview ({excelData.length} Data)
               </h3>
               <button onClick={handleSimpan} disabled={isProcessing} className="bg-green-700 text-white px-6 py-2 rounded hover:bg-green-800 disabled:opacity-50 flex items-center gap-2 font-bold shadow-sm">
@@ -119,14 +119,14 @@ export default function ImportKelasPage() {
                 {isProcessing ? "Memproses..." : "Eksekusi Penempatan"}
               </button>
             </div>
-            <div className="bg-gray-50 p-0 rounded-lg h-64 overflow-y-auto border border-gray-200">
+            <div className="bg-slate-50 p-0 rounded-lg h-64 overflow-y-auto border border-slate-200">
               <table className="w-full text-sm text-left">
-                <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0">
+                <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0">
                   <tr><th className="py-2 px-4 border-b">NIS</th><th className="py-2 px-4 border-b">Target Kelas</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {excelData.map((row, i) => (
-                    <tr key={i} className="bg-white hover:bg-gray-50">
+                    <tr key={i} className="bg-white hover:bg-slate-50">
                       <td className="py-2 px-4 font-mono text-xs">{row.nis}</td>
                       <td className="py-2 px-4 font-medium">{row.nama_kelas}</td>
                     </tr>

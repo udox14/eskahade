@@ -2,6 +2,7 @@
 
 import { execute, query } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { revalidateTag } from 'next/cache'
 
 const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
 
@@ -17,6 +18,7 @@ export async function toggleFiturActive(id: number, currentActive: boolean) {
   await assertAdmin()
   const newVal = currentActive ? 0 : 1
   await execute('UPDATE fitur_akses SET is_active = ?, updated_at = datetime(\'now\') WHERE id = ?', [newVal, id])
+  revalidateTag('fitur-akses', 'everything')
   return { success: true }
 }
 
@@ -35,6 +37,7 @@ export async function addRoleToFitur(id: number, role: string) {
       'UPDATE fitur_akses SET roles = ?, updated_at = datetime(\'now\') WHERE id = ?',
       [JSON.stringify(roles), id]
     )
+    revalidateTag('fitur-akses', 'everything')
   }
   return { success: true }
 }
@@ -53,6 +56,7 @@ export async function removeRoleFromFitur(id: number, role: string) {
     'UPDATE fitur_akses SET roles = ?, updated_at = datetime(\'now\') WHERE id = ?',
     [JSON.stringify(newRoles), id]
   )
+  revalidateTag('fitur-akses', 'everything')
   return { success: true }
 }
 

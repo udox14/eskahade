@@ -185,16 +185,16 @@ export default function LoketPembayaranPage() {
         <div className="flex items-center gap-4">
             <div className="bg-indigo-100 p-3 rounded-full text-indigo-700"><Coins className="w-6 h-6"/></div>
             <div>
-                <h1 className="text-2xl font-bold text-gray-800">Loket Keuangan Pusat</h1>
-                <p className="text-gray-500 text-sm">Penerimaan Uang Bangunan & Tagihan Tahunan.</p>
+                <h1 className="text-2xl font-bold text-slate-800">Loket Keuangan Pusat</h1>
+                <p className="text-slate-500 text-sm">Penerimaan Uang Bangunan & Tagihan Tahunan.</p>
             </div>
         </div>
         
         {/* TAHUN SELECTOR GLOBAL */}
         <div className="flex items-center gap-2 bg-white border p-1 rounded-lg shadow-sm">
-            <button onClick={() => setTahunTagihan(t => t - 1)} className="px-3 py-1 hover:bg-gray-100 rounded font-bold text-gray-600">-</button>
+            <button onClick={() => setTahunTagihan(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">-</button>
             <span className="font-mono font-bold text-indigo-700 px-2">{tahunTagihan}</span>
-            <button onClick={() => setTahunTagihan(t => t + 1)} className="px-3 py-1 hover:bg-gray-100 rounded font-bold text-gray-600">+</button>
+            <button onClick={() => setTahunTagihan(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">+</button>
         </div>
       </div>
 
@@ -205,11 +205,11 @@ export default function LoketPembayaranPage() {
             {/* Filter Bar */}
             <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full md:flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cari Nama / NIS</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari Nama / NIS</label>
                     <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                         <input 
-                            className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                             placeholder="Ketik nama santri..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
@@ -219,9 +219,9 @@ export default function LoketPembayaranPage() {
                 </div>
 
                 <div className="w-full md:w-1/4">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Asrama</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Asrama</label>
                     <select 
-                        className="w-full p-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                         value={filterAsrama}
                         onChange={e => { setFilterAsrama(e.target.value); setFilterKamar('SEMUA') }}
                     >
@@ -231,9 +231,9 @@ export default function LoketPembayaranPage() {
                 </div>
 
                 <div className="w-full md:w-1/6">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Kamar</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kamar</label>
                     <select 
-                        className="w-full p-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                         value={filterKamar}
                         onChange={e => setFilterKamar(e.target.value)}
                     >
@@ -254,16 +254,16 @@ export default function LoketPembayaranPage() {
             {/* Tabel Santri */}
             <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
                 {!hasLoaded ? (
-                    <div className="py-20 text-center text-gray-400">
-                        <Filter className="w-12 h-12 mx-auto mb-3 text-gray-300"/>
+                    <div className="py-20 text-center text-slate-400">
+                        <Filter className="w-12 h-12 mx-auto mb-3 text-slate-300"/>
                         <p>Silakan gunakan filter di atas untuk menampilkan data.</p>
                     </div>
                 ) : dataList.length === 0 ? (
-                    <div className="py-20 text-center text-gray-400">Data tidak ditemukan.</div>
+                    <div className="py-20 text-center text-slate-400">Data tidak ditemukan.</div>
                 ) : (
                     <>
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-600 font-bold border-b">
+                        <thead className="bg-slate-50 text-slate-600 font-bold border-b">
                             <tr>
                                 <th className="px-6 py-3">Nama Santri</th>
                                 <th className="px-6 py-3 text-center">Bangunan</th>
@@ -275,8 +275,8 @@ export default function LoketPembayaranPage() {
                             {pagedDataList.map((s) => (
                                 <tr key={s.id} onClick={() => handleSelect(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
                                     <td className="px-6 py-3">
-                                        <p className="font-bold text-gray-800">{s.nama_lengkap}</p>
-                                        <p className="text-xs text-gray-500">{s.asrama} - Kamar {s.kamar}</p>
+                                        <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
+                                        <p className="text-xs text-slate-500">{s.asrama} - Kamar {s.kamar}</p>
                                     </td>
                                     
                                     {/* STATUS BANGUNAN */}
@@ -284,7 +284,7 @@ export default function LoketPembayaranPage() {
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
                                             s.status_bangunan === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' :
                                             s.status_bangunan === 'CICIL' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                            'bg-gray-100 text-gray-500 border-gray-200'
+                                            'bg-slate-100 text-slate-500 border-slate-200'
                                         }`}>
                                             {s.status_bangunan}
                                         </span>
@@ -325,7 +325,7 @@ export default function LoketPembayaranPage() {
          <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
             
             {/* Tombol Kembali */}
-            <button onClick={handleBackToList} className="text-gray-500 hover:text-indigo-600 flex items-center gap-2 text-sm font-bold mb-4">
+            <button onClick={handleBackToList} className="text-slate-500 hover:text-indigo-600 flex items-center gap-2 text-sm font-bold mb-4">
                 <ArrowLeft className="w-4 h-4"/> Kembali ke Daftar
             </button>
 
@@ -334,8 +334,8 @@ export default function LoketPembayaranPage() {
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600"><User className="w-6 h-6"/></div>
                     <div>
-                        <h2 className="font-bold text-xl text-gray-800">{selectedSantri.nama_lengkap}</h2>
-                        <div className="flex gap-3 text-sm text-gray-500 mt-1">
+                        <h2 className="font-bold text-xl text-slate-800">{selectedSantri.nama_lengkap}</h2>
+                        <div className="flex gap-3 text-sm text-slate-500 mt-1">
                             <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> Angkatan {selectedSantri.tahun_masuk_fix}</span>
                             <span className="flex items-center gap-1"><Home className="w-3 h-3"/> {selectedSantri.asrama}</span>
                         </div>
@@ -361,23 +361,23 @@ export default function LoketPembayaranPage() {
                         <div className="p-6">
                             <div className="mb-4">
                                 <div className="flex justify-between text-sm mb-1">
-                                    <span className="text-gray-500">Terbayar</span>
-                                    <span className="font-bold text-gray-800">
+                                    <span className="text-slate-500">Terbayar</span>
+                                    <span className="font-bold text-slate-800">
                                         {Math.round((infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100)}%
                                     </span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3">
+                                <div className="w-full bg-slate-100 rounded-full h-3">
                                     <div className="bg-indigo-600 h-3 rounded-full transition-all duration-1000" style={{ width: `${(infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100}%` }}></div>
                                 </div>
                             </div>
                             
                             <div className="flex justify-between text-sm mb-6 border-b pb-4">
                                 <div>
-                                    <p className="text-gray-400 text-xs uppercase">Total Wajib</p>
+                                    <p className="text-slate-400 text-xs uppercase">Total Wajib</p>
                                     <p className="font-bold">Rp {infoTagihan.bangunan.total_wajib.toLocaleString()}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-gray-400 text-xs uppercase">Sisa Tagihan</p>
+                                    <p className="text-slate-400 text-xs uppercase">Sisa Tagihan</p>
                                     <p className="font-bold text-red-600">Rp {infoTagihan.bangunan.sisa.toLocaleString()}</p>
                                 </div>
                             </div>
@@ -428,10 +428,10 @@ export default function LoketPembayaranPage() {
                             {['KESEHATAN', 'EHB', 'EKSKUL'].map(jenis => {
                                 const data = infoTagihan.tahunan[jenis]
                                 return (
-                                    <div key={jenis} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                    <div key={jenis} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                                         <div>
-                                            <p className="font-bold text-gray-700">{jenis === 'EHB' ? 'EHB (Ujian)' : jenis}</p>
-                                            <p className="text-xs text-gray-500">Tarif: Rp {data.nominal.toLocaleString()}</p>
+                                            <p className="font-bold text-slate-700">{jenis === 'EHB' ? 'EHB (Ujian)' : jenis}</p>
+                                            <p className="text-xs text-slate-500">Tarif: Rp {data.nominal.toLocaleString()}</p>
                                         </div>
                                         
                                         {data.lunas ? (
@@ -458,7 +458,7 @@ export default function LoketPembayaranPage() {
                                 <button 
                                     onClick={handleLunasTahunanSemua}
                                     disabled={isProcessing}
-                                    className="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-md"
+                                    className="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-sm"
                                 >
                                     <Zap className="w-4 h-4 text-yellow-300"/> BAYAR LUNAS SEMUA (TAHUNAN)
                                 </button>
@@ -484,7 +484,7 @@ export default function LoketPembayaranPage() {
 
 function BadgeItem({ label, active }: { label: string, active: boolean }) {
     return (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${active ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${active ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
             {label}
         </span>
     )
