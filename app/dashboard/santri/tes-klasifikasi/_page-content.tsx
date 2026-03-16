@@ -48,7 +48,7 @@ export default function TesKlasifikasiPage() {
     setLoading(true)
     try {
       const res = await getSantriBaru({ search: s, page: pg, filterStatus: f, asrama: a !== 'SEMUA' ? a : undefined })
-      setRows(res.rows)
+      setRows(res.rows as Santri[])
       setTotal(res.total)
       setTotalPages(res.totalPages)
       setPage(pg)
