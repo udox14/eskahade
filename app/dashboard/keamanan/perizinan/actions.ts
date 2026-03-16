@@ -23,9 +23,9 @@ export async function getPerizinanList(filterWaktu: 'HARI' | 'MINGGU' | 'BULAN' 
   const startISO = startDate.toISOString()
 
   return query<any>(`
-    SELECT p.id, p.created_at, p.status, p.jenis, p.alasan,
+    SELECT p.id, p.created_at, p.status, p.jenis, p.alasan, p.pemberi_izin,
            p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual,
-           s.nama_lengkap, s.nis, s.asrama, s.kamar
+           s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE p.status = 'AKTIF'
@@ -95,4 +95,14 @@ export async function cariSantri(keyword: string) {
     WHERE nama_lengkap LIKE ?
     LIMIT 5
   `, [`%${keyword}%`])
+}
+
+export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role)) {
+    return { error: 'Akses ditolak' }
+  }
+  await execute('DELETE FROM perizinan WHERE id = ?', [id])
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true }
 }

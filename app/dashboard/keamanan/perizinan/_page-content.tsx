@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri } from './actions'
-import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin } from './actions'
+import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
@@ -35,6 +35,7 @@ export default function PerizinanPage() {
   const [isOpenReturn, setIsOpenReturn] = useState(false)
   const [selectedReturnId, setSelectedReturnId] = useState('')
   const [waktuKembali, setWaktuKembali] = useState(new Date().toISOString().slice(0, 16))
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -84,6 +85,16 @@ export default function PerizinanPage() {
       setHasilCari([]) 
       loadData()
     }
+  }
+
+  const handleHapus = async (item: any) => {
+    if (!confirm(`Hapus data izin ${item.nama}?`)) return
+    setDeletingId(item.id)
+    const res = await hapusIzin(item.id)
+    setDeletingId(null)
+    if ('error' in res) { toast.error('Gagal hapus', { description: (res as any).error }); return }
+    toast.success('Data izin dihapus')
+    setList(prev => prev.filter(i => i.id !== item.id))
   }
 
   const openReturnModal = (item: any) => {
@@ -159,20 +170,21 @@ export default function PerizinanPage() {
                 <th className="px-4 py-3">Jenis & Alasan</th>
                 <th className="px-4 py-3">Waktu</th>
                 <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Hapus</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={4} className="py-12 text-center text-slate-400"><Clock className="w-6 h-6 animate-spin mx-auto mb-2"/>Memuat...</td></tr>
+                <tr><td colSpan={5} className="py-12 text-center text-slate-400"><Clock className="w-6 h-6 animate-spin mx-auto mb-2"/>Memuat...</td></tr>
               ) : list.length === 0 ? (
-                <tr><td colSpan={4} className="py-12 text-center text-slate-400">Tidak ada data perizinan untuk periode ini.</td></tr>
+                <tr><td colSpan={5} className="py-12 text-center text-slate-400">Tidak ada data perizinan untuk periode ini.</td></tr>
               ) : (
                 pagedList.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                     {/* 1. SANTRI */}
                     <td className="px-4 py-3">
                       <p className="font-bold text-slate-800">{item.nama}</p>
-                      <p className="text-xs text-slate-500">{item.asrama} • {item.kelas}</p>
+                      <p className="text-xs text-slate-500">{item.asrama} / {item.kamar}</p>
                     </td>
 
                     {/* 2. JENIS & ALASAN */}
@@ -191,16 +203,16 @@ export default function PerizinanPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col text-xs">
                         <span className="text-slate-500 flex items-center gap-1">
-                          Pergi: <span className="font-medium text-slate-900">{format(new Date(item.tgl_mulai), 'dd/MM HH:mm')}</span>
+                          Pergi: <span className="font-medium text-slate-900">{format(new Date(item.tgl_mulai), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
                         </span>
                         {item.tgl_kembali_aktual ? (
                           <span className={`flex items-center gap-1 font-bold mt-1 ${item.status === 'AKTIF' ? 'text-orange-600' : 'text-green-600'}`}>
-                            Tiba: {format(new Date(item.tgl_kembali_aktual), 'dd/MM HH:mm')}
+                            Tiba: {format(new Date(item.tgl_kembali_aktual), 'dd MMM yyyy, HH:mm', { locale: id })}
                             {item.status === 'AKTIF' && ' (Telat)'}
                           </span>
                         ) : (
                           <span className="text-red-500 flex items-center gap-1 mt-1">
-                            Batas: {format(new Date(item.tgl_selesai_rencana), 'dd/MM HH:mm')}
+                            Batas: {format(new Date(item.tgl_selesai_rencana), 'dd MMM yyyy, HH:mm', { locale: id })}
                           </span>
                         )}
                       </div>
@@ -230,7 +242,17 @@ export default function PerizinanPage() {
                         </span>
                       )}
                     </td>
-
+                    {/* HAPUS */}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleHapus(item)}
+                        disabled={deletingId === item.id}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+                        title="Hapus data izin"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

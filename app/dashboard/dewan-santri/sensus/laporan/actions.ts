@@ -27,13 +27,32 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
      FROM santri WHERE status_global = 'aktif'`, []
   )
 
-  const mutasiKeluarRaw = await query<any>(`
-    SELECT rs.created_at, rs.detail_info,
-           s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.alamat
-    FROM riwayat_surat rs
-    JOIN santri s ON s.id = rs.santri_id
-    WHERE rs.jenis_surat = 'BERHENTI' AND rs.created_at >= ? AND rs.created_at <= ?
-  `, [startDate, endDate])
+  // Sumber mutasi keluar:
+  // 1. santri.tanggal_keluar dalam bulan ini — data dari fitur Santri Keluar (baru)
+  //    alasan_keluar langsung dipakai sebagai keterangan
+  // 2. riwayat_surat BERHENTI — fallback untuk data lama atau santri yang belum pakai fitur baru
+  // Dua query parallel (Promise.all), digabung di memory
+  const [keluarBaru, keluarLama] = await Promise.all([
+    query<any>(`
+      SELECT s.tanggal_keluar   AS created_at,
+             s.alasan_keluar    AS detail_info,
+             s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.alamat
+      FROM santri s
+      WHERE s.status_global = 'keluar'
+        AND s.tanggal_keluar >= ? AND s.tanggal_keluar <= ?
+    `, [startDate.slice(0, 10), endDate.slice(0, 10)]),
+
+    query<any>(`
+      SELECT rs.created_at, rs.detail_info,
+             s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.alamat
+      FROM riwayat_surat rs
+      JOIN santri s ON s.id = rs.santri_id
+      WHERE rs.jenis_surat = 'BERHENTI'
+        AND rs.created_at >= ? AND rs.created_at <= ?
+        AND s.status_global != 'keluar'
+    `, [startDate, endDate]),
+  ])
+  const mutasiKeluarRaw = [...keluarBaru, ...keluarLama]
 
   const mutasiMasuk = santriList.filter((s: any) => s.created_at >= startDate && s.created_at <= endDate)
 
