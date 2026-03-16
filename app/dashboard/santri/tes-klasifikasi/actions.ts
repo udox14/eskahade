@@ -68,7 +68,7 @@ export async function getSantriBaru(params: {
       jk:    s.jenis_kelamin,
       asrama: s.asrama,
       kamar:  s.kamar,
-      status_tes: s.hasil_id ? 'SUDAH' : 'BELUM',
+      status_tes: (s.hasil_id ? 'SUDAH' : 'BELUM') as 'SUDAH' | 'BELUM',
       hasil: s.hasil_id ? {
         id:                   s.hasil_id,
         rekomendasi_marhalah: s.rekomendasi_marhalah,
