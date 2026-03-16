@@ -281,7 +281,7 @@ function TabMonitoring({
 
       {/* Tombol muat */}
       <div className="flex justify-end">
-        <button onClick={load} disabled={loading}
+        <button onClick={() => load()} disabled={loading}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Memuat...' : 'Perbarui'}
@@ -300,7 +300,7 @@ function TabMonitoring({
             <TrendingUp className="w-7 h-7 text-emerald-300" />
           </div>
           <p className="text-slate-500 font-semibold">Pilih bulan & tahun</p>
-          <button onClick={load} className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700">
+          <button onClick={() => load()} className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700">
             Tampilkan
           </button>
         </div>
@@ -656,7 +656,7 @@ function TabPenunggak({ tahun, bulan }: { tahun: number; bulan: number }) {
                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
           </div>
-          <button onClick={load} disabled={loading}
+          <button onClick={() => load(1)} disabled={loading}
             className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2">
             <Filter className="w-4 h-4" />
             {loading ? 'Memuat...' : 'Tampilkan'}
