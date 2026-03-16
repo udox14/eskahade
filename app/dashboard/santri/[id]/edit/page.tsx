@@ -11,7 +11,7 @@ type Props = {
 }
 
 const GOL_DARAH = ['A', 'B', 'AB', 'O']
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORI"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "SADESA", "LAINNYA"]
 
 const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
@@ -150,13 +150,6 @@ export default async function EditSantriPage({ params }: Props) {
             <h3 className="font-bold text-purple-800 text-sm uppercase tracking-wide">Data Pesantren</h3>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Status</label>
-              <select name="status_global" defaultValue={s.status_global || 'aktif'} className={inputCls + " bg-white"}>
-                <option value="aktif">Aktif</option>
-                <option value="arsip">Arsip</option>
-              </select>
-            </div>
             <div>
               <label className={labelCls}>Asrama</label>
               <select name="asrama" defaultValue={s.asrama || ''} className={inputCls + " bg-white"}>

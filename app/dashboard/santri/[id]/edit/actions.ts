@@ -15,7 +15,7 @@ export async function updateSantri(id: string, formData: FormData) {
   await query(
     `UPDATE santri SET
       nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
-      jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?, status_global = ?,
+      jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?,
       gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
       jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
       sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
@@ -25,7 +25,7 @@ export async function updateSantri(id: string, formData: FormData) {
       formData.get('tempat_lahir') || null, formData.get('tanggal_lahir') || null,
       formData.get('jenis_kelamin'),
       formData.get('nama_ayah') || null, formData.get('nama_ibu') || null,
-      formData.get('alamat') || null, formData.get('status_global'),
+      formData.get('alamat') || null,
       formData.get('gol_darah') || null,
       formData.get('alamat_lengkap') || null,
       formData.get('kecamatan') || null,
