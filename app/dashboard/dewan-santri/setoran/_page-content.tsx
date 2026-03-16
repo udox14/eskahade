@@ -11,7 +11,7 @@ import {
   Banknote, RefreshCw, UserCheck, UserX, ArrowLeftRight, Pencil, X, Check,
   Settings, Download, FileSpreadsheet, Printer, Search, Filter,
   TrendingUp, ShieldCheck, CalendarCheck, Clock, BadgeCheck, SendHorizonal,
-  ChevronDown, ChevronLeft, ChevronRight
+  ChevronDown
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
