@@ -223,7 +223,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
         )}
       </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {groupedMenu.map(({ group, items }) => {
 
           if (group === '_standalone') {
@@ -237,7 +237,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                     onClick={onMobileClose}
                     className={cn(
                       "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
-                      isCollapsed ? "justify-center p-2.5 mb-1" : "justify-start px-4 py-3 mb-1",
+                      isCollapsed ? "justify-center p-2.5 mb-1" : "justify-start px-3 py-2 mb-0.5",
                       isActive
                         ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
                         : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
@@ -246,12 +246,12 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                     <div className="flex items-center space-x-3">
                       <Icon className={cn(
                         "flex-shrink-0 transition-all duration-300",
-                        isCollapsed ? "w-5 h-5" : "w-5 h-5",
+                        isCollapsed ? "w-4 h-4" : "w-4 h-4",
                         isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
                       )} />
                       {!isCollapsed && (
                         <span className={cn(
-                          "text-sm tracking-wide transition-colors duration-300",
+                          "text-xs tracking-normal transition-colors duration-300",
                           isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
                         )}>
                           {fitur.title}
@@ -274,7 +274,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                 onClick={() => toggleFolder(group)}
                 className={cn(
                   "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
-                  isCollapsed ? "justify-center p-2.5 mb-1" : "justify-between px-4 py-3 mb-1",
+                  isCollapsed ? "justify-center p-2.5 mb-1" : "justify-between px-3 py-2 mb-0.5",
                   hasActiveChild && !isOpen && isCollapsed
                     ? `${c.folderActiveBg} text-white shadow-lg border`
                     : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1`,
@@ -286,12 +286,12 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                 <div className="flex items-center space-x-3">
                   <GroupIcon className={cn(
                     "flex-shrink-0 transition-all duration-300",
-                    isCollapsed ? "w-5 h-5" : "w-5 h-5",
+                    isCollapsed ? "w-4 h-4" : "w-4 h-4",
                     hasActiveChild ? c.glowText : `opacity-80 group-hover:text-white group-hover:opacity-100`
                   )} />
                   {!isCollapsed && (
                     <span className={cn(
-                      "font-semibold text-sm tracking-wide transition-colors",
+                      "font-semibold text-xs tracking-normal transition-colors",
                       hasActiveChild || isOpen ? "text-white" : `${c.mutedText} group-hover:text-white`
                     )}>
                       {group}
@@ -314,7 +314,7 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                   "overflow-hidden transition-all duration-300 ease-in-out",
                   isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
                 )}>
-                  <div className="pl-4 space-y-1.5 relative before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 before:rounded-full">
+                  <div className="pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 before:rounded-full">
                     {items.map((fitur) => {
                       const ItemIcon = getIcon(fitur.icon);
                       const isActive = pathname === fitur.href;
@@ -324,14 +324,14 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                           href={fitur.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center pl-7 pr-4 py-2.5 rounded-r-xl text-sm transition-all duration-300 relative group overflow-hidden",
+                            "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-300 relative group overflow-hidden",
                             isActive
                               ? `text-white ${c.activeBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${c.indicator}`
                               : `${c.mutedText} hover:text-white ${c.hoverBg} font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-white/20 before:rounded-full hover:before:bg-white/60`
                           )}
                         >
                           <ItemIcon className={cn(
-                            "w-4 h-4 mr-3 flex-shrink-0 transition-all duration-300",
+                            "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-300",
                             isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
                           )} />
                           <span className="truncate">{fitur.title}</span>
