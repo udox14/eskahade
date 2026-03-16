@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Info, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import {
@@ -12,7 +11,7 @@ import {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight
+  Flame, ClipboardList, ToggleRight, ChevronRight
 } from 'lucide-react'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
@@ -31,7 +30,6 @@ function getIcon(name: string): React.ElementType {
 
 // ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
 const FITUR_DESC: Record<string, string> = {
-  '/dashboard':                                      'Halaman utama — beranda aplikasi ESKAHADE.',
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
   '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
   '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
@@ -43,7 +41,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/asrama/absen-sakit':                   'Input data santri yang sakit dan tidak bisa mengikuti kegiatan.',
   '/dashboard/asrama/layanan':                       'Kelola data katering (tempat makan) dan laundry santri.',
   '/dashboard/keamanan/perizinan':                   'Input dan pantau perizinan pulang atau keluar komplek santri.',
-  '/dashboard/keamanan/perizinan/cetak-telat':       'Cetak daftar santri yang terlambat kembali untuk ditempel di mading.',
+  '/dashboard/keamanan/perizinan/cetak-telat':       'Cetak daftar santri yang terlambat kembali.',
   '/dashboard/keamanan/perizinan/verifikasi-telat':  'Proses sidang dan vonis santri yang terlambat datang.',
   '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per bulan.',
   '/dashboard/keamanan':                             'Input pelanggaran dan kelola catatan disiplin santri.',
@@ -55,19 +53,20 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/leger':                       'Lihat rekap nilai lengkap seluruh santri dalam satu kelas.',
   '/dashboard/akademik/ranking':                     'Lihat peringkat dan prestasi santri per kelas.',
   '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
-  '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan (rapel).',
+  '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
   '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode dan filter.',
   '/dashboard/akademik/absensi/verifikasi':          'Verifikasi dan proses sidang alfa santri mingguan.',
   '/dashboard/akademik/absensi/cetak':               'Cetak surat pemanggilan untuk santri yang banyak alfa.',
   '/dashboard/akademik/absensi/cetak-blanko':        'Cetak blanko absen kosong untuk diisi manual di kelas.',
   '/dashboard/akademik/absensi-guru':                'Catat kehadiran guru pengajar setiap pertemuan.',
   '/dashboard/akademik/absensi-guru/rekap':          'Lihat rekap kinerja kehadiran guru per periode.',
-  '/dashboard/keuangan/pembayaran':                  'Loket pembayaran — proses tagihan santri dari berbagai sumber.',
+  '/dashboard/keuangan/pembayaran':                  'Loket pembayaran — proses tagihan santri.',
   '/dashboard/keuangan/laporan':                     'Laporan arus kas, pemasukan, dan tunggakan keuangan.',
   '/dashboard/asrama/spp':                           'Input dan pantau pembayaran SPP bulanan per asrama.',
   '/dashboard/asrama/uang-jajan':                    'Kelola saldo dan pengeluaran uang jajan harian santri.',
   '/dashboard/asrama/status-setoran':                'Lihat status setoran SPP asrama binaan Anda.',
   '/dashboard/dewan-santri/setoran':                 'Monitor status setoran SPP dari semua asrama.',
+  '/dashboard/dewan-santri/uang-jajan':              'Pantau saldo & topup uang jajan santri per asrama.',
   '/dashboard/keuangan/tarif':                       'Atur nominal biaya masuk dan SPP per angkatan.',
   '/dashboard/akademik/upk/kasir':                   'Kasir UPK — proses pembelian kitab dan kebutuhan santri.',
   '/dashboard/akademik/upk/manajemen':               'Kelola stok, harga, dan transaksi toko UPK pesantren.',
@@ -82,103 +81,68 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/pengaturan/fitur-akses':               'Atur fitur apa saja yang bisa diakses oleh tiap role.',
 }
 
-// ── Warna per grup ────────────────────────────────────────────────────────────
-const GROUP_STYLE: Record<string, { header: string; card: string; icon: string; badge: string }> = {
-  '_standalone':  { header: 'text-slate-700',  card: 'hover:border-slate-400 hover:bg-slate-50',  icon: 'bg-slate-100 text-slate-600',    badge: 'bg-slate-100 text-slate-600' },
-  'Kesantrian':   { header: 'text-orange-700', card: 'hover:border-orange-300 hover:bg-orange-50', icon: 'bg-orange-100 text-orange-600',  badge: 'bg-orange-100 text-orange-700' },
-  'Pengkelasan':  { header: 'text-blue-700',   card: 'hover:border-blue-300 hover:bg-blue-50',    icon: 'bg-blue-100 text-blue-600',      badge: 'bg-blue-100 text-blue-700' },
-  'Nilai & Rapor':{ header: 'text-purple-700', card: 'hover:border-purple-300 hover:bg-purple-50', icon: 'bg-purple-100 text-purple-600', badge: 'bg-purple-100 text-purple-700' },
-  'Absensi':      { header: 'text-teal-700',   card: 'hover:border-teal-300 hover:bg-teal-50',    icon: 'bg-teal-100 text-teal-600',      badge: 'bg-teal-100 text-teal-700' },
-  'Keuangan':     { header: 'text-green-700',  card: 'hover:border-green-300 hover:bg-green-50',  icon: 'bg-green-100 text-green-600',    badge: 'bg-green-100 text-green-700' },
-  'UPK':          { header: 'text-amber-700',  card: 'hover:border-amber-300 hover:bg-amber-50',  icon: 'bg-amber-100 text-amber-600',    badge: 'bg-amber-100 text-amber-700' },
-  'Master Data':  { header: 'text-rose-700',   card: 'hover:border-rose-300 hover:bg-rose-50',    icon: 'bg-rose-100 text-rose-600',      badge: 'bg-rose-100 text-rose-700' },
+// ── Accent per grup — hanya dot + garis, bukan badge ─────────────────────────
+const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
+  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
+  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
+  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
+  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
+  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
+  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
+  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
+  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  admin: 'Administrator', keamanan: 'Keamanan', sekpen: 'Sekretaris Pendidikan',
+  admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
   dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama',
   wali_kelas: 'Wali Kelas', bendahara: 'Bendahara',
 }
 
+const ROLE_EMOJI: Record<string, string> = {
+  admin: '🛡️', keamanan: '🔐', sekpen: '📋',
+  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰',
+}
+
 const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'Master Data']
 
-// ── Greeting ──────────────────────────────────────────────────────────────────
 function getGreeting(hour: number) {
-  if (hour >= 4  && hour < 11) return { text: 'Selamat Pagi',  emoji: '🌅' }
-  if (hour >= 11 && hour < 15) return { text: 'Selamat Siang', emoji: '☀️' }
-  if (hour >= 15 && hour < 18) return { text: 'Selamat Sore',  emoji: '🌤️' }
-  return { text: 'Selamat Malam', emoji: '🌙' }
+  if (hour >= 4  && hour < 11) return { text: 'Selamat Pagi',  sub: 'Semoga hari ini penuh berkah.', emoji: '🌅' }
+  if (hour >= 11 && hour < 15) return { text: 'Selamat Siang', sub: 'Jangan lupa istirahat sejenak.', emoji: '☀️' }
+  if (hour >= 15 && hour < 18) return { text: 'Selamat Sore',  sub: 'Semangat menyelesaikan tugas.', emoji: '🌤️' }
+  return { text: 'Selamat Malam', sub: 'Istirahat yang cukup ya.', emoji: '🌙' }
 }
 
 function formatTanggal(date: Date) {
   return date.toLocaleDateString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-interface Props {
-  userName: string
-  userRole: string
-  fiturAkses: FiturAkses[]
-}
+interface Props { userName: string; userRole: string; fiturAkses: FiturAkses[] }
 
-// ── Feature Card ──────────────────────────────────────────────────────────────
-function FeatureCard({ fitur, style }: { fitur: FiturAkses; style: typeof GROUP_STYLE[string] }) {
-  const [showInfo, setShowInfo] = useState(false)
+// ── Feature Card — clean minimal, no icon badge ───────────────────────────────
+function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROUP_ACCENT[string] }) {
   const Icon = getIcon(fitur.icon)
   const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
 
   return (
-    <div className="relative group">
-      <Link
-        href={fitur.href}
-        className={cn(
-          "flex flex-col items-center gap-2.5 p-4 bg-white border border-slate-200 rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm active:scale-95 text-center",
-          style.card
-        )}
-      >
-        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110", style.icon)}>
-          <Icon className="w-6 h-6" />
-        </div>
-        <span className="text-xs font-semibold text-slate-700 leading-tight">{fitur.title}</span>
-      </Link>
+    <Link href={fitur.href} title={desc}
+      className="group relative flex flex-col items-center gap-2 p-3 sm:p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-center active:scale-95"
+    >
+      {/* Icon — plain, no colored badge */}
+      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center transition-all duration-200 group-hover:bg-slate-100 group-hover:border-slate-200">
+        <Icon className={cn('w-5 h-5 text-slate-500 transition-colors duration-200', accent.iconHover)} />
+      </div>
 
-      {/* Tombol info */}
-      <button
-        onClick={e => { e.preventDefault(); setShowInfo(v => !v) }}
-        className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-        title="Lihat deskripsi"
-      >
-        <Info className="w-3 h-3 text-slate-500" />
-      </button>
+      {/* Label */}
+      <span className="text-[11px] sm:text-xs font-semibold text-slate-700 leading-tight line-clamp-2 w-full">
+        {fitur.title}
+      </span>
 
-      {/* Popup deskripsi */}
-      {showInfo && (
-        <>
-          {/* backdrop */}
-          <div
-            className="fixed inset-0 z-20"
-            onClick={() => setShowInfo(false)}
-          />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full pb-2 z-30 w-48 pointer-events-none">
-            <div className="bg-slate-800 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl leading-relaxed pointer-events-auto">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", style.badge)}>
-                  {fitur.title}
-                </span>
-                <button onClick={() => setShowInfo(false)}>
-                  <X className="w-3 h-3 text-white/60 hover:text-white" />
-                </button>
-              </div>
-              {desc}
-              {/* Panah ke bawah */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800" />
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+      {/* Subtle hover arrow */}
+      <ChevronRight className="absolute top-2.5 right-2 w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </Link>
   )
 }
 
@@ -186,20 +150,18 @@ function FeatureCard({ fitur, style }: { fitur: FiturAkses; style: typeof GROUP_
 export function HomeClient({ userName, userRole, fiturAkses }: Props) {
   const [now, setNow] = useState<Date | null>(null)
 
-  // Pakai device time — hanya jalan di client
-  useEffect(() => {
-    setNow(new Date())
-  }, [])
+  useEffect(() => { setNow(new Date()) }, [])
 
-  const hour = now?.getHours() ?? 9
-  const greeting = getGreeting(hour)
+  const hour      = now?.getHours() ?? 9
+  const greeting  = getGreeting(hour)
   const firstName = userName.split(' ')[0]
   const roleLabel = ROLE_LABEL[userRole] ?? userRole.replace('_', ' ')
+  const roleEmoji = ROLE_EMOJI[userRole] ?? '👤'
+  const totalFitur = fiturAkses.filter(f => f.href !== '/dashboard').length
 
   // Group fitur
   const grouped = new Map<string, FiturAkses[]>()
   for (const f of fiturAkses) {
-    // Skip dashboard utama dari shortcut (sudah di sini)
     if (f.href === '/dashboard') continue
     if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
     grouped.get(f.group_name)!.push(f)
@@ -207,79 +169,103 @@ export function HomeClient({ userName, userRole, fiturAkses }: Props) {
   const groups = GROUP_ORDER.filter(g => grouped.has(g))
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-5 pb-16">
 
-      {/* ── Greeting card ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-900 rounded-3xl p-7 text-white shadow-xl">
-        {/* Glow */}
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-36 h-36 bg-yellow-400/10 rounded-full blur-3xl pointer-events-none" />
+      {/* ── Hero Greeting Card ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none">
 
-        <div className="relative z-10">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-emerald-300 text-sm font-medium mb-1">
-                {now ? formatTanggal(now) : ''}
-              </p>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
-                {greeting.emoji} {greeting.text},
-                <br />
-                <span className="text-yellow-300">{firstName}!</span>
-              </h1>
-              <p className="text-emerald-200/70 text-sm mt-2">
-                Anda masuk sebagai <span className="text-white font-semibold">{roleLabel}</span>
-              </p>
+        {/* Noise texture overlay */}
+        <div className="absolute inset-0 opacity-[0.035]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          backgroundSize: '200px',
+        }} />
+
+        {/* Glow orbs */}
+        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-8 right-1/3 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl pointer-events-none" />
+
+        {/* Content */}
+        <div className="relative z-10 p-5 sm:p-8">
+
+          {/* Top: date pill + logo */}
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span className="text-[11px] font-medium text-white/50 leading-none">
+                {now ? formatTanggal(now) : '—'}
+              </span>
             </div>
-            {/* Logo kecil */}
-            <img
-              src="/logo.png"
-              alt="Logo"
-              className="w-14 h-14 object-contain opacity-80 shrink-0 drop-shadow-xl"
-            />
+            <img src="/logo.png" alt="Logo"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-80 shrink-0 drop-shadow-xl" />
           </div>
 
-          <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-emerald-300/60">Akses cepat:</span>
-            <span className="text-xs bg-white/10 text-white/80 px-2.5 py-1 rounded-full">
-              {fiturAkses.filter(f => f.href !== '/dashboard').length} fitur tersedia
-            </span>
+          {/* Greeting text */}
+          <div className="space-y-1">
+            <p className="text-white/40 text-sm font-medium">
+              {greeting.emoji} {greeting.text}
+            </p>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
+              {firstName}
+              <span className="text-emerald-400">.</span>
+            </h1>
+            <p className="text-white/30 text-sm pt-0.5">{greeting.sub}</p>
           </div>
+
+          {/* Divider */}
+          <div className="my-4 h-px bg-white/8" />
+
+          {/* Bottom: role + stats */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-base">{roleEmoji}</span>
+              <div>
+                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-0.5">Login sebagai</p>
+                <p className="text-sm font-bold text-white/80 leading-none">{roleLabel}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1.5">
+              <span className="text-emerald-400 text-xs font-bold">{totalFitur}</span>
+              <span className="text-white/40 text-xs">fitur aktif</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* ── Shortcut per grup ── */}
-      {groups.map(group => {
-        const items = grouped.get(group)!
-        const style = GROUP_STYLE[group] ?? GROUP_STYLE['_standalone']
-
-        return (
-          <div key={group}>
-            {/* Group header */}
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className={cn("text-xs font-bold uppercase tracking-widest", style.header)}>
-                {group === '_standalone' ? 'Menu Utama' : group}
-              </h2>
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-[10px] text-slate-400">{items.length} fitur</span>
-            </div>
-
-            {/* Card grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {items.map(fitur => (
-                <FeatureCard key={fitur.href} fitur={fitur} style={style} />
-              ))}
-            </div>
-          </div>
-        )
-      })}
-
-      {/* Empty state */}
-      {groups.length === 0 && (
-        <div className="text-center py-20 text-slate-400">
-          <Settings className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Belum ada fitur yang tersedia</p>
-          <p className="text-sm mt-1">Hubungi admin untuk mengatur akses fitur Anda</p>
+      {/* ── Menu Groups ── */}
+      {groups.length === 0 ? (
+        <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
+          <Settings className="w-10 h-10 opacity-20 mb-1" />
+          <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
+          <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
         </div>
+      ) : (
+        groups.map(group => {
+          const items  = grouped.get(group)!
+          const accent = GROUP_ACCENT[group] ?? GROUP_ACCENT['_standalone']
+
+          return (
+            <div key={group}>
+              {/* Section header */}
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
+                <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', accent.label)}>
+                  {group === '_standalone' ? 'Menu Utama' : group}
+                </span>
+                <div className={cn('flex-1 h-px', accent.line)} />
+                <span className="text-[10px] text-slate-400 tabular-nums font-medium">{items.length}</span>
+              </div>
+
+              {/* Grid — 3 kolom di HP, makin banyak di desktop */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                {items.map(fitur => (
+                  <FeatureCard key={fitur.href} fitur={fitur} accent={accent} />
+                ))}
+              </div>
+            </div>
+          )
+        })
       )}
     </div>
   )
