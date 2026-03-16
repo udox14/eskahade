@@ -3,44 +3,7 @@
 import { query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 
-// ─── Filter & sort params ─────────────────────────────────────────────────────
-export type ExportFilter = {
-  jenis_kelamin?: 'L' | 'P'
-  asrama?:        string
-  kamar?:         string
-  sekolah?:       string
-  kelas_sekolah?: string  // kelas sekolah (7,8,9,10,11,12)
-  nama_kelas?:    string  // kelas pesantren (nama_kelas dari tabel kelas)
-  marhalah?:      string  // nama marhalah
-  tahun_masuk?:   number
-  alamat_kata?:   string  // filter LIKE %kata%
-}
-export type SortBy = 'nama_lengkap' | 'asrama' | 'kamar' | 'kelas_pesantren' | 'sekolah' | 'tahun_masuk' | 'nis'
-
-export type KolomExport = (
-  'nis' | 'nama_lengkap' | 'jenis_kelamin' | 'tempat_lahir' | 'tanggal_lahir' |
-  'nama_ayah' | 'nama_ibu' | 'alamat' | 'asrama' | 'kamar' | 'tahun_masuk' |
-  'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik'
-)
-
-export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[] = [
-  { key: 'nis',           label: 'NIS',               group: 'Identitas' },
-  { key: 'nama_lengkap',  label: 'Nama Lengkap',       group: 'Identitas' },
-  { key: 'jenis_kelamin', label: 'Jenis Kelamin',      group: 'Identitas' },
-  { key: 'nik',           label: 'NIK',                group: 'Identitas' },
-  { key: 'tempat_lahir',  label: 'Tempat Lahir',       group: 'Identitas' },
-  { key: 'tanggal_lahir', label: 'Tanggal Lahir',      group: 'Identitas' },
-  { key: 'nama_ayah',     label: 'Nama Ayah',          group: 'Keluarga'  },
-  { key: 'nama_ibu',      label: 'Nama Ibu',           group: 'Keluarga'  },
-  { key: 'alamat',        label: 'Alamat',             group: 'Keluarga'  },
-  { key: 'asrama',        label: 'Asrama',             group: 'Pesantren' },
-  { key: 'kamar',         label: 'Kamar',              group: 'Pesantren' },
-  { key: 'tahun_masuk',   label: 'Tahun Masuk',        group: 'Pesantren' },
-  { key: 'nama_kelas',    label: 'Kelas Pesantren',    group: 'Pesantren' },
-  { key: 'marhalah',      label: 'Marhalah',           group: 'Pesantren' },
-  { key: 'sekolah',       label: 'Sekolah',            group: 'Sekolah'   },
-  { key: 'kelas_sekolah', label: 'Kelas Sekolah',      group: 'Sekolah'   },
-]
+import type { ExportFilter, SortBy, KolomExport } from './constants'
 
 // ─── Opsi filter (untuk populate dropdown) ───────────────────────────────────
 // Hemat: 4 query ringan parallel — semua aggregate/distinct tanpa JOIN besar

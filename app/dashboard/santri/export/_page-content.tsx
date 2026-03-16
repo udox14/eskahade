@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { getFilterOptions, getDataExport } from './actions'
 import {
-  getFilterOptions, getDataExport,
-  KOLOM_TERSEDIA, type ExportFilter, type SortBy, type KolomExport
-} from './actions'
+  KOLOM_TERSEDIA, SORT_OPTIONS, KOLOM_DEFAULT, HEADER_MAP,
+  type ExportFilter, type SortBy, type KolomExport
+} from './constants'
 import {
   FileSpreadsheet, Filter, Download, RefreshCw,
   ChevronDown, ChevronUp, Check, Loader2, Users, Settings2
@@ -12,19 +13,7 @@ import {
 import { toast } from 'sonner'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: 'nama_lengkap',    label: 'Nama (A-Z)' },
-  { value: 'nis',             label: 'NIS' },
-  { value: 'asrama',          label: 'Asrama & Kamar' },
-  { value: 'kamar',           label: 'Kamar' },
-  { value: 'kelas_pesantren', label: 'Kelas Pesantren' },
-  { value: 'sekolah',         label: 'Sekolah & Kelas' },
-  { value: 'tahun_masuk',     label: 'Tahun Masuk' },
-]
-
 const KOLOM_GROUPS = [...new Set(KOLOM_TERSEDIA.map(k => k.group))]
-
-const KOLOM_DEFAULT: KolomExport[] = ['nis', 'nama_lengkap', 'jenis_kelamin', 'asrama', 'kamar', 'sekolah', 'kelas_sekolah']
 
 // ── Komponen: Toggle pilih kolom ──────────────────────────────────────────────
 function KolomPicker({ selected, onChange }: {
@@ -165,16 +154,7 @@ export default function ExportSantriPage() {
       const XLSX = await import('xlsx')
 
       // Header row
-      const headerMap: Record<KolomExport, string> = {
-        nis: 'NIS', nama_lengkap: 'Nama Lengkap', jenis_kelamin: 'JK',
-        nik: 'NIK', tempat_lahir: 'Tempat Lahir', tanggal_lahir: 'Tgl Lahir',
-        nama_ayah: 'Nama Ayah', nama_ibu: 'Nama Ibu', alamat: 'Alamat',
-        asrama: 'Asrama', kamar: 'Kamar', tahun_masuk: 'Tahun Masuk',
-        sekolah: 'Sekolah', kelas_sekolah: 'Kelas Sekolah',
-        nama_kelas: 'Kelas Pesantren', marhalah: 'Marhalah',
-      }
-
-      const headers = ['No', ...kolom.map(k => headerMap[k])]
+      const headers = ['No', ...kolom.map(k => HEADER_MAP[k])]
       const rows = res.rows.map((r: any, i: number) => [
         i + 1,
         ...kolom.map(k => {
