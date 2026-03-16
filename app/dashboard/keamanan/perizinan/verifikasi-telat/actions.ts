@@ -6,8 +6,14 @@ import { revalidatePath } from 'next/cache'
 import { formatDistance } from 'date-fns'
 import { id } from 'date-fns/locale'
 
+// ─── Antrian sidang telat ─────────────────────────────────────────────────────
+// Fix: filter langsung di SQL — tidak fetch semua AKTIF lalu saring di JS
+// Kriteria telat di SQL:
+//   1. Sudah kembali aktual (tgl_kembali_aktual IS NOT NULL) → menunggu sidang
+//   2. Belum kembali tapi sudah lewat batas (tgl_selesai_rencana < NOW) → overdue
+// Kedua kondisi ini jauh lebih hemat row reads daripada fetch semua AKTIF
 export async function getAntrianTelat() {
-  const currentNow = new Date()
+  const currentNow = new Date().toISOString()
 
   const rawData = await query<any>(`
     SELECT p.id, p.jenis, p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual,
@@ -16,45 +22,37 @@ export async function getAntrianTelat() {
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE p.status = 'AKTIF'
+      AND (
+        p.tgl_kembali_aktual IS NOT NULL
+        OR p.tgl_selesai_rencana < ?
+      )
     ORDER BY p.tgl_selesai_rencana ASC
-  `, [])
+    LIMIT 200
+  `, [currentNow])
 
   if (!rawData.length) return []
 
   const list: any[] = []
-
   rawData.forEach((item: any) => {
-    const rencana = new Date(item.tgl_selesai_rencana)
-    const aktual = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) : null
+    const rencana    = new Date(item.tgl_selesai_rencana.replace(' ', 'T'))
+    const aktual     = item.tgl_kembali_aktual
+      ? new Date(item.tgl_kembali_aktual.replace(' ', 'T'))
+      : null
+    const compareTime = aktual || new Date()
+    const durasi      = formatDistance(rencana, compareTime, { locale: id, addSuffix: false })
 
-    let isTarget = false
-    let statusLabel = ''
-
-    if (aktual) {
-      isTarget = true
-      statusLabel = 'SUDAH KEMBALI (Menunggu Sidang)'
-    } else if (rencana < currentNow) {
-      isTarget = true
-      statusLabel = 'BELUM KEMBALI (Overdue)'
-    }
-
-    if (isTarget) {
-      const compareTime = aktual || currentNow
-      const durasi = formatDistance(rencana, compareTime, { locale: id, addSuffix: false })
-
-      list.push({
-        izin_id: item.id,
-        santri_id: item.santri_id,
-        nama: item.nama_lengkap,
-        info: `${item.asrama || '-'} / ${item.kamar || '-'}`,
-        jenis: item.jenis === 'PULANG' ? 'IZIN PULANG' : 'KELUAR KOMPLEK',
-        alasan: item.alasan,
-        batas_kembali: item.tgl_selesai_rencana,
-        tgl_kembali: item.tgl_kembali_aktual,
-        status_label: statusLabel,
-        durasi_telat: durasi,
-      })
-    }
+    list.push({
+      izin_id:      item.id,
+      santri_id:    item.santri_id,
+      nama:         item.nama_lengkap,
+      info:         `${item.asrama || '-'} / ${item.kamar || '-'}`,
+      jenis:        item.jenis === 'PULANG' ? 'IZIN PULANG' : 'KELUAR KOMPLEK',
+      alasan:       item.alasan,
+      batas_kembali: item.tgl_selesai_rencana,
+      tgl_kembali:  item.tgl_kembali_aktual,
+      status_label: aktual ? 'SUDAH KEMBALI (Menunggu Sidang)' : 'BELUM KEMBALI (Overdue)',
+      durasi_telat: durasi,
+    })
   })
 
   return list

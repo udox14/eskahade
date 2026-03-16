@@ -54,11 +54,11 @@ export async function catatSuratKeluar(santriId: string, jenis: string, detail: 
 
   if (jenis === 'BERHENTI') {
     await execute(
-      `UPDATE santri SET status_global = 'dikeluarkan' WHERE id = ?`,
+      `UPDATE santri SET status_global = 'keluar' WHERE id = ?`,
       [santriId]
     )
     await execute(
-      `UPDATE riwayat_pendidikan SET status_riwayat = 'keluar'
+      `UPDATE riwayat_pendidikan SET status_riwayat = 'pindah'
        WHERE santri_id = ? AND status_riwayat = 'aktif'`,
       [santriId]
     )
