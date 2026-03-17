@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getFilterOptions, getDataExport } from './actions'
+import { getFilterOptions, getDataExport, getKamarList } from './actions'
 import {
   KOLOM_TERSEDIA, SORT_OPTIONS, KOLOM_DEFAULT, HEADER_MAP,
   type ExportFilter, type SortBy, type KolomExport
@@ -80,19 +80,44 @@ function Section({ title, icon: Icon, badge, children, defaultOpen = false }: {
   )
 }
 
-// ── Komponen: Select / Input filter ──────────────────────────────────────────
-function FilterSelect({ label, value, onChange, options, placeholder = 'Semua' }: {
-  label: string; value: string; onChange: (v: string) => void
-  options: string[]; placeholder?: string
+// ── Komponen: Multi-select chip ──────────────────────────────────────────────
+function MultiChip({ label, selected, onChange, options, disabled = false }: {
+  label: string
+  selected: string[]
+  onChange: (v: string[]) => void
+  options: string[]
+  disabled?: boolean
 }) {
-  return (
+  if (options.length === 0) return (
     <div>
       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700">
-        <option value="">{placeholder}</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <p className="text-xs text-slate-300 italic py-1">{disabled ? '← Pilih asrama dulu' : 'Tidak ada opsi'}</p>
+    </div>
+  )
+
+  const toggle = (v: string) =>
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
+        {selected.length > 0 && (
+          <button onClick={() => onChange([])} className="text-[9px] text-red-400 hover:underline">× hapus</button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <button key={o} onClick={() => toggle(o)}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
+              selected.includes(o)
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
+            }`}>
+            {o}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -101,6 +126,7 @@ function FilterSelect({ label, value, onChange, options, placeholder = 'Semua' }
 export default function ExportSantriPage() {
   const [opts, setOpts]         = useState<any>(null)
   const [loadingOpts, setLoadingOpts] = useState(true)
+  const [kamarList, setKamarList]     = useState<string[]>([])
 
   // Filter
   const [filter, setFilter]     = useState<ExportFilter>({})
@@ -120,14 +146,18 @@ export default function ExportSantriPage() {
     getFilterOptions().then(o => { setOpts(o); setLoadingOpts(false) })
   }, [])
 
-  // Update kamar list saat asrama berubah
-  const kamarList = opts?.kamarList ?? []
 
-  const setF = (key: keyof ExportFilter, val: string | number | undefined) =>
-    setFilter(prev => ({ ...prev, [key]: val || undefined }))
+
+  const setF = (key: keyof ExportFilter, val: any) =>
+    setFilter(prev => ({ ...prev, [key]: val }))
+
+  const setArr = (key: keyof ExportFilter) => (vals: string[]) =>
+    setFilter(prev => ({ ...prev, [key]: vals.length > 0 ? vals : undefined }))
 
   // Hitung jumlah filter aktif
-  const activeFilters = Object.values(filter).filter(v => v !== undefined && v !== '').length
+  const activeFilters = Object.values(filter).filter(v =>
+    v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
+  ).length
 
   // Preview — ambil 10 baris pertama untuk konfirmasi
   const handlePreview = useCallback(async () => {
@@ -173,9 +203,9 @@ export default function ExportSantriPage() {
 
       const wb = XLSX.utils.book_new()
       const filterDesc = [
-        filter.asrama && filter.asrama,
+        filter.asrama?.join('-'),
         filter.jenis_kelamin === 'L' ? 'Laki' : filter.jenis_kelamin === 'P' ? 'Perempuan' : '',
-        filter.nama_kelas && filter.nama_kelas,
+        filter.nama_kelas?.join('-'),
       ].filter(Boolean).join('_') || 'Semua'
 
       XLSX.utils.book_append_sheet(wb, ws, 'Data Santri')
@@ -217,57 +247,77 @@ export default function ExportSantriPage() {
 
       {/* 1. Filter kriteria */}
       <Section title="Filter Kriteria" icon={Filter} badge={filterBadge} defaultOpen={true}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
 
-          <FilterSelect label="Jenis Kelamin"
-            value={filter.jenis_kelamin ?? ''}
-            onChange={v => setF('jenis_kelamin', v as 'L' | 'P' || undefined)}
-            options={['L', 'P']}
-            placeholder="Semua" />
+          {/* Jenis kelamin */}
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Jenis Kelamin</label>
+            <div className="flex gap-1.5">
+              {(['', 'L', 'P'] as const).map(v => (
+                <button key={v} onClick={() => setF('jenis_kelamin', v || undefined)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
+                    (filter.jenis_kelamin ?? '') === v
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
+                  }`}>
+                  {v === '' ? 'Semua' : v === 'L' ? 'Laki-laki' : 'Perempuan'}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <FilterSelect label="Asrama"
-            value={filter.asrama ?? ''}
-            onChange={v => { setF('asrama', v); setF('kamar', '') }}
-            options={opts?.asramaList ?? []} />
+          <div className="col-span-2 sm:col-span-3">
+            <MultiChip label="Asrama" selected={filter.asrama ?? []}
+              onChange={vals => { setArr('asrama')(vals); setF('kamar', undefined) }}
+              options={opts?.asramaList ?? []} />
+          </div>
 
-          <FilterSelect label="Kamar"
-            value={filter.kamar ?? ''}
-            onChange={v => setF('kamar', v)}
-            options={filter.asrama ? kamarList : []}
-            placeholder={filter.asrama ? 'Semua Kamar' : '← Pilih asrama dulu'} />
+          <div className="col-span-2 sm:col-span-3">
+            <MultiChip label="Kamar" selected={filter.kamar ?? []}
+              onChange={setArr('kamar')}
+              options={(filter.asrama?.length ? opts?.kamarList : []) ?? []}
+              disabled={!filter.asrama?.length} />
+          </div>
 
-          <FilterSelect label="Kelas Pesantren"
-            value={filter.nama_kelas ?? ''}
-            onChange={v => setF('nama_kelas', v)}
-            options={opts?.kelasList?.map((k: any) => k.nama_kelas) ?? []} />
+          <div className="col-span-2 sm:col-span-3">
+            <MultiChip label="Kelas Pesantren" selected={filter.nama_kelas ?? []}
+              onChange={setArr('nama_kelas')}
+              options={opts?.kelasList?.map((k: any) => k.nama_kelas) ?? []} />
+          </div>
 
-          <FilterSelect label="Marhalah"
-            value={filter.marhalah ?? ''}
-            onChange={v => setF('marhalah', v)}
-            options={opts?.marhalahUnik ?? []} />
+          <div className="col-span-2 sm:col-span-3">
+            <MultiChip label="Marhalah" selected={filter.marhalah ?? []}
+              onChange={setArr('marhalah')}
+              options={opts?.marhalahUnik ?? []} />
+          </div>
 
-          <FilterSelect label="Sekolah"
-            value={filter.sekolah ?? ''}
-            onChange={v => setF('sekolah', v)}
-            options={opts?.sekolahList ?? []} />
+          <div className="col-span-2 sm:col-span-3">
+            <MultiChip label="Sekolah" selected={filter.sekolah ?? []}
+              onChange={setArr('sekolah')}
+              options={opts?.sekolahList ?? []} />
+          </div>
 
-          <FilterSelect label="Kelas Sekolah"
-            value={filter.kelas_sekolah ?? ''}
-            onChange={v => setF('kelas_sekolah', v)}
-            options={opts?.kelasSekolahList ?? []} />
+          <div className="col-span-2 sm:col-span-1">
+            <MultiChip label="Kelas Sekolah" selected={filter.kelas_sekolah ?? []}
+              onChange={setArr('kelas_sekolah')}
+              options={opts?.kelasSekolahList ?? []} />
+          </div>
 
-          <FilterSelect label="Tahun Masuk"
-            value={filter.tahun_masuk?.toString() ?? ''}
-            onChange={v => setF('tahun_masuk', v ? Number(v) : undefined)}
-            options={opts?.tahunList?.map(String) ?? []} />
+          <div className="col-span-2 sm:col-span-1">
+            <MultiChip label="Tahun Masuk"
+              selected={filter.tahun_masuk?.map(String) ?? []}
+              onChange={vals => setF('tahun_masuk', vals.length ? vals.map(Number) : undefined)}
+              options={opts?.tahunList?.map(String) ?? []} />
+          </div>
 
-          <div>
+          <div className="col-span-2 sm:col-span-1">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kata dalam Alamat</label>
             <input type="text" placeholder="Cth: Tasikmalaya"
               value={filter.alamat_kata ?? ''}
               onChange={e => setF('alamat_kata', e.target.value || undefined)}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
+
         </div>
 
         {activeFilters > 0 && (

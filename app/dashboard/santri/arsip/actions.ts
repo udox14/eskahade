@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, execute, batch } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -11,70 +11,104 @@ export type FilterSantri = {
   sekolah?: string
   kelas_sekolah?: string
   kelas_pesantren?: string
+  tahun_masuk?: number
   page?: number
 }
 
 export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
-  const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, page = 1 } = filter
+  const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk, page = 1 } = filter
   const offset = (page - 1) * PAGE_SIZE
 
-  let sql = `
-    SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah,
-      k.nama_kelas as kelas_pesantren_nama
-    FROM santri s
-    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-    LEFT JOIN kelas k ON rp.kelas_id = k.id
-    WHERE s.status_global = 'aktif'
-  `
+  const clauses = ["s.status_global = 'aktif'"]
   const params: any[] = []
 
-  if (search) { sql += ` AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)`; params.push(`%${search}%`, `%${search}%`) }
-  if (asrama) { sql += ' AND s.asrama = ?'; params.push(asrama) }
-  if (sekolah) { sql += ' AND s.sekolah = ?'; params.push(sekolah) }
-  if (kelas_sekolah) { sql += ' AND s.kelas_sekolah LIKE ?'; params.push(`%${kelas_sekolah}%`) }
-  if (kelas_pesantren) { sql += ' AND LOWER(k.nama_kelas) = LOWER(?)'; params.push(kelas_pesantren) }
+  if (search)         { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
+  if (asrama)         { clauses.push('s.asrama = ?');                            params.push(asrama) }
+  if (sekolah)        { clauses.push('s.sekolah = ?');                           params.push(sekolah) }
+  if (kelas_sekolah)  { clauses.push('s.kelas_sekolah LIKE ?');                 params.push(`%${kelas_sekolah}%`) }
+  if (kelas_pesantren){ clauses.push('LOWER(k.nama_kelas) = LOWER(?)');         params.push(kelas_pesantren) }
+  if (tahun_masuk)    { clauses.push('s.tahun_masuk = ?');                       params.push(tahun_masuk) }
 
-  sql += ' ORDER BY s.nama_lengkap'
+  const needKelas = !!kelas_pesantren
+  const joinKelas = needKelas
+    ? `LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+       LEFT JOIN kelas k ON rp.kelas_id = k.id`
+    : `LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+       LEFT JOIN kelas k ON rp.kelas_id = k.id`
 
-  const allData = await query<any>(sql, params)
-  const total = allData.length
-  const data = allData.slice(offset, offset + PAGE_SIZE)
+  const where = clauses.join(' AND ')
+
+  // Count dulu — 1 query ringan
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM santri s
+     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+     LEFT JOIN kelas k ON rp.kelas_id = k.id
+     WHERE ${where}`,
+    params
+  )
+  const total = countRow?.total ?? 0
+
+  // Data dengan LIMIT/OFFSET langsung di SQL — tidak fetch semua lalu slice
+  const data = await query<any>(
+    `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar,
+            s.sekolah, s.kelas_sekolah, s.tahun_masuk,
+            k.nama_kelas AS kelas_pesantren_nama
+     FROM santri s
+     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+     LEFT JOIN kelas k ON rp.kelas_id = k.id
+     WHERE ${where}
+     ORDER BY s.nama_lengkap
+     LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, offset]
+  )
 
   return { data, total, page, hasMore: offset + PAGE_SIZE < total }
 }
 
 export async function getFilterOptionsSantri() {
-  const [asramaRows, sekolahRows, kelasRows] = await Promise.all([
-    query<{ asrama: string }>(`SELECT DISTINCT asrama FROM santri WHERE status_global = 'aktif' AND asrama IS NOT NULL`),
-    query<{ sekolah: string }>(`SELECT DISTINCT sekolah FROM santri WHERE status_global = 'aktif' AND sekolah IS NOT NULL`),
-    query<{ nama_kelas: string }>('SELECT nama_kelas FROM kelas'),
+  const [asramaRows, sekolahRows, kelasRows, tahunRows] = await Promise.all([
+    query<{ asrama: string }>(`SELECT DISTINCT asrama FROM santri WHERE status_global = 'aktif' AND asrama IS NOT NULL ORDER BY asrama`),
+    query<{ sekolah: string }>(`SELECT DISTINCT sekolah FROM santri WHERE status_global = 'aktif' AND sekolah IS NOT NULL ORDER BY sekolah`),
+    query<{ nama_kelas: string }>('SELECT DISTINCT nama_kelas FROM kelas ORDER BY nama_kelas'),
+    query<{ tahun_masuk: number }>(`SELECT DISTINCT tahun_masuk FROM santri WHERE status_global = 'aktif' AND tahun_masuk IS NOT NULL ORDER BY tahun_masuk DESC`),
   ])
 
   return {
-    asramaList: asramaRows.map(r => r.asrama).sort(),
-    sekolahList: sekolahRows.map(r => r.sekolah).sort(),
-    kelasList: kelasRows.map(r => r.nama_kelas).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    asramaList:  asramaRows.map(r => r.asrama),
+    sekolahList: sekolahRows.map(r => r.sekolah),
+    kelasList:   kelasRows.map(r => r.nama_kelas).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
+    tahunList:   tahunRows.map(r => r.tahun_masuk),
   }
 }
 
 export async function getGrupArsip() {
-  const data = await query<any>(
-    'SELECT angkatan, catatan, tanggal_arsip, asrama FROM santri_arsip ORDER BY tanggal_arsip DESC'
-  )
+  // Aggregate langsung di SQL — tidak fetch semua baris lalu group di memory
+  const rows = await query<{
+    angkatan: number | null
+    catatan: string | null
+    tanggal_arsip: string
+    jumlah: number
+    asrama_list: string
+  }>(`
+    SELECT
+      angkatan,
+      catatan,
+      DATE(tanggal_arsip) AS tanggal_arsip,
+      COUNT(*) AS jumlah,
+      GROUP_CONCAT(DISTINCT asrama) AS asrama_list
+    FROM santri_arsip
+    GROUP BY angkatan, catatan, DATE(tanggal_arsip)
+    ORDER BY tanggal_arsip DESC
+  `)
 
-  const grupMap = new Map<string, any>()
-  for (const row of data) {
-    const tgl = row.tanggal_arsip?.split('T')[0] ?? ''
-    const key = `${row.angkatan ?? 'null'}__${row.catatan ?? ''}__${tgl}`
-    if (grupMap.has(key)) {
-      const g = grupMap.get(key)!
-      g.jumlah++
-      if (row.asrama && !g.asramaList.includes(row.asrama)) g.asramaList.push(row.asrama)
-    } else {
-      grupMap.set(key, { key, angkatan: row.angkatan, catatan: row.catatan, tanggal_arsip: tgl, jumlah: 1, asramaList: row.asrama ? [row.asrama] : [] })
-    }
-  }
-  return Array.from(grupMap.values())
+  return rows.map(r => ({
+    key:          `${r.angkatan ?? 'null'}__${r.catatan ?? ''}__${r.tanggal_arsip}`,
+    angkatan:     r.angkatan,
+    catatan:      r.catatan,
+    tanggal_arsip: r.tanggal_arsip,
+    jumlah:       r.jumlah,
+    asramaList:   r.asrama_list ? r.asrama_list.split(',').filter(Boolean) : [],
+  }))
 }
 
 export type FilterSantriArsip = { search?: string; asrama?: string; page?: number }
@@ -88,25 +122,31 @@ export async function getSantriDalamGrup(
   const { search, asrama, page = 1 } = filter
   const offset = (page - 1) * PAGE_SIZE
 
-  let sql = `SELECT id, nis, nama_lengkap, asrama, tanggal_arsip, catatan, angkatan
-    FROM santri_arsip
-    WHERE tanggal_arsip >= ? AND tanggal_arsip <= ?`
-  const params: any[] = [`${tanggalArsip}T00:00:00`, `${tanggalArsip}T23:59:59`]
+  const clauses = ['DATE(tanggal_arsip) = ?']
+  const params: any[] = [tanggalArsip]
 
-  if (angkatan !== null) { sql += ' AND angkatan = ?'; params.push(angkatan) }
-  else sql += ' AND angkatan IS NULL'
+  if (angkatan !== null) { clauses.push('angkatan = ?');  params.push(angkatan) }
+  else                     clauses.push('angkatan IS NULL')
 
-  if (catatan) { sql += ' AND catatan = ?'; params.push(catatan) }
-  else sql += ' AND catatan IS NULL'
+  if (catatan) { clauses.push('catatan = ?');  params.push(catatan) }
+  else           clauses.push('catatan IS NULL')
 
-  if (search) { sql += ` AND (nama_lengkap LIKE ? OR nis LIKE ?)`; params.push(`%${search}%`, `%${search}%`) }
-  if (asrama) { sql += ' AND asrama = ?'; params.push(asrama) }
+  if (search) { clauses.push('(nama_lengkap LIKE ? OR nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
+  if (asrama) { clauses.push('asrama = ?'); params.push(asrama) }
 
-  sql += ' ORDER BY nama_lengkap'
+  const where = clauses.join(' AND ')
 
-  const allData = await query<any>(sql, params)
-  const total = allData.length
-  const data = allData.slice(offset, offset + PAGE_SIZE)
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM santri_arsip WHERE ${where}`, params
+  )
+  const total = countRow?.total ?? 0
+
+  const data = await query<any>(
+    `SELECT id, nis, nama_lengkap, asrama, tanggal_arsip, catatan, angkatan
+     FROM santri_arsip WHERE ${where}
+     ORDER BY nama_lengkap LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, offset]
+  )
 
   return { data, total, page, hasMore: offset + PAGE_SIZE < total }
 }
@@ -144,22 +184,25 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
       const angkatan = profil.nis ? parseInt(String(profil.nis).substring(0, 4)) || null : null
       const now = new Date().toISOString()
 
-      await query(
+      await execute(
         `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [crypto.randomUUID(), santriId, profil.nis, profil.nama_lengkap, isNaN(angkatan as number) ? null : angkatan, profil.asrama, catatan || null, snapshot, now]
       )
 
-      // Hapus data relasi
+      // Hapus semua data relasi dalam 1 batch
+      const deleteOps: { sql: string; params: any[] }[] = []
       if (riwayatIds.length > 0) {
         const ph = riwayatIds.map(() => '?').join(',')
-        await query(`DELETE FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${ph})`, riwayatIds)
-        await query(`DELETE FROM absensi_harian WHERE riwayat_pendidikan_id IN (${ph})`, riwayatIds)
-        await query('DELETE FROM riwayat_pendidikan WHERE santri_id = ?', [santriId])
+        deleteOps.push({ sql: `DELETE FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${ph})`, params: riwayatIds })
+        deleteOps.push({ sql: `DELETE FROM absensi_harian WHERE riwayat_pendidikan_id IN (${ph})`, params: riwayatIds })
+        deleteOps.push({ sql: 'DELETE FROM riwayat_pendidikan WHERE santri_id = ?', params: [santriId] })
       }
-      await query('DELETE FROM pelanggaran WHERE santri_id = ?', [santriId])
-      await query('DELETE FROM spp_log WHERE santri_id = ?', [santriId])
-      await query('DELETE FROM santri WHERE id = ?', [santriId])
+      deleteOps.push({ sql: 'DELETE FROM pelanggaran WHERE santri_id = ?', params: [santriId] })
+      deleteOps.push({ sql: 'DELETE FROM spp_log WHERE santri_id = ?', params: [santriId] })
+      deleteOps.push({ sql: 'DELETE FROM tabungan_log WHERE santri_id = ?', params: [santriId] })
+      deleteOps.push({ sql: 'DELETE FROM santri WHERE id = ?', params: [santriId] })
+      await batch(deleteOps)
 
       berhasil++
     } catch (err: any) {

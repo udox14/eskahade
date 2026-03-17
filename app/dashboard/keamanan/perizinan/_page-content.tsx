@@ -159,105 +159,167 @@ export default function PerizinanPage() {
         ))}
       </div>
 
-      {/* TABEL LIST */}
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <>
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-              <tr>
-                <th className="px-4 py-3">Santri</th>
-                <th className="px-4 py-3">Jenis & Alasan</th>
-                <th className="px-4 py-3">Waktu</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center">Hapus</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400"><Clock className="w-6 h-6 animate-spin mx-auto mb-2"/>Memuat...</td></tr>
-              ) : list.length === 0 ? (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400">Tidak ada data perizinan untuk periode ini.</td></tr>
-              ) : (
-                pagedList.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    {/* 1. SANTRI */}
+      {/* DAFTAR PERIZINAN */}
+      {loading ? (
+        <div className="flex justify-center py-12 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <Clock className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-slate-200 text-sm">
+          Tidak ada data perizinan untuk periode ini.
+        </div>
+      ) : (
+        <>
+          {/* Desktop: Tabel */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Santri</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jenis & Alasan</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {pagedList.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3">
-                      <p className="font-bold text-slate-800">{item.nama}</p>
-                      <p className="text-xs text-slate-500">{item.asrama} / {item.kamar}</p>
+                      <p className="font-semibold text-slate-800">{item.nama}</p>
+                      <p className="text-xs text-slate-400">{item.asrama} / {item.kamar}</p>
                     </td>
-
-                    {/* 2. JENIS & ALASAN */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        {item.jenis === 'PULANG' 
-                          ? <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> PULANG</span>
-                          : <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> KELUAR KOMPLEK</span>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {item.jenis === 'PULANG'
+                          ? <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> Pulang</span>
+                          : <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> Keluar Komplek</span>
                         }
-                        <span className="text-xs text-slate-500">via {item.pemberi_izin}</span>
+                        <span className="text-xs text-slate-400">via {item.pemberi_izin}</span>
                       </div>
-                      <p className="text-xs text-slate-600 italic">"{item.alasan}"</p>
+                      <p className="text-xs text-slate-500 italic truncate max-w-[200px]">"{item.alasan}"</p>
                     </td>
-
-                    {/* 3. WAKTU */}
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col text-xs">
-                        <span className="text-slate-500 flex items-center gap-1">
-                          Pergi: <span className="font-medium text-slate-900">{format(new Date(item.tgl_mulai), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
-                        </span>
-                        {item.tgl_kembali_aktual ? (
-                          <span className={`flex items-center gap-1 font-bold mt-1 ${item.status === 'AKTIF' ? 'text-orange-600' : 'text-green-600'}`}>
-                            Tiba: {format(new Date(item.tgl_kembali_aktual), 'dd MMM yyyy, HH:mm', { locale: id })}
-                            {item.status === 'AKTIF' && ' (Telat)'}
-                          </span>
-                        ) : (
-                          <span className="text-red-500 flex items-center gap-1 mt-1">
-                            Batas: {format(new Date(item.tgl_selesai_rencana), 'dd MMM yyyy, HH:mm', { locale: id })}
-                          </span>
-                        )}
-                      </div>
+                    <td className="px-4 py-3 text-xs">
+                      <p className="text-slate-500">Pergi: <span className="font-medium text-slate-800">{format(new Date(item.tgl_mulai), 'dd MMM yyyy, HH:mm', { locale: id })}</span></p>
+                      {item.tgl_kembali_aktual ? (
+                        <p className={`font-bold mt-0.5 ${item.status === 'AKTIF' ? 'text-orange-600' : 'text-emerald-600'}`}>
+                          Tiba: {format(new Date(item.tgl_kembali_aktual), 'dd MMM yyyy, HH:mm', { locale: id })}
+                          {item.status === 'AKTIF' && ' ⚠'}
+                        </p>
+                      ) : (
+                        <p className="text-rose-500 mt-0.5">Batas: {format(new Date(item.tgl_selesai_rencana), 'dd MMM yyyy, HH:mm', { locale: id })}</p>
+                      )}
                     </td>
-
-                    {/* 4. AKSI */}
                     <td className="px-4 py-3 text-center">
                       {item.status === 'AKTIF' ? (
                         item.tgl_kembali_aktual ? (
-                          <div className="flex flex-col items-center">
-                            <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-bold border border-orange-200">
-                              <AlertTriangle className="w-3 h-3"/> MENUNGGU SIDANG
-                            </span>
-                            <span className="text-[10px] text-orange-600 mt-1">Terlambat Kembali</span>
-                          </div>
+                          <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-orange-200">
+                            <AlertTriangle className="w-3 h-3"/> Menunggu Sidang
+                          </span>
                         ) : (
-                          <button 
-                            onClick={() => openReturnModal(item)}
-                            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shadow-sm active:scale-95"
-                          >
-                            BELUM KEMBALI
+                          <button onClick={() => openReturnModal(item)}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors active:scale-95">
+                            Belum Kembali
                           </button>
                         )
                       ) : (
-                        <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-green-200">
-                          <CheckCircle className="w-3 h-3"/> SELESAI
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-emerald-200">
+                          <CheckCircle className="w-3 h-3"/> Selesai
                         </span>
                       )}
                     </td>
-                    {/* HAPUS */}
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handleHapus(item)}
-                        disabled={deletingId === item.id}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                        title="Hapus data izin"
-                      >
+                      <button onClick={() => handleHapus(item)} disabled={deletingId === item.id}
+                        className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: Cards */}
+          <div className="md:hidden space-y-2.5">
+            {pagedList.map((item) => (
+              <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className={`h-1 w-full ${
+                  item.status !== 'AKTIF' ? 'bg-emerald-400'
+                  : item.tgl_kembali_aktual ? 'bg-orange-400'
+                  : 'bg-rose-400'
+                }`} />
+                <div className="p-3.5 space-y-2.5">
+                  {/* Nama + jenis + hapus */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-sm leading-tight">{item.nama}</p>
+                      <p className="text-xs text-slate-400">{item.asrama} / {item.kamar}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.jenis === 'PULANG'
+                        ? <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> Pulang</span>
+                        : <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> Keluar</span>
+                      }
+                      <button onClick={() => handleHapus(item)} disabled={deletingId === item.id}
+                        className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Alasan */}
+                  <p className="text-xs text-slate-500 italic">"{item.alasan}" <span className="not-italic text-slate-400">· via {item.pemberi_izin}</span></p>
+                  {/* Waktu */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-50 rounded-xl p-2 border border-slate-100">
+                      <p className="text-slate-400 text-[10px] font-medium mb-0.5">Berangkat</p>
+                      <p className="font-semibold text-slate-700">{format(new Date(item.tgl_mulai), 'dd MMM, HH:mm', { locale: id })}</p>
+                    </div>
+                    <div className={`rounded-xl p-2 border ${
+                      item.tgl_kembali_aktual
+                        ? item.status === 'AKTIF' ? 'bg-orange-50 border-orange-100' : 'bg-emerald-50 border-emerald-100'
+                        : 'bg-rose-50 border-rose-100'
+                    }`}>
+                      <p className={`text-[10px] font-medium mb-0.5 ${
+                        item.tgl_kembali_aktual
+                          ? item.status === 'AKTIF' ? 'text-orange-500' : 'text-emerald-500'
+                          : 'text-rose-400'
+                      }`}>{item.tgl_kembali_aktual ? 'Tiba' : 'Batas Kembali'}</p>
+                      <p className={`font-semibold ${
+                        item.tgl_kembali_aktual
+                          ? item.status === 'AKTIF' ? 'text-orange-700' : 'text-emerald-700'
+                          : 'text-rose-600'
+                      }`}>
+                        {item.tgl_kembali_aktual
+                          ? format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })
+                          : format(new Date(item.tgl_selesai_rencana), 'dd MMM, HH:mm', { locale: id })
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  {/* Status / Aksi */}
+                  {item.status === 'AKTIF' ? (
+                    item.tgl_kembali_aktual ? (
+                      <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                        <span className="text-xs font-bold text-orange-700">Menunggu Sidang — Terlambat Kembali</span>
+                      </div>
+                    ) : (
+                      <button onClick={() => openReturnModal(item)}
+                        className="w-full py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 active:scale-95 transition-all">
+                        Tandai Sudah Kembali
+                      </button>
+                    )
+                  ) : (
+                    <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-xs font-bold text-emerald-700">Selesai</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
           <Pagination
             currentPage={safePageList}
             totalPages={totalPagesList}
@@ -266,9 +328,9 @@ export default function PerizinanPage() {
             onPageChange={setPage}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
           />
-          </>
-        </div>
-      </div>
+
+        </>
+      )}
 
       {/* --- MODAL INPUT IZIN BARU --- */}
       {isOpenInput && (

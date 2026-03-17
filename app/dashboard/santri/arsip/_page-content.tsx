@@ -38,8 +38,8 @@ export default function ArsipSantriPage() {
   const [santriHasMore, setSantriHasMore] = useState(false)
   const [loadingSantri, setLoadingSantri] = useState(false)
   const [loadingMoreSantri, setLoadingMoreSantri] = useState(false)
-  const [filterSantri, setFilterSantri] = useState({ search: '', asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '' })
-  const [optsSantri, setOptsSantri] = useState<{ asramaList: string[], sekolahList: string[], kelasList: string[] }>({ asramaList: [], sekolahList: [], kelasList: [] })
+  const [filterSantri, setFilterSantri] = useState({ search: '', asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' })
+  const [optsSantri, setOptsSantri] = useState<{ asramaList: string[], sekolahList: string[], kelasList: string[], tahunList: number[] }>({ asramaList: [], sekolahList: [], kelasList: [], tahunList: [] })
   const [selectedArsip, setSelectedArsip] = useState<Set<string>>(new Set())
   const [catatanArsip, setCatatanArsip] = useState('')
   const [isArsipkan, setIsArsipkan] = useState(false)
@@ -59,6 +59,8 @@ export default function ArsipSantriPage() {
   const [loadingSantriArsip, setLoadingSantriArsip] = useState(false)
   const [loadingMoreSantriArsip, setLoadingMoreSantriArsip] = useState(false)
   const [filterSantriArsip, setFilterSantriArsip] = useState({ search: '', asrama: '' })
+  const [hasLoadedSantri, setHasLoadedSantri] = useState(false)
+  const [hasLoadedGrup, setHasLoadedGrup] = useState(false)
   const [optsArsipAsrama, setOptsArsipAsrama] = useState<string[]>([])
 
   const [selectedRestore, setSelectedRestore] = useState<Set<string>>(new Set())
@@ -66,12 +68,8 @@ export default function ArsipSantriPage() {
   const [isHapusMassal, setIsHapusMassal] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  // ── INIT ──
+  // ── INIT — hanya load opsi filter, data dimuat saat user klik Tampilkan ──
   useEffect(() => { loadFilterOptions() }, [])
-  useEffect(() => {
-    if (tab === 'ARSIPKAN') loadSantri(1, filterSantri, false)
-    else { setActiveGrup(null); loadGrup() }
-  }, [tab])
 
   const loadFilterOptions = async () => {
     const os = await getFilterOptionsSantri()
@@ -80,8 +78,9 @@ export default function ArsipSantriPage() {
 
   // ── LOAD SANTRI AKTIF ──
   const loadSantri = async (page: number, filter: typeof filterSantri, append: boolean) => {
+    setHasLoadedSantri(true)
     append ? setLoadingMoreSantri(true) : setLoadingSantri(true)
-    const res = await getSantriAktifUntukArsip({ ...filter, page })
+    const res = await getSantriAktifUntukArsip({ ...filter, tahun_masuk: filter.tahun_masuk ? Number(filter.tahun_masuk) : undefined, page })
     if (append) setSantriList(prev => [...prev, ...res.data])
     else { setSantriList(res.data); setSelectedArsip(new Set()) }
     setSantriTotal(res.total); setSantriPage(page); setSantriHasMore(res.hasMore)
@@ -97,6 +96,7 @@ export default function ArsipSantriPage() {
 
   // ── LOAD GRUP ARSIP (LEVEL 1) ──
   const loadGrup = async () => {
+    setHasLoadedGrup(true)
     setLoadingGrup(true)
     const data = await getGrupArsip()
     setGrupList(data)
@@ -295,6 +295,11 @@ export default function ArsipSantriPage() {
                   <Filter className="w-4 h-4" /> Filter
                   {activeFilterCount > 0 && <span className="bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFilterCount}</span>}
                 </button>
+                <button onClick={() => loadSantri(1, filterSantri, false)} disabled={loadingSantri}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 disabled:opacity-60 flex items-center gap-2">
+                  {loadingSantri ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Tampilkan
+                </button>
               </div>
             </div>
             {showFilterSantri && (
@@ -324,8 +329,15 @@ export default function ArsipSantriPage() {
                     {optsSantri.kelasList.map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Tahun Masuk</label>
+                  <select value={filterSantri.tahun_masuk} onChange={e => handleFilterSantriChange('tahun_masuk', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+                    <option value="">Semua</option>
+                    {optsSantri.tahunList.map(t => <option key={t} value={String(t)}>{t}</option>)}
+                  </select>
+                </div>
                 {activeFilterCount > 0 && (
-                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '' }; setFilterSantri(e); loadSantri(1, e, false) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
+                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e, false) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
                     <X className="w-3 h-3" /> Reset filter
                   </button>
                 )}
@@ -347,7 +359,12 @@ export default function ArsipSantriPage() {
               {selectedArsip.size > 0 && <button onClick={() => setSelectedArsip(new Set())} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" /> Batal pilih</button>}
             </div>
             <div className="max-h-[450px] overflow-y-auto">
-              {loadingSantri ? (
+              {!hasLoadedSantri ? (
+                <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+                  <Users className="w-10 h-10 text-slate-200" />
+                  <p className="text-sm">Klik <strong className="text-slate-600">Tampilkan</strong> untuk memuat daftar santri</p>
+                </div>
+              ) : loadingSantri ? (
                 <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
               ) : santriList.length === 0 ? (
                 <div className="py-16 text-center text-slate-400"><Users className="w-10 h-10 mx-auto mb-2 text-slate-300" /><p>Tidak ada santri ditemukan</p></div>
@@ -413,7 +430,17 @@ export default function ArsipSantriPage() {
                 <p className="text-sm text-blue-800">Pilih batch arsip untuk melihat daftar santri di dalamnya dan melakukan restore atau hapus.</p>
               </div>
 
-              {loadingGrup ? (
+              {!hasLoadedGrup ? (
+                <div className="flex flex-col items-center py-14 gap-3 text-center">
+                  <Archive className="w-10 h-10 text-slate-200" />
+                  <p className="text-slate-500 text-sm">Klik <strong>Tampilkan Arsip</strong> untuk memuat data</p>
+                  <button onClick={loadGrup} disabled={loadingGrup}
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2">
+                    {loadingGrup ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                    Tampilkan Arsip
+                  </button>
+                </div>
+              ) : loadingGrup ? (
                 <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
               ) : grupList.length === 0 ? (
                 <div className="py-16 text-center text-slate-400">

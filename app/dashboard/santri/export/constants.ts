@@ -2,14 +2,14 @@
 
 export type ExportFilter = {
   jenis_kelamin?: 'L' | 'P'
-  asrama?:        string
-  kamar?:         string
-  sekolah?:       string
-  kelas_sekolah?: string
-  nama_kelas?:    string
-  marhalah?:      string
-  tahun_masuk?:   number
-  alamat_kata?:   string
+  asrama?:        string[]   // multi-select
+  kamar?:         string[]
+  sekolah?:       string[]
+  kelas_sekolah?: string[]
+  nama_kelas?:    string[]
+  marhalah?:      string[]
+  tahun_masuk?:   number[]
+  alamat_kata?:   string     // tetap single (LIKE search)
 }
 
 export type SortBy = 'nama_lengkap' | 'asrama' | 'kamar' | 'kelas_pesantren' | 'sekolah' | 'tahun_masuk' | 'nis'
