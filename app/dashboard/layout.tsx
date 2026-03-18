@@ -3,7 +3,7 @@ import { ClientLayout } from "@/components/layout/client-layout";
 import { getSession } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { getFiturForRole, type FiturAkses } from "@/lib/cache/fitur-akses";
+import { getFiturForRole, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
 
 export const dynamic = 'force-dynamic';
 
@@ -25,30 +25,38 @@ export default async function DashboardLayout({
   let userName = session.full_name || 'User'
   let userRole = session.role || 'wali_kelas'
   let avatarUrl: string | null = null
+  let userShowBottomNav = true  // default aktif
 
   try {
-    const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null }>(
-      'SELECT full_name, role, avatar_url FROM users WHERE id = ?',
+    const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null; show_bottomnav: number | null }>(
+      'SELECT full_name, role, avatar_url, show_bottomnav FROM users WHERE id = ?',
       [session.id]
     );
     if (user) {
       userName = user.full_name || userName
       userRole = user.role || userRole
       avatarUrl = user.avatar_url ?? null
+      // NULL = belum diset user → ikut default (aktif), 0 = user matiin sendiri
+      userShowBottomNav = user.show_bottomnav !== 0
     }
   } catch (err: any) {
     console.error('[layout] queryOne users ERROR:', err?.message)
-    // Lanjut pakai data dari session JWT
   }
 
   console.log('[layout] userRole:', userRole)
 
-  // Ambil fitur yang boleh diakses role ini
+  // Ambil fitur dan setting bottomnav secara paralel
   let fiturAkses: FiturAkses[] = []
+  let globalBottomNavEnabled = true
+
   try {
-    fiturAkses = await getFiturForRole(userRole)
+    [fiturAkses, globalBottomNavEnabled] = await Promise.all([
+      getFiturForRole(userRole),
+      getBottomNavGlobalEnabled(),
+    ])
   } catch (err: any) {
-    console.error('[layout] getFiturForRole ERROR:', err?.message)
+    console.error('[layout] fetch error:', err?.message)
+    try { fiturAkses = await getFiturForRole(userRole) } catch {}
   }
 
   console.log('[layout] fiturAkses count:', fiturAkses.length)
@@ -60,6 +68,8 @@ export default async function DashboardLayout({
       userName={userName}
       avatarUrl={avatarUrl}
       fiturAkses={fiturAkses}
+      globalBottomNavEnabled={globalBottomNavEnabled}
+      userShowBottomNav={userShowBottomNav}
     >
       {children}
     </ClientLayout>

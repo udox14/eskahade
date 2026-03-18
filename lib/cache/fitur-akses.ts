@@ -38,10 +38,22 @@ interface FiturAksesRow {
 // Ambil SEMUA fitur — query langsung ke D1, dengan fallback aman kalau DB error
 export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
   try {
-    const rows = await query<FiturAksesRow>(
-      'SELECT id, group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan FROM fitur_akses ORDER BY group_name, urutan',
-      []
-    )
+    // Coba query dengan kolom bottomnav dulu (setelah migration 0016)
+    // Kalau kolom belum ada, fallback ke query tanpa kolom bottomnav
+    let rows: FiturAksesRow[] = []
+    try {
+      rows = await query<FiturAksesRow>(
+        'SELECT id, group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan FROM fitur_akses ORDER BY group_name, urutan',
+        []
+      )
+    } catch {
+      // Kolom bottomnav belum ada (migration belum dijalankan) — fallback
+      const fallbackRows = await query<Omit<FiturAksesRow, 'is_bottomnav' | 'bottomnav_urutan'>>(
+        'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan',
+        []
+      )
+      rows = fallbackRows.map(r => ({ ...r, is_bottomnav: 0, bottomnav_urutan: 0 }))
+    }
     return rows.map(r => ({
       ...r,
       roles: (() => {
@@ -60,6 +72,19 @@ export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
 export async function getFiturForRole(role: string): Promise<FiturAkses[]> {
   const all = await getCachedFiturAkses()
   return all.filter(f => f.is_active && f.roles.includes(role))
+}
+
+// Helper: cek apakah bottom nav diaktifkan secara global oleh admin
+export async function getBottomNavGlobalEnabled(): Promise<boolean> {
+  try {
+    const rows = await query<{ value: string }>(
+      "SELECT value FROM app_settings WHERE key = 'bottomnav_enabled'",
+      []
+    )
+    return rows[0]?.value === '1'
+  } catch {
+    return true // default aktif kalau tabel belum ada
+  }
 }
 
 // Helper: cek apakah suatu href boleh diakses role tertentu

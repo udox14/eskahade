@@ -16,9 +16,11 @@ interface ClientLayoutProps {
   userName: string;
   avatarUrl?: string | null;
   fiturAkses: FiturAkses[];
+  globalBottomNavEnabled: boolean;
+  userShowBottomNav: boolean;
 }
 
-export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl, fiturAkses }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
@@ -88,14 +90,19 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
 
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
-          <div className="max-w-7xl mx-auto w-full space-y-6 pb-20 md:pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+          <div className="max-w-7xl mx-auto w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
             {children}
           </div>
         </main>
-      </div>
 
-      {/* BOTTOM NAV — mobile only */}
-      <BottomNav fiturAkses={fiturAkses} userRole={userRole} />
+        {/* BOTTOM NAV — mobile only, di dalam flex column jadi tidak nutup konten */}
+        <BottomNav
+          fiturAkses={fiturAkses}
+          userRole={userRole}
+          globalEnabled={globalBottomNavEnabled}
+          userShowBottomNav={userShowBottomNav}
+        />
+      </div>
     </div>
   );
 }

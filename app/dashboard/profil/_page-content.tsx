@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getProfilData, updateProfil, updatePassword, uploadAvatar } from './actions'
+import { getProfilData, updateProfil, updatePassword, uploadAvatar, toggleShowBottomNav } from './actions'
 import {
   User, Camera, Save, Lock, Phone, Mail, Shield,
-  Loader2, CheckCircle, Eye, EyeOff, Building2
+  Loader2, CheckCircle, Eye, EyeOff, Building2, Smartphone
 } from 'lucide-react'
 
 const ROLE_LABEL: Record<string, string> = {
@@ -48,6 +48,8 @@ export default function ProfilPage() {
   const [pwConfirm, setPwConfirm] = useState('')
   const [savingPw, setSavingPw] = useState(false)
   const [showPw, setShowPw] = useState(false)
+  const [showBottomNav, setShowBottomNav] = useState(true)
+  const [togglingNav, setTogglingNav] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type })
@@ -59,6 +61,7 @@ export default function ProfilPage() {
       if (data) {
         setProfil(data); setNama(data.full_name || ''); setPhone(data.phone || '')
         setAvatarPreview(data.avatar_url || null)
+        setShowBottomNav(data.show_bottomnav !== 0) // null atau 1 → aktif, 0 → nonaktif
       }
       setLoading(false)
     })
@@ -180,6 +183,37 @@ export default function ProfilPage() {
             {savingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Simpan Perubahan
           </button>
+        </div>
+
+        {/* TAMPILAN */}
+        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-4">
+          <h3 className="text-sm font-black text-slate-600 uppercase tracking-wide flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-blue-500" /> Tampilan
+          </h3>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Bottom Navigation Bar</p>
+              <p className="text-xs text-slate-400 mt-0.5">Tampilkan navigasi bawah saat menggunakan HP</p>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !showBottomNav
+                setTogglingNav(true)
+                setShowBottomNav(next)
+                await toggleShowBottomNav(next)
+                setTogglingNav(false)
+                showToast(`Bottom nav ${next ? 'diaktifkan' : 'dinonaktifkan'}`, 'success')
+              }}
+              disabled={togglingNav}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                showBottomNav ? 'bg-emerald-500' : 'bg-slate-200'
+              }`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                showBottomNav ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
         </div>
 
         {/* GANTI PASSWORD */}

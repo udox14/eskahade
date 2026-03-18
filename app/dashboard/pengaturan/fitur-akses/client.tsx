@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan } from './actions'
+import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, getBottomNavGlobalStatus } from './actions'
 import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +72,7 @@ interface FiturItem {
 
 interface Props {
   fiturList: FiturItem[]
+  globalBottomNavEnabled: boolean
 }
 
 // ── Tab: Per Fitur ────────────────────────────────────────────────────────────
@@ -356,12 +357,18 @@ function TabBottomNav({
   fiturList,
   loadingId,
   pending,
+  globalEnabled,
+  togglingGlobal,
+  onToggleGlobal,
   onToggleBottomNav,
   onSetUrutan,
 }: {
   fiturList: FiturItem[]
   loadingId: string | null
   pending: boolean
+  globalEnabled: boolean
+  togglingGlobal: boolean
+  onToggleGlobal: () => void
   onToggleBottomNav: (f: FiturItem) => void
   onSetUrutan: (f: FiturItem, urutan: number) => void
 }) {
@@ -384,6 +391,31 @@ function TabBottomNav({
 
   return (
     <div className="space-y-5">
+      {/* Toggle Global */}
+      <div className={`flex items-center justify-between gap-4 rounded-xl border px-5 py-4 ${
+        globalEnabled ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+      }`}>
+        <div>
+          <p className="text-sm font-bold text-slate-800">Bottom Nav — Aktif Global</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {globalEnabled
+              ? 'Bottom nav tampil untuk semua user (sesuai preferensi masing-masing).'
+              : 'Bottom nav disembunyikan dari semua user, apapun preferensi mereka.'}
+          </p>
+        </div>
+        <button
+          onClick={onToggleGlobal}
+          disabled={togglingGlobal}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+            globalEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            globalEnabled ? 'translate-x-5' : 'translate-x-0'
+          }`} />
+        </button>
+      </div>
+
       {/* Info banner */}
       <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
         <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
@@ -539,8 +571,10 @@ function TabBottomNav({
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export function FiturAksesClient({ fiturList: initial }: Props) {
+export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: initialGlobal }: Props) {
   const [fiturList, setFiturList] = useState<FiturItem[]>(initial)
+  const [globalEnabled, setGlobalEnabled] = useState(initialGlobal)
+  const [togglingGlobal, setTogglingGlobal] = useState(false)
   const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'bottomnav'>('fitur')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -569,6 +603,19 @@ export function FiturAksesClient({ fiturList: initial }: Props) {
         setLoadingId(null)
       }
     })
+  }
+
+  async function handleToggleGlobal() {
+    setTogglingGlobal(true)
+    try {
+      await toggleBottomNavGlobal(globalEnabled)
+      setGlobalEnabled(v => !v)
+      showToast(`Bottom nav ${globalEnabled ? 'dinonaktifkan' : 'diaktifkan'} untuk semua user`)
+    } catch {
+      showToast('Gagal mengubah setting global', 'error')
+    } finally {
+      setTogglingGlobal(false)
+    }
   }
 
   function handleToggleBottomNav(fitur: FiturItem) {
@@ -705,6 +752,9 @@ export function FiturAksesClient({ fiturList: initial }: Props) {
           fiturList={fiturList}
           loadingId={loadingId}
           pending={pending}
+          globalEnabled={globalEnabled}
+          togglingGlobal={togglingGlobal}
+          onToggleGlobal={handleToggleGlobal}
           onToggleBottomNav={handleToggleBottomNav}
           onSetUrutan={handleSetUrutan}
         />

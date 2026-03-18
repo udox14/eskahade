@@ -10,7 +10,7 @@ export async function getProfilData() {
   if (!session) return null
 
   const user = await query<any>(
-    'SELECT id, email, full_name, role, asrama_binaan, avatar_url, phone FROM users WHERE id = ?',
+    'SELECT id, email, full_name, role, asrama_binaan, avatar_url, phone, show_bottomnav FROM users WHERE id = ?',
     [session.id]
   )
   return user[0] || null
@@ -62,6 +62,19 @@ export async function updatePassword(data: { current: string; new: string; confi
     [newHash, new Date().toISOString(), session.id]
   )
 
+  return { success: true }
+}
+
+export async function toggleShowBottomNav(show: boolean) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  await execute(
+    'UPDATE users SET show_bottomnav = ? WHERE id = ?',
+    [show ? 1 : 0, session.id]
+  )
+  revalidatePath('/dashboard/profil')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

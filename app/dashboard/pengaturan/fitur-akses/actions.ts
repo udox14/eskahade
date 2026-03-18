@@ -74,6 +74,27 @@ export async function getAllFiturForAdmin() {
   }))
 }
 
+// Toggle bottom nav secara global (admin only)
+export async function toggleBottomNavGlobal(currentEnabled: boolean) {
+  await assertAdmin()
+  const newVal = currentEnabled ? '0' : '1'
+  await execute(
+    "INSERT INTO app_settings (key, value, updated_at) VALUES ('bottomnav_enabled', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+    [newVal]
+  )
+  revalidateTag('fitur-akses', 'everything')
+  return { success: true }
+}
+
+// Ambil status global bottom nav
+export async function getBottomNavGlobalStatus() {
+  await assertAdmin()
+  const rows = await query<{ value: string }>(
+    "SELECT value FROM app_settings WHERE key = 'bottomnav_enabled'"
+  )
+  return rows[0]?.value === '1'
+}
+
 // Toggle is_bottomnav suatu fitur
 export async function toggleFiturBottomNav(id: number, currentVal: boolean) {
   await assertAdmin()
