@@ -37,7 +37,7 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
 }) {
   const terpilih = !!vonis
 
-  const tombol = async (
+  const tombol = (
     <div className="flex flex-wrap gap-1.5">
       {([
         { v: 'ALFA_MURNI' as VonisType, label: 'Alfa',       active: 'bg-rose-600 text-white',   idle: 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' },
