@@ -8,10 +8,10 @@ import {
   AlertTriangle, Loader2, Printer, Eye, ArrowRight, Save
 } from 'lucide-react'
 import {
-import { useConfirm } from '@/components/ui/confirm-dialog'
   getDataPerpindahan, simpanKonfigurasiKamar, generateDraft,
   updateKamarDraft, applyDraft, setKetuaKamar, resetDraft
 } from './actions'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 

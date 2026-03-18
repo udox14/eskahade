@@ -40,7 +40,7 @@ async function createJWT(payload: object): Promise<string> {
   const body = base64urlEncode(JSON.stringify({
     ...payload,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 10 // 10 tahun
   }))
 
   const enc = new TextEncoder()
@@ -96,7 +96,7 @@ export async function setSession(user: SessionUser): Promise<void> {
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: 60 * 60 * 24 * 365 * 10 // 10 tahun
   })
 }
 
