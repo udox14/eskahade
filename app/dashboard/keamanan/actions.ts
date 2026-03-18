@@ -105,8 +105,30 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
   const session = await getSession()
   if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
     return { error: 'Akses ditolak' }
+
+  // Cascade: hapus surat_pernyataan yang mencantumkan pelanggaran ini
+  // pelanggaran_ids disimpan sebagai JSON array — cari yang mengandung ID ini
+  const suratTerdampak = await query<{ id: string; pelanggaran_ids: string }>(
+    `SELECT id, pelanggaran_ids FROM surat_pernyataan
+     WHERE pelanggaran_ids LIKE ?`,
+    [`%"${id}"%`]
+  )
+  for (const surat of suratTerdampak) {
+    const ids: string[] = JSON.parse(surat.pelanggaran_ids || '[]')
+    const idsBarу = ids.filter(i => i !== id)
+    if (idsBarу.length === 0) {
+      // Tidak ada pelanggaran tersisa — hapus suratnya
+      await execute('DELETE FROM surat_pernyataan WHERE id=?', [surat.id])
+    } else {
+      // Masih ada pelanggaran lain — update array
+      await execute('UPDATE surat_pernyataan SET pelanggaran_ids=? WHERE id=?',
+        [JSON.stringify(idsBarу), surat.id])
+    }
+  }
+
   await execute('DELETE FROM pelanggaran WHERE id=?', [id])
   revalidatePath('/dashboard/keamanan')
+  revalidatePath('/dashboard/surat-santri')
   return { success: true }
 }
 
