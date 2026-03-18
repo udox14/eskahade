@@ -6,9 +6,11 @@ import { useState, useEffect } from 'react'
 import { getMarhalahList, getKelasByMarhalah, getSantriForKenaikan, importKenaikanKelas } from './actions'
 import { FileSpreadsheet, Upload, Save, Loader2, CheckCircle, AlertTriangle, Download, X, HelpCircle, LayoutList, CheckSquare, Square, Users, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner' 
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 
 export default function KenaikanKelasPage() {
+  const confirm = useConfirm()
   const [mode, setMode] = useState<'EXCEL' | 'MANUAL'>('MANUAL')
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -154,11 +156,11 @@ export default function KenaikanKelasPage() {
     }
   }
 
-  const toggleSelectNis = (nis: string) => {
+  const toggleSelectNis = async (nis: string) => {
     setSelectedNis(prev => prev.includes(nis) ? prev.filter(n => n !== nis) : [...prev, nis])
   }
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = async () => {
     if (selectedNis.length === manualSantri.length) {
       setSelectedNis([])
     } else {
@@ -166,7 +168,7 @@ export default function KenaikanKelasPage() {
     }
   }
 
-  const applyBulkPlacement = () => {
+  const applyBulkPlacement = async () => {
     if (selectedNis.length === 0) return toast.warning("Pilih minimal satu santri (ceklis).")
     if (!bulkTargetKelas) return toast.warning("Pilih kelas tujuan terlebih dahulu.")
 
@@ -180,7 +182,7 @@ export default function KenaikanKelasPage() {
     toast.success(`Berhasil menerapkan kelas ke ${selectedNis.length} santri.`)
   }
 
-  const handleIndividualPlacement = (nis: string, targetKelasNama: string) => {
+  const handleIndividualPlacement = async (nis: string, targetKelasNama: string) => {
     setPlacements(prev => ({ ...prev, [nis]: targetKelasNama }))
   }
 
@@ -212,13 +214,13 @@ export default function KenaikanKelasPage() {
   }
 
   // Handler untuk Excel
-  const handleProcessExcel = () => {
+  const handleProcessExcel = async () => {
     setShowConfirm(false)
     executeProcess(excelData)
   }
 
   // Handler untuk Manual
-  const handleProcessManual = () => {
+  const handleProcessManual = async () => {
     // Ubah format objek ke format array yang diharapkan server action
     const payload = Object.entries(placements)
       .filter(([nis, target]) => target && target !== '')
@@ -231,13 +233,13 @@ export default function KenaikanKelasPage() {
       return toast.error("Belum ada satupun santri yang ditentukan kelas tujuannya.")
     }
 
-    if (confirm(`Yakin ingin memproses kenaikan ${payload.length} santri ke kelas baru?`)) {
+    if (await confirm(`Yakin ingin memproses kenaikan ${payload.length} santri ke kelas baru?`)) {
       executeProcess(payload)
     }
   }
 
   // Trigger Konfirmasi Excel (Fungsi yang terhapus)
-  const triggerProcess = () => {
+  const triggerProcess = async () => {
     if (excelData.length === 0) {
       toast.warning("Belum ada data Excel yang diupload.")
       return

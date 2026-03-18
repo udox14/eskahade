@@ -8,6 +8,7 @@ import {
   AlertTriangle, Loader2, Printer, Eye, ArrowRight, Save
 } from 'lucide-react'
 import {
+import { useConfirm } from '@/components/ui/confirm-dialog'
   getDataPerpindahan, simpanKonfigurasiKamar, generateDraft,
   updateKamarDraft, applyDraft, setKetuaKamar, resetDraft
 } from './actions'
@@ -34,6 +35,7 @@ function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PerpindahanClient({
+  const confirm = useConfirm()
   userRole, asramaBinaan
 }: { userRole: string; asramaBinaan: string | null }) {
 
@@ -92,7 +94,7 @@ export default function PerpindahanClient({
   useEffect(() => { load() }, [load])
 
   // ── Derived: santri per kamar ──────────────────────────────────────────────
-  const getSantriDiKamar = (nomor: string) =>
+  const getSantriDiKamar = async (nomor: string) =>
     santriList.filter(s => draftMap[s.id]?.kamar_baru === nomor)
 
   const santriTanpaDraft = santriList.filter(s => !draftMap[s.id])
@@ -131,7 +133,7 @@ export default function PerpindahanClient({
   }
 
   const handleApply = async () => {
-    if (!confirm(`Apply perpindahan kamar untuk ${Object.keys(draftMap).length} santri di asrama ${asrama}? Kolom kamar santri akan diupdate.`)) return
+    if (!await confirm(`Apply perpindahan kamar untuk ${Object.keys(draftMap).length} santri di asrama ${asrama}? Kolom kamar santri akan diupdate.`)) return
     setSaving(true)
     const res = await applyDraft(asrama)
     setSaving(false)
@@ -141,7 +143,7 @@ export default function PerpindahanClient({
   }
 
   const handleReset = async () => {
-    if (!confirm('Reset semua draft perpindahan? Data kamar santri di database TIDAK berubah.')) return
+    if (!await confirm('Reset semua draft perpindahan? Data kamar santri di database TIDAK berubah.')) return
     await resetDraft(asrama)
     toast.success('Draft direset')
     await load()
@@ -161,7 +163,7 @@ export default function PerpindahanClient({
   }
 
   // ── Drag and drop ──────────────────────────────────────────────────────────
-  const handleDrop = (kamarTujuan: string) => {
+  const handleDrop = async (kamarTujuan: string) => {
     if (dragSantriId && kamarTujuan !== draftMap[dragSantriId]?.kamar_baru) {
       handlePindah(dragSantriId, kamarTujuan)
     }
@@ -170,7 +172,7 @@ export default function PerpindahanClient({
   }
 
   // ── Print ──────────────────────────────────────────────────────────────────
-  const handlePrint = (mode: 'all' | string) => {
+  const handlePrint = async (mode: 'all' | string) => {
     const printData = configs.map(cfg => {
       const santri = getSantriDiKamar(cfg.nomor_kamar)
       const ketua = ketuaMap[cfg.nomor_kamar]

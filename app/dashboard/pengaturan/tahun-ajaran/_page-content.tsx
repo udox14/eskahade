@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { CalendarDays, Plus, CheckCircle, Circle, Trash2, Loader2, BookOpen, Users, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import {
+import { useConfirm } from '@/components/ui/confirm-dialog'
   getTahunAjaranList,
   tambahTahunAjaran,
   aktifkanTahunAjaran,
@@ -11,6 +12,7 @@ import {
 } from './actions'
 
 export default function TahunAjaranPage() {
+  const confirm = useConfirm()
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [nama, setNama] = useState('')
@@ -41,7 +43,7 @@ export default function TahunAjaranPage() {
   }
 
   const handleAktifkan = async (id: number, nama: string) => {
-    if (!confirm(`Aktifkan tahun ajaran "${nama}"?\n\nSemua kelas baru yang dibuat akan otomatis masuk ke tahun ajaran ini.`)) return
+    if (!await confirm(`Aktifkan tahun ajaran "${nama}"?\n\nSemua kelas baru yang dibuat akan otomatis masuk ke tahun ajaran ini.`)) return
     setLoadingAktif(id)
     const res = await aktifkanTahunAjaran(id)
     setLoadingAktif(null)
@@ -53,7 +55,7 @@ export default function TahunAjaranPage() {
   }
 
   const handleHapus = async (id: number, nama: string) => {
-    if (!confirm(`Hapus tahun ajaran "${nama}"?\nPastikan tidak ada kelas terkait.`)) return
+    if (!await confirm(`Hapus tahun ajaran "${nama}"?\nPastikan tidak ada kelas terkait.`)) return
     setLoadingHapus(id)
     const res = await hapusTahunAjaran(id)
     setLoadingHapus(null)

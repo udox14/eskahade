@@ -7,6 +7,7 @@ import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
@@ -22,6 +23,7 @@ const ROLES = [
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
 export default function ManajemenUserPage() {
+  const confirm = useConfirm()
   const [users, setUsers] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -90,7 +92,7 @@ export default function ManajemenUserPage() {
     }
   }
 
-  const handleRoleChange = (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: string, newRole: string) => {
     if (newRole === 'pengurus_asrama') {
       setPendingRoleUpdate({ userId, role: newRole })
       setIsAsramaModalOpen(true)
@@ -99,7 +101,7 @@ export default function ManajemenUserPage() {
     executeUpdateRole(userId, newRole)
   }
 
-  const handleSelectAsrama = (asrama: string) => {
+  const handleSelectAsrama = async (asrama: string) => {
     if (pendingRoleUpdate) {
       setIsAsramaModalOpen(false)
       executeUpdateRole(pendingRoleUpdate.userId, pendingRoleUpdate.role, asrama)
@@ -241,7 +243,7 @@ export default function ManajemenUserPage() {
 
   const handleSimpanBatch = async () => {
     if (excelData.length === 0) return
-    if (!confirm(`Import ${excelData.filter(d=>d.isValid).length} user?`)) return
+    if (!await confirm(`Import ${excelData.filter(d=>d.isValid).length} user?`)) return
 
     setIsImporting(true)
     const toastId = toast.loading("Membuat akun batch...")

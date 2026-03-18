@@ -7,6 +7,7 @@ import {
   Save, ChevronLeft, ChevronRight, RefreshCw, Users, Search
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type VonisType = 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
 type AbsenItem = {
@@ -36,7 +37,7 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
 }) {
   const terpilih = !!vonis
 
-  const tombol = (
+  const tombol = async (
     <div className="flex flex-wrap gap-1.5">
       {([
         { v: 'ALFA_MURNI' as VonisType, label: 'Alfa',       active: 'bg-rose-600 text-white',   idle: 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' },
@@ -108,6 +109,7 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function VerifikasiAbsenPage() {
+  const confirm = useConfirm()
   const [list, setList]           = useState<AbsenItem[]>([])
   const [loading, setLoading]     = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -124,13 +126,13 @@ export default function VerifikasiAbsenPage() {
     finally { setLoading(false) }
   }, [])
 
-  const handleSelect = (santriId: string, v: VonisType) =>
+  const handleSelect = async (santriId: string, v: VonisType) =>
     setDrafts(prev => prev[santriId] === v
       ? (({ [santriId]: _, ...rest }) => rest)(prev)
       : { ...prev, [santriId]: v }
     )
 
-  const handlePilihSemua = (v: VonisType) => {
+  const handlePilihSemua = async (v: VonisType) => {
     const next: Record<string, VonisType> = {}
     filtered.forEach(i => { next[i.santri_id] = v })
     setDrafts(prev => ({ ...prev, ...next }))
@@ -139,7 +141,7 @@ export default function VerifikasiAbsenPage() {
   const handleSimpan = async () => {
     const ids = Object.keys(drafts)
     if (!ids.length) return
-    if (!confirm(`Simpan keputusan untuk ${ids.length} santri?`)) return
+    if (!await confirm(`Simpan keputusan untuk ${ids.length} santri?`)) return
     setIsSaving(true)
     const payload = ids.map(id => ({
       santriId: id,

@@ -16,6 +16,7 @@ import {
   ChevronRight, ChevronLeft, Calendar, BookOpen
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type Grup = {
   key: string
@@ -27,6 +28,7 @@ type Grup = {
 }
 
 export default function ArsipSantriPage() {
+  const confirm = useConfirm()
   const router = useRouter()
   const [tab, setTab] = useState<'ARSIPKAN' | 'DAFTAR_ARSIP'>('ARSIPKAN')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,7 +89,7 @@ export default function ArsipSantriPage() {
     append ? setLoadingMoreSantri(false) : setLoadingSantri(false)
   }
 
-  const handleFilterSantriChange = (key: string, val: string) => {
+  const handleFilterSantriChange = async (key: string, val: string) => {
     const next = { ...filterSantri, [key]: val }
     setFilterSantri(next)
     clearTimeout(debounceRef.current ?? undefined)
@@ -129,7 +131,7 @@ export default function ArsipSantriPage() {
     append ? setLoadingMoreSantriArsip(false) : setLoadingSantriArsip(false)
   }
 
-  const handleFilterSantriArsipChange = (key: string, val: string) => {
+  const handleFilterSantriArsipChange = async (key: string, val: string) => {
     const next = { ...filterSantriArsip, [key]: val }
     setFilterSantriArsip(next)
     clearTimeout(debounceRef.current ?? undefined)
@@ -137,13 +139,13 @@ export default function ArsipSantriPage() {
   }
 
   // ── SELECT HELPERS ──
-  const toggleSelectArsip = (id: string) => setSelectedArsip(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAllSantri = () => {
+  const toggleSelectArsip = async (id: string) => setSelectedArsip(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleSelectAllSantri = async () => {
     if (selectedArsip.size === santriList.length && santriList.length > 0) setSelectedArsip(new Set())
     else setSelectedArsip(new Set(santriList.map(s => s.id)))
   }
-  const toggleSelectRestore = (id: string) => setSelectedRestore(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAllRestore = () => {
+  const toggleSelectRestore = async (id: string) => setSelectedRestore(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleSelectAllRestore = async () => {
     if (selectedRestore.size === santriArsipList.length && santriArsipList.length > 0) setSelectedRestore(new Set())
     else setSelectedRestore(new Set(santriArsipList.map(a => a.id)))
   }
@@ -153,7 +155,7 @@ export default function ArsipSantriPage() {
   // ── ACTIONS ──
   const handleArsipkan = async () => {
     if (selectedArsip.size === 0) return toast.warning("Pilih santri yang akan dijadikan alumni")
-    if (!confirm(`⚠️ Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData mereka akan dipindah ke arsip dan dihapus dari daftar aktif.`)) return
+    if (!await confirm(`⚠️ Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData mereka akan dipindah ke arsip dan dihapus dari daftar aktif.`)) return
     setIsArsipkan(true)
     const toastId = toast.loading(`Memproses ${selectedArsip.size} santri...`)
     const res = await arsipkanSantri(Array.from(selectedArsip), catatanArsip)
@@ -167,7 +169,7 @@ export default function ArsipSantriPage() {
 
   const handleRestore = async () => {
     if (selectedRestore.size === 0) return toast.warning("Pilih data yang akan direstore")
-    if (!confirm(`Restore ${selectedRestore.size} santri ke daftar aktif?\n\nSantri dikembalikan tanpa kelas — atur manual setelahnya.`)) return
+    if (!await confirm(`Restore ${selectedRestore.size} santri ke daftar aktif?\n\nSantri dikembalikan tanpa kelas — atur manual setelahnya.`)) return
     setIsRestore(true)
     const toastId = toast.loading(`Merestore ${selectedRestore.size} santri...`)
     const res = await restoreSantri(Array.from(selectedRestore))
@@ -182,7 +184,7 @@ export default function ArsipSantriPage() {
 
   const handleHapusMassal = async () => {
     if (selectedRestore.size === 0) return toast.warning("Pilih data yang akan dihapus")
-    if (!confirm(`⚠️ HAPUS PERMANEN ${selectedRestore.size} data arsip dari Supabase?\n\nPastikan sudah didownload dulu. Tindakan ini TIDAK BISA dibatalkan!`)) return
+    if (!await confirm(`⚠️ HAPUS PERMANEN ${selectedRestore.size} data arsip dari Supabase?\n\nPastikan sudah didownload dulu. Tindakan ini TIDAK BISA dibatalkan!`)) return
     setIsHapusMassal(true)
     const toastId = toast.loading(`Menghapus ${selectedRestore.size} arsip...`)
     const res = await hapusArsipMassal(Array.from(selectedRestore))
@@ -196,7 +198,7 @@ export default function ArsipSantriPage() {
   }
 
   const handleHapusSatu = async (id: string, nama: string) => {
-    if (!confirm(`Hapus permanen arsip "${nama}"?\n\nData ini TIDAK BISA dikembalikan lagi!`)) return
+    if (!await confirm(`Hapus permanen arsip "${nama}"?\n\nData ini TIDAK BISA dikembalikan lagi!`)) return
     const res = await hapusArsipPermanen(id)
     if ('error' in res) { toast.error("Gagal hapus"); return }
     toast.success("Arsip dihapus")
@@ -226,7 +228,7 @@ export default function ArsipSantriPage() {
   }
 
   // ── LABEL GRUP ──
-  const labelGrup = (g: Grup) => {
+  const labelGrup = async (g: Grup) => {
     if (g.catatan) return g.catatan
     if (g.angkatan) return `Angkatan ${g.angkatan}`
     return `Backup ${g.tanggal_arsip}`

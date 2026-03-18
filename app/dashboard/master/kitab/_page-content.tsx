@@ -8,8 +8,10 @@ import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircl
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function MasterKitabPage() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'LIST' | 'IMPORT'>('LIST')
   
   // Data
@@ -73,7 +75,7 @@ export default function MasterKitabPage() {
   }
 
   const handleHapus = async (id: string) => {
-    if(!confirm("Hapus kitab ini?")) return
+    if(!await confirm("Hapus kitab ini?")) return
     await hapusKitab(id)
     toast.success("Dihapus")
     loadKitab()

@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string | null) {
@@ -474,7 +475,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   }, [search, asrama])
 
   const handleRestore = async (r: SantriKeluar) => {
-    if (!confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
+    if (!await confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
     setRestoringId(r.id)
     const res = await aktifkanKembali(r.id)
     setRestoringId(null)
@@ -619,6 +620,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SantriKeluarPage() {
+  const confirm = useConfirm()
   const [tab, setTab]           = useState<'aktif' | 'keluar'>('aktif')
   const [asramaList, setAsramaList] = useState<string[]>([])
 

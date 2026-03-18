@@ -9,6 +9,7 @@ import {
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type TelatItem = {
   izin_id: string; santri_id: string; nama: string; info: string
@@ -33,7 +34,7 @@ function BarisTelat({ item, no, onVonis }: {
   const sudahKembali    = !!item.tgl_kembali
 
   const handle = async (v: VonisType) => {
-    if (v === 'TELAT_MURNI' && !confirm(`Vonis TELAT kepada ${item.nama}? (+25 poin)`)) return
+    if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (+25 poin)`)) return
     setBusy(true)
     await onVonis(item.izin_id, item.santri_id, v)
     setBusy(false)
@@ -126,6 +127,7 @@ function BarisTelat({ item, no, onVonis }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function VerifikasiTelatPage() {
+  const confirm = useConfirm()
   const [list, setList]           = useState<TelatItem[]>([])
   const [loading, setLoading]     = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)

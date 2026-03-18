@@ -7,8 +7,10 @@ import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMass
 import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function MasterKelasPage() {
+  const confirm = useConfirm()
   const [mode, setMode] = useState<'manual' | 'excel'>('manual')
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -44,7 +46,7 @@ export default function MasterKelasPage() {
   }
 
   const handleHapus = async (id: string) => {
-    if(!confirm("Hapus kelas ini?")) return
+    if(!await confirm("Hapus kelas ini?")) return
     const toastId = toast.loading("Menghapus...")
     const res = await hapusKelas(id)
     toast.dismiss(toastId)

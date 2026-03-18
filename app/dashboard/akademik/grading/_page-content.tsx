@@ -5,10 +5,12 @@ import React from 'react'
 import { useState, useEffect, useRef } from 'react'
 import { getKelasList, getDataGrading, simpanGradingBatch } from './actions'
 import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet } from 'lucide-react'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // Memastikan interface TypeScript untuk Library XLSX via window
 
 export default function GradingKelasPage() {
+  const confirm = useConfirm()
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState<string>('')
   
@@ -63,7 +65,7 @@ export default function GradingKelasPage() {
   }
 
   // 3. Handler Dropdown Perubahan Grade
-  const handleGradeChange = (riwayatId: string, newGrade: string) => {
+  const handleGradeChange = async (riwayatId: string, newGrade: string) => {
     setPendingChanges(prev => ({
       ...prev,
       [riwayatId]: newGrade
@@ -77,7 +79,7 @@ export default function GradingKelasPage() {
       return alert("Belum ada perubahan yang perlu disimpan.")
     }
 
-    if (!confirm(`Simpan keputusan grading untuk ${totalChanges} santri?`)) return
+    if (!await confirm(`Simpan keputusan grading untuk ${totalChanges} santri?`)) return
 
     setIsSaving(true)
     try {
@@ -198,7 +200,7 @@ export default function GradingKelasPage() {
   };
 
   // Helper
-  const getDisplayGrade = (riwayatId: string, originalGrade: string) => {
+  const getDisplayGrade = async (riwayatId: string, originalGrade: string) => {
     return pendingChanges[riwayatId] !== undefined ? pendingChanges[riwayatId] : originalGrade
   }
 

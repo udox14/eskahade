@@ -7,6 +7,7 @@ import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft,
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
@@ -14,6 +15,7 @@ const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIF
 type FilterStatus = 'SEMUA' | 'SUDAH_BAYAR_INI' | 'NUNGGAK' | 'AMAN'
 
 export default function SPPPage() {
+  const confirm = useConfirm()
   const [view, setView] = useState<'LIST' | 'PAYMENT'>('LIST')
   const [nominal, setNominal] = useState(70000)
   const [tahun, setTahun] = useState(new Date().getFullYear())
@@ -89,7 +91,7 @@ export default function SPPPage() {
   }, [kamarIdx, kamars])
 
   // Invalidate cache kamar tertentu setelah simpan batch
-  const invalidateKamar = (kamar: string) => {
+  const invalidateKamar = async (kamar: string) => {
     setKamarCache(prev => { const n = { ...prev }; delete n[kamar]; return n })
   }
 
@@ -98,7 +100,7 @@ export default function SPPPage() {
     if (view === 'PAYMENT') window.history.pushState({ view: 'PAYMENT' }, '')
   }, [view])
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = async (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'PAYMENT') {
         setView('LIST')
         setSelectedSantri(null)
@@ -118,14 +120,14 @@ export default function SPPPage() {
     }
   }, [view, selectedSantri, tahun])
 
-  const handleSelectSantri = (santri: any) => {
+  const handleSelectSantri = async (santri: any) => {
     setSelectedSantri(santri)
     setView('PAYMENT')
   }
 
   const handleBayar = async () => {
     if (selectedMonths.length === 0) return
-    if (!confirm(`Bayar SPP ${selectedMonths.length} bulan? Total: Rp ${(selectedMonths.length * nominal).toLocaleString('id-ID')}`)) return
+    if (!await confirm(`Bayar SPP ${selectedMonths.length} bulan? Total: Rp ${(selectedMonths.length * nominal).toLocaleString('id-ID')}`)) return
     const toastId = toast.loading('Memproses...')
     const res = await bayarSPP(selectedSantri.id, tahun, selectedMonths, nominal)
     toast.dismiss(toastId)
@@ -140,7 +142,7 @@ export default function SPPPage() {
     }
   }
 
-  const toggleDraft = (e: React.MouseEvent, santri: any) => {
+  const toggleDraft = async (e: React.MouseEvent, santri: any) => {
     e.stopPropagation()
     setDrafts(prev => {
       const next = { ...prev }
@@ -155,7 +157,7 @@ export default function SPPPage() {
       santriId: id, bulan: drafts[id].bulan, tahun, nominal: drafts[id].nominal,
     }))
     if (!listPayload.length) return
-    if (!confirm(`Simpan pembayaran untuk ${listPayload.length} santri?`)) return
+    if (!await confirm(`Simpan pembayaran untuk ${listPayload.length} santri?`)) return
     setIsSavingBatch(true)
     const res = await simpanSppBatch(listPayload)
     setIsSavingBatch(false)
@@ -167,12 +169,12 @@ export default function SPPPage() {
     }
   }
 
-  const toggleBulan = (idx: number) => {
+  const toggleBulan = async (idx: number) => {
     if (riwayatBayar.some(r => r.bulan === idx)) return
     setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx])
   }
 
-  const handleBackToList = () => { window.history.back() }
+  const handleBackToList = async () => { window.history.back() }
 
   const activeKamar = kamars[kamarIdx] ?? ''
 

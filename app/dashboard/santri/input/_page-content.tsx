@@ -7,6 +7,7 @@ import { Upload, Download, Save, CheckCircle, ArrowLeft, Loader2, UserPlus, File
 import { useRouter } from 'next/navigation'
 import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './actions'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
@@ -29,6 +30,7 @@ const FORM_INIT = {
 }
 
 export default function InputSantriPage() {
+  const confirm = useConfirm()
   const router = useRouter()
   const [tab, setTab] = useState<'FORM' | 'EXCEL'>('FORM')
 
@@ -45,7 +47,7 @@ export default function InputSantriPage() {
     getKelasList().then(setKelasList)
   }, [])
 
-  const set = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
+  const set = async (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
 
   // ── HANDLER FORM ──
   const handleSimpanForm = async (e: React.FormEvent) => {
@@ -117,7 +119,7 @@ export default function InputSantriPage() {
 
   const handleSaveExcel = async () => {
     if (excelData.length === 0) return toast.warning("Data kosong")
-    if (!confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nData yang NIS-nya sudah ada akan dilewati otomatis.`)) return
+    if (!await confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nData yang NIS-nya sudah ada akan dilewati otomatis.`)) return
 
     setIsSavingExcel(true)
     const BATCH_SIZE = 50

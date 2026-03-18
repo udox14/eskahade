@@ -10,6 +10,7 @@ import { id } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const LIST_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
@@ -17,6 +18,7 @@ const LIST_PEMBERI_IZIN = [
 ]
 
 export default function PerizinanPage() {
+  const confirm = useConfirm()
   const router = useRouter()
   const [list, setList] = useState<any[]>([])
   const [page, setPage] = useState(1)
@@ -88,7 +90,7 @@ export default function PerizinanPage() {
   }
 
   const handleHapus = async (item: any) => {
-    if (!confirm(`Hapus data izin ${item.nama}?`)) return
+    if (!await confirm(`Hapus data izin ${item.nama}?`)) return
     setDeletingId(item.id)
     const res = await hapusIzin(item.id)
     setDeletingId(null)
@@ -97,7 +99,7 @@ export default function PerizinanPage() {
     setList(prev => prev.filter(i => i.id !== item.id))
   }
 
-  const openReturnModal = (item: any) => {
+  const openReturnModal = async (item: any) => {
     setSelectedReturnId(item.id)
     const now = new Date()
     const tzOffset = now.getTimezoneOffset() * 60000

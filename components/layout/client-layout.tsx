@@ -5,6 +5,7 @@ import React from 'react'
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
 
@@ -22,6 +23,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
   return (
+    <ConfirmDialogProvider>
     <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
       
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
@@ -93,5 +95,6 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
         </main>
       </div>
     </div>
+    </ConfirmDialogProvider>
   );
 }

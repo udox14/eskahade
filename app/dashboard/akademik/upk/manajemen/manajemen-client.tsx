@@ -6,8 +6,10 @@ import { Search, Package, CheckCircle, AlertCircle, ShoppingBag, Truck, DollarSi
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'DISTRIBUSI' | 'GUDANG'>('DISTRIBUSI')
   
   // State Distribusi
@@ -49,14 +51,14 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
 
   // --- ACTIONS ---
   
-  const openSerahModal = (trx: any) => {
+  const openSerahModal = async (trx: any) => {
       setSelectedTrx(trx)
       const pendingItems = trx.items_detail.filter((i:any) => i.status_serah === 'BELUM')
       setSelectedItems(pendingItems.map((i:any) => i.id))
       setIsModalOpen(true)
   }
 
-  const toggleItemSelection = (itemId: string) => {
+  const toggleItemSelection = async (itemId: string) => {
       if (selectedItems.includes(itemId)) {
           setSelectedItems(prev => prev.filter(id => id !== itemId))
       } else {
@@ -81,14 +83,14 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const handleLunas = async (id: string, nama: string) => {
-    if(!confirm(`Terima pelunasan hutang dari ${nama}?`)) return
+    if(!await confirm(`Terima pelunasan hutang dari ${nama}?`)) return
     const res = await selesaikanKeuangan(id, 'LUNAS')
     if('error' in res) toast.error((res as any).error)
     else { toast.success("Hutang Lunas"); loadDistribusi(); }
   }
 
   const handleAmbilKembalian = async (id: string, nama: string) => {
-    if(!confirm(`Serahkan uang kembalian kepada ${nama}?`)) return
+    if(!await confirm(`Serahkan uang kembalian kepada ${nama}?`)) return
     const res = await selesaikanKeuangan(id, 'AMBIL_KEMBALIAN')
     if('error' in res) toast.error((res as any).error)
     else { toast.success("Kembalian Diserahkan"); loadDistribusi(); }
@@ -111,7 +113,7 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
           {isAdmin && (
             <button
               onClick={async () => {
-                if (!confirm('⚠️ RESET TRANSAKSI UPK?\n\nSemua transaksi dan rincian item akan dihapus permanen.\nDaftar kitab dan harga tetap aman.\n\nLanjutkan?')) return
+                if (!await confirm('⚠️ RESET TRANSAKSI UPK?\n\nSemua transaksi dan rincian item akan dihapus permanen.\nDaftar kitab dan harga tetap aman.\n\nLanjutkan?')) return
                 const t = toast.loading('Mereset transaksi UPK...')
                 const res = await resetUPKTransaksi()
                 toast.dismiss(t)

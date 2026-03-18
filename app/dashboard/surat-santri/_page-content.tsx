@@ -10,20 +10,18 @@ import {
 import {
   ScrollText, Gavel, Search, Loader2, X, Trash2,
   ChevronLeft, ChevronRight, Printer, CheckSquare,
-  Square, Eye, Filter, Plus, FileText, ArrowLeft, AlertTriangle,
+  Square, Eye, Filter, Plus, FileText, ArrowLeft,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, isValid } from 'date-fns'
+import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string) {
-  if (!s) return '-'
-  try {
-    const d = new Date(s.replace(' ', 'T'))
-    return isValid(d) ? format(d, 'dd MMM yyyy', { locale: idLocale }) : s
-  } catch { return s }
+  try { return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale }) }
+  catch { return s }
 }
 
 const JENIS_LABEL: Record<string, string> = {
@@ -191,7 +189,7 @@ const SuratPerjanjianDoc = ({ data }: { data: any }) => {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TOMBOL CETAK
+// TOMBOL CETAK — isolasi hook react-to-print per baris tabel
 // ═══════════════════════════════════════════════════════════════════════════════
 function TombolCetak({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 'perjanjian' }) {
   const [data, setData] = useState<any>(null)
@@ -210,6 +208,7 @@ function TombolCetak({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 
       setLoading(false)
       if (!d) { toast.error('Data surat tidak ditemukan'); return }
       setData(d)
+      // Tunggu render selesai lalu cetak
       setTimeout(() => handlePrint(), 100)
     } else {
       handlePrint()
@@ -226,6 +225,7 @@ function TombolCetak({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 
       >
         {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
       </button>
+      {/* Hidden print area — dirender tapi tak terlihat */}
       <div className="hidden">
         <div ref={printRef}>
           {data && tipe === 'pernyataan' && <SuratPernyataanDoc data={data} />}
@@ -275,6 +275,7 @@ function TombolPreview({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' 
       {open && data && (
         <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-start justify-center p-4 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-3xl">
+            {/* toolbar pratinjau */}
             <div className="flex items-center justify-between mb-3">
               <p className="text-white font-semibold text-sm">
                 Pratinjau — {tipe === 'pernyataan' ? 'Surat Pernyataan' : `SP ${data.surat.level}`}
@@ -294,6 +295,7 @@ function TombolPreview({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' 
                 </button>
               </div>
             </div>
+            {/* dokumen surat */}
             <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
               <div ref={printRef}>
                 {tipe === 'pernyataan' ? <SuratPernyataanDoc data={data} /> : <SuratPerjanjianDoc data={data} />}
@@ -416,16 +418,7 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
               {loadingP ? (
                 <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
               ) : pelanggaran.length === 0 ? (
-                // ── BLOKIR: santri tanpa pelanggaran ─────────────────────────
-                <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800">Tidak ada catatan pelanggaran</p>
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      Santri ini belum memiliki catatan pelanggaran. Surat Pernyataan hanya bisa dibuat jika ada pelanggaran yang tercatat di fitur Keamanan.
-                    </p>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-400 italic text-center py-6">Santri ini belum memiliki catatan pelanggaran</p>
               ) : (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
                   {pelanggaran.map((p: any) => (
@@ -444,22 +437,17 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
               )}
             </div>
 
-            {/* Hanya tampil tombol simpan jika ada pelanggaran */}
-            {pelanggaran.length > 0 && (
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
-                  <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50 max-w-xs" />
-                </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
+              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50 max-w-xs" />
+            </div>
 
-                <button onClick={handleSimpan} disabled={saving || checked.size === 0}
-                  className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  {saving ? 'Menyimpan...' : 'Simpan Surat Pernyataan'}
-                </button>
-              </>
-            )}
+            <button onClick={handleSimpan} disabled={saving || checked.size === 0}
+              className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {saving ? 'Menyimpan...' : 'Simpan Surat Pernyataan'}
+            </button>
           </>
         )}
       </div>
@@ -475,8 +463,6 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
   const [hasilCari, setHasilCari] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [jumlahPelanggaran, setJumlahPelanggaran] = useState<number | null>(null)
-  const [loadingCek, setLoadingCek] = useState(false)
   const [level, setLevel] = useState<'SP1' | 'SP2' | 'SP3' | 'SK'>('SP1')
   const [suggestLevel, setSuggestLevel] = useState('')
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
@@ -494,15 +480,8 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
 
   const selectSantri = async (s: any) => {
     setSelectedSantri(s); setHasilCari([])
-    setLoadingCek(true)
-    // Cek pelanggaran dan suggest level secara paralel
-    const [pelanggaran, suggest] = await Promise.all([
-      getPelanggaranSantri(s.id),
-      getSuggestLevel(s.id),
-    ])
-    setJumlahPelanggaran(pelanggaran.length)
+    const suggest = await getSuggestLevel(s.id)
     setLevel(suggest as any); setSuggestLevel(suggest)
-    setLoadingCek(false)
   }
 
   const handleSimpan = async () => {
@@ -517,9 +496,6 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
 
   const SP_LEVELS = ['SP1', 'SP2', 'SP3', 'SK'] as const
   const SP_LABEL: Record<string, string> = { SP1: 'SP 1', SP2: 'SP 2', SP3: 'SP 3', SK: 'SK Pengeluaran' }
-
-  // Apakah santri boleh dibuatkan SP/SK?
-  const bolehBuat = jumlahPelanggaran !== null && jumlahPelanggaran > 0
 
   return (
     <div className="space-y-4">
@@ -566,64 +542,47 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
               <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
               <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
             </div>
-            <button onClick={() => { setSelectedSantri(null); setSuggestLevel(''); setJumlahPelanggaran(null) }}
+            <button onClick={() => { setSelectedSantri(null); setSuggestLevel('') }}
               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
           </div>
         )}
 
         {selectedSantri && (
           <>
-            {loadingCek ? (
-              <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
-            ) : !bolehBuat ? (
-              // ── BLOKIR: santri tanpa pelanggaran ─────────────────────────
-              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Tidak ada catatan pelanggaran</p>
-                  <p className="text-xs text-amber-600 mt-0.5">
-                    SP dan SK hanya bisa dibuat untuk santri yang memiliki catatan pelanggaran di fitur Keamanan. Catat pelanggarannya terlebih dahulu.
-                  </p>
-                </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                Pilih Level
+                {suggestLevel && <span className="ml-2 text-emerald-600 font-normal normal-case text-[11px]">(Saran: {suggestLevel === 'SK' ? 'SK Pengeluaran' : suggestLevel})</span>}
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {SP_LEVELS.map(l => (
+                  <button key={l} onClick={() => setLevel(l)}
+                    className={cn('py-2.5 rounded-xl text-xs font-bold border transition-all text-center',
+                      level === l ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400')}>
+                    {SP_LABEL[l]}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                    Pilih Level
-                    {suggestLevel && <span className="ml-2 text-emerald-600 font-normal normal-case text-[11px]">(Saran: {suggestLevel === 'SK' ? 'SK Pengeluaran' : suggestLevel})</span>}
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {SP_LEVELS.map(l => (
-                      <button key={l} onClick={() => setLevel(l)}
-                        className={cn('py-2.5 rounded-xl text-xs font-bold border transition-all text-center',
-                          level === l ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400')}>
-                        {SP_LABEL[l]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
-                    <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Catatan <span className="font-normal normal-case text-slate-400">(opsional)</span></label>
-                    <input type="text" value={catatan} onChange={e => setCatatan(e.target.value)} placeholder="Keterangan tambahan..."
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
+                <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Catatan <span className="font-normal normal-case text-slate-400">(opsional)</span></label>
+                <input type="text" value={catatan} onChange={e => setCatatan(e.target.value)} placeholder="Keterangan tambahan..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
+              </div>
+            </div>
 
-                <button onClick={handleSimpan} disabled={saving}
-                  className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  {saving ? 'Menyimpan...' : `Simpan ${level === 'SK' ? 'SK Pengeluaran' : level}`}
-                </button>
-              </>
-            )}
+            <button onClick={handleSimpan} disabled={saving}
+              className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {saving ? 'Menyimpan...' : `Simpan ${level === 'SK' ? 'SK Pengeluaran' : level}`}
+            </button>
           </>
         )}
       </div>
@@ -639,8 +598,10 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
+  // Filters
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [asramaFilter, setAsramaFilter] = useState('')
@@ -654,26 +615,27 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
     try {
       const res = await getDaftarSurat({ search: s || undefined, asrama: a || undefined, jenis: j || undefined, page: pg })
       setRows(res.rows); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg)
+      setHasLoaded(true)
     } finally { setLoading(false) }
   }, [search, asramaFilter, jenisFilter])
 
   useEffect(() => {
     getAsramaList().then(setAsramaList)
-    load(1, '', '', '')
   }, [])
 
+  // Reload saat form berhasil submit
   useEffect(() => {
     if (refreshKey > 0) load(1, search, asramaFilter, jenisFilter)
   }, [refreshKey])
 
-  const handleFilter = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSearch(searchInput); setPage(1)
+  const handleTampilkan = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setSearch(searchInput)
     load(1, searchInput, asramaFilter, jenisFilter)
   }
 
   const handleHapus = async (row: any) => {
-    if (!confirm(`Hapus surat ${JENIS_LABEL[row.tipe === 'pernyataan' ? 'pernyataan' : row.level] ?? ''} atas nama ${row.nama_lengkap}?`)) return
+    if (!await confirm(`Hapus surat ${JENIS_LABEL[row.tipe === 'pernyataan' ? 'pernyataan' : row.level] ?? ''} atas nama ${row.nama_lengkap}?`)) return
     setDeleting(row.id)
     const res = await hapusSurat(row.id, row.tipe)
     setDeleting(null)
@@ -686,23 +648,24 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
 
   return (
     <div className="space-y-3">
-      <form onSubmit={handleFilter} className="flex flex-wrap gap-2 items-center">
+      {/* Filter bar */}
+      <form onSubmit={handleTampilkan} className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
-            type="text" placeholder="Cari nama atau NIS..."
+            type="text" placeholder="Cari nama atau NIS (kosongkan untuk semua)..."
             value={searchInput} onChange={e => setSearchInput(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
           />
         </div>
         {asramaList.length > 0 && (
-          <select value={asramaFilter} onChange={e => { setAsramaFilter(e.target.value); load(1, searchInput, e.target.value, jenisFilter) }}
+          <select value={asramaFilter} onChange={e => setAsramaFilter(e.target.value)}
             className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent">
             <option value="">Semua Asrama</option>
             {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         )}
-        <select value={jenisFilter} onChange={e => { setJenisFilter(e.target.value); load(1, searchInput, asramaFilter, e.target.value) }}
+        <select value={jenisFilter} onChange={e => setJenisFilter(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent">
           <option value="">Semua Jenis</option>
           <option value="pernyataan">Surat Pernyataan</option>
@@ -711,12 +674,24 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
           <option value="SP3">SP 3</option>
           <option value="SK">SK Pengeluaran</option>
         </select>
-        <button type="submit" className="px-3 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
-          <Filter className="w-3.5 h-3.5" /> Filter
+        <button type="submit" disabled={loading}
+          className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-60 flex items-center gap-1.5 transition-colors shadow-sm">
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
+          Tampilkan
         </button>
       </form>
 
-      {loading ? (
+      {!hasLoaded && !loading ? (
+        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 border-dashed text-center">
+          <FileText className="w-10 h-10 text-slate-200" />
+          <p className="text-slate-500 text-sm font-medium">Data belum dimuat</p>
+          <p className="text-xs text-slate-400">Atur filter lalu klik <strong>Tampilkan</strong>, atau langsung tampilkan semua</p>
+          <button onClick={() => handleTampilkan()}
+            className="mt-1 px-5 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm">
+            Tampilkan Semua
+          </button>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-12 bg-white rounded-2xl border border-slate-200">
           <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
         </div>
@@ -724,7 +699,7 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
         <div className="flex flex-col items-center py-12 bg-white rounded-2xl border border-slate-200 text-center gap-2">
           <FileText className="w-9 h-9 text-slate-200" />
           <p className="text-slate-500 text-sm font-medium">Belum ada surat</p>
-          <p className="text-xs text-slate-400">Buat surat dari menu di atas</p>
+          <p className="text-xs text-slate-400">Coba ubah filter atau buat surat baru</p>
         </div>
       ) : (
         <>
@@ -806,6 +781,7 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
             ))}
           </div>
 
+          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <button onClick={() => load(page - 1)} disabled={page <= 1 || loading}
@@ -829,6 +805,7 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
 // MAIN PAGE CONTENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export function PageContent() {
+  const confirm = useConfirm()
   const [view, setView] = useState<'menu' | 'pernyataan' | 'sp'>('menu')
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -839,16 +816,18 @@ export function PageContent() {
 
   return (
     <div className="space-y-5 pb-16">
+      {/* Page header */}
       <div>
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
           <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
             <ScrollText className="w-4 h-4 text-slate-600" />
           </span>
-          SP & SK
+          Surat Santri
         </h1>
         <p className="text-sm text-slate-500 mt-1 ml-10">Surat pernyataan, SP, dan SK Pengeluaran</p>
       </div>
 
+      {/* Form area — muncul saat klik card */}
       {view === 'pernyataan' && (
         <FormSuratPernyataan onBack={() => setView('menu')} onSuccess={handleSuccess} />
       )}
@@ -856,12 +835,15 @@ export function PageContent() {
         <FormSuratSP onBack={() => setView('menu')} onSuccess={handleSuccess} />
       )}
 
+      {/* Card menu — selalu tampil di view=menu */}
       {view === 'menu' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card Surat Pernyataan */}
           <button
             onClick={() => setView('pernyataan')}
             className="group relative flex flex-col items-start gap-4 p-6 bg-white border border-slate-200 rounded-2xl text-left hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98] overflow-hidden"
           >
+            {/* subtle bg accent */}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="w-11 h-11 rounded-xl bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center transition-colors mb-3">
@@ -879,6 +861,7 @@ export function PageContent() {
             </div>
           </button>
 
+          {/* Card SP & SK */}
           <button
             onClick={() => setView('sp')}
             className="group relative flex flex-col items-start gap-4 p-6 bg-white border border-slate-200 rounded-2xl text-left hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98] overflow-hidden"
@@ -905,12 +888,14 @@ export function PageContent() {
         </div>
       )}
 
+      {/* Divider */}
       <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-slate-100" />
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daftar Surat</span>
         <div className="flex-1 h-px bg-slate-100" />
       </div>
 
+      {/* Tabel surat — selalu tampil */}
       <TabelDaftarSurat refreshKey={refreshKey} />
     </div>
   )

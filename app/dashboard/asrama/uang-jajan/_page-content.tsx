@@ -7,11 +7,13 @@ import { Wallet, TrendingUp, TrendingDown, Plus, Save, Loader2, ChevronLeft, Che
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const JAJAN_OPTS = [5000, 10000, 15000, 20000]
 
 export default function UangJajanPage() {
+  const confirm = useConfirm()
   const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
 
@@ -86,7 +88,7 @@ export default function UangJajanPage() {
   const activeKamar = kamars[kamarIdx] ?? ''
 
   // Invalidate cache + reload stats + reload santri kamar aktif setelah mutasi
-  const refreshAfterMutasi = (kamar?: string) => {
+  const refreshAfterMutasi = async (kamar?: string) => {
     const targetKamar = kamar || activeKamar
     // Hapus cache kamar yang dimutasi
     if (targetKamar) {
@@ -104,9 +106,9 @@ export default function UangJajanPage() {
   }
 
   // ── Jajan logic ────────────────────────────────────────────────────────────
-  const setDrafts = (val: Record<string, number> | ((p: Record<string, number>) => Record<string, number>)) => setDraftJajan(val)
+  const setDrafts = async (val: Record<string, number> | ((p: Record<string, number>) => Record<string, number>)) => setDraftJajan(val)
 
-  const handleSelectJajan = (santriId: string, nominal: number, saldo: number) => {
+  const handleSelectJajan = async (santriId: string, nominal: number, saldo: number) => {
     if (nominal > saldo) { toast.warning('Saldo tidak cukup!'); return }
     setDraftJajan(prev => {
       if (prev[santriId] === nominal) { const n = { ...prev }; delete n[santriId]; return n }
@@ -114,14 +116,14 @@ export default function UangJajanPage() {
     })
   }
 
-  const handleManualInput = (santriId: string, value: string, saldo: number) => {
+  const handleManualInput = async (santriId: string, value: string, saldo: number) => {
     const val = parseInt(value) || 0
     if (val > saldo) return
     if (val > 0) setDraftJajan(prev => ({ ...prev, [santriId]: val }))
     else setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
   }
 
-  const toggleManualMode = (santriId: string) => {
+  const toggleManualMode = async (santriId: string) => {
     setManualMode(prev => ({ ...prev, [santriId]: !prev[santriId] }))
     setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
   }
@@ -131,7 +133,7 @@ export default function UangJajanPage() {
     if (!list.length) return
     const overLimit = list.filter(l => l.nominal > 20000)
     const warn = overLimit.length ? `\n\n⚠️ ${overLimit.length} santri mengambil > 20.000 (akumulasi).` : ''
-    if (!confirm(`Simpan jajan untuk ${list.length} santri?\nTotal: Rp ${list.reduce((a, b) => a + b.nominal, 0).toLocaleString()}${warn}`)) return
+    if (!await confirm(`Simpan jajan untuk ${list.length} santri?\nTotal: Rp ${list.reduce((a, b) => a + b.nominal, 0).toLocaleString()}${warn}`)) return
 
     setIsSaving(true)
     const toastId = toast.loading('Memproses transaksi...')
@@ -180,7 +182,7 @@ export default function UangJajanPage() {
   }
 
   const handleDeleteHistory = async (id: string) => {
-    if (!confirm('Hapus transaksi ini? Saldo akan dikembalikan.')) return
+    if (!await confirm('Hapus transaksi ini? Saldo akan dikembalikan.')) return
     const toastId = toast.loading('Menghapus...')
     const res = await hapusTransaksi(id)
     toast.dismiss(toastId)

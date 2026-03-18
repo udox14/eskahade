@@ -13,6 +13,7 @@ import {
   GraduationCap, Banknote, RefreshCw, Users, Filter,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const ASRAMA_LIST = ['', 'AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const JENIS_BIAYA_LIST = ['KESEHATAN', 'EHB', 'EKSKUL', 'BANGUNAN']
@@ -33,6 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
 type Tab = 'naik_kelas' | 'pembebasan'
 
 export default function SantriToolsPage() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('naik_kelas')
 
   // ── TAB NAIK KELAS ─────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ export default function SantriToolsPage() {
     setLoadingPreview(false)
   }
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = async (id: string) => {
     setSelectedIds(prev => {
       const n = new Set(prev)
       n.has(id) ? n.delete(id) : n.add(id)
@@ -83,7 +85,7 @@ export default function SantriToolsPage() {
     })
   }
 
-  const toggleAll = (ids: string[]) => {
+  const toggleAll = async (ids: string[]) => {
     const allSelected = ids.every(id => selectedIds.has(id))
     setSelectedIds(prev => {
       const n = new Set(prev)
@@ -95,7 +97,7 @@ export default function SantriToolsPage() {
 
   const handleEksekusi = async () => {
     if (!selectedIds.size) return
-    if (!confirm(`Naikkan kelas sekolah ${selectedIds.size} santri? Tindakan ini tidak bisa dibatalkan secara massal.`)) return
+    if (!await confirm(`Naikkan kelas sekolah ${selectedIds.size} santri? Tindakan ini tidak bisa dibatalkan secara massal.`)) return
     setEksekusiLoading(true)
     const res = await eksekusiNaikKelas([...selectedIds])
     setEksekusiLoading(false)

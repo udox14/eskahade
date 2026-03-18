@@ -11,10 +11,12 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 export default function LayananSuratPage() {
+  const confirm = useConfirm()
   // State Navigasi Generator
   const [step, setStep] = useState(1) 
   const [jenisSurat, setJenisSurat] = useState<'MONDOK' | 'IZIN' | 'BERHENTI' | 'TAGIHAN' | null>(null)
@@ -59,7 +61,7 @@ export default function LayananSuratPage() {
   }
 
   // STEP 1: PILIH JENIS
-  const selectJenis = (jenis: any) => {
+  const selectJenis = async (jenis: any) => {
     setJenisSurat(jenis)
     setStep(2)
   }
@@ -91,7 +93,7 @@ export default function LayananSuratPage() {
   }
 
   // STEP 3: INPUT TAMBAHAN
-  const handleInputTambahan = (e: React.FormEvent) => {
+  const handleInputTambahan = async (e: React.FormEvent) => {
     e.preventDefault()
     setStep(4)
   }
@@ -119,7 +121,7 @@ export default function LayananSuratPage() {
 
   // HAPUS RIWAYAT
   const handleDeleteRiwayat = async (id: string) => {
-    if (!confirm("Hapus catatan surat ini?")) return
+    if (!await confirm("Hapus catatan surat ini?")) return
     
     const toastId = toast.loading("Menghapus...")
     const res = await hapusRiwayatSurat(id)

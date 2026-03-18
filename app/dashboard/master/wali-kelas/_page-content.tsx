@@ -6,8 +6,10 @@ import { getDataMaster, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuru
 import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function ManajemenGuruPage() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
 
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -48,12 +50,12 @@ export default function ManajemenGuruPage() {
     setLoading(false)
   }
 
-  const isGuruBusy = (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
+  const isGuruBusy = async (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
     if (!guruId) return false
     return localKelasList.some(k => k[session] == guruId && k.id !== currentKelasId)
   }
 
-  const handleChangeLocal = (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
+  const handleChangeLocal = async (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
     setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [session]: guruId } : k))
   }
 
@@ -67,7 +69,7 @@ export default function ManajemenGuruPage() {
       return local.s?.toString() !== asliS || local.a?.toString() !== asliA || local.m?.toString() !== asliM
     })
     if (changedClasses.length === 0) return toast.info("Tidak ada perubahan", { description: "Jadwal kelas belum ada yang diubah." })
-    if (!confirm(`Terdapat ${changedClasses.length} perubahan jadwal. Simpan sekarang?`)) return
+    if (!await confirm(`Terdapat ${changedClasses.length} perubahan jadwal. Simpan sekarang?`)) return
     setIsSavingBatch(true)
     const toastId = toast.loading(`Menyimpan ${changedClasses.length} jadwal...`)
     const payload = changedClasses.map(k => ({
@@ -94,24 +96,24 @@ export default function ManajemenGuruPage() {
   }
 
   const handleHapusGuru = async (id: string, nama: string) => {
-    if (!confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
+    if (!await confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
     const res = await hapusGuru(id as any)
     if ((res as any).success) { toast.success("Guru dihapus"); loadData() }
     else toast.error((res as any).error)
   }
 
-  const toggleSelectGuru = (id: string) => {
+  const toggleSelectGuru = async (id: string) => {
     setSelectedGuruIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
   }
 
-  const toggleSelectAllGuru = () => {
+  const toggleSelectAllGuru = async () => {
     if (selectedGuruIds.length === guruList.length) setSelectedGuruIds([])
     else setSelectedGuruIds(guruList.map(g => g.id))
   }
 
   const handleHapusBatch = async () => {
     if (selectedGuruIds.length === 0) return
-    if (!confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
+    if (!await confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
     const toastId = toast.loading("Menghapus data...")
     const res = await hapusGuruMassal(selectedGuruIds as any)

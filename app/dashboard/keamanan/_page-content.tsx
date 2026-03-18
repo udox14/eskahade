@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 function fmtTgl(s: string) {
   try { return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale }) }
@@ -309,7 +310,7 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
   useEffect(() => { getDetailSantri(santriId).then(d => { setData(d); setLoading(false) }) }, [santriId])
 
   const handleHapus = async (id: string) => {
-    if (!confirm('Hapus data pelanggaran ini?')) return
+    if (!await confirm('Hapus data pelanggaran ini?')) return
     setDeleting(id)
     const res = await hapusPelanggaran(id)
     setDeleting(null)
@@ -425,7 +426,8 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [modalId, setModalId] = useState<string | null>(null)
@@ -436,33 +438,46 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
     try {
       const res = await getDaftarPelanggar({ search: s || undefined, page: pg })
       setRows(res.rows); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg)
+      setHasLoaded(true)
     } finally { setLoading(false) }
   }, [search])
 
-  useEffect(() => { load(1, '') }, [])
+  const handleTampilkan = () => { setSearch(searchInput); load(1, searchInput) }
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2 items-center">
-        <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput) }} className="flex gap-2 flex-1">
+        <form onSubmit={e => { e.preventDefault(); handleTampilkan() }} className="flex gap-2 flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input type="text" placeholder="Cari nama atau NIS..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
+            <input type="text" placeholder="Cari nama atau NIS (kosongkan untuk semua)..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-white transition-all" />
           </div>
-          <button type="submit" className="px-3 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
-            <Filter className="w-3.5 h-3.5" /> Filter
+          <button type="submit" disabled={loading}
+            className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap">
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
+            Tampilkan
           </button>
         </form>
         <button onClick={() => setShowModalInput(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-sm whitespace-nowrap">
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm whitespace-nowrap">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Catat Pelanggaran</span>
           <span className="sm:hidden">Catat</span>
         </button>
       </div>
 
-      {loading ? (
+      {!hasLoaded && !loading ? (
+        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 border-dashed text-center">
+          <ShieldAlert className="w-10 h-10 text-slate-200" />
+          <p className="text-slate-500 text-sm font-medium">Data belum dimuat</p>
+          <p className="text-xs text-slate-400">Klik <strong>Tampilkan</strong> untuk memuat daftar pelanggar</p>
+          <button onClick={handleTampilkan}
+            className="mt-1 px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-sm">
+            Tampilkan Semua
+          </button>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
           <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
         </div>
@@ -561,7 +576,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
     onRefresh()
   }
   const handleHapus = async (id: number) => {
-    if (!confirm('Hapus jenis pelanggaran ini?')) return
+    if (!await confirm('Hapus jenis pelanggaran ini?')) return
     setDeleting(id)
     const res = await hapusMasterPelanggaran(id)
     setDeleting(null)
@@ -646,6 +661,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
 
 // MAIN PAGE
 export default function KeamananPage() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'daftar' | 'kamus'>('daftar')
   const [masterList, setMasterList] = useState<any[]>([])
   const [loadingMaster, setLoadingMaster] = useState(true)

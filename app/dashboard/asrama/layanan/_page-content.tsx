@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, Search, Filter, Save, Utensils, Shirt, Settings, X, Plus, Trash2, CheckCircle2, Download, UploadCloud, FileSpreadsheet } from "lucide-react";
 import { 
+import { useConfirm } from '@/components/ui/confirm-dialog'
     getDaftarAsrama, 
     getDaftarKamar, 
     getMasterJasa, 
@@ -15,6 +16,7 @@ import {
 } from "./actions";
 
 export default function LayananAsramaPage() {
+  const confirm = useConfirm()
     // --- STATE FILTER ---
     const [asramaList, setAsramaList] = useState<string[]>([]);
     const [kamarList, setKamarList] = useState<string[]>([]);
@@ -119,7 +121,7 @@ export default function LayananAsramaPage() {
     }, [hasMore, isLoading, selectedAsrama, page]);
 
     // --- HANDLERS ---
-    const handleSelectChange = (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', value: string) => {
+    const handleSelectChange = async (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', value: string) => {
         setPendingChanges(prev => {
             const updated = { ...prev };
             if (!updated[santriId]) updated[santriId] = {};
@@ -243,7 +245,7 @@ export default function LayananAsramaPage() {
     };
 
     const handleHapusJasa = async (id: string) => {
-        if(!confirm("Yakin hapus penyedia jasa ini?")) return;
+        if(!await confirm("Yakin hapus penyedia jasa ini?")) return;
         try {
             await hapusMasterJasa(id);
             const freshMaster = await getMasterJasa();
@@ -253,7 +255,7 @@ export default function LayananAsramaPage() {
         }
     };
 
-    const getDisplayValue = (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', originalValue: string) => {
+    const getDisplayValue = async (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', originalValue: string) => {
         if (pendingChanges[santriId] && pendingChanges[santriId][type] !== undefined) {
             return pendingChanges[santriId][type] === null ? "null" : pendingChanges[santriId][type];
         }

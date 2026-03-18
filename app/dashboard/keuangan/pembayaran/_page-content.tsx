@@ -5,10 +5,12 @@ import { cariSantriKeuangan, getInfoTagihan, bayarTagihan, getMonitoringPembayar
 import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Coins, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
 export default function LoketPembayaranPage() {
+  const confirm = useConfirm()
   // --- STATE UTAMA ---
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   
@@ -65,7 +67,7 @@ export default function LoketPembayaranPage() {
 
   useEffect(() => {
     // Tangkap event tombol back HP/browser
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = async (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'DETAIL') {
         // Kembali ke list
         setSelectedSantri(null)
@@ -82,7 +84,7 @@ export default function LoketPembayaranPage() {
 
   // --- HANDLERS ---
 
-  const handleSelect = (s: any) => {
+  const handleSelect = async (s: any) => {
     setSelectedSantri(s)
     setNominalCicil('')
   }
@@ -90,7 +92,7 @@ export default function LoketPembayaranPage() {
   // Bayar Lunas Tahunan (EHB, KES, EKS)
   const handleLunasTahunanSemua = async () => {
     if (!infoTagihan) return
-    if(!confirm(`Lunasi seluruh tagihan tahunan (EHB, Kesehatan, Ekskul) untuk ${selectedSantri.nama_lengkap}?`)) return
+    if(!await confirm(`Lunasi seluruh tagihan tahunan (EHB, Kesehatan, Ekskul) untuk ${selectedSantri.nama_lengkap}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pelunasan...")
@@ -111,7 +113,7 @@ export default function LoketPembayaranPage() {
     const sisa = infoTagihan.bangunan.sisa
     if (sisa <= 0) return toast.info("Sudah lunas.")
     
-    if (!confirm(`Lunasi sisa Uang Bangunan sebesar Rp ${sisa.toLocaleString()}?`)) return
+    if (!await confirm(`Lunasi sisa Uang Bangunan sebesar Rp ${sisa.toLocaleString()}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pelunasan bangunan...")
@@ -135,7 +137,7 @@ export default function LoketPembayaranPage() {
     if (!bayar || bayar <= 0) return toast.warning("Nominal tidak valid")
     if (bayar > infoTagihan.bangunan.sisa) return toast.warning("Nominal melebihi sisa tagihan!")
 
-    if (!confirm(`Terima pembayaran Uang Bangunan Rp ${bayar.toLocaleString()}?`)) return
+    if (!await confirm(`Terima pembayaran Uang Bangunan Rp ${bayar.toLocaleString()}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pembayaran...")
@@ -155,7 +157,7 @@ export default function LoketPembayaranPage() {
   // Bayar Tahunan (Per Item)
   const handleBayarTahunan = async (jenis: string, nominal: number) => {
     if (nominal <= 0) return toast.error("Tarif belum diatur untuk angkatan ini.")
-    if (!confirm(`Terima pembayaran ${jenis} Tahun ${tahunTagihan} sebesar Rp ${nominal.toLocaleString()}?`)) return
+    if (!await confirm(`Terima pembayaran ${jenis} Tahun ${tahunTagihan} sebesar Rp ${nominal.toLocaleString()}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pembayaran...")
@@ -171,7 +173,7 @@ export default function LoketPembayaranPage() {
     }
   }
 
-  const handleBackToList = () => {
+  const handleBackToList = async () => {
     // Gunakan history.back() agar konsisten dengan tombol back HP
     window.history.back()
   }

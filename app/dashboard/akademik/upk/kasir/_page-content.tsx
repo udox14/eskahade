@@ -6,8 +6,10 @@ import { useState, useEffect } from 'react'
 import { getDaftarKitab, cariSantri, simpanTransaksiUPK } from './actions'
 import { Search, ShoppingCart, User, Package, Check, Trash2, Loader2, Save, Gift, X, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function KasirUPKPage() {
+  const confirm = useConfirm()
   // Data Master
   const [katalog, setKatalog] = useState<Record<string, any[]>>({})
   const [loadingKatalog, setLoadingKatalog] = useState(true)
@@ -57,27 +59,27 @@ export default function KasirUPKPage() {
 
 
   // --- LOGIC CART ---
-  const addToCart = (kitab: any) => {
+  const addToCart = async (kitab: any) => {
     if (cart.some(c => c.id === kitab.id)) return 
     setCart(prev => [...prev, { ...kitab, hargaAsli: kitab.harga, isGratis: false }])
     toast.success("Ditambahkan")
   }
 
-  const addPaket = (listKitab: any[]) => {
+  const addPaket = async (listKitab: any[]) => {
     const newItems = listKitab.filter(k => !cart.some(c => c.id === k.id))
         .map(k => ({ ...k, hargaAsli: k.harga, isGratis: false }))
     setCart(prev => [...prev, ...newItems])
     toast.success(`${newItems.length} kitab ditambahkan`)
   }
 
-  const toggleGratis = (id: number) => {
+  const toggleGratis = async (id: number) => {
     setCart(prev => prev.map(c => {
         if (c.id === id) return { ...c, isGratis: !c.isGratis }
         return c
     }))
   }
 
-  const removeFromCart = (id: number) => {
+  const removeFromCart = async (id: number) => {
     setCart(prev => prev.filter(c => c.id !== id))
   }
 
@@ -105,7 +107,7 @@ export default function KasirUPKPage() {
     let pesanKonfirmasi = `Total: Rp ${totalTagihan.toLocaleString()}\nBayar: Rp ${bayar.toLocaleString()}`
     if (tunggakan > 0) pesanKonfirmasi += `\n\n⚠️ Sisa Tunggakan: Rp ${tunggakan.toLocaleString()} (Hutang)`
     
-    if (!confirm(`Simpan Transaksi?\n${pesanKonfirmasi}`)) return
+    if (!await confirm(`Simpan Transaksi?\n${pesanKonfirmasi}`)) return
 
     setIsSaving(true)
     const toastId = toast.loading("Memproses transaksi...")
