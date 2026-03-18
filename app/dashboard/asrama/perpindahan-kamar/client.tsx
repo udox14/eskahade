@@ -35,9 +35,9 @@ function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PerpindahanClient({
-  const confirm = useConfirm()
   userRole, asramaBinaan
 }: { userRole: string; asramaBinaan: string | null }) {
+  const confirm = useConfirm()
 
   const asramaOptions = asramaBinaan ? [asramaBinaan] : ASRAMA_LIST
   const [asrama, setAsrama] = useState(asramaOptions[0])
