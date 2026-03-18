@@ -2,8 +2,20 @@
 
 import { useState } from 'react'
 import { User, MapPin, Calendar, School, Home, BookOpen, AlertTriangle, Clock, CreditCard, Wallet, Trophy, CheckCircle, XCircle, AlertCircle, Users, Utensils, Shirt } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, isValid } from 'date-fns'
 import { id } from 'date-fns/locale'
+
+// ── Helper: format tanggal aman, tidak crash jika null/invalid ────────────────
+function safeFormat(value: string | null | undefined, fmt: string): string {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (!isValid(date)) return '-'
+  try {
+    return format(date, fmt, { locale: id })
+  } catch {
+    return '-'
+  }
+}
 
 // Pastikan export function (Named Export)
 export function SantriProfileView({ 
@@ -25,8 +37,7 @@ export function SantriProfileView({
          <div className="px-8 pb-8">
             <div className="flex flex-col md:flex-row gap-6 items-start -mt-12">
                
-               {/* FOTO PROFIL (FIX: Portrait & Rounded Corners) */}
-               {/* Mengganti rounded-full menjadi rounded-xl dan menyesuaikan tinggi agar portrait */}
+               {/* FOTO PROFIL */}
                <div className="w-32 h-40 md:w-40 md:h-52 rounded-xl border-4 border-white shadow-lg bg-gray-200 overflow-hidden flex-shrink-0 relative">
                   {santri.foto_url ? (
                     <img src={santri.foto_url} alt={santri.nama_lengkap} className="w-full h-full object-cover"/>
@@ -75,7 +86,7 @@ export function SantriProfileView({
                 <InfoRow label="Jenis Kelamin" value={santri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
                 <InfoRow 
                     label="Tempat, Tanggal Lahir" 
-                    value={`${santri.tempat_lahir || '-'}, ${santri.tanggal_lahir ? format(new Date(santri.tanggal_lahir), 'dd MMMM yyyy', {locale:id}) : '-'}`} 
+                    value={`${santri.tempat_lahir || '-'}, ${safeFormat(santri.tanggal_lahir, 'dd MMMM yyyy')}`} 
                 />
                 <InfoRow label="Golongan Darah" value={santri.gol_darah} />
                 <InfoRow 
@@ -87,9 +98,9 @@ export function SantriProfileView({
                     } 
                     isCustom 
                 />
-                <InfoRow label="Tanggal Masuk" value={santri.tanggal_masuk ? format(new Date(santri.tanggal_masuk), 'dd MMMM yyyy', {locale:id}) : null} />
+                <InfoRow label="Tanggal Masuk" value={safeFormat(santri.tanggal_masuk, 'dd MMMM yyyy')} />
                 {santri.tanggal_keluar && (
-                  <InfoRow label="Tanggal Keluar" value={format(new Date(santri.tanggal_keluar), 'dd MMMM yyyy', {locale:id})} />
+                  <InfoRow label="Tanggal Keluar" value={safeFormat(santri.tanggal_keluar, 'dd MMMM yyyy')} />
                 )}
               </div>
 
@@ -151,7 +162,6 @@ export function SantriProfileView({
                     <InfoRow label="Kamar" value={santri.kamar} />
                     <InfoRow label="Kelas Diniyah" value={santri.info_kelas} isBold />
                     
-                    {/* INFO KATERING & LAUNDRY YANG BARU DITAMBAHKAN */}
                     <div className="pt-2 mt-2 border-t border-emerald-100 space-y-3">
                         <InfoRow 
                             label={<span className="flex items-center gap-1.5"><Utensils className="w-3.5 h-3.5"/> Tempat Makan</span>} 
@@ -192,15 +202,14 @@ export function SantriProfileView({
                     <table className="w-full text-sm text-left">
                        <thead className="bg-gray-50 text-gray-600 font-bold border-b"><tr><th className="p-3 pl-6">Mata Pelajaran</th><th className="p-3 w-32 text-center">Semester 1</th><th className="p-3 w-32 text-center">Semester 2</th></tr></thead>
                        <tbody className="divide-y">
-                          {/* Grouping nilai per mapel */}
-                          {Array.from(new Set(riwayat.nilai_detail.map((n:any) => n.mapel?.nama))).map((mapelNama: any) => {
-                              const s1 = riwayat.nilai_detail.find((n:any) => n.mapel?.nama === mapelNama && n.semester === 1)?.nilai
-                              const s2 = riwayat.nilai_detail.find((n:any) => n.mapel?.nama === mapelNama && n.semester === 2)?.nilai
+                          {Array.from(new Set(riwayat.nilai_detail.map((n:any) => n.mapel_nama))).map((mapelNama: any) => {
+                              const s1 = riwayat.nilai_detail.find((n:any) => n.mapel_nama === mapelNama && n.semester === 1)?.nilai
+                              const s2 = riwayat.nilai_detail.find((n:any) => n.mapel_nama === mapelNama && n.semester === 2)?.nilai
                               return (
                                 <tr key={mapelNama} className="hover:bg-gray-50">
                                     <td className="p-3 pl-6 font-medium text-gray-700">{mapelNama}</td>
-                                    <td className="p-3 text-center font-mono">{s1 || '-'}</td>
-                                    <td className="p-3 text-center font-mono">{s2 || '-'}</td>
+                                    <td className="p-3 text-center font-mono">{s1 ?? '-'}</td>
+                                    <td className="p-3 text-center font-mono">{s2 ?? '-'}</td>
                                 </tr>
                               )
                           })}
@@ -230,8 +239,8 @@ export function SantriProfileView({
                         {spp.map((s:any) => (
                            <tr key={s.id} className="hover:bg-gray-50">
                               <td className="p-3 font-medium text-gray-800">{s.bulan}/{s.tahun}</td>
-                              <td className="p-3 text-right font-mono font-bold text-emerald-600">Rp {s.nominal_bayar.toLocaleString()}</td>
-                              <td className="p-3 text-right text-xs text-gray-500">{format(new Date(s.tanggal_bayar), 'dd/MM/yy', {locale:id})}</td>
+                              <td className="p-3 text-right font-mono font-bold text-emerald-600">Rp {Number(s.nominal_bayar || 0).toLocaleString()}</td>
+                              <td className="p-3 text-right text-xs text-gray-500">{safeFormat(s.tanggal_bayar, 'dd/MM/yy')}</td>
                            </tr>
                         ))}
                      </tbody>
@@ -258,9 +267,9 @@ export function SantriProfileView({
                                  <span className="truncate max-w-[120px]">{t.keterangan}</span>
                               </td>
                               <td className={`p-3 text-right font-mono font-bold ${t.jenis==='MASUK'?'text-green-600':'text-red-600'}`}>
-                                 {t.jenis==='MASUK'?'+':'-'} {t.nominal.toLocaleString()}
+                                 {t.jenis==='MASUK'?'+':'-'} {Number(t.nominal || 0).toLocaleString()}
                               </td>
-                              <td className="p-3 text-right text-xs text-gray-500">{format(new Date(t.created_at), 'dd/MM', {locale:id})}</td>
+                              <td className="p-3 text-right text-xs text-gray-500">{safeFormat(t.created_at, 'dd/MM')}</td>
                            </tr>
                         ))}
                      </tbody>
@@ -282,7 +291,7 @@ export function SantriProfileView({
                     <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors">
                        <div className="flex justify-between mb-2">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${p.status==='KEMBALI'?'bg-green-50 text-green-700 border-green-200':'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{p.status}</span>
-                          <span className="text-xs text-gray-500">{format(new Date(p.created_at), 'dd MMM yyyy', {locale:id})}</span>
+                          <span className="text-xs text-gray-500">{safeFormat(p.created_at, 'dd MMM yyyy')}</span>
                        </div>
                        <p className="font-medium text-gray-800 text-sm mb-1">{p.alasan}</p>
                        <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3"/> {p.jenis}</p>
@@ -299,7 +308,7 @@ export function SantriProfileView({
                     <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors">
                        <div className="flex justify-between mb-2">
                           <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-xs">+{p.poin} Poin</span>
-                          <span className="text-xs text-gray-500">{format(new Date(p.tanggal), 'dd MMM yyyy', {locale:id})}</span>
+                          <span className="text-xs text-gray-500">{safeFormat(p.tanggal, 'dd MMM yyyy')}</span>
                        </div>
                        <p className="font-medium text-gray-800 text-sm mb-1">{p.deskripsi}</p>
                        <p className="text-xs text-gray-500 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {p.jenis}</p>
