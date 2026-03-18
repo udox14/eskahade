@@ -5,7 +5,7 @@ import React from 'react'
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { BottomNav } from "@/components/layout/bottom-nav";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
 
@@ -23,7 +23,6 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
   return (
-    <ConfirmDialogProvider>
     <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
       
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
@@ -89,12 +88,14 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
 
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
-          <div className="max-w-7xl mx-auto w-full space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+          <div className="max-w-7xl mx-auto w-full space-y-6 pb-20 md:pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
             {children}
           </div>
         </main>
       </div>
+
+      {/* BOTTOM NAV — mobile only */}
+      <BottomNav fiturAkses={fiturAkses} userRole={userRole} />
     </div>
-    </ConfirmDialogProvider>
   );
 }

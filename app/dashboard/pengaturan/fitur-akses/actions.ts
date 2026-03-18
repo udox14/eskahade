@@ -64,11 +64,36 @@ export async function removeRoleFromFitur(id: number, role: string) {
 export async function getAllFiturForAdmin() {
   await assertAdmin()
   const rows = await query<any>(
-    'SELECT id, group_name, title, href, icon, roles, is_active, urutan FROM fitur_akses ORDER BY group_name, urutan'
+    'SELECT id, group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan FROM fitur_akses ORDER BY group_name, urutan'
   )
   return rows.map((r: any) => ({
     ...r,
     roles: JSON.parse(r.roles) as string[],
     is_active: r.is_active === 1,
+    is_bottomnav: r.is_bottomnav === 1,
   }))
+}
+
+// Toggle is_bottomnav suatu fitur
+export async function toggleFiturBottomNav(id: number, currentVal: boolean) {
+  await assertAdmin()
+  const newVal = currentVal ? 0 : 1
+  await execute(
+    "UPDATE fitur_akses SET is_bottomnav = ?, updated_at = datetime('now') WHERE id = ?",
+    [newVal, id]
+  )
+  revalidateTag('fitur-akses', 'everything')
+  return { success: true }
+}
+
+// Update urutan bottom nav suatu fitur (1–4)
+export async function setBottomNavUrutan(id: number, urutan: number) {
+  await assertAdmin()
+  if (urutan < 1 || urutan > 4) throw new Error('Urutan harus antara 1 dan 4')
+  await execute(
+    "UPDATE fitur_akses SET bottomnav_urutan = ?, updated_at = datetime('now') WHERE id = ?",
+    [urutan, id]
+  )
+  revalidateTag('fitur-akses', 'everything')
+  return { success: true }
 }
