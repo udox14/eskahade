@@ -67,7 +67,7 @@ export default function LoketPembayaranPage() {
 
   useEffect(() => {
     // Tangkap event tombol back HP/browser
-    const handlePopState = async (e: PopStateEvent) => {
+    const handlePopState = (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'DETAIL') {
         // Kembali ke list
         setSelectedSantri(null)
@@ -84,7 +84,7 @@ export default function LoketPembayaranPage() {
 
   // --- HANDLERS ---
 
-  const handleSelect = async (s: any) => {
+  const handleSelect = (s: any) => {
     setSelectedSantri(s)
     setNominalCicil('')
   }
@@ -173,7 +173,7 @@ export default function LoketPembayaranPage() {
     }
   }
 
-  const handleBackToList = async () => {
+  const handleBackToList = () => {
     // Gunakan history.back() agar konsisten dengan tombol back HP
     window.history.back()
   }

@@ -126,13 +126,13 @@ export default function VerifikasiAbsenPage() {
     finally { setLoading(false) }
   }, [])
 
-  const handleSelect = async (santriId: string, v: VonisType) =>
+  const handleSelect = (santriId: string, v: VonisType) =>
     setDrafts(prev => prev[santriId] === v
       ? (({ [santriId]: _, ...rest }) => rest)(prev)
       : { ...prev, [santriId]: v }
     )
 
-  const handlePilihSemua = async (v: VonisType) => {
+  const handlePilihSemua = (v: VonisType) => {
     const next: Record<string, VonisType> = {}
     filtered.forEach(i => { next[i.santri_id] = v })
     setDrafts(prev => ({ ...prev, ...next }))

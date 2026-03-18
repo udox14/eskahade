@@ -61,7 +61,7 @@ export default function LayananSuratPage() {
   }
 
   // STEP 1: PILIH JENIS
-  const selectJenis = async (jenis: any) => {
+  const selectJenis = (jenis: any) => {
     setJenisSurat(jenis)
     setStep(2)
   }
@@ -93,7 +93,7 @@ export default function LayananSuratPage() {
   }
 
   // STEP 3: INPUT TAMBAHAN
-  const handleInputTambahan = async (e: React.FormEvent) => {
+  const handleInputTambahan = (e: React.FormEvent) => {
     e.preventDefault()
     setStep(4)
   }

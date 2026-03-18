@@ -77,7 +77,7 @@ export default function SantriToolsPage() {
     setLoadingPreview(false)
   }
 
-  const toggleSelect = async (id: string) => {
+  const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const n = new Set(prev)
       n.has(id) ? n.delete(id) : n.add(id)
@@ -85,7 +85,7 @@ export default function SantriToolsPage() {
     })
   }
 
-  const toggleAll = async (ids: string[]) => {
+  const toggleAll = (ids: string[]) => {
     const allSelected = ids.every(id => selectedIds.has(id))
     setSelectedIds(prev => {
       const n = new Set(prev)

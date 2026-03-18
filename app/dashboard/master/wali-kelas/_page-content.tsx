@@ -50,12 +50,12 @@ export default function ManajemenGuruPage() {
     setLoading(false)
   }
 
-  const isGuruBusy = async (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
+  const isGuruBusy = (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
     if (!guruId) return false
     return localKelasList.some(k => k[session] == guruId && k.id !== currentKelasId)
   }
 
-  const handleChangeLocal = async (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
+  const handleChangeLocal = (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
     setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [session]: guruId } : k))
   }
 
@@ -102,11 +102,11 @@ export default function ManajemenGuruPage() {
     else toast.error((res as any).error)
   }
 
-  const toggleSelectGuru = async (id: string) => {
+  const toggleSelectGuru = (id: string) => {
     setSelectedGuruIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
   }
 
-  const toggleSelectAllGuru = async () => {
+  const toggleSelectAllGuru = () => {
     if (selectedGuruIds.length === guruList.length) setSelectedGuruIds([])
     else setSelectedGuruIds(guruList.map(g => g.id))
   }

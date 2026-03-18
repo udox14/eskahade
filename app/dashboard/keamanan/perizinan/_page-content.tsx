@@ -99,7 +99,7 @@ export default function PerizinanPage() {
     setList(prev => prev.filter(i => i.id !== item.id))
   }
 
-  const openReturnModal = async (item: any) => {
+  const openReturnModal = (item: any) => {
     setSelectedReturnId(item.id)
     const now = new Date()
     const tzOffset = now.getTimezoneOffset() * 60000

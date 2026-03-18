@@ -7,8 +7,10 @@ import { Upload, Download, Save, AlertTriangle, CheckCircle, ArrowLeft, Loader2 
 import { useRouter } from 'next/navigation'
 import { importPenempatanKelas } from './actions'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 export default function ImportKelasPage() {
+  const confirm = useConfirm()
   const router = useRouter()
   const [excelData, setExcelData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,7 +59,7 @@ export default function ImportKelasPage() {
 
   const handleSimpan = async () => {
     if (excelData.length === 0) return
-    if (!confirm(`Yakin memproses penempatan untuk ${excelData.length} santri?`)) return
+    if (!await confirm(`Yakin memproses penempatan untuk ${excelData.length} santri?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses penempatan...")

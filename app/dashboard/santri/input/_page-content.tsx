@@ -47,7 +47,7 @@ export default function InputSantriPage() {
     getKelasList().then(setKelasList)
   }, [])
 
-  const set = async (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
+  const set = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
 
   // ── HANDLER FORM ──
   const handleSimpanForm = async (e: React.FormEvent) => {

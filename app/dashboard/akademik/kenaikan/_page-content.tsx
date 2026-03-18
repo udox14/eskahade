@@ -156,11 +156,11 @@ export default function KenaikanKelasPage() {
     }
   }
 
-  const toggleSelectNis = async (nis: string) => {
+  const toggleSelectNis = (nis: string) => {
     setSelectedNis(prev => prev.includes(nis) ? prev.filter(n => n !== nis) : [...prev, nis])
   }
 
-  const toggleSelectAll = async () => {
+  const toggleSelectAll = () => {
     if (selectedNis.length === manualSantri.length) {
       setSelectedNis([])
     } else {
@@ -168,7 +168,7 @@ export default function KenaikanKelasPage() {
     }
   }
 
-  const applyBulkPlacement = async () => {
+  const applyBulkPlacement = () => {
     if (selectedNis.length === 0) return toast.warning("Pilih minimal satu santri (ceklis).")
     if (!bulkTargetKelas) return toast.warning("Pilih kelas tujuan terlebih dahulu.")
 
@@ -182,7 +182,7 @@ export default function KenaikanKelasPage() {
     toast.success(`Berhasil menerapkan kelas ke ${selectedNis.length} santri.`)
   }
 
-  const handleIndividualPlacement = async (nis: string, targetKelasNama: string) => {
+  const handleIndividualPlacement = (nis: string, targetKelasNama: string) => {
     setPlacements(prev => ({ ...prev, [nis]: targetKelasNama }))
   }
 
@@ -214,7 +214,7 @@ export default function KenaikanKelasPage() {
   }
 
   // Handler untuk Excel
-  const handleProcessExcel = async () => {
+  const handleProcessExcel = () => {
     setShowConfirm(false)
     executeProcess(excelData)
   }
@@ -239,7 +239,7 @@ export default function KenaikanKelasPage() {
   }
 
   // Trigger Konfirmasi Excel (Fungsi yang terhapus)
-  const triggerProcess = async () => {
+  const triggerProcess = () => {
     if (excelData.length === 0) {
       toast.warning("Belum ada data Excel yang diupload.")
       return

@@ -89,7 +89,7 @@ export default function ArsipSantriPage() {
     append ? setLoadingMoreSantri(false) : setLoadingSantri(false)
   }
 
-  const handleFilterSantriChange = async (key: string, val: string) => {
+  const handleFilterSantriChange = (key: string, val: string) => {
     const next = { ...filterSantri, [key]: val }
     setFilterSantri(next)
     clearTimeout(debounceRef.current ?? undefined)
@@ -131,7 +131,7 @@ export default function ArsipSantriPage() {
     append ? setLoadingMoreSantriArsip(false) : setLoadingSantriArsip(false)
   }
 
-  const handleFilterSantriArsipChange = async (key: string, val: string) => {
+  const handleFilterSantriArsipChange = (key: string, val: string) => {
     const next = { ...filterSantriArsip, [key]: val }
     setFilterSantriArsip(next)
     clearTimeout(debounceRef.current ?? undefined)
@@ -139,13 +139,13 @@ export default function ArsipSantriPage() {
   }
 
   // ── SELECT HELPERS ──
-  const toggleSelectArsip = async (id: string) => setSelectedArsip(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAllSantri = async () => {
+  const toggleSelectArsip = (id: string) => setSelectedArsip(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleSelectAllSantri = () => {
     if (selectedArsip.size === santriList.length && santriList.length > 0) setSelectedArsip(new Set())
     else setSelectedArsip(new Set(santriList.map(s => s.id)))
   }
-  const toggleSelectRestore = async (id: string) => setSelectedRestore(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAllRestore = async () => {
+  const toggleSelectRestore = (id: string) => setSelectedRestore(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleSelectAllRestore = () => {
     if (selectedRestore.size === santriArsipList.length && santriArsipList.length > 0) setSelectedRestore(new Set())
     else setSelectedRestore(new Set(santriArsipList.map(a => a.id)))
   }
@@ -228,7 +228,7 @@ export default function ArsipSantriPage() {
   }
 
   // ── LABEL GRUP ──
-  const labelGrup = async (g: Grup) => {
+  const labelGrup = (g: Grup) => {
     if (g.catatan) return g.catatan
     if (g.angkatan) return `Angkatan ${g.angkatan}`
     return `Backup ${g.tanggal_arsip}`

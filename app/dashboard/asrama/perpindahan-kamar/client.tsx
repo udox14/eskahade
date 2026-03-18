@@ -35,9 +35,9 @@ function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PerpindahanClient({
+  const confirm = useConfirm()
   userRole, asramaBinaan
 }: { userRole: string; asramaBinaan: string | null }) {
-  const confirm = useConfirm()
 
   const asramaOptions = asramaBinaan ? [asramaBinaan] : ASRAMA_LIST
   const [asrama, setAsrama] = useState(asramaOptions[0])
@@ -94,7 +94,7 @@ export default function PerpindahanClient({
   useEffect(() => { load() }, [load])
 
   // ── Derived: santri per kamar ──────────────────────────────────────────────
-  const getSantriDiKamar = async (nomor: string) =>
+  const getSantriDiKamar = (nomor: string) =>
     santriList.filter(s => draftMap[s.id]?.kamar_baru === nomor)
 
   const santriTanpaDraft = santriList.filter(s => !draftMap[s.id])
@@ -163,7 +163,7 @@ export default function PerpindahanClient({
   }
 
   // ── Drag and drop ──────────────────────────────────────────────────────────
-  const handleDrop = async (kamarTujuan: string) => {
+  const handleDrop = (kamarTujuan: string) => {
     if (dragSantriId && kamarTujuan !== draftMap[dragSantriId]?.kamar_baru) {
       handlePindah(dragSantriId, kamarTujuan)
     }
@@ -172,7 +172,7 @@ export default function PerpindahanClient({
   }
 
   // ── Print ──────────────────────────────────────────────────────────────────
-  const handlePrint = async (mode: 'all' | string) => {
+  const handlePrint = (mode: 'all' | string) => {
     const printData = configs.map(cfg => {
       const santri = getSantriDiKamar(cfg.nomor_kamar)
       const ketua = ketuaMap[cfg.nomor_kamar]

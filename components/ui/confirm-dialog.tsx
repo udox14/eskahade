@@ -9,7 +9,7 @@
  * POLA PEMAKAIAN (ganti semua confirm() lama):
  *
  *   // Sebelum:
- *   const handleHapus = async () => {
+ *   const handleHapus = () => {
  *     if (!confirm('Hapus ini?')) return
  *     ...
  *   }

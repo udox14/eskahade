@@ -51,14 +51,14 @@ export default function ManajemenUPKClient({ isAdmin }: { isAdmin: boolean }) {
 
   // --- ACTIONS ---
   
-  const openSerahModal = async (trx: any) => {
+  const openSerahModal = (trx: any) => {
       setSelectedTrx(trx)
       const pendingItems = trx.items_detail.filter((i:any) => i.status_serah === 'BELUM')
       setSelectedItems(pendingItems.map((i:any) => i.id))
       setIsModalOpen(true)
   }
 
-  const toggleItemSelection = async (itemId: string) => {
+  const toggleItemSelection = (itemId: string) => {
       if (selectedItems.includes(itemId)) {
           setSelectedItems(prev => prev.filter(id => id !== itemId))
       } else {

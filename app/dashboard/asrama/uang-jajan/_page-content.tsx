@@ -88,7 +88,7 @@ export default function UangJajanPage() {
   const activeKamar = kamars[kamarIdx] ?? ''
 
   // Invalidate cache + reload stats + reload santri kamar aktif setelah mutasi
-  const refreshAfterMutasi = async (kamar?: string) => {
+  const refreshAfterMutasi = (kamar?: string) => {
     const targetKamar = kamar || activeKamar
     // Hapus cache kamar yang dimutasi
     if (targetKamar) {
@@ -106,9 +106,9 @@ export default function UangJajanPage() {
   }
 
   // ── Jajan logic ────────────────────────────────────────────────────────────
-  const setDrafts = async (val: Record<string, number> | ((p: Record<string, number>) => Record<string, number>)) => setDraftJajan(val)
+  const setDrafts = (val: Record<string, number> | ((p: Record<string, number>) => Record<string, number>)) => setDraftJajan(val)
 
-  const handleSelectJajan = async (santriId: string, nominal: number, saldo: number) => {
+  const handleSelectJajan = (santriId: string, nominal: number, saldo: number) => {
     if (nominal > saldo) { toast.warning('Saldo tidak cukup!'); return }
     setDraftJajan(prev => {
       if (prev[santriId] === nominal) { const n = { ...prev }; delete n[santriId]; return n }
@@ -116,14 +116,14 @@ export default function UangJajanPage() {
     })
   }
 
-  const handleManualInput = async (santriId: string, value: string, saldo: number) => {
+  const handleManualInput = (santriId: string, value: string, saldo: number) => {
     const val = parseInt(value) || 0
     if (val > saldo) return
     if (val > 0) setDraftJajan(prev => ({ ...prev, [santriId]: val }))
     else setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
   }
 
-  const toggleManualMode = async (santriId: string) => {
+  const toggleManualMode = (santriId: string) => {
     setManualMode(prev => ({ ...prev, [santriId]: !prev[santriId] }))
     setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
   }

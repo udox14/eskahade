@@ -65,7 +65,7 @@ export default function GradingKelasPage() {
   }
 
   // 3. Handler Dropdown Perubahan Grade
-  const handleGradeChange = async (riwayatId: string, newGrade: string) => {
+  const handleGradeChange = (riwayatId: string, newGrade: string) => {
     setPendingChanges(prev => ({
       ...prev,
       [riwayatId]: newGrade
@@ -200,7 +200,7 @@ export default function GradingKelasPage() {
   };
 
   // Helper
-  const getDisplayGrade = async (riwayatId: string, originalGrade: string) => {
+  const getDisplayGrade = (riwayatId: string, originalGrade: string) => {
     return pendingChanges[riwayatId] !== undefined ? pendingChanges[riwayatId] : originalGrade
   }
 

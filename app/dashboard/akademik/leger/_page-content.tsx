@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger } from './actions'
 import { FileSpreadsheet, Loader2, Search, Trophy, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 
 export default function LegerNilaiPage() {
+  const confirm = useConfirm()
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
@@ -34,7 +36,7 @@ export default function LegerNilaiPage() {
   // Hitung
   const handleHitung = async () => {
     if (!dataLeger || dataLeger.siswa.length === 0) return
-    if (!confirm("Hitung ulang Jumlah, Rata-rata, dan Ranking seluruh siswa di kelas ini?")) return
+    if (!await confirm("Hitung ulang Jumlah, Rata-rata, dan Ranking seluruh siswa di kelas ini?")) return
 
     setIsCalculating(true)
     const toastId = toast.loading("Mengkalkulasi nilai...")

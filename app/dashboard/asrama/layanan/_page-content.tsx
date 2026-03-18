@@ -121,7 +121,7 @@ export default function LayananAsramaPage() {
     }, [hasMore, isLoading, selectedAsrama, page]);
 
     // --- HANDLERS ---
-    const handleSelectChange = async (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', value: string) => {
+    const handleSelectChange = (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', value: string) => {
         setPendingChanges(prev => {
             const updated = { ...prev };
             if (!updated[santriId]) updated[santriId] = {};
@@ -255,7 +255,7 @@ export default function LayananAsramaPage() {
         }
     };
 
-    const getDisplayValue = async (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', originalValue: string) => {
+    const getDisplayValue = (santriId: string, type: 'tempat_makan_id' | 'tempat_mencuci_id', originalValue: string) => {
         if (pendingChanges[santriId] && pendingChanges[santriId][type] !== undefined) {
             return pendingChanges[santriId][type] === null ? "null" : pendingChanges[santriId][type];
         }

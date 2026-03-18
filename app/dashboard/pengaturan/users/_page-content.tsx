@@ -92,7 +92,7 @@ export default function ManajemenUserPage() {
     }
   }
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleRoleChange = (userId: string, newRole: string) => {
     if (newRole === 'pengurus_asrama') {
       setPendingRoleUpdate({ userId, role: newRole })
       setIsAsramaModalOpen(true)
@@ -101,7 +101,7 @@ export default function ManajemenUserPage() {
     executeUpdateRole(userId, newRole)
   }
 
-  const handleSelectAsrama = async (asrama: string) => {
+  const handleSelectAsrama = (asrama: string) => {
     if (pendingRoleUpdate) {
       setIsAsramaModalOpen(false)
       executeUpdateRole(pendingRoleUpdate.userId, pendingRoleUpdate.role, asrama)

@@ -59,27 +59,27 @@ export default function KasirUPKPage() {
 
 
   // --- LOGIC CART ---
-  const addToCart = async (kitab: any) => {
+  const addToCart = (kitab: any) => {
     if (cart.some(c => c.id === kitab.id)) return 
     setCart(prev => [...prev, { ...kitab, hargaAsli: kitab.harga, isGratis: false }])
     toast.success("Ditambahkan")
   }
 
-  const addPaket = async (listKitab: any[]) => {
+  const addPaket = (listKitab: any[]) => {
     const newItems = listKitab.filter(k => !cart.some(c => c.id === k.id))
         .map(k => ({ ...k, hargaAsli: k.harga, isGratis: false }))
     setCart(prev => [...prev, ...newItems])
     toast.success(`${newItems.length} kitab ditambahkan`)
   }
 
-  const toggleGratis = async (id: number) => {
+  const toggleGratis = (id: number) => {
     setCart(prev => prev.map(c => {
         if (c.id === id) return { ...c, isGratis: !c.isGratis }
         return c
     }))
   }
 
-  const removeFromCart = async (id: number) => {
+  const removeFromCart = (id: number) => {
     setCart(prev => prev.filter(c => c.id !== id))
   }
 

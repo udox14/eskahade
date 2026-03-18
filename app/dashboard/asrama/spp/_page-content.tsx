@@ -91,7 +91,7 @@ export default function SPPPage() {
   }, [kamarIdx, kamars])
 
   // Invalidate cache kamar tertentu setelah simpan batch
-  const invalidateKamar = async (kamar: string) => {
+  const invalidateKamar = (kamar: string) => {
     setKamarCache(prev => { const n = { ...prev }; delete n[kamar]; return n })
   }
 
@@ -100,7 +100,7 @@ export default function SPPPage() {
     if (view === 'PAYMENT') window.history.pushState({ view: 'PAYMENT' }, '')
   }, [view])
   useEffect(() => {
-    const handlePopState = async (e: PopStateEvent) => {
+    const handlePopState = (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'PAYMENT') {
         setView('LIST')
         setSelectedSantri(null)
@@ -120,7 +120,7 @@ export default function SPPPage() {
     }
   }, [view, selectedSantri, tahun])
 
-  const handleSelectSantri = async (santri: any) => {
+  const handleSelectSantri = (santri: any) => {
     setSelectedSantri(santri)
     setView('PAYMENT')
   }
@@ -142,7 +142,7 @@ export default function SPPPage() {
     }
   }
 
-  const toggleDraft = async (e: React.MouseEvent, santri: any) => {
+  const toggleDraft = (e: React.MouseEvent, santri: any) => {
     e.stopPropagation()
     setDrafts(prev => {
       const next = { ...prev }
@@ -169,12 +169,12 @@ export default function SPPPage() {
     }
   }
 
-  const toggleBulan = async (idx: number) => {
+  const toggleBulan = (idx: number) => {
     if (riwayatBayar.some(r => r.bulan === idx)) return
     setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx])
   }
 
-  const handleBackToList = async () => { window.history.back() }
+  const handleBackToList = () => { window.history.back() }
 
   const activeKamar = kamars[kamarIdx] ?? ''
 
