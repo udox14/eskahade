@@ -61,7 +61,7 @@ function RowPulang({
   santri: any; periodeId: number; busy: boolean
   onKonfirmasi: (logId: string, ket: string) => Promise<void>
   onBatal: (logId: string) => Promise<void>
-  onToggleJenis: (logId: string, jenisSaat: string | null) => Promise<void>
+  onToggleJenis: (logId: string, jenisBaru: 'ROMBONGAN' | 'DIJEMPUT') => Promise<void>
   onKetChange: (logId: string, ket: string) => void
 }) {
   const [ket, setKet] = useState(santri.keterangan || '')
@@ -71,7 +71,7 @@ function RowPulang({
 
   const handleToggleJenis = () => {
     const next = santri.jenis_pulang === 'ROMBONGAN' ? 'DIJEMPUT' : 'ROMBONGAN'
-    onToggleJenis(santri.log_id, next as any)
+    onToggleJenis(santri.log_id, next as 'ROMBONGAN' | 'DIJEMPUT')
   }
 
   const handleKetBlur = () => {
