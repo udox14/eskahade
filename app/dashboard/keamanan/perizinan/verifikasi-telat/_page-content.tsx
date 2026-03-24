@@ -13,7 +13,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type TelatItem = {
   izin_id: string; santri_id: string; nama: string; info: string
-  jenis: string; alasan: string; batas_kembali: string
+  jenis: string; sumber: 'perizinan' | 'perpulangan'; alasan: string; batas_kembali: string
   tgl_kembali: string | null; status_label: string; durasi_telat: string
 }
 type VonisType   = 'TELAT_MURNI' | 'SAKIT' | 'IZIN_UZUR' | 'MANGKIR'
@@ -28,15 +28,16 @@ function fmtTgl(s: string) {
 // ── Baris (desktop) / Card (mobile) ──────────────────────────────────────────
 function BarisTelat({ item, no, onVonis }: {
   item: TelatItem; no: number
-  onVonis: (a: string, b: string, v: VonisType) => Promise<void>
+  onVonis: (a: string, b: string, v: VonisType, sumber: 'perizinan' | 'perpulangan') => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
   const sudahKembali    = !!item.tgl_kembali
+  const isPerpulangan   = item.sumber === 'perpulangan'
 
   const handle = async (v: VonisType) => {
     if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (+25 poin)`)) return
     setBusy(true)
-    await onVonis(item.izin_id, item.santri_id, v)
+    await onVonis(item.izin_id, item.santri_id, v, item.sumber)
     setBusy(false)
   }
 
@@ -77,6 +78,8 @@ function BarisTelat({ item, no, onVonis }: {
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
           item.jenis === 'IZIN PULANG'
             ? 'bg-purple-50 text-purple-700 border-purple-200'
+            : isPerpulangan
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
             : 'bg-slate-100 text-slate-600 border-slate-200'
         }`}>{item.jenis}</span>
       </td>
@@ -141,8 +144,8 @@ export default function VerifikasiTelatPage() {
     finally { setLoading(false) }
   }, [])
 
-  const handleVonis = async (izinId: string, santriId: string, v: VonisType) => {
-    const res = await simpanVonisTelat(izinId, santriId, v)
+  const handleVonis = async (izinId: string, santriId: string, v: VonisType, sumber: 'perizinan' | 'perpulangan' = 'perizinan') => {
+    const res = await simpanVonisTelat(izinId, santriId, v, sumber)
     if ('error' in res) { toast.error('Gagal', { description: (res as any).error }); return }
     toast.success(v === 'MANGKIR' ? 'Ditandai mangkir' : 'Vonis tersimpan')
     setList(prev => prev.filter(i => i.izin_id !== izinId))
