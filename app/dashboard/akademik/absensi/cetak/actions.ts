@@ -16,7 +16,11 @@ function getWeekRange(date: Date) {
 
 export async function getRekapAlfaMingguan(tanggalRef: string) {
   const { start, end } = getWeekRange(new Date(tanggalRef))
+  const startStr = start.toISOString().split('T')[0]
+  const endStr = end.toISOString().split('T')[0]
 
+  // Batasi ke minggu ini + data belum terverifikasi (verif = NULL atau 'BELUM')
+  // Filter tanggal di SQL — tidak scan seluruh tabel
   const rawData = await query<any>(`
     SELECT ah.id, ah.tanggal,
            ah.shubuh, ah.ashar, ah.maghrib,
@@ -25,8 +29,9 @@ export async function getRekapAlfaMingguan(tanggalRef: string) {
     FROM absensi_harian ah
     JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id
     JOIN santri s ON s.id = rp.santri_id
-    WHERE ah.shubuh = 'A' OR ah.ashar = 'A' OR ah.maghrib = 'A'
-  `, [])
+    WHERE ah.tanggal >= ? AND ah.tanggal <= ?
+      AND (ah.shubuh = 'A' OR ah.ashar = 'A' OR ah.maghrib = 'A')
+  `, [startStr, endStr])
 
   if (!rawData.length) return []
 

@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, batch } from '@/lib/db'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
@@ -110,12 +110,10 @@ export async function importKelasMassal(dataExcel: any[]) {
     return { error: 'Tidak ada data valid untuk disimpan.' }
   }
 
-  for (const row of inserts) {
-    await query(
-      'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
-      row
-    )
-  }
+  await batch(inserts.map(row => ({
+    sql: 'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
+    params: row,
+  })))
 
   revalidatePath('/dashboard/master/kelas')
   return { success: true, count: inserts.length, skipped: duplicates }

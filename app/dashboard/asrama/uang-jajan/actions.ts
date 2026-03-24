@@ -99,13 +99,18 @@ export async function simpanJajanMassal(
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
 
-  // Validasi: cek saldo cukup untuk setiap santri
+  // Validasi saldo: ambil semua sekaligus — 1 query, bukan N query serial
+  const ids = listTransaksi.map(item => item.santriId)
+  const phIds = ids.map(() => '?').join(',')
+  const saldoRows = await query<{ id: string; saldo: number }>(
+    `SELECT id, COALESCE(saldo_tabungan, 0) AS saldo FROM santri WHERE id IN (${phIds})`,
+    ids
+  )
+  const saldoMap = new Map(saldoRows.map(r => [r.id, r.saldo]))
+
   for (const item of listTransaksi) {
-    const row = await queryOne<{ saldo: number }>(
-      'SELECT COALESCE(saldo_tabungan, 0) AS saldo FROM santri WHERE id = ?',
-      [item.santriId]
-    )
-    if (!row || row.saldo < item.nominal) {
+    const saldo = saldoMap.get(item.santriId) ?? 0
+    if (saldo < item.nominal) {
       return { error: `Saldo tidak cukup untuk sebagian santri. Batalkan dan periksa ulang.` }
     }
   }

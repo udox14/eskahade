@@ -32,7 +32,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
   //    alasan_keluar langsung dipakai sebagai keterangan
   // 2. riwayat_surat BERHENTI — fallback untuk data lama atau santri yang belum pakai fitur baru
   // Dua query parallel (Promise.all), digabung di memory
-  const [keluarBaru, keluarLama] = await Promise.all([
+  const [keluarBaru, keluarLama, masukBaru] = await Promise.all([
     query<any>(`
       SELECT s.tanggal_keluar   AS created_at,
              s.alasan_keluar    AS detail_info,
@@ -51,10 +51,18 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
         AND rs.created_at >= ? AND rs.created_at <= ?
         AND s.status_global != 'keluar'
     `, [startDate, endDate]),
+
+    // Mutasi masuk: filter langsung di SQL — tidak JS filter dari santriList lengkap
+    query<any>(
+      `SELECT id, nama_lengkap, asrama, kamar, sekolah, kelas_sekolah, alamat, created_at
+       FROM santri
+       WHERE status_global = 'aktif' AND created_at >= ? AND created_at <= ?`,
+      [startDate, endDate]
+    ),
   ])
   const mutasiKeluarRaw = [...keluarBaru, ...keluarLama]
 
-  const mutasiMasuk = santriList.filter((s: any) => s.created_at >= startDate && s.created_at <= endDate)
+  const mutasiMasuk = masukBaru
 
   // A. REKAP ASRAMA
   const statsAsrama: any = {}

@@ -36,18 +36,30 @@ export async function getRiwayatAkademik(santriId: string) {
     ORDER BY rp.created_at DESC
   `, [santriId])
 
-  const result = await Promise.all(riwayat.map(async (r: any) => {
-    const nilai = await query<any>(`
-      SELECT mp.nama as mapel_nama, na.nilai, na.semester
-      FROM nilai_akademik na
-      LEFT JOIN mapel mp ON na.mapel_id = mp.id
-      WHERE na.riwayat_pendidikan_id = ?
-      ORDER BY na.semester
-    `, [r.id])
-    return { ...r, nilai_detail: nilai }
-  }))
+  if (!riwayat.length) return []
 
-  return result
+  // Ambil semua nilai sekaligus — 1 query, bukan N+1
+  const riwayatIds = riwayat.map((r: any) => r.id)
+  const ph = riwayatIds.map(() => '?').join(',')
+  const semuaNilai = await query<any>(`
+    SELECT na.riwayat_pendidikan_id, mp.nama as mapel_nama, na.nilai, na.semester
+    FROM nilai_akademik na
+    LEFT JOIN mapel mp ON na.mapel_id = mp.id
+    WHERE na.riwayat_pendidikan_id IN (${ph})
+    ORDER BY na.semester
+  `, riwayatIds)
+
+  // Group nilai per riwayat_pendidikan_id di memory
+  const nilaiByRiwayat = new Map<string, any[]>()
+  semuaNilai.forEach((n: any) => {
+    if (!nilaiByRiwayat.has(n.riwayat_pendidikan_id)) nilaiByRiwayat.set(n.riwayat_pendidikan_id, [])
+    nilaiByRiwayat.get(n.riwayat_pendidikan_id)!.push(n)
+  })
+
+  return riwayat.map((r: any) => ({
+    ...r,
+    nilai_detail: nilaiByRiwayat.get(r.id) ?? [],
+  }))
 }
 
 export async function getRiwayatPelanggaran(santriId: string) {

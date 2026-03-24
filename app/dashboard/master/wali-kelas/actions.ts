@@ -95,9 +95,10 @@ export async function importGuruMassal(dataExcel: any[]): Promise<{ success: boo
 
   if (!toInsert.length) return { error: `Semua data dilewati (${skipped} duplikat atau kosong).` }
 
-  for (const row of toInsert) {
-    await query('INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)', row)
-  }
+  await batch(toInsert.map(row => ({
+    sql: 'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
+    params: row,
+  })))
 
   revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')

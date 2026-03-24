@@ -33,11 +33,32 @@ export async function getDataRapor(kelasId: string, semester: number) {
     ORDER BY mp.nama
   `, [...riwayatIds, semester])
 
-  const absensi = await query<any>(`
-    SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
+  const absensiAgg = await query<any>(`
+    SELECT
+      riwayat_pendidikan_id,
+      SUM(CASE WHEN shubuh  = 'S' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN ashar   = 'S' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN maghrib = 'S' THEN 1 ELSE 0 END) AS total_sakit,
+      SUM(CASE WHEN shubuh  = 'I' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN ashar   = 'I' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN maghrib = 'I' THEN 1 ELSE 0 END) AS total_izin,
+      SUM(CASE WHEN shubuh  = 'A' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN ashar   = 'A' THEN 1 ELSE 0 END) +
+      SUM(CASE WHEN maghrib = 'A' THEN 1 ELSE 0 END) AS total_alfa
     FROM absensi_harian
     WHERE riwayat_pendidikan_id IN (${ph})
+    GROUP BY riwayat_pendidikan_id
   `, riwayatIds)
+
+  // Build map untuk lookup O(1)
+  const absenMap = new Map<string, { sakit: number; izin: number; alfa: number }>()
+  absensiAgg.forEach((a: any) => {
+    absenMap.set(a.riwayat_pendidikan_id, {
+      sakit: a.total_sakit ?? 0,
+      izin:  a.total_izin  ?? 0,
+      alfa:  a.total_alfa  ?? 0,
+    })
+  })
 
   const marhalahId = listSantri[0]?.marhalah_id
   let listKitab: any[] = []
@@ -49,14 +70,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
 
   return listSantri.map((s: any) => {
     const nilainya = nilaiAkademik.filter((n: any) => n.riwayat_pendidikan_id === s.id)
-    const absennya = absensi.filter((a: any) => a.riwayat_pendidikan_id === s.id)
-
-    let sakit = 0, izin = 0, alfa = 0
-    absennya.forEach((row: any) => {
-      if (row.shubuh === 'S') sakit++; if (row.shubuh === 'I') izin++; if (row.shubuh === 'A') alfa++
-      if (row.ashar === 'S') sakit++;  if (row.ashar === 'I') izin++;  if (row.ashar === 'A') alfa++
-      if (row.maghrib === 'S') sakit++; if (row.maghrib === 'I') izin++; if (row.maghrib === 'A') alfa++
-    })
+    const absen = absenMap.get(s.id) ?? { sakit: 0, izin: 0, alfa: 0 }
 
     return {
       id: s.id,
@@ -73,7 +87,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
         const kitabData = listKitab.find((k: any) => k.mapel_id === n.mapel_id)
         return { mapel: n.mapel_nama || 'Tanpa Nama', kitab: kitabData?.nama_kitab || '-', angka: n.nilai }
       }),
-      absen: { sakit, izin, alfa },
+      absen: { sakit: absen.sakit, izin: absen.izin, alfa: absen.alfa },
     }
   })
 }

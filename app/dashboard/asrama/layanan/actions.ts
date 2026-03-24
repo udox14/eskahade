@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, execute, generateId, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
@@ -62,12 +62,10 @@ export async function tambahMasterJasaBatch(dataBatch: { nama_jasa: string; jeni
   if (!session) throw new Error('Unauthorized')
   if (!dataBatch || !dataBatch.length) return { error: 'Data kosong' }
 
-  for (const item of dataBatch) {
-    await execute(
-      'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
-      [generateId(), item.nama_jasa, item.jenis]
-    )
-  }
+  await batch(dataBatch.map(item => ({
+    sql: 'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
+    params: [generateId(), item.nama_jasa, item.jenis],
+  })))
 
   revalidatePath('/dashboard/asrama/layanan')
   return { success: true, count: dataBatch.length }

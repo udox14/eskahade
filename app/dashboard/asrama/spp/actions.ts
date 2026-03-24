@@ -31,23 +31,27 @@ export async function getDashboardSPPKamar(tahun: number, asrama: string, kamar:
   const currentMonth = new Date().getMonth() + 1
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
 
+  // Gunakan CTE flat — tidak ada correlated subquery per baris santri
   const rows = await query<any>(`
+    WITH
+      bayar_tahun AS (
+        SELECT santri_id, COUNT(*) AS jumlah_bayar
+        FROM spp_log
+        WHERE tahun = ? AND bulan BETWEEN 1 AND ?
+        GROUP BY santri_id
+      ),
+      bayar_bulan_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ?
+      )
     SELECT
       s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
-      (
-        SELECT COUNT(*)
-        FROM spp_log sl
-        WHERE sl.santri_id = s.id
-          AND sl.tahun = ?
-          AND sl.bulan BETWEEN 1 AND ?
-      ) AS jumlah_bayar,
-      CASE WHEN EXISTS (
-        SELECT 1 FROM spp_log sl2
-        WHERE sl2.santri_id = s.id
-          AND sl2.tahun = ?
-          AND sl2.bulan = ?
-      ) THEN 1 ELSE 0 END AS bulan_ini_lunas
+      COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
+      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
     FROM santri s
+    LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
+    LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
     WHERE s.status_global = 'aktif'
       AND s.asrama = ?
       AND s.kamar = ?

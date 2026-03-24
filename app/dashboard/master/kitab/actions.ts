@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, batch } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedMapelAll, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 
@@ -107,12 +107,10 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
 
   if (inserts.length === 0) return { error: 'Tidak ada data valid (Cek penulisan Marhalah/Mapel)' }
 
-  for (const row of inserts) {
-    await query(
-      'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
-      row
-    )
-  }
+  await batch(inserts.map(row => ({
+    sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
+    params: row,
+  })))
 
   revalidatePath('/dashboard/master/kitab')
   return { success: true, count: inserts.length, failed: failCount }

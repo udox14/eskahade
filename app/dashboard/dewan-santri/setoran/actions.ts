@@ -164,26 +164,34 @@ export async function getDashboardSPP(tahun: number, asrama: string) {
   const currentMonth = new Date().getMonth() + 1
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
   const asramaClause = (asrama && asrama !== 'SEMUA') ? 'AND s.asrama = ?' : ''
-  const params: any[] = []
-  if (asrama && asrama !== 'SEMUA') params.push(asrama)
-  params.push(tahun, maxCheck, tahun, currentMonth)
+  const asramaParam = (asrama && asrama !== 'SEMUA') ? [asrama] : []
+
+  // Gunakan CTE flat — tidak ada correlated subquery per baris santri
   const rows = await query<any>(`
+    WITH
+      bayar_tahun AS (
+        SELECT santri_id, COUNT(*) AS jumlah_bayar
+        FROM spp_log
+        WHERE tahun = ? AND bulan BETWEEN 1 AND ?
+        GROUP BY santri_id
+      ),
+      bayar_bulan_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ?
+      )
     SELECT
       s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.bebas_spp,
       CAST(s.kamar AS INTEGER) AS kamar_num,
-      (
-        SELECT COUNT(*)
-        FROM spp_log sl
-        WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan BETWEEN 1 AND ?
-      ) AS jumlah_bayar,
-      CASE WHEN EXISTS (
-        SELECT 1 FROM spp_log sl2
-        WHERE sl2.santri_id = s.id AND sl2.tahun = ? AND sl2.bulan = ?
-      ) THEN 1 ELSE 0 END AS bulan_ini_lunas
+      COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
+      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
     FROM santri s
+    LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
+    LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
     WHERE s.status_global = 'aktif' ${asramaClause}
     ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
-  `, params)
+  `, [tahun, maxCheck, tahun, currentMonth, ...asramaParam])
+
   return rows.map((s: any) => ({
     ...s,
     bulan_ini_lunas: s.bulan_ini_lunas === 1,
