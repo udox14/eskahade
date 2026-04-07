@@ -7,7 +7,7 @@ import {
   type ExportFilter, type SortBy, type KolomExport
 } from './constants'
 import {
-  FileSpreadsheet, Filter, Download, RefreshCw,
+  FileSpreadsheet, Filter, Download,
   ChevronDown, ChevronUp, Check, Loader2, Users, Settings2
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -23,8 +23,8 @@ function KolomPicker({ selected, onChange }: {
   const toggle = (k: KolomExport) =>
     onChange(selected.includes(k) ? selected.filter(x => x !== k) : [...selected, k])
 
-  const pilihSemua  = () => onChange(KOLOM_TERSEDIA.map(k => k.key))
-  const hapusSemua  = () => onChange([])
+  const pilihSemua = () => onChange(KOLOM_TERSEDIA.map(k => k.key))
+  const hapusSemua = () => onChange([])
 
   return (
     <div className="space-y-3">
@@ -58,7 +58,7 @@ function KolomPicker({ selected, onChange }: {
   )
 }
 
-// ── Komponen: Section collapsible ────────────────────────────────────────────
+// ── Komponen: Section collapsible ─────────────────────────────────────────────
 function Section({ title, icon: Icon, badge, children, defaultOpen = false }: {
   title: string; icon: React.ElementType; badge?: string
   children: React.ReactNode; defaultOpen?: boolean
@@ -80,14 +80,24 @@ function Section({ title, icon: Icon, badge, children, defaultOpen = false }: {
   )
 }
 
-// ── Komponen: Multi-select chip ──────────────────────────────────────────────
-function MultiChip({ label, selected, onChange, options, disabled = false }: {
+// ── Komponen: Multi-select chip ───────────────────────────────────────────────
+function MultiChip({ label, selected, onChange, options, disabled = false, loading = false }: {
   label: string
   selected: string[]
   onChange: (v: string[]) => void
   options: string[]
   disabled?: boolean
+  loading?: boolean
 }) {
+  if (loading) return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
+      <p className="text-xs text-slate-300 italic py-1 flex items-center gap-1">
+        <Loader2 className="w-3 h-3 animate-spin" /> Memuat...
+      </p>
+    </div>
+  )
+
   if (options.length === 0) return (
     <div>
       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
@@ -124,20 +134,23 @@ function MultiChip({ label, selected, onChange, options, disabled = false }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportSantriPage() {
-  const [opts, setOpts]         = useState<any>(null)
+  const [opts, setOpts]               = useState<any>(null)
   const [loadingOpts, setLoadingOpts] = useState(true)
-  const [kamarList, setKamarList]     = useState<string[]>([])
+
+  // FIX #2: kamarList dikelola lewat state + useEffect, bukan dari opts
+  const [kamarList, setKamarList]         = useState<string[]>([])
+  const [loadingKamar, setLoadingKamar]   = useState(false)
 
   // Filter
-  const [filter, setFilter]     = useState<ExportFilter>({})
-  const [sortBy, setSortBy]     = useState<SortBy>('nama_lengkap')
-  const [kolom, setKolom]       = useState<KolomExport[]>(KOLOM_DEFAULT)
+  const [filter, setFilter] = useState<ExportFilter>({})
+  const [sortBy, setSortBy] = useState<SortBy>('nama_lengkap')
+  const [kolom, setKolom]   = useState<KolomExport[]>(KOLOM_DEFAULT)
 
   // Preview
-  const [preview, setPreview]   = useState<any[]>([])
-  const [total, setTotal]       = useState(0)
+  const [preview, setPreview]           = useState<any[]>([])
+  const [total, setTotal]               = useState(0)
   const [loadingPreview, setLoadingPreview] = useState(false)
-  const [hasPreview, setHasPreview] = useState(false)
+  const [hasPreview, setHasPreview]     = useState(false)
 
   const [exporting, setExporting] = useState(false)
 
@@ -146,7 +159,24 @@ export default function ExportSantriPage() {
     getFilterOptions().then(o => { setOpts(o); setLoadingOpts(false) })
   }, [])
 
-
+  // FIX #2: Fetch kamar setiap kali filter.asrama berubah
+  useEffect(() => {
+    if (!filter.asrama?.length) {
+      setKamarList([])
+      return
+    }
+    setLoadingKamar(true)
+    // Fetch kamar dari semua asrama yang dipilih secara paralel, lalu gabung & dedup
+    Promise.all(filter.asrama.map(a => getKamarList(a)))
+      .then(results => {
+        const merged = [...new Set(results.flat())].sort((a, b) => {
+          const na = parseInt(a), nb = parseInt(b)
+          return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb
+        })
+        setKamarList(merged)
+      })
+      .finally(() => setLoadingKamar(false))
+  }, [filter.asrama])
 
   const setF = (key: keyof ExportFilter, val: any) =>
     setFilter(prev => ({ ...prev, [key]: val }))
@@ -188,7 +218,7 @@ export default function ExportSantriPage() {
       const rows = res.rows.map((r: any, i: number) => [
         i + 1,
         ...kolom.map(k => {
-          const v = r[k] ?? r['nama'] ?? ''
+          const v = r[k] ?? ''
           if (k === 'jenis_kelamin') return v === 'L' ? 'Laki-laki' : v === 'P' ? 'Perempuan' : v
           return v ?? ''
         })
@@ -220,7 +250,7 @@ export default function ExportSantriPage() {
     }
   }
 
-  const kolomBadge = `${kolom.length}/${KOLOM_TERSEDIA.length} kolom`
+  const kolomBadge  = `${kolom.length}/${KOLOM_TERSEDIA.length} kolom`
   const filterBadge = activeFilters > 0 ? `${activeFilters} filter aktif` : undefined
 
   if (loadingOpts) {
@@ -268,21 +298,28 @@ export default function ExportSantriPage() {
 
           <div className="col-span-2 sm:col-span-3">
             <MultiChip label="Asrama" selected={filter.asrama ?? []}
-              onChange={vals => { setArr('asrama')(vals); setF('kamar', undefined) }}
+              onChange={vals => {
+                setArr('asrama')(vals)
+                // Reset kamar saat asrama berubah
+                setF('kamar', undefined)
+              }}
               options={opts?.asramaList ?? []} />
           </div>
 
+          {/* FIX #2: pakai state kamarList, bukan opts.kamarList */}
           <div className="col-span-2 sm:col-span-3">
             <MultiChip label="Kamar" selected={filter.kamar ?? []}
               onChange={setArr('kamar')}
-              options={(filter.asrama?.length ? opts?.kamarList : []) ?? []}
-              disabled={!filter.asrama?.length} />
+              options={kamarList}
+              disabled={!filter.asrama?.length}
+              loading={loadingKamar} />
           </div>
 
+          {/* FIX #3: kelasList sudah string[], tidak perlu .map(k => k.nama_kelas) */}
           <div className="col-span-2 sm:col-span-3">
             <MultiChip label="Kelas Pesantren" selected={filter.nama_kelas ?? []}
               onChange={setArr('nama_kelas')}
-              options={opts?.kelasList?.map((k: any) => k.nama_kelas) ?? []} />
+              options={opts?.kelasList ?? []} />
           </div>
 
           <div className="col-span-2 sm:col-span-3">
@@ -321,7 +358,7 @@ export default function ExportSantriPage() {
         </div>
 
         {activeFilters > 0 && (
-          <button onClick={() => setFilter({})}
+          <button onClick={() => { setFilter({}); setKamarList([]) }}
             className="mt-3 text-xs text-red-500 hover:underline font-medium">
             × Hapus semua filter
           </button>
