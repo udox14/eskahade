@@ -73,23 +73,26 @@ export default function AbsensiGuruPage() {
   }
 
   // --- LOGIC 3: ROW GENERATION ---
+  // FIX: query getJurnalGuru mengembalikan field flat (guru_shubuh_id, guru_shubuh_nama, dst.)
+  // bukan nested object (guru_shubuh.id, guru_shubuh.nama_lengkap)
   const rowsToRender = useMemo(() => {
     const rows: any[] = []
     
     dataList.forEach(k => {
       const mapGuru = new Map<string, { id: string, name: string, sessions: SessionType[] }>()
       
-      const addSesi = (g: any, s: SessionType) => {
-        if (!g || !g.id) return 
-        if (!mapGuru.has(g.id)) {
-            mapGuru.set(g.id, { id: g.id, name: g.nama_lengkap, sessions: [] })
+      const addSesi = (guruId: string | null, guruNama: string | null, s: SessionType) => {
+        if (!guruId) return 
+        if (!mapGuru.has(guruId)) {
+          mapGuru.set(guruId, { id: guruId, name: guruNama ?? '-', sessions: [] })
         }
-        mapGuru.get(g.id)?.sessions.push(s)
+        mapGuru.get(guruId)?.sessions.push(s)
       }
 
-      addSesi(k.guru_shubuh, 'shubuh')
-      addSesi(k.guru_ashar, 'ashar')
-      addSesi(k.guru_maghrib, 'maghrib')
+      // FIX: gunakan field flat sesuai alias di query SQL
+      addSesi(k.guru_shubuh_id, k.guru_shubuh_nama, 'shubuh')
+      addSesi(k.guru_ashar_id, k.guru_ashar_nama, 'ashar')
+      addSesi(k.guru_maghrib_id, k.guru_maghrib_nama, 'maghrib')
 
       if (mapGuru.size === 0) {
         rows.push({
@@ -151,7 +154,7 @@ export default function AbsensiGuruPage() {
         if (val) {
           payload.push({
             kelas_id: k.id,
-            guru_id_wali: k.guru_maghrib?.id || null, 
+            guru_id_wali: k.guru_maghrib_id || null, 
             tanggal: day.dateStr,
             shubuh: val.shubuh || '',
             ashar: val.ashar || '',
@@ -317,7 +320,8 @@ export default function AbsensiGuruPage() {
                                     rowSpan={row.rowSpan}
                                 >
                                     {row.kelas.nama_kelas}
-                                    <div className="text-[10px] font-normal text-slate-400 mt-1">{row.kelas.marhalah?.nama}</div>
+                                    {/* FIX: field flat dari query adalah marhalah_nama, bukan marhalah?.nama */}
+                                    <div className="text-[10px] font-normal text-slate-400 mt-1">{row.kelas.marhalah_nama}</div>
                                 </td>
                             )}
 
@@ -369,7 +373,7 @@ export default function AbsensiGuruPage() {
 
 // --- OPTIMASI KOMPONEN (React.memo) ---
 // Ini yang membuat input smooth. Dia tidak akan re-render kecuali value/disabled berubah.
-// Kita gunakan custom comparator untuk mengabaikan perubahan fungsi callback
+// Kita gunakan custom comparator untuk mengabaikan perubahan referensi fungsi callback
 const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: { 
     id: string, 
     value: string, 
