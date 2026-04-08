@@ -56,11 +56,11 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
             <tr>
               <th className="border border-black p-0.5" rowSpan={2} style={{ width: '22px' }}>NO</th>
               <th className="border border-black p-0.5" rowSpan={2}>NAMA SANTRI</th>
-              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '72px' }}>SEKOLAH</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '44px' }}>KAMAR</th>
               <th className="border border-black p-0.5" rowSpan={2} style={{ whiteSpace: 'nowrap' }}>KELAS</th>
-              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '70px' }}>KAMAR</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '72px' }}>SEKOLAH</th>
               <th className="border border-black p-0.5" colSpan={3}>REKAP ALFA</th>
-              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '24px' }}>JML</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '36px' }}>JML</th>
             </tr>
             <tr>
               <th className="border border-black p-0.5" style={{ width: '44px' }}>SBH</th>
@@ -80,9 +80,9 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
                 <tr key={idx} style={{ backgroundColor: idx % 2 === 1 ? '#f9f9f9' : 'white' }}>
                   <td className="border border-black px-1 py-0.5 text-center">{idx + 1}</td>
                   <td className="border border-black px-2 py-0.5 font-medium">{item.nama}</td>
-                  <td className="border border-black px-1 py-0.5 text-center">{item.sekolah ? `${item.sekolah}/ ${item.kelas_sekolah || ''}` : '-'}</td>
-                  <td className="border border-black px-1 py-0.5 text-center" style={{ whiteSpace: 'nowrap' }}>{item.kelas || '-'}</td>
                   <td className="border border-black px-1 py-0.5 text-center">{item.kamar}</td>
+                  <td className="border border-black px-1 py-0.5 text-center" style={{ whiteSpace: 'nowrap' }}>{item.kelas || '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.sekolah ? `${item.sekolah}/ ${item.kelas_sekolah || ''}` : '-'}</td>
                   <td className="border border-black px-1 py-0.5 text-center">{item.alfa_shubuh || '-'}</td>
                   <td className="border border-black px-1 py-0.5 text-center">{item.alfa_ashar || '-'}</td>
                   <td className="border border-black px-1 py-0.5 text-center">{item.alfa_maghrib || '-'}</td>
