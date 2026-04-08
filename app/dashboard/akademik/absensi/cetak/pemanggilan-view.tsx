@@ -50,43 +50,43 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
         {/* TABEL */}
         <table
           className="w-full border-collapse border border-black"
-          style={{ fontSize: '8.5pt', marginBottom: '8px' }}
+          style={{ fontSize: '7.5pt', marginBottom: '6px' }}
         >
           <thead className="bg-gray-200 text-center font-bold">
             <tr>
-              <th className="border border-black p-1" rowSpan={2} style={{ width: '22px' }}>NO</th>
-              <th className="border border-black p-1" rowSpan={2}>NAMA SANTRI</th>
-              <th className="border border-black p-1" rowSpan={2} style={{ width: '72px' }}>SEKOLAH/KLS</th>
-              <th className="border border-black p-1" rowSpan={2} style={{ width: '80px' }}>KELAS</th>
-              <th className="border border-black p-1" rowSpan={2} style={{ width: '70px' }}>KAMAR</th>
-              <th className="border border-black p-1" colSpan={3}>REKAP ALFA PENGAJIAN</th>
-              <th className="border border-black p-1" rowSpan={2} style={{ width: '24px' }}>JML</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '22px' }}>NO</th>
+              <th className="border border-black p-0.5" rowSpan={2}>NAMA SANTRI</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '72px' }}>SEKOLAH</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '80px' }}>KELAS</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '70px' }}>KAMAR</th>
+              <th className="border border-black p-0.5" colSpan={3}>REKAP ALFA</th>
+              <th className="border border-black p-0.5" rowSpan={2} style={{ width: '24px' }}>JML</th>
             </tr>
             <tr>
-              <th className="border border-black p-1" style={{ width: '44px' }}>SHUBUH</th>
-              <th className="border border-black p-1" style={{ width: '44px' }}>ASHAR</th>
-              <th className="border border-black p-1" style={{ width: '44px' }}>MAGHRIB</th>
+              <th className="border border-black p-0.5" style={{ width: '44px' }}>SBH</th>
+              <th className="border border-black p-0.5" style={{ width: '44px' }}>ASR</th>
+              <th className="border border-black p-0.5" style={{ width: '44px' }}>MGR</th>
             </tr>
           </thead>
           <tbody>
             {data.length === 0 ? (
               <tr>
-                <td colSpan={9} className="border border-black p-2 text-center italic">
+                <td colSpan={9} className="border border-black px-2 py-1 text-center italic">
                   Tidak ada data alfa minggu ini.
                 </td>
               </tr>
             ) : (
               data.map((item, idx) => (
                 <tr key={idx} style={{ backgroundColor: idx % 2 === 1 ? '#f9f9f9' : 'white' }}>
-                  <td className="border border-black p-1 text-center">{idx + 1}</td>
-                  <td className="border border-black p-1 px-2 font-medium">{item.nama}</td>
-                  <td className="border border-black p-1 text-center">{item.sekolah ? `${item.sekolah}/ ${item.kelas_sekolah || ''}` : '-'}</td>
-                  <td className="border border-black p-1 text-center">{item.kelas || '-'}</td>
-                  <td className="border border-black p-1 text-center">{item.kamar}</td>
-                  <td className="border border-black p-1 text-center">{item.alfa_shubuh || '-'}</td>
-                  <td className="border border-black p-1 text-center">{item.alfa_ashar || '-'}</td>
-                  <td className="border border-black p-1 text-center">{item.alfa_maghrib || '-'}</td>
-                  <td className="border border-black p-1 text-center font-bold">{item.total}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{idx + 1}</td>
+                  <td className="border border-black px-2 py-0.5 font-medium">{item.nama}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.sekolah ? `${item.sekolah}/ ${item.kelas_sekolah || ''}` : '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.kelas ? item.kelas.replace(/Tamhidi[yy]ah/gi,'TMH').replace(/Ibtidai[yy]ah/gi,'IBT').replace(/Mutawassith?ah/gi,'MTW') : '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.kamar}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.alfa_shubuh || '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.alfa_ashar || '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center">{item.alfa_maghrib || '-'}</td>
+                  <td className="border border-black px-1 py-0.5 text-center font-bold">{item.total}</td>
                 </tr>
               ))
             )}
@@ -96,10 +96,10 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
         {/* FOOTER */}
         <div
           className="border border-black"
-          style={{ padding: '6px 10px', fontSize: '8.5pt', breakInside: 'avoid' }}
+          style={{ padding: '6px 10px', fontSize: '7.5pt', breakInside: 'avoid' }}
         >
           <p className="font-bold mb-1" style={{ fontSize: '9pt' }}>PEMANGGILAN:</p>
-          <table style={{ fontSize: '8.5pt' }}>
+          <table style={{ fontSize: '7.5pt' }}>
             <tbody>
               <tr>
                 <td style={{ width: '110px', fontWeight: 600 }}>Hari / Tanggal</td>
@@ -115,16 +115,6 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
               </tr>
             </tbody>
           </table>
-        </div>
-
-        {/* TTD */}
-        <div className="flex justify-end mt-8 text-center" style={{ fontSize: '9pt' }}>
-          <div>
-            <p style={{ marginBottom: '40px' }}>Bagian Keamanan,</p>
-            <p className="font-bold border-b border-black inline-block" style={{ minWidth: '130px' }}>
-              ..............................
-            </p>
-          </div>
         </div>
       </div>
     </>
