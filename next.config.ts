@@ -6,6 +6,16 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const nextConfig: NextConfig = {
+  webpack: (config, { webpack, isServer }) => {
+    if (isServer) {
+      config.plugins.push(
+        new webpack.IgnorePlugin({ resourceRegExp: /resvg\.wasm$/ }),
+        new webpack.IgnorePlugin({ resourceRegExp: /yoga\.wasm$/ }),
+        new webpack.IgnorePlugin({ resourceRegExp: /@vercel\/og/ })
+      );
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

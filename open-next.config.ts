@@ -1,6 +1,11 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 import kvIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/kv-incremental-cache";
 
-export default defineCloudflareConfig({
+const config = defineCloudflareConfig({
   incrementalCache: kvIncrementalCache,
 });
+
+export default {
+  ...config,
+  imageOptimization: false,
+};
