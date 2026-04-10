@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getSantriAktif, getSantriKeluar, getAsramaList,
@@ -67,7 +69,7 @@ function ModalKeluar({ santri, open, onClose, onSuccess }: {
   }
 
   return (
-    <Dialog open={open} onValueChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-[2rem]">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-6 pb-0">
@@ -175,7 +177,7 @@ function ModalSurat({ santriId, open, onClose }: { santriId: string; open: boole
   const tahunIni = new Date().getFullYear()
 
   return (
-    <Dialog open={open} onValueChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl rounded-[2.5rem] bg-slate-900 overflow-y-auto print:bg-white print:max-h-none print:shadow-none print:rounded-none">
          {/* Toolbar */}
          <div className="sticky top-0 z-50 p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white print:hidden">
@@ -349,7 +351,7 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
           
           <div className="md:col-span-3 space-y-2">
              <label className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-             <Select value={asrama} onValueChange={(v) => { setAsrama(v); if (hasLoaded) load(1, search, v) }}>
+             <Select value={asrama} onValueChange={(v) => { setAsrama(v ?? ''); if (hasLoaded) load(1, search, v ?? '') }}>
                 <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-rose-500">
                   <SelectValue placeholder="Semua Asrama" />
                 </SelectTrigger>
@@ -547,7 +549,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
           <div className="md:col-span-3 space-y-2">
              <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-             <Select value={asrama} onValueChange={(v) => { setAsrama(v); if (hasLoaded) load(1, search, v) }}>
+             <Select value={asrama} onValueChange={(v) => { setAsrama(v ?? ''); if (hasLoaded) load(1, search, v ?? '') }}>
                 <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-slate-500">
                   <SelectValue placeholder="Semua Asrama" />
                 </SelectTrigger>

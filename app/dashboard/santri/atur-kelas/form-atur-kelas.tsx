@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { simpanSantriKeKelas, simpanPenempatanBatch } from './actions'
 import { Save, Search, CheckSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle, Download, Loader2, AlertTriangle, ChevronRight, User } from 'lucide-react'
@@ -207,7 +209,7 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
               <label className="text-[10px] font-black text-indigo-600/70 dark:text-indigo-400/70 uppercase tracking-[0.2em] block">
                 Langkah 1: Pilih Kelas Tujuan
               </label>
-              <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+              <Select value={selectedKelas} onValueChange={(v) => setSelectedKelas(v ?? '')}>
                 <SelectTrigger className="w-full h-11 bg-background border-border rounded-xl font-bold focus:ring-indigo-500">
                   <SelectValue placeholder="Pilih Kelas Tujuan"/>
                 </SelectTrigger>
@@ -418,7 +420,7 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
       </Tabs>
 
       {/* --- MODAL CONFIRM EXCEL --- */}
-      <Dialog open={showConfirmExcel} onValueChange={setShowConfirmExcel}>
+      <Dialog open={showConfirmExcel} onOpenChange={setShowConfirmExcel}>
         <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
           <div className="p-8 text-center space-y-6">
             <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-indigo-500/5">

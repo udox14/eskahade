@@ -136,16 +136,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <style jsx global>{`
-        @keyframes gradient-x {
-          0%, 100% { background-position: left center; }
-          50% { background-position: right center; }
-        }
-        .animate-gradient-x {
-          background-size: 200% auto;
-          animation: gradient-x 5s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }

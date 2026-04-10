@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useRef } from 'react'
 import { getSantriForFoto, uploadFotoSantri } from './actions'
 import { Search, Upload, Image as ImageIcon, RefreshCw, Loader2, Home, Filter, ShieldAlert, Check } from 'lucide-react'
@@ -141,7 +143,7 @@ export default function ManajemenFotoPage() {
           
           <div className="md:col-span-3 space-y-2">
              <label className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-             <Select value={asrama} onValueChange={(v) => { setAsrama(v); setKamar('SEMUA'); }}>
+             <Select value={asrama} onValueChange={(v) => { setAsrama(v ?? ''); setKamar('SEMUA'); }}>
                 <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-rose-500">
                   <SelectValue placeholder="Pilih Asrama" />
                 </SelectTrigger>
@@ -153,7 +155,7 @@ export default function ManajemenFotoPage() {
 
           <div className="md:col-span-2 space-y-2">
              <label className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em] block ml-1">Kamar</label>
-             <Select value={kamar} onValueChange={setKamar} disabled={asrama === 'SEMUA'}>
+             <Select value={kamar} onValueChange={(v) => setKamar(v ?? '')} disabled={asrama === 'SEMUA'}>
                 <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-rose-500">
                   <SelectValue placeholder="Kamar" />
                 </SelectTrigger>

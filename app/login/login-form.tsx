@@ -161,11 +161,3 @@ export default function LoginForm() {
     </div>
   )
 }
-iv>
-
-        </div>
-      </div>
-
-    </div>
-  )
-}

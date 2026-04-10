@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import { getKelasList, getDataRapor } from './actions'
 import { Printer, Loader2, Search, FileText, BookOpen, Layers, GraduationCap } from 'lucide-react'
@@ -111,7 +113,7 @@ export default function CetakRaporPage() {
           
           <div className="md:col-span-5 space-y-2">
             <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] block ml-1">Pilih Rombongan Belajar (Kelas)</label>
-            <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+            <Select value={selectedKelas} onValueChange={(v) => setSelectedKelas(v ?? '')}>
                <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-blue-500">
                   <SelectValue placeholder="Pilih Kelas..." />
                </SelectTrigger>
@@ -123,7 +125,7 @@ export default function CetakRaporPage() {
           
           <div className="md:col-span-4 space-y-2">
             <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] block ml-1">Periode Semester</label>
-            <Select value={selectedSemester} onValueChange={setSelectedSemester}>
+            <Select value={selectedSemester} onValueChange={(v) => setSelectedSemester(v ?? '')}>
                <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-blue-500">
                   <SelectValue placeholder="Pilih Semester..." />
                </SelectTrigger>
@@ -193,7 +195,5 @@ export default function CetakRaporPage() {
       </div>
 
     </div>
-  )
-}
   )
 }

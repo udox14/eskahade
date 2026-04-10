@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useCallback, useEffect } from 'react'
 import { getSantriBaru, simpanTes, getAsramaList } from './actions'
 import {
@@ -127,7 +129,7 @@ export default function TesKlasifikasiPage() {
 
           <div className="md:col-span-3 space-y-2">
             <label className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-            <Select value={filterAsrama} onValueChange={(v) => { setFilterAsrama(v); if (hasLoaded) loadData(1, search, filterStatus, v) }}>
+            <Select value={filterAsrama} onValueChange={(v) => { setFilterAsrama(v ?? ''); if (hasLoaded) loadData(1, search, filterStatus, v ?? '') }}>
                 <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-teal-500">
                   <SelectValue placeholder="Semua Asrama" />
                 </SelectTrigger>

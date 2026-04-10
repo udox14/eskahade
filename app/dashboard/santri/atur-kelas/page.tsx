@@ -38,6 +38,7 @@ export default async function AturKelasPage() {
         : null,
     }))
 
+  return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
       {/* Header Hero */}
       <div className="relative bg-indigo-950 border border-indigo-900/50 text-indigo-50 px-5 pt-5 pb-6 rounded-[2rem] shadow-xl shadow-indigo-900/10 overflow-hidden mb-2">
@@ -59,4 +60,5 @@ export default async function AturKelasPage() {
         <FormAturKelas kelasList={kelasList} santriList={santriBelumDapatKelas} />
       </div>
     </div>
+  )
 }
