@@ -30,6 +30,14 @@ jobs:
       - name: Build
         run: npx opennextjs-cloudflare build
 
+      - name: Prune unused @vercel/og dependencies to fix Cloudflare 3MB Limit
+        run: |
+          echo "Removing heavy unused WebAssembly binaries..."
+          rm -f .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/resvg.wasm || true
+          rm -f .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/yoga.wasm || true
+          echo "export const ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
+          echo "module.exports.ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.node.js || true
+
       - name: Deploy
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: npx opennextjs-cloudflare deploy
