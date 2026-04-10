@@ -38,23 +38,25 @@ export default async function AturKelasPage() {
         : null,
     }))
 
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Penempatan Kelas Santri</h1>
-        <p className="text-gray-500 text-sm">Realisasi hasil tes klasifikasi ke dalam kelas yang sebenarnya.</p>
+    <div className="space-y-6 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
+      {/* Header Hero */}
+      <div className="relative bg-indigo-950 border border-indigo-900/50 text-indigo-50 px-5 pt-5 pb-6 rounded-[2rem] shadow-xl shadow-indigo-900/10 overflow-hidden mb-2">
+        <div className="absolute -top-10 -right-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-[40px] pointer-events-none"/>
+        <h1 className="text-xl font-black flex items-center gap-2 mb-1">
+          <FileText className="w-5 h-5 text-indigo-400"/> Penempatan Kelas
+        </h1>
+        <p className="text-indigo-200/70 text-xs font-medium">Realisasi hasil tes klasifikasi ke dalam kelas yang sebenarnya.</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <div className="flex items-center gap-3 mb-6 p-4 bg-blue-50 text-blue-800 rounded-lg border border-blue-100">
+      <div className="bg-card border border-border rounded-2xl shadow-sm p-5 md:p-6">
+        <div className="flex items-center gap-3 mb-6 p-4 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
           <FileText className="w-5 h-5" />
-          <div className="text-sm">
-            <p className="font-semibold">Menampilkan {santriBelumDapatKelas.length} Santri Belum Dapat Kelas</p>
-            <p>Gunakan label rekomendasi (berwarna) sebagai acuan untuk memilih kelas tujuan.</p>
+          <div className="text-xs">
+            <p className="font-black uppercase tracking-widest mb-0.5">Menampilkan {santriBelumDapatKelas.length} Santri Belum Dapat Kelas</p>
+            <p className="opacity-80 font-medium">Gunakan label rekomendasi sebagai acuan untuk memilih kelas tujuan yang sesuai.</p>
           </div>
         </div>
         <FormAturKelas kelasList={kelasList} santriList={santriBelumDapatKelas} />
       </div>
     </div>
-  )
 }

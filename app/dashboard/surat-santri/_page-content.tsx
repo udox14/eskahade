@@ -11,12 +11,24 @@ import {
   ScrollText, Gavel, Search, Loader2, X, Trash2,
   ChevronLeft, ChevronRight, Printer, CheckSquare,
   Square, Eye, Filter, Plus, FileText, ArrowLeft,
+  ChevronDown, Info, ShieldAlert
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string) {
@@ -29,8 +41,16 @@ const JENIS_LABEL: Record<string, string> = {
   SP1: 'SP 1', SP2: 'SP 2', SP3: 'SP 3', SK: 'SK Pengeluaran',
 }
 
+const JENIS_COLOR: Record<string, string> = {
+  pernyataan: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20',
+  SP1: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
+  SP2: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
+  SP3: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
+  SK: 'bg-slate-900 text-slate-50 border-slate-900',
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// KOMPONEN SURAT — dirender untuk react-to-print
+// KOMPONEN SURAT — KEEP STYLES FOR PRINTING
 // ═══════════════════════════════════════════════════════════════════════════════
 const SuratPernyataanDoc = ({ data }: { data: any }) => {
   const { surat, pelanggaran } = data
@@ -55,7 +75,7 @@ const SuratPernyataanDoc = ({ data }: { data: any }) => {
         <tbody>
           {([
             ['Nama', surat.nama_lengkap ?? ''],
-            ['Asrama/ Kamar', [surat.asrama, surat.kamar].filter(Boolean).join(' / ')],
+            ['Asrama / Kamar', [surat.asrama, surat.kamar].filter(Boolean).join(' / ')],
             ['Kelas Pengajian', surat.nama_kelas ?? ''],
             ['Alamat', surat.alamat ?? ''],
             ['', ''],
@@ -189,11 +209,12 @@ const SuratPerjanjianDoc = ({ data }: { data: any }) => {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TOMBOL CETAK — isolasi hook react-to-print per baris tabel
+// TOMBOL CETAK & PREVIEW ACTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
-function TombolCetak({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 'perjanjian' }) {
+function TombolAksiSurat({ surat, onHapus }: { surat: any; onHapus: (r: any) => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
@@ -201,110 +222,67 @@ function TombolCetak({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 
     pageStyle: `@page { size: 215mm 330mm; margin: 0; }`,
   })
 
-  const cetakSurat = async () => {
+  const loadData = async () => {
     if (!data) {
       setLoading(true)
-      const d = await getDataPreviewSurat(suratId, tipe)
+      const d = await getDataPreviewSurat(surat.id, surat.tipe)
       setLoading(false)
-      if (!d) { toast.error('Data surat tidak ditemukan'); return }
+      if (!d) { toast.error('Data surat tidak ditemukan'); return null }
       setData(d)
-      // Tunggu render selesai lalu cetak
-      setTimeout(() => handlePrint(), 100)
-    } else {
-      handlePrint()
+      return d
     }
+    return data
+  }
+
+  const cetakLangsung = async () => {
+    const d = await loadData()
+    if (d) setTimeout(() => handlePrint(), 100)
+  }
+
+  const bukaPreview = async () => {
+    const d = await loadData()
+    if (d) setPreviewOpen(true)
   }
 
   return (
-    <>
-      <button
-        onClick={cetakSurat}
-        disabled={loading}
-        title="Cetak surat"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40"
-      >
-        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
-      </button>
-      {/* Hidden print area — dirender tapi tak terlihat */}
-      <div className="hidden">
-        <div ref={printRef}>
-          {data && tipe === 'pernyataan' && <SuratPernyataanDoc data={data} />}
-          {data && tipe === 'perjanjian' && <SuratPerjanjianDoc data={data} />}
-        </div>
-      </div>
-    </>
-  )
-}
+    <div className="flex items-center gap-1">
+      <Button variant="ghost" size="icon-sm" onClick={bukaPreview} disabled={loading} title="Pratinjau">
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+      </Button>
+      <Button variant="ghost" size="icon-sm" onClick={cetakLangsung} disabled={loading} title="Cetak">
+        <Printer className="w-4 h-4" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" onClick={() => onHapus(surat)} className="text-muted-foreground hover:text-rose-600" title="Hapus">
+        <Trash2 className="w-4 h-4" />
+      </Button>
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TOMBOL PREVIEW
-// ═══════════════════════════════════════════════════════════════════════════════
-function TombolPreview({ suratId, tipe }: { suratId: string; tipe: 'pernyataan' | 'perjanjian' }) {
-  const [open, setOpen] = useState(false)
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const printRef = useRef<HTMLDivElement>(null)
-
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    pageStyle: `@page { size: 215mm 330mm; margin: 0; }`,
-  })
-
-  const openPreview = async () => {
-    if (!data) {
-      setLoading(true)
-      const d = await getDataPreviewSurat(suratId, tipe)
-      setLoading(false)
-      if (!d) { toast.error('Data surat tidak ditemukan'); return }
-      setData(d)
-    }
-    setOpen(true)
-  }
-
-  return (
-    <>
-      <button
-        onClick={openPreview}
-        disabled={loading}
-        title="Pratinjau surat"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40"
-      >
-        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
-      </button>
-
-      {open && data && (
-        <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-start justify-center p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-3xl">
-            {/* toolbar pratinjau */}
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white font-semibold text-sm">
-                Pratinjau — {tipe === 'pernyataan' ? 'Surat Pernyataan' : `SP ${data.surat.level}`}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePrint()}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white text-slate-900 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Cetak
-                </button>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col gap-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+          <DialogHeader className="p-4 bg-muted/30 border-b flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-600"/> PRATINJAU DOKUMEN
+              </DialogTitle>
+              <DialogDescription className="text-[10px] font-bold uppercase tracking-tight opacity-50">
+                {surat.nama_lengkap} · {JENIS_LABEL[surat.tipe === 'pernyataan' ? 'pernyataan' : surat.level]}
+              </DialogDescription>
             </div>
-            {/* dokumen surat */}
-            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
-              <div ref={printRef}>
-                {tipe === 'pernyataan' ? <SuratPernyataanDoc data={data} /> : <SuratPerjanjianDoc data={data} />}
-              </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => handlePrint()} className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase gap-2 shadow-lg shadow-indigo-600/20">
+                <Printer className="w-3.5 h-3.5" /> CETAK SEKARANG
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+          </DialogHeader>
+          <ScrollArea className="flex-1 bg-slate-100 p-8">
+            <div className="mx-auto bg-white shadow-xl" ref={printRef}>
+              {data && (
+                surat.tipe === 'pernyataan' ? <SuratPernyataanDoc data={data} /> : <SuratPerjanjianDoc data={data} />
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
 
@@ -332,10 +310,12 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
   }
 
   const selectSantri = async (s: any) => {
+    const toastId = toast.loading(`Mengambil data pelanggaran ${s.nama_lengkap}...`)
     setSelectedSantri(s); setHasilCari([]); setChecked(new Set())
     setLoadingP(true)
     const p = await getPelanggaranSantri(s.id)
     setPelanggaran(p); setLoadingP(false)
+    toast.dismiss(toastId)
   }
 
   const handleSimpan = async () => {
@@ -349,109 +329,132 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div>
-          <h3 className="font-bold text-slate-900 text-sm">Buat Surat Pernyataan</h3>
-          <p className="text-xs text-slate-400">Cari santri → pilih pelanggaran → simpan</p>
+    <Card className="border-border shadow-xl overflow-hidden animate-in slide-in-from-bottom-6 duration-500">
+      <CardHeader className="p-6 bg-muted/30 border-b flex flex-row items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-xl h-10 w-10">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <CardTitle className="text-sm font-black uppercase tracking-tight">Buat Surat Pernyataan</CardTitle>
+            <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Sanksi disiplin atas pelanggaran tercatat</CardDescription>
+          </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-        {/* Search santri */}
+      </CardHeader>
+      <CardContent className="p-6 space-y-8">
+        {/* Search / Selection Area */}
         {!selectedSantri ? (
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Cari Santri</label>
+          <div className="space-y-4">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 text-indigo-600">Langkah 1: Pilih Santri</Label>
             <form onSubmit={handleSearch} className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text" autoFocus placeholder="Nama atau NIS..."
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  autoFocus placeholder="Cari nama atau NIS (Min. 2 karakter)..."
                   value={keyword} onChange={e => setKeyword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50"
+                  className="h-12 pl-10 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500"
                 />
               </div>
-              <button type="submit" disabled={searching || keyword.length < 2}
-                className="px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center gap-1.5">
-                {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Cari
-              </button>
+              <Button type="submit" disabled={searching || keyword.length < 2} className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-600/20 gap-2">
+                {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} CARI
+              </Button>
             </form>
-            {hasilCari.map(s => (
-              <button key={s.id} onClick={() => selectSantri(s)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-left transition-all">
-                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-600 shrink-0">{s.nama_lengkap.charAt(0)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
-                  <p className="text-xs text-slate-400">{s.nis} · {s.asrama}/{s.kamar} · {s.jumlah_pelanggaran}x pelanggaran</p>
-                </div>
-              </button>
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {hasilCari.map(s => (
+                <button key={s.id} onClick={() => selectSantri(s)}
+                  className="flex items-center gap-4 p-4 bg-white border border-border rounded-2xl text-left hover:border-indigo-400 hover:shadow-md transition-all group">
+                  <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-500 shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    {s.nama_lengkap.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-slate-900 text-sm tracking-tight uppercase truncate">{s.nama_lengkap}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-wider">
+                      {s.nis} · {s.asrama}/{s.kamar} · {s.jumlah_pelanggaran} PELANGGARAN
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
-              <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
-            </div>
-            <button onClick={() => { setSelectedSantri(null); setPelanggaran([]); setChecked(new Set()) }}
-              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
+          <div className="flex flex-col sm:flex-row items-center justify-between bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-4 gap-4">
+             <div className="flex items-center gap-4">
+               <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg font-black">
+                  {selectedSantri.nama_lengkap.charAt(0)}
+               </div>
+               <div>
+                  <p className="font-black text-indigo-900 text-sm tracking-tight uppercase leading-none mb-1">{selectedSantri.nama_lengkap}</p>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest opacity-60">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+               </div>
+             </div>
+             <Button variant="ghost" size="sm" onClick={() => { setSelectedSantri(null); setPelanggaran([]); setChecked(new Set()) }} className="h-10 rounded-xl text-rose-600 hover:bg-rose-50 font-black text-[10px] uppercase gap-2">
+                <X className="w-4 h-4"/> GANTI SANTRI
+             </Button>
           </div>
         )}
 
-        {/* Pilih pelanggaran */}
+        {/* Violations Area */}
         {selectedSantri && (
-          <>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih Pelanggaran</label>
+          <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Langkah 2: Pilih Pelanggaran</Label>
                 {pelanggaran.length > 0 && (
-                  <button onClick={() => setChecked(
-                    checked.size === pelanggaran.length ? new Set() : new Set(pelanggaran.map((p: any) => p.id))
-                  )} className="text-xs text-slate-500 hover:text-slate-700 font-semibold">
-                    {checked.size === pelanggaran.length ? 'Batal Semua' : 'Pilih Semua'}
+                  <button onClick={() => setChecked(checked.size === pelanggaran.length ? new Set() : new Set(pelanggaran.map((p: any) => p.id)))} 
+                          className="text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-indigo-600">
+                    {checked.size === pelanggaran.length ? 'BATAL SEMUA' : 'PILIH SEMUA'}
                   </button>
                 )}
               </div>
-              {loadingP ? (
-                <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
-              ) : pelanggaran.length === 0 ? (
-                <p className="text-xs text-slate-400 italic text-center py-6">Santri ini belum memiliki catatan pelanggaran</p>
-              ) : (
-                <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  {pelanggaran.map((p: any) => (
-                    <button key={p.id}
-                      onClick={() => setChecked(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
-                      className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all',
-                        checked.has(p.id) ? 'border-slate-700 bg-slate-50' : 'border-slate-200 hover:border-slate-300')}>
-                      {checked.has(p.id) ? <CheckSquare className="w-4 h-4 text-slate-700 shrink-0" /> : <Square className="w-4 h-4 text-slate-300 shrink-0" />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{p.deskripsi}</p>
-                        <p className="text-xs text-slate-400">{fmtTgl(p.tanggal)} · {p.jenis} · +{p.poin}p</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <ScrollArea className="h-64 rounded-2xl border border-dashed border-border p-4 bg-muted/20">
+                {loadingP ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+                     <Loader2 className="w-8 h-8 animate-spin text-indigo-500/50"/>
+                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Scanning Violations...</p>
+                  </div>
+                ) : pelanggaran.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12 opacity-30">
+                     <ShieldAlert className="w-12 h-12 mb-3"/>
+                     <p className="text-[10px] font-black uppercase tracking-widest">Santri ini belum memiliki catatan pelanggaran</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {pelanggaran.map((p: any) => (
+                      <button key={p.id}
+                        onClick={() => setChecked(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                        className={cn('flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all group',
+                          checked.has(p.id) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-border hover:border-indigo-300')}>
+                        <div className={cn('w-5 h-5 rounded flex items-center justify-center border shrink-0 mt-0.5',
+                           checked.has(p.id) ? 'bg-white border-white text-indigo-600' : 'bg-muted border-border')}>
+                          {checked.has(p.id) && <CheckSquare className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn("text-xs font-black uppercase tracking-tight truncate", checked.has(p.id) ? "text-white" : "text-slate-800")}>{p.deskripsi}</p>
+                          <p className={cn("text-[8px] font-bold uppercase tracking-widest mt-1", checked.has(p.id) ? "text-white/60" : "text-muted-foreground opacity-60")}>
+                            {fmtTgl(p.tanggal)} · {p.jenis} · <span className="underline">+{p.poin} POIN</span>
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
-              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50 max-w-xs" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-end">
+               <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Langkah 3: Tanggal Surat</Label>
+                  <Input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500 max-w-xs" />
+               </div>
+               <Button onClick={handleSimpan} disabled={saving || checked.size === 0} className="h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-2xl shadow-indigo-600/30 gap-3 group">
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ScrollText className="w-5 h-5 group-hover:scale-110 transition-transform" />} 
+                  {saving ? 'GENERATING DOKUMEN...' : 'GENERATE SURAT PERNYATAAN'}
+               </Button>
             </div>
-
-            <button onClick={handleSimpan} disabled={saving || checked.size === 0}
-              className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              {saving ? 'Menyimpan...' : 'Simpan Surat Pernyataan'}
-            </button>
-          </>
+          </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -498,95 +501,111 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
   const SP_LABEL: Record<string, string> = { SP1: 'SP 1', SP2: 'SP 2', SP3: 'SP 3', SK: 'SK Pengeluaran' }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div>
-          <h3 className="font-bold text-slate-900 text-sm">Buat SP / SK Pengeluaran</h3>
-          <p className="text-xs text-slate-400">Cari santri → pilih level → simpan</p>
+    <Card className="border-border shadow-xl overflow-hidden animate-in slide-in-from-bottom-6 duration-500">
+      <CardHeader className="p-6 bg-muted/30 border-b flex flex-row items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-xl h-10 w-10">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <CardTitle className="text-sm font-black uppercase tracking-tight">Buat SP / SK Pengeluaran</CardTitle>
+            <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Surat peringatan berjenjang dan pemutusan status</CardDescription>
+          </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+      </CardHeader>
+      <CardContent className="p-6 space-y-8">
         {!selectedSantri ? (
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Cari Santri</label>
+          <div className="space-y-4">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 text-indigo-600">Langkah 1: Pilih Santri</Label>
             <form onSubmit={handleSearch} className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input type="text" autoFocus placeholder="Nama atau NIS..."
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input type="text" autoFocus placeholder="Nama atau NIS..."
                   value={keyword} onChange={e => setKeyword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-slate-50" />
+                  className="h-12 pl-10 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500" />
               </div>
-              <button type="submit" disabled={searching || keyword.length < 2}
-                className="px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center gap-1.5">
-                {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Cari
-              </button>
+              <Button type="submit" disabled={searching || keyword.length < 2} className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-600/20 gap-2">
+                {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} CARI
+              </Button>
             </form>
-            {hasilCari.map(s => (
-              <button key={s.id} onClick={() => selectSantri(s)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 border border-slate-200 rounded-xl text-left transition-all">
-                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-600 shrink-0">{s.nama_lengkap.charAt(0)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
-                  <p className="text-xs text-slate-400">{s.nis} · {s.asrama}/{s.kamar}</p>
-                </div>
-              </button>
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {hasilCari.map(s => (
+                <button key={s.id} onClick={() => selectSantri(s)}
+                  className="flex items-center gap-4 p-4 bg-white border border-border rounded-2xl text-left hover:border-indigo-400 hover:shadow-md transition-all group">
+                  <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-500 shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    {s.nama_lengkap.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-slate-900 text-sm tracking-tight uppercase truncate">{s.nama_lengkap}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-wider">
+                      {s.nis} · {s.asrama}/{s.kamar}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
-              <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
-            </div>
-            <button onClick={() => { setSelectedSantri(null); setSuggestLevel('') }}
-              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
+          <div className="flex flex-col sm:flex-row items-center justify-between bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-4 gap-4">
+             <div className="flex items-center gap-4">
+               <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg font-black">
+                  {selectedSantri.nama_lengkap.charAt(0)}
+               </div>
+               <div>
+                  <p className="font-black text-indigo-900 text-sm tracking-tight uppercase leading-none mb-1">{selectedSantri.nama_lengkap}</p>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest opacity-60">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+               </div>
+             </div>
+             <Button variant="ghost" size="sm" onClick={() => { setSelectedSantri(null); setSuggestLevel('') }} className="h-10 rounded-xl text-rose-600 hover:bg-rose-50 font-black text-[10px] uppercase gap-2">
+                <X className="w-4 h-4"/> GANTI SANTRI
+             </Button>
           </div>
         )}
 
         {selectedSantri && (
-          <>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                Pilih Level
-                {suggestLevel && <span className="ml-2 text-emerald-600 font-normal normal-case text-[11px]">(Saran: {suggestLevel === 'SK' ? 'SK Pengeluaran' : suggestLevel})</span>}
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
+          <div className="space-y-8 animate-in slide-in-from-top-4 duration-500">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Langkah 2: Pilih Level Peringatan</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {SP_LEVELS.map(l => (
                   <button key={l} onClick={() => setLevel(l)}
-                    className={cn('py-2.5 rounded-xl text-xs font-bold border transition-all text-center',
-                      level === l ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400')}>
+                    className={cn('relative py-6 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all text-center flex flex-col items-center justify-center gap-2',
+                      level === l 
+                         ? (l === 'SK' ? 'bg-slate-900 text-white border-slate-900 shadow-xl scale-[1.02]' : 'bg-indigo-600 text-white border-indigo-600 shadow-xl scale-[1.02]')
+                         : 'bg-white text-slate-400 border-border hover:border-indigo-300 hover:text-indigo-600')}>
                     {SP_LABEL[l]}
+                    {suggestLevel === l && (
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-emerald-500 text-white text-[7px] font-black rounded-full shadow-lg">SUGGESTED</div>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Surat</label>
-                <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Catatan <span className="font-normal normal-case text-slate-400">(opsional)</span></label>
-                <input type="text" value={catatan} onChange={e => setCatatan(e.target.value)} placeholder="Keterangan tambahan..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-slate-50" />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
+               <div className="md:col-span-2 space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Langkah 3: Tanggal & Keterangan</Label>
+                  <Input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500" />
+               </div>
+               <div className="md:col-span-3 space-y-1.5">
+                  <Input 
+                    type="text" 
+                    value={catatan} 
+                    onChange={e => setCatatan(e.target.value)} 
+                    placeholder="Catatan tambahan (Opsional)..."
+                    className="h-12 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500" 
+                  />
+               </div>
             </div>
 
-            <button onClick={handleSimpan} disabled={saving}
-              className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              {saving ? 'Menyimpan...' : `Simpan ${level === 'SK' ? 'SK Pengeluaran' : level}`}
-            </button>
-          </>
+            <Button onClick={handleSimpan} disabled={saving} className="w-full h-16 rounded-[2rem] bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-2xl shadow-indigo-600/30 gap-3 group">
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gavel className="w-5 h-5 group-hover:-rotate-12 transition-transform" />}
+              {saving ? 'GENERATING...' : `SIMPAN & CETAK ${level === 'SK' ? 'SURAT PENGELUARAN' : SP_LABEL[level]}`}
+            </Button>
+          </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -594,6 +613,7 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
 // TABEL DAFTAR SURAT
 // ═══════════════════════════════════════════════════════════════════════════════
 function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -604,8 +624,8 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
   // Filters
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [asramaFilter, setAsramaFilter] = useState('')
-  const [jenisFilter, setJenisFilter] = useState('')
+  const [asramaFilter, setAsramaFilter] = useState('SEMUA')
+  const [jenisFilter, setJenisFilter] = useState('SEMUA')
   const [asramaList, setAsramaList] = useState<string[]>([])
 
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -613,7 +633,12 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
   const load = useCallback(async (pg = 1, s = search, a = asramaFilter, j = jenisFilter) => {
     setLoading(true)
     try {
-      const res = await getDaftarSurat({ search: s || undefined, asrama: a || undefined, jenis: j || undefined, page: pg })
+      const res = await getDaftarSurat({ 
+        search: s || undefined, 
+        asrama: a !== 'SEMUA' ? a : undefined, 
+        jenis: j !== 'SEMUA' ? j : undefined, 
+        page: pg 
+      })
       setRows(res.rows); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg)
       setHasLoaded(true)
     } finally { setLoading(false) }
@@ -623,7 +648,6 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
     getAsramaList().then(setAsramaList)
   }, [])
 
-  // Reload saat form berhasil submit
   useEffect(() => {
     if (refreshKey > 0) load(1, search, asramaFilter, jenisFilter)
   }, [refreshKey])
@@ -635,167 +659,146 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
   }
 
   const handleHapus = async (row: any) => {
-    if (!await confirm(`Hapus surat ${JENIS_LABEL[row.tipe === 'pernyataan' ? 'pernyataan' : row.level] ?? ''} atas nama ${row.nama_lengkap}?`)) return
+    if (!await confirm(`Konfirmasi Penghapusan.
+    Yakin ingin menghapus dokumen ${JENIS_LABEL[row.tipe === 'pernyataan' ? 'pernyataan' : row.level]} atas nama ${row.nama_lengkap}?`)) return
     setDeleting(row.id)
     const res = await hapusSurat(row.id, row.tipe)
     setDeleting(null)
     if ('error' in res) { toast.error(res.error); return }
-    toast.success('Surat dihapus')
+    toast.success('Dukumen berhasil dihapus dari database')
     load(page, search, asramaFilter, jenisFilter)
   }
 
-  const jenisLabel = (row: any) => row.tipe === 'pernyataan' ? 'Pernyataan' : (row.level === 'SK' ? 'SK Pengeluaran' : row.level)
-
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {/* Filter bar */}
-      <form onSubmit={handleTampilkan} className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-          <input
-            type="text" placeholder="Cari nama atau NIS (kosongkan untuk semua)..."
-            value={searchInput} onChange={e => setSearchInput(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-          />
-        </div>
-        {asramaList.length > 0 && (
-          <select value={asramaFilter} onChange={e => setAsramaFilter(e.target.value)}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent">
-            <option value="">Semua Asrama</option>
-            {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        )}
-        <select value={jenisFilter} onChange={e => setJenisFilter(e.target.value)}
-          className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent">
-          <option value="">Semua Jenis</option>
-          <option value="pernyataan">Surat Pernyataan</option>
-          <option value="SP1">SP 1</option>
-          <option value="SP2">SP 2</option>
-          <option value="SP3">SP 3</option>
-          <option value="SK">SK Pengeluaran</option>
-        </select>
-        <button type="submit" disabled={loading}
-          className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-60 flex items-center gap-1.5 transition-colors shadow-sm">
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
-          Tampilkan
-        </button>
-      </form>
+      <Card className="border-border shadow-sm overflow-hidden mb-6">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[300px] space-y-1.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Identitas Santri</Label>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-indigo-600 transition-colors pointer-events-none"/>
+              <Input
+                type="text" placeholder="Masukkan nama atau NIS..."
+                value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleTampilkan()}
+                className="h-11 pl-10 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div className="w-full sm:w-48 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Asrama</Label>
+            <Select value={asramaFilter} onValueChange={(v) => setAsramaFilter(v || 'SEMUA')}>
+              <SelectTrigger className="h-11 rounded-xl bg-muted/20 border-border font-bold">
+                <SelectValue placeholder="Semua Asrama" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SEMUA" className="font-bold">Seluruh Asrama</SelectItem>
+                {asramaList.map(a => <SelectItem key={a} value={a} className="font-bold">{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-48 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Jenis Dokumen</Label>
+            <Select value={jenisFilter} onValueChange={(v) => setJenisFilter(v || 'SEMUA')}>
+              <SelectTrigger className="h-11 rounded-xl bg-muted/20 border-border font-bold">
+                <SelectValue placeholder="Semua Jenis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SEMUA" className="font-bold">Seluruh Jenis</SelectItem>
+                <SelectItem value="pernyataan" className="font-bold">Surat Pernyataan</SelectItem>
+                <SelectItem value="SP1" className="font-bold text-blue-600">SP 1</SelectItem>
+                <SelectItem value="SP2" className="font-bold text-amber-600">SP 2</SelectItem>
+                <SelectItem value="SP3" className="font-bold text-rose-600">SP 3</SelectItem>
+                <SelectItem value="SK" className="font-bold text-slate-900">SK Pengeluaran</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleTampilkan} disabled={loading} className="h-11 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-600/20 gap-2 shrink-0">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />} TAMPILKAN
+          </Button>
+        </CardContent>
+      </Card>
 
       {!hasLoaded && !loading ? (
-        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 border-dashed text-center">
-          <FileText className="w-10 h-10 text-slate-200" />
-          <p className="text-slate-500 text-sm font-medium">Data belum dimuat</p>
-          <p className="text-xs text-slate-400">Atur filter lalu klik <strong>Tampilkan</strong>, atau langsung tampilkan semua</p>
-          <button onClick={() => handleTampilkan()}
-            className="mt-1 px-5 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm">
-            Tampilkan Semua
-          </button>
+        <div className="py-24 text-center border-2 border-dashed rounded-[2.5rem] opacity-20 flex flex-col items-center">
+           <FileText className="w-16 h-16 mb-4"/>
+           <p className="text-[10px] font-black uppercase tracking-widest">Gunakan filter untuk memuat database surat</p>
+           <Button variant="outline" size="sm" onClick={() => handleTampilkan()} className="mt-4 rounded-xl border-current uppercase text-[9px] font-black tracking-widest px-6 h-9">Tampilkan Semua Data</Button>
         </div>
       ) : loading ? (
-        <div className="flex justify-center py-12 bg-white rounded-2xl border border-slate-200">
-          <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+        <div className="py-32 flex flex-col items-center gap-4">
+           <Loader2 className="w-10 h-10 animate-spin text-indigo-500/50"/>
+           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Fetching Document Archive...</p>
         </div>
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center py-12 bg-white rounded-2xl border border-slate-200 text-center gap-2">
-          <FileText className="w-9 h-9 text-slate-200" />
-          <p className="text-slate-500 text-sm font-medium">Belum ada surat</p>
-          <p className="text-xs text-slate-400">Coba ubah filter atau buat surat baru</p>
+        <div className="py-24 text-center border-border border-2 border-dashed rounded-[2.5rem] opacity-30 flex flex-col items-center gap-3">
+           <Search className="w-12 h-12 mb-2"/>
+           <p className="text-[10px] font-black uppercase tracking-widest">Tidak ada dokumen ditemukan dengan kriteria tersebut</p>
         </div>
       ) : (
-        <>
-          <p className="text-xs text-slate-500 px-0.5"><strong className="text-slate-700">{total}</strong> surat tercatat</p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Menampilkan <span className="text-foreground">{rows.length}</span> dari {total} Dokumen</p>
+          </div>
 
-          {/* Desktop */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {['No', 'Nama Santri', 'Asrama / Kamar', 'Pelanggaran / Catatan', 'Jenis Surat', 'Tanggal', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
+          <Card className="border-border shadow-sm overflow-hidden min-h-[400px]">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="w-12 text-center text-[10px] font-black uppercase tracking-widest">No</TableHead>
+                  <TableHead className="px-4 text-[10px] font-black uppercase tracking-widest">Identitas Santri</TableHead>
+                  <TableHead className="px-4 text-[10px] font-black uppercase tracking-widest">Asrama / Kamar</TableHead>
+                  <TableHead className="px-4 text-[10px] font-black uppercase tracking-widest">Detail Pelanggaran / Catatan</TableHead>
+                  <TableHead className="px-4 text-[10px] font-black uppercase tracking-widest">Kategori</TableHead>
+                  <TableHead className="px-4 text-[10px] font-black uppercase tracking-widest text-right">Tanggal</TableHead>
+                  <TableHead className="w-24 px-4 h-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((r, i) => (
-                  <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3 text-xs text-slate-300">{(page - 1) * 30 + i + 1}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{r.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{r.nis}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{r.asrama}/{r.kamar}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px]">
+                  <TableRow key={r.id} className="hover:bg-muted/10 group">
+                    <TableCell className="text-center font-bold text-[10px] text-muted-foreground/50 tabular-nums">{(page - 1) * 30 + i + 1}</TableCell>
+                    <TableCell>
+                      <p className="font-black text-foreground text-sm tracking-tight uppercase leading-none mb-1">{r.nama_lengkap}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">{r.nis}</p>
+                    </TableCell>
+                    <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{r.asrama} / {r.kamar}</TableCell>
+                    <TableCell className="max-w-[200px]">
                       {r.tipe === 'pernyataan'
-                        ? <span className="text-slate-400">{JSON.parse(r.detail || '[]').length} pelanggaran</span>
-                        : r.catatan
-                          ? <span className="italic text-slate-400 truncate block">{r.catatan}</span>
-                          : <span className="text-slate-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-semibold text-slate-700">{jenisLabel(r)}</span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{fmtTgl(r.tanggal)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-0.5">
-                        <TombolPreview suratId={r.id} tipe={r.tipe} />
-                        <TombolCetak suratId={r.id} tipe={r.tipe} />
-                        <button
-                          onClick={() => handleHapus(r)}
-                          disabled={deleting === r.id}
-                          title="Hapus surat"
-                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                        >
-                          {deleting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                        ? <Badge variant="secondary" className="bg-muted border-0 text-[9px] font-black uppercase px-2">{JSON.parse(r.detail || '[]').length} POINT PELANGGARAN</Badge>
+                        : <p className="text-[10px] italic text-muted-foreground opacity-50 truncate">{r.catatan || '—'}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn("text-[9px] font-black uppercase px-2 shadow-none", JENIS_COLOR[r.tipe === 'pernyataan' ? 'pernyataan' : r.level])}>
+                        {JENIS_LABEL[r.tipe === 'pernyataan' ? 'pernyataan' : r.level]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-black text-[10px] tabular-nums text-muted-foreground/60">{fmtTgl(r.tanggal)}</TableCell>
+                    <TableCell className="text-right">
+                       <div className="flex justify-end pr-2 group-hover:translate-x-0 translate-x-12 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                          <TombolAksiSurat surat={r} onHapus={handleHapus} />
+                       </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {rows.map(r => (
-              <div key={r.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
-                    <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-600 shrink-0">{jenisLabel(r)}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">{fmtTgl(r.tanggal)}</span>
-                  <div className="flex items-center gap-0.5">
-                    <TombolPreview suratId={r.id} tipe={r.tipe} />
-                    <TombolCetak suratId={r.id} tipe={r.tipe} />
-                    <button onClick={() => handleHapus(r)} disabled={deleting === r.id}
-                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40">
-                      {deleting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <button onClick={() => load(page - 1)} disabled={page <= 1 || loading}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Sebelumnya
-              </button>
-              <span className="text-xs text-slate-500">Hal {page}/{totalPages}</span>
-              <button onClick={() => load(page + 1)} disabled={page >= totalPages || loading}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                Berikutnya <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="flex items-center justify-between bg-muted/20 p-4 rounded-2xl border border-dashed">
+               <Button variant="ghost" size="sm" onClick={() => load(page - 1)} disabled={page <= 1 || loading} className="h-10 px-6 rounded-xl font-black text-[10px] uppercase gap-2">
+                  <ChevronLeft className="w-4 h-4" /> PREV
+               </Button>
+               <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Laman {page} dari {totalPages}</span>
+               <Button variant="ghost" size="sm" onClick={() => load(page + 1)} disabled={page >= totalPages || loading} className="h-10 px-6 rounded-xl font-black text-[10px] uppercase gap-2">
+                  NEXT <ChevronRight className="w-4 h-4" />
+               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -805,7 +808,6 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
 // MAIN PAGE CONTENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export function PageContent() {
-  const confirm = useConfirm()
   const [view, setView] = useState<'menu' | 'pernyataan' | 'sp'>('menu')
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -815,17 +817,27 @@ export function PageContent() {
   }
 
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-8 pb-32 max-w-7xl mx-auto">
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-            <ScrollText className="w-4 h-4 text-slate-600" />
-          </span>
-          Surat Santri
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 ml-10">Surat pernyataan, SP, dan SK Pengeluaran</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-600 shadow-sm border border-indigo-500/10">
+            <ScrollText className="w-6 h-6"/>
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Layanan Surat Santri</h1>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Dokumentasi Kedisiplinan & Peringatan Santri</p>
+          </div>
+        </div>
+
+        {view !== 'menu' && (
+           <Button variant="outline" onClick={() => setView('menu')} className="rounded-xl h-12 px-6 font-black text-[10px] uppercase tracking-widest border-border hover:bg-muted/50 gap-2">
+              <ArrowLeft className="w-4 h-4"/> KEMBALI KE PANEL UTAMA
+           </Button>
+        )}
       </div>
+
+      <Separator className="opacity-50" />
 
       {/* Form area — muncul saat klik card */}
       {view === 'pernyataan' && (
@@ -837,62 +849,61 @@ export function PageContent() {
 
       {/* Card menu — selalu tampil di view=menu */}
       {view === 'menu' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-700">
           {/* Card Surat Pernyataan */}
           <button
             onClick={() => setView('pernyataan')}
-            className="group relative flex flex-col items-start gap-4 p-6 bg-white border border-slate-200 rounded-2xl text-left hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98] overflow-hidden"
+            className="group relative flex flex-col items-start gap-8 p-8 bg-white border border-border rounded-[2.5rem] text-left hover:border-indigo-400 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all active:scale-[0.98] overflow-hidden"
           >
-            {/* subtle bg accent */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000" />
+            <div className="relative w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+              <ScrollText className="w-6 h-6" />
+            </div>
             <div className="relative">
-              <div className="w-11 h-11 rounded-xl bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center transition-colors mb-3">
-                <ScrollText className="w-5 h-5 text-slate-600" />
-              </div>
-              <p className="font-bold text-slate-900">Surat Pernyataan</p>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Buat surat pernyataan berdasarkan catatan pelanggaran santri.
+              <p className="font-black text-xl text-indigo-900 tracking-tight leading-none mb-2">SURAT PERNYATAAN</p>
+              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest leading-relaxed max-w-[240px]">
+                Validasi kesalahan & janji perbaikan berdasarkan rekaman pelanggaran aktif di database.
               </p>
             </div>
-            <div className="relative mt-auto pt-3 border-t border-slate-100 w-full">
-              <p className="text-[11px] font-semibold text-slate-400 group-hover:text-slate-600 transition-colors">
-                Klik untuk membuat →
-              </p>
+            <div className="relative mt-auto w-full flex items-center justify-between pt-4 border-t border-dashed border-border/50">
+               <span className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-600/50 group-hover:text-indigo-600 transition-colors">MULAI GENERATE →</span>
+               <div className="flex -space-x-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white" />
+                  <div className="w-6 h-6 rounded-full bg-slate-200 border-2 border-white" />
+               </div>
             </div>
           </button>
 
           {/* Card SP & SK */}
           <button
             onClick={() => setView('sp')}
-            className="group relative flex flex-col items-start gap-4 p-6 bg-white border border-slate-200 rounded-2xl text-left hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98] overflow-hidden"
+            className="group relative flex flex-col items-start gap-8 p-8 bg-white border border-border rounded-[2.5rem] text-left hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-500/10 transition-all active:scale-[0.98] overflow-hidden"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000" />
+            <div className="relative w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-all duration-500 shadow-sm">
+              <Gavel className="w-6 h-6" />
+            </div>
             <div className="relative">
-              <div className="w-11 h-11 rounded-xl bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center transition-colors mb-3">
-                <Gavel className="w-5 h-5 text-slate-600" />
-              </div>
-              <p className="font-bold text-slate-900">SP & SK Pengeluaran</p>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Buat Surat Perjanjian SP 1–3 atau Surat Keputusan Pengeluaran.
+              <p className="font-black text-xl text-rose-900 tracking-tight leading-none mb-2">SP & SK PENGELUARAN</p>
+              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest leading-relaxed max-w-[240px]">
+                Penerbitan surat peringatan (SP 1-3) dan Keputusan Pengeluaran Santri secara resmi.
               </p>
             </div>
-            <div className="relative mt-auto pt-3 border-t border-slate-100 w-full flex items-center justify-between">
-              <div className="flex gap-1">
-                {['SP 1', 'SP 2', 'SP 3', 'SK'].map(l => (
-                  <span key={l} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">{l}</span>
-                ))}
-              </div>
-              <p className="text-[11px] font-semibold text-slate-400 group-hover:text-slate-600 transition-colors">Buat →</p>
+            <div className="relative mt-auto w-full flex items-center justify-between pt-4 border-t border-dashed border-border/50">
+               <div className="flex gap-2">
+                 {['SP1', 'SP2', 'SP3', 'SK'].map(l => <span key={l} className="text-[8px] font-black px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">{l}</span>)}
+               </div>
+               <span className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-600/50 group-hover:text-rose-600 transition-colors">PROSES DOKUMEN →</span>
             </div>
           </button>
         </div>
       )}
 
       {/* Divider */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-slate-100" />
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daftar Surat</span>
-        <div className="flex-1 h-px bg-slate-100" />
+      <div className="flex items-center gap-6 py-4">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent opacity-50" />
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] opacity-40">ARSIP & RIWAYAT DOKUMEN</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent opacity-50" />
       </div>
 
       {/* Tabel surat — selalu tampil */}

@@ -53,7 +53,7 @@ export function BottomNav({ fiturAkses, userRole, globalEnabled, userShowBottomN
   }
 
   return (
-    <nav className="md:hidden no-print shrink-0 w-full bg-white border-t border-slate-200 flex items-stretch h-14">
+    <nav className="md:hidden no-print shrink-0 w-full bg-card border-t border-border flex items-stretch h-14 pb-[env(safe-area-inset-bottom)] box-content z-50">
 
       {navItems.map((item) => {
         const Icon = getIcon(item.icon)
@@ -63,12 +63,15 @@ export function BottomNav({ fiturAkses, userRole, globalEnabled, userShowBottomN
             key={item.href}
             href={item.href}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-              active ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+              'flex-1 flex flex-col items-center justify-center gap-1 transition-colors relative',
+              active ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
             )}
           >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={active ? 2.2 : 1.8} />
-            <span className="text-[9px] leading-none font-medium truncate max-w-full px-1">
+            {active && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-b-full shadow-[0_0_8px_hsl(var(--primary))]" />
+            )}
+            <Icon className="w-[18px] h-[18px] z-10" strokeWidth={active ? 2.5 : 1.8} />
+            <span className="text-[9px] leading-none font-semibold truncate max-w-full px-1 z-10">
               {item.title}
             </span>
           </Link>
@@ -79,14 +82,17 @@ export function BottomNav({ fiturAkses, userRole, globalEnabled, userShowBottomN
       <Link
         href="/dashboard"
         className={cn(
-          'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
+          'flex-1 flex flex-col items-center justify-center gap-1 transition-colors relative',
           pathname === '/dashboard' && navItems.every(i => i.href !== '/dashboard')
-            ? 'text-emerald-600 bg-emerald-50'
-            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+            ? 'text-primary'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
         )}
       >
-        <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
-        <span className="text-[9px] leading-none font-medium">Menu</span>
+        {pathname === '/dashboard' && navItems.every(i => i.href !== '/dashboard') && (
+          <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-b-full shadow-[0_0_8px_hsl(var(--primary))]" />
+        )}
+        <Menu className="w-[18px] h-[18px] z-10" strokeWidth={pathname === '/dashboard' && navItems.every(i => i.href !== '/dashboard') ? 2.5 : 1.8} />
+        <span className="text-[9px] leading-none font-semibold z-10">Menu</span>
       </Link>
 
     </nav>

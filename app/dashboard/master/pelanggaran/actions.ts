@@ -19,7 +19,12 @@ export async function tambahJenisPelanggaran(formData: FormData) {
 }
 
 export async function hapusJenisPelanggaran(id: number) {
-  await query('DELETE FROM master_pelanggaran WHERE id = ?', [id])
-  revalidateTag('master-pelanggaran', 'everything') // invalidasi KV cache
-  revalidatePath('/dashboard/master/pelanggaran')
+  try {
+    await query('DELETE FROM master_pelanggaran WHERE id = ?', [id])
+    revalidateTag('master-pelanggaran', 'everything') // invalidasi KV cache
+    revalidatePath('/dashboard/master/pelanggaran')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message || "Gagal menghapus data" }
+  }
 }

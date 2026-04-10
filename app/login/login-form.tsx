@@ -1,10 +1,16 @@
 'use client'
 
 import { useState } from "react"
-import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
+import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff, Sparkles, UserCheck } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { login } from "./actions"
+import { cn } from "@/lib/utils"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -15,232 +21,147 @@ export default function LoginForm() {
     setIsSubmitting(true)
     try {
       const formData = new FormData(e.currentTarget)
-      // Server action akan redirect('/dashboard') langsung dari server
-      // jika error, return { error: '...' }
       const result = await login(formData)
 
-      // Kalau sampai sini berarti ada error (redirect tidak throw ke sini)
       if (result?.error) {
         setIsSubmitting(false)
         toast.error("Login Gagal", { description: result.error })
       }
     } catch (err: any) {
-      // Next.js redirect() melempar NEXT_REDIRECT — ini normal, bukan error
-      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
-        // Redirect sedang berjalan, biarkan
-        return
-      }
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) return
       setIsSubmitting(false)
       toast.error("Login Gagal", { description: 'Tidak dapat terhubung ke server.' })
     }
   }
 
   return (
-    <div className="min-h-screen flex font-sans" style={{ fontFamily: "'Georgia', serif" }}>
+    <div className="min-h-screen bg-[#020617] text-slate-50 flex items-center justify-center p-6 selection:bg-teal-500/30 overflow-hidden relative">
 
-      {/* ── Noise texture ── */}
-      <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
-
-      {/* ── LEFT PANEL — branding ── */}
-      <div className="hidden lg:flex lg:w-[55%] relative flex-col justify-between p-16 overflow-hidden"
-        style={{ background: "linear-gradient(160deg, #052e10 0%, #0a1a0f 40%, #071810 100%)" }}>
-
-        {/* Glow */}
-        <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] rounded-full pointer-events-none opacity-25"
-          style={{ background: "radial-gradient(circle, #16a34a 0%, transparent 65%)" }} />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[350px] h-[350px] rounded-full pointer-events-none opacity-10"
-          style={{ background: "radial-gradient(circle, #ca8a04 0%, transparent 65%)" }} />
-
-        {/* Decorative grid lines */}
-        <div className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-
-        {/* Logo */}
-        <div className="relative z-10 flex items-center gap-4">
-          <Link href="/">
-            <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain drop-shadow-xl hover:scale-105 transition-transform" />
-          </Link>
-          <div>
-            <div className="text-emerald-400 text-[10px] font-bold tracking-[0.25em] uppercase mb-0.5" style={{ fontFamily: "sans-serif" }}>
-              Sistem Informasi
-            </div>
-            <div className="text-white font-bold text-sm tracking-wide" style={{ fontFamily: "sans-serif" }}>
-              Pesantren Sukahideng
-            </div>
-          </div>
-        </div>
-
-        {/* Center content */}
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 bg-emerald-950/60 border border-emerald-700/30 text-emerald-400 text-[10px] font-semibold px-3 py-1 rounded-full mb-8 tracking-widest uppercase" style={{ fontFamily: "sans-serif" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Manajemen Terpadu
-          </div>
-
-          <h1 className="text-5xl xl:text-6xl font-bold text-white leading-[1.1] mb-6 tracking-tight">
-            Kelola Pesantren
-            <br />
-            <span className="text-transparent bg-clip-text"
-              style={{ backgroundImage: "linear-gradient(135deg, #4ade80, #fbbf24)" }}>
-              Lebih Cerdas
-            </span>
-          </h1>
-
-          <p className="text-white/45 text-base leading-relaxed max-w-md" style={{ fontFamily: "sans-serif", fontStyle: "italic" }}>
-            "Sistem informasi manajemen terpadu untuk santri, akademik,
-            asrama, keuangan, dan keamanan pesantren."
-          </p>
-
-          {/* Stats */}
-          <div className="mt-12 grid grid-cols-3 gap-6">
-            {[
-              { val: "7", label: "Role Pengguna" },
-              { val: "40+", label: "Fitur Lengkap" },
-              { val: "∞", label: "Data Santri" },
-            ].map(({ val, label }) => (
-              <div key={label} className="border-l-2 border-emerald-700/50 pl-4">
-                <div className="text-2xl font-bold text-emerald-400">{val}</div>
-                <div className="text-white/40 text-xs mt-0.5" style={{ fontFamily: "sans-serif" }}>{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Footer left */}
-        <div className="relative z-10 text-white/20 text-xs" style={{ fontFamily: "sans-serif" }}>
-          © 2025 Pesantren Sukahideng
-        </div>
+      {/* ── Background Elements ── */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] rounded-full bg-teal-500/10 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full bg-indigo-500/10 blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.05]" 
+             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%239C92AC\' fill-opacity=\'0.2\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
       </div>
 
-      {/* ── RIGHT PANEL — login form ── */}
-      <div className="flex-1 flex items-center justify-center bg-[#f8faf8] relative p-6">
-
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-[0.4]"
-          style={{ backgroundImage: "radial-gradient(circle, #d1fae5 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-
-        <div className="relative z-10 w-full max-w-md">
-
-          {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-10">
-            <Link href="/">
-              <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain mx-auto mb-3" />
-            </Link>
-            <h2 className="text-xl font-bold text-slate-800">Pesantren Sukahideng</h2>
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        
+        {/* Left Aspect: Branding */}
+        <div className="hidden lg:flex flex-col space-y-10 animate-in fade-in slide-in-from-left-10 duration-1000">
+          <div className="flex items-center gap-5">
+             <div className="w-14 h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl shadow-2xl">
+               <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
+             </div>
+             <div>
+               <h1 className="text-2xl font-black uppercase tracking-[.3em] leading-none mb-1 text-white">Sukahideng</h1>
+               <span className="text-teal-500 font-black text-[10px] uppercase tracking-widest leading-none">Intelligence Hub</span>
+             </div>
           </div>
 
-          {/* Card */}
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 md:p-10"
-            style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)" }}>
+          <div className="space-y-6">
+             <Badge variant="outline" className="h-8 px-5 rounded-full border-teal-500/20 bg-teal-500/5 text-teal-400 font-black text-[10px] uppercase tracking-[.3em] gap-2 shadow-2xl backdrop-blur-md">
+                <ShieldCheck className="w-3.5 h-3.5" /> SECURE GATEWAY
+             </Badge>
+             <h2 className="text-6xl font-black text-white leading-[0.95] tracking-tighter uppercase">
+               Authorized <br/>
+               <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">Access Only.</span>
+             </h2>
+             <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-sm italic">
+               "Silakan masuk menggunakan kredensial resmi untuk mengelola ekosistem akademik dan operasional Pesantren."
+             </p>
+          </div>
 
-            {/* Header */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-800 mb-1">Selamat Datang</h2>
-              <p className="text-slate-400 text-sm" style={{ fontFamily: "sans-serif" }}>
-                Masuk untuk mengakses dashboard manajemen
-              </p>
-            </div>
+          <div className="flex items-center gap-8 pt-6">
+             <div className="flex -space-x-3">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-[#020617] bg-slate-800 flex items-center justify-center text-[10px] font-black">{i}</div>
+                ))}
+                <div className="w-10 h-10 rounded-full border-2 border-[#020617] bg-teal-500 flex items-center justify-center text-[10px] font-black text-white">+7</div>
+             </div>
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Role Otoritas <br/> Terintegrasi</p>
+          </div>
+        </div>
 
-            {/* Form */}
-            <form onSubmit={handleLogin} className="space-y-5">
+        {/* Right Aspect: Form */}
+        <div className="animate-in fade-in slide-in-from-right-10 duration-1000">
+          <Card className="p-1 px-1 bg-white/[0.03] border-white/10 backdrop-blur-3xl rounded-[3rem] shadow-2xl overflow-hidden group">
+            <div className="p-8 md:p-12 space-y-8 bg-black/40 rounded-[2.8rem] border border-white/5 transition-all group-hover:border-teal-500/20">
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Kredensial Akun</h3>
+                <p className="text-slate-500 text-xs font-semibold tracking-wide">Input email dan password terdaftar Anda.</p>
+              </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2" style={{ fontFamily: "sans-serif" }}>
-                  Email
-                </label>
-                <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    placeholder="email@pesantren.com"
-                    disabled={isSubmitting}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm text-slate-800 placeholder:text-slate-300 disabled:opacity-60"
-                    style={{ fontFamily: "sans-serif" }}
-                  />
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-teal-500 uppercase tracking-[.25em] ml-1">Electronic Mail</label>
+                    <div className="relative group">
+                       <Mail className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-400 transition-colors" />
+                       <Input 
+                        name="email"
+                        type="email"
+                        required
+                        placeholder="admin@sukahideng.link"
+                        disabled={isSubmitting}
+                        className="h-14 pl-11 bg-white/[0.03] border-white/10 rounded-2xl focus:ring-teal-500/50 focus:border-teal-500/50 text-white font-medium shadow-inner"
+                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-teal-500 uppercase tracking-[.25em] ml-1">Password Authentication</label>
+                    <div className="relative group">
+                       <Lock className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-400 transition-colors" />
+                       <Input 
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        disabled={isSubmitting}
+                        className="h-14 pl-11 pr-12 bg-white/[0.03] border-white/10 rounded-2xl focus:ring-teal-500/50 focus:border-teal-500/50 text-white font-medium shadow-inner"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                       >
+                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                       </button>
+                    </div>
+                  </div>
                 </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full h-14 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs gap-3 shadow-[0_20px_50px_rgba(20,184,166,0.2)] transition-all active:scale-[0.98]"
+                >
+                  {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifikasi...</> : <><UserCheck className="w-4 h-4" /> Unlock Dashboard</>}
+                </Button>
+              </form>
+
+              <div className="pt-6 border-t border-white/5 flex flex-col items-center gap-4">
+                 <Link href="https://wa.me/6282218943383" target="_blank" className="text-[10px] font-black text-slate-500 hover:text-teal-500 uppercase tracking-widest transition-all">Forgot your credentials? Contact IT Support</Link>
+                 <Link href="/" className="text-[9px] font-black text-slate-700 hover:text-slate-400 uppercase tracking-[.3em] transition-all">← Back to Portal Home</Link>
               </div>
 
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2" style={{ fontFamily: "sans-serif" }}>
-                  Password
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                  <input
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="••••••••"
-                    disabled={isSubmitting}
-                    className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm text-slate-800 placeholder:text-slate-300 disabled:opacity-60"
-                    style={{ fontFamily: "sans-serif" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]"
-                style={{
-                  fontFamily: "sans-serif",
-                  background: "linear-gradient(135deg, #15803d, #166534)",
-                  boxShadow: "0 4px 20px rgba(22,163,74,0.25)"
-                }}
-              >
-                {isSubmitting
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Memproses...</>
-                  : <><ArrowRight className="w-4 h-4" /> Masuk Dashboard</>
-                }
-              </button>
-
-            </form>
-
-            {/* Divider */}
-            <div className="relative my-7">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-3 text-xs text-slate-300" style={{ fontFamily: "sans-serif" }}>
-                  Butuh bantuan?
-                </span>
-              </div>
             </div>
+          </Card>
+        </div>
 
-            {/* Contact */}
-            <a
-              href="https://wa.me/6282218943383"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 transition-colors"
-              style={{ fontFamily: "sans-serif" }}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              Hubungi Admin IT untuk reset password
-            </a>
+      </div>
 
-          </div>
+      {/* Footer minimal */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-10 hidden md:block">
+         <p className="text-[10px] font-black text-slate-800 uppercase tracking-[.4em]">Sukahideng App · Intelligent Governance</p>
+      </div>
 
-          {/* Back to home */}
-          <div className="text-center mt-6">
-            <Link href="/" className="text-xs text-slate-400 hover:text-slate-600 transition-colors" style={{ fontFamily: "sans-serif" }}>
-              ← Kembali ke halaman utama
-            </Link>
-          </div>
+    </div>
+  )
+}
+iv>
 
         </div>
       </div>

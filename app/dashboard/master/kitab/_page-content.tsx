@@ -1,14 +1,21 @@
 'use client'
 
-import React from 'react'
-
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab, getTahunAjaranAktif } from './actions'
-import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List, CalendarDays, AlertTriangle } from 'lucide-react'
+import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List, CalendarDays, AlertTriangle, Search, BookOpen, Layers, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { cn } from '@/lib/utils'
 
 export default function MasterKitabPage() {
   const confirm = useConfirm()
@@ -24,7 +31,7 @@ export default function MasterKitabPage() {
   const [loading, setLoading] = useState(true)
 
   // Filter List
-  const [filterMarhalah, setFilterMarhalah] = useState('')
+  const [filterMarhalah, setFilterMarhalah] = useState('SEMUA')
 
   // State Import
   const [excelData, setExcelData] = useState<any[]>([])
@@ -40,6 +47,7 @@ export default function MasterKitabPage() {
 
   useEffect(() => {
     loadKitab()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterMarhalah]) 
 
   const initData = async () => {
@@ -51,7 +59,7 @@ export default function MasterKitabPage() {
 
   const loadKitab = async () => {
     setLoading(true)
-    const res = await getKitabList(filterMarhalah)
+    const res = await getKitabList(filterMarhalah === 'SEMUA' ? '' : filterMarhalah)
     setKitabList(res)
     setLoading(false)
   }
@@ -60,24 +68,26 @@ export default function MasterKitabPage() {
   const handleTambah = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const toastId = toast.loading("Menambahkan...")
+    const toastId = toast.loading("Menambahkan kitab...")
     
     const res = await tambahKitab(formData)
     toast.dismiss(toastId)
 
-    if ('error' in res) {
+    if (res && 'error' in res) {
         toast.error(res.error)
     } else {
-        toast.success("Kitab ditambahkan")
+        toast.success("Kitab berhasil ditambahkan")
         loadKitab()
         e.currentTarget.reset()
     }
   }
 
   const handleHapus = async (id: string) => {
-    if(!await confirm("Hapus kitab ini?")) return
+    if(!await confirm("Hapus kitab ini? Data transaksi terkait mungkin terdampak.")) return
+    const toastId = toast.loading("Menghapus...")
     await hapusKitab(id)
-    toast.success("Dihapus")
+    toast.dismiss(toastId)
+    toast.success("Data kitab dihapus")
     loadKitab()
   }
 
@@ -86,12 +96,12 @@ export default function MasterKitabPage() {
     if (isNaN(harga)) return toast.warning("Harga tidak valid")
     
     const res = await updateHargaKitab(id, harga)
-    if ((res as any).success) {
-        toast.success("Harga diupdate")
+    if (res && (res as any).success) {
+        toast.success("Harga berhasil diperbarui")
         setEditingId(null)
         loadKitab()
     } else {
-        toast.error((res as any).error)
+        toast.error((res as any).error || "Gagal update harga")
     }
   }
 
@@ -116,246 +126,354 @@ export default function MasterKitabPage() {
       const arrayBuffer = await file.arrayBuffer()
       const wb = XLSX.read(arrayBuffer, { type: 'array' })
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
-      // Bersihkan data
       setExcelData(JSON.parse(JSON.stringify(data)))
-      toast.success(`${data.length} baris terbaca`)
+      toast.success(`Berhasil memuat ${data.length} baris data`)
     } catch {
-      toast.error("Gagal membaca file Excel")
+      toast.error("Format file tidak didukung atau rusak")
     }
   }
 
   const handleSimpanImport = async () => {
     if(excelData.length === 0) return
     setIsProcessing(true)
+    const toastId = toast.loading("Memproses import massal...")
     const res = await importKitabMassal(excelData)
     setIsProcessing(false)
+    toast.dismiss(toastId)
     
-    if ((res as any).success) {
-        toast.success(`Berhasil import ${(res as any).count} kitab`)
+    if (res && (res as any).success) {
+        toast.success(`Alhamdulillah! ${(res as any).count} kitab terimport`)
         setExcelData([])
         setTab('LIST')
         loadKitab()
     } else {
-        toast.error((res as any).error)
+        toast.error((res as any).error || "Gagal import data")
     }
   }
 
-  const { paged: pagedKitabList, totalPages: totalPagesKitabList, safePage: safePageKitabList } = usePagination(kitabList, pageSize, page)
+  // --- PAGINATION LOGIC ---
+  const totalPages = Math.ceil(kitabList.length / pageSize)
+  const safePage = Math.min(Math.max(1, page), totalPages || 1)
+  const startIndex = (safePage - 1) * pageSize
+  const pagedList = kitabList.slice(startIndex, startIndex + pageSize)
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 max-w-6xl mx-auto pb-24 animate-in fade-in duration-500">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab & Harga
-           </h1>
-           <p className="text-slate-500 text-sm">Database kitab kuning dan harga jual (UPK) per tahun ajaran.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 shadow-sm border border-emerald-500/10">
+            <BookOpen className="w-6 h-6"/>
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Master Kitab & UPK</h1>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Manajemen Inventaris Kitab Kuning Pesantren</p>
+          </div>
         </div>
-        
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-           <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-             <List className="w-4 h-4"/> Daftar Kitab
-           </button>
-           <button onClick={() => setTab('IMPORT')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'IMPORT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-             <FileSpreadsheet className="w-4 h-4"/> Import Excel
-           </button>
+
+        <div className="flex bg-muted/50 p-1 border rounded-2xl shadow-inner shrink-0">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setTab('LIST')} 
+            className={cn(
+               "h-9 rounded-xl text-[10px] font-black uppercase tracking-widest px-4",
+               tab === 'LIST' ? "bg-background text-emerald-600 shadow-sm" : "text-muted-foreground/60"
+            )}
+          >
+            <List className="w-3.5 h-3.5 mr-2"/> Daftar Kitab
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setTab('IMPORT')} 
+            className={cn(
+               "h-9 rounded-xl text-[10px] font-black uppercase tracking-widest px-4",
+               tab === 'IMPORT' ? "bg-background text-indigo-600 shadow-sm" : "text-muted-foreground/60"
+            )}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 mr-2"/> Import Massal
+          </Button>
         </div>
       </div>
 
       {/* BANNER TAHUN AJARAN */}
-      {tahunAktif ? (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-center gap-3">
-          <CalendarDays className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-          <p className="text-sm text-emerald-800">
-            Menampilkan kitab tahun ajaran: <span className="font-bold">{tahunAktif.nama}</span>
-            <span className="text-emerald-600"> — Kitab baru otomatis masuk ke tahun ini.</span>
-          </p>
-        </div>
+      {!loading && (tahunAktif ? (
+        <Alert className="bg-emerald-500/5 border-emerald-500/20 text-emerald-800 rounded-2xl shadow-sm animate-in slide-in-from-top-2 duration-700">
+          <CalendarDays className="h-4 w-4 text-emerald-600" />
+          <AlertTitle className="text-xs font-black uppercase tracking-widest leading-none mb-1">Tahun Ajaran Aktif: {tahunAktif.nama}</AlertTitle>
+          <AlertDescription className="text-[10px] font-bold opacity-70 uppercase tracking-tight">
+            Database kitab yang ditampilkan dan ditambahkan dialirkan untuk periode akademik berjalan ini.
+          </AlertDescription>
+        </Alert>
       ) : (
-        <div className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-bold text-amber-800">Belum ada tahun ajaran aktif!</p>
-            <p className="text-xs text-amber-700 mt-0.5">Kitab tidak bisa ditambahkan sebelum tahun ajaran diaktifkan.</p>
-            <Link href="/dashboard/pengaturan/tahun-ajaran" className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-amber-800 underline hover:text-amber-900">
-              <CalendarDays className="w-3.5 h-3.5" /> Atur Tahun Ajaran →
-            </Link>
-          </div>
-        </div>
-      )}
+        <Alert variant="destructive" className="bg-rose-500/5 border-rose-500/20 text-rose-800 rounded-2xl shadow-sm">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-xs font-black uppercase tracking-widest leading-none mb-1">Peringatan: Tidak Ada Tahun Ajaran Aktif</AlertTitle>
+          <AlertDescription className="text-[10px] font-bold opacity-70 uppercase tracking-tight">
+            Penambahan data kitab baru tidak diizinkan sebelum tahun ajaran diaktifkan. <Link href="/dashboard/pengaturan/tahun-ajaran" className="underline font-black">Atur Sekarang →</Link>
+          </AlertDescription>
+        </Alert>
+      ))}
 
-      {/* --- TAB LIST & INPUT MANUAL --- */}
-      {tab === 'LIST' && (
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2">
+      {tab === 'LIST' ? (
+         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-bottom-6 duration-700">
             
-            {/* FORM INPUT */}
-            <div className="md:col-span-1">
-                <div className="bg-white p-5 rounded-xl border shadow-sm sticky top-4">
-                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Plus className="w-4 h-4"/> Tambah Kitab</h3>
-                    <form onSubmit={handleTambah} className="space-y-3">
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Nama Kitab</label>
-                            <input name="nama_kitab" required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="Contoh: Jurumiyah"/>
+            {/* FORM INPUT MANUAL */}
+            <div className="lg:col-span-4 lg:order-1">
+               <Card className="border-border shadow-xl overflow-hidden relative group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000"/>
+                  <CardHeader className="bg-muted/30 border-b">
+                     <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-emerald-600"/> Registrasi Kitab
+                     </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                     <form onSubmit={handleTambah} className="space-y-5">
+                        <div className="space-y-2">
+                           <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Nama Kitab</Label>
+                           <Input name="nama_kitab" required placeholder="Ex: Matan Jurumiyah" className="h-11 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-emerald-500"/>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Tingkat (Marhalah)</label>
-                            <select name="marhalah_id" required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
-                                <option value="">-- Pilih --</option>
-                                {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                            </select>
+                        <div className="space-y-2">
+                           <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Tingkat (Marhalah)</Label>
+                           <Select name="marhalah_id" required>
+                              <SelectTrigger className="h-11 rounded-xl bg-muted/20 border-border font-bold">
+                                 <SelectValue placeholder="Pilih Marhalah"/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                 {marhalahList.map(m => <SelectItem key={m.id} value={m.id} className="font-bold">{m.nama}</SelectItem>)}
+                              </SelectContent>
+                           </Select>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Mata Pelajaran</label>
-                            <select name="mapel_id" required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
-                                <option value="">-- Pilih --</option>
-                                {mapelList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                            </select>
+                        <div className="space-y-2">
+                           <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Mata Pelajaran (Kategori)</Label>
+                           <Select name="mapel_id" required>
+                              <SelectTrigger className="h-11 rounded-xl bg-muted/20 border-border font-bold">
+                                 <SelectValue placeholder="Pilih Mapel"/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                 {mapelList.map(m => <SelectItem key={m.id} value={m.id} className="font-bold">{m.nama}</SelectItem>)}
+                              </SelectContent>
+                           </Select>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Harga (Rp)</label>
-                            <input name="harga" type="number" required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="0"/>
+                        <div className="space-y-2">
+                           <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Harga Jual (UPK) Rp</Label>
+                           <Input name="harga" type="number" required placeholder="0" className="h-11 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-emerald-500"/>
                         </div>
-                        <button className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold shadow hover:bg-emerald-700">Simpan</button>
-                    </form>
-                </div>
+                        <Button disabled={!tahunAktif} className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 gap-2">
+                           <Save className="w-4 h-4"/> SIMPAN DATA
+                        </Button>
+                     </form>
+                  </CardContent>
+               </Card>
             </div>
 
             {/* TABEL LIST */}
-            <div className="md:col-span-2 space-y-4">
-                {/* Filter */}
-                <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
-                    <span className="text-xs font-bold text-slate-500 ml-2">Filter:</span>
-                    <select 
-                        value={filterMarhalah} 
-                        onChange={(e) => setFilterMarhalah(e.target.value)}
-                        className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none"
-                    >
-                        <option value="">Semua Marhalah</option>
-                        {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                    </select>
-                </div>
+            <div className="lg:col-span-8 space-y-4">
+                <Card className="border-border shadow-sm overflow-hidden">
+                    <div className="p-4 bg-muted/30 border-b flex flex-col sm:flex-row items-center gap-4">
+                        <div className="relative flex-1 group">
+                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-emerald-500 transition-colors pointer-events-none"/>
+                           <Select value={filterMarhalah} onValueChange={(v) => setFilterMarhalah(v ?? 'SEMUA')}>
+                              <SelectTrigger className="pl-10 h-10 bg-background border-border rounded-xl font-bold text-xs">
+                                 <SelectValue placeholder="Filter Marhalah"/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                 <SelectItem value="SEMUA" className="font-bold">Semua Marhalah</SelectItem>
+                                 {marhalahList.map(m => <SelectItem key={m.id} value={m.id} className="font-bold">{m.nama}</SelectItem>)}
+                              </SelectContent>
+                           </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40">Tampilkan</span>
+                           <Select value={String(pageSize)} onValueChange={v => {setPageSize(Number(v)); setPage(1)}}>
+                              <SelectTrigger className="w-20 h-10 bg-background border-border rounded-xl font-bold text-xs">
+                                 <SelectValue/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                 {[10, 20, 50, 100].map(s => <SelectItem key={s} value={String(s)} className="font-bold">{s}</SelectItem>)}
+                              </SelectContent>
+                           </Select>
+                        </div>
+                    </div>
 
-                <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                    <>
-<table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-                            <tr>
-                                <th className="px-4 py-3">Nama Kitab</th>
-                                <th className="px-4 py-3 text-right">Harga</th>
-                                <th className="px-4 py-3 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {loading ? (
-                                <tr><td colSpan={3} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400"/></td></tr>
-                            ) : kitabList.length === 0 ? (
-                                <tr><td colSpan={3} className="text-center py-10 text-slate-400">Belum ada data.</td></tr>
-                            ) : (
-                                pagedKitabList.map(k => (
-                                    <tr key={k.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3">
-                                            <p className="font-bold text-slate-800">{k.nama_kitab}</p>
-                                            <p className="text-xs text-slate-500">{k.marhalah?.nama} • {k.mapel?.nama}</p>
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-mono text-emerald-700 font-bold">
-                                            {editingId === k.id ? (
-                                                <input 
-                                                    autoFocus
-                                                    className="w-20 border rounded px-1 py-0.5 text-right text-sm"
-                                                    value={editHarga}
-                                                    onChange={e => setEditHarga(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if(e.key === 'Enter') handleUpdateHarga(k.id)
-                                                        if(e.key === 'Escape') setEditingId(null)
-                                                    }}
-                                                    onBlur={() => setEditingId(null)}
+                    <div className="min-h-[400px]">
+                        <Table>
+                           <TableHeader className="bg-muted/10">
+                              <TableRow>
+                                 <TableHead className="px-6 h-12 text-[10px] font-black uppercase tracking-widest">Detail Kitab</TableHead>
+                                 <TableHead className="px-6 h-12 text-[10px] font-black uppercase tracking-widest text-right">Harga (UPK)</TableHead>
+                                 <TableHead className="px-6 h-12 text-[10px] font-black uppercase tracking-widest text-right px-8">Aksi</TableHead>
+                              </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                              {loading ? (
+                                 <TableRow>
+                                    <TableCell colSpan={3} className="py-32 text-center">
+                                       <Loader2 className="w-8 h-8 animate-spin text-emerald-500/50 mx-auto mb-3"/>
+                                       <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest animate-pulse">Fetching Library...</p>
+                                    </TableCell>
+                                 </TableRow>
+                              ) : pagedList.length === 0 ? (
+                                 <TableRow>
+                                    <TableCell colSpan={3} className="py-32 text-center opacity-30">
+                                       <Book className="w-12 h-12 mx-auto mb-3"/>
+                                       <p className="text-[10px] font-black uppercase tracking-widest">Tidak ada kitab di kategori ini</p>
+                                    </TableCell>
+                                 </TableRow>
+                              ) : (
+                                 pagedList.map((k) => (
+                                    <TableRow key={k.id} className="hover:bg-emerald-500/[0.03] transition-colors group">
+                                       <TableCell className="px-6 py-4">
+                                          <div className="font-black text-foreground text-sm tracking-tight uppercase">{k.nama_kitab}</div>
+                                          <div className="flex items-center gap-1.5 mt-1">
+                                             <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter px-2 h-4 border-emerald-500/20 text-emerald-600 bg-emerald-500/5">{k.mapel?.nama}</Badge>
+                                             <span className="text-[10px] font-bold text-muted-foreground opacity-50 uppercase tracking-widest">{k.marhalah?.nama}</span>
+                                          </div>
+                                       </TableCell>
+                                       <TableCell className="px-6 py-4 text-right">
+                                           {editingId === k.id ? (
+                                             <div className="flex items-center justify-end gap-1 animate-in zoom-in-95 duration-200">
+                                                <Input 
+                                                   autoFocus
+                                                   className="h-8 w-24 text-right font-black text-xs border-indigo-500 focus-visible:ring-indigo-500"
+                                                   value={editHarga}
+                                                   onChange={e => setEditHarga(e.target.value)}
+                                                   onKeyDown={e => {
+                                                      if(e.key === 'Enter') handleUpdateHarga(k.id)
+                                                      if(e.key === 'Escape') setEditingId(null)
+                                                   }}
                                                 />
-                                            ) : (
-                                                `Rp ${k.harga.toLocaleString()}`
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="flex justify-center gap-1">
-                                                <button 
-                                                    onClick={() => { setEditingId(k.id); setEditHarga(k.harga.toString()); }}
-                                                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" 
-                                                    title="Edit Harga"
-                                                >
-                                                    <Edit className="w-4 h-4"/>
-                                                </button>
-                                                <button onClick={() => handleHapus(k.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-              <Pagination
-                currentPage={safePageKitabList}
-                totalPages={totalPagesKitabList}
-                pageSize={pageSize}
-                total={kitabList.length}
-                onPageChange={setPage}
-                onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-              />
-                    </>
-                </div>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={() => handleUpdateHarga(k.id)}><Check className="w-4 h-4"/></Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-rose-500" onClick={() => setEditingId(null)}><X className="w-4 h-4"/></Button>
+                                             </div>
+                                           ) : (
+                                              <button 
+                                                onClick={() => { setEditingId(k.id); setEditHarga(k.harga.toString()); }}
+                                                className="group/btn text-right hover:scale-105 transition-transform"
+                                              >
+                                                <div className="text-sm font-black text-emerald-700 tabular-nums">Rp {k.harga.toLocaleString('id-ID')}</div>
+                                                <div className="text-[8px] font-black uppercase tracking-widest opacity-0 group-hover/btn:opacity-50 text-indigo-600">Klik untuk ubah</div>
+                                              </button>
+                                           )}
+                                       </TableCell>
+                                       <TableCell className="px-6 py-4 text-right pr-8">
+                                           <div className="flex justify-end items-center gap-1">
+                                              <Button 
+                                                  variant="ghost" 
+                                                  size="icon" 
+                                                  onClick={() => { setEditingId(k.id); setEditHarga(k.harga.toString()); }}
+                                                  className="h-9 w-9 rounded-xl text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                              >
+                                                  <Edit className="w-4 h-4"/>
+                                              </Button>
+                                              <Button 
+                                                  variant="ghost" 
+                                                  size="icon" 
+                                                  onClick={() => handleHapus(k.id)}
+                                                  className="h-9 w-9 rounded-xl text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                              >
+                                                  <Trash2 className="w-4 h-4"/>
+                                              </Button>
+                                           </div>
+                                       </TableCell>
+                                    </TableRow>
+                                 ))
+                              )}
+                           </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* PAGINATION */}
+                    {totalPages > 1 && (
+                       <div className="p-4 bg-muted/20 border-t flex flex-col sm:flex-row justify-between items-center gap-4">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Showing {startIndex + 1} to {Math.min(startIndex + pageSize, kitabList.length)} of {kitabList.length} items</p>
+                          <div className="flex items-center gap-2">
+                             <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="h-8 rounded-lg text-[10px] font-black uppercase">Prev</Button>
+                             <div className="text-[10px] font-black px-4">{page} / {totalPages}</div>
+                             <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="h-8 rounded-lg text-[10px] font-black uppercase">Next</Button>
+                          </div>
+                       </div>
+                    )}
+                </Card>
+            </div>
+         </div>
+      ) : (
+         /* TAB IMPORT */
+         <div className="space-y-8 animate-in slide-in-from-right-8 duration-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Card className="border-border shadow-md hover:shadow-xl transition-all group overflow-hidden bg-indigo-500/[0.02]">
+                 <CardContent className="p-10 flex flex-col items-center text-center space-y-6">
+                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-border flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                       <Download className="w-8 h-8"/>
+                    </div>
+                    <div className="space-y-1">
+                       <h3 className="font-black text-lg uppercase tracking-tight leading-none text-indigo-900">1. Unduh Template</h3>
+                       <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest max-w-[200px]">Format Excel standar untuk database kitab</p>
+                    </div>
+                    <Button onClick={downloadTemplate} variant="outline" className="h-11 rounded-2xl border-indigo-200 text-indigo-700 font-black text-xs uppercase hover:bg-indigo-50 px-8">
+                       Get XLSX Template
+                    </Button>
+                 </CardContent>
+              </Card>
+
+              <Card className="border-border shadow-md hover:shadow-xl transition-all group overflow-hidden bg-emerald-500/[0.02]">
+                 <CardContent className="p-10 flex flex-col items-center text-center space-y-6">
+                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-border flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                       <Upload className="w-8 h-8"/>
+                    </div>
+                    <div className="space-y-1">
+                       <h3 className="font-black text-lg uppercase tracking-tight leading-none text-emerald-900">2. Unggah Berkas</h3>
+                       <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest max-w-[200px]">Impor data massal ke tahun ajaran aktif</p>
+                    </div>
+                    <div className="relative">
+                       <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                       <Button className="h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase px-10 shadow-lg shadow-emerald-600/10">
+                          Select Excel File
+                       </Button>
+                    </div>
+                 </CardContent>
+              </Card>
             </div>
 
+            {excelData.length > 0 && (
+                <Card className="border-emerald-500/20 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10">
+                    <CardHeader className="p-6 border-b bg-emerald-500/5 flex flex-row justify-between items-center">
+                       <div>
+                          <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                             <CheckCircle className="w-4 h-4 text-emerald-600"/> Review Impor ({excelData.length} Kitab)
+                          </CardTitle>
+                          <CardDescription className="text-[9px] font-bold uppercase tracking-tighter opacity-60">Pastikan nama marhalah dan mapel sesuai referensi system</CardDescription>
+                       </div>
+                       <Button onClick={handleSimpanImport} disabled={isProcessing} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl h-11 px-8 shadow-lg shadow-emerald-600/20 gap-2">
+                          {isProcessing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} IMPORT SEMUA
+                       </Button>
+                    </CardHeader>
+                    <div className="max-h-[500px] overflow-auto">
+                        <Table>
+                           <TableHeader className="sticky top-0 bg-background z-20 shadow-sm border-b">
+                              <TableRow>
+                                 <TableHead className="text-[10px] font-black uppercase px-6">Nama Kitab</TableHead>
+                                 <TableHead className="text-[10px] font-black uppercase px-6">Marhalah</TableHead>
+                                 <TableHead className="text-[10px] font-black uppercase px-6 text-right">Harga (UPK)</TableHead>
+                              </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                              {excelData.map((d, i) => (
+                                 <TableRow key={i}>
+                                    <TableCell className="px-6 py-3 font-bold text-xs uppercase">{d['NAMA KITAB'] || d['nama kitab']}</TableCell>
+                                    <TableCell className="px-6 py-3 text-xs uppercase opacity-70">{d['MARHALAH'] || d['marhalah']}</TableCell>
+                                    <TableCell className="px-6 py-3 text-right font-black text-indigo-600 tabular-nums text-xs">Rp {(d['HARGA'] || d['harga'] || 0).toLocaleString('id-ID')}</TableCell>
+                                 </TableRow>
+                              ))}
+                           </TableBody>
+                        </Table>
+                    </div>
+                </Card>
+            )}
          </div>
       )}
-
-      {/* --- TAB 2: IMPORT EXCEL --- */}
-      {tab === 'IMPORT' && (
-         <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-3">
-                   <Download className="w-8 h-8 text-blue-600"/>
-                   <h3 className="font-bold text-blue-900">1. Template Data Kitab</h3>
-                   <button onClick={downloadTemplate} className="bg-white text-blue-700 px-4 py-2 rounded shadow-sm font-bold text-xs border hover:bg-blue-50">Download .xlsx</button>
-                </div>
-                <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex flex-col items-center text-center space-y-3">
-                   <Upload className="w-8 h-8 text-green-600"/>
-                   <h3 className="font-bold text-green-900">2. Upload Excel</h3>
-                   <div className="relative">
-                      <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
-                      <button className="bg-green-600 text-white px-4 py-2 rounded shadow-sm font-bold text-xs hover:bg-green-700">Pilih File</button>
-                   </div>
-                </div>
-             </div>
-
-             {excelData.length > 0 && (
-                <div className="bg-white border rounded-xl p-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500"/> Preview ({excelData.length})</h3>
-                        <button onClick={handleSimpanImport} disabled={isProcessing} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
-                            {isProcessing ? "Menyimpan..." : "Simpan Semua"}
-                        </button>
-                    </div>
-                    <div className="max-h-64 overflow-auto border rounded">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-100 sticky top-0">
-                                <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Harga</th></tr>
-                            </thead>
-                            <tbody>
-                                {excelData.map((d,i)=>(
-                                    <tr key={i} className="border-b">
-                                        <td className="p-2">{d['NAMA KITAB']||d['nama kitab']}</td>
-                                        <td className="p-2">{d['MARHALAH']||d['marhalah']}</td>
-                                        <td className="p-2 font-mono">{d['HARGA']||d['harga']}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-             )}
-         </div>
-      )}
-
     </div>
   )
 }

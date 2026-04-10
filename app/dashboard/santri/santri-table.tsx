@@ -2,6 +2,18 @@ import { query, queryOne } from '@/lib/db'
 import Link from 'next/link'
 import { Pencil, ChevronRight, Users, Home, BookOpen } from 'lucide-react'
 import { PaginationControls } from './santri-client'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface Props {
   page: number
@@ -36,10 +48,10 @@ export async function SantriTable({
   }
 
   if (q)            { whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${q}%`, `%${q}%`) }
-  if (asrama)       { whereClauses.push('s.asrama = ?');           params.push(asrama) }
-  if (kamar)        { whereClauses.push('s.kamar = ?');            params.push(kamar) }
-  if (sekolah)      { whereClauses.push('s.sekolah = ?');          params.push(sekolah) }
-  if (kelasSekolah) { whereClauses.push('s.kelas_sekolah LIKE ?'); params.push(`%${kelasSekolah}%`) }
+  if (asrama && asrama !== 'semua')       { whereClauses.push('s.asrama = ?');           params.push(asrama) }
+  if (kamar && kamar !== 'semua')        { whereClauses.push('s.kamar = ?');            params.push(kamar) }
+  if (sekolah && sekolah !== 'semua')      { whereClauses.push('s.sekolah = ?');          params.push(sekolah) }
+  if (kelasSekolah && kelasSekolah !== 'semua') { whereClauses.push('s.kelas_sekolah LIKE ?'); params.push(`%${kelasSekolah}%`) }
 
   const whereStr = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
@@ -60,133 +72,113 @@ export async function SantriTable({
 
   if (santriList.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl py-16 text-center">
-        <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-500 font-medium">Data tidak ditemukan</p>
-        <p className="text-gray-400 text-sm mt-1">Coba ubah kata kunci atau filter</p>
-      </div>
+      <Card className="border-dashed py-16 text-center bg-muted/20">
+        <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+        <p className="text-foreground font-medium">Data tidak ditemukan</p>
+        <p className="text-muted-foreground text-sm mt-1">Coba ubah kata kunci atau hapus filter</p>
+      </Card>
     )
   }
 
   return (
-    <>
+    <div className="space-y-4">
       {/* Counter */}
-      <p className="text-xs text-gray-500 px-1">{count} santri ditemukan</p>
+      <p className="text-xs text-muted-foreground px-1 font-medium">{count} santri ditemukan</p>
 
       {/* Mobile: Card list */}
-      <div className="md:hidden space-y-2">
+      <div className="md:hidden space-y-3">
         {santriList.map((santri: any) => (
-          <div key={santri.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
-                <p className="text-xs text-gray-400 font-mono mt-0.5">{santri.nis}</p>
+          <Card key={santri.id} className="overflow-hidden shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate block">{santri.nama_lengkap}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{santri.nis}</p>
+                </div>
+                <Badge variant={santri.status_global === 'aktif' ? 'default' : santri.status_global === 'lulus' ? 'secondary' : 'destructive'} className="shrink-0 text-[10px] h-5 py-0 px-2 uppercase tracking-wide">
+                  {santri.status_global}
+                </Badge>
               </div>
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
-                : santri.status_global === 'lulus' ? 'bg-blue-100 text-blue-700'
-                : 'bg-red-100 text-red-700'
-              }`}>
-                {santri.status_global?.toUpperCase()}
-              </span>
-            </div>
-            <div className="mt-3 flex gap-3 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <Home className="w-3 h-3 shrink-0" />
-                <span className="truncate">{santri.asrama || '-'} · Kmr {santri.kamar || '-'}</span>
-              </span>
-              <span className="flex items-center gap-1 shrink-0">
-                <BookOpen className="w-3 h-3" />
-                {santri.sekolah || '-'} {santri.kelas_sekolah ? `Kls ${santri.kelas_sekolah}` : ''}
-              </span>
-            </div>
-            <div className="mt-3 flex gap-2">
-              {!userAsrama && (
-                <Link
-                  href={`/dashboard/santri/${santri.id}/edit`}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg transition-colors"
-                >
-                  <Pencil className="w-3 h-3" /> Edit
+              <div className="mt-4 flex gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5 overflow-hidden">
+                  <Home className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                  <span className="truncate">{santri.asrama || '-'} · Kmr {santri.kamar || '-'}</span>
+                </span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <BookOpen className="w-3.5 h-3.5 opacity-70" />
+                  {santri.sekolah || '-'} {santri.kelas_sekolah ? `Kls ${santri.kelas_sekolah}` : ''}
+                </span>
+              </div>
+              <div className="mt-4 flex gap-2 pt-3 border-t border-border/50">
+                {!userAsrama && (
+                  <Link href={`/dashboard/santri/${santri.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1 h-9 rounded-lg border-amber-200/50 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30 dark:hover:text-amber-400")}>
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                  </Link>
+                )}
+                <Link href={`/dashboard/santri/${santri.id}`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "flex-1 h-9 rounded-lg")}>
+                  Detail <ChevronRight className="w-3.5 h-3.5 ml-1.5 -mr-1" />
                 </Link>
-              )}
-              <Link
-                href={`/dashboard/santri/${santri.id}`}
-                className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-lg transition-colors"
-              >
-                Detail <ChevronRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {/* Desktop: Tabel */}
-      <div className="hidden md:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider font-semibold">
-              <tr>
-                <th className="px-5 py-3.5">Nama Lengkap</th>
-                <th className="px-5 py-3.5">NIS</th>
-                <th className="px-5 py-3.5">Asrama / Kamar</th>
-                <th className="px-5 py-3.5">Sekolah</th>
-                <th className="px-5 py-3.5">Status</th>
-                <th className="px-5 py-3.5 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {santriList.map((santri: any) => (
-                <tr key={santri.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-gray-900">{santri.nama_lengkap}</td>
-                  <td className="px-5 py-3.5 text-gray-500 font-mono text-xs">{santri.nis}</td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-gray-800 font-medium text-xs">{santri.asrama || '-'}</p>
-                    <p className="text-gray-400 text-xs">Kamar {santri.kamar || '-'}</p>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-blue-700 font-medium text-xs">{santri.sekolah || '-'}</p>
-                    <p className="text-gray-400 text-xs">{santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}</p>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                      santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
-                      : santri.status_global === 'lulus' ? 'bg-blue-100 text-blue-700'
-                      : 'bg-red-100 text-red-700'
-                    }`}>
-                      {santri.status_global?.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {!userAsrama && (
-                        <Link
-                          href={`/dashboard/santri/${santri.id}/edit`}
-                          className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" /> Edit
-                        </Link>
-                      )}
-                      <Link
-                        href={`/dashboard/santri/${santri.id}`}
-                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"
-                      >
-                        Detail <ChevronRight className="w-3 h-3" />
+      <Card className="hidden md:block shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="py-4">Nama Lengkap</TableHead>
+              <TableHead className="py-4">NIS</TableHead>
+              <TableHead className="py-4">Asrama & Kamar</TableHead>
+              <TableHead className="py-4">Sekolah</TableHead>
+              <TableHead className="py-4 text-center">Status</TableHead>
+              <TableHead className="py-4 text-right">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {santriList.map((santri: any) => (
+              <TableRow key={santri.id} className="group">
+                <TableCell className="font-medium">{santri.nama_lengkap}</TableCell>
+                <TableCell className="text-muted-foreground font-mono text-xs">{santri.nis}</TableCell>
+                <TableCell>
+                  <p className="font-medium text-xs">{santri.asrama || '-'}</p>
+                  <p className="text-muted-foreground text-[11px] mt-0.5">Kamar {santri.kamar || '-'}</p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-indigo-600 dark:text-indigo-400 font-medium text-xs">{santri.sekolah || '-'}</p>
+                  <p className="text-muted-foreground text-[11px] mt-0.5">{santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}</p>
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge variant={santri.status_global === 'aktif' ? 'default' : santri.status_global === 'lulus' ? 'secondary' : 'destructive'} className="text-[10px] font-semibold uppercase tracking-wider">
+                    {santri.status_global}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                    {!userAsrama && (
+                      <Link href={`/dashboard/santri/${santri.id}/edit`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 px-2.5 text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors")}>
+                        <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                       </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    )}
+                    <Link href={`/dashboard/santri/${santri.id}`} className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-8 px-3 transition-colors shadow-none")}>
+                      Detail <ChevronRight className="w-3 h-3 ml-1" />
+                    </Link>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Pagination */}
       {count > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
+        <Card className="px-4 py-2 bg-background border-border shadow-sm">
           <PaginationControls total={count} limit={limit} page={page} />
-        </div>
+        </Card>
       )}
-    </>
+    </div>
   )
 }

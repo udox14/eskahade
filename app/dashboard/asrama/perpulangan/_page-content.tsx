@@ -10,45 +10,53 @@ import {
 import {
   LogOut, Home, ChevronLeft, ChevronRight, Loader2,
   Bus, Car, Users, CheckCircle2, AlertCircle, CalendarRange,
-  RefreshCw, PenLine,
+  RefreshCw, PenLine, Plane, ArrowLeft, ArrowRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 
 const ASRAMA_LIST = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 type Tab = 'pulang' | 'datang'
 
-// ─── Badge status pulang ──────────────────────────────────────────────────────
+// ─── Badge Components ─────────────────────────────────────────────────────────
 function BadgeStatusPulang({ status }: { status: string }) {
   if (status === 'PULANG')
-    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">PULANG</span>
-  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">BELUM</span>
+    return <Badge className="text-[10px] bg-amber-500/10 text-amber-700 border border-amber-300/50 hover:bg-amber-500/20 shadow-none font-black">PULANG</Badge>
+  return <Badge variant="outline" className="text-[10px] font-black text-muted-foreground shadow-none">BELUM</Badge>
 }
 
 function BadgeStatusDatang({ status }: { status: string }) {
   if (status === 'SUDAH')
-    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">SUDAH</span>
+    return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-700 border border-emerald-300/50 hover:bg-emerald-500/20 shadow-none font-black">SUDAH</Badge>
   if (status === 'TELAT')
-    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">TELAT</span>
+    return <Badge variant="destructive" className="text-[10px] font-black shadow-none">TELAT</Badge>
   if (status === 'VONIS')
-    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">DIVONIS</span>
-  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">BELUM</span>
+    return <Badge className="text-[10px] bg-slate-500/10 text-slate-600 border border-slate-300/50 hover:bg-slate-500/20 shadow-none font-black">DIVONIS</Badge>
+  return <Badge className="text-[10px] bg-amber-500/10 text-amber-700 border border-amber-300/50 hover:bg-amber-500/20 shadow-none font-black">BELUM</Badge>
 }
 
 function BadgeJenis({ jenis, onClick }: { jenis: string | null; onClick: () => void }) {
   if (jenis === 'ROMBONGAN')
     return (
-      <button onClick={onClick} className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200 active:scale-95 transition-transform">
+      <button onClick={onClick} className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 border border-teal-300/60 active:scale-95 transition-transform hover:bg-teal-500/20">
         <Bus className="w-3 h-3" /> ROMBONGAN
       </button>
     )
   if (jenis === 'DIJEMPUT')
     return (
-      <button onClick={onClick} className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 active:scale-95 transition-transform">
+      <button onClick={onClick} className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 border border-purple-300/60 active:scale-95 transition-transform hover:bg-purple-500/20">
         <Car className="w-3 h-3" /> DIJEMPUT
       </button>
     )
   return (
-    <button onClick={onClick} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 active:scale-95 transition-transform">
+    <button onClick={onClick} className="text-[10px] font-black px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted">
       BELUM DIATUR
     </button>
   )
@@ -82,66 +90,71 @@ function RowPulang({
   }
 
   return (
-    <div className={`p-3.5 border-b border-slate-100 last:border-b-0 transition-colors ${sudahPulang ? 'bg-amber-50/40' : 'bg-white'}`}>
+    <div className={cn(
+      "p-3.5 border-b border-border/60 last:border-b-0 transition-colors",
+      sudahPulang ? "bg-amber-500/5 dark:bg-amber-900/10" : "bg-card"
+    )}>
       <div className="flex items-start gap-3">
         {/* Info santri */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{santri.nama_lengkap}</p>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="font-bold text-foreground text-sm leading-tight truncate">{santri.nama_lengkap}</p>
             <BadgeStatusPulang status={santri.status_pulang} />
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">{santri.nis} · Kamar {santri.kamar}</p>
+          <p className="text-xs text-muted-foreground">NIS {santri.nis} · Kamar {santri.kamar}</p>
 
-          {/* Jenis + keterangan */}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <BadgeJenis jenis={santri.jenis_pulang} onClick={handleToggleJenis} />
             {sudahPulang && santri.tgl_pulang && (
-              <span className="text-[10px] text-slate-400">
-                {new Date(santri.tgl_pulang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+              <span className="text-[10px] font-bold text-muted-foreground">
+                {new Date(santri.tgl_pulang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
               </span>
             )}
           </div>
 
-          {/* Keterangan */}
+          {/* Keterangan editor */}
           {editKet ? (
-            <input
+            <Input
               ref={inputRef}
               value={ket}
               onChange={e => setKet(e.target.value)}
               onBlur={handleKetBlur}
               placeholder="Keterangan (opsional)..."
-              className="mt-1.5 w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="mt-2 h-8 text-xs focus-visible:ring-amber-500 shadow-none"
               autoFocus
             />
           ) : (
             <button
               onClick={() => setEditKet(true)}
-              className="mt-1.5 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <PenLine className="w-3 h-3" />
-              {ket ? <span className="text-slate-600">{ket}</span> : <span>Tambah keterangan...</span>}
+              {ket ? <span className="text-foreground font-medium">{ket}</span> : <span className="italic">Tambah keterangan...</span>}
             </button>
           )}
         </div>
 
         {/* Tombol aksi */}
-        <div className="shrink-0">
+        <div className="shrink-0 mt-1">
           {busy ? (
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           ) : sudahPulang ? (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onBatal(santri.log_id)}
-              className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-200 active:scale-95 transition-all"
+              className="text-xs font-bold h-8 shadow-none"
             >
               Batal
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              size="sm"
               onClick={() => onKonfirmasi(santri.log_id, ket)}
-              className="px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 active:scale-95 transition-all shadow-sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-black h-8 shadow-sm"
             >
               PULANG
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -162,46 +175,52 @@ function RowDatang({
   const isTelat = santri.status_datang === 'TELAT' || santri.status_datang === 'VONIS'
 
   return (
-    <div className={`p-3.5 border-b border-slate-100 last:border-b-0 transition-colors ${sudahDatang ? 'bg-emerald-50/40' : isTelat ? 'bg-rose-50/40' : 'bg-white'}`}>
+    <div className={cn(
+      "p-3.5 border-b border-border/60 last:border-b-0 transition-colors",
+      sudahDatang ? "bg-emerald-500/5 dark:bg-emerald-900/10" : isTelat ? "bg-destructive/5" : "bg-card"
+    )}>
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-slate-800 text-sm truncate">{santri.nama_lengkap}</p>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="font-bold text-foreground text-sm truncate">{santri.nama_lengkap}</p>
             <BadgeStatusDatang status={santri.status_datang} />
           </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <p className="text-xs text-slate-400">{santri.nis}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground">{santri.nis}</p>
             <BadgeJenis jenis={santri.jenis_pulang} onClick={() => {}} />
           </div>
           {santri.keterangan && (
-            <p className="text-xs text-slate-500 mt-1 italic">"{santri.keterangan}"</p>
+            <p className="text-xs text-muted-foreground mt-1 italic">"{santri.keterangan}"</p>
           )}
           {sudahDatang && santri.tgl_datang && (
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              Datang: {new Date(santri.tgl_datang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold">
+              Datang: {new Date(santri.tgl_datang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
             </p>
           )}
         </div>
 
         <div className="shrink-0">
           {busy ? (
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           ) : isTelat ? (
-            <span className="px-3 py-1.5 bg-rose-100 text-rose-600 rounded-xl text-xs font-bold border border-rose-200">Telat</span>
+            <Badge variant="destructive" className="text-xs font-black">Telat</Badge>
           ) : sudahDatang ? (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onBatal(santri.log_id)}
-              className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-200 active:scale-95 transition-all"
+              className="text-xs font-bold h-8 shadow-none"
             >
               Batal
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              size="sm"
               onClick={() => onKonfirmasi(santri.log_id)}
-              className="px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 active:scale-95 transition-all shadow-sm"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black h-8 shadow-sm"
             >
               SUDAH
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -222,7 +241,6 @@ export default function PerpulanganPage() {
   const [loadingKamars, setLoadingKamars] = useState(false)
   const [kamarIdx, setKamarIdx] = useState(0)
 
-  // Data santri kamar aktif (lazy + cache per kamar)
   const [santriList, setSantriList] = useState<any[]>([])
   const [loadingKamar, setLoadingKamar] = useState(false)
   const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
@@ -230,7 +248,7 @@ export default function PerpulanganPage() {
   const [tab, setTab] = useState<Tab>('pulang')
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
 
-  // ── Init: session + periode ──
+  // ── Init ──
   useEffect(() => {
     getSessionInfo().then(s => {
       if (!s) return
@@ -246,7 +264,6 @@ export default function PerpulanganPage() {
     })
   }, [])
 
-  // ── Load kamar saat asrama berubah ──
   useEffect(() => {
     if (!asrama) return
     setLoadingKamars(true)
@@ -260,7 +277,6 @@ export default function PerpulanganPage() {
     })
   }, [asrama])
 
-  // ── Lazy load santri kamar aktif ──
   useEffect(() => {
     if (!kamars.length || !periode?.id) return
     const kamar = kamars[kamarIdx]
@@ -283,7 +299,6 @@ export default function PerpulanganPage() {
 
   const activeKamar = kamars[kamarIdx] ?? ''
 
-  // ── Helper: update santri di state + cache ──
   const updateSantriState = useCallback((logId: string, patch: Partial<any>) => {
     const cacheKey = `${asrama}__${activeKamar}__${periode?.id}`
     setSantriList(prev => {
@@ -296,7 +311,6 @@ export default function PerpulanganPage() {
   const setBusy = (logId: string, val: boolean) =>
     setBusyMap(prev => ({ ...prev, [logId]: val }))
 
-  // ── Actions: Perpulangan ──
   const handleKonfirmasiPulang = async (logId: string, ket: string) => {
     setBusy(logId, true)
     const res = await konfirmasiPulang(logId, periode.id, ket)
@@ -331,7 +345,6 @@ export default function PerpulanganPage() {
     const res = await konfirmasiRombonganKamar(periode.id, asrama, activeKamar, 'Rombongan')
     if ('error' in res) { toast.error(res.error); return }
     if (res.count === 0) { toast.info('Tidak ada santri rombongan yang belum pulang'); return }
-    // Update state semua yang rombongan dan BELUM
     setSantriList(prev => {
       const updated = prev.map(s =>
         s.jenis_pulang === 'ROMBONGAN' && s.status_pulang === 'BELUM'
@@ -345,7 +358,6 @@ export default function PerpulanganPage() {
     toast.success(`${res.count} santri rombongan dikonfirmasi pulang`)
   }
 
-  // ── Actions: Kedatangan ──
   const handleKonfirmasiDatang = async (logId: string) => {
     setBusy(logId, true)
     const res = await konfirmasiDatang(logId, periode.id)
@@ -364,20 +376,17 @@ export default function PerpulanganPage() {
     toast.success('Dibatalkan')
   }
 
-  // ── Derived stats ──
   const sudahPulang = santriList.filter(s => s.status_pulang === 'PULANG').length
   const belumPulang = santriList.filter(s => s.status_pulang === 'BELUM').length
   const sudahDatang = santriList.filter(s => s.status_datang === 'SUDAH').length
   const belumDatang = santriList.filter(s => s.status_pulang === 'PULANG' && s.status_datang === 'BELUM').length
-
-  // Untuk tab datang: hanya tampilkan yang sudah PULANG
   const listDatang = santriList.filter(s => s.status_pulang === 'PULANG')
   const adaRombonganBelum = santriList.some(s => s.jenis_pulang === 'ROMBONGAN' && s.status_pulang === 'BELUM')
 
   if (loadingPeriode) {
     return (
-      <div className="flex justify-center items-center py-20 gap-2 text-slate-400">
-        <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
+      <div className="flex justify-center items-center py-32 gap-3 text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" /><span className="text-sm font-medium">Memuat data...</span>
       </div>
     )
   }
@@ -385,152 +394,160 @@ export default function PerpulanganPage() {
   if (!periode) {
     return (
       <div className="max-w-lg mx-auto pt-10 px-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
-          <CalendarRange className="w-10 h-10 text-slate-300 mx-auto" />
-          <p className="font-bold text-slate-700">Belum Ada Periode Aktif</p>
-          <p className="text-sm text-slate-500">Dewan santri atau keamanan belum mengatur periode perpulangan.</p>
-        </div>
+        <Card className="p-8 text-center space-y-3 shadow-sm border-border">
+          <CalendarRange className="w-12 h-12 text-muted-foreground/30 mx-auto" />
+          <p className="font-black text-foreground">Belum Ada Periode Aktif</p>
+          <p className="text-sm font-medium text-muted-foreground max-w-xs mx-auto">Dewan santri atau keamanan belum mengatur periode perpulangan yang aktif.</p>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="max-w-lg mx-auto pb-32 select-none">
+    <div className="max-w-lg mx-auto pb-32 select-none animate-in fade-in slide-in-from-bottom-4">
 
-      {/* ── HEADER ── */}
-      <div className="bg-slate-900 text-white p-5 rounded-b-3xl shadow-xl mb-4 relative overflow-hidden">
-        <div className="relative z-10 space-y-3">
+      {/* ── HEADER HERO ── */}
+      <div className="bg-slate-950 border-b border-slate-800 text-slate-50 px-5 pt-5 pb-6 rounded-b-3xl shadow-2xl shadow-slate-900/30 mb-5 relative overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-400/5 rounded-full blur-3xl pointer-events-none"/>
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500/20 pointer-events-none"/>
+        
+        <div className="relative z-10 space-y-4">
           <div className="flex items-center gap-2">
-            <LogOut className="w-5 h-5 text-amber-400" />
-            <h1 className="font-bold text-lg">Perpulangan & Kedatangan</h1>
-          </div>
-          <div className="bg-white/10 rounded-xl px-3 py-2 text-sm">
-            <p className="font-semibold text-amber-300">{periode.nama_periode}</p>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Pulang: {periode.tgl_mulai_pulang} s/d {periode.tgl_selesai_pulang}
-            </p>
-            <p className="text-xs text-slate-300">
-              Datang: {periode.tgl_mulai_datang} s/d {periode.tgl_selesai_datang}
-            </p>
+            <div className="p-1.5 bg-amber-400/10 rounded-lg">
+              <LogOut className="w-5 h-5 text-amber-400" />
+            </div>
+            <h1 className="font-black text-lg">Perpulangan & Kedatangan</h1>
           </div>
 
-          {/* Pilih asrama (hanya jika bukan pengurus asrama) */}
-          {!asramaBinaan && (
-            <select
-              value={asrama}
-              onChange={e => setAsrama(e.target.value)}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-            >
-              {ASRAMA_LIST.map(a => <option key={a} value={a} className="text-slate-900">{a}</option>)}
-            </select>
-          )}
-          {asramaBinaan && (
-            <div className="flex items-center gap-2 text-sm bg-white/10 rounded-xl px-3 py-2">
-              <Home className="w-4 h-4 text-slate-300" />
-              <span className="font-semibold">{asramaBinaan}</span>
+          <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 space-y-1">
+            <p className="font-black text-amber-300 text-sm">{periode.nama_periode}</p>
+            <p className="text-xs text-slate-400 font-medium">✈️ Pulang: {periode.tgl_mulai_pulang} s/d {periode.tgl_selesai_pulang}</p>
+            <p className="text-xs text-slate-400 font-medium">🏠 Datang: {periode.tgl_mulai_datang} s/d {periode.tgl_selesai_datang}</p>
+          </div>
+
+          {!asramaBinaan ? (
+            <Select value={asrama} onValueChange={(val) => { if (val) setAsrama(val) }}>
+              <SelectTrigger className="w-full bg-white/5 border-white/10 text-white h-11 rounded-2xl font-bold focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ASRAMA_LIST.map(a => <SelectItem key={a} value={a} className="font-bold">{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-2 text-sm bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+              <Home className="w-4 h-4 text-slate-300" /><span className="font-black">{asramaBinaan}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── TAB ── */}
-      <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-2xl mx-4 mb-4">
-        {(['pulang', 'datang'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-              tab === t ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
-            }`}>
-            {t === 'pulang' ? '✈️ Perpulangan' : '🏠 Kedatangan'}
-          </button>
-        ))}
-      </div>
+      {/* ── TABS ── */}
+      <div className="px-4">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
+          <TabsList className="w-full h-12 bg-muted/60 p-1.5 rounded-2xl border border-border">
+            <TabsTrigger value="pulang" className="flex-1 font-black rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+              <span>✈️</span> Perpulangan
+            </TabsTrigger>
+            <TabsTrigger value="datang" className="flex-1 font-black rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+              <span>🏠</span> Kedatangan
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      {/* ── NAVIGASI KAMAR ── */}
-      {loadingKamars ? (
-        <div className="flex justify-center py-4 gap-2 text-slate-400 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" /> Memuat daftar kamar...
-        </div>
-      ) : kamars.length === 0 ? (
-        <p className="text-center text-slate-400 text-sm py-4">Tidak ada kamar ditemukan.</p>
-      ) : (
-        <div className="mx-4 mb-3">
-          <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3">
-            <button
-              onClick={() => setKamarIdx(i => Math.max(0, i - 1))}
-              disabled={kamarIdx === 0}
-              className="p-1.5 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors active:scale-95"
-            >
-              <ChevronLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <div className="text-center">
-              <p className="font-bold text-slate-800">Kamar {activeKamar}</p>
-              <p className="text-xs text-slate-400">{kamarIdx + 1} / {kamars.length}</p>
-            </div>
-            <button
-              onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))}
-              disabled={kamarIdx === kamars.length - 1}
-              className="p-1.5 rounded-xl hover:bg-slate-100 disabled:opacity-30 transition-colors active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5 text-slate-600" />
-            </button>
+        {/* ── NAVIGASI KAMAR ── */}
+        {loadingKamars ? (
+          <div className="flex justify-center py-4 gap-2 text-muted-foreground text-sm font-medium">
+            <Loader2 className="w-4 h-4 animate-spin" /> Memuat daftar kamar...
           </div>
+        ) : kamars.length === 0 ? (
+          <p className="text-center text-muted-foreground text-sm py-4 font-medium">Tidak ada kamar ditemukan.</p>
+        ) : (
+          <div className="mb-4 space-y-3">
+            <Card className="shadow-sm border-border bg-card overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setKamarIdx(i => Math.max(0, i - 1))}
+                    disabled={kamarIdx === 0}
+                    className="h-9 w-9 rounded-xl disabled:opacity-30"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                  <div className="text-center">
+                    <p className="font-black text-foreground">Kamar {activeKamar}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{kamarIdx + 1} / {kamars.length}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))}
+                    disabled={kamarIdx === kamars.length - 1}
+                    className="h-9 w-9 rounded-xl disabled:opacity-30"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Stats kamar */}
-          {!loadingKamar && santriList.length > 0 && (
-            <div className="flex gap-2 mt-2">
-              {tab === 'pulang' ? (
-                <>
-                  <div className="flex-1 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-center">
-                    <p className="text-lg font-bold text-amber-700">{sudahPulang}</p>
-                    <p className="text-[10px] text-amber-500 font-medium">Sudah Pulang</p>
-                  </div>
-                  <div className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-center">
-                    <p className="text-lg font-bold text-slate-600">{belumPulang}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">Belum Pulang</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-center">
-                    <p className="text-lg font-bold text-emerald-700">{sudahDatang}</p>
-                    <p className="text-[10px] text-emerald-500 font-medium">Sudah Datang</p>
-                  </div>
-                  <div className="flex-1 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-center">
-                    <p className="text-lg font-bold text-amber-600">{belumDatang}</p>
-                    <p className="text-[10px] text-amber-500 font-medium">Belum Datang</p>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            {/* Stats kamar */}
+            {!loadingKamar && santriList.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {tab === 'pulang' ? (
+                  <>
+                    <div className="bg-amber-500/10 border border-amber-300/40 rounded-2xl px-3 py-3 text-center">
+                      <p className="text-xl font-black text-amber-700 tabular-nums">{sudahPulang}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mt-0.5">Sudah Pulang</p>
+                    </div>
+                    <div className="bg-muted/40 border border-border/60 rounded-2xl px-3 py-3 text-center">
+                      <p className="text-xl font-black text-foreground tabular-nums">{belumPulang}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-0.5">Belum Pulang</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-emerald-500/10 border border-emerald-300/40 rounded-2xl px-3 py-3 text-center">
+                      <p className="text-xl font-black text-emerald-700 tabular-nums">{sudahDatang}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mt-0.5">Sudah Datang</p>
+                    </div>
+                    <div className="bg-amber-500/10 border border-amber-300/40 rounded-2xl px-3 py-3 text-center">
+                      <p className="text-xl font-black text-amber-700 tabular-nums">{belumDatang}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mt-0.5">Belum Datang</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* ── BULK ROMBONGAN (tab pulang saja) ── */}
-      {tab === 'pulang' && !loadingKamar && adaRombonganBelum && (
-        <div className="mx-4 mb-3">
-          <button
-            onClick={handleKonfirmasiRombongan}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-600 text-white rounded-2xl text-sm font-bold hover:bg-teal-700 active:scale-[0.98] transition-all shadow-sm"
-          >
-            <Bus className="w-4 h-4" /> Konfirmasi Semua Rombongan
-          </button>
-        </div>
-      )}
+        {/* ── BULK ROMBONGAN ── */}
+        {tab === 'pulang' && !loadingKamar && adaRombonganBelum && (
+          <div className="mb-4">
+            <Button
+              onClick={handleKonfirmasiRombongan}
+              className="w-full h-12 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl shadow-sm"
+            >
+              <Bus className="w-4 h-4" /> Konfirmasi Semua Rombongan
+            </Button>
+          </div>
+        )}
 
-      {/* ── DAFTAR SANTRI ── */}
-      <div className="mx-4">
+        {/* ── DAFTAR SANTRI ── */}
         {loadingKamar ? (
-          <div className="bg-white rounded-2xl border border-slate-200 flex justify-center items-center py-10 gap-2 text-slate-400">
+          <Card className="shadow-sm border-border flex justify-center items-center py-12 gap-3 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">Memuat santri...</span>
-          </div>
+            <span className="text-sm font-medium">Memuat santri...</span>
+          </Card>
         ) : santriList.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 text-center py-10 text-slate-400 text-sm">
+          <Card className="shadow-sm border-border py-12 text-center text-muted-foreground text-sm font-medium">
             Tidak ada santri di kamar ini.
-          </div>
+          </Card>
         ) : tab === 'pulang' ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <Card className="shadow-sm border-border overflow-hidden bg-card">
             {santriList.map(s => (
               <RowPulang
                 key={s.id}
@@ -543,13 +560,13 @@ export default function PerpulanganPage() {
                 onKetChange={handleKetChange}
               />
             ))}
-          </div>
+          </Card>
         ) : listDatang.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 text-center py-10 text-slate-400 text-sm">
+          <Card className="shadow-sm border-border py-12 text-center text-muted-foreground text-sm font-medium">
             Belum ada santri yang dikonfirmasi pulang di kamar ini.
-          </div>
+          </Card>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <Card className="shadow-sm border-border overflow-hidden bg-card">
             {listDatang.map(s => (
               <RowDatang
                 key={s.id}
@@ -559,7 +576,7 @@ export default function PerpulanganPage() {
                 onBatal={handleBatalDatang}
               />
             ))}
-          </div>
+          </Card>
         )}
       </div>
     </div>
