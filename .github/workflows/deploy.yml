@@ -32,9 +32,13 @@ jobs:
 
       - name: Prune unused @vercel/og dependencies to fix Cloudflare 3MB Limit
         run: |
-          echo "Removing heavy unused WebAssembly binaries..."
-          rm -f .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/resvg.wasm || true
-          rm -f .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/yoga.wasm || true
+          echo "Removing heavy unused WASM binaries from root node_modules..."
+          rm -rf node_modules/next/dist/compiled/@vercel/og/* || true
+          echo "export const ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
+          echo "module.exports.ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.node.js || true
+          
+          echo "Removing from .open-next node_modules as backup..."
+          rm -rf .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/* || true
           echo "export const ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
           echo "module.exports.ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.node.js || true
 
