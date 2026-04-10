@@ -1,34 +1,63 @@
 'use client'
 
-import React, {
+/**
+ * ConfirmDialogProvider + useConfirm
+ *
+ * Mount provider INI SEKALI di client-layout.tsx, lalu gunakan hook
+ * useConfirm() di semua handler sebagai pengganti window.confirm().
+ *
+ * POLA PEMAKAIAN (ganti semua confirm() lama):
+ *
+ *   // Sebelum:
+ *   const handleHapus = () => {
+ *     if (!confirm('Hapus ini?')) return
+ *     ...
+ *   }
+ *
+ *   // Sesudah:
+ *   const confirm = useConfirm()
+ *   const handleHapus = async () => {
+ *     if (!await confirm('Hapus ini?')) return
+ *     ...
+ *   }
+ *
+ * Tidak perlu import apapun selain useConfirm — dialog tampil otomatis
+ * karena provider sudah terpasang di layout.
+ */
+
+import {
   useEffect, useRef, useState, useCallback,
   createContext, useContext,
 } from 'react'
-import { AlertTriangle, Trash2, Info, CheckCircle } from 'lucide-react'
+import { AlertTriangle, Trash2, Info, CheckCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 export type DialogVariant = 'danger' | 'warning' | 'success' | 'info'
 
 export interface ConfirmOptions {
+  /** Override teks judul (default: diekstrak dari message) */
   title?: string
+  /** Override label tombol konfirmasi */
   confirmLabel?: string
+  /** Override label tombol batal */
   cancelLabel?: string
+  /** Override variant warna/ikon */
   variant?: DialogVariant
 }
 
 type ConfirmFn = (message: string, options?: ConfirmOptions) => Promise<boolean>
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Context
+// ─────────────────────────────────────────────────────────────────────────────
 const ConfirmContext = createContext<ConfirmFn | null>(null)
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-detect variant dari pesan
+// ─────────────────────────────────────────────────────────────────────────────
 function detectVariant(msg: string): DialogVariant {
   const m = msg.toLowerCase()
   if (
@@ -48,6 +77,9 @@ function detectVariant(msg: string): DialogVariant {
   return 'info'
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Parse message → title + body
+// ─────────────────────────────────────────────────────────────────────────────
 function parseMessage(raw: string) {
   const cleaned = raw.replace(/^[⚠️❗✅ℹ️\s]+/, '').trim()
   const lines   = cleaned.split('\n')
@@ -59,38 +91,54 @@ function parseMessage(raw: string) {
   }
 }
 
-const VARIANT_CONFIG: Record<DialogVariant, {
+// ─────────────────────────────────────────────────────────────────────────────
+// Variant config
+// ─────────────────────────────────────────────────────────────────────────────
+const VARIANT: Record<DialogVariant, {
   icon: React.ElementType
-  iconClass: string
-  buttonVariant: 'default' | 'destructive' | 'secondary' | 'outline'
+  iconBg: string
+  iconColor: string
+  bar: string
+  btn: string
   label: string
 }> = {
   danger: {
     icon: Trash2,
-    iconClass: 'text-destructive bg-destructive/10',
-    buttonVariant: 'destructive',
+    iconBg: 'bg-red-100',
+    iconColor: 'text-red-600',
+    bar: 'bg-red-500',
+    btn: 'bg-red-600 hover:bg-red-700 focus:ring-red-500 text-white',
     label: 'Ya, Hapus',
   },
   warning: {
     icon: AlertTriangle,
-    iconClass: 'text-amber-600 bg-amber-100 dark:text-amber-500 dark:bg-amber-500/10',
-    buttonVariant: 'default', // standard button but maybe we can use custom color, we'll stick to default for simplicity
+    iconBg: 'bg-amber-100',
+    iconColor: 'text-amber-600',
+    bar: 'bg-amber-400',
+    btn: 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-400 text-white',
     label: 'Ya, Lanjutkan',
   },
   success: {
     icon: CheckCircle,
-    iconClass: 'text-emerald-600 bg-emerald-100 dark:text-emerald-500 dark:bg-emerald-500/10',
-    buttonVariant: 'default',
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
+    bar: 'bg-emerald-500',
+    btn: 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500 text-white',
     label: 'Ya, Simpan',
   },
   info: {
     icon: Info,
-    iconClass: 'text-blue-600 bg-blue-100 dark:text-blue-500 dark:bg-blue-500/10',
-    buttonVariant: 'default',
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600',
+    bar: 'bg-blue-400',
+    btn: 'bg-slate-800 hover:bg-slate-900 focus:ring-slate-500 text-white',
     label: 'Ya, Lanjutkan',
   },
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider
+// ─────────────────────────────────────────────────────────────────────────────
 interface State {
   open: boolean
   message: string
@@ -107,34 +155,29 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
     return new Promise(resolve => setS({ open: true, message, options, resolve }))
   }, [])
 
+  // Expose ke window untuk dipanggil dari luar React tree (edge case)
   useEffect(() => {
     ;(window as any).__confirmDialog = show
     return () => { delete (window as any).__confirmDialog }
   }, [show])
 
-  // Focus the confirm button automatically when opened
-  useEffect(() => {
-    let focusTimer: NodeJS.Timeout
-    if (s.open) {
-      focusTimer = setTimeout(() => {
-        btnRef.current?.focus()
-      }, 50)
-    }
-    return () => clearTimeout(focusTimer)
-  }, [s.open])
+  // Auto-focus tombol konfirmasi
+  useEffect(() => { if (s.open) setTimeout(() => btnRef.current?.focus(), 80) }, [s.open])
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      s.resolve?.(false)
-      setS(CLOSED)
-    }
-  }
+  // Escape = cancel
+  useEffect(() => {
+    if (!s.open) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') cancel() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [s.open])
 
   const confirm = useCallback(() => { s.resolve?.(true);  setS(CLOSED) }, [s])
   const cancel  = useCallback(() => { s.resolve?.(false); setS(CLOSED) }, [s])
 
+  // Resolve values
   const variant      = s.options.variant ?? detectVariant(s.message)
-  const cfg          = VARIANT_CONFIG[variant]
+  const cfg          = VARIANT[variant]
   const Icon         = cfg.icon
   const { title, body } = parseMessage(s.message)
   const confirmLabel = s.options.confirmLabel ?? cfg.label
@@ -144,58 +187,108 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
   return (
     <ConfirmContext.Provider value={show}>
       {children}
-      <Dialog open={s.open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md p-0 overflow-hidden outline-none">
-          {/* Accent semantic top bar optional, here we just use pure Shadcn design */}
-          <div className="p-5 pb-4">
-            <DialogHeader className="flex flex-row gap-4 items-start sm:text-left space-y-0">
-              <div className={cn(
-                'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                cfg.iconClass
-              )}>
-                <Icon className="w-5 h-5" />
+
+      {s.open && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cdlg-title"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px] animate-in fade-in duration-150"
+            onClick={cancel}
+          />
+
+          {/* Card */}
+          <div className="relative z-10 w-full max-w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ease-out">
+
+            {/* Accent bar */}
+            <div className={cn('h-1 w-full', cfg.bar)} />
+
+            <div className="p-5 pb-4">
+              {/* Icon + close */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className={cn(
+                  'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
+                  cfg.iconBg
+                )}>
+                  <Icon className={cn('w-5 h-5', cfg.iconColor)} />
+                </div>
+                <button
+                  onClick={cancel}
+                  className="p-1.5 -mt-0.5 -mr-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  aria-label="Batal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex-1 space-y-1.5 mt-0.5">
-                <DialogTitle className="leading-snug text-[15px]">
-                  {displayTitle}
-                </DialogTitle>
-                {body && (
-                  <DialogDescription className="text-sm">
-                    {body}
-                  </DialogDescription>
-                )}
-              </div>
-            </DialogHeader>
-          </div>
-          <DialogFooter className="px-5 pb-5">
-            <div className="flex w-full gap-2.5 sm:justify-end">
-              <Button 
-                variant="outline" 
-                onClick={cancel} 
-                className="flex-1 sm:flex-none"
+
+              {/* Teks */}
+              <p
+                id="cdlg-title"
+                className="font-bold text-[15px] leading-snug text-slate-900"
+              >
+                {displayTitle}
+              </p>
+              {body && (
+                <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-line mt-1.5">
+                  {body}
+                </p>
+              )}
+            </div>
+
+            {/* Tombol */}
+            <div className="px-5 pb-5 flex gap-2.5">
+              <button
+                onClick={cancel}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
               >
                 {cancelLabel}
-              </Button>
-              <Button 
+              </button>
+              <button
                 ref={btnRef}
-                variant={cfg.buttonVariant} 
-                className="flex-1 sm:flex-none"
                 onClick={confirm}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-bold transition-all',
+                  'focus:outline-none focus:ring-2 focus:ring-offset-2',
+                  cfg.btn
+                )}
               >
                 {confirmLabel}
-              </Button>
+              </button>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </ConfirmContext.Provider>
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook — gunakan ini di semua komponen
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * useConfirm()
+ *
+ * Mengembalikan fungsi async confirm(message, options?).
+ * Gunakan sebagai pengganti window.confirm() di semua event handler.
+ *
+ * @example
+ * const confirm = useConfirm()
+ *
+ * const handleHapus = async () => {
+ *   if (!await confirm('Hapus data ini?')) return
+ *   await deleteData(id)
+ * }
+ */
 export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext)
+
   return useCallback((message: string, options: ConfirmOptions = {}): Promise<boolean> => {
     if (ctx) return ctx(message, options)
+    // Fallback jika hook dipanggil di luar provider
     if (typeof window !== 'undefined' && (window as any).__confirmDialog) {
       return (window as any).__confirmDialog(message, options)
     }

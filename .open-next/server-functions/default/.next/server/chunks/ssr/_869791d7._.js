@@ -1,0 +1,31 @@
+module.exports=[37936,(a,b,c)=>{"use strict";Object.defineProperty(c,"__esModule",{value:!0}),Object.defineProperty(c,"registerServerReference",{enumerable:!0,get:function(){return d.registerServerReference}});let d=a.r(11857)},13095,(a,b,c)=>{"use strict";function d(a){for(let b=0;b<a.length;b++){let c=a[b];if("function"!=typeof c)throw Object.defineProperty(Error(`A "use server" file can only export async functions, found ${typeof c}.
+Read more: https://nextjs.org/docs/messages/invalid-use-server-value`),"__NEXT_ERROR_CODE",{value:"E352",enumerable:!1,configurable:!0})}}Object.defineProperty(c,"__esModule",{value:!0}),Object.defineProperty(c,"ensureServerEntryExports",{enumerable:!0,get:function(){return d}})},24895,a=>{"use strict";var b=a.i(37936),c=a.i(53058);a.i(70396);var d=a.i(73727),e=a.i(18558);async function f(){await (0,c.clearSession)(),(0,e.revalidatePath)("/","layout"),(0,d.redirect)("/login")}(0,a.i(13095).ensureServerEntryExports)([f]),(0,b.registerServerReference)(f,"005289e5d664eb30fe22168a654a1891fa9b9f59a3",null),a.s(["signOut",()=>f])},9343,a=>{"use strict";var b=a.i(18558),c=a.i(12259);let d=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT id, nama, urutan FROM marhalah ORDER BY urutan"),["marhalah-list"],{tags:["marhalah"],revalidate:86400}),e=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama"),["mapel-list"],{tags:["mapel"],revalidate:86400}),f=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT id, nama FROM mapel ORDER BY nama"),["mapel-all"],{tags:["mapel"],revalidate:86400}),g=(0,b.unstable_cache)(async()=>(0,c.queryOne)("SELECT * FROM tahun_ajaran WHERE is_active = 1 LIMIT 1"),["tahun-ajaran-aktif"],{tags:["tahun-ajaran"],revalidate:3600}),h=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT * FROM tahun_ajaran ORDER BY id DESC"),["tahun-ajaran-list"],{tags:["tahun-ajaran"],revalidate:3600}),i=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT id, nama_pelanggaran, kategori, poin FROM master_pelanggaran ORDER BY kategori DESC, nama_pelanggaran"),["master-pelanggaran"],{tags:["master-pelanggaran"],revalidate:3600}),j=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT * FROM biaya_settings ORDER BY tahun_angkatan DESC"),["biaya-settings"],{tags:["biaya-settings"],revalidate:86400}),k=(0,b.unstable_cache)(async()=>(0,c.query)("SELECT id, nama_lengkap, gelar FROM data_guru ORDER BY nama_lengkap"),["data-guru"],{tags:["data-guru"],revalidate:3600});a.s(["getCachedBiayaSettings",0,j,"getCachedDataGuru",0,k,"getCachedMapelAll",0,f,"getCachedMapelList",0,e,"getCachedMarhalahList",0,d,"getCachedMasterPelanggaran",0,i,"getCachedTahunAjaranAktif",0,g,"getCachedTahunAjaranList",0,h])},36533,a=>{"use strict";var b=a.i(24895),c=a.i(37936),d=a.i(12259),e=a.i(9343),f=a.i(53058),g=a.i(18558);async function h(){let a=await (0,f.getSession)();if(!a)return[];let b=`
+    SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+  `,c=[];return"wali_kelas"===a.role&&(b+=" WHERE k.wali_kelas_id = ?",c.push(a.id)),(await (0,d.query)(b,c)).sort((a,b)=>a.nama_kelas.localeCompare(b.nama_kelas,void 0,{numeric:!0,sensitivity:"base"}))}async function i(a,b){let c=await (0,e.getCachedMapelList)();if(!c.length)return{mapel:[],siswa:[]};let f=await (0,d.query)(`
+    SELECT rp.id,
+           s.id AS santri_id, s.nama_lengkap, s.nis,
+           r.jumlah_nilai, r.rata_rata, r.ranking_kelas
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+    LIMIT 1000
+  `,[b,a]);if(!f.length)return{mapel:c,siswa:[]};let g=f.map(a=>a.id),h=g.map(()=>"?").join(","),i=await (0,d.query)(`
+    SELECT riwayat_pendidikan_id, mapel_id, nilai
+    FROM nilai_akademik
+    WHERE riwayat_pendidikan_id IN (${h}) AND semester = ?
+    LIMIT 5000
+  `,[...g,b]),j=f.map(a=>{let b={};return c.forEach(c=>{let d=i.find(b=>b.riwayat_pendidikan_id===a.id&&b.mapel_id===c.id);b[c.id]=d?d.nilai:0}),{id:a.id,riwayat_id:a.id,nis:a.nis||"-",nama:a.nama_lengkap||"Tanpa Nama",nilai:b,jumlah:a.jumlah_nilai||0,rata:a.rata_rata||0,rank:a.ranking_kelas||"-"}});return j.sort((a,b)=>a.nama.localeCompare(b.nama)),{mapel:c,siswa:j}}async function j(a,b){let{mapel:c,siswa:e}=await i(a,b);if(!e.length)return{error:"Tidak ada siswa"};let f=c.length||10,h=e.map(a=>{let c=0;Object.values(a.nilai).forEach(a=>{c+=Number(a)||0});let d=Number((c/f).toFixed(2));return{riwayat_pendidikan_id:a.riwayat_id,semester:b,jumlah_nilai:c,rata_rata:d}});h.sort((a,b)=>b.rata_rata-a.rata_rata);for(let a=0;a<h.length;a++){var j;let b=h[a],c=(j=b.rata_rata)>=86?"Mumtaz":j>=76?"Jayyid Jiddan":j>=66?"Jayyid":j>=56?"Maqbul":"Dhoif";await (0,d.execute)(`
+      INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
+        jumlah_nilai = excluded.jumlah_nilai,
+        rata_rata = excluded.rata_rata,
+        ranking_kelas = excluded.ranking_kelas,
+        predikat = excluded.predikat
+    `,[(0,d.generateId)(),b.riwayat_pendidikan_id,b.semester,b.jumlah_nilai,b.rata_rata,a+1,c])}return(0,g.revalidatePath)("/dashboard/akademik/leger"),{success:!0}}(0,a.i(13095).ensureServerEntryExports)([h,i,j]),(0,c.registerServerReference)(h,"00f3a670e612e6aea09c3f47940d9f5583b1c7ff11",null),(0,c.registerServerReference)(i,"604a48781f1aa4924b35c2a8ecf2aa6e2189f4b280",null),(0,c.registerServerReference)(j,"60eb2113f3d2c50c4534217b56f12560db65d7e011",null),a.s([],66266),a.i(66266),a.s(["005289e5d664eb30fe22168a654a1891fa9b9f59a3",()=>b.signOut,"00f3a670e612e6aea09c3f47940d9f5583b1c7ff11",()=>h,"604a48781f1aa4924b35c2a8ecf2aa6e2189f4b280",()=>i,"60eb2113f3d2c50c4534217b56f12560db65d7e011",()=>j],36533)}];
+
+//# sourceMappingURL=_869791d7._.js.map

@@ -1,14 +1,6 @@
 'use client'
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
-import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 0] // 0 = semua
 
@@ -47,103 +39,83 @@ export default function Pagination({
   const end = pageSize === 0 ? total : Math.min(currentPage * pageSize, total)
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t bg-card text-card-foreground rounded-b-xl text-sm">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t bg-gray-50 rounded-b-xl text-sm">
       {/* Info */}
-      <div className="text-muted-foreground text-xs">
+      <div className="text-gray-500 text-xs">
         {total === 0 ? 'Tidak ada data' : `Menampilkan ${start}–${end} dari ${total} data`}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Page size selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">Tampilkan</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(val) => {
-              onPageSizeChange(Number(val))
-              onPageChange(1)
-            }}
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500 text-xs">Tampilkan</span>
+          <select
+            value={pageSize}
+            onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }}
+            className="border rounded-md px-2 py-1 text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <SelectTrigger className="h-8 w-[80px] text-xs">
-              <SelectValue placeholder={getPageSizeLabel(pageSize)} />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((s) => (
-                <SelectItem key={s} value={String(s)} className="text-xs">
-                  {getPageSizeLabel(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {PAGE_SIZE_OPTIONS.map(s => (
+              <option key={s} value={s}>{getPageSizeLabel(s)}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation — sembunyikan kalau pageSize = 0 (semua) */}
         {pageSize !== 0 && totalPages > 1 && (
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => onPageChange(1)}
-              disabled={currentPage === 1}
-              title="Halaman pertama"
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              title="Sebelumnya"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
+            <NavBtn onClick={() => onPageChange(1)} disabled={currentPage === 1} title="Halaman pertama">
+              <ChevronsLeft className="w-3.5 h-3.5" />
+            </NavBtn>
+            <NavBtn onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} title="Sebelumnya">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </NavBtn>
 
             {/* Page numbers */}
-            <div className="flex items-center gap-1 mx-1">
+            <div className="flex items-center gap-1">
               {getPageRange(currentPage, totalPages).map((p, i) =>
                 p === '...' ? (
-                  <span key={`dots-${i}`} className="px-1 text-muted-foreground text-xs">…</span>
+                  <span key={`dots-${i}`} className="px-1 text-gray-400">…</span>
                 ) : (
-                  <Button
+                  <button
                     key={p}
-                    variant={p === currentPage ? "default" : "outline"}
-                    size="icon"
-                    className={`w-8 h-8 text-xs ${p === currentPage ? "" : "text-muted-foreground"}`}
                     onClick={() => onPageChange(Number(p))}
+                    className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                      p === currentPage
+                        ? 'bg-blue-600 text-white'
+                        : 'hover:bg-gray-200 text-gray-600'
+                    }`}
                   >
                     {p}
-                  </Button>
+                  </button>
                 )
               )}
             </div>
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              title="Berikutnya"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => onPageChange(totalPages)}
-              disabled={currentPage === totalPages}
-              title="Halaman terakhir"
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </Button>
+            <NavBtn onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} title="Berikutnya">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </NavBtn>
+            <NavBtn onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} title="Halaman terakhir">
+              <ChevronsRight className="w-3.5 h-3.5" />
+            </NavBtn>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+function NavBtn({ onClick, disabled, title, children }: {
+  onClick: () => void; disabled: boolean; title: string; children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="w-7 h-7 flex items-center justify-center rounded border bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+    >
+      {children}
+    </button>
   )
 }
 

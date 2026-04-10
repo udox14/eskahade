@@ -8,23 +8,12 @@ import {
 import {
   UserX, UserCheck, Search, Filter, ChevronLeft, ChevronRight,
   RefreshCw, Printer, X, AlertTriangle, CheckCircle, Loader2,
-  FileText, CalendarDays, LogOut, RotateCcw, Users, Building2, Trash2, ShieldAlert
+  FileText, CalendarDays, LogOut, RotateCcw, Users, Building2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
-
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Textarea } from '@/components/ui/textarea'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string | null) {
@@ -43,9 +32,8 @@ type SantriKeluar = SantriAktif & {
 }
 
 // ── Modal Tetapkan Keluar ─────────────────────────────────────────────────────
-function ModalKeluar({ santri, open, onClose, onSuccess }: {
+function ModalKeluar({ santri, onClose, onSuccess }: {
   santri: SantriAktif
-  open: boolean
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -69,103 +57,98 @@ function ModalKeluar({ santri, open, onClose, onSuccess }: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-[2rem]">
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="p-6 pb-0">
-             <div className="flex items-center gap-4">
-               <div className="p-3 bg-rose-500/10 rounded-2xl shrink-0">
-                 <LogOut className="w-5 h-5 text-rose-600" />
-               </div>
-               <div>
-                  <DialogTitle className="text-xl font-black text-foreground">Tetapkan Keluar</DialogTitle>
-                  <DialogDescription className="text-xs font-medium text-muted-foreground">{santri.nama_lengkap}</DialogDescription>
-               </div>
-             </div>
-          </DialogHeader>
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-900">Tetapkan Keluar</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{santri.nama_lengkap}</p>
+            </div>
+            <button type="button" onClick={onClose}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-          <div className="p-6 space-y-5">
+          {/* Body */}
+          <div className="p-5 space-y-4">
             {/* Info santri */}
-            <div className="bg-muted/50 rounded-2xl p-4 border border-border/50 space-y-1">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Atribut Santri</p>
-              <p className="font-black text-foreground text-sm uppercase">{santri.nama_lengkap}</p>
-              <p className="text-xs font-mono text-muted-foreground">{santri.nis} • {santri.asrama || '—'} / {santri.kamar || '—'}</p>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
+              <p className="text-slate-500 text-xs font-medium mb-1">Data Santri</p>
+              <p className="font-semibold text-slate-800">{santri.nama_lengkap}</p>
+              <p className="text-slate-500 text-xs">{santri.nis} · {santri.asrama || '—'} / {santri.kamar || '—'}</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-5">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] block ml-1">Tanggal Keluar</label>
-                <Input 
-                  type="date" 
-                  value={tanggal} 
-                  onChange={e => setTanggal(e.target.value)}
-                  max={new Date().toISOString().slice(0, 10)}
-                  className="h-11 border-border bg-background rounded-2xl font-bold" 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] block ml-1">Alasan Keluar</label>
-                <Textarea 
-                  value={alasan} 
-                  onChange={e => setAlasan(e.target.value)}
-                  placeholder="Pindah sekolah, urusan keluarga, dsb..."
-                  className="min-h-[100px] border-border bg-background rounded-2xl font-medium resize-none text-sm" 
-                  required 
-                />
-              </div>
+            {/* Tanggal keluar */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Tanggal Keluar
+              </label>
+              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
 
-            <label className="flex items-center gap-4 p-4 bg-muted/30 border border-border rounded-2xl cursor-pointer hover:bg-muted transition-colors group">
-              <input 
-                type="checkbox" 
-                checked={buatSurat} 
-                onChange={e => setBuatSurat(e.target.checked)}
-                className="w-5 h-5 rounded-lg accent-rose-600" 
-              />
-              <div className="flex-1">
-                <p className="text-sm font-black text-foreground uppercase tracking-tight">Catat ke Layanan Surat</p>
-                <p className="text-[10px] font-medium text-muted-foreground">Otomatis membuat record Surat Berhenti di modul Surat.</p>
+            {/* Alasan */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Alasan Keluar <span className="text-rose-500">*</span>
+              </label>
+              <textarea value={alasan} onChange={e => setAlasan(e.target.value)}
+                placeholder="Contoh: Pindah ke pesantren lain, urusan keluarga, dsb..."
+                rows={3} required
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none" />
+            </div>
+
+            {/* Opsi buat surat */}
+            <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
+                className="w-4 h-4 rounded accent-rose-600" />
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
+                <p className="text-xs text-slate-400">Otomatis muncul di Layanan Surat sebagai Surat Berhenti</p>
               </div>
             </label>
 
-            <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl flex gap-3 text-amber-700 dark:text-amber-400">
-               <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-               <p className="text-[11px] font-medium leading-relaxed">
-                 Aksi ini akan menonaktifkan akun santri dari seluruh fitur operasional. Data tidak dihapus dan dapat diaktifkan kembali.
-               </p>
+            {/* Warning */}
+            <div className="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>Santri akan hilang dari semua fitur absensi, SPP, uang jajan, dll. Bisa dikembalikan aktif kapan saja.</p>
             </div>
           </div>
 
-          <DialogFooter className="p-6 bg-muted/20 border-t border-border/50 gap-3">
-            <Button variant="ghost" onClick={onClose} type="button" className="flex-1 h-12 rounded-2xl font-black text-muted-foreground uppercase tracking-widest">Batal</Button>
-            <Button 
-                type="submit" 
-                disabled={saving}
-                className="flex-1 h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black gap-2 shadow-xl shadow-rose-500/20 transition-all active:scale-[0.98]"
-            >
+          {/* Footer */}
+          <div className="p-5 pt-0 flex gap-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Batal
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-              KONFIRMASI
-            </Button>
-          </DialogFooter>
+              {saving ? 'Menyimpan...' : 'Tetapkan Keluar'}
+            </button>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
 
 // ── Modal Cetak Surat ─────────────────────────────────────────────────────────
-function ModalSurat({ santriId, open, onClose }: { santriId: string; open: boolean; onClose: () => void }) {
+function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (open) {
-      getDataSuratBerhenti(santriId).then(d => { setData(d); setLoading(false) })
-    }
-  }, [santriId, open])
+    getDataSuratBerhenti(santriId).then(d => { setData(d); setLoading(false) })
+  }, [santriId])
 
   const handleCetak = async () => {
+    // Catat ke log surat dulu
     if (data) {
       await catatSuratBerhenti(santriId, `Keluar per ${data.tanggal_keluar || '—'}. ${data.alasan_keluar || ''}`)
     }
@@ -177,143 +160,128 @@ function ModalSurat({ santriId, open, onClose }: { santriId: string; open: boole
   const tahunIni = new Date().getFullYear()
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl rounded-[2.5rem] bg-slate-900 overflow-y-auto print:bg-white print:max-h-none print:shadow-none print:rounded-none">
-         {/* Toolbar */}
-         <div className="sticky top-0 z-50 p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white print:hidden">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/20 rounded-xl">
-                <Printer className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                 <h3 className="text-sm font-black uppercase tracking-widest italic">Preview Surat Pengunduran Diri</h3>
-                 <p className="text-[10px] font-medium text-slate-400">{data?.nama_lengkap || 'Memuat...'}</p>
-              </div>
+    <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-start justify-center p-4 overflow-y-auto backdrop-blur-sm print:bg-transparent print:p-0 print:block">
+      <div className="w-full max-w-3xl">
+        {/* Toolbar cetak */}
+        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 flex items-center justify-between print:hidden">
+          <div>
+            <p className="font-bold text-slate-800">Preview Surat Pengunduran Diri</p>
+            <p className="text-sm text-slate-500">{data?.nama_lengkap || '—'}</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleCetak} disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors disabled:opacity-50">
+              <Printer className="w-4 h-4" /> Cetak
+            </button>
+            <button onClick={onClose}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Preview surat */}
+        {loading ? (
+          <div className="bg-white rounded-2xl p-20 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
+          </div>
+        ) : !data ? (
+          <div className="bg-white rounded-2xl p-16 text-center text-slate-400">Data tidak ditemukan</div>
+        ) : (
+          <div ref={printRef}
+            className="w-full bg-white shadow-xl print:shadow-none"
+            style={{ minHeight: '297mm', fontFamily: 'serif', padding: '2.5cm 2cm', fontSize: '14px', lineHeight: '1.8' }}>
+
+            {/* Kop */}
+            <div style={{ marginBottom: '12px' }}>
+              <img src="/kop-pesantren.png" alt="Kop" style={{ width: '100%', maxHeight: '150px', objectFit: 'contain' }} />
             </div>
-            <div className="flex gap-2">
-               <Button onClick={handleCetak} disabled={loading} className="bg-white hover:bg-slate-100 text-slate-900 font-black h-10 px-6 rounded-xl gap-2 transition-all active:scale-95 shadow-lg shadow-white/5">
-                  <Printer className="w-4 h-4" /> CETAK
-               </Button>
-               <Button variant="ghost" onClick={onClose} className="h-10 w-10 p-0 rounded-xl hover:bg-slate-800 text-slate-400">
-                  <X className="w-5 h-5" />
-               </Button>
+            <hr style={{ borderTop: '3px solid black', marginBottom: '16px' }} />
+
+            {/* Judul */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>
+                SURAT PENGUNDURAN DIRI
+              </h2>
+              <p style={{ margin: '4px 0 0' }}>Nomor : ...../PP-SKH/{tahunIni}</p>
             </div>
-         </div>
 
-         {/* Backdrop preview */}
-         <div className="p-8 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-            {loading ? (
-              <div className="h-[297mm] w-full max-w-[210mm] bg-white rounded-lg flex flex-col items-center justify-center gap-4 shadow-2xl">
-                <Loader2 className="w-10 h-10 animate-spin text-slate-300" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Menyiapkan Dokumen...</p>
-              </div>
-            ) : !data ? (
-              <div className="h-[297mm] w-full max-w-[210mm] bg-white rounded-lg flex items-center justify-center text-slate-400 font-bold italic">Data tidak ditemukan</div>
-            ) : (
-                <div id="print-area" className="w-full max-w-[210mm] bg-white shadow-2xl print:shadow-none p-[2.5cm_1.5cm] md:p-[2.5cm_2cm]" 
-                     style={{ minHeight: '297mm', fontFamily: "'Times New Roman', serif", color: 'black', fontSize: '14pt', lineHeight: '1.6' }}>
-                  
-                  {/* Kop */}
-                  <div className="mb-4">
-                    <img src="/kop-pesantren.png" alt="Kop" className="w-full h-auto max-h-[160px] object-contain" />
-                    <div className="h-[3px] bg-black mt-3 mb-1" />
-                    <div className="h-[1px] bg-black" />
-                  </div>
+            <p style={{ marginBottom: '8px' }}>Yang bertanda tangan di bawah ini :</p>
+            <table style={{ width: '100%', marginBottom: '12px', marginLeft: '16px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '160px', fontWeight: 'bold', verticalAlign: 'top' }}>Nama Wali Santri</td>
+                  <td style={{ verticalAlign: 'top' }}>: {data.nama_ayah || '.................................................................'} (Ayah/Wali)</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 'bold', verticalAlign: 'top' }}>Alamat</td>
+                  <td style={{ verticalAlign: 'top' }}>: {data.alamat || '.................................................................'}</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 'bold', verticalAlign: 'top' }}>Nomor WA</td>
+                  <td style={{ verticalAlign: 'top' }}>: .................................................................</td>
+                </tr>
+              </tbody>
+            </table>
 
-                  {/* Judul */}
-                  <div className="text-center mb-10">
-                    <h2 className="text-xl font-bold underline mb-1">SURAT PENGUNDURAN DIRI</h2>
-                    <p className="text-sm">Nomor : ...../PP-SKH/{tahunIni}</p>
-                  </div>
+            <p style={{ marginBottom: '8px' }}>Selaku wali santri dari :</p>
+            <table style={{ width: '100%', marginBottom: '16px', marginLeft: '16px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '160px', fontWeight: 'bold', verticalAlign: 'top' }}>Nama Santri</td>
+                  <td style={{ verticalAlign: 'top' }}>: {data.nama_lengkap}</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 'bold', verticalAlign: 'top' }}>Asrama / Kamar</td>
+                  <td style={{ verticalAlign: 'top' }}>: {data.asrama || '—'} / {data.kamar || '—'}</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 'bold', verticalAlign: 'top' }}>Tanggal Keluar</td>
+                  <td style={{ verticalAlign: 'top' }}>: {fmtTgl(data.tanggal_keluar)}</td>
+                </tr>
+              </tbody>
+            </table>
 
-                  <p className="mb-4">Yang bertanda tangan di bawah ini :</p>
-                  <table className="w-full mb-6 ml-4 border-collapse">
-                    <tbody>
-                      <tr>
-                        <td className="w-48 font-bold align-top">Nama Wali Santri</td>
-                        <td className="align-top">: {data.nama_ayah || '.................................................................'}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold align-top">Alamat Domisili</td>
-                        <td className="align-top">: {data.alamat || '.................................................................'}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold align-top">Nomor WhatsApp</td>
-                        <td className="align-top">: .................................................................</td>
-                      </tr>
-                    </tbody>
-                  </table>
+            <p style={{ marginBottom: '20px', textAlign: 'justify' }}>
+              Dengan ini kami menyatakan untuk mengundurkan diri dari Pondok Pesantren Sukahideng
+              dikarenakan <strong>"{data.alasan_keluar || '.................................................................'}"</strong>.
+              Demikian pernyataan ini kami buat dengan sesungguhnya.
+            </p>
 
-                  <p className="mb-4">Selaku orang tua / wali dari :</p>
-                  <table className="w-full mb-10 ml-4 border-collapse">
-                    <tbody>
-                      <tr>
-                        <td className="w-48 font-bold align-top">Nama Santri</td>
-                        <td className="align-top">: {data.nama_lengkap}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold align-top">Asrama / Kamar</td>
-                        <td className="align-top">: {data.asrama || '—'} / {data.kamar || '—'}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold align-top">Tanggal Keluar</td>
-                        <td className="align-top">: {fmtTgl(data.tanggal_keluar)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+            <p style={{ textAlign: 'right', marginBottom: '8px', fontWeight: 'bold' }}>Sukahideng, {tglCetak}</p>
+            <p style={{ fontWeight: 'bold', marginBottom: '32px' }}>Yang membuat pernyataan,</p>
 
-                  <p className="mb-12 text-justify">
-                    Dengan ini kami menyatakan untuk mengundurkan diri (keluar) dari Pondok Pesantren Sukahideng
-                    dikarenakan <strong>"{data.alasan_keluar || '.................................................................'}"</strong>.
-                    Demikian surat pernyataan ini kami buat dengan kesadaran penuh tanpa paksaan dari pihak manapun.
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px 16px', marginBottom: '16px' }}>
+              {[
+                { label: 'Wali Santri,', nama: data.nama_ayah },
+                { label: 'Santri yang bersangkutan,', nama: data.nama_lengkap },
+                { label: 'Dewan Santri,', nama: null },
+                { label: 'Pengurus Asrama,', nama: null },
+              ].map((item, i) => (
+                <div key={i} style={{ textAlign: 'center' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '60px' }}>{item.label}</p>
+                  <p style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
+                    {item.nama || '..................................................'}
                   </p>
-
-                  <p className="text-right mb-4">Tasikmalaya, {tglCetak}</p>
-                  <p className="font-bold mb-20 text-center md:text-left">Yang membuat pernyataan,</p>
-
-                  <div className="grid grid-cols-2 gap-y-20 gap-x-10 mb-12">
-                    {[
-                      { label: 'Wali Santri,', nama: data.nama_ayah },
-                      { label: 'Santri yang bersangkutan,', nama: data.nama_lengkap },
-                      { label: 'Dewan Santri (IDP),', nama: null },
-                      { label: 'Pengurus Asrama,', nama: null },
-                    ].map((item, i) => (
-                      <div key={i} className="text-center">
-                        <p className="font-bold mb-24">{item.label}</p>
-                        <p className="font-bold underline uppercase">({item.nama || '.........................................'})</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* TTD Pimpinan */}
-                  <div className="flex justify-center pt-8">
-                    <div className="text-center min-w-[320px]">
-                      <p className="font-bold">Mengetahui,</p>
-                      <p className="font-bold mb-28">Pimpinan Pondok Pesantren,</p>
-                      <p className="font-bold underline text-lg uppercase">KH. I. Abdul Basith Wahab, BA</p>
-                    </div>
-                  </div>
                 </div>
-            )}
-         </div>
+              ))}
+            </div>
 
-         <style>{`
-           @media print { 
-             body * { visibility: hidden !important; } 
-             #print-area, #print-area * { visibility: visible !important; } 
-             #print-area { 
-               position: absolute !important; 
-               left: 0 !important; 
-               top: 0 !important; 
-               padding: 0 !important;
-               margin: 0 !important;
-               width: 100% !important;
-               box-shadow: none !important;
-             } 
-           }
-         `}</style>
-      </DialogContent>
-    </Dialog>
+            {/* TTD Pimpinan */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+              <div style={{ textAlign: 'center', minWidth: '280px' }}>
+                <p style={{ fontWeight: 'bold' }}>Mengetahui,</p>
+                <p style={{ fontWeight: 'bold' }}>Pimpinan Pesantren,</p>
+                <div style={{ height: '96px' }} />
+                <p style={{ fontWeight: 'bold', textDecoration: 'underline' }}>Drs. KH. I. Abdul Basith Wahab</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style>{`@media print { body * { visibility: hidden; } .print\\:hidden { display: none !important; } }`}</style>
+    </div>
   )
 }
 
@@ -344,160 +312,136 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
   }, [search, asrama])
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
+    <div className="space-y-4">
       {/* Filter bar */}
-      <Card className="p-5 rounded-[2rem] border-border shadow-sm bg-card">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
-          
-          <div className="md:col-span-3 space-y-2">
-             <label className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-             <Select value={asrama} onValueChange={(v) => { setAsrama(v ?? ''); if (hasLoaded) load(1, search, v ?? '') }}>
-                <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-rose-500">
-                  <SelectValue placeholder="Semua Asrama" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SEMUA" className="font-bold">SEMUA ASRAMA</SelectItem>
-                  {asramaList.map(a => <SelectItem key={a} value={a} className="font-bold">{a}</SelectItem>)}
-                </SelectContent>
-             </Select>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[140px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
+            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-500">
+              <option value="SEMUA">Semua Asrama</option>
+              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
           </div>
-
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
-                className="md:col-span-6 space-y-2">
-             <label className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em] block ml-1">Cari Nama / NIS</label>
-             <div className="relative">
-                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-                <Input 
-                    placeholder="Masukan nama santri..." 
-                    className="h-11 pl-11 bg-background border-border rounded-2xl text-sm focus:ring-rose-500 font-medium"
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
-                />
-             </div>
-          </form>
-
-          <div className="md:col-span-3">
-            <Button 
-               onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }}
-               disabled={loading}
-               className="w-full h-11 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black gap-2 shadow-lg shadow-rose-500/20 transition-all active:scale-[0.98]"
-            >
-               {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Filter className="w-4 h-4" />}
-               Tampilkan Data
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Content */}
-      {!hasLoaded && !loading ? (
-        <div className="bg-muted/30 border-border border border-dashed rounded-[3rem] p-20 text-center space-y-4">
-           <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mx-auto shadow-sm">
-             <Users className="w-10 h-10 text-muted-foreground/30"/>
-           </div>
-           <p className="text-muted-foreground font-black text-[11px] uppercase tracking-widest leading-loose">
-             Tekan <span className="text-rose-600">tampilkan data</span> untuk memuat list santri aktif.
-           </p>
-        </div>
-      ) : loading ? (
-        <div className="py-40 flex flex-col items-center justify-center gap-3">
-           <Loader2 className="w-12 h-12 animate-spin text-rose-500"/>
-           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Mengambil List Santri Aktif...</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-              <span className="text-foreground">{fmtNum(rows.length)}</span> dari {fmtNum(total)} Terdeteksi
-            </span>
-            {totalPages > 1 && <Badge variant="secondary" className="font-black text-[10px] tracking-widest bg-muted h-5 px-2">Hal. {page} dari {totalPages}</Badge>}
-          </div>
-
-          <Card className="rounded-[2rem] border-border shadow-2xl overflow-hidden bg-card">
-            <ScrollArea className="w-full">
-               <Table>
-                 <TableHeader className="bg-muted/50">
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="w-12 h-10 px-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] border-r border-border/30">No</TableHead>
-                      <TableHead className="h-10 px-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Profil Santri</TableHead>
-                      <TableHead className="h-10 px-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Asrama / Kamar</TableHead>
-                      <TableHead className="h-10 px-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Angkatan</TableHead>
-                      <TableHead className="h-10 px-6 text-right text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Aksi</TableHead>
-                    </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {rows.length === 0 ? (
-                     <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground font-medium italic">Data tidak ditemukan.</TableCell>
-                     </TableRow>
-                   ) : (
-                     rows.map((r, i) => (
-                       <TableRow key={r.id} className="group border-border/30 hover:bg-muted/20 transition-colors">
-                         <td className="px-6 py-4 text-xs font-black text-muted-foreground/30 tabular-nums border-r border-border/30">{(page-1)*30+i+1}</td>
-                         <td className="px-6 py-4">
-                            <div className="font-black text-foreground text-sm uppercase tracking-tight">{r.nama_lengkap}</div>
-                            <div className="text-[10px] font-mono text-muted-foreground">{r.nis}</div>
-                         </td>
-                         <td className="px-6 py-4">
-                            <Badge variant="outline" className="bg-muted border-transparent font-black text-[10px] shadow-none uppercase px-2 h-5">
-                               {r.asrama || '—'} • {r.kamar || '—'}
-                            </Badge>
-                         </td>
-                         <td className="px-6 py-4 text-xs font-bold tabular-nums text-muted-foreground">{r.tahun_masuk || '—'}</td>
-                         <td className="px-6 py-4 text-right">
-                           <Button 
-                              onClick={() => setModalSantri(r)}
-                              variant="ghost"
-                              className="h-8 rounded-xl px-4 text-[10px] font-black uppercase text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 gap-2 border border-rose-500/10 shadow-sm"
-                           >
-                             <LogOut className="w-3 h-3" /> SET KELUAR
-                           </Button>
-                         </td>
-                       </TableRow>
-                     ))
-                   )}
-                 </TableBody>
-               </Table>
-            </ScrollArea>
-          </Card>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-3 pt-4">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => load(page-1)} 
-                disabled={page <= 1 || loading}
-                className="h-9 px-4 rounded-xl font-black text-[11px] gap-2 border-border shadow-sm"
-              >
-                <ChevronLeft className="w-4 h-4" /> SEBELUMNYA
-              </Button>
-              <div className="text-[10px] font-black uppercase text-muted-foreground bg-muted h-9 flex items-center px-4 rounded-xl border border-border/50">
-                PAGINASI {page} S/D {totalPages}
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => load(page+1)} 
-                disabled={page >= totalPages || loading}
-                className="h-9 px-4 rounded-xl font-black text-[11px] gap-2 border-border shadow-sm"
-              >
-                BERIKUTNYA <ChevronRight className="w-4 h-4" />
-              </Button>
+            className="flex-1 min-w-[180px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input type="text" placeholder="Nama atau NIS..."
+                value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
-          )}
+          </form>
+          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors self-end">
+            <Filter className="w-4 h-4" />
+            {loading ? 'Memuat...' : 'Tampilkan'}
+          </button>
         </div>
+      </div>
+
+      {/* Empty / Loading */}
+      {!hasLoaded && !loading && (
+        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
+          <Users className="w-10 h-10 text-slate-200" />
+          <p className="text-slate-500 text-sm">Tekan <strong>Tampilkan</strong> untuk melihat daftar santri</p>
+        </div>
+      )}
+      {loading && (
+        <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
+        </div>
+      )}
+
+      {/* Tabel */}
+      {hasLoaded && !loading && (
+        <>
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span><strong className="text-slate-700">{fmtNum(rows.length)}</strong> dari <strong className="text-slate-700">{fmtNum(total)}</strong> santri aktif</span>
+            {totalPages > 1 && <span>Hal {page}/{totalPages}</span>}
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
+              Tidak ada santri yang cocok.
+            </div>
+          ) : (
+            <>
+              {/* Desktop */}
+              <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      {['No','Nama Santri','Asrama / Kamar','Angkatan',''].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {rows.map((r, i) => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-xs text-slate-300">{(page-1)*30+i+1}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{r.nama_lengkap}</div>
+                          <div className="text-xs text-slate-400">{r.nis}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {r.asrama || '—'} / <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg font-bold">{r.kamar || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{r.tahun_masuk || '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => setModalSantri(r)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors ml-auto">
+                            <LogOut className="w-3.5 h-3.5" /> Tetapkan Keluar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden space-y-2">
+                {rows.map(r => (
+                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">{r.nama_lengkap}</p>
+                      <p className="text-xs text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</p>
+                    </div>
+                    <button onClick={() => setModalSantri(r)}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors">
+                      <LogOut className="w-3.5 h-3.5" /> Keluar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <button onClick={() => load(page-1)} disabled={page<=1||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    <ChevronLeft className="w-4 h-4" /> Sebelumnya
+                  </button>
+                  <span className="text-sm text-slate-500">Hal {page}/{totalPages}</span>
+                  <button onClick={() => load(page+1)} disabled={page>=totalPages||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    Berikutnya <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* Modal tetapkan keluar */}
       {modalSantri && (
-        <ModalKeluar 
-            santri={modalSantri} 
-            open={!!modalSantri}
-            onClose={() => setModalSantri(null)}
-            onSuccess={() => { setModalSantri(null); load(page) }} 
-        />
+        <ModalKeluar santri={modalSantri} onClose={() => setModalSantri(null)}
+          onSuccess={() => { setModalSantri(null); load(page) }} />
       )}
     </div>
   )
@@ -531,8 +475,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   }, [search, asrama])
 
   const handleRestore = async (r: SantriKeluar) => {
-     // Gunakan toast prosms atau dialog standard
-    if (!window.confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
+    if (!await confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
     setRestoringId(r.id)
     const res = await aktifkanKembali(r.id)
     setRestoringId(null)
@@ -543,184 +486,177 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+    <div className="space-y-4">
       {/* Filter bar */}
-      <Card className="p-5 rounded-[2rem] border-border shadow-sm bg-card">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
-          <div className="md:col-span-3 space-y-2">
-             <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] block ml-1">Asrama</label>
-             <Select value={asrama} onValueChange={(v) => { setAsrama(v ?? ''); if (hasLoaded) load(1, search, v ?? '') }}>
-                <SelectTrigger className="h-11 bg-background border-border rounded-2xl font-bold focus:ring-slate-500">
-                  <SelectValue placeholder="Semua Asrama" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SEMUA" className="font-bold">SEMUA ASRAMA</SelectItem>
-                  {asramaList.map(a => <SelectItem key={a} value={a} className="font-bold">{a}</SelectItem>)}
-                </SelectContent>
-             </Select>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[140px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
+            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-500">
+              <option value="SEMUA">Semua Asrama</option>
+              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
           </div>
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
-                className="md:col-span-6 space-y-2">
-             <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] block ml-1">Cari Nama Keluar</label>
-             <div className="relative">
-                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-                <Input 
-                    placeholder="Masukan nama santri..." 
-                    className="h-11 pl-11 bg-background border-border rounded-2xl text-sm focus:ring-slate-500 font-medium"
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
-                />
-             </div>
-          </form>
-          <div className="md:col-span-3">
-            <Button 
-               onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }}
-               disabled={loading}
-               className="w-full h-11 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-black gap-2 shadow-lg shadow-slate-500/20 transition-all active:scale-[0.98]"
-            >
-               {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4" />}
-               Cari Data
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {!hasLoaded && !loading ? (
-        <div className="bg-muted/30 border-border border border-dashed rounded-[3rem] p-20 text-center space-y-4">
-           <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mx-auto shadow-sm">
-             <UserX className="w-10 h-10 text-muted-foreground/30"/>
-           </div>
-           <p className="text-muted-foreground font-black text-[11px] uppercase tracking-widest leading-loose">
-             Tekan <span className="text-foreground">cari data</span> untuk melihat log santri keluar.
-           </p>
-        </div>
-      ) : loading ? (
-        <div className="py-40 flex flex-col items-center justify-center gap-3">
-           <Loader2 className="w-12 h-12 animate-spin text-slate-500"/>
-           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Memproses Pencatatan...</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-               Ditemukan <span className="text-foreground">{fmtNum(total)}</span> Riwayat Keluar
-             </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {rows.length === 0 ? (
-              <div className="col-span-full py-20 text-center bg-emerald-500/5 border border-emerald-500/10 rounded-[3rem]">
-                <CheckCircle className="w-12 h-12 text-emerald-500/30 mx-auto mb-3" />
-                <p className="text-emerald-700 dark:text-emerald-400 font-bold italic">Log santri keluar nihil.</p>
-              </div>
-            ) : (
-              rows.map((r) => (
-                <Card key={r.id} className="relative group p-0 overflow-hidden rounded-[2.5rem] border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                   <div className="h-1.5 bg-rose-500/20 w-full" />
-                   <div className="p-6 space-y-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 bg-rose-500/10 rounded-[1.25rem] border border-rose-500/10">
-                            <UserX className="w-5 h-5 text-rose-500" />
-                          </div>
-                          <div>
-                            <p className="font-black text-foreground uppercase tracking-tight">{r.nama_lengkap}</p>
-                            <p className="text-[10px] font-bold text-muted-foreground">{r.nis} • {r.asrama || '—'} / {r.kamar || '—'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                         <div className="bg-muted/50 rounded-2xl p-3 border border-border/50">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">Tanggal Keluar</p>
-                            <div className="flex items-center gap-2 text-foreground font-black text-[11px]">
-                               <CalendarDays className="w-3.5 h-3.5 text-rose-500" />
-                               {fmtTgl(r.tanggal_keluar)}
-                            </div>
-                         </div>
-                         <div className="bg-muted/50 rounded-2xl p-3 border border-border/50">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">Motif Keluar</p>
-                            <p className="text-[11px] font-bold text-foreground truncate">{r.alasan_keluar || 'Tidak dicatat'}</p>
-                         </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button 
-                          onClick={() => setSuratId(r.id)}
-                          variant="outline"
-                          className="flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 bg-background border-border shadow-sm hover:bg-muted"
-                        >
-                          <Printer className="w-3.5 h-3.5 text-primary" /> CETAK SURAT
-                        </Button>
-                        <Button 
-                          onClick={() => handleRestore(r)} 
-                          disabled={restoringId === r.id}
-                          variant="ghost"
-                          className="flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border border-emerald-500/10"
-                        >
-                          {restoringId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                          AKTIFKAN
-                        </Button>
-                      </div>
-                   </div>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-3 pt-6">
-              <Button variant="outline" size="sm" onClick={() => load(page-1)} disabled={page<=1||loading} className="h-9 px-4 rounded-xl font-black text-[11px] gap-2 shadow-sm border-border">SEBELUMNYA</Button>
-              <div className="text-[10px] font-black text-muted-foreground">HAL {page} / {totalPages}</div>
-              <Button variant="outline" size="sm" onClick={() => load(page+1)} disabled={page>=totalPages||loading} className="h-9 px-4 rounded-xl font-black text-[11px] gap-2 shadow-sm border-border">BERIKUTNYA</Button>
+            className="flex-1 min-w-[180px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input type="text" placeholder="Nama atau NIS..."
+                value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500" />
             </div>
-          )}
+          </form>
+          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-60 transition-colors self-end">
+            <Filter className="w-4 h-4" />
+            {loading ? 'Memuat...' : 'Tampilkan'}
+          </button>
+        </div>
+      </div>
+
+      {!hasLoaded && !loading && (
+        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
+          <UserX className="w-10 h-10 text-slate-200" />
+          <p className="text-slate-500 text-sm">Tekan <strong>Tampilkan</strong> untuk melihat daftar santri keluar</p>
+        </div>
+      )}
+      {loading && (
+        <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
         </div>
       )}
 
-      {suratId && <ModalSurat open={!!suratId} santriId={suratId} onClose={() => setSuratId(null)} />}
+      {hasLoaded && !loading && (
+        <>
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span><strong className="text-slate-700">{fmtNum(total)}</strong> santri keluar tercatat</span>
+            {totalPages > 1 && <span>Hal {page}/{totalPages}</span>}
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center py-12 gap-2 bg-white rounded-2xl border border-slate-200 text-center">
+              <CheckCircle className="w-10 h-10 text-emerald-300" />
+              <p className="text-slate-500 text-sm">Tidak ada santri keluar yang cocok.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {rows.map(r => (
+                  <div key={r.id}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:border-slate-300 transition-colors">
+                    <div className="h-0.5 bg-rose-400 w-full" />
+                    <div className="p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
+                              <UserX className="w-4 h-4 text-rose-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
+                              <p className="text-xs text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</p>
+                            </div>
+                          </div>
+
+                          {/* Detail keluar */}
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                              <p className="text-slate-400 font-medium mb-0.5">Tanggal Keluar</p>
+                              <p className="font-bold text-slate-700">{fmtTgl(r.tanggal_keluar)}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                              <p className="text-slate-400 font-medium mb-0.5">Alasan</p>
+                              <p className="font-semibold text-slate-700 truncate">{r.alasan_keluar || '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Aksi */}
+                        <div className="flex sm:flex-col gap-2 sm:w-36 sm:shrink-0">
+                          <button onClick={() => setSuratId(r.id)}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">
+                            <Printer className="w-3.5 h-3.5" />
+                            Cetak Surat
+                          </button>
+                          <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold hover:bg-emerald-100 disabled:opacity-50 transition-colors">
+                            {restoringId === r.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <RotateCcw className="w-3.5 h-3.5" />}
+                            Aktifkan Kembali
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <button onClick={() => load(page-1)} disabled={page<=1||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    <ChevronLeft className="w-4 h-4" /> Sebelumnya
+                  </button>
+                  <span className="text-sm text-slate-500">Hal {page}/{totalPages}</span>
+                  <button onClick={() => load(page+1)} disabled={page>=totalPages||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    Berikutnya <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {suratId && <ModalSurat santriId={suratId} onClose={() => setSuratId(null)} />}
     </div>
   )
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SantriKeluarPage() {
+  const confirm = useConfirm()
   const [tab, setTab]           = useState<'aktif' | 'keluar'>('aktif')
   const [asramaList, setAsramaList] = useState<string[]>([])
 
   useEffect(() => { getAsramaList().then(setAsramaList) }, [])
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      
-      {/* Header Hero */}
-      <div className="relative bg-slate-950 border border-slate-900/50 text-slate-50 px-6 pt-6 pb-8 rounded-[2.5rem] shadow-xl shadow-slate-900/10 overflow-hidden mb-2">
-        <div className="absolute -top-10 -right-10 w-48 h-48 bg-rose-500/10 rounded-full blur-[40px] pointer-events-none"/>
-        <h1 className="text-2xl font-black flex items-center gap-3 mb-1 uppercase tracking-tight">
-          <UserX className="w-6 h-6 text-rose-500" /> Santri Keluar
+    <div className="max-w-5xl mx-auto pb-16 space-y-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
+          <UserX className="w-6 h-6 text-rose-600" />
+          Santri Keluar
         </h1>
-        <p className="text-slate-200/60 text-xs font-medium max-w-md">Pencatatan sirkulasi santri yang berhenti di tengah semester. Data tetap terjaga dalam arsip riwayat keluar.</p>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Kelola santri yang keluar di tengah tahun ajaran — bukan alumni resmi
+        </p>
       </div>
 
-      {/* Modern Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
-        <TabsList className="bg-muted p-1 rounded-[1.5rem] h-12 w-full max-w-[400px] border border-border shadow-sm mb-6">
-          <TabsTrigger value="aktif" className="flex-1 rounded-2xl font-black text-[11px] uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:shadow-md">
-            <LogOut className="w-3.5 h-3.5" /> Tetapkan Keluar
-          </TabsTrigger>
-          <TabsTrigger value="keluar" className="flex-1 rounded-2xl font-black text-[11px] uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:shadow-md">
-            <UserX className="w-3.5 h-3.5" /> Daftar Riwayat
-          </TabsTrigger>
-        </TabsList>
+      {/* Tab */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
+        {([
+          { key: 'aktif',  label: 'Tetapkan Keluar', icon: LogOut },
+          { key: 'keluar', label: 'Daftar Keluar',   icon: UserX  },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              tab === t.key ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+            }`}>
+            <t.icon className="w-4 h-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="aktif" className="mt-0 outline-none">
-          <TabAktif asramaList={asramaList} />
-        </TabsContent>
-        <TabsContent value="keluar" className="mt-0 outline-none">
-          <TabKeluar asramaList={asramaList} />
-        </TabsContent>
-      </Tabs>
-
+      {tab === 'aktif'  && <TabAktif  asramaList={asramaList} />}
+      {tab === 'keluar' && <TabKeluar asramaList={asramaList} />}
     </div>
   )
 }

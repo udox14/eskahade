@@ -36,7 +36,7 @@ export async function getDataBlanko(kelasId: string) {
   if (!kelas) return { error: 'Kelas tidak ditemukan' }
 
   const santriList = await query<any>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
@@ -70,7 +70,7 @@ export async function getDataBlankoMassal(marhalahId: string) {
 
   const result = await Promise.all(sorted.map(async (kelas: any) => {
     const santriList = await query<any>(`
-      SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
+      SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
       WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'

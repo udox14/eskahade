@@ -13,8 +13,6 @@ import {
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, ChevronRight
 } from 'lucide-react'
-import { Card, CardDescription, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -83,16 +81,16 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/pengaturan/fitur-akses':               'Atur fitur apa saja yang bisa diakses oleh tiap role.',
 }
 
-// ── Update Accent untuk kompatibel dengan dark mode native Tailwind / Shadcn  ───
-const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string; bgSoft: string }> = {
-  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200/50 dark:bg-slate-800',    label: 'text-slate-600 dark:text-slate-400',   iconHover: 'group-hover:text-slate-700 dark:group-hover:text-slate-300', bgSoft: 'group-hover:bg-slate-100/50 dark:group-hover:bg-slate-800/50' },
-  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-500/20 dark:bg-orange-900/30',   label: 'text-orange-600 dark:text-orange-400',  iconHover: 'group-hover:text-orange-600 dark:group-hover:text-orange-400', bgSoft: 'group-hover:bg-orange-50/50 dark:group-hover:bg-orange-950/20' },
-  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-500/20 dark:bg-blue-900/30',     label: 'text-blue-600 dark:text-blue-400',    iconHover: 'group-hover:text-blue-600 dark:group-hover:text-blue-400', bgSoft: 'group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20' },
-  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-500/20 dark:bg-violet-900/30',   label: 'text-violet-600 dark:text-violet-400',  iconHover: 'group-hover:text-violet-600 dark:group-hover:text-violet-400', bgSoft: 'group-hover:bg-violet-50/50 dark:group-hover:bg-violet-950/20' },
-  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-500/20 dark:bg-teal-900/30',     label: 'text-teal-600 dark:text-teal-400',    iconHover: 'group-hover:text-teal-600 dark:group-hover:text-teal-400', bgSoft: 'group-hover:bg-teal-50/50 dark:group-hover:bg-teal-950/20' },
-  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-500/20 dark:bg-emerald-900/30',  label: 'text-emerald-600 dark:text-emerald-400', iconHover: 'group-hover:text-emerald-600 dark:group-hover:text-emerald-400', bgSoft: 'group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-950/20' },
-  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-500/20 dark:bg-amber-900/30',    label: 'text-amber-600 dark:text-amber-400',   iconHover: 'group-hover:text-amber-600 dark:group-hover:text-amber-400', bgSoft: 'group-hover:bg-amber-50/50 dark:group-hover:bg-amber-950/20' },
-  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-500/20 dark:bg-rose-900/30',     label: 'text-rose-600 dark:text-rose-400',    iconHover: 'group-hover:text-rose-600 dark:group-hover:text-rose-400', bgSoft: 'group-hover:bg-rose-50/50 dark:group-hover:bg-rose-950/20' },
+// ── Accent per grup — hanya dot + garis, bukan badge ─────────────────────────
+const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
+  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
+  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
+  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
+  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
+  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
+  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
+  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
+  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -123,27 +121,27 @@ function formatTanggal(date: Date) {
 
 interface Props { userName: string; userRole: string; fiturAkses: FiturAkses[] }
 
-// ── Feature Card ───────────────────────────────────────────
+// ── Feature Card — clean minimal, no icon badge ───────────────────────────────
 function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROUP_ACCENT[string] }) {
   const Icon = getIcon(fitur.icon)
   const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
 
   return (
-    <Link href={fitur.href} title={desc} className="block w-full h-full">
-      <Card className={cn("group h-full flex flex-col items-center gap-2 p-3 sm:p-3.5 bg-card hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-center active:scale-95 shadow-sm", accent.bgSoft)}>
-        {/* Icon */}
-        <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border flex items-center justify-center transition-all duration-200 group-hover:bg-background group-hover:border-transparent group-hover:shadow-sm">
-          <Icon className={cn('w-5 h-5 text-muted-foreground transition-colors duration-200', accent.iconHover)} />
-        </div>
+    <Link href={fitur.href} title={desc}
+      className="group relative flex flex-col items-center gap-2 p-3 sm:p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-center active:scale-95"
+    >
+      {/* Icon — plain, no colored badge */}
+      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center transition-all duration-200 group-hover:bg-slate-100 group-hover:border-slate-200">
+        <Icon className={cn('w-5 h-5 text-slate-500 transition-colors duration-200', accent.iconHover)} />
+      </div>
 
-        {/* Label */}
-        <span className="text-[11px] sm:text-xs font-semibold text-foreground leading-tight line-clamp-2 w-full mt-1">
-          {fitur.title}
-        </span>
+      {/* Label */}
+      <span className="text-[11px] sm:text-xs font-semibold text-slate-700 leading-tight line-clamp-2 w-full">
+        {fitur.title}
+      </span>
 
-        {/* Subtle hover arrow */}
-        <ChevronRight className="absolute top-2.5 right-2 w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-      </Card>
+      {/* Subtle hover arrow */}
+      <ChevronRight className="absolute top-2.5 right-2 w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
     </Link>
   )
 }
@@ -171,10 +169,11 @@ export function HomeClient({ userName, userRole, fiturAkses }: Props) {
   const groups = GROUP_ORDER.filter(g => grouped.has(g))
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 lg:space-y-8">
+    <div className="max-w-5xl mx-auto space-y-5 pb-16">
 
       {/* ── Hero Greeting Card ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl select-none">
+      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none">
+
         {/* Noise texture overlay */}
         <div className="absolute inset-0 opacity-[0.035]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
@@ -182,97 +181,91 @@ export function HomeClient({ userName, userRole, fiturAkses }: Props) {
         }} />
 
         {/* Glow orbs */}
-        <div className="absolute -top-16 -left-16 w-56 h-56 bg-primary/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-8 right-1/3 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl pointer-events-none" />
 
         {/* Content */}
-        <div className="relative z-10 p-6 sm:p-8">
-          <div className="flex items-start justify-between gap-3 mb-6">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-medium text-white/70 leading-none tracking-wide">
+        <div className="relative z-10 p-5 sm:p-8">
+
+          {/* Top: date pill + logo */}
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span className="text-[11px] font-medium text-white/50 leading-none">
                 {now ? formatTanggal(now) : '—'}
               </span>
             </div>
-            <div className="hidden sm:block">
-              <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain opacity-90 drop-shadow-2xl" />
-            </div>
+            <img src="/logo.png" alt="Logo"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-80 shrink-0 drop-shadow-xl" />
           </div>
 
-          <div className="space-y-1.5">
-            <p className="text-white/50 text-sm font-medium flex items-center gap-2">
-              <span className="text-lg">{greeting.emoji}</span> {greeting.text}
+          {/* Greeting text */}
+          <div className="space-y-1">
+            <p className="text-white/40 text-sm font-medium">
+              {greeting.emoji} {greeting.text}
             </p>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md">
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
               {firstName}
-              <span className="text-primary">.</span>
+              <span className="text-emerald-400">.</span>
             </h1>
-            <p className="text-white/40 text-sm pt-1 max-w-sm">{greeting.sub}</p>
+            <p className="text-white/30 text-sm pt-0.5">{greeting.sub}</p>
           </div>
 
-          <div className="my-5 h-px bg-white/10 w-full" />
+          {/* Divider */}
+          <div className="my-4 h-px bg-white/8" />
 
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
-                <span className="text-lg">{roleEmoji}</span>
-              </div>
-              <div className="flex flex-col justify-center">
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold leading-none mb-1">Akses Sistem</p>
-                <p className="text-sm font-bold text-white/90 leading-none">{roleLabel}</p>
+          {/* Bottom: role + stats */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-base">{roleEmoji}</span>
+              <div>
+                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-0.5">Login sebagai</p>
+                <p className="text-sm font-bold text-white/80 leading-none">{roleLabel}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 backdrop-blur-sm">
-              <span className="text-primary text-sm font-black">{totalFitur}</span>
-              <span className="text-white/60 text-xs font-medium">Fitur Aktif</span>
+            <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1.5">
+              <span className="text-emerald-400 text-xs font-bold">{totalFitur}</span>
+              <span className="text-white/40 text-xs">fitur aktif</span>
             </div>
           </div>
+
         </div>
       </div>
 
       {/* ── Menu Groups ── */}
       {groups.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-16 px-4 bg-muted/30 border-dashed text-center gap-3 shadow-none">
-          <div className="w-12 h-12 rounded-full bg-background border flex items-center justify-center">
-            <Settings className="w-6 h-6 text-muted-foreground opacity-50" />
-          </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground">Belum ada fitur yang tersedia</p>
-            <p className="text-sm text-muted-foreground">Hubungi administrator untuk mengatur hak akses Anda.</p>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {groups.map(group => {
-            const items  = grouped.get(group)!
-            const accent = GROUP_ACCENT[group] ?? GROUP_ACCENT['_standalone']
-
-            return (
-              <div key={group} className="space-y-3">
-                {/* Section header */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0 animate-in zoom-in duration-500 hidden sm:block', accent.dot)} />
-                  <h3 className={cn('text-xs font-bold uppercase tracking-[0.15em]', accent.label)}>
-                    {group === '_standalone' ? 'Menu Utama' : group}
-                  </h3>
-                  <div className={cn('flex-1 h-px opacity-60', accent.line)} />
-                  <Badge variant="outline" className="text-[10px] font-semibold text-muted-foreground px-2 h-5 rounded-full border-border/50">
-                    {items.length}
-                  </Badge>
-                </div>
-
-                {/* Grid */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
-                  {items.map((fitur, i) => (
-                    <div key={fitur.href} className="animate-in fade-in slide-in-from-bottom-2 h-full z-10" style={{ animationDelay: `${i * 30}ms` }}>
-                      <FeatureCard fitur={fitur} accent={accent} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+        <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
+          <Settings className="w-10 h-10 opacity-20 mb-1" />
+          <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
+          <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
         </div>
+      ) : (
+        groups.map(group => {
+          const items  = grouped.get(group)!
+          const accent = GROUP_ACCENT[group] ?? GROUP_ACCENT['_standalone']
+
+          return (
+            <div key={group}>
+              {/* Section header */}
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
+                <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', accent.label)}>
+                  {group === '_standalone' ? 'Menu Utama' : group}
+                </span>
+                <div className={cn('flex-1 h-px', accent.line)} />
+                <span className="text-[10px] text-slate-400 tabular-nums font-medium">{items.length}</span>
+              </div>
+
+              {/* Grid — 3 kolom di HP, makin banyak di desktop */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                {items.map(fitur => (
+                  <FeatureCard key={fitur.href} fitur={fitur} accent={accent} />
+                ))}
+              </div>
+            </div>
+          )
+        })
       )}
     </div>
   )

@@ -1,16 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
-import { Save, Settings, DollarSign, History, Loader2, Edit, ChevronLeft, ChevronRight, Coins } from 'lucide-react'
-import { toast } from 'sonner'
+import React from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { cn } from '@/lib/utils'
+import { useState, useEffect } from 'react'
+import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
+import { Save, Settings, DollarSign, History, Loader2, Edit } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function TarifPage() {
   // State Form
@@ -59,7 +54,7 @@ export default function TarifPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if (res && 'error' in res) {
+    if ('error' in res) {
         toast.error("Gagal", { description: (res as any).error })
     } else {
         toast.success("Tarif Berhasil Disimpan", { description: `Angkatan ${tahunInput} telah diperbarui.` })
@@ -71,153 +66,118 @@ export default function TarifPage() {
   const rp = (val: number) => "Rp " + (val || 0).toLocaleString('id-ID')
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24 animate-in fade-in duration-500">
+    <div className="space-y-8 max-w-6xl mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-600 shadow-sm border border-indigo-500/10">
-            <Settings className="w-6 h-6"/>
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Pengaturan Tarif Angkatan</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Manajemen Biaya Masuk & Tagihan Tahunan</p>
-          </div>
+      <div className="flex items-center gap-4">
+        <div className="bg-emerald-100 p-3 rounded-full text-emerald-700">
+          <Settings className="w-6 h-6"/>
+        </div>
+        <div>
+           <h1 className="text-2xl font-bold text-slate-800">Pengaturan Tarif Angkatan</h1>
+           <p className="text-slate-500 text-sm">Tentukan besaran biaya masuk & tahunan berdasarkan tahun masuk santri.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          
          {/* KOLOM KIRI: FORM INPUT */}
-         <div className="lg:col-span-1 lg:sticky lg:top-24">
-            <Card className="border-border shadow-xl overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"/>
-                <CardHeader className="border-b bg-muted/30">
-                  <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                    <Edit className="w-4 h-4 text-indigo-500"/> Edit / Baru
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                    <form onSubmit={handleSimpan} className="space-y-6">
-                        {/* Tahun Selector */}
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Tahun Angkatan (Masuk)</Label>
-                            <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-2xl border shadow-inner">
-                                <Button type="button" variant="ghost" size="icon" onClick={() => setTahunInput(t => t - 1)} className="h-10 w-10 rounded-xl hover:bg-background">
-                                  <ChevronLeft className="w-4 h-4"/>
-                                </Button>
-                                <Input 
-                                    type="number" 
-                                    className="border-0 bg-transparent text-center font-black text-lg focus-visible:ring-0 shadow-none h-10"
-                                    value={tahunInput}
-                                    onChange={(e) => setTahunInput(Number(e.target.value))}
-                                />
-                                <Button type="button" variant="ghost" size="icon" onClick={() => setTahunInput(t => t + 1)} className="h-10 w-10 rounded-xl hover:bg-background">
-                                  <ChevronRight className="w-4 h-4"/>
-                                </Button>
-                            </div>
+         <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
+                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
+                    <Edit className="w-5 h-5 text-emerald-600"/> Edit / Baru
+                </h3>
+                
+                <form onSubmit={handleSimpan} className="space-y-5">
+                    
+                    {/* Tahun Selector */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">-</button>
+                            <input 
+                                type="number" 
+                                className="flex-1 text-center font-bold text-lg border rounded bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
+                                value={tahunInput}
+                                onChange={(e) => setTahunInput(Number(e.target.value))}
+                            />
+                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">+</button>
                         </div>
+                    </div>
 
-                        <div className="space-y-4">
-                            {loading ? (
-                                <div className="py-12 flex flex-col items-center gap-3">
-                                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500 opacity-50"/>
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Checking data...</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4 animate-in fade-in duration-300">
-                                    <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({...nominal, BANGUNAN: v})} />
-                                    <InputDuit label="Infaq Kesehatan (Tahunan)" value={nominal.KESEHATAN} onChange={v => setNominal({...nominal, KESEHATAN: v})} />
-                                    <InputDuit label="Uang EHB (Tahunan)" value={nominal.EHB} onChange={v => setNominal({...nominal, EHB: v})} />
-                                    <InputDuit label="Ekstrakurikuler (Tahunan)" value={nominal.EKSKUL} onChange={v => setNominal({...nominal, EKSKUL: v})} />
-                                </div>
-                            )}
-                        </div>
+                    <hr className="border-dashed"/>
 
-                        <Button 
-                            type="submit"
-                            disabled={isSaving || loading}
-                            className={cn(
-                              "w-full h-12 font-black rounded-2xl shadow-lg transition-all active:scale-95 gap-2",
-                              "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20"
-                            )}
-                        >
-                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                            SIMPAN TARIF
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                    {/* Input Biaya */}
+                    {loading ? (
+                        <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
+                    ) : (
+                        <>
+                            <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({...nominal, BANGUNAN: v})} />
+                            <InputDuit label="Infaq Kesehatan (Tahunan)" value={nominal.KESEHATAN} onChange={v => setNominal({...nominal, KESEHATAN: v})} />
+                            <InputDuit label="Uang EHB (Tahunan)" value={nominal.EHB} onChange={v => setNominal({...nominal, EHB: v})} />
+                            <InputDuit label="Ekstrakurikuler (Tahunan)" value={nominal.EKSKUL} onChange={v => setNominal({...nominal, EKSKUL: v})} />
+                        </>
+                    )}
+
+                    <button 
+                        disabled={isSaving || loading}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
+                    >
+                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                        SIMPAN TARIF
+                    </button>
+
+                </form>
+            </div>
          </div>
 
          {/* KOLOM KANAN: TABEL RIWAYAT */}
          <div className="lg:col-span-2">
-            <Card className="border-border shadow-sm overflow-hidden">
-                <CardHeader className="p-5 bg-muted/30 border-b flex flex-row justify-between items-center">
-                    <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                      <History className="w-4 h-4 text-muted-foreground"/> Daftar Tarif Tersimpan
-                    </CardTitle>
-                </CardHeader>
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+                <div className="p-5 bg-slate-50 border-b flex justify-between items-center">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                        <History className="w-5 h-5"/> Daftar Tarif Tersimpan
+                    </h3>
+                </div>
                 
                 {listTarif.length === 0 ? (
-                    <div className="py-24 text-center">
-                        <Coins className="w-12 h-12 mx-auto mb-3 text-muted-foreground/20"/>
-                        <p className="text-muted-foreground font-black uppercase tracking-widest text-[10px]">Belum ada data tarif tersimpan</p>
-                    </div>
+                    <div className="p-10 text-center text-slate-400 italic">Belum ada data tarif yang diatur.</div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/30">
-                                <TableRow>
-                                    <TableHead className="px-6 h-12 font-black text-[10px] uppercase tracking-wider">Angkatan</TableHead>
-                                    <TableHead className="px-6 h-12 font-black text-[10px] uppercase tracking-wider text-right">Bangunan</TableHead>
-                                    <TableHead className="px-6 h-12 font-black text-[10px] uppercase tracking-wider text-right">Tahunan (Total)</TableHead>
-                                    <TableHead className="px-6 h-12 font-black text-[10px] uppercase tracking-wider text-center">Aksi</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {listTarif.map((item: any) => {
-                                    const totalTahunan = item.KESEHATAN + item.EHB + item.EKSKUL
-                                    const isActive = item.tahun === tahunInput
-                                    return (
-                                        <TableRow 
-                                          key={item.tahun} 
-                                          className={cn(
-                                            'transition-colors hover:bg-indigo-500/5',
-                                            isActive ? 'bg-indigo-500/5' : ''
-                                          )}
-                                        >
-                                            <TableCell className="px-6 py-4">
-                                              <span className="font-black text-lg text-indigo-600 tabular-nums">{item.tahun}</span>
-                                            </TableCell>
-                                            <TableCell className="px-6 py-4 text-right">
-                                              <p className="font-bold text-sm tracking-tight">{rp(item.BANGUNAN)}</p>
-                                            </TableCell>
-                                            <TableCell className="px-6 py-4 text-right">
-                                              <p className="font-bold text-sm tracking-tight">{rp(totalTahunan)}</p>
-                                              <p className="text-[9px] font-bold text-muted-foreground uppercase italic opacity-50">KES+EHB+EKS</p>
-                                            </TableCell>
-                                            <TableCell className="px-4 py-4 text-center">
-                                                <Button 
-                                                    variant={isActive ? 'default' : 'outline'}
-                                                    size="sm"
-                                                    onClick={() => setTahunInput(item.tahun)}
-                                                    className={cn(
-                                                      'rounded-xl text-[10px] font-black uppercase h-8 px-4',
-                                                      isActive ? 'bg-indigo-600 hover:bg-indigo-700' : 'border-indigo-400 text-indigo-600 hover:bg-indigo-50'
-                                                    )}
-                                                >
-                                                    {isActive ? 'Active' : 'Edit'}
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-white text-slate-500 border-b uppercase text-xs">
+                                <tr>
+                                    <th className="px-6 py-4">Angkatan</th>
+                                    <th className="px-6 py-4 text-right">Bangunan</th>
+                                    <th className="px-6 py-4 text-right">Kesehatan</th>
+                                    <th className="px-6 py-4 text-right">EHB</th>
+                                    <th className="px-6 py-4 text-right">Ekskul</th>
+                                    <th className="px-4 py-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {listTarif.map((item: any) => (
+                                    <tr key={item.tahun} className={`hover:bg-emerald-50 transition-colors ${item.tahun === tahunInput ? 'bg-emerald-50/50' : ''}`}>
+                                        <td className="px-6 py-4 font-bold text-lg text-emerald-800">{item.tahun}</td>
+                                        <td className="px-6 py-4 text-right font-mono">{rp(item.BANGUNAN)}</td>
+                                        <td className="px-6 py-4 text-right font-mono">{rp(item.KESEHATAN)}</td>
+                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EHB)}</td>
+                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EKSKUL)}</td>
+                                        <td className="px-4 py-4 text-center">
+                                            <button 
+                                                onClick={() => setTahunInput(item.tahun)}
+                                                className="text-xs bg-white border border-emerald-200 text-emerald-600 px-3 py-1 rounded-full hover:bg-emerald-600 hover:text-white transition-colors"
+                                            >
+                                                Edit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
-            </Card>
+            </div>
          </div>
 
       </div>
@@ -228,15 +188,15 @@ export default function TarifPage() {
 // Sub Component: Input Duit
 function InputDuit({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) {
     return (
-        <div className="space-y-1.5">
-            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">{label}</Label>
-            <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <span className="text-muted-foreground font-black text-xs scale-90">RP</span>
+        <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
+            <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-slate-400 font-bold">Rp</span>
                 </div>
-                <Input 
-                    type="number"
-                    className="pl-11 h-11 border-border bg-muted/20 focus-visible:ring-indigo-500 font-bold text-right tabular-nums rounded-xl px-4"
+                <input 
+                    type="text" // Text biar bisa format ribuan kalau mau (tapi raw number dulu biar simpel)
+                    className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
                     value={value}
                     onChange={(e) => onChange(Number(e.target.value))}
                     onFocus={(e) => e.target.select()}

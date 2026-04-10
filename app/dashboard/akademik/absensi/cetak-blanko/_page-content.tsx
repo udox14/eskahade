@@ -8,7 +8,7 @@ import { format } from 'date-fns'
 import { useReactToPrint } from 'react-to-print'
 
 // --- KOMPONEN KERTAS ABSENSI (REUSABLE) ---
-function BlankoSheet({ data, genderLabel }: { data: any; genderLabel?: string }) {
+function BlankoSheet({ data }: { data: any }) {
   const daysHeader = [
     { name: 'Rabu', colspan: 3, sessions: ['S', 'A', 'M'] },
     { name: 'Kamis', colspan: 2, sessions: ['S', 'A'] }, 
@@ -43,9 +43,7 @@ function BlankoSheet({ data, genderLabel }: { data: any; genderLabel?: string })
     <div className="print-area bg-white text-black mx-auto shadow-2xl border mb-8 print:mb-0 print:break-after-page" style={{ width: '21.59cm', minHeight: '33.02cm', padding: '1cm' }}>
       {/* HEADER */}
       <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-1 print-header">
-          <h2 className="text-xl font-black uppercase tracking-wider">
-            {data.kelas.nama_kelas}{genderLabel ? ` ${genderLabel}` : ''}
-          </h2>
+          <h2 className="text-xl font-black uppercase tracking-wider">{data.kelas.nama_kelas}</h2>
           <div className="font-bold flex gap-8">
               <span>BULAN : ___________________</span>
               <span>MINGGU KE : _____</span>
@@ -119,32 +117,8 @@ function BlankoSheet({ data, genderLabel }: { data: any; genderLabel?: string })
             </div>
           ))}
       </div>
-
-      {/* KM & SEKRETARIS */}
-      <div className="mt-2 flex gap-8 text-[9px] font-bold">
-        <span>KM &nbsp;&nbsp;&nbsp;: <span className="font-normal">.........................................................................</span></span>
-        <span>SEKRETARIS : <span className="font-normal">.........................................................................</span></span>
-      </div>
-
       <div className="mt-2 text-[8px] text-right italic text-slate-500 no-print">Dicetak pada {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
     </div>
-  )
-}
-
-// --- WRAPPER MUTAWASSITHAH: SPLIT PA / PI ---
-function BlankoSheetMutawassithah({ data }: { data: any }) {
-  const isMutawassithah = data.kelas.marhalah_nama?.toLowerCase().includes('mutawassithah')
-
-  if (!isMutawassithah) return <BlankoSheet data={data} />
-
-  const paData = { ...data, santriList: data.santriList.filter((s: any) => s.jenis_kelamin === 'L') }
-  const piData = { ...data, santriList: data.santriList.filter((s: any) => s.jenis_kelamin === 'P') }
-
-  return (
-    <>
-      <BlankoSheet data={paData} genderLabel="PA" />
-      <BlankoSheet data={piData} genderLabel="PI" />
-    </>
   )
 }
 
@@ -296,7 +270,7 @@ export default function CetakBlankoPage() {
 
       {/* RENDER AREA */}
       <div ref={printRef}>
-          {mode === 'SATUAN' && singleData && <BlankoSheetMutawassithah data={singleData} />}
+          {mode === 'SATUAN' && singleData && <BlankoSheet data={singleData} />}
           
           {mode === 'MASSAL' && massalData && (
               <div>
@@ -305,7 +279,7 @@ export default function CetakBlankoPage() {
                   </div>
                   {massalData.map((item: any, idx: number) => (
                       <div key={idx}>
-                          <BlankoSheetMutawassithah data={item} />
+                          <BlankoSheet data={item} />
                           {/* Page break otomatis ditangani CSS print:break-after-page */}
                       </div>
                   ))}

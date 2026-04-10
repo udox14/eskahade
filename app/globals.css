@@ -1,71 +1,46 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: calc(var(--radius) - 1px);
-  --radius-lg: calc(var(--radius) + 2px);
-  --radius-xl: calc(var(--radius) + 4px);
-  
-  --color-accent-santri: var(--accent-santri);
-  --color-accent-asrama: var(--accent-asrama);
-  --color-accent-keamanan: var(--accent-keamanan);
-  --color-accent-akademik: var(--accent-akademik);
-  --color-accent-keuangan: var(--accent-keuangan);
-  --color-accent-dewan: var(--accent-dewan);
-  --color-accent-upk: var(--accent-upk);
-  --color-accent-master: var(--accent-master);
-  --color-accent-pengaturan: var(--accent-pengaturan);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 /* ── PRINT STYLES ─────────────────────────────────────────── */
 @media print {
+  /* Sembunyikan header app, sidebar, dan elemen non-print */
   .no-print,
   .no-print * {
     display: none !important;
   }
+
+  /* Reset layout saat print: hilangkan padding dari sidebar */
   body,
   html {
     background: white !important;
     overflow: visible !important;
   }
+
+  /* Pastikan konten print memenuhi halaman */
   .print-area {
     position: static !important;
     overflow: visible !important;
@@ -73,128 +48,14 @@
     padding: 0 !important;
     margin: 0 !important;
   }
+
+  /* Hindari page break di tengah tabel */
   tr {
     page-break-inside: avoid;
   }
+
+  /* Pastikan gambar tidak overflow */
   img {
     max-width: 100% !important;
   }
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.601 0.140 160);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.970 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.970 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.970 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.601 0.140 160);
-  
-  --radius: 0.5rem;
-
-  --sidebar-background: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.601 0.140 160);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.601 0.140 160);
-
-  --accent-santri: oklch(0.67 0.18 260);
-  --accent-asrama: oklch(0.75 0.18 60);
-  --accent-keamanan: oklch(0.60 0.22 15);
-  --accent-akademik: oklch(0.58 0.20 290);
-  --accent-keuangan: oklch(0.60 0.14 160);
-  --accent-dewan: oklch(0.65 0.14 240);
-  --accent-upk: oklch(0.85 0.15 90);
-  --accent-master: oklch(0.60 0.22 15);
-  --accent-pengaturan: oklch(0.35 0.05 240);
-  
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.601 0.140 160);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.601 0.140 160);
-
-  --sidebar-background: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.601 0.140 160);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.601 0.140 160);
-
-  --accent-santri: oklch(0.75 0.18 260);
-  --accent-asrama: oklch(0.75 0.18 60);
-  --accent-keamanan: oklch(0.65 0.22 15);
-  --accent-akademik: oklch(0.65 0.20 290);
-  --accent-keuangan: oklch(0.60 0.14 160);
-  --accent-dewan: oklch(0.70 0.14 240);
-  --accent-upk: oklch(0.85 0.15 90);
-  --accent-master: oklch(0.65 0.22 15);
-  --accent-pengaturan: oklch(0.50 0.05 240);
-  
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
-}
-
-/* ── Landing Page Gradient Animation ── */
-@keyframes gradient-x {
-  0%, 100% { background-position: left center; }
-  50% { background-position: right center; }
-}
-.animate-gradient-x {
-  background-size: 200% auto;
-  animation: gradient-x 5s linear infinite;
 }

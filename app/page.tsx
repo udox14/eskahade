@@ -1,140 +1,136 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Users, ShieldCheck, BarChart3, GraduationCap, Star, Sparkles, Zap, Shield, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { ArrowRight, BookOpen, Users, ShieldCheck, BarChart3, GraduationCap, Star } from "lucide-react";
 
 export default function LandingPage() {
   const features = [
-    { icon: Users, label: "Data Santri", desc: "Manajemen data induk & digitalisasi arsip santri.", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { icon: BookOpen, label: "Akademik", desc: "Sistem penilaian, rapor digital, & kontrol kurikulum.", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-    { icon: ShieldCheck, label: "Perizinan", desc: "Kontrol keluar-masuk santri dengan notifikasi real-time.", color: "text-purple-400", bg: "bg-purple-500/10" },
-    { icon: BarChart3, label: "Keuangan", desc: "Monitoring SPP, donasi, & laporan cashflow transparan.", color: "text-amber-400", bg: "bg-amber-500/10" },
-    { icon: GraduationCap, label: "Asrama", desc: "Manajemen kamar, absensi jamaah, & poin kedisiplinan.", color: "text-rose-400", bg: "bg-rose-500/10" },
-    { icon: Star, label: "Multi-Role", desc: "Akses granular untuk Pengasuh, Asatidz, hingga Admin IT.", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+    { icon: Users, label: "Data Santri", desc: "Manajemen data induk lengkap" },
+    { icon: BookOpen, label: "Akademik", desc: "Nilai, rapor & absensi" },
+    { icon: ShieldCheck, label: "Keamanan", desc: "Perizinan & pelanggaran" },
+    { icon: BarChart3, label: "Keuangan", desc: "SPP & laporan keuangan" },
+    { icon: GraduationCap, label: "Asrama", desc: "Absen & layanan asrama" },
+    { icon: Star, label: "Multi-Role", desc: "Akses sesuai wewenang" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-50 selection:bg-teal-500/30 overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#0a1a0f] font-sans overflow-x-hidden" style={{ fontFamily: "'Georgia', serif" }}>
 
-      {/* ── Background Elements ── */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[1000px] h-[1000px] rounded-full bg-teal-500/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[800px] h-[800px] rounded-full bg-indigo-500/10 blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.15] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" 
-             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%239C92AC\' fill-opacity=\'0.2\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+      {/* ── Noise texture overlay ── */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
+
+      {/* ── Radial glow bg ── */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, #16a34a 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full opacity-10"
+          style={{ background: "radial-gradient(circle, #ca8a04 0%, transparent 70%)" }} />
       </div>
 
-      {/* ── Navbar ── */}
-      <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-8 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 group cursor-pointer">
-          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl group-hover:border-teal-500/50 transition-all duration-500 shadow-2xl">
-            <img src="/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
+      {/* ── HERO ── */}
+      <main className="relative z-10 min-h-screen flex flex-col">
+
+        {/* Topbar */}
+        <nav className="flex items-center justify-between px-8 md:px-16 py-6">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-lg" />
+            <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase" style={{ fontFamily: "sans-serif" }}>
+              Sukahideng
+            </span>
           </div>
-          <div>
-            <span className="text-white font-black text-sm uppercase tracking-[.3em] block leading-none mb-1">Sukahideng</span>
-            <span className="text-teal-500/60 font-black text-[9px] uppercase tracking-widest block leading-none">Intelligence System</span>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <Link href="/login" className="hidden sm:block text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Documentation</Link>
-          <Link href="/login">
-            <Button size="sm" className="h-10 px-6 rounded-2xl bg-white text-slate-950 hover:bg-teal-500 hover:text-white font-black text-[10px] uppercase tracking-widest gap-2 shadow-2xl transition-all active:scale-95 group">
-              Dashboard <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </Button>
+          <Link
+            href="/login"
+            className="flex items-center gap-2 text-sm font-semibold text-white/70 hover:text-white transition-colors border border-white/10 hover:border-emerald-500/50 px-4 py-2 rounded-full"
+            style={{ fontFamily: "sans-serif" }}
+          >
+            Masuk <ArrowRight className="w-4 h-4" />
           </Link>
-        </div>
-      </nav>
+        </nav>
 
-      {/* ── Hero section ── */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-40">
-        <div className="flex flex-col items-center text-center space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-          
-          <Badge variant="outline" className="h-8 px-5 rounded-full border-teal-500/20 bg-teal-500/5 text-teal-400 font-black text-[10px] uppercase tracking-[.3em] gap-2 shadow-2xl backdrop-blur-md">
-            <Sparkles className="w-3 h-3 animate-pulse" /> Platform Terpadu v2.0
-          </Badge>
+        {/* Hero content */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
 
-          <h1 className="text-5xl md:text-8xl font-black leading-[0.95] tracking-tight text-white max-w-5xl">
-            Digitalisasi Masa Depan <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-blue-500 to-indigo-500 animate-gradient-x">Pesantren Modern.</span>
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-emerald-950/80 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-4 py-1.5 rounded-full mb-10 tracking-widest uppercase"
+            style={{ fontFamily: "sans-serif" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Sistem Informasi Manajemen
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.05] mb-6 tracking-tight">
+            Pondok Pesantren
+            <br />
+            <span className="relative inline-block">
+              <span className="text-transparent bg-clip-text"
+                style={{ backgroundImage: "linear-gradient(135deg, #4ade80 0%, #fbbf24 50%, #4ade80 100%)", backgroundSize: "200% auto", animation: "shimmer 4s linear infinite" }}>
+                Sukahideng
+              </span>
+            </span>
           </h1>
 
-          <p className="text-slate-400 text-sm md:text-lg max-w-2xl font-medium leading-relaxed italic">
-            "Sistem Informasi Manajemen Terpadu yang dirancang khusus untuk skalabilitas, transparansi, dan efisiensi operasional Pondok Pesantren Sukahideng."
+          {/* Subheading */}
+          <p className="text-white/50 text-lg md:text-xl max-w-2xl leading-relaxed mb-14"
+            style={{ fontFamily: "sans-serif", fontStyle: "italic" }}>
+            "Membangun generasi Qur'ani yang berakhlak mulia, cerdas, dan mandiri
+            melalui sistem pendidikan terpadu."
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-            <Link href="/login">
-              <Button className="h-14 px-10 rounded-[2rem] bg-teal-600 hover:bg-teal-700 text-white font-black text-xs uppercase tracking-widest gap-3 shadow-[0_20px_50px_rgba(20,184,166,0.3)] border-teal-500/20 transition-all hover:scale-105 active:scale-95 group">
-                Mulai Digitalisasi <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-            <Button variant="ghost" className="h-14 px-8 rounded-[2rem] text-slate-400 hover:text-white hover:bg-white/5 font-black text-xs uppercase tracking-widest gap-2">
-              Pelajari Fitur <Zap className="w-4 h-4" />
-            </Button>
-          </div>
+          {/* CTA */}
+          <Link
+            href="/login"
+            className="group relative inline-flex items-center gap-3 px-10 py-4 rounded-2xl text-base font-bold text-white overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+            style={{
+              fontFamily: "sans-serif",
+              background: "linear-gradient(135deg, #15803d, #166534)",
+              boxShadow: "0 0 40px rgba(22,163,74,0.3)"
+            }}
+          >
+            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              style={{ background: "linear-gradient(135deg, #16a34a, #15803d)" }} />
+            <span className="relative">Masuk ke Dashboard</span>
+            <ArrowRight className="relative w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
 
-          {/* Social Proof / Stats */}
-          <div className="pt-20 grid grid-cols-2 md:grid-cols-4 gap-12 border-t border-white/5 w-full mt-20">
-             <div className="space-y-1">
-                <p className="font-black text-3xl tabular-nums text-white">40+</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Modul Terintegrasi</p>
-             </div>
-             <div className="space-y-1">
-                <p className="font-black text-3xl tabular-nums text-white">7</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Otoritas Pengguna</p>
-             </div>
-             <div className="space-y-1">
-                <p className="font-black text-3xl tabular-nums text-white">100%</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Uptime Cloud System</p>
-             </div>
-             <div className="space-y-1">
-                <p className="font-black text-3xl tabular-nums text-white">∞</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Limitless Database</p>
-             </div>
-          </div>
+          <p className="mt-5 text-xs text-white/25" style={{ fontFamily: "sans-serif" }}>
+            Khusus staf & pengurus yang berwenang
+          </p>
         </div>
 
-        {/* ── Features Grid ── */}
-        <div id="features" className="pt-60 space-y-20">
-          <div className="text-center space-y-4">
-            <Badge variant="outline" className="font-black text-[9px] uppercase tracking-[.4em] border-slate-800 text-slate-500">Core Capabilities</Badge>
-            <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter">Ekosistem Manajemen Cerdas</h2>
-          </div>
+        {/* ── Divider ── */}
+        <div className="relative px-8 md:px-16 mb-0">
+          <div className="h-px bg-gradient-to-r from-transparent via-emerald-800/50 to-transparent" />
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <div key={i} className="group relative p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-teal-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-teal-500/10 hover:-translate-y-2">
-                <div className={cn("inline-flex p-4 rounded-[1.5rem] mb-6 group-hover:scale-110 transition-transform duration-500 shadow-inner", f.bg)}>
-                  <f.icon className={cn("w-6 h-6", f.color)} />
+        {/* ── Features strip ── */}
+        <div className="relative z-10 bg-[#0d1f12]/80 backdrop-blur-sm border-t border-emerald-900/30 px-8 md:px-16 py-10">
+          <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {features.map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="flex flex-col items-center text-center gap-2 group">
+                <div className="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-800/50 flex items-center justify-center group-hover:border-emerald-500/50 group-hover:bg-emerald-900/50 transition-all duration-300">
+                  <Icon className="w-5 h-5 text-emerald-500 group-hover:text-emerald-400 transition-colors" />
                 </div>
-                <h3 className="text-xl font-black text-white mb-3 uppercase tracking-tight">{f.label}</h3>
-                <p className="text-slate-500 text-xs font-medium leading-relaxed">{f.desc}</p>
-                
-                <div className="absolute top-6 right-8 text-[10px] font-black text-slate-800 uppercase tracking-widest group-hover:text-teal-500 transition-colors">
-                  0{i+1}
-                </div>
+                <span className="text-white/80 text-xs font-bold" style={{ fontFamily: "sans-serif" }}>{label}</span>
+                <span className="text-white/30 text-[10px] leading-tight" style={{ fontFamily: "sans-serif" }}>{desc}</span>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="relative z-10 text-center py-5 border-t border-white/5">
+          <p className="text-white/20 text-xs" style={{ fontFamily: "sans-serif" }}>
+            © 2025 Pesantren Sukahideng · Powered by Sukahideng App
+          </p>
+        </div>
+
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-white/5 bg-black/50 backdrop-blur-3xl py-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-3">
-             <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain opacity-50" />
-             <span className="text-slate-600 font-black text-[10px] uppercase tracking-[.3em]">© 2025 Pesantren Sukahideng · Intelligence</span>
-          </div>
-          <div className="flex items-center gap-8">
-            <Link href="#" className="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-teal-500 transition-colors">Privacy</Link>
-            <Link href="#" className="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-teal-500 transition-colors">Terms</Link>
-            <Link href="#" className="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-teal-500 transition-colors">Support</Link>
-          </div>
-        </div>
-      </footer>
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+      `}</style>
 
     </div>
   );

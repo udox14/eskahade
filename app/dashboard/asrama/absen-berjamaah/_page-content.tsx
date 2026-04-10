@@ -4,12 +4,6 @@ import { useState, useEffect } from 'react'
 import { getSessionBerjamaah, getKamarsBerjamaah, getDataAbsenBerjamaahKamar, batchSaveAbsenBerjamaah } from './actions'
 import { Sun, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, ShieldOff } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
@@ -17,18 +11,18 @@ type Waktu = typeof WAKTU[number]
 type Status = null | 'A' | 'S' | 'H' | 'P'
 
 const STATUS_OPTS: { val: Status; label: string; color: string; bg: string }[] = [
-  { val: null, label: 'Hadir', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/40 dark:border-emerald-800' },
-  { val: 'A',  label: 'Alfa',  color: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 border-red-300 dark:bg-red-900/40 dark:border-red-800' },
-  { val: 'S',  label: 'Sakit', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-100 border-amber-300 dark:bg-amber-900/40 dark:border-amber-800' },
-  { val: 'H',  label: 'Haid',  color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-100 border-purple-300 dark:bg-purple-900/40 dark:border-purple-800' },
-  { val: 'P',  label: 'Pulang',color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 border-blue-300 dark:bg-blue-900/40 dark:border-blue-800' },
+  { val: null, label: 'Hadir', color: 'text-green-700', bg: 'bg-green-100 border-green-300' },
+  { val: 'A',  label: 'Alfa',  color: 'text-red-700',   bg: 'bg-red-100 border-red-300' },
+  { val: 'S',  label: 'Sakit', color: 'text-orange-700',bg: 'bg-orange-100 border-orange-300' },
+  { val: 'H',  label: 'Haid',  color: 'text-purple-700',bg: 'bg-purple-100 border-purple-300' },
+  { val: 'P',  label: 'Pulang',color: 'text-blue-700',  bg: 'bg-blue-100 border-blue-300' },
 ]
 
 const WAKTU_META = {
-  shubuh:  { label: 'Shubuh',  icon: '🌙' },
-  ashar:   { label: 'Ashar',   icon: '☀️' },
-  maghrib: { label: 'Maghrib', icon: '🌅' },
-  isya:    { label: 'Isya',    icon: '🌃' },
+  shubuh:  { label: 'Shubuh',  icon: '🌙', color: 'from-indigo-900 to-slate-900' },
+  ashar:   { label: 'Ashar',   icon: '☀️', color: 'from-orange-700 to-amber-800' },
+  maghrib: { label: 'Maghrib', icon: '🌅', color: 'from-rose-800 to-orange-900' },
+  isya:    { label: 'Isya',    icon: '🌃', color: 'from-slate-800 to-indigo-950' },
 }
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -160,170 +154,137 @@ export default function AbsenBerjamaahPage() {
 
   if (sessionInfo === 'loading') return (
     <div className="flex h-screen items-center justify-center">
-      <Loader2 className="w-10 h-10 animate-spin text-teal-500"/>
+      <Loader2 className="w-10 h-10 animate-spin text-indigo-500"/>
     </div>
   )
 
   if (!sessionInfo) return (
-    <div className="flex flex-col h-screen items-center justify-center gap-4 p-8 text-center bg-background text-muted-foreground animate-in fade-in">
-      <ShieldOff className="w-16 h-16 opacity-30"/>
-      <h2 className="text-xl font-bold text-foreground">Akses Ditolak</h2>
-      <p className="text-sm">Fitur ini hanya untuk Pengurus Asrama ASY-SYIFA 1–4.</p>
+    <div className="flex flex-col h-screen items-center justify-center gap-4 p-8 text-center">
+      <ShieldOff className="w-16 h-16 text-slate-300"/>
+      <h2 className="text-xl font-bold text-slate-500">Akses Ditolak</h2>
+      <p className="text-sm text-slate-400">Fitur ini hanya untuk Pengurus Asrama ASY-SYIFA 1–4.</p>
     </div>
   )
 
   return (
-    <div className="max-w-lg mx-auto pb-32 select-none animate-in fade-in slide-in-from-bottom-4">
+    <div className="max-w-lg mx-auto pb-32 select-none">
 
-      {/* HEADER HERO */}
-      <div className="relative bg-teal-950 border border-teal-900/50 text-teal-50 px-5 pt-5 pb-6 rounded-[2rem] rounded-t-none shadow-xl shadow-teal-900/20 overflow-hidden mb-6">
-        <div className="absolute -top-10 -right-10 w-48 h-48 bg-amber-500/20 rounded-full blur-[40px] pointer-events-none"/>
-        <div className="absolute bottom-10 -left-10 w-32 h-32 bg-teal-500/30 rounded-full blur-3xl pointer-events-none"/>
-        
-        <div className="relative z-10 space-y-4">
+      {/* HEADER */}
+      <div className="bg-gradient-to-br from-emerald-900 to-teal-900 text-white p-5 rounded-b-3xl shadow-xl mb-4 relative overflow-hidden">
+        <div className="relative z-10 space-y-3">
           <div className="flex justify-between items-center">
-            <h1 className="text-xl font-black flex items-center gap-2">
-              <Sun className="w-5 h-5 text-amber-400"/> Absen Berjamaah
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Sun className="w-5 h-5 text-yellow-300"/> Absen Berjamaah
             </h1>
-            <div className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border", sessionInfo.asrama_binaan ? 'bg-teal-800/50 text-teal-200 border-teal-500/30' : 'bg-white/5 border-white/10')}>
-              <Lock className="w-3.5 h-3.5 text-teal-100 opacity-70"/>
-              {sessionInfo.asrama_binaan
-                ? <span>{sessionInfo.asrama_binaan}</span>
-                : <select value={asrama} onChange={e => setAsrama(e.target.value)}
-                    className="bg-transparent text-teal-50 font-bold outline-none cursor-pointer appearance-none">
-                    {ASRAMA_PUTRI.map(a => <option key={a} value={a} className="text-primary">{a}</option>)}
-                  </select>
-              }
-            </div>
+            {sessionInfo.asrama_binaan
+              ? <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl text-sm font-bold">
+                  <Lock className="w-3 h-3"/> {sessionInfo.asrama_binaan}
+                </div>
+              : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                  className="bg-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-xl outline-none border border-white/20 cursor-pointer">
+                  {ASRAMA_PUTRI.map(a => <option key={a} value={a} className="text-black">{a}</option>)}
+                </select>
+            }
           </div>
 
-          <Input 
-            type="date" 
-            value={tanggal} 
-            onChange={e => setTanggal(e.target.value)}
-            className="bg-white/10 border-white/20 text-white rounded-xl focus-visible:ring-amber-500 shadow-sm"
-          />
+          <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+            className="bg-white/10 text-white text-sm px-3 py-1.5 rounded-xl outline-none border border-white/20 w-full cursor-pointer"/>
 
-          {/* Statistik kamar aktif saja */}
-          <div className="grid grid-cols-4 gap-2">
+          {/* Statistik kamar aktif saja — zero row reads */}
+          <div className="grid grid-cols-4 gap-1.5">
             {WAKTU.map(w => {
               const alfa  = countStatus(w, 'A')
               const sakit = countStatus(w, 'S')
-              const hadir = totalKamar > 0 ? (totalKamar - (santriKamar.filter(s => (localData[s.id]?.[w] ?? null) !== null).length)) : 0
+              const hadir = totalKamar - (santriKamar.filter(s => (localData[s.id]?.[w] ?? null) !== null).length)
               return (
-                <div key={w} className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-2xl p-2.5 text-center flex flex-col justify-between items-center h-[90px]">
-                  <p className="text-base leading-none mb-1">{WAKTU_META[w].icon}</p>
-                  <p className="text-[9px] font-black tracking-widest text-teal-200/70 uppercase leading-none">{WAKTU_META[w].label}</p>
+                <div key={w} className="bg-white/10 rounded-xl p-2 text-center">
+                  <p className="text-base">{WAKTU_META[w].icon}</p>
+                  <p className="text-[10px] font-bold text-white/80 uppercase">{WAKTU_META[w].label}</p>
                   <p className="text-sm font-black text-white tabular-nums">{hadir}/{totalKamar}</p>
-                  <div className="h-4 flex items-center justify-center">
-                    {(alfa > 0 || sakit > 0) && (
-                      <span className="text-[9px] text-amber-300 font-bold bg-amber-900/30 px-1 rounded">A:{alfa} S:{sakit}</span>
-                    )}
-                  </div>
+                  {(alfa > 0 || sakit > 0) && (
+                    <p className="text-[9px] text-red-300 font-bold">A:{alfa} S:{sakit}</p>
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"/>
       </div>
 
       {/* KAMAR NAV */}
       {loadingKamars ? (
-        <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground"/></div>
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-teal-400"/></div>
       ) : kamars.length > 0 && (
         <div className="flex items-center gap-2 px-4 mb-3">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => setKamarIdx(i => Math.max(0, i - 1))} 
-            disabled={kamarIdx === 0}
-            className="rounded-xl h-12 w-12 border-border shadow-sm disabled:opacity-30"
-          >
-            <ChevronLeft className="w-6 h-6"/>
-          </Button>
-          
-          <div className="flex-1">
-             <Select value={String(kamarIdx)} onValueChange={(val) => { if(val) setKamarIdx(Number(val)) }}>
-               <SelectTrigger className="w-full h-12 rounded-xl border-border shadow-sm bg-card text-center flex flex-col items-center justify-center py-1">
-                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-black">Pilih Kamar</span>
-                  <SelectValue />
-               </SelectTrigger>
-               <SelectContent>
-                 {kamars.map((k, i) => (
-                   <SelectItem key={k} value={String(i)} className="font-bold">
-                     {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({kamarCache[`${k}__${tanggal}`]?.length ?? '?'} santri)
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-          </div>
-
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} 
-            disabled={kamarIdx === kamars.length - 1}
-            className="rounded-xl h-12 w-12 border-border shadow-sm disabled:opacity-30"
-          >
-            <ChevronRight className="w-6 h-6"/>
-          </Button>
+          <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
+            className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
+            <ChevronLeft className="w-5 h-5 text-slate-700"/>
+          </button>
+          <select value={kamarIdx} onChange={e => setKamarIdx(Number(e.target.value))}
+            className="flex-1 bg-white border rounded-xl px-3 py-2 text-sm font-bold text-center outline-none shadow cursor-pointer">
+            {kamars.map((k, i) => (
+              <option key={k} value={i}>
+                {savedKamars.has(k) ? '✓ ' : ''}Kamar {k} ({kamarCache[`${k}__${tanggal}`]?.length ?? '?'} santri)
+              </option>
+            ))}
+          </select>
+          <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
+            className="p-2 bg-white rounded-xl shadow border disabled:opacity-30 active:scale-90">
+            <ChevronRight className="w-5 h-5 text-slate-700"/>
+          </button>
         </div>
       )}
 
       {/* CONTENT */}
       {loadingKamar ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground"/></div>
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-teal-400"/></div>
       ) : kamars.length === 0 && !loadingKamars ? (
-        <div className="mx-4 py-16 text-center bg-muted/30 rounded-2xl border-2 border-dashed border-border/60 text-muted-foreground text-sm font-medium">
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
           Tidak ada santri di asrama ini.
         </div>
       ) : santriKamar.length === 0 && !loadingKamar && activeKamar ? (
-        <div className="mx-4 py-16 text-center bg-muted/30 rounded-2xl border-2 border-dashed border-border/60 text-muted-foreground text-sm font-medium">
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
           Pilih kamar untuk memuat data.
         </div>
       ) : santriKamar.length > 0 && (
-        <Card className="mx-4 rounded-2xl shadow-sm border overflow-hidden bg-card" key={activeKamar}>
-          <div className="bg-muted px-4 py-3 flex justify-between items-center border-b h-12">
-            <span className="font-black text-sm text-muted-foreground tracking-wider uppercase">KAMAR {activeKamar}</span>
+        <div className="mx-4 bg-white rounded-2xl shadow border overflow-hidden" key={activeKamar}>
+          <div className="bg-teal-900 text-white px-4 py-3 flex justify-between items-center">
+            <span className="font-black text-base">KAMAR {activeKamar}</span>
             <div className="flex items-center gap-2">
               {savedKamars.has(activeKamar) && (
-                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 py-0.5 gap-1 shadow-none font-bold">
+                <span className="text-[10px] bg-green-500/30 text-green-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <CheckCircle className="w-3 h-3"/> Tersimpan
-                </Badge>
+                </span>
               )}
-              <span className="text-xs text-muted-foreground font-medium">{santriKamar.length} santri</span>
+              <span className="text-xs text-teal-300">{santriKamar.length} santri</span>
             </div>
           </div>
 
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2 bg-muted/50 border-b">
-            <div className="text-[10px] text-muted-foreground font-black tracking-widest uppercase">Nama Santri</div>
+          <div className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2 bg-slate-50 border-b">
+            <div className="text-[10px] text-slate-400 font-bold uppercase">Nama</div>
             {WAKTU.map(w => (
-              <div key={w} className="text-[9px] text-muted-foreground font-bold text-center leading-none tracking-widest uppercase flex flex-col items-center justify-end">
-                <span className="text-[14px] mb-0.5">{WAKTU_META[w].icon}</span>
-                {WAKTU_META[w].label}
+              <div key={w} className="text-[10px] text-slate-500 font-bold text-center leading-tight">
+                {WAKTU_META[w].icon}<br/>{WAKTU_META[w].label}
               </div>
             ))}
           </div>
 
           {/* Santri rows */}
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-slate-100">
             {santriKamar.map((s: SantriRow) => (
-              <div key={s.id} className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2.5 items-center hover:bg-muted/40 transition-colors">
-                <div className="min-w-0 pr-2">
-                  <p className="text-sm font-bold text-foreground truncate">{s.nama_lengkap}</p>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{s.nis}</p>
+              <div key={s.id} className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2.5 items-center hover:bg-slate-50">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{s.nama_lengkap}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
                 </div>
                 {WAKTU.map(w => {
                   const val = localData[s.id]?.[w] ?? null
                   const opt = STATUS_OPTS.find(o => o.val === val) || STATUS_OPTS[0]
                   return (
                     <button key={w} onClick={() => cycleStatus(s.id, w)}
-                      className={cn(
-                        "w-[40px] h-10 rounded-xl border-2 text-sm font-black transition-all active:scale-90 shadow-sm mx-auto flex items-center justify-center select-none outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                        opt.bg, 
-                        opt.color
-                      )}>
+                      className={`w-10 h-10 rounded-xl border-2 text-xs font-black transition-all active:scale-90 ${opt.bg} ${opt.color}`}>
                       {val === null ? '✓' : val}
                     </button>
                   )
@@ -333,63 +294,41 @@ export default function AbsenBerjamaahPage() {
           </div>
 
           {/* Legend */}
-          <div className="px-4 py-3 bg-muted/30 border-t flex flex-wrap items-center gap-2">
+          <div className="px-4 py-2.5 bg-slate-50 border-t flex flex-wrap gap-2">
             {STATUS_OPTS.map(o => (
-              <Badge key={String(o.val)} variant="outline" className={cn("text-[9px] font-black px-1.5 py-0 shadow-none gap-1 uppercase tracking-wider border", o.bg, o.color)}>
-                <span className="text-[11px] leading-none mb-px">{o.val === null ? '✓' : o.val}</span> {o.label}
-              </Badge>
+              <span key={String(o.val)} className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${o.bg} ${o.color}`}>
+                {o.val === null ? '✓' : o.val} = {o.label}
+              </span>
             ))}
-            <span className="text-[10px] text-muted-foreground ml-auto hidden sm:block italic font-medium">Tap kotak untuk ubah</span>
+            <span className="text-[10px] text-slate-400 ml-auto">Tap untuk ganti status</span>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* FIXED BOTTOM */}
       {kamars.length > 0 && santriKamar.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-safe pt-3 bg-background/80 backdrop-blur-md border-t border-border/50 z-40">
-           <div className="max-w-lg mx-auto flex gap-3 mb-2 sm:mb-4">
-             <Button 
-               variant="outline" 
-               size="icon" 
-               onClick={() => setKamarIdx(i => Math.max(0, i - 1))} 
-               disabled={kamarIdx === 0}
-               className="h-14 w-14 rounded-2xl shadow-sm border-border"
-             >
-               <ChevronLeft className="w-6 h-6"/>
-             </Button>
-             
-             <Button 
-               onClick={saveKamar} 
-               disabled={saving}
-               className={cn(
-                 "flex-1 h-14 rounded-2xl font-black text-sm shadow-sm transition-all shadow-primary/20",
-                 savedKamars.has(activeKamar) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-               )}
-             >
-               {saving
-                 ? <Loader2 className="w-5 h-5 animate-spin mr-2"/>
-                 : savedKamars.has(activeKamar)
-                   ? <CheckCircle className="w-5 h-5 mr-2"/>
-                   : <Save className="w-5 h-5 mr-2"/>
-               }
-               {saving
-                 ? "MENYIMPAN..."
-                 : savedKamars.has(activeKamar)
-                   ? "TERSIMPAN"
-                   : `SIMPAN KAMAR ${activeKamar}`
-               }
-             </Button>
- 
-             <Button 
-               variant="outline" 
-               size="icon" 
-               onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} 
-               disabled={kamarIdx === kamars.length - 1}
-               className="h-14 w-14 rounded-2xl shadow-sm border-border"
-             >
-               <ChevronRight className="w-6 h-6"/>
-             </Button>
-           </div>
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
+          <div className="max-w-lg mx-auto flex gap-3">
+            <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
+              className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">
+              <ChevronLeft className="w-5 h-5 text-slate-600"/>
+            </button>
+            <button onClick={saveKamar} disabled={saving}
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm shadow-sm transition-all active:scale-95 ${
+                savedKamars.has(activeKamar) ? 'bg-green-600 text-white' : 'bg-teal-900 text-white'
+              }`}>
+              {saving
+                ? <Loader2 className="w-5 h-5 animate-spin"/>
+                : savedKamars.has(activeKamar)
+                  ? <><CheckCircle className="w-5 h-5"/> TERSIMPAN</>
+                  : <><Save className="w-5 h-5"/> SIMPAN KAMAR {activeKamar}</>
+              }
+            </button>
+            <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
+              className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">
+              <ChevronRight className="w-5 h-5 text-slate-600"/>
+            </button>
+          </div>
         </div>
       )}
     </div>

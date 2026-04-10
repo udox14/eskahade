@@ -1,18 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { simpanSantriKeKelas, simpanPenempatanBatch } from './actions'
-import { Save, Search, CheckSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle, Download, Loader2, AlertTriangle, ChevronRight, User } from 'lucide-react'
-import { toast } from 'sonner' 
-import { cn } from '@/lib/utils'
+import React from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Card } from '@/components/ui/card'
+import { useState } from 'react'
+// HAPUS IMPORT XLSX STATIS
+import { simpanSantriKeKelas, simpanPenempatanBatch } from './actions'
+import { Save, Search, CheckSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle, Download, Loader2, AlertTriangle } from 'lucide-react'
+import { toast } from 'sonner' 
 
 export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], santriList: any[] }) {
   const [mode, setMode] = useState<'manual' | 'excel'>('manual')
@@ -191,79 +185,64 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
     <div className="space-y-6">
       
       {/* TAB SWITCHER */}
-      <Tabs value={mode} onValueChange={(v) => setMode(v as 'manual' | 'excel')} className="w-full">
-        <TabsList className="w-full grid grid-cols-2 p-1 bg-muted/60 rounded-xl h-11 mb-6 border border-border">
-          <TabsTrigger value="manual" className="font-black rounded-lg gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <CheckSquare className="w-4 h-4"/> Manual
-          </TabsTrigger>
-          <TabsTrigger value="excel" className="font-black rounded-lg gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <FileSpreadsheet className="w-4 h-4"/> Import Excel
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setMode('manual')}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            mode === 'manual' ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <CheckSquare className="w-4 h-4"/> Cara Manual (Satu Kelas)
+        </button>
+        <button
+          onClick={() => setMode('excel')}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            mode === 'excel' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4"/> Cara Import Excel (Banyak Kelas)
+        </button>
+      </div>
 
-        {/* --- MODE MANUAL --- */}
-        <TabsContent value="manual" className="space-y-6 mt-2 outline-none animate-in fade-in slide-in-from-left-4 duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* 1. Pilih Kelas */}
-            <div className="bg-indigo-500/5 p-5 rounded-2xl border border-indigo-500/10 space-y-3">
-              <label className="text-[10px] font-black text-indigo-600/70 dark:text-indigo-400/70 uppercase tracking-[0.2em] block">
-                Langkah 1: Pilih Kelas Tujuan
-              </label>
-              <Select value={selectedKelas} onValueChange={(v) => setSelectedKelas(v ?? '')}>
-                <SelectTrigger className="w-full h-11 bg-background border-border rounded-xl font-bold focus:ring-indigo-500">
-                  <SelectValue placeholder="Pilih Kelas Tujuan"/>
-                </SelectTrigger>
-                <SelectContent>
-                  {kelasList.map((k) => (
-                    <SelectItem key={k.id} value={k.id} className="font-bold">{k.nama_kelas}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* 2. Ringkasan */}
-            <div className="bg-emerald-500/5 p-5 rounded-2xl border border-emerald-500/10 flex flex-col justify-center">
-              <label className="text-[10px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-[0.2em] block mb-2">
-                Ringkasan Penempatan
-              </label>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-black text-foreground tabular-nums">{selectedSantri.length}</p>
-                  <p className="text-xs text-muted-foreground font-medium">Santri Terpilih</p>
-                </div>
-                <Button
-                  onClick={handleSimpanManual}
-                  disabled={loading || selectedSantri.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 h-11 rounded-xl shadow-lg shadow-indigo-500/20 gap-2 transition-all active:scale-95"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                  Simpan Data
-                </Button>
-              </div>
-            </div>
+      {/* --- MODE MANUAL --- */}
+      {mode === 'manual' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-left-2">
+          {/* 1. Pilih Kelas */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Langkah 1: Pilih Kelas Tujuan</label>
+            <select 
+              className="w-full md:w-1/2 p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
+              value={selectedKelas}
+              onChange={(e) => setSelectedKelas(e.target.value)}
+            >
+              <option value="">-- Pilih Kelas --</option>
+              {kelasList.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.nama_kelas}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* List Pemilihan Santri */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                Langkah 2: Pilih Santri dari Daftar
-              </label>
+          {/* 2. Pilih Santri */}
+          <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+              <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Langkah 2: Pilih Santri</label>
               
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button 
-                  variant="outline"
+                <button 
                   onClick={handleSelectAll}
-                  className="h-10 text-xs font-black rounded-xl border-border px-4 shadow-sm"
+                  className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded border transition-colors whitespace-nowrap"
                 >
-                  Pilih Semua
-                </Button>
+                  Pilih Semua Tampil
+                </button>
 
                 <div className="relative flex-1 sm:flex-none">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input 
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input 
+                    type="text" 
                     placeholder="Cari nama atau grade..." 
-                    className="pl-9 h-10 text-sm border-border rounded-xl focus:ring-indigo-500 w-full sm:w-64"
+                    className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none w-full sm:w-64"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -271,142 +250,156 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredSantri.length === 0 ? (
-                <div className="col-span-full py-20 text-center text-muted-foreground italic bg-muted/20 border border-dashed rounded-2xl">
+            <div className="border border-gray-200 rounded-lg max-h-[500px] overflow-y-auto bg-white p-2 grid grid-cols-1 gap-2">
+              {filteredSantri.length === 0 && (
+                <div className="text-center py-12 text-gray-400 italic">
                   Tidak ada santri yang cocok dengan pencarian.
                 </div>
-              ) : (
-                filteredSantri.map((s) => (
-                  <Card 
-                    key={s.id} 
-                    onClick={() => handleToggle(s.id)}
-                    className={cn(
-                      "group p-4 rounded-xl border cursor-pointer flex justify-between items-center transition-all duration-200 active:scale-[0.98] shadow-sm",
-                      selectedSantri.includes(s.id) 
-                        ? 'bg-indigo-500/5 border-indigo-500 ring-1 ring-indigo-500 shadow-indigo-500/10' 
-                        : 'bg-card border-border hover:border-indigo-400/50 hover:bg-muted/30'
-                    )}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={cn(
-                        "w-5 h-5 rounded-lg border flex items-center justify-center transition-colors shrink-0",
-                        selectedSantri.includes(s.id) ? 'bg-indigo-600 border-indigo-600' : 'border-border bg-muted/50'
-                      )}>
-                        {selectedSantri.includes(s.id) && <CheckSquare className="w-3.5 h-3.5 text-white" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-foreground truncate">{s.nama_lengkap}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{s.nis}</p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 ml-2">
-                      {s.rekomendasi ? (
-                        <Badge variant="outline" className={cn(
-                          'text-[9px] font-black border-transparent shadow-none px-2 h-5 rounded-lg',
-                          s.rekomendasi.includes('Grade A') ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400' :
-                          s.rekomendasi.includes('Tamhidiyyah') ? 'bg-orange-500/10 text-orange-700 dark:text-orange-400' :
-                          'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
-                        )}>
-                          {s.rekomendasi}
-                        </Badge>
-                      ) : (
-                        <span className="text-[9px] text-muted-foreground/40 italic font-medium">No Grade</span>
-                      )}
-                    </div>
-                  </Card>
-                ))
               )}
+
+              {filteredSantri.map((s) => (
+                <div 
+                  key={s.id} 
+                  onClick={() => handleToggle(s.id)}
+                  className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all ${
+                    selectedSantri.includes(s.id) 
+                      ? 'bg-green-50 border-green-500 ring-1 ring-green-500 shadow-sm' 
+                      : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                      selectedSantri.includes(s.id) ? 'bg-green-600 border-green-600' : 'border-gray-300 bg-gray-50'
+                    }`}>
+                      {selectedSantri.includes(s.id) && <CheckSquare className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{s.nama_lengkap}</p>
+                      <p className="text-xs text-gray-500 font-mono">{s.nis}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    {s.rekomendasi ? (
+                      <span className={`inline-block px-2 py-1 rounded text-[10px] font-bold uppercase border ${
+                        s.rekomendasi.includes('Grade A') ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                        s.rekomendasi.includes('Tamhidiyyah') ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                        'bg-blue-100 text-blue-700 border-blue-200'
+                      }`}>
+                        {s.rekomendasi}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 italic">Belum Dites</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex justify-between items-center mt-2 text-xs text-gray-500 px-1">
+              <span>* Klik nama santri untuk memilih</span>
+              <span>Terpilih: <b>{selectedSantri.length}</b> santri</span>
             </div>
           </div>
-        </TabsContent>
 
-        {/* --- MODE EXCEL --- */}
-        <TabsContent value="excel" className="space-y-6 mt-2 outline-none animate-in fade-in slide-in-from-right-4 duration-500">
+          <div className="pt-4 border-t border-gray-100 flex justify-end">
+            <button
+              onClick={handleSimpanManual}
+              disabled={loading || selectedSantri.length === 0}
+              className="bg-green-700 hover:bg-green-800 text-white px-8 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 font-medium shadow-md transition-transform active:scale-95"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+              <span>Simpan Masuk Kelas</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODE EXCEL --- */}
+      {mode === 'excel' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* STEP 1 */}
-            <div className="bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10 space-y-4">
-              <h3 className="font-black text-indigo-700 dark:text-indigo-400 flex items-center gap-2">
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 space-y-4">
+              <h3 className="font-bold text-blue-800 flex items-center gap-2">
                 <Download className="w-5 h-5"/> 1. Download Template
               </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                File Excel berisi daftar santri (NIS & Nama) yang belum mendapatkan penempatan kelas.
+              <p className="text-sm text-blue-600 leading-relaxed">
+                File Excel akan berisi daftar semua santri yang belum punya kelas, 
+                lengkap dengan kolom <b>REKOMENDASI TES</b>.
               </p>
-              <Button 
-                variant="outline"
+              <button 
                 onClick={handleDownloadTemplate}
-                className="w-full h-11 bg-background border-border text-foreground font-black hover:bg-indigo-500/10 hover:text-indigo-600 rounded-xl gap-2 shadow-sm"
+                className="w-full bg-white text-blue-700 border border-blue-200 py-2 rounded-lg font-bold hover:bg-blue-100 transition-colors"
               >
-                <FileSpreadsheet className="w-4 h-4"/> Download Template Excel
-              </Button>
+                Download Template Santri.xlsx
+              </button>
             </div>
 
             {/* STEP 2 */}
-            <div className="bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/10 space-y-4">
-              <h3 className="font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <div className="bg-green-50 p-6 rounded-xl border border-green-100 space-y-4">
+              <h3 className="font-bold text-green-800 flex items-center gap-2">
                 <Upload className="w-5 h-5"/> 2. Upload & Proses
               </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                Isi kolom <b>"TARGET KELAS"</b>. Pastikan nama kelas sesuai dengan data Master Kelas.
+              <p className="text-sm text-green-600 leading-relaxed">
+                Isi kolom <b>"TARGET KELAS"</b> di Excel (Misal: 1-A, 1-B). Pastikan nama kelas sesuai dengan Master Kelas.
               </p>
-              <div className="border-2 border-dashed border-emerald-500/30 bg-background rounded-xl p-3 text-center relative hover:bg-emerald-500/5 transition-colors group">
+              <div className="border-2 border-dashed border-green-300 bg-white rounded-lg p-3 text-center relative hover:bg-green-50 transition-colors">
                 <input 
                   type="file" 
                   accept=".xlsx"
                   onChange={handleUploadExcel}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
-                <span className="text-sm text-emerald-600 font-black group-hover:scale-105 transition-transform block">
-                  Pilih File Excel Anda
-                </span>
+                <span className="text-sm text-green-700 font-medium">Klik untuk upload file Excel</span>
               </div>
             </div>
           </div>
 
           {/* STEP 3 */}
           {excelData.length > 0 && (
-            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-              <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
-                <h3 className="font-black text-foreground text-sm flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-500"/> 
-                  Pratinjau Impor ({excelData.filter(d => d.isValid).length} Valid)
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+              <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600"/> 
+                  Preview ({excelData.filter(d => d.isValid).length} Valid)
                 </h3>
-                <Button 
+                <button 
                   onClick={triggerSimpanExcel}
                   disabled={isProcessingExcel}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 h-10 rounded-xl gap-2 shadow-lg shadow-indigo-500/20"
+                  className="bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-800 disabled:opacity-50"
                 >
-                  {isProcessingExcel ? "Memproses..." : <><Save className="w-4 h-4" /> Eksekusi Simpan</>}
-                </Button>
+                  {isProcessingExcel ? "Menyimpan..." : <><Save className="w-4 h-4" /> Eksekusi Simpan</>}
+                </button>
               </div>
               
-              <div className="max-h-[500px] overflow-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead className="bg-muted text-foreground text-[10px] font-black uppercase tracking-widest sticky top-0 z-10">
+              <div className="max-h-[400px] overflow-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0">
                     <tr>
-                      <th className="px-5 py-3 border-b border-border font-black text-muted-foreground">NIS</th>
-                      <th className="px-5 py-3 border-b border-border font-black text-muted-foreground">Nama Santri</th>
-                      <th className="px-5 py-3 border-b border-border font-black text-muted-foreground">Grade</th>
-                      <th className="px-5 py-3 border-b border-border font-black text-muted-foreground">Target Kelas</th>
-                      <th className="px-5 py-3 border-b border-border font-black text-muted-foreground text-center">Status</th>
+                      <th className="px-4 py-2">NIS</th>
+                      <th className="px-4 py-2">Nama Santri</th>
+                      <th className="px-4 py-2">Rekomendasi</th>
+                      <th className="px-4 py-2">Target Kelas (Excel)</th>
+                      <th className="px-4 py-2 text-center">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
+                  <tbody className="divide-y">
                     {excelData.map((row, i) => (
-                      <tr key={i} className={cn('hover:bg-muted/30 transition-colors', !row.isValid && 'bg-rose-500/[0.03]')}>
-                        <td className="px-5 py-3 font-mono text-xs tabular-nums">{row.nis}</td>
-                        <td className="px-5 py-3 font-bold text-foreground">{row.nama}</td>
-                        <td className="px-5 py-3 text-xs font-semibold text-purple-600">{row.rekomendasi}</td>
-                        <td className="px-5 py-3 font-black text-indigo-600">{row.target_kelas_nama}</td>
-                        <td className="px-5 py-3 text-center">
+                      <tr key={i} className={row.isValid ? 'hover:bg-gray-50' : 'bg-red-50'}>
+                        <td className="px-4 py-2 font-mono text-xs">{row.nis}</td>
+                        <td className="px-4 py-2">{row.nama}</td>
+                        <td className="px-4 py-2 text-xs font-medium text-purple-700">{row.rekomendasi}</td>
+                        <td className="px-4 py-2 font-bold">{row.target_kelas_nama}</td>
+                        <td className="px-4 py-2 text-center text-xs">
                           {row.isValid ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-transparent font-black text-[10px]">SIAP</Badge>
+                            <span className="text-green-600 font-bold">Siap Masuk</span>
                           ) : (
-                            <Badge variant="destructive" className="font-black text-[10px] gap-1">
+                            <span className="text-red-600 flex items-center justify-center gap-1">
                               <AlertCircle className="w-3 h-3"/> 
-                              {!row.santri_id ? "SANTRI TIDAK ADA" : "KELAS SALAH"}
-                            </Badge>
+                              {!row.santri_id ? "Santri Tidak Ada" : "Kelas Tidak Ditemukan"}
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -416,30 +409,29 @@ export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], san
               </div>
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+
+        </div>
+      )}
 
       {/* --- MODAL CONFIRM EXCEL --- */}
-      <Dialog open={showConfirmExcel} onOpenChange={setShowConfirmExcel}>
-        <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
-          <div className="p-8 text-center space-y-6">
-            <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-indigo-500/5">
-               <AlertTriangle className="w-10 h-10 text-indigo-600" />
+      {showConfirmExcel && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden text-center p-6">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+               <AlertTriangle className="w-8 h-8 text-blue-600" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-foreground">Konfirmasi Penempatan</h3>
-              <p className="text-sm text-muted-foreground font-medium px-4">
-                Anda akan menempatkan <span className="text-foreground font-black">{excelData.filter(d => d.isValid).length} santri</span> ke kelas baru secara massal. Pastikan data sudah benar.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-2">
-               <Button variant="outline" onClick={() => setShowConfirmExcel(false)} className="h-12 rounded-xl font-black border-border shadow-sm">Batal</Button>
-               <Button onClick={handleSimpanExcel} className="h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-500/20">Ya, Simpan!</Button>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Simpan Penempatan?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Anda akan menempatkan <b>{excelData.filter(d => d.isValid).length} santri</b> ke kelas baru sesuai Excel.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+               <button onClick={() => setShowConfirmExcel(false)} className="py-2.5 rounded-xl border border-gray-300 font-bold text-gray-600 hover:bg-gray-50">Batal</button>
+               <button onClick={handleSimpanExcel} className="py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-md">Ya, Simpan</button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
     </div>
   )
-}
+}

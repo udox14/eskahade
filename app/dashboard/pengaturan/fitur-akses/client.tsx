@@ -1,41 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { 
-  toggleFiturActive, addRoleToFitur, removeRoleFromFitur, 
-  toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal 
-} from './actions'
-import { 
-  ToggleRight, ToggleLeft, ShieldAlert, Info, Users, 
-  CheckCircle2, XCircle, LayoutGrid, Smartphone,
-  ShieldCheck, Lock, Unlock, ChevronRight, ListOrdered,
-  Zap, ArrowRight, Shield, Activity, Loader2
-} from 'lucide-react'
+import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, getBottomNavGlobalStatus } from './actions'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
-
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
 
@@ -59,24 +27,34 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   bendahara:       'Bendahara',
 }
 
-const ROLE_COLOR_CLASS: Record<string, string> = {
-  admin:           'bg-rose-500/10 text-rose-700 border-rose-500/20',
-  keamanan:        'bg-orange-500/10 text-orange-700 border-orange-500/20',
-  sekpen:          'bg-indigo-500/10 text-indigo-700 border-indigo-500/20',
-  dewan_santri:    'bg-purple-500/10 text-purple-700 border-purple-500/20',
-  pengurus_asrama: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-  wali_kelas:      'bg-teal-500/10 text-teal-700 border-teal-500/20',
-  bendahara:       'bg-amber-500/10 text-amber-700 border-amber-500/20',
+const ROLE_COLOR: Record<string, string> = {
+  admin:           'bg-red-100 text-red-700 border-red-200',
+  keamanan:        'bg-orange-100 text-orange-700 border-orange-200',
+  sekpen:          'bg-blue-100 text-blue-700 border-blue-200',
+  dewan_santri:    'bg-purple-100 text-purple-700 border-purple-200',
+  pengurus_asrama: 'bg-green-100 text-green-700 border-green-200',
+  wali_kelas:      'bg-teal-100 text-teal-700 border-teal-200',
+  bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
 }
 
-const ROLE_GRADIENT: Record<string, string> = {
-  admin:           'from-rose-600 to-rose-700 shadow-rose-500/20',
-  keamanan:        'from-orange-500 to-orange-600 shadow-orange-500/20',
-  sekpen:          'from-indigo-600 to-indigo-700 shadow-indigo-500/20',
-  dewan_santri:    'from-purple-600 to-purple-700 shadow-purple-500/20',
-  pengurus_asrama: 'from-emerald-600 to-emerald-700 shadow-emerald-500/20',
-  wali_kelas:      'from-teal-600 to-teal-700 shadow-teal-500/20',
-  bendahara:       'from-amber-500 to-amber-600 shadow-amber-500/20',
+const ROLE_BG_SOFT: Record<string, string> = {
+  admin:           'bg-red-50 border-red-200',
+  keamanan:        'bg-orange-50 border-orange-200',
+  sekpen:          'bg-blue-50 border-blue-200',
+  dewan_santri:    'bg-purple-50 border-purple-200',
+  pengurus_asrama: 'bg-green-50 border-green-200',
+  wali_kelas:      'bg-teal-50 border-teal-200',
+  bendahara:       'bg-yellow-50 border-yellow-200',
+}
+
+const ROLE_HEADER: Record<string, string> = {
+  admin:           'from-red-600 to-red-700',
+  keamanan:        'from-orange-500 to-orange-600',
+  sekpen:          'from-blue-600 to-blue-700',
+  dewan_santri:    'from-purple-600 to-purple-700',
+  pengurus_asrama: 'from-green-600 to-green-700',
+  wali_kelas:      'from-teal-600 to-teal-700',
+  bendahara:       'from-yellow-500 to-yellow-600',
 }
 
 const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'Master Data']
@@ -119,112 +97,95 @@ function TabPerFitur({
   const groups = GROUP_ORDER.filter(g => grouped.has(g))
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4">
       {/* Legend role */}
-      <Card className="bg-muted/30 border-dashed">
-        <CardContent className="px-4 py-3 flex flex-wrap gap-2 items-center">
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-2 flex items-center gap-2">
-            <ShieldCheck className="w-3.5 h-3.5"/> Access Reference:
+      <div className="flex flex-wrap gap-2 items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <span className="text-xs text-slate-500 font-semibold mr-1">Role:</span>
+        {ALL_ROLES.map(r => (
+          <span key={r} className={cn("text-xs px-2.5 py-1 rounded-full border font-medium", ROLE_COLOR[r])}>
+            {ROLE_LABEL[r]}
           </span>
-          {ALL_ROLES.map(r => (
-            <Badge key={r} variant="outline" className={cn("text-[10px] px-2.5 py-0.5 rounded-full font-black tracking-tighter uppercase", ROLE_COLOR_CLASS[r])}>
-              {ROLE_LABEL[r]}
-            </Badge>
-          ))}
-        </CardContent>
-      </Card>
+        ))}
+      </div>
 
       {groups.map(group => (
-        <Card key={group} className="border-border shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-background rounded-lg border shadow-sm">
-                  <ShieldAlert className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <CardTitle className="text-xs font-black text-foreground uppercase tracking-widest">
-                    {group === '_standalone' ? 'Sistem Utama' : group}
-                  </CardTitle>
-                  <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">
-                    {grouped.get(group)!.length} Fitur Terdaftar
-                  </CardDescription>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
+        <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-slate-400" />
+            <h2 className="font-semibold text-slate-700 text-sm">
+              {group === '_standalone' ? 'Menu Utama' : group}
+            </h2>
+            <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
+          </div>
 
-          <Table>
-            <TableHeader className="bg-muted/10">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-10 px-6">Identitas Fitur</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-10 px-4 text-center">Matriks Akses</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest h-10 px-6 text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {grouped.get(group)!.map(fitur => (
-                <TableRow key={fitur.id} className={cn("transition-colors group", !fitur.is_active && "opacity-60 bg-muted/30 whitespace-nowrap")}>
-                  <TableCell className="px-6 py-4">
-                    <div className="font-black text-sm text-foreground uppercase tracking-tight leading-none mb-1">{fitur.title}</div>
-                    <div className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-50 flex items-center gap-1.5">
-                       <ArrowRight className="w-2.5 h-2.5"/> {fitur.href}
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-4">
-                    <div className="flex flex-wrap justify-center gap-1.5 min-w-[280px]">
-                      {ALL_ROLES.map(role => {
-                        const hasRole = fitur.roles.includes(role)
-                        const isAdmin = role === 'admin'
-                        const isLoading = loadingId === `role-${fitur.id}-${role}`
-                        return (
-                          <button
-                            key={role}
-                            onClick={() => onToggleRole(fitur, role)}
-                            disabled={isAdmin || isLoading || pending}
-                            className={cn(
-                              "text-[9px] px-2.5 py-1.5 rounded-xl border-2 font-black transition-all duration-300 uppercase tracking-tighter whitespace-nowrap",
-                              isLoading && "opacity-50 !scale-90",
-                              isAdmin
-                                ? "cursor-not-allowed opacity-40 bg-muted text-muted-foreground border-transparent"
-                                : hasRole
-                                  ? cn(ROLE_COLOR_CLASS[role], "hover:scale-105 active:scale-90 border-current shadow-sm")
-                                  : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
-                            )}
-                          >
-                            {isLoading ? '...' : ROLE_LABEL[role]}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-right">
-                    <Button
-                      variant={fitur.is_active ? "outline" : "destructive"}
-                      size="sm"
-                      onClick={() => onToggleActive(fitur)}
-                      disabled={loadingId === `active-${fitur.id}` || pending}
-                      className={cn(
-                        "h-8 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all shadow-sm active:scale-95 gap-2",
-                        fitur.is_active 
-                          ? "border-emerald-500/20 text-emerald-700 bg-emerald-500/5 hover:bg-emerald-500/10 hover:text-emerald-800"
-                          : ""
-                      )}
-                    >
-                      {loadingId === `active-${fitur.id}` ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : fitur.is_active ? (
-                        <><Zap className="w-3.5 h-3.5" /> AKTIF</>
-                      ) : (
-                        <><XCircle className="w-3.5 h-3.5" /> OFF</>
-                      )}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Fitur</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Akses Role</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {grouped.get(group)!.map(fitur => (
+                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-800">{fitur.title}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[180px]">{fitur.href}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {ALL_ROLES.map(role => {
+                          const hasRole = fitur.roles.includes(role)
+                          const isAdmin = role === 'admin'
+                          const isLoading = loadingId === `role-${fitur.id}-${role}`
+                          return (
+                            <button
+                              key={role}
+                              onClick={() => onToggleRole(fitur, role)}
+                              disabled={isAdmin || isLoading || pending}
+                              title={isAdmin ? 'Admin selalu punya akses' : hasRole ? `Cabut akses ${ROLE_LABEL[role]}` : `Beri akses ${ROLE_LABEL[role]}`}
+                              className={cn(
+                                "text-xs px-2.5 py-1 rounded-full border font-medium transition-all duration-200",
+                                isLoading && "opacity-50 cursor-wait",
+                                isAdmin
+                                  ? "cursor-not-allowed opacity-80 " + ROLE_COLOR[role]
+                                  : hasRole
+                                    ? cn(ROLE_COLOR[role], "hover:opacity-75 hover:scale-95")
+                                    : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200"
+                              )}
+                            >
+                              {isLoading ? '...' : ROLE_LABEL[role]}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => onToggleActive(fitur)}
+                        disabled={loadingId === `active-${fitur.id}` || pending}
+                        className={cn(
+                          "flex items-center gap-1.5 ml-auto text-xs font-medium px-3 py-1.5 rounded-lg border transition-all duration-200",
+                          loadingId === `active-${fitur.id}` && "opacity-50 cursor-wait",
+                          fitur.is_active
+                            ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                        )}
+                      >
+                        {fitur.is_active
+                          ? <><ToggleRight className="w-4 h-4" /> Aktif</>
+                          : <><ToggleLeft className="w-4 h-4" /> Nonaktif</>
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -234,6 +195,7 @@ function TabPerFitur({
 function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
   const [selectedRole, setSelectedRole] = useState<string>('sekpen')
 
+  // Kelompokkan fitur yang dimiliki role terpilih, per grup
   const fiturForRole = fiturList.filter(f => f.roles.includes(selectedRole))
   const grouped = new Map<string, FiturItem[]>()
   for (const f of fiturForRole) {
@@ -246,10 +208,10 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
   const totalNonaktif = fiturForRole.filter(f => !f.is_active).length
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-5">
 
-      {/* Role selector cards (PREMIUM) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* Role selector cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {ALL_ROLES.map(role => {
           const count = fiturList.filter(f => f.roles.includes(role) && f.is_active).length
           const isSelected = selectedRole === role
@@ -258,109 +220,132 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
               key={role}
               onClick={() => setSelectedRole(role)}
               className={cn(
-                "group relative flex flex-col items-center gap-2 p-4 rounded-3xl border-2 text-center transition-all duration-500 active:scale-95",
+                "flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 text-center transition-all duration-200",
                 isSelected
-                  ? cn(`bg-gradient-to-br border-transparent shadow-xl scale-105 z-10`, ROLE_GRADIENT[role])
-                  : `bg-card border-border hover:border-slate-300 hover:shadow-lg`
+                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm scale-105`
+                  : `bg-white ${ROLE_BG_SOFT[role]} hover:scale-102 hover:shadow-sm`
               )}
             >
-              {isSelected && (
-                <div className="absolute top-1.5 right-1.5 p-1 bg-white/20 rounded-full text-white">
-                  <CheckCircle2 className="w-3 h-3"/>
-                </div>
-              )}
-              <div className={cn(
-                "p-2.5 rounded-2xl transition-transform duration-500",
-                isSelected ? "bg-white/20 scale-110" : "bg-muted text-muted-foreground group-hover:scale-110"
+              <span className={cn("text-xs font-bold", isSelected ? "text-white" : "text-slate-700")}>
+                {ROLE_LABEL_FULL[role]}
+              </span>
+              <span className={cn(
+                "text-lg font-black leading-none",
+                isSelected ? "text-white" : ROLE_COLOR[role].split(' ')[1]
               )}>
-                 <Shield className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <span className={cn("text-[9px] font-black uppercase tracking-widest", isSelected ? "text-white/80" : "text-muted-foreground")}>
-                  {ROLE_LABEL[role]}
-                </span>
-                <div className={cn("text-xl font-black tracking-tight leading-none", isSelected ? "text-white" : "text-foreground")}>
-                  {count}
-                </div>
-              </div>
+                {count}
+              </span>
+              <span className={cn("text-[10px]", isSelected ? "text-white/70" : "text-slate-400")}>
+                fitur aktif
+              </span>
             </button>
           )
         })}
       </div>
 
-      {/* Summary Area */}
-      <Card className={cn(
-        "border-border shadow-xl overflow-hidden relative group",
-        ROLE_COLOR_CLASS[selectedRole].split(' ')[0],
+      {/* Summary bar */}
+      <div className={cn(
+        "flex items-center gap-4 px-5 py-3 rounded-xl border",
+        ROLE_BG_SOFT[selectedRole]
       )}>
-        <div className={cn("absolute top-0 right-0 w-48 h-48 bg-gradient-to-br opacity-10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl transition-all duration-1000", ROLE_GRADIENT[selectedRole])} />
-        <CardContent className="p-6 relative z-10 flex flex-col sm:flex-row items-center gap-6">
-          <div className={cn("w-14 h-14 rounded-[2rem] bg-gradient-to-br flex items-center justify-center shrink-0 shadow-lg scale-110", ROLE_GRADIENT[selectedRole])}>
-            <Users className="w-6 h-6 text-white" />
+        <div className={cn("w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0", ROLE_HEADER[selectedRole])}>
+          <Users className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <div className="font-bold text-slate-800 text-sm">{ROLE_LABEL_FULL[selectedRole]}</div>
+          <div className="text-xs text-slate-500">
+            {fiturForRole.length} fitur diberikan akses
           </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-xl font-black text-foreground tracking-tight uppercase leading-none mb-1">{ROLE_LABEL_FULL[selectedRole]} Matriks</h2>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center justify-center sm:justify-start gap-1.5">
-               <Activity className="w-3.5 h-3.5 text-emerald-600"/> {fiturForRole.length} Fitur Terotorisasi
-            </div>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {totalAktif} aktif
           </div>
-          <div className="flex items-center gap-4 bg-background/50 backdrop-blur-sm p-3 rounded-2xl border border-border shadow-inner">
-            <div className="px-4 py-1.5 text-center">
-              <div className="text-lg font-black text-emerald-600 leading-none">{totalAktif}</div>
-              <div className="text-[8px] font-black uppercase tracking-widest opacity-50">Online</div>
+          {totalNonaktif > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+              <XCircle className="w-3.5 h-3.5" />
+              {totalNonaktif} nonaktif
             </div>
-            <Separator orientation="vertical" className="h-8" />
-            <div className="px-4 py-1.5 text-center">
-              <div className={cn("text-lg font-black leading-none", totalNonaktif > 0 ? "text-rose-600" : "text-muted-foreground/30")}>{totalNonaktif}</div>
-              <div className="text-[8px] font-black uppercase tracking-widest opacity-50">Offline</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Feature Listing */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-        {groups.map(group => (
-          <Card key={group} className="border-border shadow-sm bg-muted/5 group overflow-hidden">
-             <CardHeader className="bg-muted/30 border-b py-4">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                   <ChevronRight className="w-3.5 h-3.5 text-indigo-500 p-0.5 bg-indigo-500/10 rounded-full"/>
-                   {group === '_standalone' ? 'Sistem Utama' : group}
-                </CardTitle>
-             </CardHeader>
-             <CardContent className="p-0">
-                <div className="divide-y divide-border/50">
-                   {grouped.get(group)!.map(fitur => (
-                      <div key={fitur.id} className={cn("flex items-center justify-between gap-4 px-5 py-4 transition-all hover:bg-muted/50", !fitur.is_active && "bg-muted/30")}>
-                         <div className="space-y-0.5 min-w-0">
-                            <div className={cn("text-[11px] font-black uppercase tracking-tight truncate group-hover:text-foreground transition-colors", fitur.is_active ? 'text-slate-800' : 'text-muted-foreground opacity-60')}>
-                               {fitur.title}
-                            </div>
-                            <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40 font-mono truncate">{fitur.href}</div>
-                         </div>
-                         <Badge variant={fitur.is_active ? "default" : "outline"} className={cn("text-[8px] font-black tracking-widest h-5 px-2 py-0 border-none", fitur.is_active ? "bg-emerald-600 shadow-emerald-500/10" : "text-muted-foreground opacity-30")}>
-                            {fitur.is_active ? 'READY' : 'STANDBY'}
-                         </Badge>
-                      </div>
-                   ))}
-                </div>
-             </CardContent>
-          </Card>
-        ))}
+          )}
+        </div>
       </div>
 
-      {/* Fitur Terkunci (DETAILS REPLACEMENT) */}
+      {/* Daftar fitur per grup untuk role terpilih */}
+      {fiturForRole.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl px-6 py-12 text-center text-slate-400 text-sm">
+          Role ini belum punya akses ke fitur apapun.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {groups.map(group => (
+            <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-100 px-5 py-2.5 flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  {group === '_standalone' ? 'Menu Utama' : group}
+                </span>
+                <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {grouped.get(group)!.map(fitur => (
+                  <div
+                    key={fitur.id}
+                    className={cn(
+                      "flex items-center gap-3 px-5 py-3 transition-colors",
+                      !fitur.is_active && "opacity-50"
+                    )}
+                  >
+                    {/* Status dot */}
+                    <div className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      fitur.is_active ? "bg-green-400" : "bg-red-300"
+                    )} />
+
+                    {/* Nama fitur */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
+                      <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
+                    </div>
+
+                    {/* Badge status */}
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded-full border font-medium shrink-0",
+                      fitur.is_active
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : "bg-red-50 text-red-500 border-red-200"
+                    )}>
+                      {fitur.is_active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Fitur yang TIDAK dimiliki role ini */}
       {(() => {
-        const tidakPunya = fiturList.filter(f => !f.roles.includes(selectedRole))
+        const tidakPunya = fiturList.filter(f => !f.roles.includes(selectedRole) && f.is_active)
         if (tidakPunya.length === 0) return null
         return (
-          <Alert variant="warning" className="bg-muted/50 border-dashed py-3">
-             <Lock className="w-4 h-4 opacity-50" />
-             <AlertTitle className="text-[10px] font-black uppercase tracking-[0.2em] mb-1">Restricted Assets</AlertTitle>
-             <AlertDescription className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                Terdapat {tidakPunya.length} fitur sistem lainnya yang tidak memiliki izin akses untuk matriks {ROLE_LABEL[selectedRole]}.
-             </AlertDescription>
-          </Alert>
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 font-medium px-1 py-2 flex items-center gap-1.5 select-none">
+              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+              Lihat {tidakPunya.length} fitur yang tidak dapat diakses role ini
+            </summary>
+            <div className="mt-2 bg-white border border-slate-200 rounded-xl overflow-hidden opacity-50">
+              <div className="divide-y divide-gray-50">
+                {tidakPunya.map(fitur => (
+                  <div key={fitur.id} className="flex items-center gap-3 px-5 py-2.5">
+                    <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+                    <span className="text-sm text-slate-500">{fitur.title}</span>
+                    <span className="text-xs text-slate-400 font-mono ml-auto hidden sm:inline">{fitur.href}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
         )
       })()}
     </div>
@@ -387,6 +372,7 @@ function TabBottomNav({
   onToggleBottomNav: (f: FiturItem) => void
   onSetUrutan: (f: FiturItem, urutan: number) => void
 }) {
+  // Hitung berapa fitur is_bottomnav per role
   const roleCount: Record<string, number> = {}
   for (const f of fiturList) {
     if (!f.is_bottomnav) continue
@@ -401,172 +387,185 @@ function TabBottomNav({
 
   const otherItems = fiturList
     .filter(f => !f.is_bottomnav && f.is_active)
+    .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Global Logic Switch (PREMIUM) */}
-      <Card className={cn(
-        "border-border shadow-xl overflow-hidden transition-all duration-700 relative",
-        globalEnabled ? 'bg-emerald-500/5' : 'bg-muted/20 grayscale'
-      )}>
-        <CardContent className="p-6 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className={cn("w-14 h-14 rounded-3xl flex items-center justify-center shrink-0 shadow-lg border-2 transition-all duration-700", globalEnabled ? "bg-emerald-600 border-emerald-400 text-white" : "bg-card border-border text-muted-foreground")}>
-               <Smartphone className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-foreground tracking-tight uppercase leading-none mb-1">Global Navigation Bar</h2>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 flex items-center gap-1.5">
-                 {globalEnabled ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600"/> Active on All Devices</> : <><XCircle className="w-3.5 h-3.5 text-rose-500"/> Permanently Hidden</>}
-              </p>
-            </div>
-          </div>
-          <Switch 
-            checked={globalEnabled} 
-            onCheckedChange={onToggleGlobal} 
-            disabled={togglingGlobal} 
-            className="data-[state=checked]:bg-emerald-600"
-          />
-        </CardContent>
-      </Card>
+    <div className="space-y-5">
+      {/* Toggle Global */}
+      <div className={`flex items-center justify-between gap-4 rounded-xl border px-5 py-4 ${
+        globalEnabled ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+      }`}>
+        <div>
+          <p className="text-sm font-bold text-slate-800">Bottom Nav — Aktif Global</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {globalEnabled
+              ? 'Bottom nav tampil untuk semua user (sesuai preferensi masing-masing).'
+              : 'Bottom nav disembunyikan dari semua user, apapun preferensi mereka.'}
+          </p>
+        </div>
+        <button
+          onClick={onToggleGlobal}
+          disabled={togglingGlobal}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+            globalEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            globalEnabled ? 'translate-x-5' : 'translate-x-0'
+          }`} />
+        </button>
+      </div>
 
-      {/* Intelligence Note */}
-      <Alert className="bg-indigo-500/5 border-indigo-500/20 py-4">
-        <Smartphone className="w-4 h-4 text-indigo-600" />
-        <AlertTitle className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 font-black text-indigo-800">Docks System Protocol</AlertTitle>
-        <AlertDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-loose leading-relaxed">
-          Sistem akan mengisi maksimal <strong>4 slot dinamis</strong> per role sesuai delegasi di bawah. 
-          Slot ke-5 secara otomatis direservasi oleh sistem untuk <strong>Dashboard Master</strong>. 
-          Urutan menentukan prioritas visual di layar mobile.
-        </AlertDescription>
-      </Alert>
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
+        <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
+        <span>
+          Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu "Menu"</strong> yang mengarah ke halaman Dashboard.
+          Tiap role hanya melihat fitur yang ia miliki sekaligus ditandai bottom nav. Maksimal <strong>4 fitur aktif per role</strong>.
+        </span>
+      </div>
 
-      {/* Role Quota Monitor */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {ALL_ROLES.map(role => {
+      {/* Warning jika ada role yang melebihi 4 */}
+      {Object.entries(roleCount).some(([, c]) => c > 4) && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+          <span>
+            <strong>Peringatan:</strong> Beberapa role memiliki lebih dari 4 item bottom nav.
+            Hanya 4 item pertama (urutan terkecil) yang akan ditampilkan. Sesuaikan urutan atau nonaktifkan item berlebih.
+          </span>
+        </div>
+      )}
+
+      {/* Ringkasan per role */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {Object.entries(ROLE_LABEL).map(([role, label]) => {
           const count = roleCount[role] ?? 0
           const over = count > 4
           return (
-            <Card key={role} className={cn("border-border shadow-sm p-4 text-center space-y-2 relative overflow-hidden", over ? "bg-rose-50 border-rose-200" : "bg-card")}>
-              {over && <div className="absolute top-0 right-0 w-8 h-8 bg-rose-500/10 rounded-bl-full flex items-center justify-center"><ShieldAlert className="w-3 h-3 text-rose-600"/></div>}
-              <div className={cn("text-[9px] font-black uppercase tracking-widest", ROLE_COLOR_CLASS[role].split(' ')[1])}>{ROLE_LABEL[role]}</div>
-              <div className="flex flex-col items-center">
-                 <div className={cn("text-xl font-black leading-none", over ? "text-rose-600" : "text-foreground")}>{count}</div>
-                 <div className="text-[8px] font-black text-muted-foreground uppercase opacity-40">/ 4 slots</div>
-              </div>
-            </Card>
+            <div key={role} className={cn(
+              "rounded-xl border px-3 py-2.5 text-xs",
+              over ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"
+            )}>
+              <span className={cn("font-semibold block mb-0.5", ROLE_COLOR[role].split(' ')[1])}>
+                {label}
+              </span>
+              <span className={cn("text-slate-500", over && "text-amber-600 font-medium")}>
+                {count} / 4 slot terpakai
+              </span>
+            </div>
           )
         })}
       </div>
 
-      {/* Active Bottom Nav */}
-      <Card className="border-border shadow-sm overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b py-4">
-           <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-              <ListOrdered className="w-4 h-4 text-emerald-600"/> Optimized Docking Areas
-           </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-           {bottomNavItems.length === 0 ? (
-             <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-4 border-dashed m-4 border-2 rounded-2xl">
-                <LayoutGrid className="w-12 h-12 opacity-10" />
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">No Dynamic Assets Docked</p>
-             </div>
-           ) : (
-             <Table>
-                <TableHeader className="bg-muted/10">
-                   <TableRow>
-                      <TableHead className="w-20 text-[10px] font-black uppercase px-6">Rank</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase">Functional Unit</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-center hidden md:table-cell">Target Role</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-right px-6">Action</TableHead>
-                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                   {bottomNavItems.map(fitur => {
-                     const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
-                     return (
-                        <TableRow key={fitur.id} className="group">
-                           <TableCell className="px-6">
-                              <Select
-                                value={String(fitur.bottomnav_urutan)}
-                                onValueChange={val => onSetUrutan(fitur, Number(val))}
-                                disabled={isLoading || pending}
-                              >
-                                <SelectTrigger className="w-14 h-9 rounded-xl font-black text-xs border-emerald-500/20 focus:ring-emerald-500/20">
-                                   <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl border-border shadow-2xl">
-                                   {[1, 2, 3, 4].map(num => (
-                                      <SelectItem key={num} value={String(num)} className="rounded-lg font-black text-xs">SLOT {num}</SelectItem>
-                                   ))}
-                                </SelectContent>
-                              </Select>
-                           </TableCell>
-                           <TableCell>
-                              <div className="font-black text-xs uppercase tracking-tight text-foreground">{fitur.title}</div>
-                              <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40 font-mono truncate max-w-[150px]">{fitur.href}</div>
-                           </TableCell>
-                           <TableCell className="hidden md:table-cell">
-                              <div className="flex justify-center flex-wrap gap-1">
-                                {fitur.roles.slice(0, 3).map(role => (
-                                  <Badge key={role} variant="outline" className={cn("text-[8px] px-2 py-0 h-4 border-none", ROLE_COLOR_CLASS[role])}>
-                                    {ROLE_LABEL[role]}
-                                  </Badge>
-                                ))}
-                                {fitur.roles.length > 3 && <Badge variant="outline" className="text-[8px] px-2 py-0 h-4">+ {fitur.roles.length - 3}</Badge>}
-                              </div>
-                           </TableCell>
-                           <TableCell className="px-6 text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onToggleBottomNav(fitur)}
-                                disabled={isLoading || pending}
-                                className="h-8 rounded-xl text-[9px] font-black border-emerald-500/20 text-emerald-700 bg-emerald-500/5 hover:bg-emerald-500/10 gap-2 uppercase tracking-widest active:scale-95"
-                              >
-                                {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ToggleRight className="w-3.5 h-3.5" />}
-                                <span className="hidden sm:inline">DOCK ACTIVE</span>
-                              </Button>
-                           </TableCell>
-                        </TableRow>
-                     )
-                   })}
-                </TableBody>
-             </Table>
-           )}
-        </CardContent>
-      </Card>
+      {/* Fitur yang sudah di bottom nav */}
+      {bottomNavItems.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
+            Aktif di Bottom Nav ({bottomNavItems.length} fitur)
+          </p>
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-50">
+            {bottomNavItems.map(fitur => {
+              const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
+              return (
+                <div key={fitur.id} className="flex items-center gap-3 px-5 py-3">
+                  {/* Urutan selector */}
+                  <select
+                    value={fitur.bottomnav_urutan}
+                    disabled={isLoading || pending}
+                    onChange={e => onSetUrutan(fitur, Number(e.target.value))}
+                    className="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 bg-slate-50 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
 
-      {/* Other Available Features */}
-      {otherItems.length > 0 && (
-        <Card className="border-border border-dashed shadow-none bg-muted/5">
-           <CardHeader className="py-4">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Available Assets for Docking</CardTitle>
-           </CardHeader>
-           <CardContent className="p-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:gap-x-12 px-6 pb-6">
-                 {otherItems.map(fitur => (
-                   <div key={fitur.id} className="flex items-center justify-between py-3 group">
-                      <div className="flex-1 min-w-0">
-                         <div className="text-[11px] font-black uppercase tracking-tight text-slate-500 group-hover:text-foreground transition-colors truncate">{fitur.title}</div>
-                         <div className="text-[8px] font-black text-muted-foreground opacity-30 font-mono truncate">{fitur.href}</div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onToggleBottomNav(fitur)}
-                        disabled={loadingId === `bottomnav-${fitur.id}` || pending}
-                        className="h-7 text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 hover:bg-blue-500/10 hover:text-blue-600 rounded-lg transition-all"
-                      >
-                         Add to Dock <ArrowRight className="w-2.5 h-2.5 ml-1"/>
-                      </Button>
-                   </div>
-                 ))}
-              </div>
-           </CardContent>
-        </Card>
+                  {/* Nama & href */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
+                    <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
+                  </div>
+
+                  {/* Role badges */}
+                  <div className="hidden sm:flex flex-wrap gap-1 max-w-[180px]">
+                    {fitur.roles.slice(0, 3).map(role => (
+                      <span key={role} className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
+                        ROLE_COLOR[role] ?? 'bg-slate-100 text-slate-600 border-slate-200'
+                      )}>
+                        {ROLE_LABEL[role] ?? role}
+                      </span>
+                    ))}
+                    {fitur.roles.length > 3 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                        +{fitur.roles.length - 3}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Toggle off button */}
+                  <button
+                    onClick={() => onToggleBottomNav(fitur)}
+                    disabled={isLoading || pending}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40 shrink-0"
+                  >
+                    <ToggleRight className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Aktif</span>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
+
+      {/* Fitur lain yang bisa ditambahkan */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
+          Fitur Lainnya — klik untuk tambahkan ke bottom nav
+        </p>
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-50">
+          {otherItems.length === 0 && (
+            <p className="text-sm text-slate-400 px-5 py-4 text-center">Semua fitur sudah ditambahkan ke bottom nav.</p>
+          )}
+          {otherItems.map(fitur => {
+            const isLoading = loadingId === `bottomnav-${fitur.id}`
+            return (
+              <div key={fitur.id} className="flex items-center gap-3 px-5 py-3 opacity-60 hover:opacity-100 transition-opacity">
+                <div className="w-14 text-xs text-slate-300 text-center">—</div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-slate-700">{fitur.title}</span>
+                  <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
+                </div>
+                <div className="hidden sm:flex flex-wrap gap-1 max-w-[180px]">
+                  {fitur.roles.slice(0, 3).map(role => (
+                    <span key={role} className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
+                      ROLE_COLOR[role] ?? 'bg-slate-100 text-slate-600 border-slate-200'
+                    )}>
+                      {ROLE_LABEL[role] ?? role}
+                    </span>
+                  ))}
+                  {fitur.roles.length > 3 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                      +{fitur.roles.length - 3}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => onToggleBottomNav(fitur)}
+                  disabled={isLoading || pending}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-40 shrink-0"
+                >
+                  <ToggleRight className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Tambahkan</span>
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -576,9 +575,15 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   const [fiturList, setFiturList] = useState<FiturItem[]>(initial)
   const [globalEnabled, setGlobalEnabled] = useState(initialGlobal)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
-  const [activeTab, setActiveTab] = useState('fitur')
+  const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'bottomnav'>('fitur')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   function updateLocal(id: number, updater: (f: FiturItem) => FiturItem) {
     setFiturList(prev => prev.map(f => f.id === id ? updater(f) : f))
@@ -591,9 +596,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await toggleFiturActive(fitur.id, fitur.is_active)
         updateLocal(fitur.id, f => ({ ...f, is_active: !f.is_active }))
-        toast.success(`Fitur "${fitur.title}" ${fitur.is_active ? 'dinonaktifkan' : 'diaktifkan'}`)
+        showToast(`Fitur "${fitur.title}" ${fitur.is_active ? 'dinonaktifkan' : 'diaktifkan'}`)
       } catch {
-        toast.error('Gagal sinkronisasi status fitur')
+        showToast('Gagal mengubah status fitur', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -605,9 +610,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
     try {
       await toggleBottomNavGlobal(globalEnabled)
       setGlobalEnabled(v => !v)
-      toast.success(`Bottom Docks ${globalEnabled ? 'deactivated' : 'operational'} globally`)
+      showToast(`Bottom nav ${globalEnabled ? 'dinonaktifkan' : 'diaktifkan'} untuk semua user`)
     } catch {
-      toast.error('Gagal sinkronisasi status global')
+      showToast('Gagal mengubah setting global', 'error')
     } finally {
       setTogglingGlobal(false)
     }
@@ -620,9 +625,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await toggleFiturBottomNav(fitur.id, fitur.is_bottomnav)
         updateLocal(fitur.id, f => ({ ...f, is_bottomnav: !f.is_bottomnav }))
-        toast.success(`Asset "${fitur.title}" status dock diperbarui`)
+        showToast(`"${fitur.title}" ${fitur.is_bottomnav ? 'dihapus dari' : 'ditambahkan ke'} bottom nav`)
       } catch {
-        toast.error('Gagal konfigurasi docking asset')
+        showToast('Gagal mengubah bottom nav', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -636,9 +641,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await setBottomNavUrutan(fitur.id, urutan)
         updateLocal(fitur.id, f => ({ ...f, bottomnav_urutan: urutan }))
-        toast.success(`Priority set to ${urutan} for "${fitur.title}"`)
+        showToast(`Urutan "${fitur.title}" diubah ke ${urutan}`)
       } catch {
-        toast.error('Gagal menetapkan prioritas docking')
+        showToast('Gagal mengubah urutan', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -655,14 +660,14 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
         if (hasRole) {
           await removeRoleFromFitur(fitur.id, role)
           updateLocal(fitur.id, f => ({ ...f, roles: f.roles.filter(r => r !== role) }))
-          toast.success(`Delegasi "${ROLE_LABEL[role]}" dicabut dari "${fitur.title}"`)
+          showToast(`Role "${ROLE_LABEL[role]}" dihapus dari "${fitur.title}"`)
         } else {
           await addRoleToFitur(fitur.id, role)
           updateLocal(fitur.id, f => ({ ...f, roles: [...f.roles, role] }))
-          toast.success(`Delegasi "${ROLE_LABEL[role]}" berhasil diberikan ke "${fitur.title}"`)
+          showToast(`Role "${ROLE_LABEL[role]}" ditambahkan ke "${fitur.title}"`)
         }
       } catch {
-        toast.error('Gagal sinkronisasi delegasi role')
+        showToast('Gagal mengubah akses role', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -670,80 +675,90 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-      
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
-        <div className="flex items-center gap-5">
-          <div className="p-4 bg-indigo-500/10 rounded-[2rem] text-indigo-600 shadow-sm border-2 border-indigo-500/20 scale-110">
-            <LayoutGrid className="w-6 h-6"/>
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight uppercase leading-none">Fitur & Hak Akses</h1>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70 mt-1.5 flex items-center gap-2">
-               <Unlock className="w-3.5 h-3.5 text-emerald-600"/> Permission Management Core
-            </p>
-          </div>
-        </div>
+    <div className="space-y-5">
 
-        {/* Info Banner Integrated */}
-        <div className="hidden lg:flex items-center gap-4 bg-blue-500/5 px-5 py-3 rounded-2xl border border-blue-500/10 backdrop-blur-sm">
-           <Info className="w-4 h-4 text-blue-500" />
-           <p className="text-[10px] font-black uppercase tracking-widest text-blue-800 opacity-80 leading-tight">
-              Changes sync in real-time. <br/> Administrator assets are immutable.
-           </p>
+      {/* Toast */}
+      {toast && (
+        <div className={cn(
+          "fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-sm text-sm font-medium animate-in slide-in-from-top-2 duration-300",
+          toast.type === 'success' ? "bg-green-600 text-white" : "bg-red-600 text-white"
+        )}>
+          {toast.msg}
         </div>
+      )}
+
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+        <span>
+          Perubahan akses tersimpan langsung ke database dan berlaku dalam <strong>±5 menit</strong> setelah cache diperbarui.
+          Role <strong>Admin</strong> tidak bisa dicabut aksesnya dari fitur apapun.
+        </span>
       </div>
 
-      <Separator className="opacity-50" />
-
-      {/* TABS NAVIGATION (PREMIUM) */}
-      <Tabs defaultValue="fitur" value={activeTab} onValueChange={(v) => setActiveTab(v ?? 'fitur')} className="w-full">
-        <TabsList className="h-14 bg-muted/50 p-1.5 rounded-[1.5rem] border border-border shadow-inner mb-8 overflow-x-auto no-scrollbar justify-start">
-          <TabsTrigger value="fitur" className="h-11 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 flex items-center gap-3">
-             <LayoutGrid className="w-4 h-4" /> Feature matrix
-          </TabsTrigger>
-          <TabsTrigger value="role" className="h-11 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 flex items-center gap-3">
-             <Users className="w-4 h-4" /> Role delegation
-          </TabsTrigger>
-          <TabsTrigger value="bottomnav" className="h-11 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 flex items-center gap-3">
-             <Smartphone className="w-4 h-4" /> Docks system
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="fitur">
-          <TabPerFitur
-            fiturList={fiturList}
-            loadingId={loadingId}
-            pending={pending}
-            onToggleActive={handleToggleActive}
-            onToggleRole={handleToggleRole}
-          />
-        </TabsContent>
-        <TabsContent value="role">
-          <TabPerRole fiturList={fiturList} />
-        </TabsContent>
-        <TabsContent value="bottomnav">
-          <TabBottomNav
-            fiturList={fiturList}
-            loadingId={loadingId}
-            pending={pending}
-            globalEnabled={globalEnabled}
-            togglingGlobal={togglingGlobal}
-            onToggleGlobal={handleToggleGlobal}
-            onToggleBottomNav={handleToggleBottomNav}
-            onSetUrutan={handleSetUrutan}
-          />
-        </TabsContent>
-      </Tabs>
-
-      {/* MOBILE INFO BANNER */}
-      <div className="lg:hidden flex items-start gap-3 bg-blue-500/5 px-5 py-4 rounded-2xl border border-blue-500/10">
-         <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-         <p className="text-[9px] font-black uppercase tracking-widest text-blue-800 opacity-80 leading-relaxed">
-            Semua perubahan akses tersimpan secara otomatis. Role Administrator memiliki akses mutlak yang tidak dapat dimodifikasi.
-         </p>
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('fitur')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'fitur'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <LayoutGrid className="w-4 h-4" />
+          Per Fitur
+        </button>
+        <button
+          onClick={() => setActiveTab('role')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'role'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Users className="w-4 h-4" />
+          Per Role
+        </button>
+        <button
+          onClick={() => setActiveTab('bottomnav')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'bottomnav'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Smartphone className="w-4 h-4" />
+          Bottom Nav
+        </button>
       </div>
+
+      {/* Tab content */}
+      {activeTab === 'fitur' ? (
+        <TabPerFitur
+          fiturList={fiturList}
+          loadingId={loadingId}
+          pending={pending}
+          onToggleActive={handleToggleActive}
+          onToggleRole={handleToggleRole}
+        />
+      ) : activeTab === 'role' ? (
+        <TabPerRole fiturList={fiturList} />
+      ) : (
+        <TabBottomNav
+          fiturList={fiturList}
+          loadingId={loadingId}
+          pending={pending}
+          globalEnabled={globalEnabled}
+          togglingGlobal={togglingGlobal}
+          onToggleGlobal={handleToggleGlobal}
+          onToggleBottomNav={handleToggleBottomNav}
+          onSetUrutan={handleSetUrutan}
+        />
+      )}
     </div>
   )
 }

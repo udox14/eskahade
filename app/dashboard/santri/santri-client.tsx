@@ -3,26 +3,7 @@
 import React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import Pagination from '@/components/ui/pagination'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { Search, ChevronLeft, ChevronRight, Filter, X, SlidersHorizontal } from 'lucide-react'
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value)
@@ -53,11 +34,11 @@ export function SearchInput() {
 
   return (
     <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-      <Input
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+      <input
         type="text"
         placeholder="Cari nama atau NIS..."
-        className="w-full pl-9 pr-4 rounded-xl border-border bg-background shadow-sm"
+        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm bg-slate-50 focus:bg-white transition-colors"
         value={text}
         onChange={e => setText(e.target.value)}
       />
@@ -71,26 +52,25 @@ export function LimitSelector() {
   const searchParams = useSearchParams()
   const limit = searchParams.get('limit') || '10'
 
-  const handleChange = (val: string) => {
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const params = new URLSearchParams(searchParams.toString())
-    params.set('limit', val)
+    params.set('limit', e.target.value)
     params.set('page', '1')
     router.replace(`?${params.toString()}`, { scroll: false })
   }
 
   return (
-    <Select value={limit} onValueChange={(val) => { if (val) handleChange(val) }}>
-      <SelectTrigger className="w-[100px] rounded-xl shadow-sm">
-        <SelectValue placeholder="Baris" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="10">10 Baris</SelectItem>
-        <SelectItem value="20">20 Baris</SelectItem>
-        <SelectItem value="50">50 Baris</SelectItem>
-        <SelectItem value="100">100 Baris</SelectItem>
-        <SelectItem value="9999">Semua</SelectItem>
-      </SelectContent>
-    </Select>
+    <select
+      value={limit}
+      onChange={handleChange}
+      className="border border-slate-200 rounded-xl px-2.5 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50 focus:bg-white transition-colors"
+    >
+      <option value="10">10</option>
+      <option value="20">20</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="9999">Semua</option>
+    </select>
   )
 }
 
@@ -98,30 +78,54 @@ export function LimitSelector() {
 export function PaginationControls({ total, limit, page }: { total: number; limit: number; page: number }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const totalPages = limit === 999999 ? 1 : Math.ceil(total / limit)
+  const totalPages = Math.ceil(total / limit)
 
-  const onPageChange = (newPage: number) => {
+  const go = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('page', newPage.toString())
     router.push(`?${params.toString()}`, { scroll: false })
   }
 
-  const onPageSizeChange = (newSize: number) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('limit', newSize === 0 ? '9999' : newSize.toString())
-    params.set('page', '1')
-    router.replace(`?${params.toString()}`, { scroll: false })
-  }
-
   return (
-    <Pagination 
-      currentPage={page} 
-      totalPages={totalPages} 
-      pageSize={limit === 999999 ? 0 : limit} 
-      total={total} 
-      onPageChange={onPageChange} 
-      onPageSizeChange={onPageSizeChange} 
-    />
+    <div className="flex items-center justify-between">
+      <p className="text-xs text-slate-500">
+        Hal. <b>{page}</b>/<b>{totalPages}</b> · {total} santri
+      </p>
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => go(Math.max(1, page - 1))}
+          disabled={page === 1}
+          className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4 text-slate-600" />
+        </button>
+        {/* Halaman sekitar current */}
+        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+          const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+          const p = start + i
+          return (
+            <button
+              key={p}
+              onClick={() => go(p)}
+              className={`w-8 h-8 text-xs rounded-lg border transition-colors font-medium ${
+                p === page
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {p}
+            </button>
+          )
+        })}
+        <button
+          onClick={() => go(Math.min(totalPages, page + 1))}
+          disabled={page === totalPages}
+          className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -145,12 +149,12 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
 
   const handleApply = () => {
     const params = new URLSearchParams(searchParams.toString())
-    if (asrama && asrama !== 'semua') params.set('asrama', asrama); else params.delete('asrama')
-    if (kamar && kamar !== 'semua') params.set('kamar', kamar); else params.delete('kamar')
-    if (sekolah && sekolah !== 'semua') params.set('sekolah', sekolah); else params.delete('sekolah')
-    if (kelasSekolah && kelasSekolah !== 'semua') params.set('kelas_sekolah', kelasSekolah); else params.delete('kelas_sekolah')
-    if (marhalah && marhalah !== 'semua') params.set('marhalah', marhalah); else params.delete('marhalah')
-    if (kelasPesantren && kelasPesantren !== 'semua') params.set('kelas', kelasPesantren); else params.delete('kelas')
+    if (asrama) params.set('asrama', asrama); else params.delete('asrama')
+    if (kamar) params.set('kamar', kamar); else params.delete('kamar')
+    if (sekolah) params.set('sekolah', sekolah); else params.delete('sekolah')
+    if (kelasSekolah) params.set('kelas_sekolah', kelasSekolah); else params.delete('kelas_sekolah')
+    if (marhalah) params.set('marhalah', marhalah); else params.delete('marhalah')
+    if (kelasPesantren) params.set('kelas', kelasPesantren); else params.delete('kelas')
     params.set('page', '1')
     router.replace(`?${params.toString()}`, { scroll: false })
     setIsOpen(false)
@@ -167,112 +171,154 @@ export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[];
   const activeCount = [asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren].filter(Boolean).length
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger
-        render={
-          <Button
-            variant={activeCount > 0 ? "secondary" : "outline"}
-            className={cn("flex items-center gap-2 rounded-xl shadow-sm", activeCount > 0 && "bg-primary/10 text-primary hover:bg-primary/20 border-primary/20")}
-          />
-        }
+    <>
+      {/* Tombol Filter */}
+      <button
+        onClick={() => setIsOpen(true)}
+        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
+          activeCount > 0
+            ? 'bg-blue-50 border-blue-300 text-blue-700'
+            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
+        }`}
       >
         <SlidersHorizontal className="w-4 h-4" />
         <span className="hidden sm:inline">Filter</span>
         {activeCount > 0 && (
-          <Badge variant="default" className="w-5 h-5 flex items-center justify-center p-0 rounded-full leading-none ml-1">
+          <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
             {activeCount}
-          </Badge>
+          </span>
         )}
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
-        <SheetHeader className="p-5 border-b">
-          <SheetTitle className="text-left">
-            Filter Santri
-            {activeCount > 0 && (
-              <span className="block text-xs font-normal text-muted-foreground mt-1">
-                {activeCount} filter aktif diterapkan
-              </span>
-            )}
-          </SheetTitle>
-        </SheetHeader>
+      </button>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Tempat Tinggal */}
-          <div className="bg-muted/40 rounded-xl p-4 border border-border">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Tempat Tinggal</p>
-            <div className="space-y-3">
-              <Select value={asrama} onValueChange={(val) => { if (val) { setAsrama(val); setKamar('') } }}>
-                <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Semua Asrama" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semua">Semua Asrama</SelectItem>
-                  {ASRAMA_LIST.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              
-              <Select disabled={!asrama || asrama === 'semua'} value={kamar} onValueChange={(val) => { if (val) setKamar(val) }}>
-                <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Semua Kamar" /></SelectTrigger>
-                <SelectContent className="max-h-[250px]">
-                  <SelectItem value="semua">Semua Kamar</SelectItem>
-                  {Array.from({ length: 50 }, (_, i) => i + 1).map(n => (
-                    <SelectItem key={n} value={String(n)}>Kamar {n}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      {/* Overlay + Drawer — fixed ke viewport, tidak terpotong */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setIsOpen(false)}
+          />
 
-          {/* Sekolah Formal */}
-          <div className="bg-blue-500/5 rounded-xl p-4 border border-blue-500/10 dark:bg-blue-900/10">
-            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-3">Sekolah Formal</p>
-            <div className="space-y-3">
-              <Select value={sekolah} onValueChange={(val) => { if (val) setSekolah(val) }}>
-                <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Semua Sekolah" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semua">Semua Sekolah</SelectItem>
-                  {SEKOLAH_LIST.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                value={kelasSekolah}
-                onChange={e => setKelasSekolah(e.target.value)}
-                placeholder="Kelas (contoh: 7, 8, 10)"
-                className="w-full bg-background"
-              />
-            </div>
-          </div>
+          {/* Panel — bottom sheet di mobile, modal di desktop */}
+          <div className="relative z-10 w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
 
-          {/* Kelas Pesantren */}
-          <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 dark:bg-emerald-900/10">
-            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-3">Kelas Pesantren</p>
-            <div className="space-y-3">
-              <Select value={marhalah} onValueChange={(val) => { if (val) { setMarhalah(val); setKelasPesantren('') } }}>
-                <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Semua Marhalah" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semua">Semua Marhalah</SelectItem>
-                  {marhalahList.map((m: any) => <SelectItem key={m.id} value={String(m.id)}>{m.nama}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select disabled={!marhalah || marhalah === 'semua'} value={kelasPesantren} onValueChange={(val) => { if (val) setKelasPesantren(val) }}>
-                <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Semua Kelas" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semua">Semua Kelas</SelectItem>
-                  {filteredKelas.map((k: any) => <SelectItem key={k.id} value={String(k.id)}>{k.nama_kelas}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            {/* Handle bar (mobile) */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
+
+            {/* Header */}
+            <div className="flex justify-between items-center px-5 py-4 border-b">
+              <div>
+                <h3 className="font-bold text-slate-800">Filter Santri</h3>
+                {activeCount > 0 && (
+                  <p className="text-xs text-blue-600 mt-0.5">{activeCount} filter aktif</p>
+                )}
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body — scrollable */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Tempat Tinggal */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Tempat Tinggal</p>
+                <div className="space-y-2">
+                  <select
+                    value={asrama}
+                    onChange={e => { setAsrama(e.target.value); setKamar('') }}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">Semua Asrama</option>
+                    {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  <select
+                    value={kamar}
+                    onChange={e => setKamar(e.target.value)}
+                    disabled={!asrama}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">Semua Kamar</option>
+                    {Array.from({ length: 50 }, (_, i) => i + 1).map(n => (
+                      <option key={n} value={n}>Kamar {n}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Sekolah Formal */}
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Sekolah Formal</p>
+                <div className="space-y-2">
+                  <select
+                    value={sekolah}
+                    onChange={e => setSekolah(e.target.value)}
+                    className="w-full p-2.5 border border-blue-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">Semua Sekolah</option>
+                    {SEKOLAH_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    value={kelasSekolah}
+                    onChange={e => setKelasSekolah(e.target.value)}
+                    placeholder="Kelas (contoh: 7, 8, 10)"
+                    className="w-full p-2.5 border border-blue-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Kelas Pesantren */}
+              <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                <p className="text-xs font-bold text-green-600 uppercase tracking-wider mb-3">Kelas Pesantren</p>
+                <div className="space-y-2">
+                  <select
+                    value={marhalah}
+                    onChange={e => { setMarhalah(e.target.value); setKelasPesantren('') }}
+                    className="w-full p-2.5 border border-green-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                  >
+                    <option value="">Semua Marhalah</option>
+                    {marhalahList.map((m: any) => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                  </select>
+                  <select
+                    value={kelasPesantren}
+                    onChange={e => setKelasPesantren(e.target.value)}
+                    disabled={!marhalah}
+                    className="w-full p-2.5 border border-green-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">Semua Kelas</option>
+                    {filteredKelas.map((k: any) => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
+                  </select>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t bg-slate-50 rounded-b-2xl flex gap-3">
+              <button
+                onClick={handleReset}
+                className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                onClick={handleApply}
+                className="flex-2 w-full py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                Terapkan Filter
+              </button>
+            </div>
+
           </div>
         </div>
-
-        <div className="p-5 border-t bg-muted/20 flex gap-3 mt-auto">
-          <Button variant="outline" onClick={handleReset} className="flex-1 rounded-xl">
-            Reset
-          </Button>
-          <Button onClick={handleApply} className="flex-2 w-full rounded-xl shadow-sm">
-            Terapkan Filter
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+      )}
+    </>
   )
 }

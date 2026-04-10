@@ -1,11 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-  CalendarDays, Plus, CheckCircle, Circle, Trash2, 
-  Loader2, BookOpen, Users, AlertTriangle, ShieldCheck,
-  History, Settings2, Sparkles
-} from 'lucide-react'
+import { CalendarDays, Plus, CheckCircle, Circle, Trash2, Loader2, BookOpen, Users, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getTahunAjaranList,
@@ -14,14 +10,6 @@ import {
   hapusTahunAjaran,
 } from './actions'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { cn } from '@/lib/utils'
-
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 
 export default function TahunAjaranPage() {
   const confirm = useConfirm()
@@ -81,199 +69,158 @@ export default function TahunAjaranPage() {
   const aktif = list.find(t => t.is_active)
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700">
+    <div className="max-w-3xl mx-auto space-y-6 pb-20">
 
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 shadow-sm border border-emerald-500/10">
-            <CalendarDays className="w-6 h-6"/>
-          </div>
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <CalendarDays className="w-7 h-7 text-green-700" />
+          Tahun Ajaran
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">
+          Kelola tahun ajaran. Hanya satu yang bisa aktif dalam satu waktu. Kelas baru otomatis terhubung ke tahun ajaran yang sedang aktif.
+        </p>
+      </div>
+
+      {/* INFO AKTIF */}
+      {aktif && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
           <div>
-            <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Tahun Ajaran</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Kelola Periode Akademik Aktif</p>
+            <p className="text-sm font-bold text-green-800">Tahun Ajaran Aktif: {aktif.nama}</p>
+            <p className="text-xs text-green-600 mt-0.5">
+              {aktif.jumlah_kelas} kelas · {aktif.jumlah_santri} santri aktif
+            </p>
           </div>
+        </div>
+      )}
+
+      {/* FORM TAMBAH */}
+      <div className="bg-white border rounded-xl shadow-sm p-6">
+        <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">Tambah Tahun Ajaran Baru</h2>
+        <div className="flex gap-3">
+          <input
+            value={nama}
+            onChange={e => setNama(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleTambah()}
+            placeholder="Contoh: 2025/2026"
+            className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <button
+            onClick={handleTambah}
+            disabled={isSaving || !nama.trim()}
+            className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Tambah
+          </button>
+        </div>
+        <p className="text-xs text-slate-400 mt-2">Format yang disarankan: <span className="font-mono">2025/2026</span></p>
+      </div>
+
+      {/* DAFTAR TAHUN AJARAN */}
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b bg-slate-50">
+          <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Daftar Tahun Ajaran</h2>
+        </div>
+
+        {loading ? (
+          <div className="p-12 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+          </div>
+        ) : list.length === 0 ? (
+          <div className="p-12 text-center">
+            <CalendarDays className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Belum ada tahun ajaran. Tambahkan di atas.</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {list.map(ta => (
+              <div
+                key={ta.id}
+                className={`px-6 py-4 flex items-center gap-4 transition-colors ${ta.is_active ? 'bg-green-50/60' : 'hover:bg-slate-50'}`}
+              >
+                {/* STATUS ICON */}
+                <div className="flex-shrink-0">
+                  {ta.is_active
+                    ? <CheckCircle className="w-6 h-6 text-green-600" />
+                    : <Circle className="w-6 h-6 text-slate-300" />
+                  }
+                </div>
+
+                {/* INFO */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-base ${ta.is_active ? 'text-green-800' : 'text-slate-700'}`}>
+                      {ta.nama}
+                    </span>
+                    {ta.is_active && (
+                      <span className="text-[10px] font-bold bg-green-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Aktif
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" />
+                      {ta.jumlah_kelas} kelas
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      {ta.jumlah_santri} santri aktif
+                    </span>
+                  </div>
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {!ta.is_active && (
+                    <button
+                      onClick={() => handleAktifkan(ta.id, ta.nama)}
+                      disabled={loadingAktif === ta.id}
+                      className="text-xs font-bold text-green-700 border border-green-300 bg-white hover:bg-green-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    >
+                      {loadingAktif === ta.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <CheckCircle className="w-3 h-3" />
+                      }
+                      Aktifkan
+                    </button>
+                  )}
+                  {!ta.is_active && (
+                    <button
+                      onClick={() => handleHapus(ta.id, ta.nama)}
+                      disabled={loadingHapus === ta.id}
+                      className="text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      title="Hapus tahun ajaran"
+                    >
+                      {loadingHapus === ta.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />
+                      }
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* CATATAN */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+        <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-amber-800 space-y-1">
+          <p className="font-bold">Catatan Penting</p>
+          <ul className="space-y-1 text-xs list-disc list-inside text-amber-700">
+            <li>Mengaktifkan tahun ajaran baru <strong>tidak menghapus</strong> data tahun sebelumnya.</li>
+            <li>Setelah mengaktifkan tahun ajaran baru, buat kelas-kelas baru untuk tahun tersebut.</li>
+            <li>Data santri, nilai, absensi, dan keuangan tahun lama tetap aman dan bisa dilihat di riwayat.</li>
+            <li>Tahun ajaran hanya bisa dihapus jika belum ada kelas yang terdaftar di dalamnya.</li>
+          </ul>
         </div>
       </div>
 
-      <Separator className="opacity-50" />
-
-      {/* INFO AKTIF (ENHANCED) */}
-      {aktif && (
-        <Alert className="bg-emerald-500/5 border-emerald-500/20 text-emerald-900 shadow-sm overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-          <ShieldCheck className="w-5 h-5 text-emerald-600" />
-          <AlertTitle className="text-[10px] font-black uppercase tracking-[0.2em] mb-1">Tahun Ajaran Aktif</AlertTitle>
-          <AlertDescription className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-lg font-black tracking-tight">{aktif.nama}</p>
-              <div className="flex items-center gap-3 mt-1 font-bold text-[10px] uppercase tracking-widest text-emerald-700/70">
-                 <span className="flex items-center gap-1"><BookOpen className="w-3 h-3"/> {aktif.jumlah_kelas} Kelas</span>
-                 <span className="flex items-center gap-1"><Users className="w-3 h-3"/> {aktif.jumlah_santri} Santri</span>
-              </div>
-            </div>
-            <Sparkles className="w-8 h-8 text-emerald-500/20 opacity-50" />
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* GRID CONTENT */}
-      <div className="grid grid-cols-1 gap-8">
-        
-        {/* FORM TAMBAH (MODERNIZED) */}
-        <Card className="border-border shadow-sm overflow-hidden bg-muted/5">
-          <CardHeader className="bg-muted/30 border-b py-5">
-            <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-emerald-700">
-               <Plus className="w-4 h-4"/> Tambah Periode
-            </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Input tahun ajaran baru ke sistem.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 space-y-1.5">
-                <Input
-                  value={nama}
-                  onChange={e => setNama(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleTambah()}
-                  placeholder="Contoh: 2025/2026"
-                  className="h-11 rounded-xl bg-background border-border font-black text-sm focus-visible:ring-emerald-500"
-                />
-                <p className="text-[10px] text-muted-foreground ml-1 font-bold uppercase tracking-widest opacity-50">Format: YYYY/YYYY (e.g. 2024/2025)</p>
-              </div>
-              <Button
-                onClick={handleTambah}
-                disabled={isSaving || !nama.trim()}
-                className="h-11 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-500/20 gap-2 transition-transform active:scale-95 shrink-0"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                TAMBAH
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* DAFTAR TAHUN AJARAN */}
-        <Card className="border-border shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b py-5 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-700">
-                 <History className="w-4 h-4"/> Riwayat Periode
-              </CardTitle>
-            </div>
-            <Settings2 className="w-4 h-4 text-slate-400 opacity-50" />
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-16 flex flex-col items-center justify-center gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-500/50" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Syncing Periods...</p>
-              </div>
-            ) : list.length === 0 ? (
-              <div className="p-16 text-center">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 border border-dashed border-border">
-                  <CalendarDays className="w-8 h-8 text-muted-foreground opacity-20" />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Empty Historical Data</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 divide-y divide-border/50">
-                {list.map(ta => (
-                  <div
-                    key={ta.id}
-                    className={cn(
-                      "px-6 py-5 flex items-center justify-between gap-4 transition-all hover:bg-muted/30 group",
-                      ta.is_active ? 'bg-emerald-500/5' : ''
-                    )}
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={cn(
-                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-500",
-                        ta.is_active 
-                          ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 text-white scale-110' 
-                          : 'bg-white border-border text-slate-300 group-hover:border-slate-400'
-                      )}>
-                        {ta.is_active ? <CheckCircle className="w-5 h-5" /> : <Circle className="w-5 h-5 stroke-[1.5]" />}
-                      </div>
-
-                      <div className="truncate">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-base font-black tracking-tight uppercase",
-                            ta.is_active ? 'text-emerald-900' : 'text-slate-700'
-                          )}>
-                            {ta.nama}
-                          </span>
-                          {ta.is_active && (
-                            <Badge className="bg-emerald-600/10 text-emerald-700 border-emerald-600/20 text-[9px] font-black tracking-[0.1em] px-2 py-0">AKTIF</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 mt-1 font-bold text-[10px] uppercase tracking-widest text-muted-foreground transition-opacity group-hover:opacity-100 opacity-60">
-                           <span className="flex items-center gap-1"><BookOpen className="w-3 h-3 text-emerald-600/50"/> {ta.jumlah_kelas} Kelas</span>
-                           <span className="flex items-center gap-1"><Users className="w-3 h-3 text-emerald-600/50"/> {ta.jumlah_santri} Santri</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!ta.is_active && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAktifkan(ta.id, ta.nama)}
-                            disabled={loadingAktif === ta.id}
-                            className="h-9 px-4 rounded-xl text-[10px] font-black tracking-widest uppercase border-emerald-500/20 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-all active:scale-95 gap-1.5"
-                          >
-                            {loadingAktif === ta.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-                            AKTIFKAN
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleHapus(ta.id, ta.nama)}
-                            disabled={loadingHapus === ta.id}
-                            className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-90"
-                            title="Hapus tahun ajaran"
-                          >
-                            {loadingHapus === ta.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* CATATAN (MODERNIZED ALERT) */}
-        <Alert variant="warning" className="bg-amber-500/5 border-amber-500/20 text-amber-900 shadow-sm">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <AlertTitle className="text-[10px] font-black uppercase tracking-[0.2em] mb-2">Protokol Periode Akademik</AlertTitle>
-          <AlertDescription>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-bold uppercase tracking-widest opacity-80 leading-relaxed">
-              <li className="flex items-start gap-2">
-                <span className="text-amber-600 mt-0.5">●</span>
-                <span>Data tahun sebelumnya tetap tersimpan & aman di arsip sistem.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span>●</span>
-                <span>Wajib membuat kelas baru setelah mengaktifkan periode baru.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span>●</span>
-                <span>Semua transaksi & absensi akan terasosiasi dengan periode aktif.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span>●</span>
-                <span>Periode hanya bisa dihapus jika belum memiliki relasi data kelas.</span>
-              </li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-
-      </div>
     </div>
   )
 }

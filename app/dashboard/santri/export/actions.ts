@@ -5,11 +5,20 @@ import { getSession } from '@/lib/auth/session'
 import type { ExportFilter, SortBy, KolomExport } from './constants'
 
 // ─── Opsi filter (untuk populate dropdown) ───────────────────────────────────
+// Hemat row reads:
+// - Semua query parallel (Promise.all) — tidak serial
+// - Query marhalah + kelas digabung 1 query (sebelumnya 2 query hampir identik)
+// - Kamar tidak ditampilkan tanpa asrama (terlalu banyak, tidak relevan)
+// - Role pengurus_asrama di-enforce di server, bukan client
 export async function getFilterOptions() {
   const session = await getSession()
   const asramaBinaan = session?.role === 'pengurus_asrama'
     ? session.asrama_binaan ?? null
     : null
+
+  const asramaWhere = asramaBinaan
+    ? `WHERE status_global = 'aktif' AND asrama = '${asramaBinaan}'`
+    : `WHERE status_global = 'aktif' AND asrama IS NOT NULL`
 
   const [asramaList, sekolahList, kelasSekolahList, tahunList, kelasMarhalahList] = await Promise.all([
     // 1. Daftar asrama
@@ -34,7 +43,8 @@ export async function getFilterOptions() {
       `SELECT DISTINCT tahun_masuk AS v FROM santri WHERE status_global='aktif' AND tahun_masuk IS NOT NULL ORDER BY tahun_masuk DESC`
     ).then(r => r.map(x => x.v)),
 
-    // 5. Kelas + marhalah dalam 1 query
+    // 5. Kelas + marhalah dalam 1 query (gabungan dari 2 query sebelumnya)
+    // JOIN ringan — tabel kelas & marhalah kecil, riwayat_pendidikan pakai index
     query<{ marhalah: string; nama_kelas: string; urutan: number }>(`
       SELECT DISTINCT m.nama AS marhalah, k.nama_kelas, m.urutan
       FROM kelas k
@@ -49,7 +59,6 @@ export async function getFilterOptions() {
   ])
 
   const marhalahUnik = [...new Set(kelasMarhalahList.map(r => r.marhalah))]
-  // FIX: kelasList adalah string[] langsung, bukan object[]
   const kelasList    = kelasMarhalahList.map(r => r.nama_kelas)
 
   return {
@@ -59,13 +68,14 @@ export async function getFilterOptions() {
     tahunList,
     marhalahUnik,
     kelasList,
-    asramaBinaan,
+    asramaBinaan, // kirim ke client agar dropdown kamar tahu
   }
 }
 
 // ─── Daftar kamar per asrama (lazy — dipanggil hanya saat asrama dipilih) ─────
 export async function getKamarList(asrama: string) {
   const session = await getSession()
+  // Pengurus asrama hanya bisa akses asrama binaannya
   if (session?.role === 'pengurus_asrama' && session.asrama_binaan !== asrama) {
     return []
   }
@@ -79,6 +89,12 @@ export async function getKamarList(asrama: string) {
 }
 
 // ─── Export data santri ───────────────────────────────────────────────────────
+// Hemat row reads:
+// - 1 query saja ke DB
+// - SELECT hanya kolom yang dipilih user (bukan SELECT *)
+// - JOIN ke riwayat_pendidikan/kelas/marhalah hanya kalau kolom/filter membutuhkan
+// - ROW_NUMBER dihitung di memory (D1 tidak support window function)
+// - Batasi 5000 baris sebagai proteksi
 export async function getDataExport(
   filter: ExportFilter,
   kolom: KolomExport[],
@@ -87,46 +103,26 @@ export async function getDataExport(
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  const forceAsrama = session.role === 'pengurus_asrama' ? session.asrama_binaan : null
+  // Enforce asrama untuk pengurus_asrama
+  const forceAsrama    = session.role === 'pengurus_asrama' ? session.asrama_binaan : null
+  const effectiveAsrama = forceAsrama || filter.asrama || null
 
   // Perlu JOIN ke riwayat_pendidikan?
   const needKelas = kolom.includes('nama_kelas') || kolom.includes('marhalah')
-    || !!(filter.nama_kelas?.length) || !!(filter.marhalah?.length)
+    || !!filter.nama_kelas || !!filter.marhalah
 
   const clauses: string[] = ["s.status_global = 'aktif'"]
   const params: any[]     = []
 
-  // ── Helper: tambah klausa IN (?, ?, ...) untuk array ──────────────────────
-  // FIX: semua filter multi-select sekarang pakai IN bukan =
-  const addIn = (col: string, vals?: string[] | number[]) => {
-    if (!vals?.length) return
-    clauses.push(`${col} IN (${vals.map(() => '?').join(', ')})`)
-    params.push(...vals)
-  }
-
-  // Asrama: forceAsrama (string tunggal) menang atas filter.asrama (array)
-  if (forceAsrama) {
-    clauses.push('s.asrama = ?')
-    params.push(forceAsrama)
-  } else {
-    addIn('s.asrama', filter.asrama)
-  }
-
-  addIn('s.kamar',          filter.kamar)
-  addIn('s.sekolah',        filter.sekolah)
-  addIn('s.kelas_sekolah',  filter.kelas_sekolah)
-  addIn('k.nama_kelas',     filter.nama_kelas)
-  addIn('m.nama',           filter.marhalah)
-  addIn('s.tahun_masuk',    filter.tahun_masuk)
-
-  if (filter.jenis_kelamin) {
-    clauses.push('s.jenis_kelamin = ?')
-    params.push(filter.jenis_kelamin)
-  }
-  if (filter.alamat_kata) {
-    clauses.push('s.alamat LIKE ?')
-    params.push(`%${filter.alamat_kata}%`)
-  }
+  if (effectiveAsrama)      { clauses.push('s.asrama = ?');          params.push(effectiveAsrama) }
+  if (filter.kamar)         { clauses.push('s.kamar = ?');           params.push(filter.kamar) }
+  if (filter.jenis_kelamin) { clauses.push('s.jenis_kelamin = ?');   params.push(filter.jenis_kelamin) }
+  if (filter.sekolah)       { clauses.push('s.sekolah = ?');         params.push(filter.sekolah) }
+  if (filter.kelas_sekolah) { clauses.push('s.kelas_sekolah = ?');   params.push(filter.kelas_sekolah) }
+  if (filter.tahun_masuk)   { clauses.push('s.tahun_masuk = ?');     params.push(filter.tahun_masuk) }
+  if (filter.alamat_kata)   { clauses.push('s.alamat LIKE ?');       params.push(`%${filter.alamat_kata}%`) }
+  if (filter.nama_kelas)    { clauses.push('k.nama_kelas = ?');      params.push(filter.nama_kelas) }
+  if (filter.marhalah)      { clauses.push('m.nama = ?');            params.push(filter.marhalah) }
 
   const where = clauses.join(' AND ')
 
@@ -149,7 +145,7 @@ export async function getDataExport(
 
   // SELECT hanya kolom yang dipilih — bukan SELECT *
   const selectCols = [
-    's.id AS _id',
+    's.id AS _id', // untuk dedup kalau ada LEFT JOIN multiple riwayat
     kolom.includes('nis')           ? 's.nis'           : null,
     kolom.includes('nama_lengkap')  ? 's.nama_lengkap'  : null,
     kolom.includes('jenis_kelamin') ? 's.jenis_kelamin' : null,

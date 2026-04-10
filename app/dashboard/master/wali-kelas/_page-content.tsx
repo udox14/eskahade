@@ -1,27 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
+import { useState, useEffect } from 'react'
 import { getDataMaster, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import {
-  UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload,
-  Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare,
-  Square, Info, Filter, ArrowRight, UserPlus, UserMinus, ShieldCheck,
-  CheckCircle2, ChevronLeft, ChevronRight, LayoutGrid, Database, Layers, Users
-} from 'lucide-react'
+import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
-import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
@@ -83,10 +68,8 @@ export default function ManajemenGuruPage() {
       const asliM = asli.guru_maghrib_id?.toString() || ""
       return local.s?.toString() !== asliS || local.a?.toString() !== asliA || local.m?.toString() !== asliM
     })
-    if (changedClasses.length === 0) return toast.info("Tidak ada perubahan", { description: "Jadwal pengajar belum ada yang diubah." })
-    if (!await confirm(`Konfirmasi Perubahan Jadwal.
-    Terdapat ${changedClasses.length} kelas yang akan diperbarui jadwal pengajarnya. Simpan sekarang?`)) return
-    
+    if (changedClasses.length === 0) return toast.info("Tidak ada perubahan", { description: "Jadwal kelas belum ada yang diubah." })
+    if (!await confirm(`Terdapat ${changedClasses.length} perubahan jadwal. Simpan sekarang?`)) return
     setIsSavingBatch(true)
     const toastId = toast.loading(`Menyimpan ${changedClasses.length} jadwal...`)
     const payload = changedClasses.map(k => ({
@@ -98,38 +81,25 @@ export default function ManajemenGuruPage() {
     const res = await simpanJadwalBatch(payload)
     setIsSavingBatch(false)
     toast.dismiss(toastId)
-    if (res && 'error' in res) {
-      toast.error("Gagal", { description: (res as any).error })
-    } else { 
-      toast.success("Berhasil!", { description: `${(res as any).count} jadwal kelas telah diperbarui.` })
-      loadData() 
-    }
+    if ('error' in res) toast.error("Gagal", { description: (res as any).error })
+    else { toast.success("Berhasil!", { description: `${(res as any).count} kelas telah diperbarui.` }); loadData() }
   }
 
   const handleTambahGuru = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newGuru.nama) return toast.warning("Nama wajib diisi")
-    const toastId = toast.loading("Mendaftarkan guru baru...")
+    const toastId = toast.loading("Menambahkan...")
     const res = await tambahGuruManual(newGuru.nama, newGuru.gelar, newGuru.kode)
     toast.dismiss(toastId)
-    if (res && (res as any).success) { 
-      toast.success("Guru berhasil terdaftar")
-      setNewGuru({ nama: '', gelar: '', kode: '' })
-      loadData() 
-    } else {
-      toast.error((res as any).error || "Gagal mendaftarkan guru")
-    }
+    if ((res as any).success) { toast.success("Guru ditambahkan"); setNewGuru({ nama: '', gelar: '', kode: '' }); loadData() }
+    else toast.error((res as any).error)
   }
 
   const handleHapusGuru = async (id: string, nama: string) => {
-    if (!await confirm(`Hapus permanen data guru ${nama}? Pastikan guru ini tidak sedang terikat pada jadwal mengajar.`)) return
+    if (!await confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
     const res = await hapusGuru(id as any)
-    if (res && (res as any).success) { 
-      toast.success("Data guru dihapus")
-      loadData() 
-    } else {
-      toast.error((res as any).error || "Gagal menghapus guru")
-    }
+    if ((res as any).success) { toast.success("Guru dihapus"); loadData() }
+    else toast.error((res as any).error)
   }
 
   const toggleSelectGuru = (id: string) => {
@@ -137,26 +107,20 @@ export default function ManajemenGuruPage() {
   }
 
   const toggleSelectAllGuru = () => {
-    if (selectedGuruIds.length === filteredTeachers.length) setSelectedGuruIds([])
-    else setSelectedGuruIds(filteredTeachers.map(g => g.id))
+    if (selectedGuruIds.length === guruList.length) setSelectedGuruIds([])
+    else setSelectedGuruIds(guruList.map(g => g.id))
   }
 
   const handleHapusBatch = async () => {
     if (selectedGuruIds.length === 0) return
-    if (!await confirm(`Konfirmasi Hapus Massal.
-    Yakin ingin menghapus ${selectedGuruIds.length} guru terpilih? Hanya guru yang tidak terikat jadwal yang akan terhapus.`)) return
-    
+    if (!await confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
-    const toastId = toast.loading("Memproses penghapusan massal...")
+    const toastId = toast.loading("Menghapus data...")
     const res = await hapusGuruMassal(selectedGuruIds as any)
     setIsDeletingBatch(false)
     toast.dismiss(toastId)
-    if (res && (res as any).success) { 
-      toast.success("Selesai!", { description: `${(res as any).count} data guru dibersihkan dari database.` })
-      loadData() 
-    } else {
-      toast.error("Gagal", { description: (res as any).error })
-    }
+    if ((res as any).success) { toast.success("Berhasil", { description: `${(res as any).count} guru dihapus.` }); loadData() }
+    else toast.error("Gagal Menghapus", { description: (res as any).error })
   }
 
   const handleDownloadTemplate = async () => {
@@ -181,22 +145,21 @@ export default function ManajemenGuruPage() {
       const ws = wb.Sheets[wb.SheetNames[0]]
       const data = XLSX.utils.sheet_to_json(ws)
       setExcelData(JSON.parse(JSON.stringify(data)))
-      toast.success(`${data.length} baris data terbaca dari file Excel`)
-    } catch { toast.error("File tidak valid atau rusak") }
+      toast.success(`${data.length} baris terbaca`)
+    } catch { toast.error("Gagal baca file") }
   }
 
   const handleSimpanGuru = async () => {
     if (excelData.length === 0) return
     setIsProcessing(true)
-    const toastId = toast.loading("Mengimport data guru massal...")
+    const toastId = toast.loading("Mengimport data guru...")
     const res = await importGuruMassal(excelData)
     setIsProcessing(false)
     toast.dismiss(toastId)
-    if (res && 'error' in res) {
-      toast.error("Gagal import", { description: (res as any).error })
-    } else {
-      const skippedMsg = ((res as any).skipped ?? 0) > 0 ? ` (${(res as any).skipped} duplikat diabaikan)` : ''
-      toast.success(`Alhamdulillah! ${(res as any).count} guru terdaftar${skippedMsg}`)
+    if ('error' in res) toast.error("Gagal import", { description: (res as any).error })
+    else {
+      const skippedMsg = ((res as any).skipped ?? 0) > 0 ? ` (${(res as any).skipped} duplikat dilewati)` : ''
+      toast.success(`Berhasil import ${(res as any).count} guru${skippedMsg}`)
       setExcelData([]); loadData(); setTab('JADWAL')
     }
   }
@@ -209,427 +172,233 @@ export default function ManajemenGuruPage() {
     ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
     : guruList
 
-  // Pagination Logic for Teacher List in Master Tab
-  const filteredTeachers = guruList.filter(g => g.nama_lengkap.toLowerCase().includes(search.toLowerCase()))
-  const totalPages = Math.ceil(filteredTeachers.length / pageSize)
-  const safePage = Math.min(Math.max(1, page), totalPages || 1)
-  const startIndex = (safePage - 1) * pageSize
-  const pagedGuruList = filteredTeachers.slice(startIndex, startIndex + pageSize)
+  const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-24 animate-in fade-in duration-500">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
-      {/* HEADER & TABS SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-600 shadow-sm border border-indigo-500/10">
-            <Briefcase className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Manajemen Asatidzah</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Pengaturan Jadwal Pengajar & Wali Kelas</p>
-          </div>
+      {/* HEADER & TABS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Briefcase className="w-6 h-6 text-indigo-600" /> Manajemen Guru & Jadwal
+          </h1>
+          <p className="text-slate-500 text-sm">Atur pengajar per kelas. Guru Malam otomatis jadi Wali Kelas.</p>
         </div>
-
-        <div className="flex bg-muted/50 p-1 border rounded-2xl shadow-inner shrink-0">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => { setTab('JADWAL'); setSearch('') }} 
-            className={cn(
-               "h-9 rounded-xl text-[10px] font-black uppercase tracking-widest px-4",
-               tab === 'JADWAL' ? "bg-background text-indigo-600 shadow-sm" : "text-muted-foreground/60"
-            )}
-          >
-            <School className="w-3.5 h-3.5 mr-2" /> Jadwal Pengajar
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => { setTab('MASTER'); setSearch('') }} 
-            className={cn(
-               "h-9 rounded-xl text-[10px] font-black uppercase tracking-widest px-4",
-               tab === 'MASTER' ? "bg-background text-emerald-600 shadow-sm" : "text-muted-foreground/60"
-            )}
-          >
-            <UserCheck className="w-3.5 h-3.5 mr-2" /> Database Guru
-          </Button>
+        <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+          <button onClick={() => setTab('JADWAL')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'JADWAL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <School className="w-4 h-4" /> Jadwal Kelas
+          </button>
+          <button onClick={() => setTab('MASTER')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'MASTER' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <UserCheck className="w-4 h-4" /> Master Guru
+          </button>
         </div>
       </div>
 
-      <Separator className="opacity-50" />
-
       {/* TAB 1: JADWAL KELAS */}
       {tab === 'JADWAL' && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-6 duration-700">
-           
-           <Alert className="bg-indigo-500/5 border-indigo-500/10 text-indigo-800 rounded-2xl shadow-sm">
-             <Info className="h-4 w-4 text-indigo-600" />
-             <AlertTitle className="text-xs font-black uppercase tracking-widest leading-none mb-1">Mekanisme Wali Kelas</AlertTitle>
-             <AlertDescription className="text-[10px] font-bold opacity-70 uppercase tracking-tight leading-relaxed">
-               Pengajar yang ditempatkan pada sesi <b>MAGHRIB</b> secara otomatis akan berperan sebagai Wali Kelas 
-               dan memiliki akses log-in ke dashboard asatidzah untuk monitoring santri di kelas tersebut.
-             </AlertDescription>
-           </Alert>
-
-           {/* Filter & Action Bar */}
-           <div className="flex flex-col sm:flex-row justify-between items-end gap-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
-                 <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Cari Nama Rombel</Label>
-                    <div className="relative group">
-                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-indigo-500 transition-colors"/>
-                       <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ketik nama kelas..." className="h-11 pl-10 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500"/>
-                    </div>
-                 </div>
-                 <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Cari Nama Pengajar</Label>
-                    <div className="relative group">
-                       <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-indigo-500 transition-colors"/>
-                       <Input value={guruSearch} onChange={e => setGuruSearch(e.target.value)} placeholder="Filter nama di dropdown..." className="h-11 pl-10 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-indigo-500"/>
-                    </div>
-                 </div>
+        <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+            <div className="flex gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <Button 
-                onClick={handleSimpanSemua} 
-                disabled={isSavingBatch || loading} 
-                className="h-11 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg shadow-indigo-600/20 gap-3 transition-transform active:scale-95 shrink-0"
-              >
-                {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                SIMPAN SEMUA JADWAL
-              </Button>
-           </div>
-
-           {/* JADWAL TABLE */}
-           <Card className="border-border shadow-sm overflow-hidden min-h-[500px]">
-              <div className="overflow-x-auto">
-                 <Table>
-                    <TableHeader className="bg-muted/30 border-b">
-                       <TableRow>
-                          <TableHead className="px-6 h-12 text-[10px] font-black uppercase tracking-widest">Rombongan Belajar</TableHead>
-                          <TableHead className="px-4 h-12 text-[10px] font-black uppercase tracking-widest">Sesi Shubuh</TableHead>
-                          <TableHead className="px-4 h-12 text-[10px] font-black uppercase tracking-widest">Sesi Ashar</TableHead>
-                          <TableHead className="px-4 h-12 text-[10px] font-black uppercase tracking-widest bg-amber-500/5 text-amber-900 border-l border-amber-500/10">Sesi Maghrib (Wali Kelas)</TableHead>
-                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                       {loading ? (
-                         <TableRow>
-                            <TableCell colSpan={4} className="py-32 text-center">
-                               <Loader2 className="w-8 h-8 animate-spin text-indigo-500/50 mx-auto mb-3"/>
-                               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest animate-pulse">Synchronizing Schedules...</p>
-                            </TableCell>
-                         </TableRow>
-                       ) : filteredLocalKelas.length === 0 ? (
-                         <TableRow>
-                            <TableCell colSpan={4} className="py-24 text-center opacity-30">
-                               <Layers className="w-12 h-12 mx-auto mb-3"/>
-                               <p className="text-[10px] font-black uppercase tracking-widest">Tidak ada kelas ditemukan</p>
-                            </TableCell>
-                         </TableRow>
-                       ) : filteredLocalKelas.map(k => (
-                         <TableRow key={k.id} className="hover:bg-indigo-500/[0.02] transition-colors border-b last:border-0">
-                            <TableCell className="px-6 py-4">
-                               <div className="font-black text-indigo-600 text-sm tracking-tight uppercase">{k.nama_kelas}</div>
-                               <div className="text-[9px] font-bold text-muted-foreground uppercase opacity-40 mt-0.5">Primary Classroom</div>
-                            </TableCell>
-                            <TableCell className="px-4 py-4 min-w-[220px]">
-                               <div className="space-y-1">
-                                  <div className="flex justify-between items-center text-[8px] font-black text-muted-foreground/40 uppercase mb-0.5 px-1 truncate">Shubuh Session</div>
-                                  <Select value={k.s} onValueChange={v => handleChangeLocal(k.id, 's', v)}>
-                                     <SelectTrigger className="h-10 bg-background border-border rounded-xl font-bold text-xs">
-                                        <SelectValue placeholder="— Tanpa Pengajar —" />
-                                     </SelectTrigger>
-                                     <SelectContent>
-                                        <SelectItem value="0" className="opacity-40 italic">Tanpa Pengajar</SelectItem>
-                                        {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : (
-                                          <SelectItem key={g.id} value={g.id.toString()} className="font-bold">{g.nama_lengkap}</SelectItem>
-                                        ))}
-                                     </SelectContent>
-                                  </Select>
-                               </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-4 min-w-[220px]">
-                               <div className="space-y-1">
-                                  <div className="flex justify-between items-center text-[8px] font-black text-muted-foreground/40 uppercase mb-0.5 px-1">Ashar Session</div>
-                                  <Select value={k.a} onValueChange={v => handleChangeLocal(k.id, 'a', v)}>
-                                     <SelectTrigger className="h-10 bg-background border-border rounded-xl font-bold text-xs">
-                                        <SelectValue placeholder="— Tanpa Pengajar —" />
-                                     </SelectTrigger>
-                                     <SelectContent>
-                                        <SelectItem value="0" className="opacity-40 italic">Tanpa Pengajar</SelectItem>
-                                        {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : (
-                                          <SelectItem key={g.id} value={g.id.toString()} className="font-bold">{g.nama_lengkap}</SelectItem>
-                                        ))}
-                                     </SelectContent>
-                                  </Select>
-                               </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-4 min-w-[240px] bg-amber-500/[0.02] border-l border-amber-500/10">
-                               <div className="space-y-1">
-                                  <div className="flex justify-between items-center text-[8px] font-black text-amber-700/50 uppercase mb-0.5 px-1">Maghrib (Wali Kelas)</div>
-                                  <Select value={k.m} onValueChange={v => handleChangeLocal(k.id, 'm', v)}>
-                                     <SelectTrigger className="h-10 bg-white border-amber-500/30 rounded-xl font-black text-xs text-indigo-900 shadow-sm focus:ring-amber-500">
-                                        <SelectValue placeholder="— Belum Ditentukan —" />
-                                     </SelectTrigger>
-                                     <SelectContent>
-                                        <SelectItem value="0" className="opacity-40 italic">Tanpa Wali Kelas</SelectItem>
-                                        {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : (
-                                          <SelectItem key={g.id} value={g.id.toString()} className="font-bold text-indigo-700">{g.nama_lengkap}</SelectItem>
-                                        ))}
-                                     </SelectContent>
-                                  </Select>
-                                  {k.m !== "" && k.m !== "0" && (
-                                     <div className="flex items-center gap-1.5 px-2 py-0.5 mt-1 animate-in zoom-in-95 duration-500">
-                                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-600"/>
-                                        <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Akses Dashboard Wali Aktif</span>
-                                     </div>
-                                  )}
-                               </div>
-                            </TableCell>
-                         </TableRow>
-                       ))}
-                    </TableBody>
-                 </Table>
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
               </div>
-           </Card>
+            </div>
+            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+              {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              SIMPAN JADWAL
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto min-h-[400px]">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-indigo-50 text-indigo-900 font-bold uppercase text-xs sticky top-0 z-10">
+                  <tr>
+                    <th className="px-4 py-3 min-w-[150px]">Kelas</th>
+                    <th className="px-4 py-3 min-w-[200px]">Shubuh</th>
+                    <th className="px-4 py-3 min-w-[200px]">Ashar</th>
+                    <th className="px-4 py-3 min-w-[200px] bg-yellow-100 text-yellow-900 border-l border-yellow-200">Maghrib (Wali Kelas)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></td></tr>
+                  ) : filteredLocalKelas.map(k => (
+                    <tr key={k.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-800">{k.nama_kelas}</p>
+                      </td>
+                      <td className="px-4 py-2">
+                        <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
+                          <option value="">- Kosong -</option>
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
+                          <option value="">- Kosong -</option>
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2 bg-yellow-50/30 border-l border-yellow-100">
+                        <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full p-1.5 border border-yellow-300 bg-white text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-yellow-500">
+                          <option value="">- Kosong -</option>
+                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                        </select>
+                        {k.m && <p className="text-[9px] text-green-600 mt-1 text-center font-bold">Auto Akun</p>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {/* TAB 2: MASTER GURU */}
       {tab === 'MASTER' && (
-        <div className="space-y-8 animate-in slide-in-from-right-10 duration-700">
-           
-           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
-              {/* Manual Input Form */}
-              <div className="lg:col-span-4">
-                 <Card className="border-border shadow-xl overflow-hidden relative group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000"/>
-                    <CardHeader className="bg-muted/30 border-b">
-                       <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                          <UserPlus className="w-4 h-4 text-emerald-600"/> Registrasi Guru Baru
-                       </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                       <form onSubmit={handleTambahGuru} className="space-y-4">
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nama Lengkap</Label>
-                             <Input 
-                                value={newGuru.nama} 
-                                onChange={e => setNewGuru({ ...newGuru, nama: e.target.value })} 
-                                placeholder="Ahmad Bin Fulan" 
-                                className="h-11 rounded-xl bg-muted/20 border-border font-black focus-visible:ring-emerald-500" 
-                                required 
-                             />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Gelar (S.Pd, dsb)</Label>
-                                <Input value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.target.value })} placeholder="S.Pd.I" className="h-11 rounded-xl bg-muted/20 border-border font-bold"/>
-                             </div>
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Kode / Inisial</Label>
-                                <Input value={newGuru.kode} onChange={e => setNewGuru({ ...newGuru, kode: e.target.value })} placeholder="AHM" className="h-11 rounded-xl bg-muted/20 border-border font-bold uppercase"/>
-                             </div>
-                          </div>
-                          <Button className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 gap-2 mt-2">
-                             <CheckCircle2 className="w-4 h-4"/> TAMBAHKAN DATA
-                          </Button>
-                       </form>
-                    </CardContent>
-                 </Card>
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
 
-                 <div className="mt-6 bg-emerald-700 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000"/>
-                    <UserCheck className="w-10 h-10 mb-4 opacity-50"/>
-                    <h4 className="font-black text-sm uppercase tracking-tight">Standardisasi ID Guru</h4>
-                    <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1 leading-relaxed">Pastikan kode atau inisial tidak duplikat dengan guru lain untuk kemudahan identifikasi di jadwal.</p>
-                 </div>
+          {/* FORM INPUT MANUAL */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-2">
+              <Plus className="w-5 h-5 text-green-600" /> Tambah Guru Baru (Manual)
+            </h3>
+            <form onSubmit={handleTambahGuru} className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="w-full md:flex-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap</label>
+                <input value={newGuru.nama} onChange={e => setNewGuru({ ...newGuru, nama: e.target.value })} className="w-full p-2 border rounded" placeholder="Contoh: Ahmad" required />
               </div>
-
-              {/* Excel Import Prompts */}
-              <div className="lg:col-span-8 space-y-6">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <Card className="border-border shadow-md hover:shadow-xl transition-all group overflow-hidden bg-indigo-500/[0.02] cursor-pointer" onClick={handleDownloadTemplate}>
-                       <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
-                          <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-border flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
-                             <Download className="w-7 h-7"/>
-                          </div>
-                          <div className="space-y-1">
-                             <h3 className="font-black text-base uppercase tracking-tight text-indigo-900">1. Unduh Template</h3>
-                             <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Dapatkan berkas standar .xlsx</p>
-                          </div>
-                       </CardContent>
-                    </Card>
-
-                    <Card className="border-border shadow-md hover:shadow-xl transition-all group overflow-hidden bg-emerald-500/[0.02]">
-                       <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
-                          <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-border flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                             <Upload className="w-7 h-7"/>
-                          </div>
-                          <div className="space-y-1">
-                             <h3 className="font-black text-base uppercase tracking-tight text-emerald-900">2. Unggah Berkas</h3>
-                             <div className="relative mt-2">
-                                <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                <Badge variant="outline" className="text-emerald-600 font-black text-[9px] uppercase border-emerald-500/30">Pilih Excel File</Badge>
-                             </div>
-                          </div>
-                       </CardContent>
-                    </Card>
-                 </div>
-
-                 {excelData.length > 0 && (
-                    <Card className="border-emerald-500/20 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10">
-                       <CardHeader className="p-5 border-b bg-emerald-500/5 flex flex-row justify-between items-center">
-                          <div className="space-y-1">
-                             <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                <FileSpreadsheet className="w-4 h-4 text-emerald-600"/> Preview Impor ({excelData.length} Baris)
-                             </CardTitle>
-                             <CardDescription className="text-[9px] font-black uppercase text-emerald-700/60 tracking-wider">
-                                {excelData.length - excelData.filter(d => guruList.some(g => g.nama_lengkap.toLowerCase() === String(d['NAMA LENGKAP'] || d['NAMA']).toLowerCase().trim())).length} Baru terdeteksi
-                             </CardDescription>
-                          </div>
-                          <Button onClick={handleSimpanGuru} disabled={isProcessing} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl h-10 px-8 shadow-lg shadow-emerald-600/20 gap-2">
-                             {isProcessing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} SIMPAN SEMUA
-                          </Button>
-                       </CardHeader>
-                       <div className="max-h-64 overflow-auto">
-                          <Table>
-                             <TableHeader className="bg-muted/10 sticky top-0 z-10 border-b">
-                                <TableRow>
-                                   <TableHead className="text-[10px] font-black uppercase">Nama Guru</TableHead>
-                                   <TableHead className="text-[10px] font-black uppercase">Gelar</TableHead>
-                                   <TableHead className="text-[10px] font-black uppercase text-center">Status</TableHead>
-                                </TableRow>
-                             </TableHeader>
-                             <TableBody>
-                                {excelData.map((d, i) => {
-                                  const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
-                                  const isDuplikat = guruList.some(g => g.nama_lengkap.toLowerCase() === nama.toLowerCase())
-                                  return (
-                                     <TableRow key={i} className={cn(isDuplikat ? "bg-rose-500/[0.03]" : "hover:bg-muted/30")}>
-                                        <TableCell className={cn("text-xs font-bold uppercase", isDuplikat ? "text-rose-500 line-through" : "text-foreground")}>{nama}</TableCell>
-                                        <TableCell className="text-xs opacity-50">{d['GELAR'] || d['gelar'] || '-'}</TableCell>
-                                        <TableCell className="text-center">
-                                           {isDuplikat ? <Badge variant="outline" className="text-rose-600 border-rose-200 text-[9px] font-black">DUPLIKAT</Badge> : <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-600 opacity-30"/>}
-                                        </TableCell>
-                                     </TableRow>
-                                  )
-                                })}
-                             </TableBody>
-                          </Table>
-                       </div>
-                    </Card>
-                 )}
+              <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Gelar (Opsional)</label>
+                <input value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.target.value })} className="w-full p-2 border rounded" placeholder="S.Pd." />
               </div>
-           </div>
-
-           {/* TEACHER LIST & BULK DELETE */}
-           <Card className="border-border shadow-sm overflow-hidden">
-              <CardHeader className="bg-muted/30 border-b py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                 <div>
-                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                       <Database className="w-4 h-4 text-muted-foreground"/> Database Guru Terdaftar ({guruList.length})
-                    </CardTitle>
-                    <CardDescription className="text-[9px] font-bold uppercase tracking-widest opacity-60 mt-1">Gunakan checkbox untuk aksi penghapusan massal data pengajar.</CardDescription>
-                 </div>
-                 <div className="flex items-center gap-3">
-                    <div className="relative group w-full sm:w-64">
-                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-emerald-500 transition-colors pointer-events-none"/>
-                       <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cari di database..." className="h-10 pl-9 rounded-xl border-border bg-background font-bold text-xs focus-visible:ring-emerald-500"/>
-                    </div>
-                    {selectedGuruIds.length > 0 && (
-                       <Button onClick={handleHapusBatch} disabled={isDeletingBatch} className="h-10 px-6 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase shadow-lg shadow-rose-600/20 gap-2">
-                          {isDeletingBatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                          HAPUS ({selectedGuruIds.length})
-                       </Button>
-                    )}
-                 </div>
-              </CardHeader>
-              
-              <div className="p-6">
-                 <div className="flex items-center gap-3 mb-6 bg-muted/20 p-3 rounded-2xl border border-dashed">
-                    <button onClick={toggleSelectAllGuru} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-indigo-600 transition-colors">
-                       {selectedGuruIds.length === filteredTeachers.length && filteredTeachers.length > 0 ? <CheckSquare className="w-4 h-4 text-indigo-600"/> : <Square className="w-4 h-4"/>}
-                       PILIH SEMUA DATA DIHALAMAN INI
-                    </button>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {pagedGuruList.length === 0 ? (
-                       <div className="col-span-full py-20 text-center opacity-30 flex flex-col items-center">
-                          <Users className="w-12 h-12 mb-3"/>
-                          <p className="text-[10px] font-black uppercase tracking-widest">Tidak ada guru ditemukan</p>
-                       </div>
-                    ) : pagedGuruList.map(g => (
-                       <Card 
-                          key={g.id} 
-                          onClick={() => toggleSelectGuru(g.id)}
-                          className={cn(
-                             "cursor-pointer group relative transition-all duration-300 border-border overflow-hidden",
-                             selectedGuruIds.includes(g.id) ? "bg-rose-500/[0.03] border-rose-300 ring-1 ring-rose-500/20 shadow-rose-500/5 shadow-lg" : "hover:shadow-md hover:border-indigo-200"
-                          )}
-                       >
-                          <CardContent className="p-4 flex items-center gap-4">
-                             <div className={cn(
-                                "w-11 h-11 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-all",
-                                selectedGuruIds.includes(g.id) ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground group-hover:bg-indigo-600 group-hover:text-white"
-                             )}>
-                                {g.nama_lengkap.split(' ').map((n: string)=>n[0]).slice(0,2).join('')}
-                             </div>
-                             <div className="min-w-0 flex-1">
-                                <p className={cn("font-black text-sm tracking-tight uppercase truncate leading-none mb-1", selectedGuruIds.includes(g.id) ? "text-rose-700" : "text-foreground group-hover:text-indigo-700")}>{g.nama_lengkap}</p>
-                                <p className="text-[10px] font-black text-muted-foreground uppercase opacity-40 truncate tracking-widest leading-none">{g.gelar || '-'}</p>
-                             </div>
-                             <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} 
-                                className="h-8 w-8 rounded-lg text-muted-foreground/30 hover:text-rose-600 hover:bg-rose-50 transition-all shrink-0 opacity-0 group-hover:opacity-100"
-                             >
-                                <Trash2 className="w-3.5 h-3.5" />
-                             </Button>
-                             {selectedGuruIds.includes(g.id) && (
-                                <div className="absolute top-1 right-1"><CheckSquare className="w-3 h-3 text-rose-500"/></div>
-                             )}
-                          </CardContent>
-                       </Card>
-                    ))}
-                 </div>
+              <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kode (Opsional)</label>
+                <input value={newGuru.kode} onChange={e => setNewGuru({ ...newGuru, kode: e.target.value })} className="w-full p-2 border rounded" placeholder="AHM" />
               </div>
+              <button className="bg-green-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-green-700 w-full md:w-auto">Simpan</button>
+            </form>
+          </div>
 
-              {/* PAGINATION */}
-              {totalPages > 1 && (
-                 <div className="p-6 bg-muted/10 border-t flex flex-col sm:flex-row justify-between items-center gap-6">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">
-                       Laman {safePage} dari {totalPages} · Total {filteredTeachers.length} Guru
+          <hr className="border-dashed" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-3">
+              <Download className="w-8 h-8 text-blue-600" />
+              <h3 className="font-bold text-blue-900">1. Template Data Guru</h3>
+              <button onClick={handleDownloadTemplate} className="bg-white text-blue-700 px-4 py-2 rounded shadow-sm font-bold text-xs border hover:bg-blue-50">Download .xlsx</button>
+            </div>
+            <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex flex-col items-center text-center space-y-3">
+              <Upload className="w-8 h-8 text-green-600" />
+              <h3 className="font-bold text-green-900">2. Upload Excel</h3>
+              <div className="relative">
+                <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <button className="bg-green-600 text-white px-4 py-2 rounded shadow-sm font-bold text-xs hover:bg-green-700">Pilih File</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Import */}
+          {excelData.length > 0 && (() => {
+            const previewRows = excelData.map(d => {
+              const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
+              const isDuplikat = guruList.some(g => g.nama_lengkap.toLowerCase() === nama.toLowerCase())
+              return { nama, gelar: d['GELAR'] || d['gelar'] || '-', isDuplikat }
+            })
+            const dupCount = previewRows.filter(r => r.isDuplikat).length
+            const newCount = previewRows.length - dupCount
+            return (
+              <div className="bg-white border rounded-xl p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <div>
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><List className="w-4 h-4" /> Preview ({excelData.length} baris)</h3>
+                    <p className="text-xs mt-0.5">
+                      <span className="text-green-600 font-bold">{newCount} baru</span>
+                      {dupCount > 0 && <span className="text-red-500 font-bold ml-2">{dupCount} duplikat (dilewati)</span>}
                     </p>
-                    <div className="flex items-center gap-2">
-                       <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="h-9 rounded-xl text-[10px] font-black uppercase px-4 border-border shadow-none">Prev</Button>
-                       <div className="flex gap-1">
-                          {Array.from({length: Math.min(5, totalPages)}, (_, i) => {
-                             let pg = i + 1;
-                             if (totalPages > 5 && page > 3) pg = page - 2 + i;
-                             if (totalPages > 5 && page > totalPages - 2) pg = totalPages - 4 + i;
-                             if (pg > totalPages) return null;
-                             return (
-                                <Button 
-                                   key={pg} 
-                                   variant={pg === page ? 'default' : 'ghost'} 
-                                   onClick={() => setPage(pg)}
-                                   className={cn("w-9 h-9 rounded-xl font-black text-xs", pg === page ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "")}
-                                >
-                                   {pg}
-                                </Button>
-                             )
-                          })}
-                       </div>
-                       <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="h-9 rounded-xl text-[10px] font-black uppercase px-4 border-border shadow-none">Next</Button>
+                  </div>
+                  <button onClick={handleSimpanGuru} disabled={isProcessing || newCount === 0} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
+                    {isProcessing ? "Menyimpan..." : `Simpan ${newCount} Guru Baru`}
+                  </button>
+                </div>
+                <div className="max-h-64 overflow-auto border rounded">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-100 sticky top-0">
+                      <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.map((r, i) => (
+                        <tr key={i} className={`border-b ${r.isDuplikat ? 'bg-red-50' : ''}`}>
+                          <td className={`p-2 font-medium ${r.isDuplikat ? 'text-red-400 line-through' : 'text-slate-800'}`}>{r.nama}</td>
+                          <td className="p-2 text-slate-500">{r.gelar}</td>
+                          <td className="p-2 text-center">
+                            {r.isDuplikat
+                              ? <span className="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">Duplikat</span>
+                              : <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Baru</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <Pagination
+                    currentPage={safePageGuruList}
+                    totalPages={totalPagesGuruList}
+                    pageSize={pageSize}
+                    total={guruList.length}
+                    onPageChange={setPage}
+                    onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                  />
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Daftar Guru + Hapus Massal */}
+          <div className="bg-white border rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-3">
+              <div>
+                <h3 className="font-bold text-slate-700">Daftar Guru Terdaftar ({guruList.length})</h3>
+                <p className="text-xs text-slate-500">Pilih kotak centang untuk menghapus banyak data sekaligus.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={toggleSelectAllGuru} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition">
+                  {selectedGuruIds.length === guruList.length && guruList.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  Pilih Semua
+                </button>
+                {selectedGuruIds.length > 0 && (
+                  <button onClick={handleHapusBatch} disabled={isDeletingBatch} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 disabled:opacity-50 shadow-sm">
+                    {isDeletingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Hapus Terpilih ({selectedGuruIds.length})
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="max-h-96 overflow-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {pagedGuruList.map(g => (
+                <div key={g.id} onClick={() => toggleSelectGuru(g.id)}
+                  className={`p-3 border border-slate-200 rounded-xl flex justify-between items-center cursor-pointer transition-all ${selectedGuruIds.includes(g.id) ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 hover:bg-white hover:shadow-sm'}`}>
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {selectedGuruIds.includes(g.id) ? <CheckSquare className="w-5 h-5 text-red-500 flex-shrink-0" /> : <Square className="w-5 h-5 text-slate-300 flex-shrink-0" />}
+                    <div className="truncate">
+                      <p className={`font-bold text-sm truncate ${selectedGuruIds.includes(g.id) ? 'text-red-700' : 'text-slate-800'}`}>{g.nama_lengkap}</p>
+                      <p className="text-xs text-slate-500">{g.gelar || '-'}</p>
                     </div>
-                 </div>
-              )}
-           </Card>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} className="text-slate-300 hover:text-red-500 p-2 transition-opacity" title="Hapus Guru Ini">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

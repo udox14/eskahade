@@ -4,34 +4,31 @@ import { useState, useEffect, useRef } from 'react'
 import { getProfilData, updateProfil, updatePassword, uploadAvatar, toggleShowBottomNav } from './actions'
 import {
   User, Camera, Save, Lock, Phone, Mail, Shield,
-  Loader2, CheckCircle, Eye, EyeOff, Building2, Smartphone,
-  ExternalLink, KeyRound, Palette
+  Loader2, CheckCircle, Eye, EyeOff, Building2, Smartphone
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', wali_kelas: 'Wali Kelas', pengurus_asrama: 'Pengurus Asrama',
   akademik: 'Akademik', keamanan: 'Keamanan', dewan_santri: 'Dewan Santri', bendahara: 'Bendahara',
 }
-
 const ROLE_COLOR: Record<string, string> = {
-  admin: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
-  pengurus_asrama: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-  keamanan: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
-  akademik: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
-  wali_kelas: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
-  dewan_santri: 'bg-teal-500/10 text-teal-700 border-teal-500/20',
-  bendahara: 'bg-orange-500/10 text-orange-700 border-orange-500/20',
+  admin: 'bg-red-100 text-red-700 border-red-200',
+  pengurus_asrama: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  keamanan: 'bg-blue-100 text-blue-700 border-blue-200',
+  akademik: 'bg-purple-100 text-purple-700 border-purple-200',
+  wali_kelas: 'bg-amber-100 text-amber-700 border-amber-200',
+  dewan_santri: 'bg-teal-100 text-teal-700 border-teal-200',
+  bendahara: 'bg-orange-100 text-orange-700 border-orange-200',
+}
+
+function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
+  return (
+    <div className={`fixed top-4 right-4 z-[999] flex items-center gap-2 px-4 py-3 rounded-xl shadow-sm text-sm font-semibold ${
+      type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+    }`}>
+      {type === 'success' ? <CheckCircle className="w-4 h-4" /> : '⚠️'} {msg}
+    </div>
+  )
 }
 
 export default function ProfilPage() {
@@ -40,6 +37,7 @@ export default function ProfilPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   const [nama, setNama] = useState('')
   const [phone, setPhone] = useState('')
@@ -53,12 +51,17 @@ export default function ProfilPage() {
   const [showBottomNav, setShowBottomNav] = useState(true)
   const [togglingNav, setTogglingNav] = useState(false)
 
+  const showToast = (msg: string, type: 'success' | 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
   useEffect(() => {
     getProfilData().then(data => {
       if (data) {
         setProfil(data); setNama(data.full_name || ''); setPhone(data.phone || '')
         setAvatarPreview(data.avatar_url || null)
-        setShowBottomNav(data.show_bottomnav !== 0)
+        setShowBottomNav(data.show_bottomnav !== 0) // null atau 1 → aktif, 0 → nonaktif
       }
       setLoading(false)
     })
@@ -67,23 +70,16 @@ export default function ProfilPage() {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) return toast.error('Ukuran file maksimal 2MB')
-    
+    if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB', 'error'); return }
     const reader = new FileReader()
     reader.onload = ev => setAvatarPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
-    
     setUploadingAvatar(true)
     const fd = new FormData(); fd.append('file', file)
     const res = await uploadAvatar(fd)
     setUploadingAvatar(false)
-    
-    if ('error' in res) { 
-      toast.error(res.error as string)
-      setAvatarPreview(profil?.avatar_url || null)
-      return 
-    }
-    toast.success('Foto profil diperbarui!')
+    if ('error' in res) { showToast(res.error as string, 'error'); setAvatarPreview(profil?.avatar_url || null); return }
+    showToast('Foto profil diperbarui!', 'success')
     setProfil((p: any) => ({ ...p, avatar_url: (res as any).url }))
   }
 
@@ -91,257 +87,182 @@ export default function ProfilPage() {
     setSavingInfo(true)
     const res = await updateProfil({ full_name: nama, phone })
     setSavingInfo(false)
-    if ('error' in res) return toast.error(res.error as string)
-    toast.success('Profil berhasil diperbaharui!')
+    if ('error' in res) { showToast(res.error as string, 'error'); return }
+    showToast('Profil berhasil disimpan!', 'success')
     setProfil((p: any) => ({ ...p, full_name: nama, phone }))
   }
 
   const handleChangePassword = async () => {
-    if (!pwCurrent || !pwNew || !pwConfirm) return toast.warning('Semua field harus diisi')
-    if (pwNew !== pwConfirm) return toast.error('Konfirmasi password baru tidak cocok')
-    
+    if (!pwCurrent || !pwNew || !pwConfirm) { showToast('Semua field harus diisi', 'error'); return }
     setSavingPw(true)
     const res = await updatePassword({ current: pwCurrent, new: pwNew, confirm: pwConfirm })
     setSavingPw(false)
-    if ('error' in res) return toast.error(res.error as string)
-    toast.success('Password berhasil diubah!')
+    if ('error' in res) { showToast(res.error as string, 'error'); return }
+    showToast('Password berhasil diubah!', 'success')
     setPwCurrent(''); setPwNew(''); setPwConfirm('')
-  }
-
-  const handleToggleNav = async (next: boolean) => {
-    setTogglingNav(true)
-    setShowBottomNav(next)
-    await toggleShowBottomNav(next)
-    setTogglingNav(false)
-    toast.success(`Navigasi bawah ${next ? 'diaktifkan' : 'dinonaktifkan'}`)
   }
 
   const initials = (profil?.full_name || '?').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
   const pwStrength = pwNew.length === 0 ? 0 : pwNew.length < 6 ? 1 : pwNew.length < 10 ? 2 : 3
 
-  if (loading) {
-    return (
-      <div className="flex flex-col h-64 items-center justify-center gap-4 animate-in fade-in duration-500">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500/50" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Authenticating Identity...</p>
-      </div>
-    )
-  }
+  if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
 
   return (
-    <div className="max-w-xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      
-      {/* HEADER SECTION */}
-      <div className="flex items-center gap-4 px-2">
-        <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 shadow-sm border border-emerald-500/10">
-          <User className="w-6 h-6"/>
-        </div>
-        <div>
-          <h1 className="text-xl font-black text-foreground tracking-tight uppercase">Manajemen Profil</h1>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest opacity-70">Pengaturan Identitas & Keamanan Akun</p>
-        </div>
-      </div>
+    <>
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
+      <div className="max-w-xl mx-auto space-y-5 pb-20">
 
-      {/* IDENTITY CARD (PREMIUM STYLED) */}
-      <Card className="border-border shadow-2xl overflow-hidden relative group">
-        <div className="h-28 bg-gradient-to-br from-emerald-600 to-emerald-900 relative">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] group-hover:scale-150 transition-transform duration-1000" />
-          <div className="absolute -bottom-1 left-0 right-0 h-16 bg-gradient-to-t from-card to-transparent" />
-        </div>
-        <CardContent className="px-6 pb-6 -mt-14 relative z-10">
-          <div className="flex items-end justify-between">
-            <div className="relative">
-              <Avatar className="w-24 h-24 border-4 border-card shadow-2xl rounded-3xl bg-emerald-100">
-                {avatarPreview ? (
-                  <AvatarImage src={avatarPreview} alt="Avatar" className="object-cover" />
-                ) : (
-                  <AvatarFallback className="bg-emerald-100 text-emerald-800 text-2xl font-black">{initials}</AvatarFallback>
-                )}
-              </Avatar>
-              <button 
-                onClick={() => fileRef.current?.click()}
-                disabled={uploadingAvatar}
-                className="absolute -bottom-1 -right-1 w-9 h-9 bg-white hover:bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-lg border border-border transition-all active:scale-90"
-              >
-                {uploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin"/> : <Camera className="w-4 h-4" />}
-              </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-            </div>
-            <div className="mb-2">
-              <Badge variant="outline" className={cn("px-4 py-1.5 rounded-xl border font-black text-[10px] uppercase tracking-widest shadow-sm", ROLE_COLOR[profil?.role])}>
-                <Shield className="w-3 h-3 mr-2" /> {ROLE_LABEL[profil?.role] || profil?.role}
-              </Badge>
-            </div>
+        {/* KARTU IDENTITAS */}
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="h-20 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 relative">
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(45deg,white 0,white 1px,transparent 0,transparent 50%)', backgroundSize: '8px 8px' }} />
           </div>
-          
-          <div className="mt-4 space-y-1">
-            <h2 className="text-2xl font-black text-foreground tracking-tight uppercase leading-none">{profil?.full_name || 'Anonymous User'}</h2>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 font-bold">
-               <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1.5 tracking-wider">
-                  <Mail className="w-3.5 h-3.5 text-emerald-600"/> {profil?.email}
-               </div>
-               {profil?.asrama_binaan && (
-                 <div className="text-[10px] text-emerald-700 uppercase flex items-center gap-1.5 tracking-wider">
-                    <Building2 className="w-3.5 h-3.5"/> {profil.asrama_binaan}
-                 </div>
-               )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Separator className="opacity-50" />
-
-      {/* FORMS SECTION */}
-      <div className="grid grid-cols-1 gap-8">
-        
-        {/* ACCOUNT INFORMATION */}
-        <Card className="border-border shadow-sm overflow-hidden bg-muted/5">
-          <CardHeader className="bg-muted/30 border-b py-5">
-            <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-emerald-700">
-               <User className="w-4 h-4"/> Informasi Akun
-            </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Perbarui data personal dan kontak darurat Anda.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nama Lengkap</Label>
-                <Input 
-                  value={nama} onChange={e => setNama(e.target.value)}
-                  className="h-11 rounded-xl bg-background border-border font-black focus-visible:ring-emerald-500" 
-                  placeholder="Nama Lengkap" 
-                />
-              </div>
-              <div className="space-y-1.5 opacity-60 grayscale cursor-not-allowed">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Alamat Email (Locked)</Label>
-                <Input value={profil?.email || ''} disabled className="h-11 rounded-xl bg-muted border-border font-bold text-muted-foreground" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-1">No. HP / WhatsApp</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-                  <Input 
-                    value={phone} onChange={e => setPhone(e.target.value)}
-                    className="h-11 pl-10 rounded-xl bg-background border-border font-black focus-visible:ring-emerald-500" 
-                    placeholder="08xxxxxxxxxx" type="tel" 
-                  />
-                </div>
-              </div>
-            </div>
-            <Button 
-               onClick={handleSaveInfo} 
-               disabled={savingInfo} 
-               className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-500/20 gap-2 transition-transform active:scale-95"
-            >
-              {savingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} SIMPAN PERUBAHAN
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* SETTINGS / DISPLAY */}
-        <Card className="border-border shadow-sm overflow-hidden bg-muted/5">
-          <CardHeader className="bg-muted/30 border-b py-5">
-            <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-indigo-700">
-               <Palette className="w-4 h-4"/> Pengaturan Tampilan
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white border border-border shadow-sm">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100">
-                  <Smartphone className="w-5 h-5"/>
-                </div>
-                <div>
-                  <p className="text-sm font-black text-foreground tracking-tight uppercase">Bottom Navigation Bar</p>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Tampilkan pintasan navigasi saat layar mode mobile.</p>
-                </div>
-              </div>
-              <Switch checked={showBottomNav} onCheckedChange={handleToggleNav} disabled={togglingNav} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* SECURITY / PASSWORD */}
-        <Card className="border-border shadow-sm overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-          <CardHeader className="bg-muted/30 border-b py-5">
-            <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-amber-600">
-               <KeyRound className="w-4 h-4"/> Keamanan Akun
-            </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Demi keamanan, gunakan kombinasi password yang kuat.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Password Saat Ini</Label>
-                <div className="relative">
-                   <Input 
-                      type={showPw ? 'text' : 'password'} value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
-                      className="h-11 rounded-xl bg-background border-border font-black focus-visible:ring-amber-500 pr-10" 
-                      placeholder="••••••••" 
-                   />
-                </div>
-              </div>
-              
-              <Separator className="opacity-30" />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 text-amber-600">Password Baru</Label>
-                    <div className="relative">
-                      <Input 
-                         type={showPw ? 'text' : 'password'} value={pwNew} onChange={e => setPwNew(e.target.value)}
-                         className="h-11 rounded-xl bg-background border-border font-black focus-visible:ring-amber-500 pr-10" 
-                         placeholder="••••••••" 
-                      />
-                      <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors">
-                        {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
+          <div className="px-5 pb-5 -mt-10">
+            <div className="flex items-end justify-between">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border-4 border-white shadow-sm overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-900 flex items-center justify-center">
+                  {avatarPreview
+                    ? <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    : <span className="text-white text-xl font-black">{initials}</span>
+                  }
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full">
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
                     </div>
-                 </div>
-                 <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 text-amber-600">Konfirmasi Password Baru</Label>
-                    <Input 
-                      type={showPw ? 'text' : 'password'} value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
-                      className="h-11 rounded-xl bg-background border-border font-black focus-visible:ring-amber-500" 
-                      placeholder="••••••••" 
-                    />
-                 </div>
-              </div>
-
-              {pwNew && (
-                <div className="p-3 bg-white border border-border rounded-xl space-y-2 group animate-in zoom-in-95 duration-300">
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className={cn(
-                        "h-1.5 flex-1 rounded-full transition-all duration-500 shadow-inner",
-                        pwStrength >= i 
-                          ? (i === 1 ? 'bg-rose-500' : i === 2 ? 'bg-amber-400' : 'bg-emerald-500 shadow-emerald-500/20') 
-                          : 'bg-muted'
-                      )} />
-                    ))}
-                  </div>
-                  <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                    {pwStrength === 1 ? <><span className="text-rose-500 animate-pulse">●</span> Lemah — Tambahkan angka atau simbol</> : 
-                     pwStrength === 2 ? <><span className="text-amber-500">●</span> Cukup — Masih bisa diperkuat</> : 
-                     <><span className="text-emerald-600">●</span> Sangat Kuat — Syukron Jazaakallah!</>}
-                  </p>
+                  )}
                 </div>
+                <button onClick={() => fileRef.current?.click()}
+                  className="absolute -bottom-0.5 -right-0.5 w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center shadow border-2 border-white transition-colors">
+                  <Camera className="w-3 h-3" />
+                </button>
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
+              </div>
+              <div className="mb-1">
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${ROLE_COLOR[profil?.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                  <Shield className="w-3 h-3" />{ROLE_LABEL[profil?.role] || profil?.role}
+                </span>
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <h2 className="text-lg font-black text-slate-800">{profil?.full_name || '—'}</h2>
+              <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Mail className="w-3 h-3" />{profil?.email}</p>
+              {profil?.asrama_binaan && (
+                <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-1"><Building2 className="w-3 h-3" />{profil.asrama_binaan}</p>
               )}
             </div>
+          </div>
+        </div>
 
-            <Button 
-               onClick={handleChangePassword} 
-               disabled={savingPw || !pwNew} 
-               className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black shadow-lg shadow-amber-500/20 gap-2 transition-transform active:scale-95"
+        {/* INFORMASI AKUN */}
+        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-4">
+          <h3 className="text-sm font-black text-slate-600 uppercase tracking-wide flex items-center gap-2">
+            <User className="w-4 h-4 text-emerald-600" /> Informasi Akun
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">Nama Lengkap</label>
+              <input value={nama} onChange={e => setNama(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                placeholder="Nama lengkap" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">Email</label>
+              <input value={profil?.email || ''} disabled
+                className="w-full border border-slate-100 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 text-slate-400 cursor-not-allowed" />
+              <p className="text-[10px] text-slate-400 mt-1">Email tidak dapat diubah</p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1 flex items-center gap-1"><Phone className="w-3 h-3" />No. HP / WhatsApp</label>
+              <input value={phone} onChange={e => setPhone(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                placeholder="08xxxxxxxxxx" type="tel" />
+            </div>
+          </div>
+          <button onClick={handleSaveInfo} disabled={savingInfo}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
+            {savingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Simpan Perubahan
+          </button>
+        </div>
+
+        {/* TAMPILAN */}
+        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-4">
+          <h3 className="text-sm font-black text-slate-600 uppercase tracking-wide flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-blue-500" /> Tampilan
+          </h3>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Bottom Navigation Bar</p>
+              <p className="text-xs text-slate-400 mt-0.5">Tampilkan navigasi bawah saat menggunakan HP</p>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !showBottomNav
+                setTogglingNav(true)
+                setShowBottomNav(next)
+                await toggleShowBottomNav(next)
+                setTogglingNav(false)
+                showToast(`Bottom nav ${next ? 'diaktifkan' : 'dinonaktifkan'}`, 'success')
+              }}
+              disabled={togglingNav}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                showBottomNav ? 'bg-emerald-500' : 'bg-slate-200'
+              }`}
             >
-              {savingPw ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />} GANTI PASSWORD SEKARANG
-            </Button>
-          </CardContent>
-        </Card>
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                showBottomNav ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+        </div>
+
+        {/* GANTI PASSWORD */}
+        <div className="bg-white rounded-2xl border shadow-sm p-5 space-y-4">
+          <h3 className="text-sm font-black text-slate-600 uppercase tracking-wide flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-500" /> Ganti Password
+          </h3>
+          <div className="space-y-3">
+            {([
+              { label: 'Password Saat Ini', val: pwCurrent, set: setPwCurrent },
+              { label: 'Password Baru', val: pwNew, set: setPwNew },
+              { label: 'Konfirmasi Password Baru', val: pwConfirm, set: setPwConfirm },
+            ] as { label: string; val: string; set: (v: string) => void }[]).map(({ label, val, set }) => (
+              <div key={label}>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">{label}</label>
+                <div className="relative">
+                  <input type={showPw ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent pr-10 transition-all"
+                    placeholder="••••••••" />
+                  <button type="button" onClick={() => setShowPw(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {pwNew && (
+              <div className="space-y-1 pt-1">
+                <div className="flex gap-1.5">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                      pwStrength >= i ? i === 1 ? 'bg-red-400' : i === 2 ? 'bg-amber-400' : 'bg-emerald-500' : 'bg-slate-100'
+                    }`} />
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {pwStrength === 1 ? 'Lemah — tambah karakter' : pwStrength === 2 ? 'Cukup' : 'Kuat ✓'}
+                </p>
+              </div>
+            )}
+          </div>
+          <button onClick={handleChangePassword} disabled={savingPw}
+            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
+            {savingPw ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+            Ganti Password
+          </button>
+        </div>
 
       </div>
-    </div>
+    </>
   )
 }

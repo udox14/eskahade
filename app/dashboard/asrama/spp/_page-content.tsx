@@ -9,13 +9,6 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
@@ -199,199 +192,155 @@ export default function SPPPage() {
 
   // ── VIEW: LIST ──────────────────────────────────────────────────────────
   if (view === 'LIST') return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4">
+    <div className="space-y-6 max-w-5xl mx-auto pb-32">
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border/50 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
-            <CreditCard className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/>
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Dashboard SPP</h1>
-            <p className="text-muted-foreground text-sm">Monitoring pembayaran santri per kamar.</p>
-          </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <CreditCard className="w-6 h-6 text-emerald-600"/> Dashboard SPP
+          </h1>
+          <p className="text-slate-500 text-sm">Monitoring pembayaran santri per kamar.</p>
         </div>
-
-        <div className="flex flex-wrap gap-2 items-center w-full md:w-auto mt-2 md:mt-0">
-          <div className="flex items-center bg-card border rounded-xl p-0.5 shadow-sm">
-            <Button variant="ghost" size="icon-sm" onClick={() => setTahun(t => t - 1)} className="rounded-lg hover:bg-muted"><ChevronLeft className="w-4 h-4"/></Button>
-            <span className="px-3 font-mono font-bold text-foreground text-sm">{tahun}</span>
-            <Button variant="ghost" size="icon-sm" onClick={() => setTahun(t => t + 1)} className="rounded-lg hover:bg-muted"><ChevronRight className="w-4 h-4"/></Button>
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1">
+            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">-</button>
+            <span className="px-2 font-mono font-bold text-slate-700">{tahun}</span>
+            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">+</button>
           </div>
-
-          <div className={cn("flex-1 md:flex-none p-1 rounded-xl border flex items-center gap-2 pr-1 shadow-sm", userAsrama ? 'bg-amber-500/10 border-amber-500/30' : 'bg-card')}>
-             <div className="pl-3 py-1 flex items-center gap-2">
-               {userAsrama ? <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"/> : <Home className="w-4 h-4 text-muted-foreground"/>}
-               <Select value={asrama} disabled={!!userAsrama} onValueChange={(val) => { if(val) setAsrama(val) }}>
-                 <SelectTrigger className="h-8 border-none bg-transparent shadow-none focus:ring-0 p-0 text-sm font-bold gap-2 focus-visible:ring-0 appearance-none min-w-[120px]">
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {ASRAMA_LIST.map(a => <SelectItem key={a} value={a} className="font-bold">{a}</SelectItem>)}
-                 </SelectContent>
-               </Select>
-             </div>
+          <div className={`p-2 rounded-lg border flex items-center gap-2 ${userAsrama ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
+            {userAsrama ? <Lock className="w-3 h-3 text-orange-600"/> : <Home className="w-4 h-4 text-slate-400"/>}
+            <select
+              value={asrama}
+              onChange={e => setAsrama(e.target.value)}
+              disabled={!!userAsrama}
+              className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed"
+            >
+              {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
           </div>
         </div>
       </div>
 
       {/* SEARCH & FILTER */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4"/>
-          <Input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"/>
+          <input
             type="text"
             placeholder="Cari nama santri..."
-            className="w-full pl-10 h-11 bg-card rounded-xl shadow-sm border-border focus-visible:ring-emerald-500"
+            className="w-full pl-10 pr-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 bg-muted/40 p-1.5 rounded-xl border border-border overflow-x-auto scrollbar-none w-full md:w-auto">
-          <Filter className="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 hidden sm:block"/>
+        <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 overflow-x-auto">
+          <Filter className="w-4 h-4 text-slate-400 ml-2 flex-shrink-0"/>
           {(['SEMUA', 'SUDAH_BAYAR_INI', 'NUNGGAK', 'AMAN'] as FilterStatus[]).map(f => (
-            <Button 
-               key={f} 
-               variant={filterStatus === f ? "default" : "ghost"}
-               onClick={() => setFilterStatus(f)}
-               className={cn(
-                 "rounded-lg h-8 px-3 text-xs font-bold transition-all whitespace-nowrap shadow-none border-none",
-                 filterStatus === f && f === 'SUDAH_BAYAR_INI' ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm' :
-                 filterStatus === f && f === 'NUNGGAK' ? 'bg-red-500 hover:bg-red-600 text-white shadow-sm' :
-                 filterStatus === f ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted'
-               )}
-            >
+            <button key={f} onClick={() => setFilterStatus(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                filterStatus === f
+                  ? f === 'SUDAH_BAYAR_INI' ? 'bg-green-100 text-green-700 shadow-sm'
+                  : f === 'NUNGGAK' ? 'bg-red-100 text-red-700 shadow-sm'
+                  : 'bg-white shadow text-slate-800'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}>
               {f === 'SEMUA' ? 'Semua' : f === 'SUDAH_BAYAR_INI' ? `Lunas ${BULAN_LIST[currentMonthIdx - 1]}` : f === 'NUNGGAK' ? 'Menunggak' : 'Aman'}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
 
       {/* KAMAR NAVIGATOR */}
       {loadingKamars ? (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground"/></div>
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-slate-400"/></div>
       ) : kamars.length > 0 && (
-        <div className="flex items-center justify-between bg-card p-2 rounded-2xl shadow-sm border border-border md:w-80 mx-auto">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setKamarIdx(i => Math.max(0, i - 1))} 
-            disabled={kamarIdx === 0}
-            className="rounded-xl disabled:opacity-30 h-12 w-12"
-          >
+        <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
+          <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
+            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
             <ChevronLeft className="w-6 h-6"/>
-          </Button>
+          </button>
           <div className="flex flex-col items-center">
-            <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1">Kamar Saat Ini</span>
-            <Select value={String(kamarIdx)} onValueChange={(val) => { if(val) setKamarIdx(Number(val)) }}>
-               <SelectTrigger className="font-bold text-xl h-auto py-1 shadow-none bg-transparent border-none focus:ring-0 focus-visible:ring-0 p-0 hover:bg-muted/50 rounded-lg px-2">
-                  <SelectValue />
-               </SelectTrigger>
-               <SelectContent>
-                 {kamars.map((k, idx) => (
-                   <SelectItem key={k} value={String(idx)} className="font-bold text-base">
-                     Kamar {k}
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
+            <span className="text-xs text-slate-500 uppercase font-bold tracking-widest">Kamar Saat Ini</span>
+            <select value={kamarIdx} onChange={e => setKamarIdx(Number(e.target.value))}
+              className="font-bold text-lg text-slate-800 text-center outline-none bg-transparent cursor-pointer">
+              {kamars.map((k, idx) => <option key={k} value={idx}>{k}</option>)}
+            </select>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} 
-            disabled={kamarIdx === kamars.length - 1}
-            className="rounded-xl disabled:opacity-30 h-12 w-12"
-          >
+          <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
+            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
             <ChevronRight className="w-6 h-6"/>
-          </Button>
+          </button>
         </div>
       )}
 
       {/* SANTRI LIST */}
       {loadingKamar ? (
-        <div className="text-center py-16"><Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground"/></div>
+        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
       ) : !activeKamar ? null : filteredSantri.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-border/60 bg-muted/30 rounded-2xl text-sm font-medium">
+        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
           {santriKamar.length === 0 ? 'Tidak ada santri di kamar ini.' : 'Tidak ada santri yang cocok dengan filter.'}
         </div>
       ) : (
-        <Card className="rounded-2xl shadow-sm overflow-hidden border-border bg-card">
-          <div className="bg-muted/50 px-4 py-3 border-b font-black tracking-wider uppercase text-muted-foreground text-xs flex justify-between items-center h-12">
-            <span>KAMAR {activeKamar}</span>
-            <Badge variant="outline" className="text-[10px] font-bold shadow-none bg-background">{filteredSantri.length} Santri</Badge>
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-50 px-4 py-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
+            <span className="text-lg">KAMAR {activeKamar}</span>
+            <span className="text-xs bg-white border px-2 py-1 rounded font-normal text-slate-500">{filteredSantri.length} Santri</span>
           </div>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y">
             {filteredSantri.map((s: any) => {
               const isPaid = s.bulan_ini_lunas
               const isDraft = !!drafts[s.id]
               return (
                 <div key={s.id} onClick={() => handleSelectSantri(s)}
-                  className={cn(
-                    "p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors cursor-pointer group hover:bg-muted/40",
-                    isDraft && "bg-emerald-500/5 dark:bg-emerald-500/10"
-                  )}>
-                  
+                  className={`p-4 flex items-center justify-between transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold text-xs text-muted-foreground border shadow-sm group-hover:bg-background group-hover:border-emerald-500/30 transition-all shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600 group-hover:bg-white group-hover:text-emerald-600 border flex-shrink-0">
                       {s.nis.slice(-2)}
                     </div>
                     <div>
-                      <p className="font-bold text-foreground leading-none mb-1.5">{s.nama_lengkap}</p>
-                      <div className="flex flex-wrap gap-2 text-xs items-center">
-                        <span className="text-muted-foreground font-mono">{s.nis}</span>
-                        {s.jumlah_tunggakan > 0 && <Badge variant="destructive" className="h-5 px-1.5 py-0 text-[10px] shadow-none uppercase">-{s.jumlah_tunggakan} Bln Nunggak</Badge>}
+                      <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
+                      <div className="flex gap-2 text-xs text-slate-400 items-center">
+                        <span>{s.nis}</span>
+                        {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex-shrink-0 flex sm:justify-end">
+                  <div className="text-right">
                     {isCurrentYear && !isPaid ? (
-                      <Button 
-                        onClick={(e) => toggleDraft(e, s)}
-                        variant={isDraft ? "default" : "outline"}
-                        size="sm"
-                        className={cn(
-                          "w-full sm:w-auto h-8 rounded-lg text-xs font-bold transition-all",
-                          isDraft ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm" : "text-muted-foreground hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-500/5"
-                        )}>
-                        {isDraft ? <CheckCircle className="w-3.5 h-3.5 mr-1"/> : <PlusCircle className="w-3.5 h-3.5 mr-1"/>}
-                        {isDraft ? 'Siap Bayar' : `Bayar ${BULAN_LIST[currentMonthIdx - 1]}`}
-                      </Button>
+                      <button onClick={(e) => toggleDraft(e, s)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1 transition-all ${
+                          isDraft ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 hover:border-emerald-500 hover:text-emerald-600'
+                        }`}>
+                        {isDraft ? <><CheckCircle className="w-3 h-3"/> Siap Bayar</> : <><PlusCircle className="w-3 h-3"/> Bayar {BULAN_LIST[currentMonthIdx - 1]}</>}
+                      </button>
                     ) : (
-                      <Badge variant="outline" className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs shadow-none gap-1 font-bold dark:text-emerald-400">
-                        <CheckCircle className="w-3.5 h-3.5"/> Lunas
-                      </Badge>
+                      <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                        <CheckCircle className="w-3 h-3"/> Lunas
+                      </span>
                     )}
                   </div>
-
                 </div>
               )
             })}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* FLOATING SAVE */}
       {totalDraft > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-safe pt-4 bg-background/80 backdrop-blur-md border-t border-border/50 z-50">
-          <div className="max-w-md mx-auto mb-2 sm:mb-4">
-             <Button 
-               onClick={handleSimpanBatch} 
-               disabled={isSavingBatch}
-               className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-900/20 flex items-center justify-between px-6 transition-all active:scale-95 disabled:opacity-70"
-             >
-               <div className="text-left flex flex-col">
-                 <span className="text-[10px] text-emerald-100 uppercase tracking-widest font-black leading-none">{totalDraft} Santri Dipilih</span>
-                 <span className="text-xl font-bold mt-1 leading-none">Rp {totalNominalDraft.toLocaleString('id-ID')}</span>
-               </div>
-               <div className="flex items-center gap-2 font-black bg-black/20 px-4 py-2 rounded-xl text-sm leading-none">
-                 {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
-                 {isSavingBatch ? 'MENYIMPAN...' : 'SIMPAN'}
-               </div>
-             </Button>
-          </div>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
+          <button onClick={handleSimpanBatch} disabled={isSavingBatch}
+            className="w-full bg-slate-900 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-black transition-transform active:scale-95 disabled:opacity-70">
+            <div className="text-left">
+              <p className="text-xs text-slate-400">{totalDraft} Santri Dipilih</p>
+              <p className="text-xl font-bold text-emerald-400">Total: Rp {totalNominalDraft.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="flex items-center gap-2 font-bold bg-white/10 px-4 py-2 rounded-lg">
+              {isSavingBatch ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+              {isSavingBatch ? 'Menyimpan...' : 'SIMPAN'}
+            </div>
+          </button>
         </div>
       )}
     </div>
@@ -399,59 +348,48 @@ export default function SPPPage() {
 
   // ── VIEW: PAYMENT ───────────────────────────────────────────────────────
   if (view === 'PAYMENT') return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24 animate-in slide-in-from-right-4 slide-in-from-bottom-2">
-      <div className="flex items-center gap-4 border-b border-border/50 pb-5">
-        <Button variant="outline" size="icon" onClick={handleBackToList} className="rounded-full shadow-sm hover:bg-muted shrink-0 w-10 h-10">
-          <ArrowLeft className="w-5 h-5"/>
-        </Button>
+    <div className="space-y-6 max-w-4xl mx-auto pb-20 animate-in slide-in-from-right-4">
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={handleBackToList} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-slate-600"/>
+        </button>
         <div>
-           <Badge variant="outline" className="mb-2 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-mono tracking-widest text-[10px]">SPP MANUAL INPUT</Badge>
-           <h1 className="text-2xl font-black text-foreground leading-none mb-1.5">{selectedSantri.nama_lengkap}</h1>
-           <p className="text-xs text-muted-foreground font-medium">Nis: {selectedSantri.nis} • Kelas {selectedSantri.kelas_sekolah || '?'} • Kamar {selectedSantri.kamar}</p>
+          <h1 className="text-xl font-bold text-slate-800">Input Pembayaran</h1>
+          <p className="text-sm text-slate-500">Membayar untuk: <span className="font-bold text-emerald-600">{selectedSantri.nama_lengkap}</span></p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {BULAN_LIST.map((namaBulan, idx) => {
           const bulanIndex = idx + 1
           const dataBayar = riwayatBayar.find(r => r.bulan === bulanIndex)
           const isSelected = selectedMonths.includes(bulanIndex)
-          
-          let cardClasses = 'bg-card border-border hover:border-emerald-400 dark:hover:border-emerald-600'
-          let isNunggak = false;
-
-          if (dataBayar) {
-             cardClasses = 'bg-emerald-500/10 border-emerald-500/30 cursor-default opacity-80'
-          } else if (isSelected) {
-             cardClasses = 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105 shadow-emerald-500/20 z-10'
-          } else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
-             cardClasses = 'bg-red-500/5 border-red-500/30 hover:bg-red-500/10'
-             isNunggak = true;
+          let style = 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'
+          if (dataBayar) style = 'bg-green-100 border-green-500 text-green-800 cursor-default'
+          else if (isSelected) style = 'bg-emerald-600 text-white border-emerald-600 shadow-sm transform scale-105'
+          else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
+            style = 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
           }
-
           return (
             <div key={bulanIndex} onClick={() => toggleBulan(bulanIndex)}
-              className={cn("p-4 rounded-2xl border-2 flex flex-col justify-between h-[120px] sm:h-32 transition-all cursor-pointer select-none", cardClasses)}>
+              className={`p-4 rounded-xl border-2 flex flex-col justify-between h-32 transition-all cursor-pointer ${style}`}>
               <div className="flex justify-between items-start">
-                <span className={cn("font-bold text-sm sm:text-base", isSelected ? "text-white" : "text-foreground")}>{namaBulan}</span>
-                {dataBayar && <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0"/>}
-                {!dataBayar && isSelected && <CheckCircle className="w-5 h-5 text-white/70 shrink-0"/>}
+                <span className="font-bold text-lg">{namaBulan}</span>
+                {dataBayar && <CheckCircle className="w-5 h-5"/>}
+                {!dataBayar && isSelected && <CheckCircle className="w-5 h-5 text-white/50"/>}
               </div>
-              
-              <div className="text-[11px] sm:text-xs">
+              <div className="text-xs mt-2">
                 {dataBayar ? (
-                  <div className="text-emerald-700 dark:text-emerald-400">
-                    <p className="font-black uppercase tracking-wider mb-0.5">LUNAS</p>
-                    <p className="opacity-80 font-medium">{format(new Date(dataBayar.tanggal_bayar), 'dd MMM yy', { locale: id })}</p>
-                  </div>
+                  <>
+                    <p className="font-medium opacity-80">LUNAS</p>
+                    <p className="opacity-60">{format(new Date(dataBayar.tanggal_bayar), 'dd/MM/yy', { locale: id })}</p>
+                  </>
                 ) : (
-                  <div className={cn(isSelected ? "text-emerald-100" : "text-muted-foreground")}>
-                    <p className="font-medium opacity-80 mb-0.5">Tagihan</p>
-                    <p className={cn("font-black text-sm sm:text-base", isSelected ? "text-white" : "text-foreground")}>
-                       Rp {nominal.toLocaleString('id-ID')}
-                    </p>
-                    {isNunggak && !isSelected && <Badge variant="destructive" className="px-1.5 py-0 h-4 text-[9px] uppercase tracking-wider mt-1.5 absolute top-3 right-3 shadow-none">NUNGGAK</Badge>}
-                  </div>
+                  <>
+                    <p className="font-medium opacity-80">Tagihan</p>
+                    <p className="font-bold text-lg">Rp {nominal.toLocaleString('id-ID')}</p>
+                    {style.includes('bg-red-50') && <span className="bg-red-200 text-red-800 px-1.5 py-0.5 rounded text-[10px] font-bold mt-1 inline-block">NUNGGAK</span>}
+                  </>
                 )}
               </div>
             </div>
@@ -460,22 +398,18 @@ export default function SPPPage() {
       </div>
 
       {selectedMonths.length > 0 && (
-         <div className="fixed bottom-0 left-0 right-0 px-4 pb-safe pt-4 bg-background/80 backdrop-blur-md border-t border-border/50 z-50">
-            <div className="max-w-md mx-auto mb-2 sm:mb-4">
-              <Button 
-                 onClick={handleBayar}
-                 className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-900/20 flex items-center justify-between px-6 transition-all active:scale-95"
-              >
-                 <div className="text-left flex flex-col">
-                   <span className="text-[10px] text-emerald-100 uppercase tracking-widest font-black leading-none">{selectedMonths.length} Bulan Dipilih</span>
-                   <span className="text-xl font-bold mt-1 leading-none">Rp {(selectedMonths.length * nominal).toLocaleString('id-ID')}</span>
-                 </div>
-                 <div className="flex items-center gap-2 font-black bg-black/20 px-4 py-2 rounded-xl text-sm leading-none">
-                   BAYAR <CreditCard className="w-4 h-4 ml-1"/>
-                 </div>
-              </Button>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
+          <button onClick={handleBayar}
+            className="w-full bg-slate-900 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-black transition-transform active:scale-95">
+            <div className="text-left">
+              <p className="text-xs text-slate-400">Total Bayar ({selectedMonths.length} Bulan)</p>
+              <p className="text-xl font-bold text-green-400">Rp {(selectedMonths.length * nominal).toLocaleString('id-ID')}</p>
             </div>
-         </div>
+            <div className="flex items-center gap-2 font-bold bg-white/10 px-4 py-2 rounded-lg">
+              BAYAR SEKARANG <CreditCard className="w-5 h-5"/>
+            </div>
+          </button>
+        </div>
       )}
     </div>
   )
