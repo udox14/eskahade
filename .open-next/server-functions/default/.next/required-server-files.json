@@ -2,7 +2,6 @@
   "version": 1,
   "config": {
     "env": {},
-    "webpack": null,
     "typescript": {
       "ignoreBuildErrors": false
     },
@@ -67,12 +66,16 @@
         {
           "protocol": "https",
           "hostname": "**.r2.cloudflarestorage.com"
+        },
+        {
+          "protocol": "https",
+          "hostname": "*.r2.dev"
         }
       ],
       "qualities": [
         75
       ],
-      "unoptimized": false
+      "unoptimized": true
     },
     "devIndicators": {
       "position": "bottom-left"
@@ -106,7 +109,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\DATA\\sukahideng-app",
+    "outputFileTracingRoot": "C:\\DATA\\Codes\\eskahade",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -163,7 +166,7 @@
       "proxyPrefetch": "flexible",
       "optimisticClientCache": true,
       "manualClientBasePath": false,
-      "cpus": 13,
+      "cpus": 11,
       "memoryBasedWorkersCount": false,
       "imgOptConcurrency": null,
       "imgOptTimeoutInSeconds": 7,
@@ -300,11 +303,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "C:\\DATA\\sukahideng-app"
+      "root": "C:\\DATA\\Codes\\eskahade"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "C:\\DATA\\sukahideng-app",
+  "appDir": "C:\\DATA\\Codes\\eskahade",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

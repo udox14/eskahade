@@ -3587,22 +3587,337 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/page_client-reference-manifest.js": {
-      "bytes": 7540,
-      "imports": [],
-      "format": "cjs"
-    },
-    ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
-      "bytes": 5948,
+      "bytes": 15332,
       "imports": [],
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
-      "bytes": 6643,
+      "bytes": 10343,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
+      "bytes": 5980,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js": {
+      "bytes": 12403,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/page_client-reference-manifest.js": {
+      "bytes": 16272,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/profil/page_client-reference-manifest.js": {
+      "bytes": 16352,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page_client-reference-manifest.js": {
+      "bytes": 16942,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/page_client-reference-manifest.js": {
+      "bytes": 27010,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page_client-reference-manifest.js": {
+      "bytes": 16730,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page_client-reference-manifest.js": {
+      "bytes": 16719,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page_client-reference-manifest.js": {
+      "bytes": 16561,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page_client-reference-manifest.js": {
+      "bytes": 16611,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page_client-reference-manifest.js": {
+      "bytes": 16521,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page_client-reference-manifest.js": {
+      "bytes": 16876,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page_client-reference-manifest.js": {
+      "bytes": 19079,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page_client-reference-manifest.js": {
+      "bytes": 16883,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page_client-reference-manifest.js": {
+      "bytes": 16630,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page_client-reference-manifest.js": {
+      "bytes": 16485,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page_client-reference-manifest.js": {
+      "bytes": 16582,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page_client-reference-manifest.js": {
+      "bytes": 16788,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page_client-reference-manifest.js": {
+      "bytes": 16330,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page_client-reference-manifest.js": {
+      "bytes": 16585,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page_client-reference-manifest.js": {
+      "bytes": 16725,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page_client-reference-manifest.js": {
+      "bytes": 16801,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page_client-reference-manifest.js": {
+      "bytes": 16646,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page_client-reference-manifest.js": {
+      "bytes": 16690,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page_client-reference-manifest.js": {
+      "bytes": 16695,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page_client-reference-manifest.js": {
+      "bytes": 16626,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page_client-reference-manifest.js": {
+      "bytes": 16792,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page_client-reference-manifest.js": {
+      "bytes": 16761,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page_client-reference-manifest.js": {
+      "bytes": 16792,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page_client-reference-manifest.js": {
+      "bytes": 16553,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page_client-reference-manifest.js": {
+      "bytes": 16682,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page_client-reference-manifest.js": {
+      "bytes": 16663,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page_client-reference-manifest.js": {
+      "bytes": 16300,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page_client-reference-manifest.js": {
+      "bytes": 16622,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page_client-reference-manifest.js": {
+      "bytes": 16666,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page_client-reference-manifest.js": {
+      "bytes": 16925,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page_client-reference-manifest.js": {
+      "bytes": 16645,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page_client-reference-manifest.js": {
+      "bytes": 16825,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page_client-reference-manifest.js": {
+      "bytes": 16703,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page_client-reference-manifest.js": {
+      "bytes": 16751,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page_client-reference-manifest.js": {
+      "bytes": 16737,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page_client-reference-manifest.js": {
+      "bytes": 16600,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page_client-reference-manifest.js": {
+      "bytes": 16323,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page_client-reference-manifest.js": {
+      "bytes": 16456,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page_client-reference-manifest.js": {
+      "bytes": 16545,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page_client-reference-manifest.js": {
+      "bytes": 16446,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page_client-reference-manifest.js": {
+      "bytes": 16542,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page_client-reference-manifest.js": {
+      "bytes": 16539,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page_client-reference-manifest.js": {
+      "bytes": 16517,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/api/auth/login/route_client-reference-manifest.js": {
+      "bytes": 317,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page_client-reference-manifest.js": {
+      "bytes": 16112,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page_client-reference-manifest.js": {
+      "bytes": 16315,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page_client-reference-manifest.js": {
+      "bytes": 16431,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page_client-reference-manifest.js": {
+      "bytes": 16406,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page_client-reference-manifest.js": {
+      "bytes": 16493,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page_client-reference-manifest.js": {
+      "bytes": 16436,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page_client-reference-manifest.js": {
+      "bytes": 16464,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page_client-reference-manifest.js": {
+      "bytes": 16503,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page_client-reference-manifest.js": {
+      "bytes": 16472,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page_client-reference-manifest.js": {
+      "bytes": 16666,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page_client-reference-manifest.js": {
+      "bytes": 16663,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page_client-reference-manifest.js": {
+      "bytes": 16401,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page_client-reference-manifest.js": {
+      "bytes": 16851,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page_client-reference-manifest.js": {
+      "bytes": 16366,
       "imports": [],
       "format": "cjs"
     },
     ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.external.js": {
-      "bytes": 326152,
+      "bytes": 230887,
       "imports": [
         {
           "path": "path",
@@ -3627,17 +3942,332 @@
         {
           "path": ".open-next/server-functions/default/.next/server/app/page_client-reference-manifest.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\page_client-reference-manifest.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\_global-error\\page_client-reference-manifest.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\_not-found\\page_client-reference-manifest.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\_not-found\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\_global-error\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\login\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/profil/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\profil\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\surat-santri\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\users\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\perpulangan-periode\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\fitur-akses\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\tahun-ajaran\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\tes-klasifikasi\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\[id]\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\keluar\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\input\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\foto\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\export\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\atur-kelas\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\arsip\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\laporan\\rapor\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\wali-kelas\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\santri-tools\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\pelanggaran\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\kelas\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\kitab\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\rekap-asrama\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\uang-jajan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\surat\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\sensus\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\setoran\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\uang-jajan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\status-setoran\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\spp\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpulangan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpindahan-kamar\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-malam\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\layanan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-sakit\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-berjamaah\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\pembayaran\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\laporan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\tarif\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\ranking\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\kenaikan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\leger\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi-guru\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\grading\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/api/auth/login/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\auth\\login\\route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\[id]\\edit\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\atur-kelas\\import\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\verifikasi-telat\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\cetak-telat\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\sensus\\laporan\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpulangan\\monitoring\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\upk\\manajemen\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\upk\\kasir\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\nilai\\input\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi-guru\\rekap\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\verifikasi\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\cetak-blanko\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\rekap\\page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\cetak\\page_client-reference-manifest.js"
         }
       ],
       "format": "cjs"
@@ -3679,7 +4309,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/_global-error/page.js": {
-      "bytes": 616,
+      "bytes": 833,
       "imports": [
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
@@ -3690,7 +4320,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/_not-found/page.js": {
-      "bytes": 855,
+      "bytes": 1145,
       "imports": [
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
@@ -3736,8 +4366,690 @@
       ],
       "format": "cjs"
     },
+    ".open-next/server-functions/default/.next/server/app/api/auth/login/route.js": {
+      "bytes": 397,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page.js": {
+      "bytes": 1476,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page.js": {
+      "bytes": 1485,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page.js": {
+      "bytes": 1487,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page.js": {
+      "bytes": 1480,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page.js": {
+      "bytes": 1471,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page.js": {
+      "bytes": 1478,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page.js": {
+      "bytes": 1485,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page.js": {
+      "bytes": 1471,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page.js": {
+      "bytes": 1472,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page.js": {
+      "bytes": 1469,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page.js": {
+      "bytes": 1478,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page.js": {
+      "bytes": 1471,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page.js": {
+      "bytes": 1476,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page.js": {
+      "bytes": 1480,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page.js": {
+      "bytes": 1477,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page.js": {
+      "bytes": 1469,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page.js": {
+      "bytes": 1479,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page.js": {
+      "bytes": 1487,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page.js": {
+      "bytes": 1465,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page.js": {
+      "bytes": 1474,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page.js": {
+      "bytes": 1472,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page.js": {
+      "bytes": 1485,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page.js": {
+      "bytes": 1474,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page.js": {
+      "bytes": 1475,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page.js": {
+      "bytes": 1478,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page.js": {
+      "bytes": 1460,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page.js": {
+      "bytes": 1562,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page.js": {
+      "bytes": 1565,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page.js": {
+      "bytes": 1476,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page.js": {
+      "bytes": 1471,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page.js": {
+      "bytes": 1474,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page.js": {
+      "bytes": 1469,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page.js": {
+      "bytes": 1468,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page.js": {
+      "bytes": 1467,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page.js": {
+      "bytes": 1467,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page.js": {
+      "bytes": 1473,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page.js": {
+      "bytes": 1472,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page.js": {
+      "bytes": 1472,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/page.js": {
+      "bytes": 1448,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page.js": {
+      "bytes": 1477,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page.js": {
+      "bytes": 1485,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page.js": {
+      "bytes": 1478,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page.js": {
+      "bytes": 1471,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/profil/page.js": {
+      "bytes": 1458,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page.js": {
+      "bytes": 1514,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page.js": {
+      "bytes": 1466,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page.js": {
+      "bytes": 1467,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page.js": {
+      "bytes": 1482,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page.js": {
+      "bytes": 1470,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page.js": {
+      "bytes": 1468,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page.js": {
+      "bytes": 1466,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page.js": {
+      "bytes": 1467,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page.js": {
+      "bytes": 1466,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/page.js": {
+      "bytes": 1538,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page.js": {
+      "bytes": 1477,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page.js": {
+      "bytes": 1464,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
     ".open-next/server-functions/default/.next/server/app/favicon.ico/route.js": {
-      "bytes": 332,
+      "bytes": 418,
       "imports": [
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/[turbopack]_runtime.js",
@@ -3747,8 +5059,19 @@
       ],
       "format": "cjs"
     },
+    ".open-next/server-functions/default/.next/server/app/login/page.js": {
+      "bytes": 1282,
+      "imports": [
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
+          "kind": "require-call",
+          "original": "../../chunks/ssr/[turbopack]_runtime.js"
+        }
+      ],
+      "format": "cjs"
+    },
     ".open-next/server-functions/default/.next/server/app/page.js": {
-      "bytes": 979,
+      "bytes": 1309,
       "imports": [
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js",
@@ -3759,7 +5082,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/node_modules/next/dist/server/require.js": {
-      "bytes": 5015,
+      "bytes": 20900,
       "imports": [
         {
           "path": "path",
@@ -3809,22 +5132,337 @@
         {
           "path": ".open-next/server-functions/default/.next/server/app/_global-error/page.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\_global-error\\page.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\_global-error\\page.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/_not-found/page.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\_not-found\\page.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\_not-found\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/api/auth/login/route.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\auth\\login\\route.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi-guru\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi-guru\\rekap\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\cetak-blanko\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\cetak\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\rekap\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\absensi\\verifikasi\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\grading\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\kenaikan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\leger\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\nilai\\input\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\ranking\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\upk\\kasir\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\akademik\\upk\\manajemen\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-berjamaah\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-malam\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\absen-sakit\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\layanan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpindahan-kamar\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpulangan\\monitoring\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\perpulangan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\spp\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\status-setoran\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\asrama\\uang-jajan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\sensus\\laporan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\sensus\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\setoran\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\surat\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\dewan-santri\\uang-jajan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\cetak-telat\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\perizinan\\verifikasi-telat\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keamanan\\rekap-asrama\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\laporan\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\pembayaran\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\keuangan\\tarif\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\laporan\\rapor\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\kelas\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\kitab\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\pelanggaran\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\santri-tools\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\master\\wali-kelas\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\fitur-akses\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\perpulangan-periode\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\tahun-ajaran\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\pengaturan\\users\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/profil/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\profil\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\[id]\\edit\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\[id]\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\arsip\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\atur-kelas\\import\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\atur-kelas\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\export\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\foto\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\input\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\keluar\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\santri\\tes-klasifikasi\\page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\dashboard\\surat-santri\\page.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/favicon.ico/route.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\favicon.ico\\route.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\favicon.ico\\route.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/login/page.js",
+          "kind": "require-call",
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\login\\page.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/page.js",
           "kind": "require-call",
-          "original": "C:\\DATA\\sukahideng-app\\.open-next\\server-functions\\default\\.next\\server\\app\\page.js"
+          "original": "C:\\DATA\\Codes\\eskahade\\.open-next\\server-functions\\default\\.next\\server\\app\\page.js"
         }
       ],
       "format": "cjs"
@@ -4549,7 +6187,7 @@
         {
           "path": ".open-next/server-functions/default/cache.cjs",
           "kind": "require-call",
-          "original": "C:/DATA/sukahideng-app/.open-next/server-functions/default/cache.cjs"
+          "original": "C:/DATA/Codes/eskahade/.open-next/server-functions/default/cache.cjs"
         }
       ],
       "format": "cjs"
@@ -4788,7 +6426,7 @@
         {
           "path": ".open-next/server-functions/default/cache.cjs",
           "kind": "require-call",
-          "original": "C:/DATA/sukahideng-app/.open-next/server-functions/default/cache.cjs"
+          "original": "C:/DATA/Codes/eskahade/.open-next/server-functions/default/cache.cjs"
         },
         {
           "path": ".open-next/server-functions/default/node_modules/react/jsx-runtime.js",
@@ -5309,12 +6947,12 @@
         {
           "path": ".open-next/server-functions/default/composable-cache.cjs",
           "kind": "require-call",
-          "original": "C:/DATA/sukahideng-app/.open-next/server-functions/default/composable-cache.cjs"
+          "original": "C:/DATA/Codes/eskahade/.open-next/server-functions/default/composable-cache.cjs"
         },
         {
           "path": ".open-next/server-functions/default/cache.cjs",
           "kind": "require-call",
-          "original": "C:/DATA/sukahideng-app/.open-next/server-functions/default/cache.cjs"
+          "original": "C:/DATA/Codes/eskahade/.open-next/server-functions/default/cache.cjs"
         },
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/experimental/testmode/server.js",
@@ -5336,7 +6974,7 @@
       "format": "esm"
     },
     ".open-next/server-functions/default/index.mjs": {
-      "bytes": 263989,
+      "bytes": 97687,
       "imports": [
         {
           "path": "node:module",
@@ -6518,37 +8156,415 @@
           "bytesInOutput": 586
         },
         ".open-next/server-functions/default/.next/server/app/page_client-reference-manifest.js": {
-          "bytesInOutput": 7181
-        },
-        ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
-          "bytesInOutput": 5714
+          "bytesInOutput": 14767
         },
         ".open-next/server-functions/default/.next/server/app/_not-found/page_client-reference-manifest.js": {
-          "bytesInOutput": 6351
+          "bytesInOutput": 9948
+        },
+        ".open-next/server-functions/default/.next/server/app/_global-error/page_client-reference-manifest.js": {
+          "bytesInOutput": 5746
+        },
+        ".open-next/server-functions/default/.next/server/app/login/page_client-reference-manifest.js": {
+          "bytesInOutput": 11941
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/page_client-reference-manifest.js": {
+          "bytesInOutput": 15752
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/profil/page_client-reference-manifest.js": {
+          "bytesInOutput": 15839
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page_client-reference-manifest.js": {
+          "bytesInOutput": 16435
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/page_client-reference-manifest.js": {
+          "bytesInOutput": 26305
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16219
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page_client-reference-manifest.js": {
+          "bytesInOutput": 16217
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page_client-reference-manifest.js": {
+          "bytesInOutput": 16073
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page_client-reference-manifest.js": {
+          "bytesInOutput": 16115
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page_client-reference-manifest.js": {
+          "bytesInOutput": 16026
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page_client-reference-manifest.js": {
+          "bytesInOutput": 16380
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page_client-reference-manifest.js": {
+          "bytesInOutput": 18524
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page_client-reference-manifest.js": {
+          "bytesInOutput": 16378
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page_client-reference-manifest.js": {
+          "bytesInOutput": 16124
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page_client-reference-manifest.js": {
+          "bytesInOutput": 15978
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page_client-reference-manifest.js": {
+          "bytesInOutput": 16077
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page_client-reference-manifest.js": {
+          "bytesInOutput": 16287
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page_client-reference-manifest.js": {
+          "bytesInOutput": 15824
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page_client-reference-manifest.js": {
+          "bytesInOutput": 16080
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page_client-reference-manifest.js": {
+          "bytesInOutput": 16224
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page_client-reference-manifest.js": {
+          "bytesInOutput": 16302
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page_client-reference-manifest.js": {
+          "bytesInOutput": 16146
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page_client-reference-manifest.js": {
+          "bytesInOutput": 16184
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page_client-reference-manifest.js": {
+          "bytesInOutput": 16189
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page_client-reference-manifest.js": {
+          "bytesInOutput": 16129
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16292
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16266
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page_client-reference-manifest.js": {
+          "bytesInOutput": 16292
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page_client-reference-manifest.js": {
+          "bytesInOutput": 16054
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page_client-reference-manifest.js": {
+          "bytesInOutput": 16184
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16162
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page_client-reference-manifest.js": {
+          "bytesInOutput": 15803
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page_client-reference-manifest.js": {
+          "bytesInOutput": 16114
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16166
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page_client-reference-manifest.js": {
+          "bytesInOutput": 16431
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page_client-reference-manifest.js": {
+          "bytesInOutput": 16145
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16321
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page_client-reference-manifest.js": {
+          "bytesInOutput": 16203
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page_client-reference-manifest.js": {
+          "bytesInOutput": 16255
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page_client-reference-manifest.js": {
+          "bytesInOutput": 16238
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16098
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page_client-reference-manifest.js": {
+          "bytesInOutput": 15819
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page_client-reference-manifest.js": {
+          "bytesInOutput": 15954
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16044
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page_client-reference-manifest.js": {
+          "bytesInOutput": 15942
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page_client-reference-manifest.js": {
+          "bytesInOutput": 16045
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page_client-reference-manifest.js": {
+          "bytesInOutput": 16037
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page_client-reference-manifest.js": {
+          "bytesInOutput": 16015
+        },
+        ".open-next/server-functions/default/.next/server/app/api/auth/login/route_client-reference-manifest.js": {
+          "bytesInOutput": 469
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page_client-reference-manifest.js": {
+          "bytesInOutput": 15610
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page_client-reference-manifest.js": {
+          "bytesInOutput": 15821
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page_client-reference-manifest.js": {
+          "bytesInOutput": 15948
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page_client-reference-manifest.js": {
+          "bytesInOutput": 15918
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page_client-reference-manifest.js": {
+          "bytesInOutput": 16002
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page_client-reference-manifest.js": {
+          "bytesInOutput": 15947
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page_client-reference-manifest.js": {
+          "bytesInOutput": 15968
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page_client-reference-manifest.js": {
+          "bytesInOutput": 16003
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page_client-reference-manifest.js": {
+          "bytesInOutput": 15974
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page_client-reference-manifest.js": {
+          "bytesInOutput": 16175
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page_client-reference-manifest.js": {
+          "bytesInOutput": 16172
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page_client-reference-manifest.js": {
+          "bytesInOutput": 15912
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page_client-reference-manifest.js": {
+          "bytesInOutput": 16355
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page_client-reference-manifest.js": {
+          "bytesInOutput": 15870
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.external.js": {
-          "bytesInOutput": 257829
+          "bytesInOutput": 165032
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js": {
           "bytesInOutput": 15468
         },
         ".open-next/server-functions/default/.next/server/app/_global-error/page.js": {
-          "bytesInOutput": 731
+          "bytesInOutput": 948
         },
         ".open-next/server-functions/default/.next/server/app/_not-found/page.js": {
-          "bytesInOutput": 968
+          "bytesInOutput": 1258
         },
         ".open-next/server-functions/default/.next/server/chunks/[turbopack]_runtime.js": {
           "bytesInOutput": 15455
         },
+        ".open-next/server-functions/default/.next/server/app/api/auth/login/route.js": {
+          "bytesInOutput": 514
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/page.js": {
+          "bytesInOutput": 1604
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi-guru/rekap/page.js": {
+          "bytesInOutput": 1616
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak-blanko/page.js": {
+          "bytesInOutput": 1620
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/cetak/page.js": {
+          "bytesInOutput": 1606
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/page.js": {
+          "bytesInOutput": 1594
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/rekap/page.js": {
+          "bytesInOutput": 1604
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/absensi/verifikasi/page.js": {
+          "bytesInOutput": 1616
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/grading/page.js": {
+          "bytesInOutput": 1595
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/kenaikan/page.js": {
+          "bytesInOutput": 1597
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/leger/page.js": {
+          "bytesInOutput": 1591
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/nilai/input/page.js": {
+          "bytesInOutput": 1603
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/ranking/page.js": {
+          "bytesInOutput": 1595
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/kasir/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/akademik/upk/manajemen/page.js": {
+          "bytesInOutput": 1607
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-berjamaah/page.js": {
+          "bytesInOutput": 1607
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-malam/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/absen-sakit/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/layanan/page.js": {
+          "bytesInOutput": 1591
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpindahan-kamar/page.js": {
+          "bytesInOutput": 1611
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/monitoring/page.js": {
+          "bytesInOutput": 1621
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/perpulangan/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/spp/page.js": {
+          "bytesInOutput": 1583
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/status-setoran/page.js": {
+          "bytesInOutput": 1603
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/asrama/uang-jajan/page.js": {
+          "bytesInOutput": 1597
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/laporan/page.js": {
+          "bytesInOutput": 1617
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/sensus/page.js": {
+          "bytesInOutput": 1601
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/setoran/page.js": {
+          "bytesInOutput": 1603
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/surat/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/dewan-santri/uang-jajan/page.js": {
+          "bytesInOutput": 1609
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/page.js": {
+          "bytesInOutput": 1579
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/cetak-telat/page.js": {
+          "bytesInOutput": 1697
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/perizinan/verifikasi-telat/page.js": {
+          "bytesInOutput": 1705
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keamanan/rekap-asrama/page.js": {
+          "bytesInOutput": 1605
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/laporan/page.js": {
+          "bytesInOutput": 1595
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/pembayaran/page.js": {
+          "bytesInOutput": 1601
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/keuangan/tarif/page.js": {
+          "bytesInOutput": 1591
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/laporan/rapor/page.js": {
+          "bytesInOutput": 1589
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/kelas/page.js": {
+          "bytesInOutput": 1587
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/kitab/page.js": {
+          "bytesInOutput": 1587
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/pelanggaran/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/santri-tools/page.js": {
+          "bytesInOutput": 1599
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/master/wali-kelas/page.js": {
+          "bytesInOutput": 1597
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/page.js": {
+          "bytesInOutput": 1561
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/fitur-akses/page.js": {
+          "bytesInOutput": 1607
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/perpulangan-periode/page.js": {
+          "bytesInOutput": 1623
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/tahun-ajaran/page.js": {
+          "bytesInOutput": 1609
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/pengaturan/users/page.js": {
+          "bytesInOutput": 1595
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/profil/page.js": {
+          "bytesInOutput": 1575
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/edit/page.js": {
+          "bytesInOutput": 1635
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/[id]/page.js": {
+          "bytesInOutput": 1585
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/arsip/page.js": {
+          "bytesInOutput": 1587
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/import/page.js": {
+          "bytesInOutput": 1611
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/atur-kelas/page.js": {
+          "bytesInOutput": 1595
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/export/page.js": {
+          "bytesInOutput": 1589
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/foto/page.js": {
+          "bytesInOutput": 1585
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/input/page.js": {
+          "bytesInOutput": 1587
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/keluar/page.js": {
+          "bytesInOutput": 1587
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/page.js": {
+          "bytesInOutput": 1655
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/santri/tes-klasifikasi/page.js": {
+          "bytesInOutput": 1607
+        },
+        ".open-next/server-functions/default/.next/server/app/dashboard/surat-santri/page.js": {
+          "bytesInOutput": 1587
+        },
         ".open-next/server-functions/default/.next/server/app/favicon.ico/route.js": {
-          "bytesInOutput": 452
+          "bytesInOutput": 539
+        },
+        ".open-next/server-functions/default/.next/server/app/login/page.js": {
+          "bytesInOutput": 1391
         },
         ".open-next/server-functions/default/.next/server/app/page.js": {
-          "bytesInOutput": 1084
+          "bytesInOutput": 1415
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/require.js": {
-          "bytesInOutput": 3143
+          "bytesInOutput": 10035
         },
         ".open-next/server-functions/default/node_modules/next/dist/lib/interop-default.js": {
           "bytesInOutput": 363
@@ -6746,10 +8762,10 @@
           "bytesInOutput": 8860
         },
         ".open-next/server-functions/default/index.mjs": {
-          "bytesInOutput": 232301
+          "bytesInOutput": 70945
         }
       },
-      "bytes": 2302223
+      "bytes": 3173575
     }
   }
 }

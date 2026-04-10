@@ -58,6 +58,12 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/api/auth/login",
+      "regex": "^/api/auth/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/login(?:/)?$"
+    },
+    {
       "page": "/dashboard",
       "regex": "^/dashboard(?:/)?$",
       "routeKeys": {},
@@ -148,6 +154,12 @@
       "namedRegex": "^/dashboard/akademik/upk/manajemen(?:/)?$"
     },
     {
+      "page": "/dashboard/asrama/absen-berjamaah",
+      "regex": "^/dashboard/asrama/absen\\-berjamaah(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/asrama/absen\\-berjamaah(?:/)?$"
+    },
+    {
       "page": "/dashboard/asrama/absen-malam",
       "regex": "^/dashboard/asrama/absen\\-malam(?:/)?$",
       "routeKeys": {},
@@ -164,6 +176,24 @@
       "regex": "^/dashboard/asrama/layanan(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/asrama/layanan(?:/)?$"
+    },
+    {
+      "page": "/dashboard/asrama/perpindahan-kamar",
+      "regex": "^/dashboard/asrama/perpindahan\\-kamar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/asrama/perpindahan\\-kamar(?:/)?$"
+    },
+    {
+      "page": "/dashboard/asrama/perpulangan",
+      "regex": "^/dashboard/asrama/perpulangan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/asrama/perpulangan(?:/)?$"
+    },
+    {
+      "page": "/dashboard/asrama/perpulangan/monitoring",
+      "regex": "^/dashboard/asrama/perpulangan/monitoring(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/asrama/perpulangan/monitoring(?:/)?$"
     },
     {
       "page": "/dashboard/asrama/spp",
@@ -208,16 +238,16 @@
       "namedRegex": "^/dashboard/dewan\\-santri/surat(?:/)?$"
     },
     {
+      "page": "/dashboard/dewan-santri/uang-jajan",
+      "regex": "^/dashboard/dewan\\-santri/uang\\-jajan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/dewan\\-santri/uang\\-jajan(?:/)?$"
+    },
+    {
       "page": "/dashboard/keamanan",
       "regex": "^/dashboard/keamanan(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/keamanan(?:/)?$"
-    },
-    {
-      "page": "/dashboard/keamanan/input",
-      "regex": "^/dashboard/keamanan/input(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/dashboard/keamanan/input(?:/)?$"
     },
     {
       "page": "/dashboard/keamanan/perizinan",
@@ -236,6 +266,12 @@
       "regex": "^/dashboard/keamanan/perizinan/verifikasi\\-telat(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/keamanan/perizinan/verifikasi\\-telat(?:/)?$"
+    },
+    {
+      "page": "/dashboard/keamanan/rekap-asrama",
+      "regex": "^/dashboard/keamanan/rekap\\-asrama(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/keamanan/rekap\\-asrama(?:/)?$"
     },
     {
       "page": "/dashboard/keuangan/laporan",
@@ -280,16 +316,46 @@
       "namedRegex": "^/dashboard/master/pelanggaran(?:/)?$"
     },
     {
+      "page": "/dashboard/master/santri-tools",
+      "regex": "^/dashboard/master/santri\\-tools(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/master/santri\\-tools(?:/)?$"
+    },
+    {
       "page": "/dashboard/master/wali-kelas",
       "regex": "^/dashboard/master/wali\\-kelas(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/master/wali\\-kelas(?:/)?$"
     },
     {
+      "page": "/dashboard/pengaturan/fitur-akses",
+      "regex": "^/dashboard/pengaturan/fitur\\-akses(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/pengaturan/fitur\\-akses(?:/)?$"
+    },
+    {
+      "page": "/dashboard/pengaturan/perpulangan-periode",
+      "regex": "^/dashboard/pengaturan/perpulangan\\-periode(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/pengaturan/perpulangan\\-periode(?:/)?$"
+    },
+    {
+      "page": "/dashboard/pengaturan/tahun-ajaran",
+      "regex": "^/dashboard/pengaturan/tahun\\-ajaran(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/pengaturan/tahun\\-ajaran(?:/)?$"
+    },
+    {
       "page": "/dashboard/pengaturan/users",
       "regex": "^/dashboard/pengaturan/users(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/pengaturan/users(?:/)?$"
+    },
+    {
+      "page": "/dashboard/profil",
+      "regex": "^/dashboard/profil(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/profil(?:/)?$"
     },
     {
       "page": "/dashboard/santri",
@@ -316,6 +382,12 @@
       "namedRegex": "^/dashboard/santri/atur\\-kelas/import(?:/)?$"
     },
     {
+      "page": "/dashboard/santri/export",
+      "regex": "^/dashboard/santri/export(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/santri/export(?:/)?$"
+    },
+    {
       "page": "/dashboard/santri/foto",
       "regex": "^/dashboard/santri/foto(?:/)?$",
       "routeKeys": {},
@@ -328,10 +400,22 @@
       "namedRegex": "^/dashboard/santri/input(?:/)?$"
     },
     {
+      "page": "/dashboard/santri/keluar",
+      "regex": "^/dashboard/santri/keluar(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/santri/keluar(?:/)?$"
+    },
+    {
       "page": "/dashboard/santri/tes-klasifikasi",
       "regex": "^/dashboard/santri/tes\\-klasifikasi(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/santri/tes\\-klasifikasi(?:/)?$"
+    },
+    {
+      "page": "/dashboard/surat-santri",
+      "regex": "^/dashboard/surat\\-santri(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/surat\\-santri(?:/)?$"
     },
     {
       "page": "/favicon.ico",

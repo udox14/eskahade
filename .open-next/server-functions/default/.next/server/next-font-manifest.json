@@ -1,6 +1,199 @@
 {
-  "app": {},
-  "appUsingSizeAdjust": false,
+  "app": {
+    "[project]/app/_not-found/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi-guru/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi-guru/rekap/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi/cetak-blanko/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi/cetak/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi/rekap/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/absensi/verifikasi/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/grading/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/kenaikan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/leger/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/nilai/input/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/ranking/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/upk/kasir/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/akademik/upk/manajemen/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/absen-berjamaah/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/absen-malam/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/absen-sakit/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/layanan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/perpindahan-kamar/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/perpulangan/monitoring/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/perpulangan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/spp/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/status-setoran/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/asrama/uang-jajan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/dewan-santri/sensus/laporan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/dewan-santri/sensus/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/dewan-santri/setoran/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/dewan-santri/surat/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/dewan-santri/uang-jajan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keamanan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keamanan/perizinan/cetak-telat/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keamanan/perizinan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keamanan/perizinan/verifikasi-telat/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keamanan/rekap-asrama/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keuangan/laporan/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keuangan/pembayaran/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/keuangan/tarif/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/laporan/rapor/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/master/kelas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/master/kitab/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/master/pelanggaran/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/master/santri-tools/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/master/wali-kelas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/pengaturan/fitur-akses/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/pengaturan/perpulangan-periode/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/pengaturan/tahun-ajaran/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/pengaturan/users/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/profil/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/[id]/edit/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/arsip/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/atur-kelas/import/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/atur-kelas/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/export/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/foto/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/input/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/keluar/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/santri/tes-klasifikasi/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/dashboard/surat-santri/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/login/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/app/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
   "pages": {},
   "pagesUsingSizeAdjust": false
 }
