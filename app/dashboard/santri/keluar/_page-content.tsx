@@ -44,7 +44,6 @@ function ModalKeluar({ santri, onClose, onSuccess }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!alasan.trim()) { toast.error('Alasan keluar wajib diisi'); return }
     setSaving(true)
     const res = await tetapkanKeluar({
       santriId: santri.id, tanggalKeluar: tanggal,
@@ -94,11 +93,11 @@ function ModalKeluar({ santri, onClose, onSuccess }: {
             {/* Alasan */}
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Alasan Keluar <span className="text-rose-500">*</span>
+                Alasan Keluar <span className="text-slate-400 font-normal ml-1">(Opsional)</span>
               </label>
               <textarea value={alasan} onChange={e => setAlasan(e.target.value)}
                 placeholder="Contoh: Pindah ke pesantren lain, urusan keluarga, dsb..."
-                rows={3} required
+                rows={3}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none" />
             </div>
 
@@ -296,20 +295,22 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch]     = useState('')
   const [asrama, setAsrama]     = useState('SEMUA')
+  const [pageSize, setPageSize] = useState(20)
   const [modalSantri, setModalSantri] = useState<SantriAktif | null>(null)
 
-  const load = useCallback(async (pg = 1, s = search, a = asrama) => {
+  const load = useCallback(async (pg = 1, s = search, a = asrama, ps = pageSize) => {
     setLoading(true)
     try {
       const res = await getSantriAktif({
         search: s || undefined,
         asrama: a !== 'SEMUA' ? a : undefined,
         page: pg,
+        pageSize: ps,
       })
       setRows(res.rows); setTotal(res.total)
       setTotalPages(res.totalPages); setPage(pg); setHasLoaded(true)
     } finally { setLoading(false) }
-  }, [search, asrama])
+  }, [search, asrama, pageSize])
 
   return (
     <div className="space-y-4">
@@ -339,6 +340,13 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
             <Filter className="w-4 h-4" />
             {loading ? 'Memuat...' : 'Tampilkan'}
           </button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
+            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
+              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -382,7 +390,7 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
                   <tbody className="divide-y divide-slate-50">
                     {rows.map((r, i) => (
                       <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3 text-xs text-slate-300">{(page-1)*30+i+1}</td>
+                        <td className="px-4 py-3 text-xs text-slate-300">{(page-1)*pageSize + i + 1}</td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-800">{r.nama_lengkap}</div>
                           <div className="text-xs text-slate-400">{r.nis}</div>
@@ -457,22 +465,24 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   const [hasLoaded, setHasLoaded] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch]     = useState('')
-  const [asrama, setAsrama]     = useState('SEMUA')
+   const [asrama, setAsrama]     = useState('SEMUA')
+  const [pageSize, setPageSize] = useState(20)
   const [suratId, setSuratId]   = useState<string | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
 
-  const load = useCallback(async (pg = 1, s = search, a = asrama) => {
+  const load = useCallback(async (pg = 1, s = search, a = asrama, ps = pageSize) => {
     setLoading(true)
     try {
       const res = await getSantriKeluar({
         search: s || undefined,
         asrama: a !== 'SEMUA' ? a : undefined,
         page: pg,
+        pageSize: ps,
       })
       setRows(res.rows); setTotal(res.total)
       setTotalPages(res.totalPages); setPage(pg); setHasLoaded(true)
     } finally { setLoading(false) }
-  }, [search, asrama])
+  }, [search, asrama, pageSize])
 
   const handleRestore = async (r: SantriKeluar) => {
     if (!await confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
@@ -513,6 +523,13 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
             <Filter className="w-4 h-4" />
             {loading ? 'Memuat...' : 'Tampilkan'}
           </button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
+            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
+              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -542,54 +559,80 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
             </div>
           ) : (
             <>
-              <div className="space-y-2">
+               {/* Desktop: Compact Table */}
+              <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">No</th>
+                      <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Santri</th>
+                      <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Keluar</th>
+                      <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alasan</th>
+                      <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {rows.map((r, i) => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-2 text-xs text-slate-300">{(page-1)*pageSize + i + 1}</td>
+                        <td className="px-4 py-2">
+                          <div className="font-semibold text-slate-800 text-xs">{r.nama_lengkap}</div>
+                          <div className="text-[10px] text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="text-xs font-bold text-slate-700">{fmtTgl(r.tanggal_keluar)}</div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="text-xs text-slate-500 max-w-[200px] truncate" title={r.alasan_keluar || ''}>
+                            {r.alasan_keluar || '—'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex justify-end gap-1.5">
+                            <button onClick={() => setSuratId(r.id)}
+                              className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                              title="Cetak Surat">
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
+                              className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1">
+                              {restoringId === r.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <RotateCcw className="w-3 h-3"/>}
+                              Aktifkan
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile: Compact Cards */}
+              <div className="md:hidden space-y-2">
                 {rows.map(r => (
-                  <div key={r.id}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:border-slate-300 transition-colors">
-                    <div className="h-0.5 bg-rose-400 w-full" />
-                    <div className="p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
-                              <UserX className="w-4 h-4 text-rose-500" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
-                              <p className="text-xs text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</p>
-                            </div>
-                          </div>
-
-                          {/* Detail keluar */}
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                              <p className="text-slate-400 font-medium mb-0.5">Tanggal Keluar</p>
-                              <p className="font-bold text-slate-700">{fmtTgl(r.tanggal_keluar)}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                              <p className="text-slate-400 font-medium mb-0.5">Alasan</p>
-                              <p className="font-semibold text-slate-700 truncate">{r.alasan_keluar || '—'}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Aksi */}
-                        <div className="flex sm:flex-col gap-2 sm:w-36 sm:shrink-0">
-                          <button onClick={() => setSuratId(r.id)}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">
-                            <Printer className="w-3.5 h-3.5" />
-                            Cetak Surat
-                          </button>
-                          <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold hover:bg-emerald-100 disabled:opacity-50 transition-colors">
-                            {restoringId === r.id
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <RotateCcw className="w-3.5 h-3.5" />}
-                            Aktifkan Kembali
-                          </button>
-                        </div>
+                  <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-sm truncate">{r.nama_lengkap}</p>
+                        <p className="text-[10px] text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</p>
                       </div>
+                      <div className="shrink-0 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                        {fmtTgl(r.tanggal_keluar)}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 line-clamp-1 mb-3 bg-slate-50 p-1.5 rounded-lg italic">
+                      {r.alasan_keluar || 'Tanpa alasan'}
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setSuratId(r.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">
+                        <Printer className="w-3.5 h-3.5" /> Surat
+                      </button>
+                      <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold">
+                        {restoringId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <RotateCcw className="w-3.5 h-3.5"/>}
+                        Pulihkan
+                      </button>
                     </div>
                   </div>
                 ))}

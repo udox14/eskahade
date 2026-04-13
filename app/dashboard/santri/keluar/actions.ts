@@ -4,7 +4,9 @@ import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-const PAGE_SIZE = 30
+// Default page size if not provided
+const DEFAULT_PAGE_SIZE = 30
+
 
 // ─── Helper asrama list ───────────────────────────────────────────────────────
 export async function getAsramaList() {
@@ -21,9 +23,10 @@ export async function getSantriAktif(params: {
   search?: string
   asrama?: string
   page?: number
+  pageSize?: number
 }) {
-  const { search, asrama, page = 1 } = params
-  const offset = (page - 1) * PAGE_SIZE
+  const { search, asrama, page = 1, pageSize = DEFAULT_PAGE_SIZE } = params
+  const offset = (page - 1) * pageSize
 
   const clauses = ["s.status_global = 'aktif'"]
   const baseParams: any[] = []
@@ -50,10 +53,10 @@ export async function getSantriAktif(params: {
      FROM santri s WHERE ${where}
      ORDER BY s.asrama, s.nama_lengkap
      LIMIT ? OFFSET ?`,
-    [...baseParams, PAGE_SIZE, offset]
+    [...baseParams, pageSize, offset]
   )
 
-  return { rows, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
 }
 
 // ─── Daftar santri keluar (untuk tab Santri Keluar) ──────────────────────────
@@ -61,9 +64,10 @@ export async function getSantriKeluar(params: {
   search?: string
   asrama?: string
   page?: number
+  pageSize?: number
 }) {
-  const { search, asrama, page = 1 } = params
-  const offset = (page - 1) * PAGE_SIZE
+  const { search, asrama, page = 1, pageSize = DEFAULT_PAGE_SIZE } = params
+  const offset = (page - 1) * pageSize
 
   const clauses = ["s.status_global = 'keluar'"]
   const baseParams: any[] = []
@@ -95,10 +99,10 @@ export async function getSantriKeluar(params: {
      FROM santri s WHERE ${where}
      ORDER BY s.tanggal_keluar DESC, s.nama_lengkap
      LIMIT ? OFFSET ?`,
-    [...baseParams, PAGE_SIZE, offset]
+    [...baseParams, pageSize, offset]
   )
 
-  return { rows, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
 }
 
 // ─── Tetapkan santri keluar ───────────────────────────────────────────────────
