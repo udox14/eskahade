@@ -1,62 +1,98 @@
 'use client'
 
-import React from 'react'
-
-import { useState, useEffect } from 'react'
-import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin } from './actions'
-import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowRight, ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin, getAsramaList, exportDataIzin, getAnalitikIzin } from './actions'
+import { Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, AlertTriangle, Trash2, Filter, Download, BarChart2, List } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import Pagination, { usePagination } from '@/components/ui/pagination' 
+import Pagination from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import * as XLSX from 'xlsx'
 
 const LIST_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
   "Ryan M. Ridwan", "M. Jihad Robbani", "Wahid Hasyim", "Abdul Halim"
 ]
 
+const LIST_ALASAN = [
+  "SAKIT", "BEROBAT", "KONTROL", "ACARA KELUARGA", "ACARA",
+  "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH", 
+  "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
+]
+
 export default function PerizinanPage() {
   const confirm = useConfirm()
   const router = useRouter()
-  const [list, setList] = useState<any[]>([])
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [filterWaktu, setFilterWaktu] = useState<'HARI' | 'MINGGU' | 'BULAN'>('HARI')
-  const [loading, setLoading] = useState(true)
+  
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'DAFTAR' | 'ANALITIK'>('DAFTAR')
 
-  // State Modal Input
+  // Data State
+  const [list, setList] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [asramaOptions, setAsramaOptions] = useState<string[]>([])
+  const [analitikData, setAnalitikData] = useState<any>(null)
+
+  // Filters & Pagination
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [asrama, setAsrama] = useState('SEMUA')
+  const [tanggal, setTanggal] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'>('SEMUA')
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+
+  // Modal Input
   const [isOpenInput, setIsOpenInput] = useState(false)
   const [searchSantri, setSearchSantri] = useState('')
   const [hasilCari, setHasilCari] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [jenisIzin, setJenisIzin] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
+  const [alasanDropdown, setAlasanDropdown] = useState('SAKIT')
   
-  // State Modal Kembali
+  // Modal Kembali
   const [isOpenReturn, setIsOpenReturn] = useState(false)
   const [selectedReturnId, setSelectedReturnId] = useState('')
   const [waktuKembali, setWaktuKembali] = useState(new Date().toISOString().slice(0, 16))
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadData()
-  }, [filterWaktu])
+    getAsramaList().then(setAsramaOptions)
+  }, [])
 
-  const loadData = async () => {
+  const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, t = tanggal, st = statusFilter) => {
     setLoading(true)
-    const res = await getPerizinanList(filterWaktu)
-    setList(res)
-    setLoading(false)
-  }
+    try {
+      const res = await getPerizinanList({ page: pg, pageSize: ps, search: s, asrama: a, tanggal: t, statusFilter: st })
+      setList(res.rows)
+      setTotal(res.total)
+      setTotalPages(res.totalPages)
+      setPage(pg)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, search, asrama, tanggal, statusFilter])
+
+  const loadAnalitik = useCallback(async (a = asrama) => {
+    try {
+      const data = await getAnalitikIzin({ asrama: a })
+      setAnalitikData(data)
+    } catch(e) { console.error(e) }
+  }, [asrama])
+
+  useEffect(() => {
+    if (activeTab === 'DAFTAR') loadData(page, pageSize, search, asrama, tanggal, statusFilter)
+    else loadAnalitik(asrama)
+  }, [activeTab, page, pageSize, search, asrama, tanggal, statusFilter, loadData, loadAnalitik])
 
   // --- HANDLERS ---
   const handleCariSantri = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (searchSantri.length < 3) {
-        toast.warning("Ketik minimal 3 huruf untuk mencari.")
-        return 
-    }
+    if (searchSantri.length < 3) { toast.warning("Ketik minimal 3 huruf untuk mencari."); return }
     const res = await cariSantri(searchSantri)
     setHasilCari(res)
     if (res.length === 0) toast.info("Santri tidak ditemukan.")
@@ -64,16 +100,12 @@ export default function PerizinanPage() {
 
   const handleSimpan = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!selectedSantri) {
-        toast.error("Mohon pilih santri terlebih dahulu!")
-        return 
-    }
-    
+    if (!selectedSantri) { toast.error("Mohon pilih santri terlebih dahulu!"); return }
     const loadingToast = toast.loading("Menyimpan data izin...")
     const formData = new FormData(e.currentTarget)
     formData.append('santri_id', selectedSantri.id)
     formData.append('jenis', jenisIzin)
-    
+    formData.append('alasan_dropdown', alasanDropdown) // Ensure dropdown is caught
     const res = await simpanIzin(formData)
     toast.dismiss(loadingToast)
 
@@ -81,11 +113,8 @@ export default function PerizinanPage() {
       toast.error("Gagal menyimpan: " + (res as any).error)
     } else {
       toast.success("Data perizinan berhasil disimpan!")
-      setIsOpenInput(false)
-      setSelectedSantri(null)
-      setSearchSantri('')
-      setHasilCari([]) 
-      loadData()
+      setIsOpenInput(false); setSelectedSantri(null); setSearchSantri(''); setHasilCari([]) 
+      loadData(1)
     }
   }
 
@@ -96,15 +125,14 @@ export default function PerizinanPage() {
     setDeletingId(null)
     if ('error' in res) { toast.error('Gagal hapus', { description: (res as any).error }); return }
     toast.success('Data izin dihapus')
-    setList(prev => prev.filter(i => i.id !== item.id))
+    loadData()
   }
 
   const openReturnModal = (item: any) => {
     setSelectedReturnId(item.id)
     const now = new Date()
     const tzOffset = now.getTimezoneOffset() * 60000
-    const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16)
-    setWaktuKembali(localISOTime)
+    setWaktuKembali((new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16))
     setIsOpenReturn(true)
   }
 
@@ -113,338 +141,497 @@ export default function PerizinanPage() {
     const res = await setSudahDatang(selectedReturnId, waktuKembali)
     toast.dismiss(loadingToast)
 
-    if ('error' in res) {
-      toast.error((res as any).error)
-    } else {
-      if ((res as any).message?.includes('Terlambat')) {
-        toast.warning("Tercatat Terlambat!", { description: "Data masuk ke antrian verifikasi/sidang." })
-      } else {
-        toast.success("Tepat Waktu.", { description: "Izin diselesaikan." })
-      }
-      setIsOpenReturn(false)
-      loadData()
+    if ('error' in res) { toast.error((res as any).error) } 
+    else {
+      if ((res as any).message?.includes('Terlambat')) toast.warning("Tercatat Terlambat!", { description: "Data masuk ke antrian verifikasi/sidang." })
+      else toast.success("Tepat Waktu.", { description: "Izin diselesaikan." })
+      setIsOpenReturn(false); loadData()
     }
   }
 
-  const { paged: pagedList, totalPages: totalPagesList, safePage: safePageList } = usePagination(list, pageSize, page)
+  const handleExportExcel = async () => {
+    const loadingToast = toast.loading("Menyiapkan data export...")
+    try {
+      const data = await exportDataIzin({ search, asrama, tanggal, statusFilter: statusFilter as any })
+      if (!data || data.length === 0) { toast.dismiss(loadingToast); toast.info("Tidak ada data untuk diexport"); return }
+      
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Data_Izin")
+      XLSX.writeFile(wb, `Laporan_Perizinan_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+      toast.success("Berhasil export Excel!")
+    } catch(e) {
+      toast.error("Gagal export data")
+    } finally {
+      toast.dismiss(loadingToast)
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
-      
       {/* HEADER */}
       <div className="flex items-center gap-4">
-        {/* FIX: Ganti Link href ke button router.back() */}
-        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-800">Perizinan Santri</h1>
-          <p className="text-slate-500 text-sm">Monitoring santri keluar/masuk komplek.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Perizinan Santri</h1>
+          <p className="text-slate-500 text-sm">Monitoring santri keluar/masuk komplek dan pulang.</p>
         </div>
-        <button 
-          onClick={() => setIsOpenInput(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium text-sm"
-        >
+        <button onClick={() => setIsOpenInput(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
           <Plus className="w-4 h-4" /> Izin Baru
         </button>
       </div>
 
-      {/* FILTER WAKTU */}
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['HARI', 'MINGGU', 'BULAN'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilterWaktu(f)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${filterWaktu === f ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            {f === 'HARI' ? 'Hari Ini' : f === 'MINGGU' ? 'Minggu Ini' : 'Bulan Ini'}
-          </button>
-        ))}
+      {/* TABS */}
+      <div className="flex gap-2 border-b border-slate-200">
+        <button onClick={() => setActiveTab('DAFTAR')} className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'DAFTAR' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <List className="w-4 h-4" /> Daftar Izin
+        </button>
+        <button onClick={() => setActiveTab('ANALITIK')} className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ANALITIK' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <BarChart2 className="w-4 h-4" /> Analitik & Tren
+        </button>
       </div>
 
-      {/* DAFTAR PERIZINAN */}
-      {loading ? (
-        <div className="flex justify-center py-12 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
-          <Clock className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
-        </div>
-      ) : list.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-slate-200 text-sm">
-          Tidak ada data perizinan untuk periode ini.
-        </div>
-      ) : (
-        <>
-          {/* Desktop: Tabel */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Santri</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jenis & Alasan</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
-                  <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {pagedList.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{item.nama}</p>
-                      <p className="text-xs text-slate-400">{item.asrama} / {item.kamar}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {item.jenis === 'PULANG'
-                          ? <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> Pulang</span>
-                          : <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> Keluar Komplek</span>
-                        }
-                        <span className="text-xs text-slate-400">via {item.pemberi_izin}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 italic truncate max-w-[200px]">"{item.alasan}"</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <p className="text-slate-500">Pergi: <span className="font-medium text-slate-800">{format(new Date(item.tgl_mulai), 'dd MMM yyyy, HH:mm', { locale: id })}</span></p>
-                      {item.tgl_kembali_aktual ? (
-                        <p className={`font-bold mt-0.5 ${item.status === 'AKTIF' ? 'text-orange-600' : 'text-emerald-600'}`}>
-                          Tiba: {format(new Date(item.tgl_kembali_aktual), 'dd MMM yyyy, HH:mm', { locale: id })}
-                          {item.status === 'AKTIF' && ' ⚠'}
-                        </p>
-                      ) : (
-                        <p className="text-rose-500 mt-0.5">Batas: {format(new Date(item.tgl_selesai_rencana), 'dd MMM yyyy, HH:mm', { locale: id })}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {item.status === 'AKTIF' ? (
-                        item.tgl_kembali_aktual ? (
-                          <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-orange-200">
-                            <AlertTriangle className="w-3 h-3"/> Menunggu Sidang
-                          </span>
-                        ) : (
-                          <button onClick={() => openReturnModal(item)}
-                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors active:scale-95">
-                            Belum Kembali
-                          </button>
-                        )
-                      ) : (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-emerald-200">
-                          <CheckCircle className="w-3 h-3"/> Selesai
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleHapus(item)} disabled={deletingId === item.id}
-                        className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile: Cards */}
-          <div className="md:hidden space-y-2.5">
-            {pagedList.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className={`h-1 w-full ${
-                  item.status !== 'AKTIF' ? 'bg-emerald-400'
-                  : item.tgl_kembali_aktual ? 'bg-orange-400'
-                  : 'bg-rose-400'
-                }`} />
-                <div className="p-3.5 space-y-2.5">
-                  {/* Nama + jenis + hapus */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 text-sm leading-tight">{item.nama}</p>
-                      <p className="text-xs text-slate-400">{item.asrama} / {item.kamar}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {item.jenis === 'PULANG'
-                        ? <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-purple-200"><Home className="w-3 h-3"/> Pulang</span>
-                        : <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-blue-200"><MapPin className="w-3 h-3"/> Keluar</span>
-                      }
-                      <button onClick={() => handleHapus(item)} disabled={deletingId === item.id}
-                        className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  {/* Alasan */}
-                  <p className="text-xs text-slate-500 italic">"{item.alasan}" <span className="not-italic text-slate-400">· via {item.pemberi_izin}</span></p>
-                  {/* Waktu */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-slate-50 rounded-xl p-2 border border-slate-100">
-                      <p className="text-slate-400 text-[10px] font-medium mb-0.5">Berangkat</p>
-                      <p className="font-semibold text-slate-700">{format(new Date(item.tgl_mulai), 'dd MMM, HH:mm', { locale: id })}</p>
-                    </div>
-                    <div className={`rounded-xl p-2 border ${
-                      item.tgl_kembali_aktual
-                        ? item.status === 'AKTIF' ? 'bg-orange-50 border-orange-100' : 'bg-emerald-50 border-emerald-100'
-                        : 'bg-rose-50 border-rose-100'
-                    }`}>
-                      <p className={`text-[10px] font-medium mb-0.5 ${
-                        item.tgl_kembali_aktual
-                          ? item.status === 'AKTIF' ? 'text-orange-500' : 'text-emerald-500'
-                          : 'text-rose-400'
-                      }`}>{item.tgl_kembali_aktual ? 'Tiba' : 'Batas Kembali'}</p>
-                      <p className={`font-semibold ${
-                        item.tgl_kembali_aktual
-                          ? item.status === 'AKTIF' ? 'text-orange-700' : 'text-emerald-700'
-                          : 'text-rose-600'
-                      }`}>
-                        {item.tgl_kembali_aktual
-                          ? format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })
-                          : format(new Date(item.tgl_selesai_rencana), 'dd MMM, HH:mm', { locale: id })
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  {/* Status / Aksi */}
-                  {item.status === 'AKTIF' ? (
-                    item.tgl_kembali_aktual ? (
-                      <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                        <span className="text-xs font-bold text-orange-700">Menunggu Sidang — Terlambat Kembali</span>
-                      </div>
-                    ) : (
-                      <button onClick={() => openReturnModal(item)}
-                        className="w-full py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 active:scale-95 transition-all">
-                        Tandai Sudah Kembali
-                      </button>
-                    )
-                  ) : (
-                    <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-xs font-bold text-emerald-700">Selesai</span>
-                    </div>
-                  )}
-                </div>
+      {/* DAFTAR TAB CONTENT */}
+      {activeTab === 'DAFTAR' && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+          
+          {/* COMPREHENSIVE FILTER BAR */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="min-w-[140px] flex-1 sm:flex-none">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
+                <select value={asrama} onChange={e => {setAsrama(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                  <option value="SEMUA">Semua Asrama</option>
+                  {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
               </div>
-            ))}
+              <div className="min-w-[150px] flex-1 sm:flex-none">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Tanggal Filter</label>
+                <input type="date" value={tanggal} onChange={e => {setTanggal(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" title="Pilih tanggal melihat siapa yang izin beririsan pada hari tersebut" />
+              </div>
+              <div className="min-w-[150px] flex-1 sm:flex-none">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Status</label>
+                <select value={statusFilter} onChange={e => {setStatusFilter(e.target.value as any); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                  <option value="SEMUA">Semua Status</option>
+                  <option value="BELUM_KEMBALI">Sedang Izin (Belum Kembali)</option>
+                  <option value="SUDAH_KEMBALI">Sudah Kembali</option>
+                  <option value="TERLAMBAT">Terlambat (Kembali / Belum)</option>
+                  <option value="TEPAT_WAKTU">Tepat Waktu (Sudah Kembali)</option>
+                </select>
+              </div>
+              <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }} className="flex-1 min-w-[200px]">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari Santri</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input type="text" placeholder="Ketik Nama / NIS..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
+                </div>
+              </form>
+              
+              <div className="flex gap-2 self-end w-full sm:w-auto">
+                <button type="button" onClick={() => loadData(1, pageSize, searchInput, asrama, tanggal, statusFilter)} className="flex-1 sm:flex-none bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-black transition-colors">
+                  <Filter className="w-4 h-4" /> Filter
+                </button>
+                <button type="button" onClick={handleExportExcel} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors">
+                  <Download className="w-4 h-4" /> Export
+                </button>
+              </div>
+            </div>
+            {(search || tanggal || asrama !== 'SEMUA' || statusFilter !== 'SEMUA') && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-slate-500">Filter Aktif:</span>
+                <button onClick={() => {setSearchInput(''); setSearch(''); setTanggal(''); setAsrama('SEMUA'); setStatusFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors">
+                  Reset Filter
+                </button>
+              </div>
+            )}
           </div>
-          <Pagination
-            currentPage={safePageList}
-            totalPages={totalPagesList}
-            pageSize={pageSize}
-            total={list.length}
-            onPageChange={setPage}
-            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-          />
 
-        </>
+          {/* LIST DATA */}
+          {loading ? (
+            <div className="flex justify-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
+              <Clock className="w-6 h-6 animate-spin" /><span className="ml-2 font-medium">Memuat Data...</span>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 flex flex-col items-center">
+              <div className="bg-slate-50 p-4 rounded-full mb-3"><MapPin className="w-8 h-8 text-slate-300" /></div>
+              <p className="text-slate-500 font-medium">Tidak ada data yang sesuai filter.</p>
+            </div>
+          ) : (
+            <>
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                <div className="flex items-center gap-2 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-sm">
+                  <span>Baris:</span>
+                  <select value={pageSize} onChange={e => {setPageSize(Number(e.target.value)); setPage(1)}} className="bg-transparent focus:outline-none text-slate-800">
+                    {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <span>Total: <span className="text-slate-800">{total}</span> izin</span>
+              </div>
+
+              {/* Desktop Table (Compact View) */}
+              <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase">Santri</th>
+                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase">Perizinan</th>
+                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase">Waktu</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase w-32">Status</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {list.map((item) => {
+                      const tglMulai = new Date(item.tgl_mulai)
+                      const tglRencana = new Date(item.tgl_selesai_rencana)
+                      const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
+                      
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2">
+                            <p className="font-bold text-slate-800">{item.nama}</p>
+                            <p className="text-[11px] text-slate-500">{item.nis} · {item.asrama}/{item.kamar}</p>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              {item.jenis === 'PULANG' ? (
+                                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1"><Home className="w-3 h-3"/> Pulang</span>
+                              ) : (
+                                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex items-center gap-1"><MapPin className="w-3 h-3"/> Keluar</span>
+                              )}
+                              <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[120px]" title={item.pemberi_izin}>{item.pemberi_izin}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-1 italic max-w-xs" title={item.alasan}>"{item.alasan}"</p>
+                          </td>
+                          <td className="px-3 py-2">
+                            <table className="text-[11px] text-slate-600">
+                              <tbody>
+                                <tr><td className="pr-2 text-slate-400">PGI:</td><td className="font-semibold">{format(tglMulai, 'dd MMM, HH:mm', { locale: id })}</td></tr>
+                                {item.tgl_kembali_aktual ? (
+                                  <tr><td className="pr-2 text-slate-400">TBA:</td><td className={`font-bold ${isTelat ? 'text-orange-600' : 'text-emerald-600'}`}>{format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })}</td></tr>
+                                ) : (
+                                  <tr><td className="pr-2 text-slate-400">BTS:</td><td className={`font-semibold ${isTelat ? 'text-red-500 font-bold' : ''}`}>{format(tglRencana, 'dd MMM, HH:mm', { locale: id })}</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {item.status === 'AKTIF' ? (
+                              item.tgl_kembali_aktual ? (
+                                <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-lg flex items-center justify-center gap-1"><AlertTriangle className="w-3 h-3"/> Sidang</span>
+                              ) : (
+                                <button onClick={() => openReturnModal(item)} className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-2.5 py-1 rounded-lg text-[11px] font-bold w-full transition-colors">Belum Kembali</button>
+                              )
+                            ) : (
+                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg flex items-center justify-center gap-1"><CheckCircle className="w-3 h-3"/> Selesai {isTelat && '(Telat)'}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                              {deletingId === item.id ? <Clock className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards (Compact View) */}
+              <div className="md:hidden space-y-2">
+                {list.map((item) => {
+                  const tglMulai = new Date(item.tgl_mulai)
+                  const tglRencana = new Date(item.tgl_selesai_rencana)
+                  const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
+
+                  return (
+                    <div key={item.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col gap-2">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-sm">{item.nama}</p>
+                          <p className="text-[10px] text-slate-500">{item.nis} · {item.asrama}/{item.kamar}</p>
+                        </div>
+                        {item.jenis === 'PULANG' 
+                          ? <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">PULANG</span>
+                          : <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">KELUAR</span>}
+                      </div>
+
+                      <div className="bg-slate-50 rounded-lg p-2 text-xs">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
+                          <span className="text-slate-500 italic truncate mr-2">"{item.alasan}"</span>
+                          <span className="text-[10px] font-bold text-slate-400 bg-white px-1 rounded border border-slate-100">{item.pemberi_izin}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span><span className="text-slate-400 text-[10px]">PGI:</span> <b>{format(tglMulai, 'dd MMM, HH:mm', { locale: id })}</b></span>
+                          {item.tgl_kembali_aktual 
+                            ? <span><span className="text-slate-400 text-[10px]">TBA:</span> <b className={isTelat ? 'text-orange-600' : 'text-emerald-600'}>{format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })}</b></span>
+                            : <span><span className="text-slate-400 text-[10px]">BTS:</span> <b className={isTelat ? 'text-red-500' : ''}>{format(tglRencana, 'dd MMM, HH:mm', { locale: id })}</b></span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-1">
+                        {item.status === 'AKTIF' ? (
+                          item.tgl_kembali_aktual ? (
+                            <span className="flex-1 text-center py-1.5 text-xs font-bold text-orange-700 bg-orange-100 rounded-lg border border-orange-200">Menunggu Sidang (Telat)</span>
+                          ) : (
+                            <button onClick={() => openReturnModal(item)} className="flex-1 py-1.5 bg-rose-50 text-rose-600 font-bold border border-rose-200 rounded-lg text-xs">Tandai Kembali</button>
+                          )
+                        ) : (
+                          <span className="flex-1 text-center py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 flex justify-center items-center gap-1"><CheckCircle className="w-3 h-3"/> Izin Selesai {isTelat && '(Telat)'}</span>
+                        )}
+                        <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 rounded-lg border border-slate-100">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Pagination Component */}
+              <Pagination currentPage={page} totalPages={totalPages} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
+            </>
+          )}
+
+        </div>
       )}
 
-      {/* --- MODAL INPUT IZIN BARU --- */}
-      {isOpenInput && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800">Buat Perizinan Baru</h3>
-              <button onClick={() => setIsOpenInput(false)}><X className="w-6 h-6 text-slate-400 hover:text-red-500"/></button>
+      {/* ANALITIK TAB CONTENT */}
+      {activeTab === 'ANALITIK' && (
+        <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Ringkasan & Tren Perizinan</h2>
+              <p className="text-xs text-slate-500">Angka ini merepresentasikan seluruh data riwayat izin yang tersimpan.</p>
             </div>
-            
-            <form onSubmit={handleSimpan} className="p-5 space-y-4">
-              
-              {/* Cari Santri */}
-              {!selectedSantri ? (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Santri</label>
-                  <div className="flex gap-2">
-                    <input 
-                      className="flex-1 p-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Nama / NIS..."
-                      value={searchSantri}
-                      onChange={(e) => setSearchSantri(e.target.value)}
-                    />
-                    <button type="button" onClick={handleCariSantri} className="bg-gray-800 text-white px-3 rounded-lg hover:bg-black"><Search className="w-4 h-4"/></button>
-                  </div>
-                  <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                    {hasilCari.map(s => (
-                      <div key={s.id} onClick={() => setSelectedSantri(s)} className="p-2 border rounded hover:bg-blue-50 cursor-pointer flex justify-between items-center text-sm">
-                        <span>{s.nama_lengkap}</span>
-                        <span className="text-xs text-slate-500">{s.asrama}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-blue-50 p-3 rounded-lg flex justify-between items-center border border-blue-100">
-                  <div className="flex items-center gap-2">
-                    <User className="w-5 h-5 text-blue-600"/>
-                    <div>
-                      <p className="font-bold text-sm text-blue-900">{selectedSantri.nama_lengkap}</p>
-                      <p className="text-xs text-blue-700">{selectedSantri.asrama} - {selectedSantri.kamar}</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setSelectedSantri(null)} className="text-xs text-blue-600 underline">Ganti</button>
-                </div>
-              )}
+            <div className="w-full sm:w-auto">
+              <select value={asrama} onChange={e => setAsrama(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm text-slate-700">
+                <option value="SEMUA">Keseluruhan Asrama</option>
+                {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          </div>
 
-              {/* Jenis & Waktu */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jenis Izin</label>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <label className={`cursor-pointer p-3 rounded-lg border text-center text-sm font-bold transition-all ${jenisIzin === 'KELUAR_KOMPLEK' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-                    <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'KELUAR_KOMPLEK'} onChange={() => setJenisIzin('KELUAR_KOMPLEK')}/>
-                    KELUAR KOMPLEK
-                  </label>
-                  <label className={`cursor-pointer p-3 rounded-lg border text-center text-sm font-bold transition-all ${jenisIzin === 'PULANG' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-                    <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'PULANG'} onChange={() => setJenisIzin('PULANG')}/>
-                    IZIN PULANG
-                  </label>
+          {!analitikData ? (
+            <div className="flex justify-center py-20"><Clock className="w-6 h-6 animate-spin text-slate-300"/></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card 1: Total & Tipe */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 uppercase mb-4">Total & Distribusi Izin</p>
+                <div className="flex items-end gap-2 mb-6">
+                  <span className="text-5xl font-black text-slate-800 tracking-tighter">{analitikData.total}</span>
+                  <span className="text-sm text-slate-500 font-medium pb-2">Izin Tercatat</span>
                 </div>
-
-                {jenisIzin === 'PULANG' ? (
-                  <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg">
+                
+                {analitikData.total > 0 && (
+                  <div className="space-y-4">
                     <div>
-                      <span className="text-xs text-slate-500">Dari Tanggal</span>
-                      <input type="date" name="date_start" required className="w-full p-2 border rounded bg-white text-sm outline-none focus:border-purple-500"/>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500">Sampai Tanggal</span>
-                      <input type="date" name="date_end" required className="w-full p-2 border rounded bg-white text-sm outline-none focus:border-purple-500"/>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 p-3 rounded-lg space-y-2">
-                    <div>
-                      <span className="text-xs text-slate-500">Tanggal Izin</span>
-                      <input type="date" name="date_single" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border rounded bg-white text-sm outline-none focus:border-blue-500"/>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="text-xs text-slate-500">Jam Keluar</span>
-                        <input type="time" name="time_start" required className="w-full p-2 border rounded bg-white text-sm outline-none focus:border-blue-500"/>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-purple-700 flex items-center gap-1"><Home className="w-3 h-3"/> Izin Pulang</span>
+                        <span>{analitikData.pulang} ({Math.round(analitikData.pulang/analitikData.total*100)}%)</span>
                       </div>
-                      <div>
-                        <span className="text-xs text-slate-500">Jam Kembali</span>
-                        <input type="time" name="time_end" required className="w-full p-2 border rounded bg-white text-sm outline-none focus:border-blue-500"/>
+                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(analitikData.pulang/analitikData.total)*100}%`}}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-blue-700 flex items-center gap-1"><MapPin className="w-3 h-3"/> Keluar Komplek</span>
+                        <span>{analitikData.keluar} ({Math.round(analitikData.keluar/analitikData.total*100)}%)</span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(analitikData.keluar/analitikData.total)*100}%`}}></div>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Detail */}
+              {/* Card 2: Kepatuhan Waktu */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <p className="text-sm font-bold text-slate-400 uppercase mb-4">Kepatuhan Waktu Kembali</p>
+                
+                {analitikData.tepat + analitikData.telat > 0 ? (() => {
+                  const totalKembali = analitikData.tepat + analitikData.telat
+                  const percentTepat = Math.round((analitikData.tepat / totalKembali) * 100)
+                  return (
+                    <>
+                      <div className="flex items-center gap-4 mb-5">
+                        <div className="w-20 h-20 rounded-full border-8 border-emerald-500 flex items-center justify-center shrink-0" style={{ borderRightColor: percentTepat < 50 ? '#f1f5f9' : undefined, borderBottomColor: percentTepat < 75 ? '#f1f5f9' : undefined }}>
+                          <span className="text-xl font-bold text-slate-800">{percentTepat}%</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-lg">Tepat Waktu</p>
+                          <p className="text-xs text-slate-500 mt-1">Santri yang sudah kembali dinilai dari kepatuhannya terhadap batas izin.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                          <p className="text-2xl font-black text-emerald-600">{analitikData.tepat}</p>
+                          <p className="text-[10px] font-bold text-emerald-800 uppercase mt-1">Tepat Waktu</p>
+                        </div>
+                        <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-center">
+                          <p className="text-2xl font-black text-rose-600">{analitikData.telat}</p>
+                          <p className="text-[10px] font-bold text-rose-800 uppercase mt-1">Terlambat</p>
+                        </div>
+                      </div>
+                    </>
+                  )
+                })() : (
+                  <div className="text-center py-10 flex flex-col items-center justify-center h-full text-slate-400"><AlertTriangle className="w-10 h-10 mb-2 opacity-50"/> Belum ada data kembali</div>
+                )}
+                
+                {analitikData.aktif > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500">Izin Berjalan (Saat Ini)</span>
+                    <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">{analitikData.aktif} Santri</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* --- MODAL INPUT IZIN BARU --- */}
+      {isOpenInput && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Keperluan / Alasan</label>
-                <textarea name="alasan" required rows={2} className="w-full p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Membeli buku, Sakit..."></textarea>
+                <h3 className="font-bold text-slate-900 text-lg">Buat Perizinan Baru</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Berikan akses keluar/pulang untuk santri.</p>
+              </div>
+              <button type="button" onClick={() => setIsOpenInput(false)} className="p-2 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+            
+            <form onSubmit={handleSimpan} className="p-5 max-h-[80vh] overflow-y-auto space-y-5">
+              
+              {/* Cari Santri */}
+              {!selectedSantri ? (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Pilih Santri</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium" placeholder="Ketik Nama / NIS..." value={searchSantri} onChange={(e) => setSearchSantri(e.target.value)} />
+                    </div>
+                    <button type="button" onClick={handleCariSantri} className="bg-slate-800 text-white px-4 rounded-xl font-bold hover:bg-slate-900 transition-colors text-sm">Cari</button>
+                  </div>
+                  {hasilCari.length > 0 && (
+                    <div className="mt-3 divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                      {hasilCari.map(s => (
+                        <div key={s.id} onClick={() => setSelectedSantri(s)} className="p-3 bg-white hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{s.nama_lengkap}</p>
+                            <p className="text-[10px] text-slate-400">{s.nis}</p>
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{s.asrama} / {s.kamar}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-blue-50 p-3.5 rounded-xl flex justify-between items-center border border-blue-100 shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <User className="w-5 h-5 text-blue-600"/>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-800">{selectedSantri.nama_lengkap}</p>
+                      <p className="text-[11px] font-medium text-slate-500">{selectedSantri.asrama} - {selectedSantri.kamar}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1.5 rounded-lg hover:bg-rose-100 transition-colors">Ganti</button>
+                </div>
+              )}
+
+              {/* Jenis & Waktu */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Jenis & Waktu Izin</label>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <label className={`cursor-pointer p-3 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 ${jenisIzin === 'KELUAR_KOMPLEK' ? 'bg-blue-50 text-blue-700 border-blue-500 shadow-sm' : 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200'}`}>
+                    <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'KELUAR_KOMPLEK'} onChange={() => setJenisIzin('KELUAR_KOMPLEK')}/>
+                    <MapPin className={`w-5 h-5 ${jenisIzin === 'KELUAR_KOMPLEK' ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold">KELUAR KOMPLEK</span>
+                  </label>
+                  <label className={`cursor-pointer p-3 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 ${jenisIzin === 'PULANG' ? 'bg-purple-50 text-purple-700 border-purple-500 shadow-sm' : 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200'}`}>
+                    <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'PULANG'} onChange={() => setJenisIzin('PULANG')}/>
+                    <Home className={`w-5 h-5 ${jenisIzin === 'PULANG' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold">IZIN PULANG</span>
+                  </label>
+                </div>
+
+                {jenisIzin === 'PULANG' ? (
+                  <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Pulang</span>
+                      <input type="date" name="date_start" required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali</span>
+                      <input type="date" name="date_end" required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Izin</span>
+                      <input type="date" name="date_single" required defaultValue={new Date().toLocaleDateString('en-CA')} className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Berangkat Pukul</span>
+                        <input type="time" name="time_start" required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali Pukul</span>
+                        <input type="time" name="time_end" required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detail Alasan Baru */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Keperluan Dasar</label>
+                  <select value={alasanDropdown} onChange={e => setAlasanDropdown(e.target.value)} required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
+                    {LIST_ALASAN.map(nama => (
+                      <option key={nama} value={nama}>{nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Deskripsi Detail <span className="text-slate-400 font-normal lowercase">(Opsional)</span></label>
+                  <textarea name="deskripsi" rows={2} className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700" placeholder="Contoh: Mengambil ijazah ke SMP asal..."></textarea>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Pemberi Izin</label>
-                <select name="pemberi_izin" required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- Pilih Ustadz --</option>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Pemberi Izin (ACC)</label>
+                <select name="pemberi_izin" required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                  <option value="">-- Pilih Ustadz Pengurus --</option>
                   {LIST_PEMBERI_IZIN.map(nama => (
                     <option key={nama} value={nama}>{nama}</option>
                   ))}
                 </select>
               </div>
-
-              <button className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-sm active:scale-95 transition-transform">
-                IZINKAN
-              </button>
-
+              
+              <div className="pt-2">
+                <button type="submit" disabled={!selectedSantri} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-xl font-bold shadow-sm shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle className="w-5 h-5" /> REKAM PERIZINAN BARU
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -452,27 +639,30 @@ export default function PerizinanPage() {
 
       {/* --- MODAL PENGEMBALIAN --- */}
       {isOpenReturn && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600"/>
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-emerald-500 p-6 flex flex-col items-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle className="w-8 h-8 text-white"/>
+              </div>
+              <h3 className="text-xl font-bold text-white">Konfirmasi Tiba</h3>
+              <p className="text-sm text-emerald-100 text-center mt-1">Data kepatuhan waktu santri diukur dari kedatangan ini.</p>
             </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Konfirmasi Kedatangan</h3>
-            <p className="text-sm text-slate-500 mb-6">
-              Kapan santri ini tiba di pondok? <br/>
-              <span className="text-xs">(Silakan ubah jika data ini input susulan)</span>
-            </p>
             
-            <input 
-              type="datetime-local" 
-              value={waktuKembali}
-              onChange={(e) => setWaktuKembali(e.target.value)}
-              className="w-full p-3 border-2 border-green-200 rounded-lg text-center font-bold text-slate-700 mb-6 focus:border-green-500 outline-none"
-            />
+            <div className="p-6">
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block text-center">Waktu Aktual Tiba</label>
+              <input 
+                type="datetime-local" 
+                value={waktuKembali}
+                onChange={(e) => setWaktuKembali(e.target.value)}
+                className="w-full p-3 border-2 border-slate-200 focus:border-emerald-500 rounded-xl text-center font-bold text-slate-800 mb-6 outline-none transition-colors"
+                title="Waktu kepulangan bisa Anda sesuaikan jika telat input"
+              />
 
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setIsOpenReturn(false)} className="py-2 rounded-lg border border-slate-300 text-slate-600 font-medium hover:bg-slate-50">Batal</button>
-              <button onClick={handleSimpanKembali} className="py-2 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700">SIMPAN</button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setIsOpenReturn(false)} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Batal</button>
+                <button type="button" onClick={handleSimpanKembali} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-200">Simpan Final</button>
+              </div>
             </div>
           </div>
         </div>

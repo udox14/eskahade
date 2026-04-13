@@ -4,63 +4,192 @@ import { query, queryOne, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-export async function getPerizinanList(filterWaktu: 'HARI' | 'MINGGU' | 'BULAN' = 'HARI') {
-  const now = new Date()
-  let startDate = new Date()
+const DEFAULT_PAGE_SIZE = 10
 
-  if (filterWaktu === 'HARI') {
-    startDate.setHours(0, 0, 0, 0)
-  } else if (filterWaktu === 'MINGGU') {
-    const day = now.getDay()
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1)
-    startDate = new Date(now)
-    startDate.setDate(diff)
-    startDate.setHours(0, 0, 0, 0)
-  } else {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-  }
-
-  const startISO = startDate.toISOString()
-
-  return query<any>(`
-    SELECT p.id, p.created_at, p.status, p.jenis, p.alasan, p.pemberi_izin,
-           p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual,
-           s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
-    FROM perizinan p
-    JOIN santri s ON s.id = p.santri_id
-    WHERE p.status = 'AKTIF'
-       OR (p.status = 'KEMBALI' AND p.tgl_kembali_aktual >= ?)
-    ORDER BY p.created_at DESC
-  `, [startISO])
+// ─── Helper asrama list ───────────────────────────────────────────────────────
+export async function getAsramaList() {
+  const rows = await query<{ asrama: string }>(
+    `SELECT DISTINCT asrama FROM santri
+     WHERE status_global = 'aktif' AND asrama IS NOT NULL ORDER BY asrama`
+  )
+  return rows.map(r => r.asrama)
 }
 
+// ─── Get Perizinan List (Paginated & Filtered) ───────────────────────────────
+export async function getPerizinanList(params: {
+  page?: number
+  pageSize?: number
+  search?: string
+  asrama?: string
+  tanggal?: string
+  statusFilter?: 'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'
+}) {
+  const { page = 1, pageSize = DEFAULT_PAGE_SIZE, search, asrama, tanggal, statusFilter = 'SEMUA' } = params
+  const offset = (page - 1) * pageSize
+
+  const clauses: string[] = []
+  const baseParams: any[] = []
+
+  if (asrama && asrama !== 'SEMUA') {
+    clauses.push('s.asrama = ?')
+    baseParams.push(asrama)
+  }
+
+  if (search) {
+    clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    baseParams.push(`%${search}%`, `%${search}%`)
+  }
+
+  if (tanggal) {
+    const startOfDay = new Date(`${tanggal}T00:00:00+07:00`).toISOString()
+    const endOfDay = new Date(`${tanggal}T23:59:59+07:00`).toISOString()
+    clauses.push(`p.tgl_mulai <= ? AND (p.status = 'AKTIF' OR p.tgl_kembali_aktual >= ?)`)
+    baseParams.push(endOfDay, startOfDay)
+  }
+
+  if (statusFilter === 'BELUM_KEMBALI') {
+    clauses.push("p.status = 'AKTIF'")
+  } else if (statusFilter === 'SUDAH_KEMBALI') {
+    clauses.push("p.status = 'KEMBALI'")
+  } else if (statusFilter === 'TERLAMBAT') {
+    clauses.push(`((p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana) OR (p.status = 'AKTIF' AND p.tgl_selesai_rencana < ?))`)
+    baseParams.push(new Date().toISOString())
+  } else if (statusFilter === 'TEPAT_WAKTU') {
+    clauses.push("p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana")
+  }
+
+  const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
+
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM perizinan p JOIN santri s ON s.id = p.santri_id WHERE ${where}`,
+    baseParams
+  )
+  const total = countRow?.total ?? 0
+
+  const rows = await query<any>(
+    `SELECT p.id, p.created_at, p.status, p.jenis, p.alasan, p.pemberi_izin,
+            p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual,
+            s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
+     FROM perizinan p
+     JOIN santri s ON s.id = p.santri_id
+     WHERE ${where}
+     ORDER BY p.status ASC, p.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [...baseParams, pageSize, offset]
+  )
+
+  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
+}
+
+// ─── Export Data Izin ────────────────────────────────────────────────────────
+export async function exportDataIzin(params: {
+  search?: string
+  asrama?: string
+  tanggal?: string
+  statusFilter?: string
+}) {
+  const { search, asrama, tanggal, statusFilter = 'SEMUA' } = params
+
+  const clauses: string[] = []
+  const baseParams: any[] = []
+
+  if (asrama && asrama !== 'SEMUA') { clauses.push('s.asrama = ?'); baseParams.push(asrama) }
+  if (search) { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); baseParams.push(`%${search}%`, `%${search}%`) }
+  if (tanggal) { 
+    const startOfDay = new Date(`${tanggal}T00:00:00+07:00`).toISOString()
+    const endOfDay = new Date(`${tanggal}T23:59:59+07:00`).toISOString()
+    clauses.push(`p.tgl_mulai <= ? AND (p.status = 'AKTIF' OR p.tgl_kembali_aktual >= ?)`)
+    baseParams.push(endOfDay, startOfDay)
+  }
+  if (statusFilter === 'BELUM_KEMBALI') clauses.push("p.status = 'AKTIF'")
+  else if (statusFilter === 'SUDAH_KEMBALI') clauses.push("p.status = 'KEMBALI'")
+  else if (statusFilter === 'TERLAMBAT') {
+    clauses.push(`((p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana) OR (p.status = 'AKTIF' AND p.tgl_selesai_rencana < ?))`)
+    baseParams.push(new Date().toISOString())
+  } else if (statusFilter === 'TEPAT_WAKTU') {
+    clauses.push("p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana")
+  }
+
+  const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
+
+  return query<any>(`
+    SELECT s.nama_lengkap AS "Nama Santri", s.nis AS "NIS", s.asrama AS "Asrama", s.kamar AS "Kamar",
+           p.jenis AS "Jenis Izin", p.alasan AS "Alasan/Keperluan", p.pemberi_izin AS "Pemberi Izin",
+           p.status AS "Status", 
+           p.tgl_mulai AS "Keberangkatan", p.tgl_selesai_rencana AS "Batas Kembali", p.tgl_kembali_aktual AS "Waktu Tiba"
+    FROM perizinan p
+    JOIN santri s ON s.id = p.santri_id
+    WHERE ${where}
+    ORDER BY p.status ASC, p.tgl_mulai DESC
+  `, baseParams)
+}
+
+// ─── Get Analitik Izin ───────────────────────────────────────────────────────
+export async function getAnalitikIzin(params: { asrama?: string }) {
+  const { asrama } = params
+  
+  const clauses: string[] = []
+  const baseParams: any[] = []
+  if (asrama && asrama !== 'SEMUA') {
+    clauses.push('s.asrama = ?')
+    baseParams.push(asrama)
+  }
+  const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
+
+  const statsRow = await queryOne<any>(`
+    SELECT 
+      COUNT(p.id) as total_izin,
+      SUM(CASE WHEN p.jenis = 'PULANG' THEN 1 ELSE 0 END) as izin_pulang,
+      SUM(CASE WHEN p.jenis = 'KELUAR_KOMPLEK' THEN 1 ELSE 0 END) as izin_keluar,
+      SUM(CASE WHEN p.status = 'AKTIF' THEN 1 ELSE 0 END) as belum_kembali,
+      SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) as tepat_waktu,
+      SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as terlambat_kembali
+    FROM perizinan p
+    JOIN santri s ON s.id = p.santri_id
+    WHERE ${where}
+  `, baseParams)
+
+  return {
+    total: statsRow?.total_izin || 0,
+    pulang: statsRow?.izin_pulang || 0,
+    keluar: statsRow?.izin_keluar || 0,
+    aktif: statsRow?.belum_kembali || 0,
+    tepat: statsRow?.tepat_waktu || 0,
+    telat: statsRow?.terlambat_kembali || 0,
+  }
+}
+
+// ─── Simpan Izin ─────────────────────────────────────────────────────────────
 export async function simpanIzin(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
 
   const santri_id = formData.get('santri_id') as string
   const jenis = formData.get('jenis') as string
-  const alasan = formData.get('alasan') as string
+  const alasan_dropdown = formData.get('alasan_dropdown') as string
+  const deskripsi = formData.get('deskripsi') as string
   const pemberi_izin = formData.get('pemberi_izin') as string
+
+  const alasan_final = deskripsi.trim() ? `${alasan_dropdown} - ${deskripsi.trim()}` : alasan_dropdown
 
   let tgl_mulai: string, tgl_selesai_rencana: string
 
   if (jenis === 'PULANG') {
     const dStart = formData.get('date_start') as string
     const dEnd = formData.get('date_end') as string
-    tgl_mulai = new Date(`${dStart}T08:00:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${dEnd}T17:00:00`).toISOString()
+    tgl_mulai = new Date(`${dStart}T08:00:00+07:00`).toISOString()
+    tgl_selesai_rencana = new Date(`${dEnd}T17:00:00+07:00`).toISOString()
   } else {
     const date = formData.get('date_single') as string
     const tStart = formData.get('time_start') as string
     const tEnd = formData.get('time_end') as string
-    tgl_mulai = new Date(`${date}T${tStart}:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${date}T${tEnd}:00`).toISOString()
+    tgl_mulai = new Date(`${date}T${tStart}:00+07:00`).toISOString()
+    tgl_selesai_rencana = new Date(`${date}T${tEnd}:00+07:00`).toISOString()
   }
 
   await execute(`
     INSERT INTO perizinan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'AKTIF', ?)
-  `, [generateId(), santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, session?.id ?? null])
+  `, [generateId(), santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
 
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
