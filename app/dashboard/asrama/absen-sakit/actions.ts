@@ -1,12 +1,13 @@
 'use server'
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 async function getUserRestriction() {
   const session = await getSession()
-  if (session?.role === 'pengurus_asrama') return session.asrama_binaan ?? null
+  if (!session) return null
+  if (hasRole(session, 'pengurus_asrama')) return session.asrama_binaan ?? null
   return null
 }
 

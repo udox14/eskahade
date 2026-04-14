@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 
 // ─── Session info ─────────────────────────────────────────────────────────────
 export async function getSessionMonitoring() {

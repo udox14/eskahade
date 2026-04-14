@@ -3,14 +3,12 @@
 // Helper untuk memproteksi halaman berdasarkan konfigurasi fitur_akses di DB.
 // Dipanggil di dalam Server Component (page.tsx) — bukan middleware.
 //
-// Catatan:
-// - Kalau tidak login → redirect ke /login
-// - Kalau login tapi tidak punya akses → redirect ke /dashboard
-// - Admin SELALU lolos (tidak perlu dicek ke DB)
-// - Kalau tabel fitur_akses belum ada / DB error → LOG + izinkan masuk
-//   (fail-open agar login tidak rusak total, error terlihat di wrangler tail)
+// Multi-role aware:
+// - Cek semua role user (session.roles[])
+// - Admin SELALU lolos
+// - Support per-user grant/revoke overrides
 
-import { getSession, type SessionUser } from '@/lib/auth/session'
+import { getSession, type SessionUser, getEffectiveRoles } from '@/lib/auth/session'
 import { canAccessHref } from '@/lib/cache/fitur-akses'
 import { redirect } from 'next/navigation'
 
@@ -21,15 +19,17 @@ export async function guardPage(href: string): Promise<SessionUser> {
     redirect('/login')
   }
 
+  const roles = getEffectiveRoles(session)
+
   // Admin selalu boleh akses semua
-  if (session.role === 'admin') {
+  if (roles.includes('admin')) {
     return session
   }
 
-  // Cek akses dari DB
+  // Cek akses dari DB (multi-role + per-user overrides)
   let allowed = false
   try {
-    allowed = await canAccessHref(href, session.role)
+    allowed = await canAccessHref(href, roles, session.id)
   } catch (err: any) {
     // Kalau DB error (mis. tabel belum ada), log dan izinkan masuk
     // supaya non-admin tidak ter-redirect loop secara diam-diam
@@ -38,7 +38,7 @@ export async function guardPage(href: string): Promise<SessionUser> {
     return session
   }
 
-  console.log('[guard] href:', href, '| role:', session.role, '| allowed:', allowed)
+  console.log('[guard] href:', href, '| roles:', roles, '| allowed:', allowed)
 
   if (!allowed) {
     redirect('/dashboard')
@@ -54,8 +54,12 @@ export async function guardRole(allowedRoles: string[] = []): Promise<SessionUse
     redirect('/login')
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(session.role)) {
-    redirect('/dashboard')
+  if (allowedRoles.length > 0) {
+    const userRoles = getEffectiveRoles(session)
+    const hasAccess = userRoles.some(r => allowedRoles.includes(r))
+    if (!hasAccess) {
+      redirect('/dashboard')
+    }
   }
 
   return session

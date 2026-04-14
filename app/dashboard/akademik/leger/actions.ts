@@ -2,7 +2,7 @@
 
 import { query, execute, generateId } from '@/lib/db'
 import { getCachedMapelList } from '@/lib/cache/master'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 export async function getKelasListForLeger() {
@@ -16,7 +16,7 @@ export async function getKelasListForLeger() {
   `
   const params: any[] = []
 
-  if (session.role === 'wali_kelas') {
+  if (hasRole(session, 'wali_kelas')) {
     sql += ' WHERE k.wali_kelas_id = ?'
     params.push(session.id)
   }

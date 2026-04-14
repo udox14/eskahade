@@ -119,7 +119,7 @@ function formatTanggal(date: Date) {
   })
 }
 
-interface Props { userName: string; userRole: string; fiturAkses: FiturAkses[] }
+interface Props { userName: string; userRole: string; userRoles?: string[]; fiturAkses: FiturAkses[] }
 
 // ── Feature Card — clean minimal, no icon badge ───────────────────────────────
 function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROUP_ACCENT[string] }) {
@@ -147,7 +147,7 @@ function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROU
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function HomeClient({ userName, userRole, fiturAkses }: Props) {
+export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props) {
   const [now, setNow] = useState<Date | null>(null)
 
   useEffect(() => { setNow(new Date()) }, [])
@@ -155,8 +155,9 @@ export function HomeClient({ userName, userRole, fiturAkses }: Props) {
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)
   const firstName = userName.split(' ')[0]
-  const roleLabel = ROLE_LABEL[userRole] ?? userRole.replace('_', ' ')
-  const roleEmoji = ROLE_EMOJI[userRole] ?? '👤'
+  const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
+  const roleLabel = effectiveRoles.map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
+  const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
   const totalFitur = fiturAkses.filter(f => f.href !== '/dashboard').length
 
   // Group fitur

@@ -1,7 +1,7 @@
 'use server'
 
 import { query } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 

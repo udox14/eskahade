@@ -12,6 +12,7 @@ import type { FiturAkses } from "@/lib/cache/fitur-akses";
 interface ClientLayoutProps {
   children: React.ReactNode;
   userRole: string;
+  userRoles?: string[];
   userEmail: string;
   userName: string;
   avatarUrl?: string | null;
@@ -20,7 +21,7 @@ interface ClientLayoutProps {
   userShowBottomNav: boolean;
 }
 
-export function ClientLayout({ children, userRole, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
 
@@ -38,6 +39,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
         <div className="h-full w-full bg-slate-900 text-white">
            <Sidebar 
              userRole={userRole}
+             userRoles={userRoles}
              fiturAkses={fiturAkses}
              isCollapsed={isCollapsed} 
              toggleSidebar={() => setIsCollapsed(!isCollapsed)} 
@@ -62,6 +64,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
       >
          <Sidebar 
             userRole={userRole}
+            userRoles={userRoles}
             fiturAkses={fiturAkses}
             isCollapsed={false}
             toggleSidebar={() => {}} 
@@ -82,6 +85,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
             <Header 
                 userName={userName} 
                 userRole={userRole}
+                userRoles={userRoles}
                 avatarUrl={avatarUrl}
                 onMenuClick={() => setIsMobileOpen(true)}
             />
@@ -99,6 +103,7 @@ export function ClientLayout({ children, userRole, userEmail, userName, avatarUr
         <BottomNav
           fiturAkses={fiturAkses}
           userRole={userRole}
+          userRoles={userRoles}
           globalEnabled={globalBottomNavEnabled}
           userShowBottomNav={userShowBottomNav}
         />

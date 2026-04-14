@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -204,7 +204,7 @@ export async function hapusSurat(
   tipe: 'pernyataan' | 'perjanjian'
 ): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
     return { error: 'Akses ditolak' }
   const tabel = tipe === 'pernyataan' ? 'surat_pernyataan' : 'surat_perjanjian'
   await execute(`DELETE FROM ${tabel} WHERE id = ?`, [suratId])

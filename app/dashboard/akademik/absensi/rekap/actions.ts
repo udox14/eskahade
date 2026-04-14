@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 
 export async function getUserScope() {
   const session = await getSession()
@@ -9,11 +9,11 @@ export async function getUserScope() {
 
   const role = session.role
 
-  if (role === 'pengurus_asrama') {
+  if (hasRole(session, 'pengurus_asrama')) {
     return { role, type: 'ASRAMA', value: session.asrama_binaan }
   }
 
-  if (role === 'wali_kelas') {
+  if (hasRole(session, 'wali_kelas')) {
     const kelas = await queryOne<{ id: string }>(
       'SELECT id FROM kelas WHERE wali_kelas_id = ?', [session.id]
     )

@@ -1,14 +1,14 @@
 'use server'
 
 import { execute, query } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidateTag } from 'next/cache'
 
 const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
 
 async function assertAdmin() {
   const session = await getSession()
-  if (!session || session.role !== 'admin') {
+  if (!session || !isAdmin(session)) {
     throw new Error('Akses ditolak')
   }
 }

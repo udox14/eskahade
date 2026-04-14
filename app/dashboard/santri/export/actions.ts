@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import type { ExportFilter, SortBy, KolomExport } from './constants'
 
 // ─── Opsi filter (untuk populate dropdown) ───────────────────────────────────
@@ -12,7 +12,7 @@ import type { ExportFilter, SortBy, KolomExport } from './constants'
 // - Role pengurus_asrama di-enforce di server, bukan client
 export async function getFilterOptions() {
   const session = await getSession()
-  const asramaBinaan = session?.role === 'pengurus_asrama'
+  const asramaBinaan = session && hasRole(session, 'pengurus_asrama')
     ? session.asrama_binaan ?? null
     : null
 
@@ -76,7 +76,7 @@ export async function getFilterOptions() {
 export async function getKamarList(asrama: string) {
   const session = await getSession()
   // Pengurus asrama hanya bisa akses asrama binaannya
-  if (session?.role === 'pengurus_asrama' && session.asrama_binaan !== asrama) {
+  if (session && hasRole(session, 'pengurus_asrama') && session.asrama_binaan !== asrama) {
     return []
   }
   const rows = await query<{ v: string }>(
@@ -104,7 +104,7 @@ export async function getDataExport(
   if (!session) return { error: 'Tidak terautentikasi' }
 
   // Enforce asrama untuk pengurus_asrama
-  const forceAsrama    = session.role === 'pengurus_asrama' ? session.asrama_binaan : null
+  const forceAsrama    = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
   const effectiveAsrama = forceAsrama || filter.asrama || null
 
   // Perlu JOIN ke riwayat_pendidikan?

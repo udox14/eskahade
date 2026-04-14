@@ -270,8 +270,10 @@ export default function MonitoringPerpulanganPage() {
     telat: a.telat + r.telat,
   }), { total: 0, sudah_pulang: 0, sudah_datang: 0, belum_datang: 0, telat: 0 })
 
-  const canExpand = session?.role !== 'pengurus_asrama'
-  const canTandaiTelat = ['admin', 'keamanan', 'dewan_santri'].includes(session?.role ?? '')
+  // Client-side role checks on plain session data object
+  const sessionRole = session?.role ?? ''
+  const canExpand = sessionRole !== 'pengurus_asrama'
+  const canTandaiTelat = ['admin', 'keamanan', 'dewan_santri'].includes(sessionRole)
 
   return (
     <div className="max-w-2xl mx-auto pb-16 space-y-4">

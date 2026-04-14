@@ -136,13 +136,14 @@ const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor'
 
 interface SidebarProps {
   userRole?: string;
+  userRoles?: string[];
   fiturAkses: FiturAkses[];
   isCollapsed: boolean;
   toggleSidebar: () => void;
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
+export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [theme, setTheme] = useState<ThemeKey>('emerald');
   const [mounted, setMounted] = useState(false);
@@ -189,7 +190,8 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
   };
 
   const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
-  const roleLabel = ROLE_LABEL[userRole] ?? userRole.replace('_', ' ');
+  const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole];
+  const roleLabels = effectiveRoles.map(r => ROLE_LABEL[r] ?? r.replace('_', ' '));
 
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
@@ -384,7 +386,10 @@ export function Sidebar({ userRole = 'wali_kelas', fiturAkses, isCollapsed, togg
                 Akses
               </span>
               <span className="text-xs font-bold text-white truncate capitalize leading-tight">
-                {roleLabel}
+                {roleLabels.length <= 2
+                  ? roleLabels.join(' • ')
+                  : `${roleLabels[0]} +${roleLabels.length - 1}`
+                }
               </span>
             </div>
           </div>

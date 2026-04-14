@@ -15,6 +15,7 @@ export type SessionUser = {
   email: string
   full_name: string
   role: string
+  roles: string[]
   asrama_binaan: string | null
 }
 
@@ -121,3 +122,34 @@ export async function getSessionFromCookieString(cookieString: string): Promise<
   if (!match) return null
   return await verifyJWT(match[1])
 }
+
+// ── Multi-role helpers ────────────────────────────────────────
+// Backward-compatible: jika session.roles belum ada (JWT lama),
+// fallback ke [session.role].
+
+function getRoles(session: SessionUser): string[] {
+  if (session.roles && Array.isArray(session.roles) && session.roles.length > 0) {
+    return session.roles
+  }
+  return session.role ? [session.role] : []
+}
+
+export function hasRole(session: SessionUser | null, role: string): boolean {
+  if (!session) return false
+  return getRoles(session).includes(role)
+}
+
+export function hasAnyRole(session: SessionUser | null, roles: string[]): boolean {
+  if (!session) return false
+  const userRoles = getRoles(session)
+  return roles.some(r => userRoles.includes(r))
+}
+
+export function isAdmin(session: SessionUser | null): boolean {
+  return hasRole(session, 'admin')
+}
+
+export function getEffectiveRoles(session: SessionUser | null): string[] {
+  if (!session) return []
+  return getRoles(session)
+}

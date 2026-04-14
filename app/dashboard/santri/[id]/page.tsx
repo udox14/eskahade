@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { guardRole } from '@/lib/auth/guard'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { getSantriDetail } from './actions'
 import { SantriDetailContent } from './detail-content'
 import { notFound, redirect } from 'next/navigation'
@@ -28,13 +28,13 @@ export default async function SantriDetailPage({ params }: Props) {
   if (!santri) return notFound()
 
   // Pengurus asrama hanya boleh lihat santri asrama binaannya
-  if (session.role === 'pengurus_asrama') {
+  if (hasRole(session, 'pengurus_asrama')) {
     if (!session.asrama_binaan || santri.asrama !== session.asrama_binaan) {
       redirect('/dashboard/santri')
     }
   }
 
-  const isReadOnly = session.role === 'pengurus_asrama'
+  const isReadOnly = hasRole(session, 'pengurus_asrama')
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">

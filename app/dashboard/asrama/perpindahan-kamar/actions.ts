@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch, getDB } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
@@ -48,7 +48,7 @@ export async function simpanKonfigurasiKamar(
   kamarList: { nomor_kamar: string; kuota: number; blok?: string }[]
 ) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   const db = await getDB()
   try {
@@ -74,7 +74,7 @@ export async function generateDraft(
   persenUntukBaru: number  // 0–100, misal 20 = 20% slot dikosongkan untuk santri baru
 ) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   const { configs, santriList } = await getDataPerpindahan(asrama)
   if (!configs.length) return { error: 'Belum ada konfigurasi kamar' }
@@ -184,7 +184,7 @@ export async function generateDraft(
 
 export async function updateKamarDraft(asrama: string, santriId: string, kamarBaru: string) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   await execute(
     `UPDATE kamar_draft SET kamar_baru = ? WHERE asrama = ? AND santri_id = ?`,
@@ -198,7 +198,7 @@ export async function updateKamarDraft(asrama: string, santriId: string, kamarBa
 
 export async function applyDraft(asrama: string) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   const drafts = await query<any>('SELECT * FROM kamar_draft WHERE asrama = ?', [asrama])
   if (!drafts.length) return { error: 'Tidak ada draft untuk diapply' }
@@ -226,7 +226,7 @@ export async function applyDraft(asrama: string) {
 
 export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_id: string | null) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   if (!santri_id) {
     await execute('DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar = ?', [asrama, nomor_kamar])
@@ -245,7 +245,7 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
 
 export async function resetDraft(asrama: string) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   await execute('DELETE FROM kamar_draft WHERE asrama = ?', [asrama])
   revalidatePath(REVALIDATE)

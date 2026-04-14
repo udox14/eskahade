@@ -1,5 +1,5 @@
 import { guardPage } from '@/lib/auth/guard'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 import { getAllFiturForAdmin, getBottomNavGlobalStatus } from './actions'
 import { FiturAksesClient } from './client'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export default async function FiturAksesPage() {
   await guardPage('/dashboard/pengaturan/fitur-akses')
   const session = await getSession()
-  if (!session || session.role !== 'admin') redirect('/dashboard')
+  if (!session || !isAdmin(session)) redirect('/dashboard')
 
   const [fiturList, globalBottomNavEnabled] = await Promise.all([
     getAllFiturForAdmin(),

@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 // ─── Helper: cek jenis pulang dari alamat ────────────────────────────────────
@@ -302,7 +302,7 @@ export async function tandaiTelatMassal(
   periodeId: number
 ): Promise<{ success: boolean; count: number } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
     return { error: 'Akses ditolak' }
 
   const p = await queryOne<{ tgl_selesai_datang: string }>(

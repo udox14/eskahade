@@ -9,6 +9,7 @@ import Link from 'next/link'
 interface HeaderProps {
   userName: string
   userRole: string
+  userRoles?: string[]
   avatarUrl?: string | null
   onMenuClick?: () => void
 }
@@ -44,7 +45,7 @@ function useClock() {
   return now
 }
 
-export function Header({ userName, userRole, avatarUrl, onMenuClick }: HeaderProps) {
+export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isNotifOpen, setIsNotifOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -52,8 +53,9 @@ export function Header({ userName, userRole, avatarUrl, onMenuClick }: HeaderPro
   const now = useClock()
 
   const initials = userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-  const roleLabel = ROLE_LABEL[userRole] || userRole.replace('_', ' ')
-  const roleColor = ROLE_COLOR[userRole] || 'text-slate-600'
+  const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
+  const roleLabel = effectiveRoles.map(r => ROLE_LABEL[r] || r.replace('_', ' ')).join(' • ')
+  const roleColor = ROLE_COLOR[effectiveRoles[0]] || 'text-slate-600'
   const firstName = userName.split(' ')[0]
 
   const dayStr = now?.toLocaleDateString('id-ID', { weekday: 'long' }) ?? ''

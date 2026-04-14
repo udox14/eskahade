@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { guardPage } from '@/lib/auth/guard'
 import { query, queryOne } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import Link from 'next/link'
 import { Plus, Home, Users } from 'lucide-react'
 import { SearchInput, LimitSelector, PaginationControls, SantriFilter } from './santri-client'
@@ -19,7 +19,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const session = await getSession()
 
   let userAsrama: string | null = null
-  if (session?.role === 'pengurus_asrama') {
+  if (session && hasRole(session, 'pengurus_asrama')) {
     userAsrama = session.asrama_binaan ?? null
   }
 

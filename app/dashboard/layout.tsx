@@ -1,9 +1,9 @@
 import React from 'react'
 import { ClientLayout } from "@/components/layout/client-layout";
-import { getSession } from "@/lib/auth/session";
+import { getSession, getEffectiveRoles } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { getFiturForRole, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
+import { getFiturForRoles, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,22 +19,33 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  console.log('[layout] session OK, role:', session.role, 'id:', session.id?.substring(0, 8))
+  console.log('[layout] session OK, roles:', getEffectiveRoles(session), 'id:', session.id?.substring(0, 8))
 
   // Ambil data user dari DB — pakai try-catch agar tidak crash kalau kolom belum ada
   let userName = session.full_name || 'User'
-  let userRole = session.role || 'wali_kelas'
+  let userRoles = getEffectiveRoles(session)
   let avatarUrl: string | null = null
   let userShowBottomNav = true  // default aktif
 
   try {
-    const user = await queryOne<{ full_name: string; role: string; avatar_url: string | null; show_bottomnav: number | null }>(
-      'SELECT full_name, role, avatar_url, show_bottomnav FROM users WHERE id = ?',
+    const user = await queryOne<{ full_name: string; role: string; roles: string | null; avatar_url: string | null; show_bottomnav: number | null }>(
+      'SELECT full_name, role, roles, avatar_url, show_bottomnav FROM users WHERE id = ?',
       [session.id]
     );
     if (user) {
       userName = user.full_name || userName
-      userRole = user.role || userRole
+      // Parse multi-role dari DB
+      try {
+        if (user.roles) {
+          const parsed = JSON.parse(user.roles)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            userRoles = parsed
+          }
+        }
+      } catch {
+        // fallback ke session roles
+      }
+      if (userRoles.length === 0) userRoles = [user.role]
       avatarUrl = user.avatar_url ?? null
       // NULL = belum diset user → ikut default (aktif), 0 = user matiin sendiri
       userShowBottomNav = user.show_bottomnav !== 0
@@ -43,7 +54,7 @@ export default async function DashboardLayout({
     console.error('[layout] queryOne users ERROR:', err?.message)
   }
 
-  console.log('[layout] userRole:', userRole)
+  console.log('[layout] userRoles:', userRoles)
 
   // Ambil fitur dan setting bottomnav secara paralel
   let fiturAkses: FiturAkses[] = []
@@ -51,19 +62,20 @@ export default async function DashboardLayout({
 
   try {
     [fiturAkses, globalBottomNavEnabled] = await Promise.all([
-      getFiturForRole(userRole),
+      getFiturForRoles(userRoles, session.id),
       getBottomNavGlobalEnabled(),
     ])
   } catch (err: any) {
     console.error('[layout] fetch error:', err?.message)
-    try { fiturAkses = await getFiturForRole(userRole) } catch {}
+    try { fiturAkses = await getFiturForRoles(userRoles, session.id) } catch {}
   }
 
   console.log('[layout] fiturAkses count:', fiturAkses.length)
 
   return (
     <ClientLayout
-      userRole={userRole}
+      userRole={userRoles[0] || 'wali_kelas'}
+      userRoles={userRoles}
       userEmail=""
       userName={userName}
       avatarUrl={avatarUrl}

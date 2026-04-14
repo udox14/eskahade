@@ -2,12 +2,12 @@
 
 import { query, execute } from '@/lib/db'
 import { getCachedMapelAll } from '@/lib/cache/master'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 export async function getKelasList() {
   const session = await getSession()
-  const isWaliKelas = session?.role === 'wali_kelas'
+  const isWaliKelas = hasRole(session, 'wali_kelas')
 
   let sql = `
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama

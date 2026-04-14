@@ -32,18 +32,21 @@ function getIcon(name: string): React.ElementType {
 interface BottomNavProps {
   fiturAkses: FiturAkses[]
   userRole: string
+  userRoles?: string[]
   globalEnabled: boolean      // dari admin — kalau false, sembunyikan untuk semua
   userShowBottomNav: boolean  // preferensi user — kalau false, sembunyikan untuk user ini
 }
 
-export function BottomNav({ fiturAkses, userRole, globalEnabled, userShowBottomNav }: BottomNavProps) {
+export function BottomNav({ fiturAkses, userRole, userRoles, globalEnabled, userShowBottomNav }: BottomNavProps) {
   const pathname = usePathname()
 
   // Cek dua kondisi: admin harus aktifkan global, DAN user tidak matikan sendiri
   if (!globalEnabled || !userShowBottomNav) return null
 
+  const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
+
   const navItems = fiturAkses
-    .filter(f => f.is_active && f.is_bottomnav && f.roles.includes(userRole))
+    .filter(f => f.is_active && f.is_bottomnav && f.roles.some(r => effectiveRoles.includes(r)))
     .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
     .slice(0, 4)
 

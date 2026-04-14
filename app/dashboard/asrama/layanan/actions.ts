@@ -1,20 +1,21 @@
 'use server'
 
 import { query, execute, generateId, batch } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 // Helper: ambil asrama restriction untuk pengurus_asrama
 async function getRestrictedAsrama(): Promise<string | null> {
   const session = await getSession()
   if (!session) return null
-  if (session.role === 'pengurus_asrama') return session.asrama_binaan ?? null
+  if (hasRole(session, 'pengurus_asrama')) return session.asrama_binaan ?? null
   return null // admin & role lain → tidak dibatasi
 }
 
 export async function getClientRestriction() {
   const session = await getSession()
-  if (session?.role === 'pengurus_asrama') return session.asrama_binaan ?? null
+  if (!session) return null
+  if (hasRole(session, 'pengurus_asrama')) return session.asrama_binaan ?? null
   return null
 }
 

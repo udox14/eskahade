@@ -1,12 +1,12 @@
 'use server'
 
 import { query } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 
 export async function getStatusSetoranSaya(tahun: number) {
   const session = await getSession()
 
-  if (session?.role !== 'pengurus_asrama' || !session.asrama_binaan) {
+  if (!session || !hasRole(session, 'pengurus_asrama') || !session.asrama_binaan) {
     return { error: 'Anda tidak memiliki akses asrama binaan.' }
   }
 

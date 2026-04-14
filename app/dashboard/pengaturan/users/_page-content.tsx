@@ -3,8 +3,9 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRole, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch } from './actions'
-import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins } from 'lucide-react'
+import { getUsersList, updateUserRoles, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur } from './actions'
+import type { FiturAkses } from '@/lib/cache/fitur-akses'
+import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -42,7 +43,19 @@ export default function ManajemenUserPage() {
   const [newRole, setNewRole] = useState('wali_kelas')
 
   const [isAsramaModalOpen, setIsAsramaModalOpen] = useState(false)
-  const [pendingRoleUpdate, setPendingRoleUpdate] = useState<{userId: string, role: string} | null>(null)
+  const [pendingRoleUpdate, setPendingRoleUpdate] = useState<{userId: string, roles: string[]} | null>(null)
+
+  // Multi-role edit modal
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
+  const [roleEditUser, setRoleEditUser] = useState<any>(null)
+  const [roleEditSelected, setRoleEditSelected] = useState<string[]>([])
+
+  // Grant/Revoke modal
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false)
+  const [overrideUser, setOverrideUser] = useState<any>(null)
+  const [overrideList, setOverrideList] = useState<{fitur_id:number,action:string}[]>([])
+  const [allFitur, setAllFitur] = useState<FiturAkses[]>([])
+  const [overrideLoading, setOverrideLoading] = useState(false)
 
   const [isOpenReset, setIsOpenReset] = useState(false)
   const [userToReset, setUserToReset] = useState<{id: string, name: string} | null>(null)
@@ -70,45 +83,121 @@ export default function ManajemenUserPage() {
   }
 
   // --- FILTERING ---
-  const filteredUsers = users.filter(u => {
-    if (filterRole === 'SEMUA') return true
-    return u.role === filterRole
-  })
-
-  // --- HANDLERS ROLE ---
-  const executeUpdateRole = async (userId: string, newRole: string, asrama?: string) => {
-    setProcessingId(userId)
-    const toastId = toast.loading("Mengupdate hak akses...")
-
-    const res = await updateUserRole(userId, newRole, asrama)
-    
-    toast.dismiss(toastId)
-    setProcessingId(null)
-
-    if ('error' in res) {
-      toast.error("Gagal update", { description: (res as any).error })
-    } else {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole, asrama_binaan: asrama } : u))
-      toast.success("Berhasil diupdate", { 
-        description: `Role diubah menjadi ${newRole.replace('_', ' ')} ${asrama ? `(${asrama})` : ''}` 
-      })
-    }
+  // Parse user roles helper
+  const parseRoles = (u: any): string[] => {
+    try {
+      if (u.roles) {
+        const parsed = JSON.parse(u.roles)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {}
+    return [u.role]
   }
 
-  const handleRoleChange = (userId: string, newRole: string) => {
-    if (newRole === 'pengurus_asrama') {
-      setPendingRoleUpdate({ userId, role: newRole })
+  const filteredUsers = users.filter(u => {
+    if (filterRole === 'SEMUA') return true
+    const userRoles = parseRoles(u)
+    return userRoles.includes(filterRole)
+  })
+
+  // --- HANDLERS MULTI-ROLE ---
+  const openRoleModal = (user: any) => {
+    setRoleEditUser(user)
+    setRoleEditSelected(parseRoles(user))
+    setIsRoleModalOpen(true)
+  }
+
+  const handleSaveRoles = async () => {
+    if (!roleEditUser || roleEditSelected.length === 0) {
+      toast.error('Pilih minimal satu role')
+      return
+    }
+    // Jika ada pengurus_asrama, tanya asrama
+    if (roleEditSelected.includes('pengurus_asrama') && !roleEditUser.asrama_binaan) {
+      setPendingRoleUpdate({ userId: roleEditUser.id, roles: roleEditSelected })
+      setIsRoleModalOpen(false)
       setIsAsramaModalOpen(true)
       return
     }
-    executeUpdateRole(userId, newRole)
+    setProcessingId(roleEditUser.id)
+    const toastId = toast.loading('Menyimpan role...')
+    const res = await updateUserRoles(roleEditUser.id, roleEditSelected, roleEditUser.asrama_binaan)
+    toast.dismiss(toastId)
+    setProcessingId(null)
+    if ('error' in res) {
+      toast.error('Gagal update', { description: (res as any).error })
+    } else {
+      const rolesJson = JSON.stringify(roleEditSelected)
+      setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson } : u))
+      toast.success('Role diperbarui', { description: roleEditSelected.map(r => ROLES.find(x=>x.value===r)?.label||r).join(', ') })
+      setIsRoleModalOpen(false)
+    }
   }
 
-  const handleSelectAsrama = (asrama: string) => {
+  const handleSelectAsrama = async (asrama: string) => {
     if (pendingRoleUpdate) {
       setIsAsramaModalOpen(false)
-      executeUpdateRole(pendingRoleUpdate.userId, pendingRoleUpdate.role, asrama)
+      setProcessingId(pendingRoleUpdate.userId)
+      const toastId = toast.loading('Menyimpan role...')
+      const res = await updateUserRoles(pendingRoleUpdate.userId, pendingRoleUpdate.roles, asrama)
+      toast.dismiss(toastId)
+      setProcessingId(null)
+      if ('error' in res) {
+        toast.error('Gagal update', { description: (res as any).error })
+      } else {
+        const rolesJson = JSON.stringify(pendingRoleUpdate.roles)
+        setUsers(prev => prev.map(u => u.id === pendingRoleUpdate!.userId ? { ...u, role: pendingRoleUpdate!.roles[0], roles: rolesJson, asrama_binaan: asrama } : u))
+        toast.success('Role & Asrama diperbarui')
+      }
       setPendingRoleUpdate(null)
+    }
+  }
+
+  // --- HANDLERS OVERRIDE (GRANT/REVOKE) ---
+  const openOverrideModal = async (user: any) => {
+    setOverrideUser(user)
+    setOverrideLoading(true)
+    setIsOverrideModalOpen(true)
+    try {
+      const [overrides, fitur] = await Promise.all([
+        getUserOverrides(user.id),
+        getAllActiveFitur(),
+      ])
+      setOverrideList(overrides.map(o => ({ fitur_id: o.fitur_id, action: o.action })))
+      setAllFitur(fitur.filter(f => f.is_active))
+    } catch {
+      toast.error('Gagal memuat data fitur')
+    } finally {
+      setOverrideLoading(false)
+    }
+  }
+
+  const handleOverrideToggle = async (fiturId: number, currentAction: string | null, userHasAccess: boolean) => {
+    if (!overrideUser) return
+    const toastId = toast.loading('Menyimpan...')
+    try {
+      if (currentAction === 'grant') {
+        // Remove grant override
+        await removeUserFiturOverride(overrideUser.id, fiturId)
+        setOverrideList(prev => prev.filter(o => o.fitur_id !== fiturId))
+      } else if (currentAction === 'revoke') {
+        // Remove revoke override
+        await removeUserFiturOverride(overrideUser.id, fiturId)
+        setOverrideList(prev => prev.filter(o => o.fitur_id !== fiturId))
+      } else if (userHasAccess) {
+        // User has access via role → revoke it
+        await setUserFiturOverride(overrideUser.id, fiturId, 'revoke')
+        setOverrideList(prev => [...prev.filter(o => o.fitur_id !== fiturId), { fitur_id: fiturId, action: 'revoke' }])
+      } else {
+        // User doesn't have access → grant it
+        await setUserFiturOverride(overrideUser.id, fiturId, 'grant')
+        setOverrideList(prev => [...prev.filter(o => o.fitur_id !== fiturId), { fitur_id: fiturId, action: 'grant' }])
+      }
+      toast.success('Tersimpan')
+    } catch {
+      toast.error('Gagal menyimpan')
+    } finally {
+      toast.dismiss(toastId)
     }
   }
 
@@ -410,29 +499,39 @@ export default function ManajemenUserPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <select 
-                          className={`p-2 border border-slate-200 rounded-xl text-sm w-48 outline-none cursor-pointer font-bold transition-colors ${
-                            u.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                            u.role === 'pengurus_asrama' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                            u.role === 'bendahara' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            'bg-white text-slate-700'
-                          }`}
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          disabled={processingId === u.id}
+                        <div className="flex flex-wrap gap-1">
+                          {parseRoles(u).map(r => {
+                            const rl = ROLES.find(x => x.value === r)
+                            return (
+                              <span key={r} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                r === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                r === 'pengurus_asrama' ? 'bg-orange-100 text-orange-700' :
+                                r === 'bendahara' ? 'bg-emerald-100 text-emerald-700' :
+                                r === 'keamanan' ? 'bg-red-100 text-red-700' :
+                                r === 'dewan_santri' ? 'bg-violet-100 text-violet-700' :
+                                r === 'sekpen' ? 'bg-cyan-100 text-cyan-700' :
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {rl?.label || r}
+                              </span>
+                            )
+                          })}
+                        </div>
+                        <button
+                          onClick={() => openRoleModal(u)}
+                          className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                          title="Edit Role"
                         >
-                          {ROLES.map(r => (
-                            <option key={r.value} value={r.value}>{r.label}</option>
-                          ))}
-                        </select>
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
                         {processingId === u.id && <Loader2 className="w-4 h-4 animate-spin text-blue-600"/>}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {u.role === 'pengurus_asrama' ? (
+                      {parseRoles(u).includes('pengurus_asrama') ? (
                         <button 
                           onClick={() => {
-                            setPendingRoleUpdate({ userId: u.id, role: 'pengurus_asrama' })
+                            setPendingRoleUpdate({ userId: u.id, roles: parseRoles(u) })
                             setIsAsramaModalOpen(true)
                           }}
                           className="inline-flex items-center gap-1 bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1 rounded-full text-xs font-bold transition-colors"
@@ -446,6 +545,14 @@ export default function ManajemenUserPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         
+                        <button 
+                          onClick={() => openOverrideModal(u)}
+                          className="text-slate-500 hover:text-emerald-600 p-2 rounded-lg hover:bg-emerald-50 transition-colors"
+                          title="Grant / Revoke Fitur"
+                        >
+                          <ShieldCheck className="w-4 h-4"/>
+                        </button>
+
                         <button 
                           onClick={() => {
                             setUserToEdit({ id: u.id, name: u.full_name, email: u.email })
@@ -742,6 +849,131 @@ export default function ManajemenUserPage() {
             <div className="grid grid-cols-2 gap-3">
                <button onClick={() => setIsOpenDelete(false)} className="py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50">Batal</button>
                <button onClick={handleDeleteUser} className="py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-sm flex items-center justify-center gap-2"><Trash2 className="w-4 h-4"/> Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL EDIT MULTI-ROLE --- */}
+      {isRoleModalOpen && roleEditUser && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Edit Role</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">{roleEditUser.full_name}</p>
+              </div>
+              <button onClick={() => setIsRoleModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-4 space-y-2">
+              {ROLES.map(r => {
+                const checked = roleEditSelected.includes(r.value)
+                return (
+                  <label key={r.value} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors border ${
+                    checked ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded text-blue-600"
+                      checked={checked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRoleEditSelected(prev => [...prev, r.value])
+                        } else {
+                          setRoleEditSelected(prev => prev.filter(x => x !== r.value))
+                        }
+                      }}
+                    />
+                    <span className={`text-sm font-semibold ${checked ? 'text-blue-800' : 'text-slate-700'}`}>{r.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
+              <button onClick={() => setIsRoleModalOpen(false)} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 font-medium">Batal</button>
+              <button onClick={handleSaveRoles} disabled={roleEditSelected.length === 0} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold disabled:opacity-50 flex items-center gap-1.5">
+                <Save className="w-3.5 h-3.5" /> Simpan Role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL GRANT / REVOKE FITUR --- */}
+      {isOverrideModalOpen && overrideUser && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Grant / Revoke Fitur</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">{overrideUser.full_name} — {parseRoles(overrideUser).map(r => ROLES.find(x=>x.value===r)?.label||r).join(', ')}</p>
+              </div>
+              <button onClick={() => setIsOverrideModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {overrideLoading ? (
+                <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
+              ) : (
+                <div className="space-y-1">
+                  {allFitur.filter(f => f.href !== '/dashboard').map(f => {
+                    const userRoles = parseRoles(overrideUser)
+                    const hasViaRole = f.roles.some(r => userRoles.includes(r))
+                    const override = overrideList.find(o => o.fitur_id === f.id)
+                    const effectiveAccess = override ? override.action === 'grant' : hasViaRole
+
+                    let statusLabel = ''
+                    let statusColor = ''
+                    let statusIcon: React.ReactNode = null
+                    if (override?.action === 'grant') {
+                      statusLabel = 'Granted'
+                      statusColor = 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                      statusIcon = <ShieldCheck className="w-3 h-3" />
+                    } else if (override?.action === 'revoke') {
+                      statusLabel = 'Revoked'
+                      statusColor = 'text-red-600 bg-red-50 border-red-200'
+                      statusIcon = <ShieldOff className="w-3 h-3" />
+                    } else if (hasViaRole) {
+                      statusLabel = 'Dari Role'
+                      statusColor = 'text-blue-600 bg-blue-50 border-blue-200'
+                      statusIcon = <Shield className="w-3 h-3" />
+                    }
+
+                    return (
+                      <div key={f.id} className={`flex items-center justify-between py-2 px-3 rounded-lg border transition-colors ${
+                        effectiveAccess ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50/50'
+                      }`}>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-semibold truncate ${effectiveAccess ? 'text-slate-800' : 'text-slate-400'}`}>{f.title}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{f.group_name === '_standalone' ? '' : f.group_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {statusLabel && (
+                            <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${statusColor}`}>
+                              {statusIcon}{statusLabel}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleOverrideToggle(f.id, override?.action || null, hasViaRole)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              override?.action === 'grant' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                              override?.action === 'revoke' ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                              effectiveAccess ? 'bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600' :
+                              'bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600'
+                            }`}
+                            title={override ? 'Reset Override' : effectiveAccess ? 'Revoke' : 'Grant'}
+                          >
+                            {override ? <X className="w-3.5 h-3.5" /> : effectiveAccess ? <ShieldOff className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="p-3 border-t bg-slate-50 flex justify-between items-center text-[10px] text-slate-400 shrink-0">
+              <span>✅ = Dari Role · 🟢 Granted · 🔴 Revoked</span>
+              <button onClick={() => setIsOverrideModalOpen(false)} className="px-3 py-1.5 text-xs bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-medium">Tutup</button>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 
@@ -21,7 +21,7 @@ export async function tambahMasterPelanggaran(data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
     return { error: 'Akses ditolak' }
   await execute(
     'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi) VALUES (?, ?, ?, ?)',
@@ -36,7 +36,7 @@ export async function editMasterPelanggaran(id: number, data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
     return { error: 'Akses ditolak' }
   await execute(
     'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=? WHERE id=?',
@@ -49,7 +49,7 @@ export async function editMasterPelanggaran(id: number, data: {
 
 export async function hapusMasterPelanggaran(id: number): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin'].includes(session.role)) return { error: 'Akses ditolak' }
+  if (!session || !hasAnyRole(session, ['admin'])) return { error: 'Akses ditolak' }
   const used = await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM pelanggaran WHERE master_id=?', [id])
   if (used && used.n > 0) return { error: 'Tidak bisa dihapus — sudah dipakai di data pelanggaran' }
   await execute('DELETE FROM master_pelanggaran WHERE id=?', [id])
@@ -103,7 +103,7 @@ export async function simpanPelanggaran(data: {
 
 export async function hapusPelanggaran(id: string): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role))
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
     return { error: 'Akses ditolak' }
 
   // Cascade: hapus surat_pernyataan yang mencantumkan pelanggaran ini

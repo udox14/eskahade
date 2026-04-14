@@ -1,7 +1,7 @@
 'use server'
 
 import { query, getDB } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 export async function getSessionInfo() {
@@ -76,7 +76,7 @@ export async function batchSaveAbsenMalam(
   tanggal: string
 ) {
   const session = await getSession()
-  if (!session || !['admin', 'pengurus_asrama'].includes(session.role)) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
   const toSave = records.filter(r => r.status === 'ALFA')
   const toDelete = records.filter(r => r.status !== 'ALFA').map(r => r.santri_id)

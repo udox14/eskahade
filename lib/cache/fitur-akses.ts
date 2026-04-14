@@ -1,10 +1,7 @@
 // lib/cache/fitur-akses.ts
 //
-// CATATAN PENTING:
-// unstable_cache dari Next.js TIDAK reliable di Cloudflare Workers dengan OpenNext.
-// Fix: query langsung ke D1 per request, dengan try-catch defensif.
-// Kalau tabel fitur_akses belum ada / query gagal → return [] bukan throw,
-// supaya tidak menyebabkan redirect loop ke /login.
+// Multi-role aware permission engine.
+// Supports: multi-role checks + per-user grant/revoke overrides.
 
 import { query } from '@/lib/db'
 
@@ -68,10 +65,46 @@ export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
   }
 }
 
-// Helper: filter hanya fitur yang aktif DAN role user ada di dalamnya
-export async function getFiturForRole(role: string): Promise<FiturAkses[]> {
+// ── Per-user overrides ──────────────────────────────────────────
+interface OverrideRow {
+  fitur_id: number
+  action: string // 'grant' | 'revoke'
+}
+
+async function getUserOverrides(userId: string): Promise<OverrideRow[]> {
+  try {
+    return await query<OverrideRow>(
+      'SELECT fitur_id, action FROM user_fitur_override WHERE user_id = ?',
+      [userId]
+    )
+  } catch {
+    // Tabel belum ada (migration belum jalan) → kosong
+    return []
+  }
+}
+
+// ── Multi-role helpers ──────────────────────────────────────────
+
+// Helper: filter fitur yang aktif DAN salah satu role user ada di dalamnya,
+// PLUS apply per-user overrides (grant/revoke)
+export async function getFiturForRoles(roles: string[], userId?: string): Promise<FiturAkses[]> {
   const all = await getCachedFiturAkses()
-  return all.filter(f => f.is_active && f.roles.includes(role))
+  const overrides = userId ? await getUserOverrides(userId) : []
+
+  const grantedIds = new Set(overrides.filter(o => o.action === 'grant').map(o => o.fitur_id))
+  const revokedIds = new Set(overrides.filter(o => o.action === 'revoke').map(o => o.fitur_id))
+
+  return all.filter(f => {
+    if (!f.is_active) return false
+    if (revokedIds.has(f.id)) return false              // revoked → blokir
+    if (grantedIds.has(f.id)) return true                // granted → izinkan
+    return f.roles.some(r => roles.includes(r))          // cek role biasa
+  })
+}
+
+// Backward compat wrapper — single role
+export async function getFiturForRole(role: string): Promise<FiturAkses[]> {
+  return getFiturForRoles([role])
 }
 
 // Helper: cek apakah bottom nav diaktifkan secara global oleh admin
@@ -87,11 +120,22 @@ export async function getBottomNavGlobalEnabled(): Promise<boolean> {
   }
 }
 
-// Helper: cek apakah suatu href boleh diakses role tertentu
-export async function canAccessHref(href: string, role: string): Promise<boolean> {
+// Helper: cek apakah suatu href boleh diakses user dengan multi-role + overrides
+export async function canAccessHref(href: string, roles: string[], userId?: string): Promise<boolean> {
   const all = await getCachedFiturAkses()
   const fitur = all.find(f => f.href === href)
   if (!fitur) return false           // href tidak terdaftar → blokir
   if (!fitur.is_active) return false // fitur dinonaktifkan admin → blokir
-  return fitur.roles.includes(role)
+
+  // Cek per-user overrides
+  if (userId) {
+    const overrides = await getUserOverrides(userId)
+    const override = overrides.find(o => o.fitur_id === fitur.id)
+    if (override) {
+      return override.action === 'grant' // grant → true, revoke → false
+    }
+  }
+
+  // Cek role biasa (multi-role)
+  return fitur.roles.some(r => roles.includes(r))
 }

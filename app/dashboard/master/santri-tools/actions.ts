@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 // ── Helper: ekstrak angka kelas dari string bebas ─────────────────────────
@@ -21,7 +21,7 @@ export async function previewNaikKelas(filter: {
   kelasSekolah?: string
 }) {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return { error: 'Unauthorized' }
+  if (!session || !isAdmin(session)) return { error: 'Unauthorized' }
 
   let where = "s.status_global = 'aktif' AND s.kelas_sekolah IS NOT NULL AND s.kelas_sekolah != ''"
   const params: any[] = []
@@ -63,7 +63,7 @@ export async function previewNaikKelas(filter: {
 // ── Eksekusi naik kelas massal ────────────────────────────────────────────
 export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success: boolean; updated: number } | { error: string }> {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return { error: 'Unauthorized' }
+  if (!session || !isAdmin(session)) return { error: 'Unauthorized' }
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   // Ambil data kelas_sekolah santri yang dipilih
@@ -103,7 +103,7 @@ export async function getSantriPembebasan(filter: {
   hanyaBebasSpp?: boolean
 }) {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return []
+  if (!session || !isAdmin(session)) return []
 
   let where = "s.status_global = 'aktif'"
   const params: any[] = []
@@ -152,7 +152,7 @@ export async function setBebas(
   bebas: boolean
 ): Promise<{ success: boolean; updated: number } | { error: string }> {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return { error: 'Unauthorized' }
+  if (!session || !isAdmin(session)) return { error: 'Unauthorized' }
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   const now = new Date().toISOString()
@@ -174,7 +174,7 @@ export async function catatBebasPembayaran(
   keterangan: string
 ): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return { error: 'Unauthorized' }
+  if (!session || !isAdmin(session)) return { error: 'Unauthorized' }
 
   // Cek apakah sudah ada record
   const existing = await queryOne<{ id: string }>(
@@ -200,7 +200,7 @@ export async function hapusBebasPembayaran(
   tahun: number
 ): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || session.role !== 'admin') return { error: 'Unauthorized' }
+  if (!session || !isAdmin(session)) return { error: 'Unauthorized' }
 
   await execute(
     `DELETE FROM pembayaran_tahunan WHERE santri_id = ? AND jenis_biaya = ? AND tahun_tagihan = ? AND nominal_bayar = 0`,

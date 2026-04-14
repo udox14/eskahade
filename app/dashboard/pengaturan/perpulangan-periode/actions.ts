@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/pengaturan/perpulangan-periode'
@@ -9,7 +9,7 @@ const ALLOWED_ROLES = ['admin', 'keamanan', 'dewan_santri']
 
 async function assertAllowed() {
   const session = await getSession()
-  if (!session || !ALLOWED_ROLES.includes(session.role))
+  if (!session || !hasAnyRole(session, ALLOWED_ROLES))
     throw new Error('Akses ditolak')
   return session
 }

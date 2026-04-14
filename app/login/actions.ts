@@ -21,12 +21,13 @@ export async function login(formData: FormData) {
     password_hash: string
     full_name: string
     role: string
+    roles: string | null
     asrama_binaan: string | null
   } | null = null
 
   try {
     user = await queryOne(
-      'SELECT id, email, password_hash, full_name, role, asrama_binaan FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan FROM users WHERE email = ?',
       [email.toLowerCase().trim()]
     )
     console.log('[LOGIN] Step 2: user found=', !!user, 'role=', user?.role)
@@ -54,13 +55,30 @@ export async function login(formData: FormData) {
     return { error: 'Email atau Password salah.' }
   }
 
+  // Parse multi-role: jika kolom roles ada (JSON array), gunakan itu.
+  // Jika null/kosong, fallback ke [role].
+  let rolesArray: string[] = []
   try {
-    console.log('[LOGIN] Step 4: setting session for role=', user.role)
+    if (user.roles) {
+      rolesArray = JSON.parse(user.roles)
+      if (!Array.isArray(rolesArray) || rolesArray.length === 0) {
+        rolesArray = [user.role]
+      }
+    } else {
+      rolesArray = [user.role]
+    }
+  } catch {
+    rolesArray = [user.role]
+  }
+
+  try {
+    console.log('[LOGIN] Step 4: setting session for roles=', rolesArray)
     await setSession({
       id: user.id,
       email: user.email,
       full_name: user.full_name || '',
-      role: user.role,
+      role: rolesArray[0],        // role utama = elemen pertama
+      roles: rolesArray,          // semua role
       asrama_binaan: user.asrama_binaan,
     })
     console.log('[LOGIN] Step 4: session set OK')
@@ -70,7 +88,5 @@ export async function login(formData: FormData) {
   }
 
   console.log('[LOGIN] Step 5: redirecting to /dashboard')
-  // Redirect dari server — ini yang memastikan Set-Cookie header
-  // dikirim bersamaan dengan response redirect ke browser
   redirect('/dashboard')
 }

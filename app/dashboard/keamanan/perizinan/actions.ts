@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -177,7 +177,7 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 // ─── Update Izin ─────────────────────────────────────────────────────────────
 export async function updateIzin(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role)) {
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
     return { error: 'Akses ditolak' }
   }
 
@@ -282,7 +282,7 @@ export async function cariSantri(keyword: string) {
 
 export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  if (!session || !['admin', 'keamanan', 'dewan_santri'].includes(session.role)) {
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
     return { error: 'Akses ditolak' }
   }
   await execute('DELETE FROM perizinan WHERE id = ?', [id])
