@@ -40,7 +40,7 @@ function BlankoSheet({ data }: { data: any }) {
   }
 
   return (
-    <div className="print-area bg-white text-black mx-auto shadow-2xl border mb-8 print:mb-0 print:break-after-page" style={{ width: '21.59cm', minHeight: '33.02cm', padding: '1cm 1cm 1cm 2.2cm' }}>
+    <div className="print-area bg-white text-black mx-auto shadow-2xl border mb-8 print:mb-0" style={{ width: '21.59cm', padding: '1cm 1cm 1cm 2.2cm' }}>
       {/* HEADER */}
       <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-1 print-header">
           <h2 className="text-xl font-black uppercase tracking-wider">{data.kelas.nama_kelas}</h2>
@@ -201,7 +201,8 @@ export default function CetakBlankoPage() {
               @page { size: 21.59cm 33.02cm; margin: 0.5cm; }
               body { background: white; }
               .no-print { display: none !important; }
-              .print-area { box-shadow: none !important; border: none !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+              .print-area { box-shadow: none !important; border: none !important; width: 100% !important; padding: 0.5cm 0.5cm 0.5cm 2.2cm !important; margin: 0 !important; page-break-after: always; box-sizing: border-box !important; }
+              .print-area:last-child { page-break-after: auto; }
               table { page-break-inside: auto; border-collapse: collapse; width: 100%; }
               tr { page-break-inside: avoid; }
               .agenda-section { page-break-inside: avoid; }
