@@ -87,9 +87,9 @@ export default function AbsensiGuruPage() {
         mapGuru.get(g.id)?.sessions.push(s)
       }
 
-      addSesi(k.guru_shubuh, 'shubuh')
-      addSesi(k.guru_ashar, 'ashar')
-      addSesi(k.guru_maghrib, 'maghrib')
+      addSesi({ id: k.guru_shubuh_id, nama_lengkap: k.guru_shubuh_nama }, 'shubuh')
+      addSesi({ id: k.guru_ashar_id, nama_lengkap: k.guru_ashar_nama }, 'ashar')
+      addSesi({ id: k.guru_maghrib_id, nama_lengkap: k.guru_maghrib_nama }, 'maghrib')
 
       if (mapGuru.size === 0) {
         rows.push({
@@ -215,7 +215,7 @@ export default function AbsensiGuruPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Briefcase className="w-6 h-6 text-indigo-600"/> Absensi Guru (Jurnal)
+             <Briefcase className="w-6 h-6 text-indigo-600"/> Absensi Guru
            </h1>
            <p className="text-slate-500 text-sm">Input kehadiran mengajar mingguan.</p>
         </div>

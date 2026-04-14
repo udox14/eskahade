@@ -33,6 +33,9 @@ export default function ManajemenUserPage() {
   // Filter State
   const [filterRole, setFilterRole] = useState('SEMUA')
 
+  // Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+
   // Modals
   const [isOpenAdd, setIsOpenAdd] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -267,6 +270,35 @@ export default function ManajemenUserPage() {
     }
   }
 
+  const handleExportSelected = async () => {
+    if (selectedIds.length === 0) return
+    const toastId = toast.loading("Menyiapkan data export...")
+    
+    try {
+      const selectedUsers = users.filter(u => selectedIds.includes(u.id))
+      const XLSX = await import('xlsx')
+      
+      const rows = selectedUsers.map(u => ({
+        "NAMA LENGKAP": u.full_name || "-",
+        "EMAIL": u.email,
+        "ROLE": ROLES.find(r => r.value === u.role)?.label || u.role,
+        "ASRAMA BINAAN": u.asrama_binaan || "-"
+      }))
+      
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [{wch: 30}, {wch: 35}, {wch: 25}, {wch: 20}]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Data User Terpilih")
+      XLSX.writeFile(wb, `Export_Akun_User_${new Date().getTime()}.xlsx`)
+      
+      toast.success("Berhasil export Excel!")
+    } catch(e) {
+      toast.error("Gagal export data")
+    } finally {
+      toast.dismiss(toastId)
+    }
+  }
+
   const { paged: pagedUsers, totalPages: totalPagesUsers, safePage: safePageUsers } = usePagination(filteredUsers, pageSize, page)
 
   return (
@@ -299,6 +331,14 @@ export default function ManajemenUserPage() {
             </div>
 
             <button 
+                onClick={handleExportSelected}
+                disabled={selectedIds.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium transition-colors cursor-pointer"
+            >
+                <Download className="w-5 h-5" /> Export ({selectedIds.length})
+            </button>
+
+            <button 
                 onClick={() => setIsOpenImport(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium transition-colors"
             >
@@ -321,6 +361,22 @@ export default function ManajemenUserPage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
+                <th className="px-4 py-4 w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const newSelection = Array.from(new Set([...selectedIds, ...pagedUsers.map(u => u.id)]));
+                        setSelectedIds(newSelection);
+                      } else {
+                        const visibleIds = new Set(pagedUsers.map(u => u.id));
+                        setSelectedIds(prev => prev.filter(id => !visibleIds.has(id)));
+                      }
+                    }}
+                    checked={pagedUsers.length > 0 && pagedUsers.every(u => selectedIds.includes(u.id))}
+                  />
+                </th>
                 <th className="px-6 py-4">Nama Lengkap & Email</th>
                 <th className="px-6 py-4">Role / Hak Akses</th>
                 <th className="px-6 py-4">Asrama Binaan</th>
@@ -329,12 +385,23 @@ export default function ManajemenUserPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={4} className="text-center py-10">Memuat data...</td></tr>
+                <tr><td colSpan={5} className="text-center py-10">Memuat data...</td></tr>
               ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-10">Data user tidak ditemukan.</td></tr>
+                <tr><td colSpan={5} className="text-center py-10">Data user tidak ditemukan.</td></tr>
               ) : (
                 pagedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                        checked={selectedIds.includes(u.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(prev => [...prev, u.id])
+                          else setSelectedIds(prev => prev.filter(id => id !== u.id))
+                        }}
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <p className="font-bold text-slate-800">{u.full_name || "Tanpa Nama"}</p>
                       <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
