@@ -40,7 +40,7 @@ function BlankoSheet({ data }: { data: any }) {
   }
 
   return (
-    <div className="print-area bg-white text-black mx-auto shadow-2xl border mb-8 print:mb-0 print:break-after-page" style={{ width: '21.59cm', minHeight: '33.02cm', padding: '1cm' }}>
+    <div className="print-area bg-white text-black mx-auto shadow-2xl border mb-8 print:mb-0 print:break-after-page" style={{ width: '21.59cm', minHeight: '33.02cm', padding: '1cm 1cm 1cm 2.2cm' }}>
       {/* HEADER */}
       <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-1 print-header">
           <h2 className="text-xl font-black uppercase tracking-wider">{data.kelas.nama_kelas}</h2>
@@ -117,6 +117,12 @@ function BlankoSheet({ data }: { data: any }) {
             </div>
           ))}
       </div>
+      
+      {/* ISSIAN KM DAN SEKRETARIS */}
+      <div className="flex justify-between mt-4 px-12 text-[10px] font-bold">
+          <div>KM: ........................................................</div>
+          <div>Sekretaris: ........................................................</div>
+      </div>
       <div className="mt-2 text-[8px] text-right italic text-slate-500 no-print">Dicetak pada {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
     </div>
   )
@@ -170,6 +176,18 @@ export default function CetakBlankoPage() {
         }
     }
     setLoading(false)
+  }
+
+  const transformToSheets = (item: any) => {
+     if (item.kelas?.nama_kelas?.toUpperCase().includes('MUTAWASSITHAH')) {
+         const pa = item.santriList.filter((s:any) => s.jenis_kelamin === 'L')
+         const pi = item.santriList.filter((s:any) => s.jenis_kelamin === 'P')
+         const sheets = []
+         if (pa.length > 0) sheets.push({ ...item, kelas: { ...item.kelas, nama_kelas: item.kelas.nama_kelas + ' PA' }, santriList: pa })
+         if (pi.length > 0) sheets.push({ ...item, kelas: { ...item.kelas, nama_kelas: item.kelas.nama_kelas + ' PI' }, santriList: pi })
+         return sheets.length > 0 ? sheets : [item]
+     }
+     return [item]
   }
 
   const hasData = singleData || (massalData && massalData.length > 0)
@@ -270,17 +288,16 @@ export default function CetakBlankoPage() {
 
       {/* RENDER AREA */}
       <div ref={printRef}>
-          {mode === 'SATUAN' && singleData && <BlankoSheet data={singleData} />}
+          {mode === 'SATUAN' && singleData && transformToSheets(singleData).map((d: any, idx: number) => <BlankoSheet key={'s'+idx} data={d} />)}
           
           {mode === 'MASSAL' && massalData && (
               <div>
                   <div className="no-print mb-4 p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 text-sm text-center">
                       Berhasil memuat <b>{massalData.length} kelas</b>. Klik tombol <b>Cetak</b> di atas untuk mencetak semua sekaligus.
                   </div>
-                  {massalData.map((item: any, idx: number) => (
+                  {massalData.flatMap((item: any) => transformToSheets(item)).map((item: any, idx: number) => (
                       <div key={idx}>
                           <BlankoSheet data={item} />
-                          {/* Page break otomatis ditangani CSS print:break-after-page */}
                       </div>
                   ))}
               </div>
