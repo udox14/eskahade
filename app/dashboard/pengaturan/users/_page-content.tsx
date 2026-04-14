@@ -5,7 +5,7 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { getUsersList, updateUserRoles, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
-import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight } from 'lucide-react'
+import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -33,6 +33,7 @@ export default function ManajemenUserPage() {
   
   // Filter State
   const [filterRole, setFilterRole] = useState('SEMUA')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -95,9 +96,20 @@ export default function ManajemenUserPage() {
   }
 
   const filteredUsers = users.filter(u => {
-    if (filterRole === 'SEMUA') return true
-    const userRoles = parseRoles(u)
-    return userRoles.includes(filterRole)
+    let matchRole = true
+    if (filterRole !== 'SEMUA') {
+      matchRole = parseRoles(u).includes(filterRole)
+    }
+
+    let matchSearch = true
+    if (searchQuery.trim() !== '') {
+      const qs = searchQuery.toLowerCase()
+      matchSearch = (u.full_name?.toLowerCase().includes(qs) || 
+                     u.email?.toLowerCase().includes(qs) || 
+                     u.nip?.toLowerCase().includes(qs))
+    }
+
+    return matchRole && matchSearch
   })
 
   // --- HANDLERS MULTI-ROLE ---
@@ -405,7 +417,19 @@ export default function ManajemenUserPage() {
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap md:flex-nowrap">
+            {/* Search Bar */}
+            <div className="relative flex-grow md:flex-grow-0">
+                <input 
+                    type="text"
+                    placeholder="Cari nama, email, nip..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white border border-slate-300 text-slate-700 py-2 pl-9 pr-3 rounded-lg font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+            </div>
+
             {/* Filter Dropdown */}
             <div className="relative">
                 <select 

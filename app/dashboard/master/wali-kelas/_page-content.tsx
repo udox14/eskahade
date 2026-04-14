@@ -50,10 +50,24 @@ export default function ManajemenGuruPage() {
     setLoading(false)
   }
 
-  const isGuruBusy = (guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
+  const { busyMapS, busyMapA, busyMapM } = React.useMemo(() => {
+    const s = new Map<string, string>()
+    const a = new Map<string, string>()
+    const m = new Map<string, string>()
+    localKelasList.forEach(k => {
+      if (k.s) s.set(String(k.s), k.id)
+      if (k.a) a.set(String(k.a), k.id)
+      if (k.m) m.set(String(k.m), k.id)
+    })
+    return { busyMapS: s, busyMapA: a, busyMapM: m }
+  }, [localKelasList])
+
+  const isGuruBusy = React.useCallback((guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
     if (!guruId) return false
-    return localKelasList.some(k => k[session] == guruId && k.id !== currentKelasId)
-  }
+    const map = session === 's' ? busyMapS : session === 'a' ? busyMapA : busyMapM
+    const assignedKelas = map.get(String(guruId))
+    return assignedKelas !== undefined && assignedKelas !== currentKelasId
+  }, [busyMapS, busyMapA, busyMapM])
 
   const handleChangeLocal = (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
     setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [session]: guruId } : k))
@@ -164,13 +178,13 @@ export default function ManajemenGuruPage() {
     }
   }
 
-  const filteredLocalKelas = localKelasList.filter(k =>
+  const filteredLocalKelas = React.useMemo(() => localKelasList.filter(k =>
     k.nama_kelas.toLowerCase().includes(search.toLowerCase())
-  )
+  ), [localKelasList, search])
 
-  const filteredForDropdown = guruSearch
+  const filteredForDropdown = React.useMemo(() => guruSearch
     ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
-    : guruList
+    : guruList, [guruList, guruSearch])
 
   const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
 
@@ -348,14 +362,6 @@ export default function ManajemenGuruPage() {
                       ))}
                     </tbody>
                   </table>
-                  <Pagination
-                    currentPage={safePageGuruList}
-                    totalPages={totalPagesGuruList}
-                    pageSize={pageSize}
-                    total={guruList.length}
-                    onPageChange={setPage}
-                    onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-                  />
                 </div>
               </div>
             )
@@ -398,6 +404,15 @@ export default function ManajemenGuruPage() {
                 </div>
               ))}
             </div>
+            
+            <Pagination
+              currentPage={safePageGuruList}
+              totalPages={totalPagesGuruList}
+              pageSize={pageSize}
+              total={guruList.length}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+            />
           </div>
         </div>
       )}
