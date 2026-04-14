@@ -126,7 +126,7 @@ export default function AbsensiGuruPage() {
   // --- HANDLERS (Gunakan useCallback) ---
   const handleCellChange = useCallback((kelasId: string, dateStr: string, session: SessionType, value: string) => {
     const upperVal = value.toUpperCase()
-    // Validasi input: hanya H, A, S, I, B, L
+    // Validasi input: hanya H, A, S, I, B, L atau kosong
     if (!['H', 'A', 'S', 'I', 'B', 'L', ''].includes(upperVal)) return
     
     const key = `${kelasId}-${dateStr}`
@@ -184,19 +184,17 @@ export default function AbsensiGuruPage() {
       const moveC = e.key === 'ArrowRight' ? 1 : (e.key === 'ArrowLeft' ? -1 : 0)
       
       let safetyCounter = 0
-      const limit = maxCol + maxRow + 10;
-      
-      while (safetyCounter < limit) {
+      while (safetyCounter < 50) {
         safetyCounter++
         
         currR += moveR
         currC += moveC
         
-        // Terkunci per baris (Tidak lanjut ke guru lain kalau tekan Kiri/Kanan)
-        if (currC < 0 || currC >= maxCol) break
-        
-        // Terkunci per kolom (Berhenti di ujung atas/bawah saat tekan Atas/Bawah)
+        // Batas Baris
         if (currR < 0 || currR >= maxRow) break
+        
+        // Batas Kolom (Stop di ujung, jangan pindah baris)
+        if (currC < 0 || currC >= maxCol) break
         
         const nextId = `cell-${currR}-${currC}`
         const el = document.getElementById(nextId) as HTMLInputElement
@@ -266,8 +264,8 @@ export default function AbsensiGuruPage() {
       </div>
 
       <div className="text-xs text-slate-500 bg-blue-50 p-3 rounded-lg border border-blue-100 flex flex-wrap gap-4">
-        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-white text-slate-800 font-bold border rounded flex items-center justify-center"></span> Hadir (Kosong)</span>
-        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-green-100 text-green-700 font-bold border rounded flex items-center justify-center">H</span> Hadir Ditandai</span>
+        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-green-100 text-green-700 font-bold border rounded flex items-center justify-center">H</span> Hadir</span>
+        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-yellow-100 text-yellow-700 font-bold border rounded flex items-center justify-center">B</span> Badal</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-red-100 text-red-700 font-bold border rounded flex items-center justify-center">A</span> Kosong</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-slate-200 text-slate-500 font-bold border rounded flex items-center justify-center">L</span> Libur</span>
         <span className="ml-auto italic">* Navigasi panah kanan/kiri terkunci per baris</span>
