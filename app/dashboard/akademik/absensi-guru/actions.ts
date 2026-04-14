@@ -38,7 +38,11 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 
   const absensiMap: Record<string, any> = {}
   absensi.forEach((a: any) => {
-    absensiMap[`${a.kelas_id}-${a.tanggal}`] = { shubuh: a.shubuh, ashar: a.ashar, maghrib: a.maghrib }
+    absensiMap[`${a.kelas_id}-${a.tanggal}`] = { 
+        shubuh: a.shubuh || '', 
+        ashar: a.ashar || '', 
+        maghrib: a.maghrib || '' 
+    }
   })
 
   return {
