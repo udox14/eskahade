@@ -175,7 +175,8 @@ export default function AbsensiGuruPage() {
       e.preventDefault()
 
       const maxRow = totalRows
-      const maxCol = 21 // 7 hari x 3 sesi
+      const totalCols = SESSIONS.reduce((acc, sess) => acc + days.filter(d => !isLibur(d.dayName, sess)).length, 0)
+      const maxCol = totalCols
       
       let currR = rowIdx
       let currC = colIdx
@@ -284,25 +285,26 @@ export default function AbsensiGuruPage() {
              <table className="w-full text-sm border-collapse">
                 <thead className="bg-slate-100 sticky top-0 z-20 shadow-sm">
                    <tr>
-                      <th className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Kelas</th>
-                      <th className="p-3 text-left border bg-slate-100 z-30 w-48 min-w-[12rem] shadow-sm md:sticky md:left-48">Guru Pengajar</th>
-                      {days.map(day => (
-                        <th key={day.dateStr} colSpan={3} className="border text-center py-2 px-1 min-w-[6rem]">
-                            <div className="font-bold text-slate-800">{day.label}</div>
-                            <div className="text-[10px] text-slate-500 font-normal">{day.shortDate}</div>
-                        </th>
-                      ))}
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Kelas</th>
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 z-30 w-48 min-w-[12rem] shadow-sm md:sticky md:left-48">Guru Pengajar</th>
+                      {SESSIONS.map(sess => {
+                           const sessDays = days.filter(d => !isLibur(d.dayName, sess))
+                           return (
+                               <th key={sess} colSpan={sessDays.length} className="border text-center py-2 px-1 font-extrabold text-slate-800 uppercase bg-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] tracking-widest text-sm">
+                                   {sess}
+                               </th>
+                           )
+                      })}
                    </tr>
                    <tr>
-                      <th className="border bg-slate-100 sticky left-0 z-30 shadow-sm"></th>
-                      <th className="border bg-slate-100 md:sticky md:left-48 z-30"></th>
-                      {days.map(day => (
-                        <React.Fragment key={day.dateStr + 'h'}>
-                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Shubuh">S</th>
-                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Ashar">A</th>
-                            <th className="border text-center text-[9px] text-slate-500 bg-slate-50 w-8" title="Maghrib">M</th>
-                        </React.Fragment>
-                      ))}
+                      {SESSIONS.map(sess => {
+                           const sessDays = days.filter(d => !isLibur(d.dayName, sess))
+                           return sessDays.map(day => (
+                               <th key={sess + day.dateStr} className="border text-center text-[10px] text-slate-700 bg-slate-50 min-w-[3.5rem] p-1.5 shadow-sm">
+                                   <div className="font-bold uppercase tracking-wider">{day.label}</div>
+                               </th>
+                           ))
+                      })}
                    </tr>
                 </thead>
                 <tbody>
@@ -327,33 +329,29 @@ export default function AbsensiGuruPage() {
                             </td>
 
                             {/* KOLOM INPUT GRID (OPTIMIZED) */}
-                            {days.map(day => {
-                                const key = `${row.kelas.id}-${day.dateStr}`
-                                const val = gridData[key] || { shubuh:'', ashar:'', maghrib:'' }
-                                
-                                return (
-                                    <React.Fragment key={key}>
-                                        {SESSIONS.map(sess => {
-                                            const isMyJob = row.validSessions.includes(sess)
-                                            const isHoliday = isLibur(day.dayName, sess)
-                                            const disabled = !isMyJob || isHoliday
-                                            
-                                            const cellId = `cell-${rowIdx}-${colCounter}`
-                                            colCounter++
+                            {SESSIONS.map(sess => {
+                                const sessDays = days.filter(d => !isLibur(d.dayName, sess))
+                                return sessDays.map(day => {
+                                    const key = `${row.kelas.id}-${day.dateStr}`
+                                    const val = gridData[key] || { shubuh:'', ashar:'', maghrib:'' }
+                                    
+                                    const isMyJob = row.validSessions.includes(sess)
+                                    const disabled = !isMyJob
+                                    
+                                    const cellId = `cell-${rowIdx}-${colCounter}`
+                                    colCounter++
 
-                                            return (
-                                                <CellInput 
-                                                    key={sess}
-                                                    id={cellId}
-                                                    value={val[sess]} 
-                                                    onChange={(v: string) => handleCellChange(row.kelas.id, day.dateStr, sess, v)} 
-                                                    disabled={disabled}
-                                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDown(e, rowIdx, colCounter - 1, rowsToRender.length)}
-                                                />
-                                            )
-                                        })}
-                                    </React.Fragment>
-                                )
+                                    return (
+                                        <CellInput 
+                                            key={sess + day.dateStr}
+                                            id={cellId}
+                                            value={val[sess]} 
+                                            onChange={(v: string) => handleCellChange(row.kelas.id, day.dateStr, sess, v)} 
+                                            disabled={disabled}
+                                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDown(e, rowIdx, colCounter - 1, rowsToRender.length)}
+                                        />
+                                    )
+                                })
                             })}
                         </tr>
                       )
