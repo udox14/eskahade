@@ -101,3 +101,68 @@ export async function getKelasList() {
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
 }
+
+export async function getAbsensiGlobalA(tanggalRef: string) {
+  const { start, end } = getWeekRange(new Date(tanggalRef))
+  const startStr = start.toISOString().split('T')[0]
+  const endStr = end.toISOString().split('T')[0]
+
+  const results = await query<any>(`
+    WITH ProblemStudents AS (
+      SELECT DISTINCT riwayat_pendidikan_id
+      FROM absensi_harian
+      WHERE tanggal >= ? AND tanggal <= ?
+        AND (shubuh = 'A' OR ashar = 'A' OR maghrib = 'A')
+    )
+    SELECT 
+      rp.id, 
+      s.nama_lengkap, 
+      s.asrama, 
+      s.kamar, 
+      s.sekolah, 
+      s.kelas_sekolah,
+      k.nama_kelas AS kelas_pesantren,
+      ah.tanggal,
+      ah.shubuh,
+      ah.ashar,
+      ah.maghrib
+    FROM ProblemStudents ps
+    JOIN riwayat_pendidikan rp ON rp.id = ps.riwayat_pendidikan_id
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN absensi_harian ah ON ah.riwayat_pendidikan_id = ps.riwayat_pendidikan_id
+      AND ah.tanggal >= ? AND ah.tanggal <= ?
+    ORDER BY s.nama_lengkap
+  `, [startStr, endStr, startStr, endStr])
+
+  const santriMap = new Map()
+  const absensiGrid: Record<string, any> = {}
+  
+  results.forEach((row: any) => {
+    if (!santriMap.has(row.id)) {
+      santriMap.set(row.id, {
+        id: row.id,
+        nama_lengkap: row.nama_lengkap,
+        asrama: row.asrama,
+        kamar: row.kamar,
+        sekolah: row.sekolah,
+        kelas_sekolah: row.kelas_sekolah,
+        kelas_pesantren: row.kelas_pesantren
+      })
+    }
+    
+    if (row.tanggal) {
+      if (!absensiGrid[row.id]) absensiGrid[row.id] = {}
+      absensiGrid[row.id][row.tanggal] = {
+        shubuh: row.shubuh,
+        ashar: row.ashar,
+        maghrib: row.maghrib
+      }
+    }
+  })
+
+  return {
+    santri: Array.from(santriMap.values()),
+    absensi: absensiGrid
+  }
+}

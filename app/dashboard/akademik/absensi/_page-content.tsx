@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getKelasList, getAbsensiData, simpanAbsensi } from './actions'
-import { Save, Calendar, Loader2, Trash2, FileSpreadsheet } from 'lucide-react'
+import { getKelasList, getAbsensiData, simpanAbsensi, getAbsensiGlobalA } from './actions'
+import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner' // IMPORT WAJIB
@@ -21,6 +21,9 @@ export default function AbsensiPage() {
   
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
 
   // 1. Load Daftar Kelas
   useEffect(() => {
@@ -291,6 +294,79 @@ export default function AbsensiPage() {
     }
   }
 
+  // Handler: Export Global (Khusus Alfa)
+  const handleExportGlobalA = async () => {
+    const exportToast = toast.loading("Mengambil data rekap global...")
+    try {
+      const { santri, absensi } = await getAbsensiGlobalA(selectedDate)
+      
+      if (!santri.length) {
+        toast.info("Tidak ditemukan santri dengan Alfa (A) di pekan ini.")
+        return
+      }
+
+      // Sortir data
+      const sortedSantri = [...santri].sort((a, b) => {
+        if (exportSortBy === 'asrama') {
+          const compAsrama = (a.asrama || '').localeCompare(b.asrama || '')
+          if (compAsrama !== 0) return compAsrama
+          const compKamar = (a.kamar || '').localeCompare(b.kamar || '', undefined, { numeric: true })
+          if (compKamar !== 0) return compKamar
+          return a.nama_lengkap.localeCompare(b.nama_lengkap)
+        } else {
+          const compKelas = (a.kelas_pesantren || '').localeCompare(b.kelas_pesantren || '', undefined, { numeric: true })
+          if (compKelas !== 0) return compKelas
+          return a.nama_lengkap.localeCompare(b.nama_lengkap)
+        }
+      })
+
+      const XLSX = await import('xlsx')
+      const headers = ["Nama Santri", "Asrama", "Kamar", "Kelas Pesantren", "Sekolah", "Kelas Sekolah"]
+      const activeSessions: { dateStr: string, session: SessionType, label: string }[] = []
+      
+      days.forEach(day => {
+        SESSIONS.forEach(session => {
+          if (!isHoliday(day.label, session)) {
+            activeSessions.push({ 
+              dateStr: day.dateStr, 
+              session, 
+              label: `${day.label} ${session.charAt(0).toUpperCase() + session.slice(1)}`
+            })
+          }
+        })
+      })
+      headers.push(...activeSessions.map(s => s.label))
+
+      const rows = sortedSantri.map(s => {
+        const rowData = [s.nama_lengkap, s.asrama || '-', s.kamar || '-', s.kelas_pesantren || '-', s.sekolah || '-', s.kelas_sekolah || '-']
+        const santriGrid = absensi[s.id] || {}
+        activeSessions.forEach(as => {
+          const val = santriGrid[as.dateStr]?.[as.session] || 'H'
+          rowData.push(val === 'H' ? '' : val)
+        })
+        return rowData
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws['!cols'] = headers.map((h, i) => ({ wch: Math.max(h.length, ...rows.map(r => String(r[i] || '').length)) + 2 }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Rekap Alfa Mingguan")
+      
+      const tglAwal = days[0].dateStr.split('-').reverse().join('-')
+      const tglAkhir = days[6].dateStr.split('-').reverse().join('-')
+      const fileName = `Rekap_Alfa_Global_${tglAwal}_sd_${tglAkhir}.xlsx`
+      
+      XLSX.writeFile(wb, fileName)
+      toast.success(`Berhasil export ${santri.length} santri bermasalah.`)
+    } catch (e) {
+      console.error(e)
+      toast.error("Gagal export rekap global")
+    } finally {
+      toast.dismiss(exportToast)
+    }
+  }
+
   // Generate Kolom Header secara Flat untuk kalkulasi Index
   let colCounter = 0;
 
@@ -300,12 +376,19 @@ export default function AbsensiPage() {
         <h1 className="text-2xl font-bold text-slate-800">Absensi Mingguan (Rapel)</h1>
         <div className="flex gap-2">
           <button 
+            onClick={() => setShowExportModal(true)} 
+            className="border border-red-200 bg-red-50 text-red-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-100 shadow-sm transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Rekap Alfa (Global)
+          </button>
+          <button 
             onClick={handleExportExcel} 
             disabled={loading || dataSantri.length === 0}
             className="border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 disabled:opacity-50 shadow-sm"
           >
             <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            Export Excel
+            Export Kelas
           </button>
           <button 
             onClick={handleSimpan} 
@@ -448,6 +531,56 @@ export default function AbsensiPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EXPORT GLOBAL ALFA */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Export Rekap Alfa</h3>
+                <button onClick={() => setShowExportModal(false)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                Akan mengekspor <strong>seluruh santri</strong> di semua kelas yang memiliki catatan <strong>Alfa (A)</strong> di pekan terpilih.
+              </p>
+              
+              <div className="space-y-4">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Urutkan Berdasarkan:</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setExportSortBy('asrama')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all group ${exportSortBy === 'asrama' ? 'border-green-600 bg-green-50' : 'border-slate-100 hover:border-slate-200'}`}
+                  >
+                    <div className={`font-bold transition-colors ${exportSortBy === 'asrama' ? 'text-green-700' : 'text-slate-700'}`}>Asrama</div>
+                    <div className="text-[10px] text-slate-500 mt-1">Asrama → Kamar → Nama</div>
+                  </button>
+                  <button 
+                    onClick={() => setExportSortBy('kelas')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all group ${exportSortBy === 'kelas' ? 'border-green-600 bg-green-50' : 'border-slate-100 hover:border-slate-200'}`}
+                  >
+                    <div className={`font-bold transition-colors ${exportSortBy === 'kelas' ? 'text-green-700' : 'text-slate-700'}`}>Kelas</div>
+                    <div className="text-[10px] text-slate-500 mt-1">Kelas → Nama</div>
+                  </button>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setShowExportModal(false)
+                  setTimeout(handleExportGlobalA, 100)
+                }}
+                className="w-full mt-8 bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 shadow-xl transition-all active:scale-[0.98]"
+              >
+                Download Excel (Rekap Global)
+              </button>
+            </div>
           </div>
         </div>
       )}
