@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { getKelasList, getAbsensiData, simpanAbsensi } from './actions'
-import { Save, Calendar, Loader2, Trash2 } from 'lucide-react'
+import { Save, Calendar, Loader2, Trash2, FileSpreadsheet } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner' // IMPORT WAJIB
@@ -204,6 +204,93 @@ export default function AbsensiPage() {
     }
   }
 
+  // Handler: Export Excel
+  const handleExportExcel = async () => {
+    if (!selectedKelas || dataSantri.length === 0) return
+
+    const exportToast = toast.loading("Menyiapkan file Excel...")
+    try {
+      const XLSX = await import('xlsx')
+      
+      // 1. Persiapkan Header
+      const headers = [
+        "Nama Santri", 
+        "Asrama", 
+        "Kamar", 
+        "Kelas Pesantren", 
+        "Sekolah", 
+        "Kelas Sekolah"
+      ]
+      
+      // Tambah header sesi absensi yang aktif
+      const activeSessions: { dateStr: string, session: SessionType, label: string }[] = []
+      
+      days.forEach(day => {
+        SESSIONS.forEach(session => {
+          if (!isHoliday(day.label, session)) {
+            activeSessions.push({ 
+              dateStr: day.dateStr, 
+              session, 
+              label: `${day.label} ${session.charAt(0).toUpperCase() + session.slice(1)}`
+            })
+          }
+        })
+      })
+
+      headers.push(...activeSessions.map(s => s.label))
+
+      // 2. Persiapkan Data
+      const rows = dataSantri.map(s => {
+        const rowData: any[] = [
+          s.nama_lengkap,
+          s.asrama || '-',
+          s.kamar || '-',
+          s.kelas_pesantren || '-',
+          s.sekolah || '-',
+          s.kelas_sekolah || '-'
+        ]
+        
+        const santriGrid = gridData[s.id] || {}
+        
+        activeSessions.forEach(as => {
+          const val = santriGrid[as.dateStr]?.[as.session] || 'H'
+          // Sesuai permintaan: Alfa ditulis A. Yang lain (H) dikosongkan agar bersih.
+          rowData.push(val === 'H' ? '' : val)
+        })
+        
+        return rowData
+      })
+
+      // 3. Generate Sheet
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      
+      // Auto-width
+      const colWidths = headers.map((h, i) => {
+        const maxLen = Math.max(
+          h.length,
+          ...rows.map(r => String(r[i] || '').length)
+        )
+        return { wch: maxLen + 2 }
+      })
+      ws['!cols'] = colWidths
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Absensi")
+      
+      const tglAwal = days[0].dateStr.split('-').reverse().join('-')
+      const tglAkhir = days[6].dateStr.split('-').reverse().join('-')
+      const fileName = `Absensi_${dataSantri[0]?.kelas_pesantren || 'Kelas'}_${tglAwal}_sd_${tglAkhir}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      toast.success("Berhasil export ke Excel")
+    } catch (error) {
+      console.error(error)
+      toast.error("Gagal export ke Excel")
+    } finally {
+      toast.dismiss(exportToast)
+    }
+  }
+
   // Generate Kolom Header secara Flat untuk kalkulasi Index
   let colCounter = 0;
 
@@ -211,14 +298,24 @@ export default function AbsensiPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-800">Absensi Mingguan (Rapel)</h1>
-        <button 
-          onClick={handleSimpan} 
-          disabled={saving || !selectedKelas}
-          className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800 disabled:opacity-50 shadow-sm"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-          Simpan Absensi
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportExcel} 
+            disabled={loading || dataSantri.length === 0}
+            className="border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 disabled:opacity-50 shadow-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+            Export Excel
+          </button>
+          <button 
+            onClick={handleSimpan} 
+            disabled={saving || !selectedKelas}
+            className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800 disabled:opacity-50 shadow-sm"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+            Simpan Absensi
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">

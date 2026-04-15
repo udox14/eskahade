@@ -22,9 +22,19 @@ export async function getAbsensiData(kelasId: string, tanggalRef: string) {
   const endStr = end.toISOString().split('T')[0]
 
   const santri = await query<any>(`
-    SELECT rp.id, s.id AS santri_id, s.nama_lengkap, s.nis
+    SELECT 
+      rp.id, 
+      s.id AS santri_id, 
+      s.nama_lengkap, 
+      s.nis,
+      s.asrama,
+      s.kamar,
+      s.sekolah,
+      s.kelas_sekolah,
+      k.nama_kelas AS kelas_pesantren
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
     WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
