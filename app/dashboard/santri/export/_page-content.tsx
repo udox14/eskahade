@@ -146,6 +146,15 @@ export default function ExportSantriPage() {
     getFilterOptions().then(o => { setOpts(o); setLoadingOpts(false) })
   }, [])
 
+  // Load kamar list saat asrama dipilih (single asrama) atau clear saat multi/kosong
+  useEffect(() => {
+    if (filter.asrama && filter.asrama.length === 1) {
+      getKamarList(filter.asrama[0]).then(setKamarList)
+    } else {
+      setKamarList([])
+    }
+  }, [filter.asrama])
+
 
 
   const setF = (key: keyof ExportFilter, val: any) =>
@@ -275,14 +284,14 @@ export default function ExportSantriPage() {
           <div className="col-span-2 sm:col-span-3">
             <MultiChip label="Kamar" selected={filter.kamar ?? []}
               onChange={setArr('kamar')}
-              options={(filter.asrama?.length ? opts?.kamarList : []) ?? []}
+              options={filter.asrama?.length === 1 ? kamarList : []}
               disabled={!filter.asrama?.length} />
           </div>
 
           <div className="col-span-2 sm:col-span-3">
             <MultiChip label="Kelas Pesantren" selected={filter.nama_kelas ?? []}
               onChange={setArr('nama_kelas')}
-              options={opts?.kelasList?.map((k: any) => k.nama_kelas) ?? []} />
+              options={opts?.kelasList ?? []} />
           </div>
 
           <div className="col-span-2 sm:col-span-3">

@@ -104,25 +104,37 @@ export async function getDataExport(
   if (!session) return { error: 'Tidak terautentikasi' }
 
   // Enforce asrama untuk pengurus_asrama
-  const forceAsrama    = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
-  const effectiveAsrama = forceAsrama || filter.asrama || null
+  const forceAsrama = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
+
+  // Helper: build IN clause untuk array filter
+  const addInClause = (col: string, arr: any[] | undefined | null) => {
+    if (!arr || arr.length === 0) return
+    clauses.push(`${col} IN (${arr.map(() => '?').join(', ')})`)
+    params.push(...arr)
+  }
+
+  // Effective asrama: kalau pengurus_asrama, paksa asrama binaannya saja
+  const effectiveAsrama: string[] | null = forceAsrama
+    ? [forceAsrama]
+    : (filter.asrama && filter.asrama.length > 0 ? filter.asrama : null)
 
   // Perlu JOIN ke riwayat_pendidikan?
   const needKelas = kolom.includes('nama_kelas') || kolom.includes('marhalah')
-    || !!filter.nama_kelas || !!filter.marhalah
+    || (!!filter.nama_kelas && filter.nama_kelas.length > 0)
+    || (!!filter.marhalah && filter.marhalah.length > 0)
 
   const clauses: string[] = ["s.status_global = 'aktif'"]
   const params: any[]     = []
 
-  if (effectiveAsrama)      { clauses.push('s.asrama = ?');          params.push(effectiveAsrama) }
-  if (filter.kamar)         { clauses.push('s.kamar = ?');           params.push(filter.kamar) }
+  addInClause('s.asrama', effectiveAsrama)
+  addInClause('s.kamar', filter.kamar)
   if (filter.jenis_kelamin) { clauses.push('s.jenis_kelamin = ?');   params.push(filter.jenis_kelamin) }
-  if (filter.sekolah)       { clauses.push('s.sekolah = ?');         params.push(filter.sekolah) }
-  if (filter.kelas_sekolah) { clauses.push('s.kelas_sekolah = ?');   params.push(filter.kelas_sekolah) }
-  if (filter.tahun_masuk)   { clauses.push('s.tahun_masuk = ?');     params.push(filter.tahun_masuk) }
+  addInClause('s.sekolah', filter.sekolah)
+  addInClause('s.kelas_sekolah', filter.kelas_sekolah)
+  addInClause('s.tahun_masuk', filter.tahun_masuk)
   if (filter.alamat_kata)   { clauses.push('s.alamat LIKE ?');       params.push(`%${filter.alamat_kata}%`) }
-  if (filter.nama_kelas)    { clauses.push('k.nama_kelas = ?');      params.push(filter.nama_kelas) }
-  if (filter.marhalah)      { clauses.push('m.nama = ?');            params.push(filter.marhalah) }
+  addInClause('k.nama_kelas', filter.nama_kelas)
+  addInClause('m.nama', filter.marhalah)
 
   const where = clauses.join(' AND ')
 
