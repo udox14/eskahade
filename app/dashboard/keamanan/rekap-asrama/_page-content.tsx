@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah } from './actions'
+import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah, getKamarList } from './actions'
 import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 
@@ -48,6 +48,7 @@ export default function RekapAsramaPage() {
   const [filterKamar, setFilterKamar] = useState('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
+  const [availableKamars, setAvailableKamars] = useState<string[]>([])
 
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
@@ -63,6 +64,7 @@ export default function RekapAsramaPage() {
   useEffect(() => { 
     asramaRef.current = asrama
     setFilterKamar('Semua')
+    getKamarList(asrama).then(k => setAvailableKamars(k))
   }, [asrama])
   useEffect(() => { bulanRef.current = bulan }, [bulan])
 
@@ -136,9 +138,6 @@ export default function RekapAsramaPage() {
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
 
-  const currentSantriList = tab === 'malam' ? malamSantri : bjSantri
-  const activeKamars = Array.from(new Set(currentSantriList.map(s => s.kamar || 'Tanpa Kamar'))).sort((a,b) => (parseInt(a) || 999) - (parseInt(b) || 999))
-
   const filteredMalamSantri = malamSantri.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
@@ -188,11 +187,11 @@ export default function RekapAsramaPage() {
           <select
             value={filterKamar}
             onChange={e => setFilterKamar(e.target.value)}
-            disabled={!hasLoaded || activeKamars.length === 0}
+            disabled={availableKamars.length === 0}
             className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
             <option value="Semua">Semua Kamar</option>
-            {activeKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+            {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
           </select>
 
           <button

@@ -15,6 +15,14 @@ export async function getSessionRekap() {
   }
 }
 
+export async function getKamarList(asrama: string) {
+  const rows = await query<any>(`
+    SELECT DISTINCT kamar FROM santri 
+    WHERE asrama = ? AND status_global = 'aktif'
+  `, [asrama])
+  return rows.map(r => r.kamar || 'Tanpa Kamar').sort((a,b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+}
+
 // Rekap Absen Malam: per santri, jumlah alfa per bulan
 export async function getRekapAbsenMalam(asrama: string, bulan: string) {
   // bulan format: YYYY-MM
