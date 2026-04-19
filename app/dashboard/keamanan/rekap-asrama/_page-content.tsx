@@ -185,6 +185,16 @@ export default function RekapAsramaPage() {
               </select>
           }
 
+          <select
+            value={filterKamar}
+            onChange={e => setFilterKamar(e.target.value)}
+            disabled={!hasLoaded || activeKamars.length === 0}
+            className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
+          >
+            <option value="Semua">Semua Kamar</option>
+            {activeKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+          </select>
+
           <button
             onClick={load}
             disabled={loading}
@@ -225,14 +235,6 @@ export default function RekapAsramaPage() {
                 className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <select
-              value={filterKamar}
-              onChange={e => setFilterKamar(e.target.value)}
-              className="px-3 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value="Semua">Semua Kamar</option>
-              {activeKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
-            </select>
           </div>
         </div>
       )}
