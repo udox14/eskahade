@@ -146,7 +146,6 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
   
   const [unmappedNames, setUnmappedNames] = useState<string[]>([])
   const [mappings, setMappings] = useState<Record<string, string>>({}) // "Excel Name": "santri id"
-  const [skipAllUnmapped, setSkipAllUnmapped] = useState(false)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -214,8 +213,8 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
               bestCandidate = s
             }
           })
-          // Pre-fill dropdown jika kemiripan sangat tinggi, tapi biarkan user ACC
-          if (bestScore > 0.85 && bestCandidate) {
+          // Otomatis pre-fill combobox dengan saran teratas agar user tinggal mantau
+          if (bestScore > 0.05 && bestCandidate) {
             initMaps[n] = bestCandidate.id
           }
           unmapped.push(n) // Wajib masuk antrean review
@@ -243,12 +242,6 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
   }
 
   const handleNextToStep3 = () => {
-    // Validasi apabila ada yang belum di-map tapi tidak dicentang skip
-    const hasEmpty = unmappedNames.some(n => !mappings[n])
-    if (hasEmpty && !skipAllUnmapped) {
-      toast.warning("Masih ada nama yang belum dicocokkan! (Pilih nama atau centang Abaikan)")
-      return
-    }
     setStep(3)
   }
 
@@ -260,11 +253,8 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
       const activeSessions = new Set<string>() // format: tanggal|waktu
 
       parsedRaw.forEach(log => {
-        // Apakah namanya ada di map / tidak diskip?
         let assignedId = mappings[log.nama]
-        if (!assignedId && skipAllUnmapped) {
-           return // diskip
-        }
+        // Jika user sengaja abaikan (assignedId = ""), log ini tidak tercatat hadir.
         if (assignedId) {
           hadirSet.add(`${assignedId}|${log.tanggal}|${log.waktu}`)
           activeSessions.add(`${log.tanggal}|${log.waktu}`)
@@ -398,12 +388,6 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
                   )
                 })}
               </div>
-
-              <label className="flex items-center gap-2 mt-4 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded" 
-                  checked={skipAllUnmapped} onChange={(e) => setSkipAllUnmapped(e.target.checked)}/>
-                <span className="text-sm text-slate-600 font-medium">Abaikan sekaligus nama yang tidak saya cocokkan di atas</span>
-              </label>
 
               <div className="flex justify-end pt-4 gap-2">
                 <button onClick={() => setStep(1)} className="px-5 py-2 text-slate-600 font-bold bg-slate-100 hover:bg-slate-200 rounded-xl text-sm">Batal</button>
