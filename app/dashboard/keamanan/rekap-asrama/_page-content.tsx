@@ -223,8 +223,18 @@ export default function RekapAsramaPage() {
             </button>
           </div>
           
-          <div className="flex gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
+          <div className="flex gap-2 w-full flex-wrap sm:w-auto sm:flex-nowrap">
+            {tab === 'berjamaah' && !isPutri && (
+              <button 
+                onClick={() => setShowImportModal(true)} 
+                className="flex shrink-0 items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-bold shadow-sm hover:bg-indigo-100 active:scale-95 transition text-sm"
+                title="Import Excel Mesin Fingerprint"
+              >
+                <Upload className="w-4 h-4"/>
+                <span className="hidden lg:block">Import Excel</span>
+              </button>
+            )}
+            <div className="relative flex-1 min-w-[200px] sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -347,13 +357,6 @@ export default function RekapAsramaPage() {
           {/* ABSEN BERJAMAAH */}
           {tab === 'berjamaah' && (
             <div className="space-y-4">
-              {!isPutri && (
-                <div className="flex justify-end relative z-0">
-                  <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl font-bold shadow-sm hover:bg-indigo-100 transition text-sm">
-                    <Upload className="w-4 h-4"/> Import Mesin Fingerprint
-                  </button>
-                </div>
-              )}
               {filteredBjSantri.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
                   Tidak ada data absen berjamaah untuk filter ini.

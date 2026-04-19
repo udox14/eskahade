@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Upload, X, AlertCircle, ArrowRight, Save, CheckCircle, Loader2 } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { Upload, X, AlertCircle, ArrowRight, Save, CheckCircle, Loader2, ChevronDown, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { importAbsenBerjamaahFingerprint } from './actions'
 
@@ -34,6 +34,13 @@ function parseExcelDate(dateVal: any): string {
   return String(dateVal)
 }
 
+function expandName(str: string) {
+  // Ubah variasi awalan/huruf M menjadi muhammad untuk skor lebih sinkron
+  return str.toLowerCase()
+    .replace(/\b(m|mo|moh|moch|muh|mohammad|mohamad|muhamad|mhd)\b/g, 'muhammad')
+    .replace(/[^a-z0-9]/g, '')
+}
+
 function getBigrams(str: string) {
   const bigrams = new Set<string>()
   for (let i = 0; i < str.length - 1; i++) {
@@ -44,8 +51,8 @@ function getBigrams(str: string) {
 
 function stringSimilarity(str1: string, str2: string) {
   if (!str1 || !str2) return 0
-  const s1 = str1.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const s2 = str2.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const s1 = expandName(str1)
+  const s2 = expandName(str2)
   if (s1 === s2) return 1
   if (s1.length < 2 || s2.length < 2) return 0
   
@@ -53,6 +60,83 @@ function stringSimilarity(str1: string, str2: string) {
   const set2 = getBigrams(s2)
   const intersection = Array.from(set1).filter(x => set2.has(x))
   return (2 * intersection.length) / (set1.size + set2.size)
+}
+
+// Komponen Combobox manual karena native <select> tidak bisa di-search
+const SantriCombobox = ({ 
+  candidates, 
+  value, 
+  onChange 
+}: { 
+  candidates: any[], 
+  value: string, 
+  onChange: (val: string) => void 
+}) => {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = candidates.filter(c => 
+    c.nama_lengkap.toLowerCase().includes(search.toLowerCase())
+  )
+  const selected = candidates.find(c => c.id === value)
+
+  return (
+    <div className="relative" ref={ref}>
+      <div 
+        onClick={() => setOpen(!open)}
+        className="w-full bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center text-sm font-medium shadow-sm hover:border-slate-300"
+      >
+        <span className="truncate">{selected ? `${selected.nama_lengkap} (${selected.kamar})` : "❌ Abaikan & Buang Baris Ini"}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {open && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border shadow-xl rounded-lg flex flex-col overflow-hidden max-h-60">
+          <div className="p-2 border-b bg-slate-50 flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-slate-400 ml-1 shrink-0" />
+            <input 
+              autoFocus 
+              type="text" 
+              placeholder="Cari nama spesifik..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+              className="w-full px-1 py-1 text-sm bg-transparent outline-none" 
+            />
+          </div>
+          <div className="overflow-y-auto">
+            <div 
+              onClick={() => { onChange(''); setOpen(false); setSearch('') }} 
+              className="px-3 py-2 cursor-pointer hover:bg-red-50 text-red-600 font-bold text-sm border-b"
+            >
+              ❌ Abaikan & Buang Baris Ini
+            </div>
+            {filtered.map(c => (
+              <div 
+                key={c.id} 
+                onClick={() => { onChange(c.id); setOpen(false); setSearch('') }} 
+                className="px-3 py-2 cursor-pointer hover:bg-indigo-50 text-sm flex justify-between items-center group"
+              >
+                <span className="text-slate-700 font-medium group-hover:text-indigo-700 truncate">{c.nama_lengkap}</span>
+                <span className="text-xs text-slate-400 whitespace-nowrap ml-2">({c.kamar}) • {(c.score * 100).toFixed(0)}%</span>
+              </div>
+            ))}
+            {filtered.length === 0 && <div className="p-4 text-center text-sm text-slate-400">Pencarian tidak ditemukan</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santriList }: ImportModalProps) {
@@ -111,13 +195,13 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
       const unmapped: string[] = []
       const initMaps: Record<string, string> = {}
 
-      const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const normalize = (str: string) => expandName(str)
 
       uniqueNames.forEach(n => {
         const normN = normalize(n)
         // 1. Cari exact match
         let match = santriList.find(s => s.nama_lengkap.toLowerCase() === n.toLowerCase())
-        // 2. Cari normalized match (tanpa spasi/tanda baca)
+        // 2. Cari normalized match
         if (!match) match = santriList.find(s => normalize(s.nama_lengkap) === normN)
         // 3. Fuzzy matching jika masih tidak ada
         if (!match) {
@@ -275,51 +359,40 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
                 </div>
               </div>
 
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto px-1 pb-4">
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto px-1 pb-4">
                 {unmappedNames.map(name => {
-                  // Urutkan dropdown berdasarkan tingkat kemiripan untuk nama ini
-                  const sortedCandidates = [...santriList].map(s => ({
+                  // Hitung kemiripan dan singkirkan yang nilainya 0 (sama sekali tak mirip)
+                  const candidatesWithScores = santriList.map(s => ({
                     ...s,
                     score: stringSimilarity(name, s.nama_lengkap)
-                  })).sort((a, b) => b.score - a.score)
+                  }))
+                  
+                  const sortedCandidates = candidatesWithScores
+                    .filter(s => s.score > 0.05) // Hanya yg mirip walau sedikit
+                    .sort((a, b) => b.score - a.score)
 
-                  // Pre-select the best match if there is no mapping yet (helps user click faster)
-                  // Wait, if it wasn't > 0.85 it wasn't auto-mapped. But maybe we suggest it visually.
                   const bestMatch = sortedCandidates[0]
 
                   return (
-                    <div key={name} className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama di Excel</p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-bold text-slate-800 text-base uppercase">{name}</p>
-                            {bestMatch && bestMatch.score > 0.4 && (
-                              <span className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-indigo-100">
-                                Rating Kemiripan: {(bestMatch.score * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
+                    <div key={name} className="bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2.5">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold text-slate-800 text-sm uppercase">{name}</p>
+                          {bestMatch && bestMatch.score > 0.4 && (
+                            <span className="bg-indigo-50 text-indigo-600 text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-indigo-100">
+                              Kemiripan: {(bestMatch.score * 100).toFixed(0)}%
+                            </span>
+                          )}
                         </div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">Nama di Excel</p>
                       </div>
 
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                        <p className="text-sm font-semibold text-slate-700 mb-2">Memilih Santri Tujuan</p>
-                        <div className="relative">
-                          <select 
-                            value={mappings[name] || ''}
-                            onChange={(e) => setMappings({...mappings, [name]: e.target.value})}
-                            className="w-full appearance-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-lg hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm font-medium"
-                          >
-                            <option value="">❌ Abaikan & Buang Baris Ini</option>
-                            {sortedCandidates.map(s => (
-                              <option key={s.id} value={s.id}>{s.nama_lengkap} ({s.kamar})</option>
-                            ))}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                          </div>
-                        </div>
+                      <div className="bg-slate-50/50 border border-slate-100 rounded-lg p-2.5">
+                        <SantriCombobox 
+                          candidates={sortedCandidates.length > 0 ? sortedCandidates : candidatesWithScores} 
+                          value={mappings[name] || ''} 
+                          onChange={(val) => setMappings({...mappings, [name]: val})} 
+                        />
                       </div>
                     </div>
                   )
