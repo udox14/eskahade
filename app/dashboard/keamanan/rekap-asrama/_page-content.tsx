@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah } from './actions'
-import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
+import ImportBerjamaahModal from './ImportBerjamaahModal'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -44,6 +45,9 @@ export default function RekapAsramaPage() {
   const [tab, setTab] = useState<'malam' | 'berjamaah'>('malam')
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [filterKamar, setFilterKamar] = useState('Semua')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
@@ -56,7 +60,10 @@ export default function RekapAsramaPage() {
   const asramaRef = useRef(asrama)
   const bulanRef = useRef(bulan)
 
-  useEffect(() => { asramaRef.current = asrama }, [asrama])
+  useEffect(() => { 
+    asramaRef.current = asrama
+    setFilterKamar('Semua')
+  }, [asrama])
   useEffect(() => { bulanRef.current = bulan }, [bulan])
 
   // Flag untuk auto-load setelah session tersedia
@@ -94,9 +101,7 @@ export default function RekapAsramaPage() {
 
       const [malam, bj] = await Promise.all([
         getRekapAbsenMalam(currentAsrama, currentBulan),
-        isPutriAsrama
-          ? getRekapAbsenBerjamaah(currentAsrama, currentBulan, hideHaid)
-          : Promise.resolve({ santriList: [], detail: {} })
+        getRekapAbsenBerjamaah(currentAsrama, currentBulan, hideHaid)
       ])
 
       setMalamSantri(malam.santriList)
@@ -105,7 +110,6 @@ export default function RekapAsramaPage() {
       setBjSantri(bj.santriList)
       setBjDetail(bj.detail)
       setHasLoaded(true)
-      if (!isPutriAsrama) setTab('malam')
     } catch (error: any) {
       console.error(error)
       alert("Gagal memuat rekap asrama. Silakan coba lagi. Error: " + (error?.message || "Unknown error"))
@@ -131,6 +135,21 @@ export default function RekapAsramaPage() {
     Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
+
+  const currentSantriList = tab === 'malam' ? malamSantri : bjSantri
+  const activeKamars = Array.from(new Set(currentSantriList.map(s => s.kamar || 'Tanpa Kamar'))).sort((a,b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+
+  const filteredMalamSantri = malamSantri.filter(s => {
+    const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
+    const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
+    return matchKamar && matchSearch
+  })
+  
+  const filteredBjSantri = bjSantri.filter(s => {
+    const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
+    const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
+    return matchKamar && matchSearch
+  })
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16">
@@ -181,19 +200,40 @@ export default function RekapAsramaPage() {
         </div>
       </div>
 
-      {/* TABS — muncul hanya setelah ada data */}
+      {/* TABS & FILTER */}
       {hasLoaded && !loading && (
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-          <button onClick={() => setTab('malam')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-            <Moon className="w-4 h-4"/> Absen Malam
-          </button>
-          {isPutri && (
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+            <button onClick={() => setTab('malam')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Moon className="w-4 h-4"/> Absen Malam
+            </button>
             <button onClick={() => setTab('berjamaah')}
               className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-slate-500 hover:text-slate-700'}`}>
               <Sun className="w-4 h-4"/> Berjamaah
             </button>
-          )}
+          </div>
+          
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari nama santri..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <select
+              value={filterKamar}
+              onChange={e => setFilterKamar(e.target.value)}
+              className="px-3 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="Semua">Semua Kamar</option>
+              {activeKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+            </select>
+          </div>
         </div>
       )}
 
@@ -225,33 +265,33 @@ export default function RekapAsramaPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-black text-slate-800">{malamSantri.length}</p>
+                  <p className="text-2xl font-black text-slate-800">{filteredMalamSantri.length}</p>
                   <p className="text-xs text-slate-400 mt-1">Total Santri</p>
                 </div>
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
                   <p className="text-2xl font-black text-red-600">
-                    {Object.values(malamAlfa).reduce((s, v) => s + v, 0)}
+                    {filteredMalamSantri.reduce((s, santri) => s + (malamAlfa[santri.id] || 0), 0)}
                   </p>
                   <p className="text-xs text-red-400 mt-1">Total Alfa</p>
                 </div>
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 text-center shadow-sm">
                   <p className="text-2xl font-black text-orange-600">
-                    {Object.keys(malamAlfa).length}
+                    {filteredMalamSantri.filter(santri => (malamAlfa[santri.id] || 0) > 0).length}
                   </p>
                   <p className="text-xs text-orange-400 mt-1">Santri Pernah Alfa</p>
                 </div>
               </div>
 
-              {malamSantri.length === 0 ? (
+              {filteredMalamSantri.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
-                  Tidak ada data absen malam untuk periode ini.
+                  Tidak ada data absen malam untuk filter ini.
                 </div>
-              ) : sortedKamars(malamSantri).map(kamar => {
-                const santriKamar = grouped(malamSantri)[kamar]
+              ) : sortedKamars(filteredMalamSantri).map(kamar => {
+                const santriKamar = grouped(filteredMalamSantri)[kamar]
                 return (
                   <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                     <div className="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center">
-                      <span className="font-bold">Kamar {kamar}</span>
+                      <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
                       <span className="text-xs text-slate-400">{santriKamar.length} santri</span>
                     </div>
                     <div className="overflow-x-auto">
@@ -306,15 +346,22 @@ export default function RekapAsramaPage() {
           {/* ABSEN BERJAMAAH */}
           {tab === 'berjamaah' && (
             <div className="space-y-4">
-              {bjSantri.length === 0 ? (
+              {!isPutri && (
+                <div className="flex justify-end relative z-0">
+                  <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl font-bold shadow-sm hover:bg-indigo-100 transition text-sm">
+                    <Upload className="w-4 h-4"/> Import Mesin Fingerprint
+                  </button>
+                </div>
+              )}
+              {filteredBjSantri.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
-                  Tidak ada data absen berjamaah untuk periode ini.
+                  Tidak ada data absen berjamaah untuk filter ini.
                 </div>
               ) : (
                 <>
                   <div className="grid grid-cols-4 gap-3">
                     {WAKTU.map(w => {
-                      const alfa = bjSantri.reduce((s, santri) => {
+                      const alfa = filteredBjSantri.reduce((s, santri) => {
                         return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] === 'A').length
                       }, 0)
                       return (
@@ -327,12 +374,12 @@ export default function RekapAsramaPage() {
                     })}
                   </div>
 
-                  {sortedKamars(bjSantri).map(kamar => {
-                    const santriKamar = grouped(bjSantri)[kamar]
+                  {sortedKamars(filteredBjSantri).map(kamar => {
+                    const santriKamar = grouped(filteredBjSantri)[kamar]
                     return (
                       <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                         <div className="bg-teal-900 text-white px-4 py-2.5 flex justify-between items-center">
-                          <span className="font-bold">Kamar {kamar}</span>
+                          <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
                           <span className="text-xs text-teal-300">{santriKamar.length} santri</span>
                         </div>
                         <div className="overflow-x-auto">
@@ -416,6 +463,15 @@ export default function RekapAsramaPage() {
             </div>
           )}
         </>
+      )}
+
+      {showImportModal && (
+        <ImportBerjamaahModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => load()}
+          santriList={bjSantri}
+        />
       )}
     </div>
   )

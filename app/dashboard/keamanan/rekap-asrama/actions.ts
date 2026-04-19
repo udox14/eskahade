@@ -1,6 +1,6 @@
 'use server'
 
-import { query } from '@/lib/db'
+import { query, batch } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -87,3 +87,33 @@ export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hide
 
   return { santriList, detail }
 }
+
+export async function importAbsenBerjamaahFingerprint(alfaRows: { santri_id: string, tanggal: string, shubuh?: 'A', ashar?: 'A' }[]) {
+  if (!alfaRows || !alfaRows.length) return { success: true, count: 0 }
+  const session = await getSession()
+  const uid = session?.id || null
+
+  const statements = alfaRows.map(r => ({
+    sql: `
+      INSERT INTO absen_berjamaah (santri_id, tanggal, shubuh, ashar, created_by)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(santri_id, tanggal) DO UPDATE SET
+        shubuh = COALESCE(absen_berjamaah.shubuh, excluded.shubuh),
+        ashar  = COALESCE(absen_berjamaah.ashar, excluded.ashar)
+    `,
+    params: [r.santri_id, r.tanggal, r.shubuh || null, r.ashar || null, uid]
+  }))
+
+  try {
+    // Jalankan dalam chunking jika alfaRows sangat banyak untuk menghindari limit
+    const chunkSize = 50
+    for (let i = 0; i < statements.length; i += chunkSize) {
+      const chunk = statements.slice(i, i + chunkSize)
+      await batch(chunk)
+    }
+    return { success: true, count: alfaRows.length }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
