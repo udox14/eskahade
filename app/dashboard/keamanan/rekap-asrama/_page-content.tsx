@@ -106,6 +106,9 @@ export default function RekapAsramaPage() {
       setBjDetail(bj.detail)
       setHasLoaded(true)
       if (!isPutriAsrama) setTab('malam')
+    } catch (error: any) {
+      console.error(error)
+      alert("Gagal memuat rekap asrama. Silakan coba lagi. Error: " + (error?.message || "Unknown error"))
     } finally {
       setLoading(false)
     }

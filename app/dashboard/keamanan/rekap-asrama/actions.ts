@@ -31,14 +31,12 @@ export async function getRekapAbsenMalam(asrama: string, bulan: string) {
 
   if (!santriList.length) return { santriList: [], alfaPerSantri: {}, detailPerSantri: {} }
 
-  const ids = santriList.map((s: any) => s.id)
-  const ph = ids.map(() => '?').join(',')
-
   const absenList = await query<any>(`
-    SELECT santri_id, tanggal, status FROM absen_malam_v2
-    WHERE tanggal >= ? AND tanggal <= ? AND santri_id IN (${ph})
-    ORDER BY tanggal
-  `, [startDate, endDate, ...ids])
+    SELECT a.santri_id, a.tanggal, a.status FROM absen_malam_v2 a
+    JOIN santri s ON a.santri_id = s.id
+    WHERE a.tanggal >= ? AND a.tanggal <= ? AND s.asrama = ? AND s.status_global = 'aktif'
+    ORDER BY a.tanggal
+  `, [startDate, endDate, asrama])
 
   // Build detail per santri: { santri_id: { 'YYYY-MM-DD': status } }
   const detailPerSantri: Record<string, Record<string, string>> = {}
@@ -68,14 +66,12 @@ export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hide
 
   if (!santriList.length) return { santriList: [], detail: {} }
 
-  const ids = santriList.map((s: any) => s.id)
-  const ph = ids.map(() => '?').join(',')
-
   const rows = await query<any>(`
-    SELECT santri_id, tanggal, shubuh, ashar, maghrib, isya FROM absen_berjamaah
-    WHERE tanggal >= ? AND tanggal <= ? AND santri_id IN (${ph})
-    ORDER BY tanggal
-  `, [startDate, endDate, ...ids])
+    SELECT a.santri_id, a.tanggal, a.shubuh, a.ashar, a.maghrib, a.isya FROM absen_berjamaah a
+    JOIN santri s ON a.santri_id = s.id
+    WHERE a.tanggal >= ? AND a.tanggal <= ? AND s.asrama = ? AND s.status_global = 'aktif'
+    ORDER BY a.tanggal
+  `, [startDate, endDate, asrama])
 
   // detail[santri_id][tanggal] = { shubuh, ashar, maghrib, isya }
   const detail: Record<string, Record<string, any>> = {}
