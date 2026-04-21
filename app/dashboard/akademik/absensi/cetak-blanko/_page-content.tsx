@@ -179,7 +179,8 @@ export default function CetakBlankoPage() {
   }
 
   const transformToSheets = (item: any) => {
-     if (item.kelas?.nama_kelas?.toUpperCase().includes('MUTAWASSITHAH')) {
+     const namaKelas = item.kelas?.nama_kelas?.toUpperCase() || ''
+     if (namaKelas.includes('MUTAWASSITHAH')) {
          const pa = item.santriList.filter((s:any) => s.jenis_kelamin === 'L')
          const pi = item.santriList.filter((s:any) => s.jenis_kelamin === 'P')
          const sheets = []
@@ -187,6 +188,28 @@ export default function CetakBlankoPage() {
          if (pi.length > 0) sheets.push({ ...item, kelas: { ...item.kelas, nama_kelas: item.kelas.nama_kelas + ' PI' }, santriList: pi })
          return sheets.length > 0 ? sheets : [item]
      }
+     
+     if (namaKelas.includes('MUTAQADDIMAH')) {
+         const asramaGroups: Record<string, any[]> = {}
+         item.santriList.forEach((s: any) => {
+             const asramaText = (s.asrama || 'Tanpa Asrama').toUpperCase().trim()
+             if (!asramaGroups[asramaText]) {
+                 asramaGroups[asramaText] = []
+             }
+             asramaGroups[asramaText].push(s)
+         })
+         
+         const sheets: any[] = []
+         Object.keys(asramaGroups).sort().forEach(asramaName => {
+             sheets.push({
+                 ...item,
+                 kelas: { ...item.kelas, nama_kelas: item.kelas.nama_kelas + ' - ' + asramaName },
+                 santriList: asramaGroups[asramaName]
+             })
+         })
+         return sheets.length > 0 ? sheets : [item]
+     }
+
      return [item]
   }
 
