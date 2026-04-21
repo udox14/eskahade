@@ -44,6 +44,7 @@ export default function InputNilaiPage() {
   const [selectedMapel, setSelectedMapel] = useState<string>('')
   
   const [loading, setLoading] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
 
   // Data States (Lazy Loaded)
@@ -54,7 +55,10 @@ export default function InputNilaiPage() {
 
   // Initial load referensi
   useEffect(() => {
-    getReferensiData().then(setRefData)
+    setIsInitializing(true)
+    getReferensiData()
+      .then(setRefData)
+      .finally(() => setIsInitializing(false))
   }, [])
 
   // Lazy Load Logic
@@ -243,15 +247,21 @@ export default function InputNilaiPage() {
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Kelas Target</label>
                 <select 
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-slate-50 disabled:cursor-not-allowed"
                   value={selectedKelas}
                   onChange={(e) => setSelectedKelas(e.target.value)}
+                  disabled={isInitializing}
                 >
-                  <option value="">-- Pilih Kelas --</option>
-                  {refData.kelas.map((k: any) => (
+                  <option value="">{isInitializing ? "-- Memuat data... --" : "-- Pilih Kelas --"}</option>
+                  {!isInitializing && refData.kelas.map((k: any) => (
                     <option key={k.id} value={k.id}>{k.nama_kelas} ({k.marhalah_nama})</option>
                   ))}
                 </select>
+                {refData.kelas.length === 0 && !isInitializing && (
+                  <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3"/> Data kelas belum tersedia di database.
+                  </p>
+                )}
               </div>
 
               {activeTab === 'akademik' && akademikMode === 'direct' && (

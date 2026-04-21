@@ -5,16 +5,34 @@ import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 export async function getReferensiData() {
-  const mapel = await getCachedMapelList()
-  const kelasRaw = await query<any>(`
-    SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
-    FROM kelas k
-    LEFT JOIN marhalah m ON m.id = k.marhalah_id
-  `, [])
-  const kelas = kelasRaw.sort((a: any, b: any) =>
-    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
-  )
-  return { mapel, kelas }
+  try {
+    // Jalankan parallel agar lebih cepat
+    const [mapel, kelasRaw] = await Promise.all([
+      getCachedMapelList().catch(err => {
+        console.error("Error fetching mapel list:", err)
+        return []
+      }),
+      query<any>(`
+        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+        FROM kelas k
+        LEFT JOIN marhalah m ON m.id = k.marhalah_id
+      `, []).catch(err => {
+        console.error("Error fetching kelas list:", err)
+        return []
+      })
+    ])
+    
+    const kelas = Array.isArray(kelasRaw) 
+      ? [...kelasRaw].sort((a: any, b: any) =>
+          String(a.nama_kelas).localeCompare(String(b.nama_kelas), undefined, { numeric: true, sensitivity: 'base' })
+        )
+      : []
+
+    return { mapel: mapel || [], kelas }
+  } catch (err) {
+    console.error("Fatal error in getReferensiData:", err)
+    return { mapel: [], kelas: [] }
+  }
 }
 
 export async function getDataSantriPerKelas(kelasId: string) {
