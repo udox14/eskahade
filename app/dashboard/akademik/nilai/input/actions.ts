@@ -1,7 +1,8 @@
 'use server'
 
 import { query, execute, batch, generateId } from '@/lib/db'
-import { getSession, hasRole } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 /** 
@@ -11,49 +12,34 @@ import { revalidatePath } from 'next/cache'
 export async function getReferensiData() {
   try {
     const session = await getSession()
-    if (!session) {
-      console.warn("No session found in getReferensiData");
-      return { mapel: [], kelas: [] }
+    if (!session) return { mapel: [], kelas: [] }
+
+    // Mapel
+    const mapel = await getCachedMapelList().catch(() => [])
+
+    // Kelas
+    let sql = `
+      SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+      FROM kelas k
+      LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    `
+    const params: any[] = []
+
+    // Jika user BUKAN admin/akademik/sekpen, TAPI dia adalah wali_kelas,
+    // maka hanya tampilkan kelas binaannya saja.
+    if (!hasAnyRole(session, ['admin', 'akademik', 'sekpen']) && hasRole(session, 'wali_kelas')) {
+      sql += ' WHERE k.wali_kelas_id = ?'
+      params.push(session.id)
     }
 
-    // Jalankan parallel
-    const [mapelRaw, kelasRaw] = await Promise.all([
-      // Mapel: Ambil langsung dari DB
-      query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama').catch(err => {
-        console.error("Error Mapel:", err);
-        return []
-      }),
-      // Kelas: Ambil dengan filter Wali Kelas jika perlu (sama seperti Leger)
-      (async () => {
-        let sql = `
-          SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
-          FROM kelas k
-          LEFT JOIN marhalah m ON m.id = k.marhalah_id
-        `
-        const params: any[] = []
-        if (hasRole(session, 'wali_kelas')) {
-          sql += ' WHERE k.wali_kelas_id = ?'
-          params.push(session.id)
-        }
-        return query<any>(sql, params).catch(err => {
-          console.error("Error Kelas:", err);
-          return []
-        })
-      })()
-    ])
-
-    const kelas = (kelasRaw || []).sort((a: any, b: any) =>
+    const kelasRaw = await query<any>(sql, params).catch(() => [])
+    const kelas = [...kelasRaw].sort((a: any, b: any) =>
       String(a.nama_kelas).localeCompare(String(b.nama_kelas), undefined, { numeric: true, sensitivity: 'base' })
     )
 
-    return { 
-      mapel: mapelRaw || [], 
-      kelas: kelas
-    }
+    return { mapel, kelas }
   } catch (err) {
-    console.error("Fatal error in getReferensiData:", err)
-    // Jangan throw ke client agar tidak muncul error toast merah yang kasar, 
-    // tapi kembalikan objek kosong
+    console.error("Fatal error getReferensiData:", err)
     return { mapel: [], kelas: [] }
   }
 }
