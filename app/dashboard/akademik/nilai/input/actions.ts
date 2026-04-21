@@ -1,7 +1,6 @@
 'use server'
 
 import { query, execute, batch, generateId } from '@/lib/db'
-import { getCachedMapelList } from '@/lib/cache/master'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 

@@ -56,13 +56,18 @@ export default function InputNilaiPage() {
 
   const fetchRef = async () => {
     setIsInitializing(true)
-    // Gunakan action yang sama persis dengan Leger (terbukti berhasil)
-    const [kelas, mapelData] = await Promise.all([
-      getKelasListForLeger(),
-      getReferensiData().then(d => d.mapel).catch(() => [])
-    ])
-    setRefData({ mapel: mapelData, kelas })
-    setIsInitializing(false)
+    try {
+      // getReferensiData sekarang sudah mencakup logika Leger (session & wali kelas) 
+      // dan mengembalikan { mapel, kelas } dengan penanganan error internal.
+      const data = await getReferensiData()
+      setRefData(data)
+    } catch (err) {
+      console.error("Gagal memuat data referensi:", err)
+      // Fallback aman jika terjadi error yang tidak terduga
+      setRefData({ mapel: [], kelas: [] })
+    } finally {
+      setIsInitializing(false)
+    }
   }
 
   // Initial load referensi
