@@ -130,9 +130,19 @@ export default function AbsensiPage() {
   }
 
   // LOGIKA NAVIGASI KEYBOARD
+  const getTotalActiveSessions = () => {
+    let count = 0;
+    days.forEach(day => {
+        SESSIONS.forEach(session => {
+            if (!isHoliday(day.label, session)) count++;
+        });
+    });
+    return count;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent, currentRow: number, currentCol: number) => {
     const totalRows = dataSantri.length
-    const totalCols = 21 
+    const totalCols = getTotalActiveSessions()
     
     let nextRow = currentRow
     let nextCol = currentCol
@@ -435,42 +445,49 @@ export default function AbsensiPage() {
       ) : loading ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-green-600"/></div>
       ) : (
-        <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-slate-100 sticky top-0 z-20 shadow-sm">
-                <tr>
-                  <th className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Nama Santri</th>
-                  <th className="p-2 text-center border bg-slate-100 z-30 w-32 min-w-[8rem] shadow-sm md:sticky md:left-48">Aksi Cepat</th>
-                  {days.map(day => (
-                    <th key={day.dateStr} colSpan={3} className="border text-center py-2 px-1 min-w-[9rem]">
+        <div className="bg-white border rounded-xl shadow-sm">
+          <table className="w-full text-sm border-collapse">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="p-3 text-left border w-48">Nama Santri</th>
+                <th className="p-2 text-center border w-32">Aksi Cepat</th>
+                {days.map(day => {
+                  const activeCount = SESSIONS.filter(s => !isHoliday(day.label, s)).length;
+                  if (activeCount === 0) return null;
+                  return (
+                    <th key={day.dateStr} colSpan={activeCount} className="border text-center py-2 px-1">
                       <div className="font-bold text-slate-800">{day.label}</div>
                       <div className="text-xs text-slate-500 font-normal">{day.shortDate}</div>
                     </th>
-                  ))}
-                </tr>
-                <tr>
-                  <th className="border bg-slate-100 sticky left-0 z-30 shadow-sm"></th>
-                  <th className="border bg-slate-100 z-30 shadow-sm md:sticky md:left-48"></th>
-                  {days.map(day => (
-                    <React.Fragment key={day.dateStr + 'header'}>
-                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'shubuh') ? 'bg-slate-200' : 'bg-slate-50'}`}>S</th>
-                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'ashar') ? 'bg-slate-200' : 'bg-slate-50'}`}>A</th>
-                      <th className={`border text-center text-xs text-slate-500 w-10 ${isHoliday(day.label, 'maghrib') ? 'bg-slate-200' : 'bg-slate-50'}`}>M</th>
-                    </React.Fragment>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dataSantri.map((s, rowIdx) => {
-                  let currentCellIndex = 0; 
+                  );
+                })}
+              </tr>
+              <tr>
+                <th className="border"></th>
+                <th className="border"></th>
+                {days.map(day => {
+                  const activeCount = SESSIONS.filter(s => !isHoliday(day.label, s)).length;
+                  if (activeCount === 0) return null;
                   return (
-                    <tr key={s.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                      <td className="p-2 border sticky left-0 bg-inherit font-medium truncate z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                        {s.nama_lengkap}
-                      </td>
-                      
-                      <td className="p-1 border bg-inherit z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] text-center md:sticky md:left-48">
+                    <React.Fragment key={day.dateStr + 'header'}>
+                      {!isHoliday(day.label, 'shubuh') && <th className="border text-center text-xs text-slate-500 w-10 bg-slate-50">S</th>}
+                      {!isHoliday(day.label, 'ashar') && <th className="border text-center text-xs text-slate-500 w-10 bg-slate-50">A</th>}
+                      {!isHoliday(day.label, 'maghrib') && <th className="border text-center text-xs text-slate-500 w-10 bg-slate-50">M</th>}
+                    </React.Fragment>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {dataSantri.map((s, rowIdx) => {
+                let currentCellIndex = 0; 
+                return (
+                  <tr key={s.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="p-2 border font-medium truncate">
+                      {s.nama_lengkap}
+                    </td>
+                    
+                    <td className="p-1 border text-center">
                         <div className="flex justify-center gap-1">
                           <button 
                             onClick={() => handleFillRow(s.id, 'A')}
@@ -508,6 +525,8 @@ export default function AbsensiPage() {
                           <React.Fragment key={day.dateStr + s.id}>
                             {SESSIONS.map(session => {
                               const isOff = isHoliday(day.label, session)
+                              if (isOff) return null;
+
                               const cellId = `cell-${rowIdx}-${currentCellIndex}`
                               const cellColIndex = currentCellIndex 
                               currentCellIndex++ 
@@ -531,7 +550,6 @@ export default function AbsensiPage() {
                 })}
               </tbody>
             </table>
-          </div>
         </div>
       )}
 
