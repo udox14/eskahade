@@ -53,12 +53,24 @@ export default function InputNilaiPage() {
   const [catatanData, setCatatanData] = useState<any[]>([])
   const [excelPreview, setExcelPreview] = useState<any[]>([])
 
+  const fetchRef = async () => {
+    setIsInitializing(true)
+    try {
+      const data = await getReferensiData()
+      setRefData(data)
+      if (data.kelas.length > 0) {
+        toast.success(`Berhasil memuat ${data.kelas.length} kelas.`)
+      }
+    } catch (err) {
+      toast.error("Gagal memuat data referensi.")
+    } finally {
+      setIsInitializing(false)
+    }
+  }
+
   // Initial load referensi
   useEffect(() => {
-    setIsInitializing(true)
-    getReferensiData()
-      .then(setRefData)
-      .finally(() => setIsInitializing(false))
+    fetchRef()
   }, [])
 
   // Lazy Load Logic
@@ -227,8 +239,18 @@ export default function InputNilaiPage() {
         {/* SIDEBAR: CONTEXT */}
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-2xl border shadow-sm space-y-5">
-            <div className="flex items-center gap-2 font-bold text-slate-800 border-b pb-3 text-sm uppercase tracking-wider">
-              <LayoutGrid className="w-4 h-4 text-blue-500"/> Filter Konteks
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2 font-bold text-slate-800 text-sm uppercase tracking-wider">
+                <LayoutGrid className="w-4 h-4 text-blue-500"/> Filter Konteks
+              </div>
+              <button 
+                onClick={fetchRef} 
+                disabled={isInitializing}
+                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500 transition-colors"
+                title="Refresh Data"
+              >
+                <Loader2 className={`w-3.5 h-3.5 ${isInitializing ? 'animate-spin' : ''}`} />
+              </button>
             </div>
             
             <div className="space-y-4">

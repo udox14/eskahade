@@ -3,35 +3,32 @@
 import { query, execute, batch, generateId } from '@/lib/db'
 import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
+import { getKelasList } from '@/app/dashboard/master/kelas/actions'
 
 export async function getReferensiData() {
   try {
-    // Jalankan parallel agar lebih cepat
-    const [mapel, kelasRaw] = await Promise.all([
-      getCachedMapelList().catch(err => {
-        console.error("Error fetching mapel list:", err)
-        return []
-      }),
-      query<any>(`
-        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
-        FROM kelas k
-        LEFT JOIN marhalah m ON m.id = k.marhalah_id
-      `, []).catch(err => {
-        console.error("Error fetching kelas list:", err)
-        return []
-      })
-    ])
+    console.log("Fetching referensi data for input nilai (Bypassing cache for test)...");
     
-    const kelas = Array.isArray(kelasRaw) 
-      ? [...kelasRaw].sort((a: any, b: any) =>
-          String(a.nama_kelas).localeCompare(String(b.nama_kelas), undefined, { numeric: true, sensitivity: 'base' })
-        )
-      : []
+    // Jalankan parallel agar lebih cepat
+    const [mapel, kelas] = await Promise.all([
+      // Bypass cache sementara untuk test
+      query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama').catch(err => {
+        console.error("Error fetching mapel list direct:", err);
+        return [];
+      }),
+      getKelasList().catch(err => {
+        console.error("Error fetching kelas list via master action:", err);
+        return [];
+      })
+    ]);
+    
+    console.log(`Fetched ${mapel?.length || 0} mapel and ${kelas?.length || 0} kelas using shared action.`);
+    
+    return { mapel: mapel || [], kelas: kelas || [] };
 
-    return { mapel: mapel || [], kelas }
   } catch (err) {
-    console.error("Fatal error in getReferensiData:", err)
-    return { mapel: [], kelas: [] }
+    console.error("Fatal error in getReferensiData:", err);
+    return { mapel: [], kelas: [] };
   }
 }
 
