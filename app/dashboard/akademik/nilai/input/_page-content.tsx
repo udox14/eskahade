@@ -29,6 +29,7 @@ import {
   simpanCatatanWali,
   KEPRIBADIAN_FIELDS
 } from './actions'
+import { getKelasListForLeger } from '@/app/dashboard/akademik/leger/actions'
 import { toast } from 'sonner'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
@@ -55,17 +56,13 @@ export default function InputNilaiPage() {
 
   const fetchRef = async () => {
     setIsInitializing(true)
-    try {
-      const data = await getReferensiData()
-      setRefData(data)
-      if (data.kelas.length > 0) {
-        toast.success(`Berhasil memuat ${data.kelas.length} kelas.`)
-      }
-    } catch (err) {
-      toast.error("Gagal memuat data referensi.")
-    } finally {
-      setIsInitializing(false)
-    }
+    // Gunakan action yang sama persis dengan Leger (terbukti berhasil)
+    const [kelas, mapelData] = await Promise.all([
+      getKelasListForLeger(),
+      getReferensiData().then(d => d.mapel).catch(() => [])
+    ])
+    setRefData({ mapel: mapelData, kelas })
+    setIsInitializing(false)
   }
 
   // Initial load referensi
