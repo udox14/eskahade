@@ -10,7 +10,7 @@ const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIF
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
-const WAKTU_SHORT: Record<Waktu, string> = { shubuh: 'Shb', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
+const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib', isya: 'Isya' }
 const ITEMS_PER_PAGE = 20
 
 // --- Week helpers (Rabu s/d Selasa) ---
@@ -210,55 +210,55 @@ export default function RekapAbsenBerjamaahPage() {
         </div>
 
         {/* CONTROLS */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Week navigator */}
-          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1.5 shadow-sm flex-1 min-w-[220px]">
-            <button onClick={() => setWeekWednesday(m => addDays(m, -7))} className="p-1 hover:bg-slate-100 rounded-lg">
+        <div className="space-y-2">
+          {/* Baris 1: Week navigator full-width */}
+          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-2 shadow-sm w-full">
+            <button onClick={() => setWeekWednesday(m => addDays(m, -7))} className="p-1.5 hover:bg-slate-100 rounded-lg shrink-0">
               <ChevronLeft className="w-4 h-4"/>
             </button>
-            <span className="text-xs font-bold text-slate-700 text-center flex-1">{formatWeekLabel(weekWednesday)}</span>
+            <span className="text-sm font-bold text-slate-700 text-center flex-1">{formatWeekLabel(weekWednesday)}</span>
             <button
               onClick={() => setWeekWednesday(m => addDays(m, 7))}
               disabled={weekWednesday >= thisWeekWednesday()}
-              className="p-1 hover:bg-slate-100 rounded-lg disabled:opacity-30"
+              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 shrink-0"
             >
               <ChevronRight className="w-4 h-4"/>
             </button>
           </div>
 
-          {/* Asrama */}
-          {sessionInfo?.asrama_binaan
-            ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
-                <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
-              </span>
-            : <select value={asrama} onChange={e => setAsrama(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm">
-                {ASRAMA_LIST.map(a => <option key={a}>{a}</option>)}
-              </select>
-          }
+          {/* Baris 2: Asrama + Kamar + Tampilkan */}
+          <div className="flex gap-2 items-center">
+            {sessionInfo?.asrama_binaan
+              ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
+                  <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
+                </span>
+              : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                  className="flex-1 border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm">
+                  {ASRAMA_LIST.map(a => <option key={a}>{a}</option>)}
+                </select>
+            }
 
-          {/* Kamar */}
-          <select
-            value={filterKamar}
-            onChange={e => { setFilterKamar(e.target.value); setPage(1) }}
-            disabled={availableKamars.length === 0}
-            className="border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm disabled:opacity-50"
-          >
-            <option value="Semua">Semua Kamar</option>
-            {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
-          </select>
+            <select
+              value={filterKamar}
+              onChange={e => { setFilterKamar(e.target.value); setPage(1) }}
+              disabled={availableKamars.length === 0}
+              className="flex-1 border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm disabled:opacity-50"
+            >
+              <option value="Semua">Semua Kamar</option>
+              {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+            </select>
 
-          {/* Tampilkan */}
-          <button
-            onClick={load}
-            disabled={loading}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
-              !hasLoaded ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
-            {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-          </button>
+            <button
+              onClick={load}
+              disabled={loading}
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+                !hasLoaded ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
+              {hasLoaded ? 'Perbarui' : 'Tampilkan'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -397,17 +397,17 @@ export default function RekapAbsenBerjamaahPage() {
                                   <button
                                     key={w}
                                     onClick={() => toggleDelete(s.id, tgl, w)}
-                                    title={markedForDelete ? 'Klik untuk batalkan penghapusan' : 'Klik untuk tandai hapus'}
-                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition active:scale-90 select-none ${
+                                    title={markedForDelete ? 'Batalkan penghapusan' : 'Tandai hapus'}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-90 select-none ${
                                       markedForDelete
                                         ? 'bg-slate-100 text-slate-400 line-through border border-dashed border-slate-300'
                                         : 'bg-red-500 text-white hover:bg-red-600'
                                     }`}
                                   >
-                                    {WAKTU_SHORT[w]}
+                                    {WAKTU_LABEL[w]}
                                     {markedForDelete
-                                      ? <X className="w-3 h-3 no-underline"/>
-                                      : <Trash2 className="w-3 h-3"/>
+                                      ? <X className="w-3 h-3 shrink-0 no-underline"/>
+                                      : <Trash2 className="w-3 h-3 shrink-0"/>
                                     }
                                   </button>
                                 )

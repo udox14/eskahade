@@ -21,6 +21,7 @@ export default function AbsensiPage() {
   
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
@@ -53,9 +54,43 @@ export default function AbsensiPage() {
       }
       setGridData(grid)
       setLoading(false)
+      setHasUnsavedChanges(false) // Data baru, belum ada perubahan
       toast.dismiss(loadToast) // Tutup Toast Loading
     })
   }, [selectedKelas, selectedDate])
+
+  // EFFECT UNTUK WARNING KETIKA BELUM SAVE
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    
+    const handleClickAtag = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return
+      
+      const target = (e.target as Element).closest('a')
+      if (target && target.href) {
+        const isInternal = target.href.startsWith(window.location.origin)
+        if (isInternal && !window.confirm("Ada perubahan yang belum disimpan. Yakin ingin keluar dari halaman ini?")) {
+            e.preventDefault()
+            e.stopPropagation()
+        }
+      }
+    }
+
+    if (hasUnsavedChanges) {
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        document.addEventListener('click', handleClickAtag, { capture: true })
+    }
+
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+        document.removeEventListener('click', handleClickAtag, { capture: true })
+    }
+  }, [hasUnsavedChanges])
 
   // Helper: Generate Array 7 Hari (Rabu - Selasa)
   const getDaysArray = () => {
@@ -93,6 +128,7 @@ export default function AbsensiPage() {
     const upperVal = value.toUpperCase()
     if (!['H', 'S', 'I', 'A', ''].includes(upperVal)) return
 
+    setHasUnsavedChanges(true)
     setGridData(prev => ({
       ...prev,
       [santriId]: {
@@ -107,6 +143,7 @@ export default function AbsensiPage() {
 
   // Handler: Isi Satu Baris Full (A/S/I/H)
   const handleFillRow = (santriId: string, value: string) => {
+    setHasUnsavedChanges(true)
     setGridData(prev => {
       const currentSantriData = prev[santriId] ? JSON.parse(JSON.stringify(prev[santriId])) : {}
       
@@ -213,8 +250,19 @@ export default function AbsensiPage() {
     if (res?.error) {
       toast.error("Gagal menyimpan absensi", { description: res.error })
     } else {
+      setHasUnsavedChanges(false)
       toast.success("Alhamdulillah!", { description: "Absensi mingguan berhasil disimpan." })
     }
+  }
+
+  const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin pindah kelas?")) return
+      setSelectedKelas(e.target.value)
+  }
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin ganti tanggal/pekan?")) return
+      setSelectedDate(e.target.value)
   }
 
   // Handler: Export Excel
@@ -417,7 +465,7 @@ export default function AbsensiPage() {
           <select 
             className="p-2 border border-slate-200 rounded-xl w-full md:w-48 focus:ring-2 focus:ring-green-500 outline-none"
             value={selectedKelas}
-            onChange={(e) => setSelectedKelas(e.target.value)}
+            onChange={handleClassChange}
           >
             <option value="">-- Kelas --</option>
             {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
@@ -429,7 +477,7 @@ export default function AbsensiPage() {
             type="date" 
             className="p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={handleDateChange}
           />
         </div>
         <div className="text-sm text-slate-500 pb-2">
@@ -447,10 +495,10 @@ export default function AbsensiPage() {
       ) : (
         <div className="bg-white border rounded-xl shadow-sm">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-100">
+            <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
               <tr>
-                <th className="p-3 text-left border w-48">Nama Santri</th>
-                <th className="p-2 text-center border w-32">Aksi Cepat</th>
+                <th className="p-3 text-left border w-48 bg-slate-100">Nama Santri</th>
+                <th className="p-2 text-center border w-32 bg-slate-100">Aksi Cepat</th>
                 {days.map(day => {
                   const activeCount = SESSIONS.filter(s => !isHoliday(day.label, s)).length;
                   if (activeCount === 0) return null;

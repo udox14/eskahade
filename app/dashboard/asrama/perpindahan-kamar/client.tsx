@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import {
   Home, Settings, Play, CheckCircle, RotateCcw, Users, Crown,
@@ -31,6 +31,84 @@ function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
   if (isi > kuota) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">Over</span>
   if (isi === kuota) return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 font-semibold">Penuh</span>
   return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-600 font-semibold">Normal</span>
+}
+
+// ── Combobox Ketua Kamar ──────────────────────────────────────────────────────
+function ComboboxKetuaKamar({
+  candidates,
+  value,
+  onChange,
+  placeholder = "— Pilih Ketua —",
+}: {
+  candidates: { id: string; nama_lengkap: string; kelas_sekolah: string | null }[];
+  value: string;
+  onChange: (val: string | null) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = candidates.filter(c =>
+    c.nama_lengkap.toLowerCase().includes(search.toLowerCase())
+  );
+  const selected = candidates.find(c => c.id === value);
+
+  return (
+    <div className="relative w-full" ref={ref}>
+      <div
+        onClick={() => setOpen(!open)}
+        className="w-full bg-white border border-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg cursor-pointer flex justify-between items-center text-xs font-semibold shadow-sm hover:border-slate-300 transition-colors"
+      >
+        <span className="truncate">{selected ? `${selected.nama_lengkap} ${selected.kelas_sekolah ? `(Kls ${selected.kelas_sekolah})` : ''}` : placeholder}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-xl rounded-lg flex flex-col overflow-hidden max-h-56 text-xs">
+          <div className="p-1.5 border-b border-inherit bg-slate-50 flex items-center">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Cari nama..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-2 py-1.5 bg-transparent outline-none border-none text-xs text-slate-800"
+            />
+          </div>
+          <div className="overflow-y-auto max-h-48">
+            <div
+              onClick={() => { onChange(null); setOpen(false); setSearch(''); }}
+              className="px-3 py-2.5 cursor-pointer hover:bg-slate-100 text-slate-500 hover:text-red-600 font-bold border-b border-inherit transition-colors"
+            >
+              {placeholder}
+            </div>
+            {filtered.map(c => (
+              <div
+                key={c.id}
+                onClick={() => { onChange(c.id); setOpen(false); setSearch(''); }}
+                className="px-3 py-2 cursor-pointer hover:bg-amber-50 flex justify-between items-center group transition-colors"
+              >
+                <span className="text-slate-700 font-medium group-hover:text-amber-700 truncate">{c.nama_lengkap}</span>
+                <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">{c.kelas_sekolah ? `Kls ${c.kelas_sekolah}` : ''}</span>
+              </div>
+            ))}
+            {filtered.length === 0 && <div className="p-3 text-center text-slate-400">Tidak ditemukan</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -457,16 +535,11 @@ export default function PerpindahanClient({
                             return (
                               <div key={cfg.nomor_kamar} className="bg-white p-2.5 rounded-lg border border-amber-200">
                                 <div className="text-[11px] font-bold text-slate-500 mb-1.5 uppercase">Kamar {cfg.nomor_kamar}</div>
-                                <select value={ketua?.santri_id || ''}
-                                  onChange={e => handleSetKetua(cfg.nomor_kamar, e.target.value || null)}
-                                  className="w-full text-xs font-semibold border-slate-200 rounded py-1.5 outline-none text-slate-800 cursor-pointer">
-                                  <option value="">— Pilih Ketua —</option>
-                                  {santriList.map(s => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.nama_lengkap} {s.kelas_sekolah ? `(Kls ${s.kelas_sekolah})` : ''}
-                                    </option>
-                                  ))}
-                                </select>
+                                <ComboboxKetuaKamar
+                                  candidates={santriList}
+                                  value={ketua?.santri_id || ''}
+                                  onChange={(val) => handleSetKetua(cfg.nomor_kamar, val)}
+                                />
                               </div>
                             )
                           })}
@@ -563,14 +636,13 @@ export default function PerpindahanClient({
                           <div className="px-3 py-2 border-b border-inherit bg-amber-50/50">
                             <div className="flex items-center gap-1.5">
                               <Crown className="w-3 h-3 text-amber-500 shrink-0"/>
-                              <select value={ketua?.santri_id || ''}
-                                onChange={e => handleSetKetua(cfg.nomor_kamar, e.target.value || null)}
-                                className="flex-1 text-xs border-0 bg-transparent outline-none text-amber-700 font-semibold cursor-pointer truncate">
-                                <option value="">— Pilih Ketua —</option>
-                                {santriKamar.map(s => (
-                                  <option key={s.id} value={s.id}>{s.nama_lengkap}</option>
-                                ))}
-                              </select>
+                              <div className="flex-1 min-w-0 pr-1">
+                                <ComboboxKetuaKamar
+                                  candidates={santriKamar}
+                                  value={ketua?.santri_id || ''}
+                                  onChange={(val) => handleSetKetua(cfg.nomor_kamar, val)}
+                                />
+                              </div>
                             </div>
                           </div>
 

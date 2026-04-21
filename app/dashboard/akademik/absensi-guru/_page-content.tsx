@@ -22,14 +22,50 @@ export default function AbsensiGuruPage() {
   const [gridData, setGridData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Init Marhalah
   useEffect(() => {
     getMarhalahList().then(setMarhalahList)
   }, [])
 
+  // EFFECT UNTUK WARNING KETIKA BELUM SAVE
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    
+    const handleClickAtag = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return
+      
+      const target = (e.target as Element).closest('a')
+      if (target && target.href) {
+        const isInternal = target.href.startsWith(window.location.origin)
+        if (isInternal && !window.confirm("Ada perubahan yang belum disimpan. Yakin ingin keluar dari halaman ini?")) {
+            e.preventDefault()
+            e.stopPropagation()
+        }
+      }
+    }
+
+    if (hasUnsavedChanges) {
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        document.addEventListener('click', handleClickAtag, { capture: true })
+    }
+
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+        document.removeEventListener('click', handleClickAtag, { capture: true })
+    }
+  }, [hasUnsavedChanges])
+
   // Load Data
   const loadData = async () => {
+    if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin menampilkan data baru?")) return
+    
     setLoading(true)
     const days = getDaysArray(selectedDate)
     const res = await getJurnalGuru(days[0].dateStr, days[6].dateStr, selectedMarhalah)
@@ -38,6 +74,7 @@ export default function AbsensiGuruPage() {
     setGridData(res.absensi)
     setLoading(false)
     setHasLoaded(true)
+    setHasUnsavedChanges(false)
   }
 
   // --- LOGIC 1: ARRAY HARI ---
@@ -129,6 +166,7 @@ export default function AbsensiGuruPage() {
     // Validasi input: hanya H, A, S, I, B, L atau kosong
     if (!['H', 'A', 'S', 'I', 'B', 'L', ''].includes(upperVal)) return
     
+    setHasUnsavedChanges(true)
     const key = `${kelasId}-${dateStr}`
     setGridData(prev => ({
       ...prev,
@@ -166,7 +204,10 @@ export default function AbsensiGuruPage() {
     toast.dismiss(loadToast)
 
     if (res?.error) toast.error("Gagal menyimpan", { description: res.error })
-    else toast.success("Jurnal Tersimpan!")
+    else {
+        setHasUnsavedChanges(false)
+        toast.success("Jurnal Tersimpan!")
+    }
   }
 
   // --- KEYBOARD NAVIGATION (MEMOIZED) ---
@@ -272,21 +313,21 @@ export default function AbsensiGuruPage() {
         <span className="ml-auto italic">* Navigasi panah kanan/kiri terkunci per baris</span>
       </div>
 
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
+      <div className="bg-white border rounded-xl shadow-sm">
         {!hasLoaded ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <div className="flex flex-col items-center justify-center p-12 text-slate-400">
                 <Search className="w-16 h-16 mb-4 text-slate-200"/>
                 <p>Silakan pilih tingkat dan tanggal, lalu klik <b>Tampilkan</b>.</p>
             </div>
         ) : loading ? (
              <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500"/></div>
         ) : (
-             <div className="overflow-auto flex-1">
+             <div>
              <table className="w-full text-sm border-collapse">
-                <thead className="bg-slate-100 sticky top-0 z-20 shadow-sm">
+                <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
                    <tr>
-                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 sticky left-0 z-30 w-48 min-w-[12rem] shadow-sm">Kelas</th>
-                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 z-30 w-48 min-w-[12rem] shadow-sm md:sticky md:left-48">Guru Pengajar</th>
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 w-48">Kelas</th>
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 w-48">Guru Pengajar</th>
                       {SESSIONS.map(sess => {
                            const sessDays = days.filter(d => !isLibur(d.dayName, sess))
                            return (
