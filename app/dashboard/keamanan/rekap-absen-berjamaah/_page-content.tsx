@@ -1,69 +1,90 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSessionRekap, getRekapAbsenBerjamaah, getKamarList } from '../rekap-asrama/actions'
+import { getSessionRekap, getRekapBerjamaahAlfaRange, getKamarList, getSantriByAsrama, deleteAbsenBerjamaahRecords } from '../rekap-asrama/actions'
 import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
-import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
+import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
+const WAKTU_SHORT: Record<Waktu, string> = { shubuh: 'Shb', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
+const ITEMS_PER_PAGE = 20
 
-const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shb', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
-
-const STATUS_COLOR: Record<string, string> = {
-  'A': 'bg-red-500 text-white',
-  'S': 'bg-orange-400 text-white',
-  'H': 'bg-purple-400 text-white',
-  'P': 'bg-blue-400 text-white',
+// --- Week helpers (Rabu s/d Selasa) ---
+function toDateStr(d: Date): string {
+  return d.toISOString().split('T')[0]
 }
-
-function bulanIni() { return new Date().toISOString().slice(0, 7) }
-function getDaysInMonth(bulan: string) {
-  const [y, m] = bulan.split('-').map(Number)
-  return new Date(y, m, 0).getDate()
+// Cari Rabu sebelumnya (atau hari ini jika sudah Rabu)
+function getWednesdayOfWeek(d: Date): Date {
+  const day = d.getDay() // 0=Min,1=Sen,2=Sel,3=Rab,4=Kam,5=Jum,6=Sab
+  // Jarak ke Rabu terdekat sebelumnya: Rab=0, Kam=-1... Sel=+1... Min=+2 (maju ke belakang)
+  const diff = day >= 3 ? day - 3 : day + 4  // hari - 3, tapi kalau < 3 tambah 7 dulu
+  // diff = berapa hari sejak Rabu terakhir
+  const wednesday = new Date(d)
+  wednesday.setDate(d.getDate() - diff)
+  wednesday.setHours(0, 0, 0, 0)
+  return wednesday
 }
-function formatBulan(bulan: string) {
-  const [y, m] = bulan.split('-').map(Number)
-  return new Date(y, m - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+function thisWeekWednesday(): string {
+  return toDateStr(getWednesdayOfWeek(new Date()))
 }
-function prevBulan(b: string) {
-  const [y, m] = b.split('-').map(Number)
-  return new Date(y, m - 2).toISOString().slice(0, 7)
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr)
+  d.setDate(d.getDate() + n)
+  return toDateStr(d)
 }
-function nextBulan(b: string) {
-  const [y, m] = b.split('-').map(Number)
-  return new Date(y, m).toISOString().slice(0, 7)
+function weekEnd(wednesday: string): string {
+  return addDays(wednesday, 6) // Selasa
+}
+function formatWeekLabel(wednesday: string): string {
+  const start = new Date(wednesday)
+  const end = new Date(addDays(wednesday, 6))
+  const s = start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+  const e = end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  return `${s} – ${e}`
+}
+function formatDayLabel(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 export default function RekapAbsenBerjamaahPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
-  const [bulan, setBulan] = useState(bulanIni())
+  const [weekWednesday, setWeekWednesday] = useState(thisWeekWednesday())
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [filterKamar, setFilterKamar] = useState('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
+  const [allSantri, setAllSantri] = useState<any[]>([])
+  const [page, setPage] = useState(1)
 
-  const [bjSantri, setBjSantri] = useState<any[]>([])
-  const [bjDetail, setBjDetail] = useState<Record<string, Record<string, any>>>({})
+  const [santriList, setSantriList] = useState<any[]>([])
+  const [detail, setDetail] = useState<Record<string, Record<string, any>>>({})
+
+  // pendingDeletes: set of "santriId|tanggal|waktu"
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
 
   const sessionInfoRef = useRef<any>(null)
   const asramaRef = useRef(asrama)
-  const bulanRef = useRef(bulan)
+  const weekWednesdayRef = useRef(weekWednesday)
 
   useEffect(() => {
     asramaRef.current = asrama
     setFilterKamar('Semua')
+    setPage(1)
     getKamarList(asrama).then(k => setAvailableKamars(k))
+    getSantriByAsrama(asrama).then(s => setAllSantri(s))
   }, [asrama])
-  useEffect(() => { bulanRef.current = bulan }, [bulan])
+
+  useEffect(() => { weekWednesdayRef.current = weekWednesday }, [weekWednesday])
 
   const [sessionReady, setSessionReady] = useState(false)
-
   useEffect(() => {
     getSessionRekap().then(s => {
       setSessionInfo(s)
@@ -77,268 +98,354 @@ export default function RekapAbsenBerjamaahPage() {
   }, [])
 
   useEffect(() => {
-    if (sessionReady && sessionInfoRef.current?.asrama_binaan) {
-      load()
-    }
+    if (sessionReady && sessionInfoRef.current?.asrama_binaan) load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionReady])
 
   async function load() {
     setLoading(true)
+    setPendingDeletes(new Set())
+    setPage(1)
     try {
-      const si = sessionInfoRef.current
-      const hideHaid = !si?.isPutri || si?.role === 'keamanan'
-      const bj = await getRekapAbsenBerjamaah(asramaRef.current, bulanRef.current, hideHaid)
-      setBjSantri(bj.santriList)
-      setBjDetail(bj.detail)
+      const wednesday = weekWednesdayRef.current
+      const end = weekEnd(wednesday)
+      const data = await getRekapBerjamaahAlfaRange(asramaRef.current, wednesday, end)
+      setSantriList(data.santriList)
+      setDetail(data.detail)
       setHasLoaded(true)
-    } catch (error: any) {
-      console.error(error)
-      alert("Gagal memuat rekap absen berjamaah. Error: " + (error?.message || "Unknown error"))
+    } catch (err: any) {
+      toast.error("Gagal memuat data: " + (err?.message || "Unknown error"))
     } finally {
       setLoading(false)
     }
   }
 
-  const days = getDaysInMonth(bulan)
-  const daysArr = Array.from({ length: days }, (_, i) => {
-    const d = String(i + 1).padStart(2, '0')
-    return `${bulan}-${d}`
-  })
+  function toggleDelete(santriId: string, tanggal: string, waktu: string) {
+    const key = `${santriId}|${tanggal}|${waktu}`
+    setPendingDeletes(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
-  const grouped = (list: any[]) => list.reduce((acc, s) => {
-    const k = s.kamar || 'Tanpa Kamar'
-    if (!acc[k]) acc[k] = []
-    acc[k].push(s)
-    return acc
-  }, {} as Record<string, any[]>)
-
-  const sortedKamars = (list: any[]) =>
-    Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+  async function handleSave() {
+    if (pendingDeletes.size === 0) return
+    setSaving(true)
+    try {
+      const records = Array.from(pendingDeletes).map(key => {
+        const [santriId, tanggal, waktu] = key.split('|')
+        return { santriId, tanggal, waktu }
+      })
+      const res = await deleteAbsenBerjamaahRecords(records)
+      if (res?.success) {
+        toast.success(`${res.count} record alfa berhasil dihapus.`)
+        await load()
+      } else {
+        toast.error("Gagal menyimpan perubahan")
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Terjadi kesalahan")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
 
-  const filteredSantri = bjSantri.filter(s => {
+  const daysArr = Array.from({ length: 7 }, (_, i) => addDays(weekWednesday, i))
+
+  // Filter
+  const filteredSantri = santriList.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
-    const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
+    const matchSearch = !searchQuery
+      || s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase())
+      || (s.nis || '').includes(searchQuery)
     return matchKamar && matchSearch
   })
 
+  const totalPages = Math.ceil(filteredSantri.length / ITEMS_PER_PAGE)
+  const paginated = filteredSantri.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
+  // Count total active alfa (excluding pending deletes)
+  const totalAlfa = filteredSantri.reduce((sum, s) => {
+    const d = detail[s.id] || {}
+    return sum + Object.entries(d).reduce((daySum, [tgl, dayData]) => {
+      return daySum + WAKTU.filter(w => {
+        return dayData[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)
+      }).length
+    }, 0)
+  }, 0)
+
+  function getSantriAlfaDays(santriId: string) {
+    const d = detail[santriId] || {}
+    return daysArr.filter(tgl => {
+      const dayData = d[tgl]
+      if (!dayData) return false
+      return WAKTU.some(w => dayData[w] === 'A')
+    })
+  }
+
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-16">
+    <div className="space-y-4 max-w-3xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Flame className="w-7 h-7 text-teal-600"/> Rekap Absen Berjamaah
-          </h1>
-          <p className="text-sm text-slate-500">Rekap shalat berjamaah per bulan</p>
+      <div className="flex flex-col gap-3 border-b pb-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Flame className="w-6 h-6 text-teal-600"/> Rekap Absen Berjamaah
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">Verifikasi alfa shalat berjamaah per minggu</p>
+          </div>
+          {hasLoaded && !loading && !isPutri && (
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-xl font-bold text-xs hover:bg-teal-100 active:scale-95 transition"
+            >
+              <Upload className="w-3.5 h-3.5"/> Import Excel
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+
+        {/* CONTROLS */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Week navigator */}
+          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1.5 shadow-sm flex-1 min-w-[220px]">
+            <button onClick={() => setWeekWednesday(m => addDays(m, -7))} className="p-1 hover:bg-slate-100 rounded-lg">
               <ChevronLeft className="w-4 h-4"/>
             </button>
-            <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <button onClick={() => setBulan(b => nextBulan(b))} disabled={bulan >= bulanIni()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+            <span className="text-xs font-bold text-slate-700 text-center flex-1">{formatWeekLabel(weekWednesday)}</span>
+            <button
+              onClick={() => setWeekWednesday(m => addDays(m, 7))}
+              disabled={weekWednesday >= thisWeekWednesday()}
+              className="p-1 hover:bg-slate-100 rounded-lg disabled:opacity-30"
+            >
               <ChevronRight className="w-4 h-4"/>
             </button>
           </div>
 
+          {/* Asrama */}
           {sessionInfo?.asrama_binaan
-            ? <span className="bg-teal-100 text-teal-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
+            ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
                 <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
               </span>
             : <select value={asrama} onChange={e => setAsrama(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm">
-                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+                className="border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm">
+                {ASRAMA_LIST.map(a => <option key={a}>{a}</option>)}
               </select>
           }
 
+          {/* Kamar */}
           <select
             value={filterKamar}
-            onChange={e => setFilterKamar(e.target.value)}
+            onChange={e => { setFilterKamar(e.target.value); setPage(1) }}
             disabled={availableKamars.length === 0}
-            className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
+            className="border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm disabled:opacity-50"
           >
             <option value="Semua">Semua Kamar</option>
             {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
           </select>
 
+          {/* Tampilkan */}
           <button
             onClick={load}
             disabled={loading}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
               !hasLoaded ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
-              : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
-            }
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
+            {hasLoaded ? 'Perbarui' : 'Tampilkan'}
           </button>
         </div>
       </div>
 
-      {/* FILTER CARI & IMPORT */}
-      {hasLoaded && !loading && (
-        <div className="flex gap-2 justify-end flex-wrap">
-          {!isPutri && (
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="flex shrink-0 items-center justify-center gap-2 px-3 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-xl font-bold shadow-sm hover:bg-teal-100 active:scale-95 transition text-sm"
-              title="Import Excel Mesin Fingerprint"
-            >
-              <Upload className="w-4 h-4"/>
-              <span className="hidden lg:block">Import Excel</span>
-            </button>
-          )}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari nama santri..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* KONTEN */}
-      {!hasLoaded && !loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-teal-50 flex items-center justify-center">
-            <Flame className="w-10 h-10 text-teal-300"/>
+      {/* EMPTY / LOADING */}
+      {!hasLoaded && !loading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-teal-50 flex items-center justify-center">
+            <Flame className="w-8 h-8 text-teal-300"/>
           </div>
           <div>
-            <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
-            <p className="text-sm text-slate-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
+            <p className="font-bold text-slate-500">Data belum dimuat</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih asrama & minggu lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
           <button onClick={load}
-            className="mt-1 bg-teal-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-teal-700 active:scale-95 transition-all shadow">
+            className="bg-teal-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 active:scale-95 transition shadow">
             Tampilkan Sekarang
           </button>
         </div>
+      )}
 
-      ) : loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-10 h-10 animate-spin text-teal-400"/>
+      {loading && (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-400"/>
         </div>
+      )}
 
-      ) : (
-        <div className="space-y-4">
-          {filteredSantri.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
-              Tidak ada data absen berjamaah untuk filter ini.
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-3">
-                {WAKTU.map(w => {
-                  const alfa = filteredSantri.reduce((s, santri) => {
-                    return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] === 'A').length
-                  }, 0)
-                  return (
-                    <div key={w} className="bg-white border rounded-xl p-3 text-center shadow-sm">
-                      <p className="text-sm text-slate-500 font-semibold capitalize">{w}</p>
-                      <p className="text-xl font-black text-red-600 tabular-nums">{alfa}</p>
-                      <p className="text-[10px] text-slate-400">alfa bulan ini</p>
-                    </div>
-                  )
-                })}
+      {hasLoaded && !loading && (
+        <>
+          {/* SUMMARY + SEARCH */}
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex gap-2">
+              <div className="bg-white border rounded-xl px-3 py-2 text-center shadow-sm min-w-[80px]">
+                <p className="text-lg font-black text-slate-800">{filteredSantri.length}</p>
+                <p className="text-[10px] text-slate-400">Santri Alfa</p>
               </div>
+              <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-center shadow-sm min-w-[80px]">
+                <p className="text-lg font-black text-red-600">{totalAlfa}</p>
+                <p className="text-[10px] text-red-400">Total Alfa</p>
+              </div>
+              {pendingDeletes.size > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 text-center shadow-sm min-w-[80px]">
+                  <p className="text-lg font-black text-orange-600">{pendingDeletes.size}</p>
+                  <p className="text-[10px] text-orange-400">Akan Dihapus</p>
+                </div>
+              )}
+            </div>
 
-              {sortedKamars(filteredSantri).map(kamar => {
-                const santriKamar = grouped(filteredSantri)[kamar]
+            <div className="flex gap-2 items-center flex-1 min-w-[200px] justify-end">
+              <div className="relative flex-1 max-w-[200px]">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+                <input
+                  type="text"
+                  placeholder="Cari santri..."
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setPage(1) }}
+                  className="w-full pl-8 pr-3 py-2 text-xs border rounded-xl outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SAVE BANNER */}
+          {pendingDeletes.size > 0 && (
+            <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 gap-3">
+              <p className="text-sm font-bold text-orange-700">
+                {pendingDeletes.size} alfa ditandai untuk dihapus
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPendingDeletes(new Set())}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border rounded-xl hover:bg-slate-50 flex items-center gap-1"
+                >
+                  <X className="w-3 h-3"/> Batal
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* NO DATA */}
+          {filteredSantri.length === 0 && (
+            <div className="py-16 text-center text-slate-400 bg-white border rounded-2xl">
+              <Flame className="w-8 h-8 mx-auto text-slate-200 mb-3"/>
+              <p className="font-semibold">Tidak ada santri alfa minggu ini</p>
+              <p className="text-sm mt-1">Coba pilih minggu lain atau impor data absensi.</p>
+            </div>
+          )}
+
+          {/* SANTRI CARDS */}
+          {paginated.length > 0 && (
+            <div className="space-y-3">
+              {paginated.map(s => {
+                const alfaDays = getSantriAlfaDays(s.id)
+                const activeAlfaCount = alfaDays.reduce((sum, tgl) => {
+                  const dayData = detail[s.id]?.[tgl] || {}
+                  return sum + WAKTU.filter(w => dayData[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)).length
+                }, 0)
+
                 return (
-                  <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                    <div className="bg-teal-900 text-white px-4 py-2.5 flex justify-between items-center">
-                      <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
-                      <span className="text-xs text-teal-300">{santriKamar.length} santri</span>
+                  <div key={s.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition ${activeAlfaCount === 0 ? 'opacity-60' : ''}`}>
+                    {/* Card Header */}
+                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50 border-b">
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{s.nama_lengkap}</p>
+                        <p className="text-[11px] text-slate-400">{s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar'}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs font-black px-2 py-1 rounded-full ${activeAlfaCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                          {activeAlfaCount} alfa
+                        </span>
+                      </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs min-w-[600px]">
-                        <thead className="bg-slate-50 border-b">
-                          <tr>
-                            <th className="px-3 py-2 text-left sticky left-0 bg-slate-50 z-10 w-36">Nama</th>
-                            {WAKTU.map(w => (
-                              <th key={w} className="px-1 py-2 text-center font-bold text-slate-500 w-10">{WAKTU_LABEL[w]}</th>
-                            ))}
-                            {daysArr.map(d => (
-                              <th key={d} className="px-0.5 py-2 text-center text-slate-400 font-normal w-5 text-[10px]">{d.slice(8)}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {santriKamar.map((s: any) => {
-                            const detail = bjDetail[s.id] || {}
-                            const counts: Record<Waktu, Record<string, number>> = {
-                              shubuh: {}, ashar: {}, maghrib: {}, isya: {}
-                            }
-                            Object.values(detail).forEach((d: any) => {
-                              WAKTU.forEach(w => {
-                                if (d[w]) counts[w][d[w]] = (counts[w][d[w]] || 0) + 1
-                              })
-                            })
-                            return (
-                              <tr key={s.id} className="hover:bg-slate-50">
-                                <td className="px-3 py-2 sticky left-0 bg-white z-10">
-                                  <p className="font-semibold text-slate-800 truncate max-w-[130px]">{s.nama_lengkap}</p>
-                                </td>
-                                {WAKTU.map(w => {
-                                  const a = counts[w]['A'] || 0
-                                  const nonH = Object.values(counts[w]).reduce((s, v) => s + v, 0)
-                                  return (
-                                    <td key={w} className="px-1 py-2 text-center">
-                                      {a > 0
-                                        ? <span className="inline-block bg-red-500 text-white font-black text-[9px] px-1 py-0.5 rounded-full min-w-[16px]">{a}</span>
-                                        : nonH > 0
-                                          ? <span className="inline-block bg-orange-200 text-orange-700 font-bold text-[9px] px-1 py-0.5 rounded-full min-w-[16px]">{nonH}</span>
-                                          : <span className="text-slate-200">—</span>
-                                      }
-                                    </td>
-                                  )
-                                })}
-                                {daysArr.map(d => {
-                                  const dayData = detail[d]
-                                  const hasIssue = dayData && WAKTU.some(w => dayData[w] !== null)
-                                  if (!hasIssue) return (
-                                    <td key={d} className="px-0.5 py-2 text-center">
-                                      <span className="text-slate-200 text-[9px]">·</span>
-                                    </td>
-                                  )
-                                  return (
-                                    <td key={d} className="px-0.5 py-1 text-center">
-                                      <div className="flex flex-col gap-0.5 items-center">
-                                        {WAKTU.map(w => {
-                                          const st = dayData?.[w]
-                                          if (!st) return null
-                                          return (
-                                            <span key={w} className={`inline-block text-[8px] font-black w-4 h-4 rounded leading-4 text-center ${STATUS_COLOR[st] || 'bg-slate-200 text-slate-600'}`}>
-                                              {st}
-                                            </span>
-                                          )
-                                        })}
-                                      </div>
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+
+                    {/* Days */}
+                    <div className="divide-y">
+                      {alfaDays.map(tgl => {
+                        const dayData = detail[s.id]?.[tgl] || {}
+                        const alfaWaktus = WAKTU.filter(w => dayData[w] === 'A')
+                        if (alfaWaktus.length === 0) return null
+
+                        return (
+                          <div key={tgl} className="px-4 py-3 flex items-center gap-3">
+                            <p className="text-xs text-slate-500 font-semibold w-24 shrink-0">{formatDayLabel(tgl)}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {alfaWaktus.map(w => {
+                                const delKey = `${s.id}|${tgl}|${w}`
+                                const markedForDelete = pendingDeletes.has(delKey)
+                                return (
+                                  <button
+                                    key={w}
+                                    onClick={() => toggleDelete(s.id, tgl, w)}
+                                    title={markedForDelete ? 'Klik untuk batalkan penghapusan' : 'Klik untuk tandai hapus'}
+                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition active:scale-90 select-none ${
+                                      markedForDelete
+                                        ? 'bg-slate-100 text-slate-400 line-through border border-dashed border-slate-300'
+                                        : 'bg-red-500 text-white hover:bg-red-600'
+                                    }`}
+                                  >
+                                    {WAKTU_SHORT[w]}
+                                    {markedForDelete
+                                      ? <X className="w-3 h-3 no-underline"/>
+                                      : <Trash2 className="w-3 h-3"/>
+                                    }
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
               })}
-            </>
+            </div>
           )}
-        </div>
+
+          {/* PAGINATION */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 pt-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-slate-50 disabled:opacity-30 flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5"/> Prev
+              </button>
+              <span className="text-xs text-slate-500 font-semibold">
+                {page} / {totalPages} &nbsp;·&nbsp; {filteredSantri.length} santri
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-slate-50 disabled:opacity-30 flex items-center gap-1"
+              >
+                Next <ChevronRight className="w-3.5 h-3.5"/>
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {showImportModal && (
@@ -346,7 +453,7 @@ export default function RekapAbsenBerjamaahPage() {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={() => load()}
-          santriList={bjSantri}
+          santriList={allSantri}
         />
       )}
     </div>

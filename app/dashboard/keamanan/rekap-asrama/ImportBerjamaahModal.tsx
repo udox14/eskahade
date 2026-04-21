@@ -248,35 +248,16 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
   const handleMulaiImport = async () => {
     setLoading(true)
     try {
-      // 1. Build list of "Hadir" (berdasarkan ID)
-      const hadirSet = new Set<string>() // format: id|tanggal|waktu
-      const activeSessions = new Set<string>() // format: tanggal|waktu
-
-      parsedRaw.forEach(log => {
-        let assignedId = mappings[log.nama]
-        // Jika user sengaja abaikan (assignedId = ""), log ini tidak tercatat hadir.
-        if (assignedId) {
-          hadirSet.add(`${assignedId}|${log.tanggal}|${log.waktu}`)
-          activeSessions.add(`${log.tanggal}|${log.waktu}`)
-        }
-      })
-
-      // 2. Build list of "Alfa": santri active yang ga ada di hadirSet
+      // Nama yang ada di Excel = ALFA langsung
       const alfaRowsMap: Record<string, { santri_id: string, tanggal: string, shubuh?: 'A', ashar?: 'A' }> = {}
 
-      activeSessions.forEach(sess => {
-        const [tanggal, waktu] = sess.split('|')
-        santriList.forEach(santri => {
-          const key = `${santri.id}|${tanggal}`
-          if (!hadirSet.has(`${santri.id}|${tanggal}|${waktu}`)) {
-            // Ini dia Alfa
-            if (!alfaRowsMap[key]) {
-              alfaRowsMap[key] = { santri_id: santri.id, tanggal }
-            }
-            if (waktu === 'shubuh') alfaRowsMap[key].shubuh = 'A'
-            if (waktu === 'ashar') alfaRowsMap[key].ashar = 'A'
-          }
-        })
+      parsedRaw.forEach(log => {
+        const santriId = mappings[log.nama]
+        if (!santriId) return // Diabaikan user atau tidak ter-mapping
+        const key = `${santriId}|${log.tanggal}`
+        if (!alfaRowsMap[key]) alfaRowsMap[key] = { santri_id: santriId, tanggal: log.tanggal }
+        if (log.waktu === 'shubuh') alfaRowsMap[key].shubuh = 'A'
+        if (log.waktu === 'ashar') alfaRowsMap[key].ashar = 'A'
       })
 
       const finalAlfaRows = Object.values(alfaRowsMap)
@@ -315,8 +296,8 @@ export default function ImportBerjamaahModal({ isOpen, onClose, onSuccess, santr
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-xl text-sm leading-relaxed">
                 <AlertCircle className="w-5 h-5 inline mr-2 -mt-1"/>
-                Sistem hanya akan membaca kolom: <strong>Nama</strong>, <strong>Tanggal</strong>, dan <strong>waktu</strong>. 
-                Sistem menangkap status Hadir setiap ada baris waktu SUBUH/ASHAR. Santri yang tidak terekam otomatis dihitung ALFA.
+                Sistem hanya akan membaca kolom: <strong>Nama</strong>, <strong>Tanggal</strong>, dan <strong>waktu</strong>.
+                Setiap nama yang muncul di Excel <strong>dianggap ALFA</strong>. Yang tidak ada di file = hadir.
               </div>
               <div className="border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-2xl p-10 text-center relative group hover:bg-indigo-50/50 transition">
                 <input 

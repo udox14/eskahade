@@ -96,6 +96,88 @@ export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hide
   return { santriList, detail }
 }
 
+export async function getSantriByAsrama(asrama: string) {
+  return query<any>(`
+    SELECT id, nama_lengkap, nis, kamar FROM santri
+    WHERE asrama = ? AND status_global = 'aktif'
+    ORDER BY CAST(kamar AS INTEGER), nama_lengkap
+  `, [asrama])
+}
+
+// Rekap berjamaah per rentang tanggal, hanya santri yang punya alfa
+export async function getRekapBerjamaahAlfaRange(asrama: string, startDate: string, endDate: string) {
+  const rows = await query<any>(`
+    SELECT s.id, s.nama_lengkap, s.nis, s.kamar,
+           a.tanggal, a.shubuh, a.ashar, a.maghrib, a.isya
+    FROM absen_berjamaah a
+    JOIN santri s ON a.santri_id = s.id
+    WHERE a.tanggal >= ? AND a.tanggal <= ?
+      AND s.asrama = ? AND s.status_global = 'aktif'
+      AND (a.shubuh = 'A' OR a.ashar = 'A' OR a.maghrib = 'A' OR a.isya = 'A')
+    ORDER BY CAST(s.kamar AS INTEGER), s.nama_lengkap, a.tanggal
+  `, [startDate, endDate, asrama])
+
+  const santriMap: Record<string, any> = {}
+  const detail: Record<string, Record<string, any>> = {}
+
+  rows.forEach((r: any) => {
+    if (!santriMap[r.id]) {
+      santriMap[r.id] = { id: r.id, nama_lengkap: r.nama_lengkap, nis: r.nis, kamar: r.kamar }
+    }
+    if (!detail[r.id]) detail[r.id] = {}
+    detail[r.id][r.tanggal] = {
+      shubuh:  r.shubuh  === 'A' ? 'A' : null,
+      ashar:   r.ashar   === 'A' ? 'A' : null,
+      maghrib: r.maghrib === 'A' ? 'A' : null,
+      isya:    r.isya    === 'A' ? 'A' : null,
+    }
+  })
+
+  return { santriList: Object.values(santriMap) as any[], detail }
+}
+
+// Hapus record alfa berjamaah tertentu (verifikasi)
+export async function deleteAbsenBerjamaahRecords(records: { santriId: string, tanggal: string, waktu: string }[]) {
+  if (!records.length) return { success: true, count: 0 }
+
+  const VALID_WAKTU = new Set(['shubuh', 'ashar', 'maghrib', 'isya'])
+  const valid = records.filter(r => VALID_WAKTU.has(r.waktu))
+  if (!valid.length) return { success: true, count: 0 }
+
+  // Group by santriId|tanggal
+  const grouped: Record<string, Set<string>> = {}
+  valid.forEach(r => {
+    const k = `${r.santriId}|${r.tanggal}`
+    if (!grouped[k]) grouped[k] = new Set()
+    grouped[k].add(r.waktu)
+  })
+
+  const stmts: { sql: string, params: any[] }[] = []
+  Object.entries(grouped).forEach(([key, waktus]) => {
+    const [santriId, tanggal] = key.split('|')
+    const setParts: string[] = []
+    if (waktus.has('shubuh'))  setParts.push("shubuh = NULL")
+    if (waktus.has('ashar'))   setParts.push("ashar = NULL")
+    if (waktus.has('maghrib')) setParts.push("maghrib = NULL")
+    if (waktus.has('isya'))    setParts.push("isya = NULL")
+    stmts.push({
+      sql: `UPDATE absen_berjamaah SET ${setParts.join(', ')} WHERE santri_id = ? AND tanggal = ?`,
+      params: [santriId, tanggal]
+    })
+    stmts.push({
+      sql: `DELETE FROM absen_berjamaah WHERE santri_id = ? AND tanggal = ? AND shubuh IS NULL AND ashar IS NULL AND maghrib IS NULL AND isya IS NULL`,
+      params: [santriId, tanggal]
+    })
+  })
+
+  const chunkSize = 50
+  for (let i = 0; i < stmts.length; i += chunkSize) {
+    await batch(stmts.slice(i, i + chunkSize))
+  }
+
+  return { success: true, count: valid.length }
+}
+
 export async function importAbsenBerjamaahFingerprint(alfaRows: { santri_id: string, tanggal: string, shubuh?: 'A', ashar?: 'A' }[]) {
   if (!alfaRows || !alfaRows.length) return { success: true, count: 0 }
   const session = await getSession()
