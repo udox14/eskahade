@@ -2,33 +2,60 @@
 
 import { query, execute, batch, generateId } from '@/lib/db'
 import { getCachedMapelList } from '@/lib/cache/master'
+import { getSession, hasRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
-import { getKelasList } from '@/app/dashboard/master/kelas/actions'
 
+/** 
+ * Ambil data referensi (Mapel & Kelas) 
+ * Menggunakan logika yang sama dengan Leger Nilai agar terbukti berhasil.
+ */
 export async function getReferensiData() {
   try {
-    console.log("Fetching referensi data for input nilai (Bypassing cache for test)...");
-    
-    // Jalankan parallel agar lebih cepat
-    const [mapel, kelas] = await Promise.all([
-      // Bypass cache sementara untuk test
-      query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama').catch(err => {
-        console.error("Error fetching mapel list direct:", err);
-        return [];
-      }),
-      getKelasList().catch(err => {
-        console.error("Error fetching kelas list via master action:", err);
-        return [];
-      })
-    ]);
-    
-    console.log(`Fetched ${mapel?.length || 0} mapel and ${kelas?.length || 0} kelas using shared action.`);
-    
-    return { mapel: mapel || [], kelas: kelas || [] };
+    const session = await getSession()
+    if (!session) {
+      console.warn("No session found in getReferensiData");
+      return { mapel: [], kelas: [] }
+    }
 
+    // Jalankan parallel
+    const [mapelRaw, kelasRaw] = await Promise.all([
+      // Mapel: Ambil langsung dari DB
+      query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama').catch(err => {
+        console.error("Error Mapel:", err);
+        return []
+      }),
+      // Kelas: Ambil dengan filter Wali Kelas jika perlu (sama seperti Leger)
+      (async () => {
+        let sql = `
+          SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+          FROM kelas k
+          LEFT JOIN marhalah m ON m.id = k.marhalah_id
+        `
+        const params: any[] = []
+        if (hasRole(session, 'wali_kelas')) {
+          sql += ' WHERE k.wali_kelas_id = ?'
+          params.push(session.id)
+        }
+        return query<any>(sql, params).catch(err => {
+          console.error("Error Kelas:", err);
+          return []
+        })
+      })()
+    ])
+
+    const kelas = (kelasRaw || []).sort((a: any, b: any) =>
+      String(a.nama_kelas).localeCompare(String(b.nama_kelas), undefined, { numeric: true, sensitivity: 'base' })
+    )
+
+    return { 
+      mapel: mapelRaw || [], 
+      kelas: kelas
+    }
   } catch (err) {
-    console.error("Fatal error in getReferensiData:", err);
-    return { mapel: [], kelas: [] };
+    console.error("Fatal error in getReferensiData:", err)
+    // Jangan throw ke client agar tidak muncul error toast merah yang kasar, 
+    // tapi kembalikan objek kosong
+    return { mapel: [], kelas: [] }
   }
 }
 
@@ -50,7 +77,6 @@ export async function getDataSantriPerKelas(kelasId: string) {
 
 // ─── NILAI AKADEMIK ─────────────────────────────────────────────────────────
 
-/** Ambil nilai santri untuk 1 mapel tertentu */
 export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, semester: number) {
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, na.nilai
@@ -70,7 +96,6 @@ export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, sem
   }))
 }
 
-/** Simpan nilai untuk 1 mapel (Direct Input) */
 export async function simpanNilaiPerMapel(
   semester: number,
   mapelId: number,
@@ -89,7 +114,6 @@ export async function simpanNilaiPerMapel(
   return { success: true, count: data.length }
 }
 
-/** Simpan Nilai Massal (Excel Upload) - Sekarang Include Kepribadian & Catatan */
 export async function simpanNilaiExcelMenyeluruh(
   kelasId: string,
   semester: number,
@@ -114,7 +138,6 @@ export async function simpanNilaiExcelMenyeluruh(
     const riwayatId = mapNisToId.get(nis)
     if (!riwayatId) { errors.push(`Baris ${baris}: NIS '${nis}' tidak ditemukan.`); return }
 
-    // 1. Proses Nilai Akademik
     Object.keys(row).forEach(key => {
       const namaKolom = key.toUpperCase().trim()
       const mapelId = mapMapel.get(namaKolom)
@@ -126,13 +149,11 @@ export async function simpanNilaiExcelMenyeluruh(
       }
     })
 
-    // 2. Proses Nilai Kepribadian
     const getVal = (col: string) => {
       const v = Number(row[col] || row[col.toLowerCase()])
       return isNaN(v) ? 80 : Math.min(100, Math.max(0, v))
     }
 
-    // Hanya jika ada salah satu kolom kepribadian
     if (row['KEDISIPLINAN'] !== undefined || row['IBADAH'] !== undefined) {
       toUpsertAkhlak.push({
         riwayatId,
@@ -145,7 +166,6 @@ export async function simpanNilaiExcelMenyeluruh(
       })
     }
 
-    // 3. Proses Catatan Wali Kelas
     const catatan = String(row['CATATAN WALI KELAS'] || row['catatan_wali_kelas'] || '').trim()
     if (catatan) {
       toUpsertRanking.push({ riwayatId, semester, catatan })
@@ -154,9 +174,7 @@ export async function simpanNilaiExcelMenyeluruh(
 
   if (errors.length > 0) return { error: `Ditemukan masalah:\n${errors.slice(0, 5).join('\n')}` }
 
-  // Batch Executions
   const batches = []
-
   if (toUpsertAkademik.length > 0) {
     batches.push(...toUpsertAkademik.map(item => ({
       sql: `INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
@@ -165,7 +183,6 @@ export async function simpanNilaiExcelMenyeluruh(
       params: [generateId(), item.riwayatId, item.mapelId, item.semester, item.nilai],
     })))
   }
-
   if (toUpsertAkhlak.length > 0) {
     batches.push(...toUpsertAkhlak.map(item => ({
       sql: `INSERT INTO nilai_akhlak (id, riwayat_pendidikan_id, semester, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian)
@@ -177,7 +194,6 @@ export async function simpanNilaiExcelMenyeluruh(
     })))
   }
 
-  // Untuk Ranking (Catatan), kita pakai loop execute karena ranking tabel butuh pengecekan existing atau upsert manual jika kolom lain tidak ada
   if (toUpsertRanking.length > 0) {
     for (const item of toUpsertRanking) {
       await execute(`
@@ -193,7 +209,7 @@ export async function simpanNilaiExcelMenyeluruh(
   revalidatePath('/dashboard/akademik/nilai')
   revalidatePath('/dashboard/laporan/rapor')
   
-  return { success: true, count: toUpsertAkademik.length + toUpsertAkhlak.length + toUpsertRanking.length }
+  return { success: true }
 }
 
 // ─── NILAI KEPRIBADIAN ──────────────────────────────────────────────────────
