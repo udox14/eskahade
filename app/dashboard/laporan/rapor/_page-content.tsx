@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getKelasList, getDataRapor } from './actions'
+import { getKelasList, getDataRapor, getTahunAjaran } from './actions'
 import { Printer, Loader2, Search, FileText } from 'lucide-react'
 import { RaporSatuHalaman } from './rapor-view'
 import { useReactToPrint } from 'react-to-print'
@@ -11,6 +11,7 @@ export default function CetakRaporPage() {
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
+  const [tahunAjaran, setTahunAjaran] = useState('2024/2025')
   
   const [dataRapor, setDataRapor] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -35,9 +36,10 @@ export default function CetakRaporPage() {
     handlePrint()
   }
 
-  // Load Kelas
+  // Load Kelas & Tahun Ajaran
   useEffect(() => {
     getKelasList().then(setKelasList)
+    getTahunAjaran().then(setTahunAjaran)
   }, [])
 
   // Load Data
@@ -50,7 +52,7 @@ export default function CetakRaporPage() {
     setLoading(true)
     const loadToast = toast.loading("Mengambil data nilai dan ranking...")
     
-    // Reset data lama biar kerasa refreshnya
+    // Reset data lama
     setDataRapor([]) 
 
     try {
@@ -111,6 +113,17 @@ export default function CetakRaporPage() {
             <option value="2">Genap</option>
           </select>
         </div>
+
+        <div className="w-full md:w-auto">
+          <label className="text-sm font-medium text-slate-700 block mb-1">Tahun Pelajaran</label>
+          <input
+            type="text"
+            value={tahunAjaran}
+            onChange={(e) => setTahunAjaran(e.target.value)}
+            className="p-2 border border-slate-200 rounded-xl w-full md:w-36 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="2024/2025"
+          />
+        </div>
         
         <button 
           onClick={handleLoad}
@@ -147,21 +160,21 @@ export default function CetakRaporPage() {
         ) : (
           /* DIV INI YANG AKAN DIPRINT */
           <div ref={printRef} className="w-fit bg-white shadow-2xl print:shadow-none">
-             {/* Print Wrapper */}
-             <div className="print:block">
-                {dataRapor.map((siswa, idx) => (
-                  <div key={siswa.id} className="mb-10 last:mb-0 print:mb-0 break-after-page">
-                    <RaporSatuHalaman 
-                      data={siswa} 
-                      semester={Number(selectedSemester)} 
-                    />
-                    {/* Pembatas Visual di Layar (Tidak ikut diprint) */}
-                    <div className="h-4 bg-slate-100 w-full print:hidden border-y border-dashed border-slate-300 relative top-5 flex items-center justify-center">
-                        <span className="bg-slate-100 px-2 text-[10px] text-slate-400">Halaman Berikutnya</span>
-                    </div>
+            <div className="print:block">
+              {dataRapor.map((siswa, idx) => (
+                <div key={siswa.id} className="mb-10 last:mb-0 print:mb-0 break-after-page">
+                  <RaporSatuHalaman 
+                    data={siswa} 
+                    semester={Number(selectedSemester)}
+                    tahunAjaran={tahunAjaran}
+                  />
+                  {/* Pembatas Visual di Layar (Tidak ikut diprint) */}
+                  <div className="h-4 bg-slate-100 w-full print:hidden border-y border-dashed border-slate-300 relative top-5 flex items-center justify-center">
+                    <span className="bg-slate-100 px-2 text-[10px] text-slate-400">Halaman Berikutnya</span>
                   </div>
-                ))}
-             </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
