@@ -10,7 +10,13 @@ const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIF
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
-const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib', isya: 'Isya' }
+const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'SBH', ashar: 'ASR', maghrib: 'MAG', isya: 'ISYA' }
+const WAKTU_COLOR: Record<Waktu, string> = {
+  shubuh:  'bg-blue-500 hover:bg-blue-600 text-white',
+  ashar:   'bg-orange-400 hover:bg-orange-500 text-white',
+  maghrib: 'bg-purple-500 hover:bg-purple-600 text-white',
+  isya:    'bg-slate-600 hover:bg-slate-700 text-white',
+}
 const ITEMS_PER_PAGE = 20
 
 // --- Week helpers (Rabu s/d Selasa) ---
@@ -389,8 +395,13 @@ export default function RekapAbsenBerjamaahPage() {
                         return (
                           <div key={tgl} className="px-4 py-3 flex items-center gap-3">
                             <p className="text-xs text-slate-500 font-semibold w-24 shrink-0">{formatDayLabel(tgl)}</p>
-                            <div className="flex flex-wrap gap-2">
-                              {alfaWaktus.map(w => {
+                            <div className="flex gap-2">
+                              {WAKTU.map(w => {
+                                const isAlfa = dayData[w] === 'A'
+                                if (!isAlfa) {
+                                  // Slot kosong agar posisi fixed
+                                  return <div key={w} className="px-3 py-1.5 rounded-full text-xs font-bold opacity-0 pointer-events-none select-none">{WAKTU_LABEL[w]}</div>
+                                }
                                 const delKey = `${s.id}|${tgl}|${w}`
                                 const markedForDelete = pendingDeletes.has(delKey)
                                 return (
@@ -401,12 +412,12 @@ export default function RekapAbsenBerjamaahPage() {
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-90 select-none ${
                                       markedForDelete
                                         ? 'bg-slate-100 text-slate-400 line-through border border-dashed border-slate-300'
-                                        : 'bg-red-500 text-white hover:bg-red-600'
+                                        : WAKTU_COLOR[w]
                                     }`}
                                   >
                                     {WAKTU_LABEL[w]}
                                     {markedForDelete
-                                      ? <X className="w-3 h-3 shrink-0 no-underline"/>
+                                      ? <X className="w-3 h-3 shrink-0"/>
                                       : <Trash2 className="w-3 h-3 shrink-0"/>
                                     }
                                   </button>

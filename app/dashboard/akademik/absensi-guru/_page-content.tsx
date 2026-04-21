@@ -313,16 +313,16 @@ export default function AbsensiGuruPage() {
         <span className="ml-auto italic">* Navigasi panah kanan/kiri terkunci per baris</span>
       </div>
 
-      <div className="bg-white border rounded-xl shadow-sm">
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
         {!hasLoaded ? (
-            <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <Search className="w-16 h-16 mb-4 text-slate-200"/>
                 <p>Silakan pilih tingkat dan tanggal, lalu klik <b>Tampilkan</b>.</p>
             </div>
         ) : loading ? (
              <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500"/></div>
         ) : (
-             <div>
+             <div className="overflow-y-auto overflow-x-hidden hover:overflow-x-auto flex-1">
              <table className="w-full text-sm border-collapse">
                 <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
                    <tr>
@@ -397,8 +397,8 @@ export default function AbsensiGuruPage() {
                         </tr>
                       )
                    })}
-                </tbody>
-             </table>
+                 </tbody>
+              </table>
              </div>
            )}
       </div>

@@ -493,9 +493,10 @@ export default function AbsensiPage() {
       ) : loading ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-green-600"/></div>
       ) : (
-        <div className="bg-white border rounded-xl shadow-sm">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
+          <div className="overflow-y-auto overflow-x-hidden hover:overflow-x-auto flex-1">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
               <tr>
                 <th className="p-3 text-left border w-48 bg-slate-100">Nama Santri</th>
                 <th className="p-2 text-center border w-32 bg-slate-100">Aksi Cepat</th>
@@ -598,6 +599,7 @@ export default function AbsensiPage() {
                 })}
               </tbody>
             </table>
+          </div>
         </div>
       )}
 
