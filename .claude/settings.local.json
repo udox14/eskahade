@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(npx wrangler *)",
+      "Bash(node -e ' *)",
+      "Bash(node /c/DATA/eskahade/fix_db.mjs)"
+    ]
+  }
+}

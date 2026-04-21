@@ -444,6 +444,35 @@ export default function PerpindahanClient({
                         </div>
                       </div>
 
+                      {/* SETUP KETUA KAMAR SEBELUM GENERATE */}
+                      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Crown className="w-5 h-5 text-amber-500"/>
+                          <h4 className="font-bold text-amber-800">Tentukan Ketua Kamar (Opsional)</h4>
+                        </div>
+                        <p className="text-xs text-amber-700 mb-4">Ketua yang dipilih akan otomatis ditetapkan di kamarnya saat generate draft dan kuota kamar akan disesuaikan.</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {configs.map(cfg => {
+                            const ketua = ketuaMap[cfg.nomor_kamar];
+                            return (
+                              <div key={cfg.nomor_kamar} className="bg-white p-2.5 rounded-lg border border-amber-200">
+                                <div className="text-[11px] font-bold text-slate-500 mb-1.5 uppercase">Kamar {cfg.nomor_kamar}</div>
+                                <select value={ketua?.santri_id || ''}
+                                  onChange={e => handleSetKetua(cfg.nomor_kamar, e.target.value || null)}
+                                  className="w-full text-xs font-semibold border-slate-200 rounded py-1.5 outline-none text-slate-800 cursor-pointer">
+                                  <option value="">— Pilih Ketua —</option>
+                                  {santriList.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.nama_lengkap} {s.kelas_sekolah ? `(Kls ${s.kelas_sekolah})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+
                       <div className="flex gap-3">
                         <button onClick={handleGenerate} disabled={saving}
                           className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50">

@@ -9,6 +9,13 @@ const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
 // ─── GET: Load semua data yang dibutuhkan untuk satu asrama ──────────────────
 
 export async function getDataPerpindahan(asrama: string) {
+  try {
+    // Auto-patch untuk mem-fix error "has no column named blok" di DB lokal
+    await execute('ALTER TABLE kamar_config ADD COLUMN blok TEXT');
+  } catch (e) {
+    // Abaikan error jika kolom sudah ada
+  }
+
   const [configs, drafts, ketuaList, santriList] = await Promise.all([
     // Konfigurasi kamar
     query<any>('SELECT * FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar', [asrama]),
@@ -80,13 +87,19 @@ export async function generateDraft(
   if (!configs.length) return { error: 'Belum ada konfigurasi kamar' }
   if (!santriList.length) return { error: 'Tidak ada santri di asrama ini' }
 
+  const db = await getDB()
+  const kamarKetua = await query<any>('SELECT santri_id, nomor_kamar FROM kamar_ketua WHERE asrama = ?', [asrama])
+
   // Hitung slot efektif per kamar (setelah dikurangi % untuk santri baru)
-  const kamarSlots = configs.map((k: any) => ({
-    nomor: k.nomor_kamar,
-    kuota: k.kuota,
-    blok: k.blok || null,
-    efektif: Math.max(1, Math.floor(k.kuota * (1 - persenUntukBaru / 100))),
-  }))
+  const kamarSlots = configs.map((k: any) => {
+    const terisiKetua = kamarKetua.filter(x => x.nomor_kamar === k.nomor_kamar).length
+    return {
+      nomor: k.nomor_kamar,
+      kuota: k.kuota,
+      blok: k.blok || null,
+      efektif: Math.max(0, Math.floor(k.kuota * (1 - persenUntukBaru / 100)) - terisiKetua),
+    }
+  })
 
   // Pengelompokan blok: { 'A': [kamar1,kamar2,...], null: [...] }
   const blokKamar: Record<string, typeof kamarSlots> = {}
@@ -115,7 +128,8 @@ export async function generateDraft(
 
   // Helper: distribusi santri ke kamar dalam satu blok
   function distribusiBlok(santriBlok: any[], kamarBlok: typeof kamarSlots, assignment: Record<string,string>) {
-    const shuffled = interleaveByKelas(santriBlok)
+    const belumAssign = santriBlok.filter(s => !assignment[s.id])
+    const shuffled = interleaveByKelas(belumAssign)
     let idx = 0
     for (const kamar of kamarBlok) {
       for (let slot = 0; slot < kamar.efektif && idx < shuffled.length; slot++, idx++) {
@@ -135,6 +149,11 @@ export async function generateDraft(
 
   const assignment: Record<string, string> = {}
 
+  // Assign ketua ke kamarnya masing-masing
+  for (const k of kamarKetua) {
+     assignment[k.santri_id] = k.nomor_kamar;
+  }
+
   // Santri yang kamar lamanya ada di blok tertentu → ikut blok itu
   // Santri tanpa kamar / kamar tidak dikenali blok → masuk pool __TANPA_BLOK__
   const blokSantri: Record<string, any[]> = {}
@@ -144,6 +163,7 @@ export async function generateDraft(
   for (const k of kamarSlots) { kamarToBlok[k.nomor] = k.blok || '__TANPA_BLOK__' }
 
   for (const s of santriList) {
+    if (assignment[s.id]) continue; // lewati ketua yang sudah diassign
     const blokSantriKey = s.kamar_asli && kamarToBlok[s.kamar_asli]
       ? kamarToBlok[s.kamar_asli]
       : '__TANPA_BLOK__'
@@ -158,7 +178,6 @@ export async function generateDraft(
   }
 
   // Simpan ke kamar_draft (upsert)
-  const db = await getDB()
   try {
     const stmts = [
       db.prepare('DELETE FROM kamar_draft WHERE asrama = ?').bind(asrama),
