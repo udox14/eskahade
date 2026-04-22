@@ -5,10 +5,11 @@ interface PemanggilanProps {
   data: any[];
   periode: { start: Date; end: Date };
   tglPanggil: Date;
-  namaAsrama: string; // Tambahan prop
+  namaAsrama: string;
+  isMangkir?: boolean; // Tambahan
 }
 
-export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: PemanggilanProps) {
+export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangkir }: PemanggilanProps) {
   // Format Tanggal Header
   const strBulan = format(periode.start, 'MMMM yyyy', { locale: id }).toUpperCase()
   const strMinggu = `MINGGU KE-${Math.ceil(periode.start.getDate() / 7)}`
@@ -29,7 +30,9 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama }: Peman
 
       {/* 2. JUDUL DOKUMEN */}
       <div className="text-center mb-6">
-        <h2 className="text-base font-bold underline">DATA PEMANGGILAN ALFA PENGAJIAN</h2>
+        <h2 className="text-base font-bold underline">
+          {isMangkir ? 'DATA PEMANGGILAN MANGKIR (SUSULAN)' : 'DATA PEMANGGILAN ALFA PENGAJIAN'}
+        </h2>
         {/* Nama Asrama Ditampilkan Disini */}
         <h3 className="text-sm font-bold uppercase mt-1 bg-gray-200 inline-block px-4 py-1 rounded">ASRAMA: {namaAsrama}</h3>
         <p className="text-xs font-bold uppercase mt-2">

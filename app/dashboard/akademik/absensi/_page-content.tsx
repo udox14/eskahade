@@ -30,6 +30,7 @@ export default function AbsensiPage() {
 
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   // 1. Load Data Master
   useEffect(() => {
@@ -39,9 +40,7 @@ export default function AbsensiPage() {
   }, [])
 
   // 2. Load Data Utama
-  useEffect(() => {
-    // Tampilkan data jika salah satu filter dipilih, atau jika user ingin "Semua" (tapi kita batasi biar ga kaget)
-    // Di sini kita izinkan load jika minimal ada satu filter atau emang mau liat semua
+  const loadData = () => {
     setLoading(true)
     const loadToast = toast.loading("Memuat data absensi...")
 
@@ -66,8 +65,15 @@ export default function AbsensiPage() {
       setGridData(grid)
       setLoading(false)
       setHasUnsavedChanges(false)
+      setHasLoaded(true)
       toast.dismiss(loadToast)
     })
+  }
+
+  useEffect(() => {
+    if (hasLoaded) {
+      loadData()
+    }
   }, [selectedKelas, selectedAsrama, selectedMarhalah, selectedDate])
 
   // EFFECT UNTUK WARNING KETIKA BELUM SAVE
@@ -566,7 +572,23 @@ export default function AbsensiPage() {
         </div>
       </div>
 
-      {loading ? (
+      {!hasLoaded ? (
+        <div className="text-center py-24 bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col items-center justify-center gap-6">
+          <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center">
+             <Calendar className="w-12 h-12 text-green-300" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Siap Absen?</h3>
+            <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">Pilih filter di atas lalu klik tombol di bawah untuk menampilkan daftar santri.</p>
+          </div>
+          <button 
+            onClick={loadData}
+            className="bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-green-200 hover:bg-green-700 active:scale-95 transition-all"
+          >
+            Tampilkan Daftar Santri
+          </button>
+        </div>
+      ) : loading ? (
         <div className="text-center py-12 flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 animate-spin text-green-600 mb-4 opacity-50"/>
           <p className="text-slate-500 font-medium animate-pulse">Menyiapkan data absensi...</p>

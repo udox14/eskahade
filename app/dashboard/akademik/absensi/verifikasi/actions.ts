@@ -4,18 +4,54 @@ import { query, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { generateId, now } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getCachedMarhalahList } from '@/lib/cache/master'
+
+function getWeekRange(date: Date) {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = (day < 3 ? day + 7 : day) - 3
+  d.setDate(d.getDate() - diff)
+  d.setHours(0, 0, 0, 0)
+  const start = new Date(d)
+  const end = new Date(d)
+  end.setDate(end.getDate() + 6)
+  return { start, end }
+}
 
 // ─── Antrian verifikasi absen ─────────────────────────────────────────────────
 // Fix row reads:
 // 1. Tambah filter verif IS NULL atau verif = 'BELUM' — tidak fetch yang sudah OK
 // 2. Tambah LIMIT 3 bulan terakhir — tidak scan data lama yang harusnya sudah diverifikasi
 // 3. Pakai INNER JOIN ke santri aktif — tidak fetch data santri yang sudah arsip
-export async function getAntrianVerifikasi() {
-  // Batas waktu: 3 bulan terakhir — data alfa lama yang masih belum diverif
-  // kemungkinan memang sudah tidak relevan / sudah diproses manual
-  const batas = new Date()
-  batas.setMonth(batas.getMonth() - 3)
-  const batasStr = batas.toISOString().slice(0, 10)
+export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string } = {}) {
+  const whereClauses = []
+  const params = []
+
+  if (tanggalRef) {
+    const { start, end } = getWeekRange(new Date(tanggalRef))
+    whereClauses.push("ah.tanggal >= ? AND ah.tanggal <= ?")
+    params.push(start.toISOString().split('T')[0], end.toISOString().split('T')[0])
+  } else {
+    const batas = new Date()
+    batas.setMonth(batas.getMonth() - 3)
+    whereClauses.push("ah.tanggal >= ?")
+    params.push(batas.toISOString().slice(0, 10))
+  }
+
+  if (filters.kelasId) {
+    whereClauses.push("rp.kelas_id = ?")
+    params.push(filters.kelasId)
+  }
+  if (filters.asrama) {
+    whereClauses.push("s.asrama = ?")
+    params.push(filters.asrama)
+  }
+  if (filters.marhalahId) {
+    whereClauses.push("k.marhalah_id = ?")
+    params.push(filters.marhalahId)
+  }
+
+  const whereSql = whereClauses.join(" AND ")
 
   const rawData = await query<any>(`
     SELECT ah.id, ah.tanggal,
@@ -27,7 +63,8 @@ export async function getAntrianVerifikasi() {
       AND rp.status_riwayat = 'aktif'
     INNER JOIN santri s ON s.id = rp.santri_id
       AND s.status_global = 'aktif'
-    WHERE ah.tanggal >= ?
+    INNER JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ${whereSql}
       AND (
         (ah.shubuh  = 'A' AND (ah.verif_shubuh  IS NULL OR ah.verif_shubuh  = 'BELUM'))
         OR
@@ -35,9 +72,9 @@ export async function getAntrianVerifikasi() {
         OR
         (ah.maghrib = 'A' AND (ah.verif_maghrib IS NULL OR ah.verif_maghrib = 'BELUM'))
       )
-    ORDER BY ah.tanggal DESC
+    ORDER BY ah.tanggal DESC, s.nama_lengkap ASC
     LIMIT 2000
-  `, [batasStr])
+  `, params)
 
   const groupedMap = new Map<string, any>()
 
@@ -149,4 +186,25 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
   revalidatePath('/dashboard/akademik/absensi/verifikasi')
   revalidatePath('/dashboard/keamanan')
   return { success: true, count: daftarVonis.length }
+}
+
+export async function getKelasList() {
+  const data = await query<any>('SELECT id, nama_kelas, marhalah_id FROM kelas ORDER BY nama_kelas')
+  return data.sort((a: any, b: any) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
+}
+
+export async function getAsramaList() {
+  const data = await query<any>(`
+    SELECT DISTINCT asrama 
+    FROM santri 
+    WHERE asrama IS NOT NULL AND asrama != '' 
+    ORDER BY asrama
+  `)
+  return data.map((d: any) => d.asrama)
+}
+
+export async function getMarhalahList() {
+  return getCachedMarhalahList()
 }

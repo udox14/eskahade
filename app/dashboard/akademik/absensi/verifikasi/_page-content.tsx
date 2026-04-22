@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { getAntrianVerifikasi, simpanVerifikasiMassal } from './actions'
+import { useState, useCallback, useEffect } from 'react'
+import { getAntrianVerifikasi, simpanVerifikasiMassal, getKelasList, getAsramaList, getMarhalahList } from './actions'
 import {
   Gavel, CheckCircle, Loader2, AlertTriangle,
-  Save, ChevronLeft, ChevronRight, RefreshCw, Users, Search
+  Save, ChevronLeft, ChevronRight, RefreshCw, Users, Search, Filter, ChevronDown, Calendar
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -118,13 +118,42 @@ export default function VerifikasiAbsenPage() {
   const [page, setPage]           = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch]       = useState('')
-  const [filterAsrama, setFilterAsrama] = useState('SEMUA')
+
+  const [kelasList, setKelasList] = useState<any[]>([])
+  const [asramaList, setAsramaList] = useState<string[]>([])
+  const [marhalahList, setMarhalahList] = useState<any[]>([])
+  
+  const [selectedKelas, setSelectedKelas] = useState('')
+  const [selectedAsrama, setSelectedAsrama] = useState('')
+  const [selectedMarhalah, setSelectedMarhalah] = useState('')
+  const [selectedDate, setSelectedDate] = useState('') // Kosongkan agar fetch 3 bulan terakhir defaultnya
+
+  useEffect(() => {
+    getKelasList().then(setKelasList)
+    getAsramaList().then(setAsramaList)
+    getMarhalahList().then(setMarhalahList)
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true); setDrafts({})
-    try { setList(await getAntrianVerifikasi()); setHasLoaded(true); setPage(1) }
+    try { 
+      const data = await getAntrianVerifikasi(selectedDate, {
+        kelasId: selectedKelas,
+        asrama: selectedAsrama,
+        marhalahId: selectedMarhalah
+      })
+      setList(data)
+      setHasLoaded(true)
+      setPage(1) 
+    }
     finally { setLoading(false) }
-  }, [])
+  }, [selectedDate, selectedKelas, selectedAsrama, selectedMarhalah])
+
+  useEffect(() => {
+    if (hasLoaded) {
+      loadData()
+    }
+  }, [loadData, hasLoaded])
 
   const handleSelect = (santriId: string, v: VonisType) =>
     setDrafts(prev => prev[santriId] === v
@@ -156,10 +185,8 @@ export default function VerifikasiAbsenPage() {
     setDrafts({}); setPage(1)
   }
 
-  const asramaList = Array.from(new Set(list.map(i => i.info.split(' / ')[0]).filter(Boolean))).sort()
 
   const filtered = list.filter(i => {
-    if (filterAsrama !== 'SEMUA' && !i.info.startsWith(filterAsrama)) return false
     if (search && !i.nama.toLowerCase().includes(search.toLowerCase()) && !i.nis.includes(search)) return false
     return true
   })
@@ -168,125 +195,188 @@ export default function VerifikasiAbsenPage() {
   const totalDrafts = Object.keys(drafts).length
 
   return (
-    <div className="max-w-5xl mx-auto pb-32 space-y-4">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div className="max-w-5xl mx-auto pb-32 space-y-6">
+      {/* Header Utama */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-            <Gavel className="w-6 h-6 text-violet-600" /> Verifikasi Sidang Absensi
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+             <Gavel className="w-8 h-8 text-violet-600" /> Verifikasi Absensi
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Tetapkan status alfa santri secara massal</p>
+          <p className="text-slate-500 mt-1 font-medium">Tetapkan status sidang alfa santri secara massal</p>
         </div>
-        <button onClick={loadData} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-bold hover:bg-violet-700 disabled:opacity-60 transition-colors self-start sm:self-auto">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          {hasLoaded ? 'Perbarui' : 'Tampilkan Antrian'}
-        </button>
+        
+        <div className="flex items-center gap-3">
+           <button onClick={loadData} disabled={loading}
+            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-sm font-bold hover:bg-slate-50 disabled:opacity-60 transition-all shadow-sm">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Segarkan Antrian
+          </button>
+        </div>
       </div>
 
-      {/* Empty states */}
-      {!hasLoaded && !loading && (
-        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
-          <Gavel className="w-10 h-10 text-violet-200" />
-          <p className="text-slate-500 text-sm">Klik <strong>Tampilkan Antrian</strong> untuk mulai</p>
-        </div>
-      )}
-      {loading && (
-        <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
-          <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat antrian...</span>
-        </div>
-      )}
-      {hasLoaded && !loading && list.length === 0 && (
-        <div className="flex flex-col items-center py-16 gap-2 bg-white rounded-2xl border border-slate-200 text-center">
-          <CheckCircle className="w-10 h-10 text-emerald-400" />
-          <p className="font-bold text-slate-700">Semua Beres!</p>
-          <p className="text-slate-500 text-sm">Tidak ada antrian yang perlu diverifikasi.</p>
-        </div>
-      )}
-
-      {/* Toolbar + tabel */}
-      {hasLoaded && !loading && list.length > 0 && (
-        <>
-          {/* Toolbar */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-
-              {/* Stats */}
-              <div className="flex items-center gap-1.5 bg-slate-100 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600">
-                <Users className="w-3.5 h-3.5" /> {list.length} antrian
-              </div>
-              {totalDrafts > 0 && (
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 text-xs font-bold text-emerald-700">
-                  <CheckCircle className="w-3.5 h-3.5" /> {totalDrafts} dipilih
-                </div>
-              )}
-
-              <div className="flex-1" />
-
-              {/* Pilih semua */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] text-slate-400 font-medium">Pilih semua:</span>
-                {([
-                  { v: 'ALFA_MURNI' as VonisType, label: 'Alfa',  cls: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
-                  { v: 'SAKIT'      as VonisType, label: 'Sakit', cls: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
-                  { v: 'IZIN'       as VonisType, label: 'Izin',  cls: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
-                ].map(({ v, label, cls }) => (
-                  <button key={v} onClick={() => handlePilihSemua(v)}
-                    className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 ${cls}`}>
-                    {label}
-                  </button>
-                )))}
-              </div>
-            </div>
-
-            {/* Search + filter asrama */}
-            <div className="flex gap-2 flex-wrap">
-              {asramaList.length > 1 && (
-                <select value={filterAsrama} onChange={e => { setFilterAsrama(e.target.value); setPage(1) }}
-                  className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-700">
-                  <option value="SEMUA">Semua Asrama</option>
-                  {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              )}
-              <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
-                className="flex gap-2 flex-1 min-w-[180px]">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input type="text" placeholder="Cari nama atau NIS..."
-                    value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
-                </div>
-                <button type="submit"
-                  className="px-3 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors">
-                  Cari
-                </button>
-              </form>
-            </div>
+      {/* FILTER BAR - PREMIUM DESIGN */}
+      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-2xl border border-slate-100 text-slate-500">
+            <Filter className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Filter Sidang</span>
           </div>
 
-          {/* Info hal */}
-          {filtered.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-slate-500 px-0.5">
-              <span><strong className="text-slate-700">{filtered.length}</strong> santri</span>
-              {totalPages > 1 && <span>Hal {page}/{totalPages}</span>}
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Filter Marhalah */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Marhalah</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
+                value={selectedMarhalah}
+                onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
+              >
+                <option value="">Semua Marhalah</option>
+                {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
-          )}
 
-          {/* Tabel + cards */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Filter Kelas */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Kelas</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
+                value={selectedKelas}
+                onChange={(e) => setSelectedKelas(e.target.value)}
+              >
+                <option value="">Semua Kelas</option>
+                {kelasList
+                  .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+                  .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
+                }
+              </select>
+              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Filter Asrama */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Asrama</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
+                value={selectedAsrama}
+                onChange={(e) => setSelectedAsrama(e.target.value)}
+              >
+                <option value="">Semua Asrama</option>
+                {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Filter Tanggal */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Pilih Pekan (Opsional)</label>
+              <input 
+                type="date" 
+                className="w-full pl-3 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none text-sm text-slate-700 font-bold transition-all hover:border-slate-300"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-100">
+          <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
+            className="flex gap-2 flex-1 max-w-md">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
+              <input type="text" placeholder="Cari nama santri atau NIS..."
+                value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all shadow-inner" />
+            </div>
+            <button type="submit"
+              className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all active:scale-95 shadow-lg shadow-slate-200">
+              Cari
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2 flex-wrap bg-slate-50 p-2 rounded-2xl border border-slate-100">
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-2 mr-1">Pilih Semua:</span>
+            {([
+              { v: 'ALFA_MURNI' as VonisType, label: 'Alfa',  cls: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white' },
+              { v: 'SAKIT'      as VonisType, label: 'Sakit', cls: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-500 hover:text-white' },
+              { v: 'IZIN'       as VonisType, label: 'Izin',  cls: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white' },
+            ].map(({ v, label, cls }) => (
+              <button key={v} onClick={() => handlePilihSemua(v)}
+                className={`border px-4 py-2 rounded-xl text-[10px] font-black tracking-wider transition-all active:scale-95 ${cls}`}>
+                {label}
+              </button>
+            )))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
+           <Loader2 className="w-12 h-12 animate-spin text-violet-600 opacity-20" />
+           <p className="text-slate-400 font-bold animate-pulse tracking-widest text-[10px]">MEMUAT ANTRIAN SIDANG...</p>
+        </div>
+      ) : !hasLoaded ? (
+        <div className="flex flex-col items-center py-24 gap-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 text-center">
+          <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center">
+            <Gavel className="w-12 h-12 text-violet-300" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Siap Verifikasi?</h3>
+            <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">Gunakan filter di atas lalu klik tombol di bawah untuk menarik data santri yang perlu disidang.</p>
+          </div>
+          <button 
+            onClick={loadData}
+            className="bg-violet-600 text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-violet-200 hover:bg-violet-700 active:scale-95 transition-all"
+          >
+            Tampilkan Antrian Sidang
+          </button>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="flex flex-col items-center py-24 gap-4 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
+          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-10 h-10 text-emerald-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-800">Semua Beres!</h3>
+            <p className="text-slate-500 text-sm mt-1">Tidak ditemukan antrian sidang yang perlu diproses.</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between px-4">
+            <div className="flex items-center gap-4">
+               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full tracking-widest">
+                <Users className="w-3.5 h-3.5" /> {list.length} ANTRIAN
+              </div>
+              {totalDrafts > 0 && (
+                <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100 animate-pulse tracking-widest">
+                  <CheckCircle className="w-3.5 h-3.5" /> {totalDrafts} DIPILIH
+                </div>
+              )}
+            </div>
+            {totalPages > 1 && (
+               <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
+                Halaman {page} dari {totalPages}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
             {/* Desktop tabel */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center w-8">No</th>
-                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left">Nama Santri</th>
-                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left">Sesi Alfa</th>
-                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left">Vonis</th>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-12">No</th>
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Nama Santri</th>
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Sesi Alfa</th>
+                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Vonis Sidang</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {paged.map((item, i) => (
                     <BarisAbsen key={item.santri_id} item={item}
                       no={(page-1)*PAGE_SIZE+i+1}
@@ -298,7 +388,7 @@ export default function VerifikasiAbsenPage() {
             </div>
 
             {/* Mobile cards */}
-            <div className="sm:hidden p-3 space-y-2.5">
+            <div className="sm:hidden p-4 space-y-4">
               {paged.map((item, i) => (
                 <BarisAbsen key={item.santri_id} item={item}
                   no={(page-1)*PAGE_SIZE+i+1}
@@ -308,18 +398,18 @@ export default function VerifikasiAbsenPage() {
             </div>
 
             {paged.length === 0 && (
-              <div className="text-center py-10 text-slate-400 text-sm">Tidak ada data yang cocok.</div>
+              <div className="text-center py-20 text-slate-400 font-bold italic">Tidak ada data yang cocok dengan pencarian.</div>
             )}
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between mt-4">
               <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1}
-                className="flex items-center gap-1.5 px-4 py-2 font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Sebelumnya
+                className="flex items-center gap-2 px-5 py-2.5 font-bold border border-slate-200 rounded-2xl text-slate-600 hover:bg-white hover:shadow-md disabled:opacity-30 transition-all">
+                <ChevronLeft className="w-4 h-4" /> Sebelum
               </button>
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                   let pg = i + 1
                   if (totalPages > 5) {
@@ -329,15 +419,15 @@ export default function VerifikasiAbsenPage() {
                   }
                   return (
                     <button key={pg} onClick={() => setPage(pg)}
-                      className={`w-9 h-9 rounded-xl text-sm font-bold transition-all ${
-                        pg === page ? 'bg-violet-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      className={`w-10 h-10 rounded-2xl text-sm font-black transition-all ${
+                        pg === page ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-300'
                       }`}>{pg}</button>
                   )
                 })}
               </div>
               <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page >= totalPages}
-                className="flex items-center gap-1.5 px-4 py-2 font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                Berikutnya <ChevronRight className="w-4 h-4" />
+                className="flex items-center gap-2 px-5 py-2.5 font-bold border border-slate-200 rounded-2xl text-slate-600 hover:bg-white hover:shadow-md disabled:opacity-30 transition-all">
+                Lanjut <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -346,19 +436,19 @@ export default function VerifikasiAbsenPage() {
 
       {/* Floating save */}
       {totalDrafts > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 z-50 animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 z-50 animate-in slide-in-from-bottom-8 duration-300">
           <button onClick={handleSimpan} disabled={isSaving}
-            className="w-full bg-slate-900 text-white py-4 px-5 rounded-2xl shadow-2xl flex items-center justify-between hover:bg-black transition-all active:scale-95 disabled:opacity-60">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center font-black text-slate-900 text-sm">
+            className="w-full bg-slate-900 text-white py-4 px-6 rounded-[2rem] shadow-2xl flex items-center justify-between hover:bg-black hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-60 ring-4 ring-white">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-black text-slate-900 text-lg">
                 {totalDrafts}
               </div>
               <div className="text-left">
-                <p className="font-bold text-sm leading-none">Simpan Putusan</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{totalDrafts} santri akan diproses</p>
+                <p className="font-black text-sm tracking-tight">SIMPAN PUTUSAN</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{totalDrafts} SANTRI SIAP PROSES</p>
               </div>
             </div>
-            {isSaving ? <Loader2 className="w-5 h-5 animate-spin text-emerald-400" /> : <Save className="w-5 h-5 text-emerald-400" />}
+            {isSaving ? <Loader2 className="w-6 h-6 animate-spin text-emerald-400" /> : <Save className="w-6 h-6 text-emerald-400" />}
           </button>
         </div>
       )}
