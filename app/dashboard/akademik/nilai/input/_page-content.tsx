@@ -38,7 +38,8 @@ export default function InputNilaiPage() {
   const [activeTab, setActiveTab] = useState<TabType>('akademik')
   const [akademikMode, setAkademikMode] = useState<AkademikMode>('direct')
   
-  const [refData, setRefData] = useState<{ mapel: any[], kelas: any[] }>({ mapel: [], kelas: [] })
+  const [refData, setRefData] = useState<{ mapel: any[], kelas: any[], marhalah: any[] }>({ mapel: [], kelas: [], marhalah: [] })
+  const [selectedMarhalah, setSelectedMarhalah] = useState('')
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
   const [selectedMapel, setSelectedMapel] = useState<string>('')
@@ -60,12 +61,12 @@ export default function InputNilaiPage() {
       if (data?.error) {
         throw new Error(data.error)
       }
-      console.log('[InputNilai] refData received:', JSON.stringify({ mapelCount: data?.mapel?.length, kelasCount: data?.kelas?.length }))
-      setRefData(data ?? { mapel: [], kelas: [] })
+      console.log('[InputNilai] refData received:', JSON.stringify({ mapelCount: data?.mapel?.length, kelasCount: data?.kelas?.length, marhalahCount: data?.marhalah?.length }))
+      setRefData(data ?? { mapel: [], kelas: [], marhalah: [] })
     } catch (err: any) {
       console.error("Gagal memuat data referensi:", err)
       toast.error("Gagal memuat data referensi: " + (err?.message || 'Unknown error'))
-      setRefData({ mapel: [], kelas: [] })
+      setRefData({ mapel: [], kelas: [], marhalah: [] })
     } finally {
       setIsInitializing(false)
     }
@@ -270,6 +271,20 @@ export default function InputNilaiPage() {
               </div>
 
               <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Marhalah</label>
+                <select 
+                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  value={selectedMarhalah}
+                  onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
+                >
+                  <option value="">-- Semua Marhalah --</option>
+                  {refData.marhalah.map((m: any) => (
+                    <option key={m.id} value={m.id}>{m.nama}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Kelas Target</label>
                 <select 
                   className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-slate-50 disabled:cursor-not-allowed"
@@ -278,9 +293,12 @@ export default function InputNilaiPage() {
                   disabled={isInitializing}
                 >
                   <option value="">{isInitializing ? "-- Memuat data... --" : "-- Pilih Kelas --"}</option>
-                  {!isInitializing && refData.kelas.map((k: any) => (
-                    <option key={k.id} value={k.id}>{k.nama_kelas} ({k.marhalah_nama})</option>
-                  ))}
+                  {!isInitializing && refData.kelas
+                    .filter((k: any) => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+                    .map((k: any) => (
+                      <option key={k.id} value={k.id}>{k.nama_kelas} ({k.marhalah_nama})</option>
+                    ))
+                  }
                 </select>
                 {refData.kelas.length === 0 && !isInitializing && (
                   <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">

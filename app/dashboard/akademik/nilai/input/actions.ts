@@ -11,10 +11,13 @@ import { revalidatePath } from 'next/cache'
 export async function getReferensiData() {
   try {
     const session = await getSession()
-    if (!session) return { mapel: [], kelas: [] }
+    if (!session) return { mapel: [], kelas: [], marhalah: [] }
 
     // ── Mapel
     const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
+
+    // ── Marhalah
+    const marhalah = await query<any>('SELECT id, nama FROM marhalah ORDER BY urutan')
 
     // ── Kelas ──
     const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
@@ -22,14 +25,14 @@ export async function getReferensiData() {
     let kelas: any[]
     if (isFullAccess) {
       kelas = await query<any>(`
-        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+        SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
         LEFT JOIN marhalah m ON m.id = k.marhalah_id
         ORDER BY k.nama_kelas
       `)
     } else if (hasRole(session, 'wali_kelas')) {
       kelas = await query<any>(`
-        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+        SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
         LEFT JOIN marhalah m ON m.id = k.marhalah_id
         WHERE k.wali_kelas_id = ?
@@ -39,9 +42,9 @@ export async function getReferensiData() {
       kelas = []
     }
 
-    return { mapel, kelas }
+    return { mapel, kelas, marhalah }
   } catch (err: any) {
-    return { mapel: [], kelas: [], error: err?.message || String(err) }
+    return { mapel: [], kelas: [], marhalah: [], error: err?.message || String(err) }
   }
 }
 
