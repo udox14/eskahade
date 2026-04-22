@@ -9,39 +9,40 @@ import { revalidatePath } from 'next/cache'
  * Admin/Sekpen/Akademik = semua kelas. Wali kelas = hanya kelas binaannya.
  */
 export async function getReferensiData() {
-  const session = await getSession()
-  if (!session) return { mapel: [], kelas: [] }
+  try {
+    const session = await getSession()
+    if (!session) return { mapel: [], kelas: [] }
 
-  // ── Mapel (query langsung, JANGAN pakai unstable_cache di sini
-  //    karena conflict dengan cookies() dari getSession) ──
-  const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
+    // ── Mapel
+    const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
 
-  // ── Kelas ──
-  const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+    // ── Kelas ──
+    const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
 
-  let kelas: any[]
-  if (isFullAccess) {
-    // Admin/Sekpen/Akademik: semua kelas
-    kelas = await query<any>(`
-      SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
-      FROM kelas k
-      LEFT JOIN marhalah m ON m.id = k.marhalah_id
-      ORDER BY k.nama_kelas
-    `)
-  } else if (hasRole(session, 'wali_kelas')) {
-    // Wali kelas: hanya kelas binaannya
-    kelas = await query<any>(`
-      SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
-      FROM kelas k
-      LEFT JOIN marhalah m ON m.id = k.marhalah_id
-      WHERE k.wali_kelas_id = ?
-      ORDER BY k.nama_kelas
-    `, [session.id])
-  } else {
-    kelas = []
+    let kelas: any[]
+    if (isFullAccess) {
+      kelas = await query<any>(`
+        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+        FROM kelas k
+        LEFT JOIN marhalah m ON m.id = k.marhalah_id
+        ORDER BY k.nama_kelas
+      `)
+    } else if (hasRole(session, 'wali_kelas')) {
+      kelas = await query<any>(`
+        SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+        FROM kelas k
+        LEFT JOIN marhalah m ON m.id = k.marhalah_id
+        WHERE k.wali_kelas_id = ?
+        ORDER BY k.nama_kelas
+      `, [session.id])
+    } else {
+      kelas = []
+    }
+
+    return { mapel, kelas }
+  } catch (err: any) {
+    return { mapel: [], kelas: [], error: err?.message || String(err) }
   }
-
-  return { mapel, kelas }
 }
 
 export async function getDataSantriPerKelas(kelasId: string) {
