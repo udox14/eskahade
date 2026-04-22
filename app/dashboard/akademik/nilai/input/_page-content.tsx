@@ -29,7 +29,6 @@ import {
   simpanCatatanWali,
   KEPRIBADIAN_FIELDS
 } from './actions'
-import { getKelasListForLeger } from '@/app/dashboard/akademik/leger/actions'
 import { toast } from 'sonner'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
@@ -57,13 +56,12 @@ export default function InputNilaiPage() {
   const fetchRef = async () => {
     setIsInitializing(true)
     try {
-      // getReferensiData sekarang sudah mencakup logika Leger (session & wali kelas) 
-      // dan mengembalikan { mapel, kelas } dengan penanganan error internal.
       const data = await getReferensiData()
-      setRefData(data)
-    } catch (err) {
+      console.log('[InputNilai] refData received:', JSON.stringify({ mapelCount: data?.mapel?.length, kelasCount: data?.kelas?.length }))
+      setRefData(data ?? { mapel: [], kelas: [] })
+    } catch (err: any) {
       console.error("Gagal memuat data referensi:", err)
-      // Fallback aman jika terjadi error yang tidak terduga
+      toast.error("Gagal memuat data referensi: " + (err?.message || 'Unknown error'))
       setRefData({ mapel: [], kelas: [] })
     } finally {
       setIsInitializing(false)

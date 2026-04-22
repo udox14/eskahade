@@ -2,12 +2,11 @@
 
 import { query, execute } from '@/lib/db'
 import { getCachedMapelAll } from '@/lib/cache/master'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 export async function getKelasList() {
   const session = await getSession()
-  const isWaliKelas = hasRole(session, 'wali_kelas')
 
   let sql = `
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
@@ -16,7 +15,9 @@ export async function getKelasList() {
   `
   const params: any[] = []
 
-  if (isWaliKelas && session?.id) {
+  // Admin/Sekpen/Akademik = akses semua kelas,
+  // Wali kelas = hanya kelas binaannya
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && hasRole(session, 'wali_kelas') && session?.id) {
     sql += ' WHERE k.wali_kelas_id = ?'
     params.push(session.id)
   }

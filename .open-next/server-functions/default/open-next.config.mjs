@@ -150,8 +150,8 @@ function isUserWorkerFirst(runWorkerFirst, pathname) {
 var asset_resolver_default = resolver;
 
 // node_modules/@opennextjs/cloudflare/dist/api/config.js
-function defineCloudflareConfig(config = {}) {
-  const { incrementalCache, tagCache, queue, cachePurge, enableCacheInterception = false, routePreloadingBehavior = "none" } = config;
+function defineCloudflareConfig(config2 = {}) {
+  const { incrementalCache, tagCache, queue, cachePurge, enableCacheInterception = false, routePreloadingBehavior = "none" } = config2;
   return {
     default: {
       override: {
@@ -367,9 +367,13 @@ var KVIncrementalCache = class {
 var kv_incremental_cache_default = new KVIncrementalCache();
 
 // open-next.config.ts
-var open_next_config_default = defineCloudflareConfig({
+var config = defineCloudflareConfig({
   incrementalCache: kv_incremental_cache_default
 });
+var open_next_config_default = {
+  ...config,
+  imageOptimization: false
+};
 export {
   open_next_config_default as default
 };

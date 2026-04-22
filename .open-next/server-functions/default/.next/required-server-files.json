@@ -109,7 +109,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\DATA\\Codes\\eskahade",
+    "outputFileTracingRoot": "C:\\DATA\\eskahade",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -166,7 +166,7 @@
       "proxyPrefetch": "flexible",
       "optimisticClientCache": true,
       "manualClientBasePath": false,
-      "cpus": 11,
+      "cpus": 13,
       "memoryBasedWorkersCount": false,
       "imgOptConcurrency": null,
       "imgOptTimeoutInSeconds": 7,
@@ -303,11 +303,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "C:\\DATA\\Codes\\eskahade"
+      "root": "C:\\DATA\\eskahade"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "C:\\DATA\\Codes\\eskahade",
+  "appDir": "C:\\DATA\\eskahade",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

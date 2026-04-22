@@ -250,6 +250,12 @@
       "namedRegex": "^/dashboard/keamanan(?:/)?$"
     },
     {
+      "page": "/dashboard/keamanan/input",
+      "regex": "^/dashboard/keamanan/input(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/keamanan/input(?:/)?$"
+    },
+    {
       "page": "/dashboard/keamanan/perizinan",
       "regex": "^/dashboard/keamanan/perizinan(?:/)?$",
       "routeKeys": {},
@@ -266,6 +272,18 @@
       "regex": "^/dashboard/keamanan/perizinan/verifikasi\\-telat(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/keamanan/perizinan/verifikasi\\-telat(?:/)?$"
+    },
+    {
+      "page": "/dashboard/keamanan/rekap-absen-berjamaah",
+      "regex": "^/dashboard/keamanan/rekap\\-absen\\-berjamaah(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/keamanan/rekap\\-absen\\-berjamaah(?:/)?$"
+    },
+    {
+      "page": "/dashboard/keamanan/rekap-absen-malam",
+      "regex": "^/dashboard/keamanan/rekap\\-absen\\-malam(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/keamanan/rekap\\-absen\\-malam(?:/)?$"
     },
     {
       "page": "/dashboard/keamanan/rekap-asrama",

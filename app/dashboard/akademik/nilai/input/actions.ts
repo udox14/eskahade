@@ -7,61 +7,41 @@ import { revalidatePath } from 'next/cache'
 
 /** 
  * Ambil data referensi (Mapel & Kelas)
+ * Admin/Sekpen/Akademik = semua kelas. Wali kelas = hanya kelas binaannya.
  */
 export async function getReferensiData() {
-  try {
-    const session = await getSession()
-    if (!session) return { mapel: [], kelas: [] }
+  const session = await getSession()
+  if (!session) return { mapel: [], kelas: [] }
 
-    // Mapel
-    let mapel: any[] = []
-    try {
-      const mc = await getCachedMapelList()
-      mapel = Array.isArray(mc) ? mc : []
-    } catch (err) {
-      console.error("Error get mapel:", err)
-    }
+  // ── Mapel ──
+  const mapel = await getCachedMapelList()
 
-    // Kelas
-    let sql = `
+  // ── Kelas ──
+  const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+
+  let kelas: any[]
+  if (isFullAccess) {
+    // Admin/Sekpen/Akademik: semua kelas
+    kelas = await query<any>(`
       SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
       FROM kelas k
       LEFT JOIN marhalah m ON m.id = k.marhalah_id
-    `
-    const params: any[] = []
-
-    const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
-    const isWaliKelas = hasRole(session, 'wali_kelas')
-
-    if (!isFullAccess) {
-      if (isWaliKelas) {
-        sql += ' WHERE k.wali_kelas_id = ?'
-        params.push(session.id)
-      } else {
-        // Jika tidak memiliki akses penuh atau binaan wali kelas
-        return { mapel, kelas: [] }
-      }
-    }
-
-    let kelasRaw: any[] = []
-    try {
-      const raw = await query<any>(sql, params)
-      kelasRaw = Array.isArray(raw) ? raw : []
-    } catch (err) {
-      console.error("Error get kelas:", err)
-    }
-
-    const kelas = kelasRaw.sort((a: any, b: any) => {
-      const nameA = String(a?.nama_kelas || '')
-      const nameB = String(b?.nama_kelas || '')
-      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
-    })
-
-    return { mapel, kelas }
-  } catch (err) {
-    console.error("Fatal error getReferensiData:", err)
-    return { mapel: [], kelas: [] }
+      ORDER BY k.nama_kelas
+    `)
+  } else if (hasRole(session, 'wali_kelas')) {
+    // Wali kelas: hanya kelas binaannya
+    kelas = await query<any>(`
+      SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+      FROM kelas k
+      LEFT JOIN marhalah m ON m.id = k.marhalah_id
+      WHERE k.wali_kelas_id = ?
+      ORDER BY k.nama_kelas
+    `, [session.id])
+  } else {
+    kelas = []
   }
+
+  return { mapel, kelas }
 }
 
 export async function getDataSantriPerKelas(kelasId: string) {

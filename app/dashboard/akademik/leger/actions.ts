@@ -16,7 +16,9 @@ export async function getKelasListForLeger() {
   `
   const params: any[] = []
 
-  if (hasRole(session, 'wali_kelas')) {
+  // Admin/Sekpen/Akademik = akses semua kelas, 
+  // Wali kelas = hanya kelas binaannya
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && hasRole(session, 'wali_kelas')) {
     sql += ' WHERE k.wali_kelas_id = ?'
     params.push(session.id)
   }
