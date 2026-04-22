@@ -199,105 +199,102 @@ export default function VerifikasiAbsenPage() {
       {/* Header Utama */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-             <Gavel className="w-8 h-8 text-violet-600" /> Verifikasi Absensi
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium">Tetapkan status sidang alfa santri secara massal</p>
+          <h1 className="text-2xl font-bold text-slate-800">Verifikasi Absensi</h1>
+          <p className="text-slate-500 text-sm">Tetapkan status sidang alfa santri secara massal</p>
         </div>
         
         <div className="flex items-center gap-3">
            <button onClick={loadData} disabled={loading}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-sm font-bold hover:bg-slate-50 disabled:opacity-60 transition-all shadow-sm">
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 disabled:opacity-60 transition-all shadow-sm">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Segarkan Antrian
+            Segarkan
           </button>
         </div>
       </div>
 
-      {/* FILTER BAR - PREMIUM DESIGN */}
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-2xl border border-slate-100 text-slate-500">
-            <Filter className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Filter Sidang</span>
-          </div>
+      <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+        <div className="flex items-center gap-2 text-slate-700">
+          <Filter className="w-4 h-4" />
+          <span className="text-sm font-bold">Filter Sidang</span>
+        </div>
 
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Filter Marhalah */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Marhalah</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
-                value={selectedMarhalah}
-                onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
-              >
-                <option value="">Semua Marhalah</option>
-                {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Marhalah</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedMarhalah}
+                  onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
+                >
+                  <option value="">Semua Marhalah</option>
+                  {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
-            {/* Filter Kelas */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Kelas</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
-                value={selectedKelas}
-                onChange={(e) => setSelectedKelas(e.target.value)}
-              >
-                <option value="">Semua Kelas</option>
-                {kelasList
-                  .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
-                  .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
-                }
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Kelas</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedKelas}
+                  onChange={(e) => setSelectedKelas(e.target.value)}
+                >
+                  <option value="">Semua Kelas</option>
+                  {kelasList
+                    .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+                    .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
+                  }
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
-            {/* Filter Asrama */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Asrama</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none appearance-none text-sm text-slate-700 font-bold cursor-pointer transition-all hover:border-slate-300"
-                value={selectedAsrama}
-                onChange={(e) => setSelectedAsrama(e.target.value)}
-              >
-                <option value="">Semua Asrama</option>
-                {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Asrama</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedAsrama}
+                  onChange={(e) => setSelectedAsrama(e.target.value)}
+                >
+                  <option value="">Semua Asrama</option>
+                  {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
-            {/* Filter Tanggal */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-violet-600 transition-colors">Pilih Pekan (Opsional)</label>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Pilih Pekan (Opsional)</label>
               <input 
                 type="date" 
-                className="w-full pl-3 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none text-sm text-slate-700 font-bold transition-all hover:border-slate-300"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm text-slate-700 transition-all hover:border-slate-300"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
               />
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
             className="flex gap-2 flex-1 max-w-md">
-            <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
-              <input type="text" placeholder="Cari nama santri atau NIS..."
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" placeholder="Cari nama atau NIS..."
                 value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all shadow-inner" />
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all" />
             </div>
             <button type="submit"
-              className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all active:scale-95 shadow-lg shadow-slate-200">
+              className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-all active:scale-95">
               Cari
             </button>
           </form>
 
-          <div className="flex items-center gap-2 flex-wrap bg-slate-50 p-2 rounded-2xl border border-slate-100">
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-2 mr-1">Pilih Semua:</span>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <span className="text-slate-500 font-bold ml-2">Pilih Semua:</span>
             {([
               { v: 'ALFA_MURNI' as VonisType, label: 'Alfa',  cls: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white' },
               { v: 'SAKIT'      as VonisType, label: 'Sakit', cls: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-500 hover:text-white' },
@@ -319,17 +316,15 @@ export default function VerifikasiAbsenPage() {
            <p className="text-slate-400 font-bold animate-pulse tracking-widest text-[10px]">MEMUAT ANTRIAN SIDANG...</p>
         </div>
       ) : !hasLoaded ? (
-        <div className="flex flex-col items-center py-24 gap-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 text-center">
-          <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center">
-            <Gavel className="w-12 h-12 text-violet-300" />
-          </div>
+        <div className="flex flex-col items-center py-20 bg-white rounded-xl border shadow-sm text-center gap-4">
+          <Gavel className="w-16 h-16 text-slate-200" />
           <div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Siap Verifikasi?</h3>
-            <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">Gunakan filter di atas lalu klik tombol di bawah untuk menarik data santri yang perlu disidang.</p>
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Siap Verifikasi?</h3>
+            <p className="text-slate-500 text-sm">Pilih filter di atas lalu klik tombol di bawah untuk menampilkan antrian sidang.</p>
           </div>
           <button 
             onClick={loadData}
-            className="bg-violet-600 text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-violet-200 hover:bg-violet-700 active:scale-95 transition-all"
+            className="bg-violet-600 text-white px-8 py-3 rounded-xl font-bold shadow hover:bg-violet-700 active:scale-95 transition-all"
           >
             Tampilkan Antrian Sidang
           </button>

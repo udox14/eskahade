@@ -477,85 +477,82 @@ export default function AbsensiPage() {
         </div>
       </div>
 
-      {/* FILTER BAR - PREMIUM DESIGN */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-2xl border border-slate-100 text-slate-500">
-            <Filter className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-wider">Filter Data</span>
-          </div>
+      <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+        <div className="flex items-center gap-2 text-slate-700">
+          <Filter className="w-4 h-4" />
+          <span className="text-sm font-bold">Filter Data</span>
+        </div>
 
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Filter Marhalah */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Marhalah</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
-                value={selectedMarhalah}
-                onChange={handleMarhalahChange}
-              >
-                <option value="">Semua Marhalah</option>
-                {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
-
-            {/* Filter Kelas */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Kelas</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
-                value={selectedKelas}
-                onChange={handleClassChange}
-              >
-                <option value="">Semua Kelas</option>
-                {kelasList
-                  .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
-                  .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
-                }
-              </select>
-              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
-
-            {/* Filter Asrama */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Asrama</label>
-              <select 
-                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
-                value={selectedAsrama}
-                onChange={handleAsramaChange}
-              >
-                <option value="">Semua Asrama</option>
-                {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
-
-            {/* Filter Tanggal */}
-            <div className="relative group">
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Tanggal Pekan</label>
-              <div className="relative flex items-center">
-                 <input 
-                    type="date" 
-                    className="w-full pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm text-slate-700 font-medium transition-all hover:border-slate-300"
-                    value={selectedDate}
-                    onChange={handleDateChange}
-                />
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Marhalah</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedMarhalah}
+                  onChange={handleMarhalahChange}
+                >
+                  <option value="">Semua Marhalah</option>
+                  {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
             </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Kelas</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedKelas}
+                  onChange={handleClassChange}
+                >
+                  <option value="">Semua Kelas</option>
+                  {kelasList
+                    .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+                    .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
+                  }
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Asrama</label>
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
+                  value={selectedAsrama}
+                  onChange={handleAsramaChange}
+                >
+                  <option value="">Semua Asrama</option>
+                  {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Tanggal Pekan</label>
+              <input 
+                  type="date" 
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm text-slate-700 transition-all hover:border-slate-300"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+              />
           </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
-           <div className="flex items-center gap-2 text-sm font-medium text-slate-500 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+           <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
             <Calendar className="w-4 h-4 text-green-600" />
-            <span>Pekan Ini: <span className="text-slate-800">{days[0].shortDate} — {days[6].shortDate}</span></span>
+            <span>Pekan Ini: <span className="font-bold text-slate-800">{days[0].shortDate} — {days[6].shortDate}</span></span>
           </div>
 
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowExportModal(true)} 
-              className="px-4 py-2 bg-rose-50 text-rose-700 rounded-2xl flex items-center gap-2 hover:bg-rose-100 transition-colors text-sm font-bold border border-rose-100"
+              className="px-4 py-2 bg-rose-600 text-white rounded-lg flex items-center gap-2 hover:bg-rose-700 transition-colors text-sm font-bold"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Rekap Alfa (Global)
@@ -563,7 +560,7 @@ export default function AbsensiPage() {
             <button 
               onClick={handleExportExcel} 
               disabled={loading || dataSantri.length === 0}
-              className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center gap-2 hover:bg-emerald-100 disabled:opacity-50 transition-colors text-sm font-bold border border-emerald-100"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-bold"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Export Excel
@@ -573,17 +570,15 @@ export default function AbsensiPage() {
       </div>
 
       {!hasLoaded ? (
-        <div className="text-center py-24 bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col items-center justify-center gap-6">
-          <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center">
-             <Calendar className="w-12 h-12 text-green-300" />
-          </div>
+        <div className="text-center py-20 bg-white rounded-xl border shadow-sm flex flex-col items-center justify-center gap-4">
+          <Calendar className="w-16 h-16 text-slate-200" />
           <div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Siap Absen?</h3>
-            <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">Pilih filter di atas lalu klik tombol di bawah untuk menampilkan daftar santri.</p>
+            <h3 className="text-xl font-bold text-slate-800">Siap Absen?</h3>
+            <p className="text-slate-500 text-sm">Pilih filter di atas lalu klik tombol di bawah untuk menampilkan daftar santri.</p>
           </div>
           <button 
             onClick={loadData}
-            className="bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-green-200 hover:bg-green-700 active:scale-95 transition-all"
+            className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow hover:bg-green-700 active:scale-95 transition-all"
           >
             Tampilkan Daftar Santri
           </button>

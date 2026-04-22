@@ -54,78 +54,72 @@ export default function CetakPemanggilanPage() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER NO-PRINT */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+      <div className="flex items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-3 hover:bg-slate-100 rounded-2xl transition-colors bg-white border border-slate-100 shadow-sm">
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Cetak Pemanggilan</h1>
-            <p className="text-slate-500 font-medium">Rekap santri untuk sidang pemanggilan alfa</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cetak Pemanggilan</h1>
+            <p className="text-slate-500 text-sm">Rekap santri untuk sidang pemanggilan alfa</p>
           </div>
         </div>
 
         {data.length > 0 && (
           <button 
             onClick={() => handlePrint()}
-            className="bg-emerald-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] font-bold"
+            className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800 transition-all font-bold"
           >
-            <Printer className="w-5 h-5"/> Cetak Surat (PDF)
+            <Printer className="w-4 h-4"/> Cetak PDF
           </button>
         )}
       </div>
 
-      {/* FILTER BAR - PREMIUM DESIGN */}
-      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6 print:hidden">
+      <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col gap-6 print:hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="relative group">
-            <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-widest z-10 group-focus-within:text-blue-600 transition-colors">1. Pilih Pekan</label>
+          <div>
+            <label className="text-sm font-bold text-slate-700 block mb-1">1. Pilih Pekan</label>
             <input 
               type="date" 
-              className="w-full pl-3 pr-3 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm text-slate-700 font-bold transition-all hover:border-slate-300"
+              className="w-full p-2 border border-slate-200 rounded-lg text-sm text-slate-700 font-bold"
               value={tglRef}
               onChange={(e) => setTglRef(e.target.value)}
             />
-            <p className="text-[10px] text-slate-400 font-medium mt-1.5 ml-1 italic">* Otomatis deteksi periode Rabu - Selasa</p>
+            <p className="text-xs text-slate-500 mt-1 italic">Otomatis deteksi periode Rabu - Selasa</p>
           </div>
 
-          <div className="relative group">
-            <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-widest z-10 group-focus-within:text-blue-600 transition-colors">2. Tanggal Panggil</label>
+          <div>
+            <label className="text-sm font-bold text-slate-700 block mb-1">2. Tanggal Panggil</label>
             <input 
               type="date" 
-              className="w-full pl-3 pr-3 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm text-slate-700 font-bold transition-all hover:border-slate-300"
+              className="w-full p-2 border border-slate-200 rounded-lg text-sm text-slate-700 font-bold"
               value={tglPanggil}
               onChange={(e) => setTglPanggil(e.target.value)}
             />
-            <p className="text-[10px] text-slate-400 font-medium mt-1.5 ml-1 italic">* Tanggal ini akan muncul di surat</p>
+            <p className="text-xs text-slate-500 mt-1 italic">Tanggal ini akan muncul di surat</p>
           </div>
 
           <div className="flex flex-col justify-center">
-            <label className="flex items-center gap-3 cursor-pointer group w-fit">
-              <div className="relative">
-                <input 
-                  type="checkbox" 
-                  className="sr-only" 
-                  checked={onlyMangkir}
-                  onChange={(e) => setOnlyMangkir(e.target.checked)}
-                />
-                <div className={`w-12 h-6 rounded-full transition-colors ${onlyMangkir ? 'bg-orange-500' : 'bg-slate-200'}`}></div>
-                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${onlyMangkir ? 'translate-x-6' : ''}`}></div>
-              </div>
-              <span className={`text-sm font-bold transition-colors ${onlyMangkir ? 'text-orange-600' : 'text-slate-500'}`}>Hanya Santri Mangkir</span>
+            <label className="flex items-center gap-2 cursor-pointer group w-fit">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                checked={onlyMangkir}
+                onChange={(e) => setOnlyMangkir(e.target.checked)}
+              />
+              <span className={`text-sm font-bold ${onlyMangkir ? 'text-blue-600' : 'text-slate-700'}`}>Hanya Santri Mangkir</span>
             </label>
-            <p className="text-[10px] text-slate-400 mt-1">Cetak yang tidak hadir sidang sebelumnya</p>
+            <p className="text-xs text-slate-500 mt-1">Cetak santri yang tidak hadir sidang sebelumnya</p>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 flex justify-end">
+        <div className="pt-4 border-t border-slate-100 flex justify-end">
           <button 
             onClick={handleLoad}
             disabled={loading}
-            className="bg-slate-900 text-white px-10 py-3.5 rounded-2xl flex items-center gap-2 hover:bg-black disabled:opacity-50 transition-all active:scale-[0.98] font-bold shadow-lg shadow-slate-200"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 transition-all font-bold"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : <Search className="w-5 h-5"/>}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>}
             Tampilkan Data
           </button>
         </div>
