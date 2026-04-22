@@ -3,7 +3,7 @@ Read more: https://nextjs.org/docs/messages/invalid-use-server-value`),"__NEXT_E
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
-  `,c=[];return(0,f.hasRole)(a,"wali_kelas")&&(b+=" WHERE k.wali_kelas_id = ?",c.push(a.id)),(await (0,d.query)(b,c)).sort((a,b)=>a.nama_kelas.localeCompare(b.nama_kelas,void 0,{numeric:!0,sensitivity:"base"}))}async function i(a,b){let c=await (0,e.getCachedMapelList)();if(!c.length)return{mapel:[],siswa:[]};let f=await (0,d.query)(`
+  `,c=[];return!(0,f.hasAnyRole)(a,["admin","sekpen","akademik"])&&(0,f.hasRole)(a,"wali_kelas")&&(b+=" WHERE k.wali_kelas_id = ?",c.push(a.id)),(await (0,d.query)(b,c)).sort((a,b)=>a.nama_kelas.localeCompare(b.nama_kelas,void 0,{numeric:!0,sensitivity:"base"}))}async function i(a,b){let c=await (0,e.getCachedMapelList)();if(!c.length)return{mapel:[],siswa:[]};let f=await (0,d.query)(`
     SELECT rp.id,
            s.id AS santri_id, s.nama_lengkap, s.nis,
            r.jumlah_nilai, r.rata_rata, r.ranking_kelas

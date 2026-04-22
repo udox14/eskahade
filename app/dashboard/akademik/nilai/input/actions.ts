@@ -2,7 +2,6 @@
 
 import { query, execute, batch, generateId } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
-import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 /** 
@@ -13,8 +12,9 @@ export async function getReferensiData() {
   const session = await getSession()
   if (!session) return { mapel: [], kelas: [] }
 
-  // ── Mapel ──
-  const mapel = await getCachedMapelList()
+  // ── Mapel (query langsung, JANGAN pakai unstable_cache di sini
+  //    karena conflict dengan cookies() dari getSession) ──
+  const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
 
   // ── Kelas ──
   const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
