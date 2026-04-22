@@ -6,8 +6,7 @@ import { getCachedMapelList } from '@/lib/cache/master'
 import { revalidatePath } from 'next/cache'
 
 /** 
- * Ambil data referensi (Mapel & Kelas) 
- * Menggunakan logika yang sama dengan Leger Nilai agar terbukti berhasil.
+ * Ambil data referensi (Mapel & Kelas)
  */
 export async function getReferensiData() {
   try {
@@ -15,7 +14,13 @@ export async function getReferensiData() {
     if (!session) return { mapel: [], kelas: [] }
 
     // Mapel
-    const mapel = await getCachedMapelList().catch(() => [])
+    let mapel: any[] = []
+    try {
+      const mc = await getCachedMapelList()
+      mapel = Array.isArray(mc) ? mc : []
+    } catch (err) {
+      console.error("Error get mapel:", err)
+    }
 
     // Kelas
     let sql = `
@@ -25,17 +30,32 @@ export async function getReferensiData() {
     `
     const params: any[] = []
 
-    // Jika user BUKAN admin/akademik/sekpen, TAPI dia adalah wali_kelas,
-    // maka hanya tampilkan kelas binaannya saja.
-    if (!hasAnyRole(session, ['admin', 'akademik', 'sekpen']) && hasRole(session, 'wali_kelas')) {
-      sql += ' WHERE k.wali_kelas_id = ?'
-      params.push(session.id)
+    const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+    const isWaliKelas = hasRole(session, 'wali_kelas')
+
+    if (!isFullAccess) {
+      if (isWaliKelas) {
+        sql += ' WHERE k.wali_kelas_id = ?'
+        params.push(session.id)
+      } else {
+        // Jika tidak memiliki akses penuh atau binaan wali kelas
+        return { mapel, kelas: [] }
+      }
     }
 
-    const kelasRaw = await query<any>(sql, params).catch(() => [])
-    const kelas = [...kelasRaw].sort((a: any, b: any) =>
-      String(a.nama_kelas).localeCompare(String(b.nama_kelas), undefined, { numeric: true, sensitivity: 'base' })
-    )
+    let kelasRaw: any[] = []
+    try {
+      const raw = await query<any>(sql, params)
+      kelasRaw = Array.isArray(raw) ? raw : []
+    } catch (err) {
+      console.error("Error get kelas:", err)
+    }
+
+    const kelas = kelasRaw.sort((a: any, b: any) => {
+      const nameA = String(a?.nama_kelas || '')
+      const nameB = String(b?.nama_kelas || '')
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
+    })
 
     return { mapel, kelas }
   } catch (err) {
