@@ -225,7 +225,7 @@ export default function AbsensiPage() {
 
   // Handler: Simpan
   const handleSimpan = async () => {
-    if (!selectedKelas) return
+    if (dataSantri.length === 0) return
 
     setSaving(true)
     const loadToast = toast.loading("Menyimpan absensi...") // Toast Loading
@@ -289,7 +289,7 @@ export default function AbsensiPage() {
 
   // Handler: Export Excel
   const handleExportExcel = async () => {
-    if (!selectedKelas || dataSantri.length === 0) return
+    if (dataSantri.length === 0) return
 
     const exportToast = toast.loading("Menyiapkan file Excel...")
     try {
@@ -566,13 +566,19 @@ export default function AbsensiPage() {
         </div>
       </div>
 
-      {!selectedKelas ? (
-        <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed">
-          <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2"/>
-          <p className="text-slate-500">Pilih kelas untuk mulai mengabsen.</p>
+      {loading ? (
+        <div className="text-center py-12 flex flex-col items-center justify-center">
+          <Loader2 className="w-12 h-12 animate-spin text-green-600 mb-4 opacity-50"/>
+          <p className="text-slate-500 font-medium animate-pulse">Menyiapkan data absensi...</p>
         </div>
-      ) : loading ? (
-        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-green-600"/></div>
+      ) : dataSantri.length === 0 ? (
+        <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+          <Calendar className="w-16 h-16 text-slate-200 mx-auto mb-4"/>
+          <h3 className="text-lg font-bold text-slate-400">Tidak Ada Data</h3>
+          <p className="text-slate-400 text-sm max-w-xs mx-auto mt-1">
+            Tidak ditemukan santri yang sesuai dengan kriteria filter yang Anda pilih.
+          </p>
+        </div>
       ) : (
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
           <div className="overflow-y-auto overflow-x-hidden hover:overflow-x-auto flex-1">
