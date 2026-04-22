@@ -3,6 +3,7 @@
 import { query, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
+import { getCachedMarhalahList } from '@/lib/cache/master'
 
 function getWeekRange(date: Date) {
   const d = new Date(date)
@@ -16,10 +17,28 @@ function getWeekRange(date: Date) {
   return { start, end }
 }
 
-export async function getAbsensiData(kelasId: string, tanggalRef: string) {
+export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string }) {
   const { start, end } = getWeekRange(new Date(tanggalRef))
   const startStr = start.toISOString().split('T')[0]
   const endStr = end.toISOString().split('T')[0]
+
+  let whereClauses = ["rp.status_riwayat = 'aktif'"]
+  let params: any[] = []
+
+  if (filters.kelasId) {
+    whereClauses.push("rp.kelas_id = ?")
+    params.push(filters.kelasId)
+  }
+  if (filters.asrama) {
+    whereClauses.push("s.asrama = ?")
+    params.push(filters.asrama)
+  }
+  if (filters.marhalahId) {
+    whereClauses.push("k.marhalah_id = ?")
+    params.push(filters.marhalahId)
+  }
+
+  const whereSql = whereClauses.join(" AND ")
 
   const santri = await query<any>(`
     SELECT 
@@ -35,20 +54,21 @@ export async function getAbsensiData(kelasId: string, tanggalRef: string) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     JOIN kelas k ON k.id = rp.kelas_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
-    ORDER BY s.nama_lengkap
-  `, [kelasId])
+    WHERE ${whereSql}
+    ORDER BY s.asrama, s.kamar, s.nama_lengkap
+  `, params)
 
   if (!santri.length) return { santri: [], absensi: [] }
 
-  // JOIN langsung ke kelas — hindari IN (100+ ids) yang melebihi batas 999 variabel D1
   const absensi = await query<any>(`
     SELECT ah.riwayat_pendidikan_id, ah.tanggal, ah.shubuh, ah.ashar, ah.maghrib
     FROM absensi_harian ah
     JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ${whereSql}
       AND ah.tanggal >= ? AND ah.tanggal <= ?
-  `, [kelasId, startStr, endStr])
+  `, [...params, startStr, endStr])
 
   return { santri, absensi }
 }
@@ -96,10 +116,24 @@ export async function simpanAbsensi(dataInput: any[]) {
 }
 
 export async function getKelasList() {
-  const data = await query<any>('SELECT id, nama_kelas FROM kelas ORDER BY nama_kelas')
+  const data = await query<any>('SELECT id, nama_kelas, marhalah_id FROM kelas ORDER BY nama_kelas')
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
+}
+
+export async function getAsramaList() {
+  const data = await query<any>(`
+    SELECT DISTINCT asrama 
+    FROM santri 
+    WHERE asrama IS NOT NULL AND asrama != '' 
+    ORDER BY asrama
+  `)
+  return data.map((d: any) => d.asrama)
+}
+
+export async function getMarhalahList() {
+  return getCachedMarhalahList()
 }
 
 export async function getAbsensiGlobalA(tanggalRef: string) {

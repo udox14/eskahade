@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getKelasList, getAbsensiData, simpanAbsensi, getAbsensiGlobalA } from './actions'
-import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X } from 'lucide-react'
+import { getKelasList, getAbsensiData, simpanAbsensi, getAbsensiGlobalA, getAsramaList, getMarhalahList } from './actions'
+import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X, Filter, ChevronDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner' // IMPORT WAJIB
@@ -13,7 +13,12 @@ const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
 
 export default function AbsensiPage() {
   const [kelasList, setKelasList] = useState<any[]>([])
+  const [asramaList, setAsramaList] = useState<string[]>([])
+  const [marhalahList, setMarhalahList] = useState<any[]>([])
+  
   const [selectedKelas, setSelectedKelas] = useState('')
+  const [selectedAsrama, setSelectedAsrama] = useState('')
+  const [selectedMarhalah, setSelectedMarhalah] = useState('')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   
   const [dataSantri, setDataSantri] = useState<any[]>([])
@@ -26,19 +31,25 @@ export default function AbsensiPage() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
 
-  // 1. Load Daftar Kelas
+  // 1. Load Data Master
   useEffect(() => {
     getKelasList().then(setKelasList)
+    getAsramaList().then(setAsramaList)
+    getMarhalahList().then(setMarhalahList)
   }, [])
 
   // 2. Load Data Utama
   useEffect(() => {
-    if (!selectedKelas) return
-
+    // Tampilkan data jika salah satu filter dipilih, atau jika user ingin "Semua" (tapi kita batasi biar ga kaget)
+    // Di sini kita izinkan load jika minimal ada satu filter atau emang mau liat semua
     setLoading(true)
-    const loadToast = toast.loading("Memuat data absensi...") // Toast Loading
+    const loadToast = toast.loading("Memuat data absensi...")
 
-    getAbsensiData(selectedKelas, selectedDate).then((data: any) => {
+    getAbsensiData(selectedDate, { 
+      kelasId: selectedKelas, 
+      asrama: selectedAsrama, 
+      marhalahId: selectedMarhalah 
+    }).then((data: any) => {
       setDataSantri(data.santri || [])
       
       const grid: Record<string, any> = {}
@@ -54,10 +65,10 @@ export default function AbsensiPage() {
       }
       setGridData(grid)
       setLoading(false)
-      setHasUnsavedChanges(false) // Data baru, belum ada perubahan
-      toast.dismiss(loadToast) // Tutup Toast Loading
+      setHasUnsavedChanges(false)
+      toast.dismiss(loadToast)
     })
-  }, [selectedKelas, selectedDate])
+  }, [selectedKelas, selectedAsrama, selectedMarhalah, selectedDate])
 
   // EFFECT UNTUK WARNING KETIKA BELUM SAVE
   useEffect(() => {
@@ -260,6 +271,17 @@ export default function AbsensiPage() {
       setSelectedKelas(e.target.value)
   }
 
+  const handleMarhalahChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin pindah marhalah?")) return
+      setSelectedMarhalah(e.target.value)
+      setSelectedKelas('') // Reset kelas jika marhalah ganti
+  }
+
+  const handleAsramaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin pindah asrama?")) return
+      setSelectedAsrama(e.target.value)
+  }
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (hasUnsavedChanges && !window.confirm("Ada absensi yang belum disave! Yakin ingin ganti tanggal/pekan?")) return
       setSelectedDate(e.target.value)
@@ -430,58 +452,117 @@ export default function AbsensiPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-800">Absensi Mingguan (Rapel)</h1>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setShowExportModal(true)} 
-            className="border border-red-200 bg-red-50 text-red-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-100 shadow-sm transition-colors"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Rekap Alfa (Global)
-          </button>
-          <button 
-            onClick={handleExportExcel} 
-            disabled={loading || dataSantri.length === 0}
-            className="border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 disabled:opacity-50 shadow-sm"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            Export Kelas
-          </button>
-          <button 
+      {/* HEADER UTAMA */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Absensi Pengajian</h1>
+          <p className="text-slate-500 mt-1">Input absensi mingguan (rapel) santri</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+           <button 
             onClick={handleSimpan} 
-            disabled={saving || !selectedKelas}
-            className="bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800 disabled:opacity-50 shadow-sm"
+            disabled={saving || dataSantri.length === 0}
+            className="bg-green-600 text-white px-8 py-3 rounded-2xl flex items-center gap-2 hover:bg-green-700 disabled:opacity-50 shadow-lg shadow-green-200 transition-all active:scale-[0.98] font-bold"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+            {saving ? <Loader2 className="w-5 h-4 animate-spin"/> : <Save className="w-5 h-4" />}
             Simpan Absensi
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
-        <div>
-          <label className="text-sm font-medium text-slate-700 block mb-1">Pilih Kelas</label>
-          <select 
-            className="p-2 border border-slate-200 rounded-xl w-full md:w-48 focus:ring-2 focus:ring-green-500 outline-none"
-            value={selectedKelas}
-            onChange={handleClassChange}
-          >
-            <option value="">-- Kelas --</option>
-            {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
-          </select>
+      {/* FILTER BAR - PREMIUM DESIGN */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col gap-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-2xl border border-slate-100 text-slate-500">
+            <Filter className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider">Filter Data</span>
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Filter Marhalah */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Marhalah</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
+                value={selectedMarhalah}
+                onChange={handleMarhalahChange}
+              >
+                <option value="">Semua Marhalah</option>
+                {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Filter Kelas */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Kelas</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
+                value={selectedKelas}
+                onChange={handleClassChange}
+              >
+                <option value="">Semua Kelas</option>
+                {kelasList
+                  .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+                  .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
+                }
+              </select>
+              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Filter Asrama */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Asrama</label>
+              <select 
+                className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none appearance-none text-sm text-slate-700 font-medium cursor-pointer transition-all hover:border-slate-300"
+                value={selectedAsrama}
+                onChange={handleAsramaChange}
+              >
+                <option value="">Semua Asrama</option>
+                {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Filter Tanggal */}
+            <div className="relative group">
+              <label className="absolute -top-2 left-3 px-1 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-tighter z-10 group-focus-within:text-green-600 transition-colors">Tanggal Pekan</label>
+              <div className="relative flex items-center">
+                 <input 
+                    type="date" 
+                    className="w-full pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm text-slate-700 font-medium transition-all hover:border-slate-300"
+                    value={selectedDate}
+                    onChange={handleDateChange}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="text-sm font-medium text-slate-700 block mb-1">Tanggal (Pewakil Pekan)</label>
-          <input 
-            type="date" 
-            className="p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-            value={selectedDate}
-            onChange={handleDateChange}
-          />
-        </div>
-        <div className="text-sm text-slate-500 pb-2">
-          {days[0].shortDate} s.d. {days[6].shortDate}
+
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
+           <div className="flex items-center gap-2 text-sm font-medium text-slate-500 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+            <Calendar className="w-4 h-4 text-green-600" />
+            <span>Pekan Ini: <span className="text-slate-800">{days[0].shortDate} — {days[6].shortDate}</span></span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowExportModal(true)} 
+              className="px-4 py-2 bg-rose-50 text-rose-700 rounded-2xl flex items-center gap-2 hover:bg-rose-100 transition-colors text-sm font-bold border border-rose-100"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Rekap Alfa (Global)
+            </button>
+            <button 
+              onClick={handleExportExcel} 
+              disabled={loading || dataSantri.length === 0}
+              className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center gap-2 hover:bg-emerald-100 disabled:opacity-50 transition-colors text-sm font-bold border border-emerald-100"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Export Excel
+            </button>
+          </div>
         </div>
       </div>
 

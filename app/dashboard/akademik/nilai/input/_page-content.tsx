@@ -56,7 +56,10 @@ export default function InputNilaiPage() {
   const fetchRef = async () => {
     setIsInitializing(true)
     try {
-      const data = await getReferensiData()
+      const data = await getReferensiData() as any
+      if (data?.error) {
+        throw new Error(data.error)
+      }
       console.log('[InputNilai] refData received:', JSON.stringify({ mapelCount: data?.mapel?.length, kelasCount: data?.kelas?.length }))
       setRefData(data ?? { mapel: [], kelas: [] })
     } catch (err: any) {
