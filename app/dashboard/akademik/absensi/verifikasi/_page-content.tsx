@@ -66,9 +66,40 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
     </div>
   )
 
+  if (no === -1) {
+    // Mobile card
+    return (
+      <div className={`rounded-xl border p-4 space-y-4 transition-all shadow-sm ${
+        terpilih ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className={`font-bold text-sm ${terpilih ? 'text-emerald-800' : 'text-slate-900'}`}>{item.nama}</p>
+            <p className="text-[11px] text-slate-400 font-medium tracking-tight uppercase">{item.nis} · {item.info}</p>
+          </div>
+          {terpilih && (
+            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+          )}
+        </div>
+
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col gap-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Alfa:</p>
+          {sesiPills}
+        </div>
+
+        <div className="pt-2 border-t border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">Tentukan Vonis:</p>
+          <div className="flex justify-center">
+            {tombol}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Desktop row
-  const desktopRow = (
-    <tr className={`hidden sm:table-row border-b border-slate-100 transition-colors ${terpilih ? 'bg-emerald-50/50' : 'hover:bg-slate-50/50'}`}>
+  return (
+    <tr className={`border-b border-slate-100 transition-colors ${terpilih ? 'bg-emerald-50/50' : 'hover:bg-slate-50/50'}`}>
       <td className="px-3 py-2.5 text-xs text-slate-300 text-center w-8">{no}</td>
       <td className="px-3 py-2.5">
         <p className={`font-semibold text-sm leading-tight ${terpilih ? 'text-emerald-800' : 'text-slate-800'}`}>{item.nama}</p>
@@ -78,37 +109,6 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
       <td className="px-3 py-2.5">{tombol}</td>
     </tr>
   )
-
-  // Mobile card
-  const mobileCard = (
-    <div className={`sm:hidden rounded-xl border p-4 space-y-4 transition-all shadow-sm ${
-      terpilih ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-white border-slate-200'
-    }`}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className={`font-bold text-sm ${terpilih ? 'text-emerald-800' : 'text-slate-900'}`}>{item.nama}</p>
-          <p className="text-[11px] text-slate-400 font-medium tracking-tight uppercase">{item.nis} · {item.info}</p>
-        </div>
-        {terpilih && (
-          <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-        )}
-      </div>
-
-      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col gap-2">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Alfa:</p>
-        {sesiPills}
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">Tentukan Vonis:</p>
-        <div className="flex justify-center">
-          {tombol}
-        </div>
-      </div>
-    </div>
-  )
-
-  return <>{desktopRow}{mobileCard}</>
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export default function VerifikasiAbsenPage() {
     if (hasLoaded) {
       loadData()
     }
-  }, [loadData, hasLoaded])
+  }, [selectedDate, selectedKelas, selectedAsrama, selectedMarhalah])
 
   const handleSelect = (santriId: string, v: VonisType) =>
     setDrafts(prev => prev[santriId] === v
@@ -393,7 +393,7 @@ export default function VerifikasiAbsenPage() {
             <div className="sm:hidden p-4 space-y-4">
               {paged.map((item, i) => (
                 <BarisAbsen key={item.santri_id} item={item}
-                  no={(page-1)*PAGE_SIZE+i+1}
+                  no={-1}
                   vonis={drafts[item.santri_id]}
                   onSelect={handleSelect} />
               ))}
