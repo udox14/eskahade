@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId, batch } from '@/lib/db'
+import { query, execute, generateId } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
@@ -51,30 +51,20 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 
 export async function simpanAbsensiGuru(payload: any[]) {
   const session = await getSession()
-  if (!session) return { error: 'Unauthorized' }
   if (payload.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
-  const statements: { sql: string; params: any[] }[] = []
-
   for (const item of payload) {
-    statements.push({
-      sql: `INSERT INTO absensi_guru (id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
-              shubuh = excluded.shubuh,
-              ashar = excluded.ashar,
-              maghrib = excluded.maghrib,
-              updated_by = excluded.updated_by`,
-      params: [generateId(), item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session.id]
-    })
+    await execute(`
+      INSERT INTO absensi_guru (id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
+        shubuh = excluded.shubuh,
+        ashar = excluded.ashar,
+        maghrib = excluded.maghrib,
+        updated_by = excluded.updated_by
+    `, [generateId(), item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session?.id ?? null])
   }
 
-  try {
-    await batch(statements)
-    revalidatePath('/dashboard/akademik/absensi-guru')
-    return { success: true }
-  } catch (err: any) {
-    console.error("Batch save teacher error:", err)
-    return { error: err?.message || 'Gagal menyimpan batch guru' }
-  }
+  revalidatePath('/dashboard/akademik/absensi-guru')
+  return { success: true }
 }

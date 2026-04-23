@@ -78,6 +78,16 @@ export default function AbsensiGuruPage() {
   }
 
   // --- LOGIC 1: ARRAY HARI ---
+  const DAY_ABBREV: Record<string, string> = {
+    'senin': 'SN',
+    'selasa': 'SLS',
+    'rabu': 'RB',
+    'kamis': 'KMS',
+    'jumat': 'JMT',
+    'sabtu': 'SBT',
+    'minggu': 'MGU',
+  }
+
   const getDaysArray = (baseDate: string) => {
     const d = new Date(baseDate)
     const day = d.getDay()
@@ -88,11 +98,13 @@ export default function AbsensiGuruPage() {
     for (let i = 0; i < 7; i++) {
       const current = new Date(d)
       current.setDate(d.getDate() + i)
+      const dayNameStr = format(current, 'EEEE', { locale: id }).toLowerCase()
       daysArr.push({
         dateStr: current.toISOString().split('T')[0],
         label: format(current, 'EEEE', { locale: id }),
+        abbrev: DAY_ABBREV[dayNameStr] ?? dayNameStr.substring(0, 3).toUpperCase(),
         shortDate: format(current, 'dd/MM'),
-        dayName: format(current, 'EEEE', { locale: id }).toLowerCase() 
+        dayName: dayNameStr
       })
     }
     return daysArr
@@ -323,15 +335,15 @@ export default function AbsensiGuruPage() {
              <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500"/></div>
         ) : (
              <div className="overflow-y-auto overflow-x-hidden hover:overflow-x-auto flex-1">
-              <table className="w-full text-sm border-separate border-spacing-0">
-                <thead className="bg-slate-100 sticky top-0 z-40">
+             <table className="w-full text-sm border-collapse">
+                <thead className="bg-slate-100 sticky top-0 z-40 shadow-sm outline outline-1 outline-slate-200">
                    <tr>
-                      <th rowSpan={2} className="p-3 text-left border-b border-r bg-slate-100 w-40 sticky left-0 z-50">Kelas</th>
-                      <th rowSpan={2} className="p-3 text-left border-b border-r bg-slate-100 w-48 sticky left-40 z-50">Guru Pengajar</th>
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 sticky left-0 z-50 w-28">Kelas</th>
+                      <th rowSpan={2} className="p-3 text-left border bg-slate-100 sticky left-28 z-50 w-40">Guru Pengajar</th>
                       {SESSIONS.map(sess => {
                            const sessDays = days.filter(d => !isLibur(d.dayName, sess))
                            return (
-                               <th key={sess} colSpan={sessDays.length} className="border-b border-r text-center py-2 px-1 font-extrabold text-slate-800 uppercase bg-slate-200 tracking-widest text-[11px]">
+                               <th key={sess} colSpan={sessDays.length} className="border text-center py-2 px-1 font-extrabold text-slate-800 uppercase bg-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] tracking-widest text-sm">
                                    {sess}
                                </th>
                            )
@@ -341,8 +353,8 @@ export default function AbsensiGuruPage() {
                       {SESSIONS.map(sess => {
                            const sessDays = days.filter(d => !isLibur(d.dayName, sess))
                            return sessDays.map(day => (
-                               <th key={sess + day.dateStr} className="border-b border-r text-center text-[10px] text-slate-600 bg-slate-50 min-w-[3.5rem] p-1.5 font-bold uppercase">
-                                   {day.label}
+                               <th key={sess + day.dateStr} className="border text-center text-[10px] text-slate-700 bg-slate-50 w-10 min-w-[2.5rem] p-1 shadow-sm">
+                                   <div className="font-bold uppercase tracking-wider">{day.abbrev}</div>
                                </th>
                            ))
                       })}
@@ -352,25 +364,23 @@ export default function AbsensiGuruPage() {
                    {rowsToRender.map((row, rowIdx) => {
                       let colCounter = 0
                       return (
-                        <tr key={row.uniqueId} className="group hover:bg-indigo-50/50 transition-colors">
+                        <tr key={row.uniqueId} className="hover:bg-indigo-50/30 transition-colors">
                             {/* KOLOM KELAS */}
                             {row.isFirst && (
                                 <td 
-                                    className="p-3 border-b border-r sticky left-0 bg-white z-20 align-top"
+                                    className="p-3 border sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] align-top font-bold text-slate-800 w-28"
                                     rowSpan={row.rowSpan}
                                 >
-                                    <div className="font-bold text-slate-800 leading-tight">{row.kelas.nama_kelas}</div>
-                                    <div className="text-[10px] font-medium text-slate-400 mt-1 uppercase tracking-tighter">{row.kelas.marhalah_nama || row.kelas.marhalah?.nama}</div>
+                                    <div className="whitespace-nowrap">{row.kelas.nama_kelas}</div>
+                                    <div className="text-[10px] font-normal text-slate-400 mt-1 whitespace-nowrap">{row.kelas.marhalah?.nama}</div>
                                 </td>
                             )}
 
                             {/* KOLOM GURU */}
-                            <td className="p-2 border-b border-r bg-white sticky left-40 z-20 group-hover:bg-indigo-50/50 transition-colors">
-                                <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                                    <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                                        <User className="w-3 h-3 text-indigo-500"/>
-                                    </div>
-                                    <span className="truncate">{row.guru.name}</span>
+                            <td className="p-2 border bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sticky left-28 text-xs font-medium text-slate-700 w-40 min-w-[10rem]">
+                                <div className="flex items-center gap-1.5">
+                                    <User className="w-3 h-3 text-indigo-400 shrink-0"/>
+                                    <span className="whitespace-nowrap overflow-hidden text-ellipsis">{row.guru.name}</span>
                                 </div>
                             </td>
 
@@ -427,16 +437,16 @@ const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: {
     if (value === 'B') color = 'bg-yellow-100 text-yellow-700 font-bold'
     if (value === 'L') color = 'bg-slate-100 text-slate-400'
 
-    if (disabled) color = 'bg-slate-50 text-slate-200 cursor-not-allowed'
+    if (disabled) color = 'bg-slate-200/50 text-slate-300 cursor-not-allowed'
 
     return (
-        <td className={`border-b border-r p-0 h-10 ${disabled ? 'bg-slate-50' : ''}`}>
+        <td className={`border p-0 h-full align-middle ${disabled ? 'bg-slate-100' : ''}`}>
             <input 
                 id={id}
                 type="text" 
                 maxLength={1}
                 disabled={disabled}
-                className={`w-full h-full text-center focus:outline-none focus:bg-indigo-50 focus:ring-1 focus:ring-inset focus:ring-indigo-400 uppercase cursor-pointer transition-all text-xs ${color}`}
+                className={`w-full h-10 text-center focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 uppercase cursor-pointer transition-colors text-xs ${color}`}
                 value={disabled ? '' : value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
