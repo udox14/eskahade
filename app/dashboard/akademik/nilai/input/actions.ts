@@ -226,13 +226,6 @@ export async function getDataKepribadian(kelasId: string, semester: number) {
   }))
 }
 
-export const KEPRIBADIAN_FIELDS = [
-  { key: 'kedisiplinan', label: 'Akhlak/Budi Pekerti' },
-  { key: 'ibadah',       label: 'Ketekunan Ibadah'    },
-  { key: 'kesopanan',    label: 'Kerapihan'            },
-  { key: 'kebersihan',   label: 'Kebersihan'           },
-  { key: 'kemandirian',  label: 'Kemandirian'          },
-] as const
 
 export async function simpanKepribadian(semester: number, data: any[]) {
   if (!data.length) return { error: 'Tidak ada data.' }

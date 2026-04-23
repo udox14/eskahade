@@ -27,8 +27,8 @@ import {
   simpanKepribadian,
   getDataCatatanWali,
   simpanCatatanWali,
-  KEPRIBADIAN_FIELDS
 } from './actions'
+import { KEPRIBADIAN_FIELDS } from './constants'
 import { toast } from 'sonner'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'

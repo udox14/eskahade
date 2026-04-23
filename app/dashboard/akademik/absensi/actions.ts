@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, execute, generateId, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
@@ -76,9 +76,9 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
 export async function simpanAbsensi(dataInput: any[]) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
+  if (!dataInput.length) return { success: true }
 
-  const toDelete: { riwayat_id: string; tanggal: string }[] = []
-  const toUpsert: any[] = []
+  const statements: { sql: string; params: any[] }[] = []
 
   for (const item of dataInput) {
     const s = item.shubuh || 'H'
@@ -86,33 +86,32 @@ export async function simpanAbsensi(dataInput: any[]) {
     const m = item.maghrib || 'H'
 
     if (s === 'H' && a === 'H' && m === 'H') {
-      toDelete.push({ riwayat_id: item.riwayat_id, tanggal: item.tanggal })
+      statements.push({
+        sql: `DELETE FROM absensi_harian WHERE riwayat_pendidikan_id = ? AND tanggal = ?`,
+        params: [item.riwayat_id, item.tanggal]
+      })
     } else {
-      toUpsert.push({ riwayat_id: item.riwayat_id, tanggal: item.tanggal, s, a, m })
+      statements.push({
+        sql: `INSERT INTO absensi_harian (id, riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib, created_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(riwayat_pendidikan_id, tanggal) DO UPDATE SET
+                shubuh = excluded.shubuh,
+                ashar = excluded.ashar,
+                maghrib = excluded.maghrib,
+                created_by = excluded.created_by`,
+        params: [generateId(), item.riwayat_id, item.tanggal, s, a, m, session.id]
+      })
     }
   }
 
-  for (const key of toDelete) {
-    await execute(
-      `DELETE FROM absensi_harian WHERE riwayat_pendidikan_id = ? AND tanggal = ?`,
-      [key.riwayat_id, key.tanggal]
-    )
+  try {
+    await batch(statements)
+    revalidatePath('/dashboard/akademik/absensi')
+    return { success: true }
+  } catch (err: any) {
+    console.error("Batch save error:", err)
+    return { error: err?.message || 'Gagal menyimpan batch' }
   }
-
-  for (const item of toUpsert) {
-    await execute(`
-      INSERT INTO absensi_harian (id, riwayat_pendidikan_id, tanggal, shubuh, ashar, maghrib, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(riwayat_pendidikan_id, tanggal) DO UPDATE SET
-        shubuh = excluded.shubuh,
-        ashar = excluded.ashar,
-        maghrib = excluded.maghrib,
-        created_by = excluded.created_by
-    `, [generateId(), item.riwayat_id, item.tanggal, item.s, item.a, item.m, session.id])
-  }
-
-  revalidatePath('/dashboard/akademik/absensi')
-  return { success: true }
 }
 
 export async function getKelasList() {
