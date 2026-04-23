@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, execute, generateId, batch } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
