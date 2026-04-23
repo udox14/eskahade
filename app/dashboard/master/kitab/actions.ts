@@ -71,7 +71,7 @@ export async function updateHargaKitab(id: string, hargaBaru: number): Promise<{
   return { success: true }
 }
 
-export async function importKitabMassal(dataExcel: any[]): Promise<{ success: boolean; count: number; failed: number } | { error: string }> {
+export async function importKitabMassal(dataExcel: any[]): Promise<{ success: boolean; inserted: number; updated: number; failed: number } | { error: string }> {
   const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
@@ -84,7 +84,16 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
   const mapMarhalah = new Map(mrh.map((m: any) => [m.nama.toLowerCase().trim(), m.id]))
   const mapMapel = new Map(mpl.map((m: any) => [m.nama.toLowerCase().trim(), m.id]))
 
-  const inserts: any[] = []
+  // Ambil semua kitab yang sudah ada untuk tahun ajaran ini
+  const existing = await query<any>(
+    'SELECT id, nama_kitab, marhalah_id FROM kitab WHERE tahun_ajaran_id = ?',
+    [aktif.id]
+  )
+  // Key: `namaKitab|||marhalahId` → id kitab
+  const existingMap = new Map(existing.map((e: any) => [`${String(e.nama_kitab).toLowerCase().trim()}|||${e.marhalah_id}`, e.id]))
+
+  const toInsert: { sql: string; params: any[] }[] = []
+  const toUpdate: { sql: string; params: any[] }[] = []
   let failCount = 0
 
   for (const row of dataExcel) {
@@ -98,20 +107,31 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
     const marhalahId = mapMarhalah.get(String(namaMarhalah).toLowerCase().trim())
     const mapelId = mapMapel.get(String(namaMapel).toLowerCase().trim())
 
-    if (marhalahId && mapelId) {
-      inserts.push([namaKitab, marhalahId, mapelId, harga, aktif.id])
+    if (!marhalahId || !mapelId) { failCount++; continue }
+
+    const lookupKey = `${String(namaKitab).toLowerCase().trim()}|||${marhalahId}`
+    const existingId = existingMap.get(lookupKey)
+
+    if (existingId) {
+      // Sudah ada → UPDATE mapel dan harga
+      toUpdate.push({
+        sql: 'UPDATE kitab SET mapel_id = ?, harga = ? WHERE id = ?',
+        params: [mapelId, harga, existingId],
+      })
     } else {
-      failCount++
+      // Belum ada → INSERT baru
+      toInsert.push({
+        sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
+        params: [namaKitab, marhalahId, mapelId, harga, aktif.id],
+      })
     }
   }
 
-  if (inserts.length === 0) return { error: 'Tidak ada data valid (Cek penulisan Marhalah/Mapel)' }
+  if (toInsert.length === 0 && toUpdate.length === 0) return { error: 'Tidak ada data valid (Cek penulisan Marhalah/Mapel)' }
 
-  await batch(inserts.map(row => ({
-    sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
-    params: row,
-  })))
+  const allStatements = [...toInsert, ...toUpdate]
+  await batch(allStatements)
 
   revalidatePath('/dashboard/master/kitab')
-  return { success: true, count: inserts.length, failed: failCount }
+  return { success: true, inserted: toInsert.length, updated: toUpdate.length, failed: failCount }
 }

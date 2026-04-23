@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
 
 export async function getUserScope() {
   const session = await getSession()
@@ -14,9 +14,11 @@ export async function getUserScope() {
   }
 
   if (hasRole(session, 'wali_kelas')) {
-    const kelas = await queryOne<{ id: string }>(
-      'SELECT id FROM kelas WHERE wali_kelas_id = ?', [session.id]
-    )
+    const kelas = await queryOne<{ id: string }>(`
+      SELECT k.id FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      WHERE k.wali_kelas_id = ? LIMIT 1
+    `, [session.id])
     return { role, type: 'KELAS', value: kelas?.id }
   }
 
@@ -113,7 +115,11 @@ export async function getDetailAbsensiSantri(santriId: string) {
 }
 
 export async function getReferensiFilter() {
-  const kelas = await query<any>('SELECT id, nama_kelas FROM kelas')
+  const kelas = await query<any>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `)
   const sorted = kelas.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )

@@ -17,6 +17,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
            ga.id AS guru_ashar_id, ga.nama_lengkap AS guru_ashar_nama,
            gm.id AS guru_maghrib_id, gm.nama_lengkap AS guru_maghrib_nama
     FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id

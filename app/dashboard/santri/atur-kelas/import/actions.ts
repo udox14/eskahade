@@ -12,7 +12,11 @@ type ImportRow = {
 export async function importPenempatanKelas(data: ImportRow[]) {
   if (!data || data.length === 0) return { error: 'Data kosong.' }
 
-  const semuaKelas = await query<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas')
+  const semuaKelas = await query<{ id: string; nama_kelas: string }>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `)
   const mapKelas = new Map(semuaKelas.map(k => [k.nama_kelas.trim().toLowerCase(), k.id]))
 
   const semuaSantri = await query<{ id: string; nis: string }>('SELECT id, nis FROM santri')

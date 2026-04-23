@@ -50,14 +50,22 @@ async function upsertJasa(nama: string, jenis: 'Makan' | 'Cuci'): Promise<string
 }
 
 export async function getKelasList() {
-  const data = await query<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas')
+  const data = await query<{ id: string; nama_kelas: string }>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `)
   return data.sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 export async function importSantriMassal(dataSantri: SantriImportData[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!dataSantri || dataSantri.length === 0) return { error: 'Data kosong tidak bisa disimpan.' }
 
-  const kelasList = await query<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas')
+  const kelasList = await query<{ id: string; nama_kelas: string }>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `)
   const mapKelas = new Map(kelasList.map(k => [k.nama_kelas.trim().toLowerCase(), k.id]))
 
   const tahunMasukDefault = new Date().getFullYear()
@@ -221,8 +229,12 @@ export async function tambahSantriSatuSatu(data: {
   )
 
   if (kelas_pesantren?.trim()) {
-    const kelasData = await queryOne<{ id: string }>(
-      "SELECT id FROM kelas WHERE LOWER(nama_kelas) = LOWER(?)",
+    const kelasData = await queryOne<{ id: string }>(`
+      SELECT k.id FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      WHERE LOWER(k.nama_kelas) = LOWER(?)
+      LIMIT 1
+    `,
       [kelas_pesantren.trim()]
     )
     if (kelasData) {

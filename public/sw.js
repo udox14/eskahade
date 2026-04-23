@@ -1,7 +1,7 @@
 // Service Worker — Sukahideng App PWA
-// Strategy: Network First untuk navigasi, Cache First untuk aset statis
+// Strategy: Network First untuk navigasi & JS chunks, Cache First untuk gambar/font
 
-const CACHE_NAME = 'sukahideng-v1'
+const CACHE_NAME = 'sukahideng-v2'
 const STATIC_ASSETS = [
   '/logo.png',
   '/icon-192x192.png',
@@ -18,7 +18,7 @@ self.addEventListener('install', event => {
   self.skipWaiting()
 })
 
-// Activate: hapus cache lama
+// Activate: hapus cache lama (termasuk sukahideng-v1)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -37,12 +37,8 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
 
-  // Aset statis (gambar, font, icon) → Cache First
-  if (
-    request.destination === 'image' ||
-    request.destination === 'font' ||
-    url.pathname.startsWith('/_next/static/')
-  ) {
+  // Gambar & font → Cache First (jarang berubah, hemat bandwidth)
+  if (request.destination === 'image' || request.destination === 'font') {
     event.respondWith(
       caches.match(request).then(cached => {
         if (cached) return cached
@@ -58,7 +54,24 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Navigasi & API → Network First, fallback ke cache
+  // /_next/static/ → Network First (KRITIS: hindari chunk lama setelah deploy)
+  // Setiap deploy Next.js menghasilkan hash baru — harus ambil dari network dulu
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+          }
+          return response
+        })
+        .catch(() => caches.match(request)) // fallback ke cache kalau offline
+    )
+    return
+  }
+
+  // Navigasi & API → Network First, fallback ke cache kalau offline
   event.respondWith(
     fetch(request)
       .then(response => {

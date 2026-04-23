@@ -12,6 +12,7 @@ export async function getKelasList() {
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
   `
   const params: any[] = []
 

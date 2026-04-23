@@ -28,6 +28,7 @@ export async function getReferensiData() {
         SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
         LEFT JOIN marhalah m ON m.id = k.marhalah_id
+        JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
         ORDER BY k.nama_kelas
       `)
     } else if (hasRole(session, 'wali_kelas')) {
@@ -35,6 +36,7 @@ export async function getReferensiData() {
         SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
         LEFT JOIN marhalah m ON m.id = k.marhalah_id
+        JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
         WHERE k.wali_kelas_id = ?
         ORDER BY k.nama_kelas
       `, [session.id])

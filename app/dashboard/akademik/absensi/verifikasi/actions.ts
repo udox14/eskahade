@@ -189,7 +189,12 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
 }
 
 export async function getKelasList() {
-  const data = await query<any>('SELECT id, nama_kelas, marhalah_id FROM kelas ORDER BY nama_kelas')
+  const data = await query<any>(`
+    SELECT k.id, k.nama_kelas, k.marhalah_id
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    ORDER BY k.nama_kelas
+  `)
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )

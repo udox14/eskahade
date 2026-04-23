@@ -1,25 +1,36 @@
 'use server'
 
 import { query, execute, generateId } from '@/lib/db'
-import { getCachedMapelList } from '@/lib/cache/master'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getCachedMapelList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
-export async function getKelasListForLeger() {
+export async function getTahunAjaranList() {
+  return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
+}
+
+export async function getKelasListForLeger(tahunAjaranId?: number) {
   const session = await getSession()
   if (!session) return []
+
+  // Jika tidak ada tahunAjaranId, default ke tahun aktif
+  let taId = tahunAjaranId
+  if (!taId) {
+    const aktif = await getCachedTahunAjaranAktif()
+    taId = aktif?.id
+  }
 
   let sql = `
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE k.tahun_ajaran_id = ?
   `
-  const params: any[] = []
+  const params: any[] = [taId]
 
-  // Admin/Sekpen/Akademik = akses semua kelas, 
-  // Wali kelas = hanya kelas binaannya
+  // Wali kelas hanya bisa lihat kelas binaannya
   if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && hasRole(session, 'wali_kelas')) {
-    sql += ' WHERE k.wali_kelas_id = ?'
+    sql += ' AND k.wali_kelas_id = ?'
     params.push(session.id)
   }
 

@@ -13,6 +13,7 @@ export async function getKelasList() {
     SELECT k.*, m.nama as marhalah_nama
     FROM kelas k
     LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
   `)
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })

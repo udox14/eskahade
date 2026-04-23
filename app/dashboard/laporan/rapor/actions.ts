@@ -3,6 +3,10 @@
 import { query } from '@/lib/db'
 import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
+export async function getTahunAjaranList() {
+  return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
+}
+
 export async function getDataRapor(kelasId: string, semester: number) {
   const listSantri = await query<any>(`
     SELECT rp.id, rp.grade_lanjutan,
@@ -82,10 +86,17 @@ export async function getDataRapor(kelasId: string, semester: number) {
   })
 
   const marhalahId = listSantri[0]?.marhalah_id
+  // Ambil tahun_ajaran dari kelas yang dipilih, bukan tahun aktif
+  // Ini penting agar rapor historis menampilkan kitab yang benar untuk tahun ajaran tersebut
+  const tahunAjaranIdKelas = await query<any>(
+    'SELECT tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
+  ).then(r => r[0]?.tahun_ajaran_id ?? null)
+
   let listKitab: any[] = []
-  if (marhalahId) {
+  if (marhalahId && tahunAjaranIdKelas) {
     listKitab = await query<any>(
-      'SELECT mapel_id, nama_kitab FROM kitab WHERE marhalah_id = ?', [marhalahId]
+      'SELECT mapel_id, nama_kitab FROM kitab WHERE marhalah_id = ? AND tahun_ajaran_id = ?',
+      [marhalahId, tahunAjaranIdKelas]
     )
   }
 
@@ -153,8 +164,17 @@ function angkaKePredikat(angka: number): string {
   return 'Kurang'
 }
 
-export async function getKelasList() {
-  const data = await query<any>('SELECT id, nama_kelas FROM kelas', [])
+export async function getKelasList(tahunAjaranId?: number) {
+  let taId = tahunAjaranId
+  if (!taId) {
+    const aktif = await getCachedTahunAjaranAktif()
+    taId = aktif?.id
+  }
+
+  const data = taId
+    ? await query<any>('SELECT id, nama_kelas FROM kelas WHERE tahun_ajaran_id = ?', [taId])
+    : await query<any>('SELECT id, nama_kelas FROM kelas', [])
+
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )

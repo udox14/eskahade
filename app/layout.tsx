@@ -2,6 +2,7 @@ import React from 'react'
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { VersionWatcher } from '@/components/version-watcher'
 
 export const metadata: Metadata = {
   title: "ESKAHADE",
@@ -76,6 +77,7 @@ export default function RootLayout({
       <body style={{ fontFamily: "'Inter', sans-serif" }}>
         {children}
         <Toaster position="top-center" richColors />
+        <VersionWatcher />
       </body>
     </html>
   );

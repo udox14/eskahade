@@ -131,7 +131,12 @@ export default function MasterKitabPage() {
     setIsProcessing(false)
     
     if ((res as any).success) {
-        toast.success(`Berhasil import ${(res as any).count} kitab`)
+        const { inserted, updated, failed } = res as any
+        const parts = []
+        if (inserted > 0) parts.push(`${inserted} ditambahkan`)
+        if (updated > 0) parts.push(`${updated} diperbarui`)
+        if (failed > 0) parts.push(`${failed} dilewati`)
+        toast.success(`Import selesai: ${parts.join(', ')}`)
         setExcelData([])
         setTab('LIST')
         loadKitab()
@@ -257,7 +262,7 @@ export default function MasterKitabPage() {
                                     <tr key={k.id} className="hover:bg-slate-50">
                                         <td className="px-4 py-3">
                                             <p className="font-bold text-slate-800">{k.nama_kitab}</p>
-                                            <p className="text-xs text-slate-500">{k.marhalah?.nama} • {k.mapel?.nama}</p>
+                                            <p className="text-xs text-slate-500">{k.marhalah_nama} • {k.mapel_nama}</p>
                                         </td>
                                         <td className="px-4 py-3 text-right font-mono text-emerald-700 font-bold">
                                             {editingId === k.id ? (
@@ -338,13 +343,14 @@ export default function MasterKitabPage() {
                     <div className="max-h-64 overflow-auto border rounded">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-100 sticky top-0">
-                                <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Harga</th></tr>
+                                <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Mapel</th><th className="p-2">Harga</th></tr>
                             </thead>
                             <tbody>
                                 {excelData.map((d,i)=>(
                                     <tr key={i} className="border-b">
                                         <td className="p-2">{d['NAMA KITAB']||d['nama kitab']}</td>
                                         <td className="p-2">{d['MARHALAH']||d['marhalah']}</td>
+                                        <td className="p-2">{d['MAPEL']||d['mapel']}</td>
                                         <td className="p-2 font-mono">{d['HARGA']||d['harga']}</td>
                                     </tr>
                                 ))}

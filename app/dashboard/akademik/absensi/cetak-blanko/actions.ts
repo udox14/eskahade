@@ -1,14 +1,16 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getCachedMarhalahList } from '@/lib/cache/master'
+import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
 export async function getKelasForCetak() {
+  const aktif = await getCachedTahunAjaranAktif()
   const data = await query<any>(`
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
-  `, [])
+    WHERE k.tahun_ajaran_id = ?
+  `, [aktif?.id ?? 0])
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
@@ -47,6 +49,7 @@ export async function getDataBlanko(kelasId: string) {
 }
 
 export async function getDataBlankoMassal(marhalahId: string) {
+  const aktif = await getCachedTahunAjaranAktif()
   const kelasList = await query<any>(`
     SELECT k.id, k.nama_kelas,
            m.nama AS marhalah_nama,
@@ -58,9 +61,9 @@ export async function getDataBlankoMassal(marhalahId: string) {
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
-    WHERE k.marhalah_id = ?
+    WHERE k.marhalah_id = ? AND k.tahun_ajaran_id = ?
     ORDER BY k.nama_kelas
-  `, [marhalahId])
+  `, [marhalahId, aktif?.id ?? 0])
 
   const sorted = kelasList.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })

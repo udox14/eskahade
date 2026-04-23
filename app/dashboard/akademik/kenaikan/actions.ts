@@ -10,9 +10,12 @@ export async function getMarhalahList() {
 
 export async function getKelasByMarhalah(marhalahId: string) {
   if (!marhalahId) return []
-  const data = await query<any>(
-    'SELECT id, nama_kelas FROM kelas WHERE marhalah_id = ?', [marhalahId]
-  )
+  const data = await query<any>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    WHERE k.marhalah_id = ?
+  `, [marhalahId])
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
@@ -24,9 +27,11 @@ export async function getSantriForKenaikan(marhalahId: string, kelasId: string) 
   if (kelasId) {
     kelasIds = [kelasId]
   } else if (marhalahId) {
-    const listKelas = await query<any>(
-      'SELECT id FROM kelas WHERE marhalah_id = ?', [marhalahId]
-    )
+    const listKelas = await query<any>(`
+      SELECT k.id FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      WHERE k.marhalah_id = ?
+    `, [marhalahId])
     kelasIds = listKelas.map((k: any) => k.id)
   }
 
@@ -61,7 +66,11 @@ export async function getSantriForKenaikan(marhalahId: string, kelasId: string) 
 export async function importKenaikanKelas(dataExcel: any[]) {
   if (!dataExcel || !dataExcel.length) return { error: 'Data kosong.' }
 
-  const allClasses = await query<any>('SELECT id, nama_kelas FROM kelas', [])
+  // Kelas tujuan diambil dari tahun ajaran AKTIF (kelas baru tahun depan)
+  const allClasses = await query<any>(`
+    SELECT k.id, k.nama_kelas FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `, [])
   const mapKelas = new Map<string, string>()
   allClasses.forEach((k: any) => mapKelas.set(k.nama_kelas.trim().toLowerCase(), k.id))
 

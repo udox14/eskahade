@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger } from './actions'
-import { FileSpreadsheet, Loader2, Search, Trophy, Calculator } from 'lucide-react'
+import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger, getTahunAjaranList } from './actions'
+import { FileSpreadsheet, Loader2, Search, Trophy, Calculator, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
 
 export default function LegerNilaiPage() {
   const confirm = useConfirm()
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [selectedTA, setSelectedTA] = useState<number | undefined>(undefined)
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
@@ -17,12 +19,25 @@ export default function LegerNilaiPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [isCalculating, setIsCalculating] = useState(false)
 
+  // Load daftar TA sekali saat mount
   useEffect(() => {
-    getKelasListForLeger().then(data => {
+    getTahunAjaranList().then(list => {
+      setTahunAjaranList(list)
+      const aktif = list.find((t: any) => t.is_active === 1)
+      if (aktif) setSelectedTA(aktif.id)
+    })
+  }, [])
+
+  // Setiap TA berubah, reload daftar kelas
+  useEffect(() => {
+    if (!selectedTA) return
+    setSelectedKelas('')
+    setDataLeger(null)
+    getKelasListForLeger(selectedTA).then(data => {
       setKelasList(data)
       if (data.length > 0) setSelectedKelas(data[0].id)
     })
-  }, [])
+  }, [selectedTA])
 
   useEffect(() => { if (selectedKelas) loadData() }, [selectedKelas, selectedSemester])
 
@@ -111,6 +126,23 @@ export default function LegerNilaiPage() {
       </div>
 
       <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
+        {/* Dropdown Tahun Ajaran */}
+        <div className="w-full md:w-auto">
+          <label className="text-xs font-bold text-slate-500 uppercase block mb-1 flex items-center gap-1">
+            <CalendarDays className="w-3 h-3"/> Tahun Ajaran
+          </label>
+          <select
+            className="p-2 border border-slate-200 rounded-xl w-48 bg-slate-50 outline-none"
+            value={selectedTA ?? ''}
+            onChange={(e) => setSelectedTA(Number(e.target.value))}
+          >
+            {tahunAjaranList.map(ta => (
+              <option key={ta.id} value={ta.id}>
+                {ta.nama}{ta.is_active ? ' (Aktif)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="w-full md:w-auto">
           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas</label>
           <select 

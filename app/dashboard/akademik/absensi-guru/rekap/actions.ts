@@ -45,6 +45,7 @@ export async function getRekapKinerjaGuru(
            ga.id AS ga_id, ga.nama_lengkap AS ga_nama,
            gm.id AS gm_id, gm.nama_lengkap AS gm_nama
     FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id

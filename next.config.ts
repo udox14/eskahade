@@ -6,6 +6,10 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const nextConfig: NextConfig = {
+  // Inject BUILD_TIMESTAMP ke dalam bundle saat build (tersedia di server & edge runtime)
+  env: {
+    BUILD_TIMESTAMP: String(Date.now()),
+  },
   webpack: (config, { webpack, isServer }) => {
     if (isServer) {
       config.plugins.push(

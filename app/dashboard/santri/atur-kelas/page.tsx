@@ -7,9 +7,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function AturKelasPage() {
   await guardPage('/dashboard/santri/atur-kelas')
-  const kelasRaw = await query<any>(
-    'SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama FROM kelas k LEFT JOIN marhalah m ON m.id = k.marhalah_id', []
-  )
+  const kelasRaw = await query<any>(`
+    SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `, [])
   const kelasList = kelasRaw.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )

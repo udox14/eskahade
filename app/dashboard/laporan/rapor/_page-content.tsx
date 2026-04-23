@@ -1,17 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getKelasList, getDataRapor, getTahunAjaran } from './actions'
-import { Printer, Loader2, Search, FileText } from 'lucide-react'
+import { getKelasList, getDataRapor, getTahunAjaranList } from './actions'
+import { Printer, Loader2, Search, FileText, CalendarDays } from 'lucide-react'
 import { RaporSatuHalaman } from './rapor-view'
 import { useReactToPrint } from 'react-to-print'
 import { toast } from 'sonner' 
 
 export default function CetakRaporPage() {
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [selectedTA, setSelectedTA] = useState<number | undefined>(undefined)
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSemester, setSelectedSemester] = useState('1')
-  const [tahunAjaran, setTahunAjaran] = useState('2024/2025')
+  const [tahunAjaran, setTahunAjaran] = useState('')
   
   const [dataRapor, setDataRapor] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -36,11 +38,24 @@ export default function CetakRaporPage() {
     handlePrint()
   }
 
-  // Load Kelas & Tahun Ajaran
+  // Load daftar TA sekali saat mount
   useEffect(() => {
-    getKelasList().then(setKelasList)
-    getTahunAjaran().then(setTahunAjaran)
+    getTahunAjaranList().then(list => {
+      setTahunAjaranList(list)
+      const aktif = list.find((t: any) => t.is_active === 1)
+      if (aktif) setSelectedTA(aktif.id)
+    })
   }, [])
+
+  // Setiap TA berubah → reload kelas & set label tahun pelajaran
+  useEffect(() => {
+    if (!selectedTA) return
+    const ta = tahunAjaranList.find((t: any) => t.id === selectedTA)
+    if (ta) setTahunAjaran(ta.nama)
+    setSelectedKelas('')
+    setDataRapor([])
+    getKelasList(selectedTA).then(setKelasList)
+  }, [selectedTA])
 
   // Load Data
   const handleLoad = async () => {
@@ -90,6 +105,25 @@ export default function CetakRaporPage() {
 
       {/* FILTER BAR NO-PRINT */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end print:hidden flex-none">
+        {/* Dropdown Tahun Ajaran */}
+        <div className="w-full md:w-auto">
+          <label className="text-sm font-medium text-slate-700 block mb-1 flex items-center gap-1">
+            <CalendarDays className="w-4 h-4 text-slate-400"/> Tahun Ajaran
+          </label>
+          <select
+            className="p-2 border border-slate-200 rounded-xl w-full md:w-44 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+            value={selectedTA ?? ''}
+            onChange={(e) => setSelectedTA(Number(e.target.value))}
+          >
+            <option value="">-- Pilih --</option>
+            {tahunAjaranList.map(ta => (
+              <option key={ta.id} value={ta.id}>
+                {ta.nama}{ta.is_active ? ' ✓' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="w-full md:w-auto">
           <label className="text-sm font-medium text-slate-700 block mb-1">Kelas</label>
           <select 
@@ -112,17 +146,6 @@ export default function CetakRaporPage() {
             <option value="1">Ganjil</option>
             <option value="2">Genap</option>
           </select>
-        </div>
-
-        <div className="w-full md:w-auto">
-          <label className="text-sm font-medium text-slate-700 block mb-1">Tahun Pelajaran</label>
-          <input
-            type="text"
-            value={tahunAjaran}
-            onChange={(e) => setTahunAjaran(e.target.value)}
-            className="p-2 border border-slate-200 rounded-xl w-full md:w-36 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="2024/2025"
-          />
         </div>
         
         <button 

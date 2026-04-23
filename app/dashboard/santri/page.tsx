@@ -26,7 +26,11 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   // Data filter (dari cache — ringan, tidak blocking)
   const [marhalahList, kelasRaw] = await Promise.all([
     getCachedMarhalahList(),
-    query<any>('SELECT id, nama_kelas, marhalah_id FROM kelas', [])
+    query<any>(`
+      SELECT k.id, k.nama_kelas, k.marhalah_id
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    `, [])
   ])
   const kelasList = kelasRaw.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })

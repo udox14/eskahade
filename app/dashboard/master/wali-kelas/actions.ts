@@ -20,6 +20,7 @@ export async function getDataMaster() {
       gm.id as guru_maghrib_id, gm.nama_lengkap as guru_maghrib_nama,
       u.full_name as wali_kelas_nama
     FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     LEFT JOIN marhalah m ON k.marhalah_id = m.id
     LEFT JOIN data_guru gs ON k.guru_shubuh_id = gs.id
     LEFT JOIN data_guru ga ON k.guru_ashar_id = ga.id
