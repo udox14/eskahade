@@ -63,6 +63,13 @@ export default function SantriToolsPage() {
     getSekolahList().then(setSekolahList)
   }, [])
 
+  // Auto-load data pembebasan saat tab pembebasan pertama kali dibuka
+  useEffect(() => {
+    if (tab === 'pembebasan' && pbData.length === 0 && !pbLoading) {
+      loadPembebasan()
+    }
+  }, [tab])
+
   // ── Naik Kelas ─────────────────────────────────────────────────────────
   const handlePreview = async () => {
     setLoadingPreview(true)
@@ -174,7 +181,7 @@ export default function SantriToolsPage() {
           className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${
             tab === 'pembebasan' ? 'bg-white shadow text-indigo-700' : 'text-slate-500 hover:text-slate-700'
           }`}>
-          <ShieldCheck className="w-4 h-4"/> Manajemen Pembebasan
+          <ShieldCheck className="w-4 h-4"/> Pembebasan Pembayaran
         </button>
       </div>
 

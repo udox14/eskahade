@@ -34,6 +34,7 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'Absensi': CalendarCheck,
   'Keuangan': Coins,
   'UPK': Package,
+  'EHB': ClipboardList,
   'Master Data': Database,
 };
 
@@ -132,7 +133,7 @@ const ROLE_LABEL: Record<string, string> = {
   bendahara: 'Bendahara',
 };
 
-const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'Master Data'];
+const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'EHB', 'Master Data'];
 
 interface SidebarProps {
   userRole?: string;
