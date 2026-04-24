@@ -6,7 +6,7 @@ import { Search, Filter, Loader2, User, Home, BookOpen, X, Calendar } from 'luci
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
 export default function RekapAbsensiPage() {
   const [scope, setScope] = useState<any>(null)

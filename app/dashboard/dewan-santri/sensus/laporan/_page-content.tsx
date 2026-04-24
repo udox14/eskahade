@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useReactToPrint } from 'react-to-print'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const ROOM_NUMBERS = Array.from({ length: 37 }, (_, i) => i + 1)
 
 export default function CetakLaporanSensus() {

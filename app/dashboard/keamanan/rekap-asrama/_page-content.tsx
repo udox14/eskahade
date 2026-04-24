@@ -5,7 +5,7 @@ import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah, getKamarLi
 import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList } from '../rekap-asrama/actions'
 import { Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
 function bulanIni() { return new Date().toISOString().slice(0, 7) }
 function getDaysInMonth(bulan: string) {

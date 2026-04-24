@@ -130,7 +130,7 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
 }
 
 // ── Filter ────────────────────────────────────────────────────────────────────
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
+const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "SADESA", "LAINNYA"]
 
 export function SantriFilter({ marhalahList, kelasList }: { marhalahList: any[]; kelasList: any[] }) {

@@ -30,7 +30,7 @@ function BlankoSheet({ data }: { data: any }) {
 
   const formatAsrama = (asrama: string, kamar: string) => {
     if (!asrama) return '-'
-    let code = asrama.toUpperCase().replace('ASY-SYIFA', 'ASY').replace('BAHAGIA', 'BHG').replace('AL-FALAH', 'ALF').replace('AS-SALAM', 'ASAS').trim()
+    let code = asrama.toUpperCase().replace('ASY-SYIFA', 'ASY').replace('BAHAGIA', 'BHG').replace('AL-FALAH', 'ALF').replace('AS-SALAM', 'ASAS').replace('AL-BAGHORY', 'BGR').trim()
     return `${code}/${kamar || '-'}`
   }
 

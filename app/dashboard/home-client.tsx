@@ -38,6 +38,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/asrama/absen-malam':                   'Catat kehadiran santri saat apel malam per kamar.',
   '/dashboard/asrama/absen-berjamaah':               'Rekam kehadiran shalat berjamaah santri per waktu.',
   '/dashboard/asrama/perpindahan-kamar':             'Proses perpindahan santri antar kamar dalam satu asrama.',
+  '/dashboard/asrama/mutasi-asrama':                 'Pindahkan santri antar asrama, assign santri baru, atau mutasi batch.',
   '/dashboard/asrama/absen-sakit':                   'Input data santri yang sakit dan tidak bisa mengikuti kegiatan.',
   '/dashboard/asrama/layanan':                       'Kelola data katering (tempat makan) dan laundry santri.',
   '/dashboard/keamanan/perizinan':                   'Input dan pantau perizinan pulang atau keluar komplek santri.',
