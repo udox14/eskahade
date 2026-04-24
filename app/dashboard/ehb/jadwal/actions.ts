@@ -105,18 +105,49 @@ export async function saveSesiConfig(eventId: number, sesiList: SesiInput[]) {
 
   if (!sesiList.length) return { error: 'Minimal 1 sesi' }
 
-  // Hapus sesi lama, insert baru
-  await execute(`DELETE FROM ehb_sesi WHERE ehb_event_id = ?`, [eventId])
+  try {
+    const stmts: any[] = []
+    
+    // Ambil sesi lama dari database
+    const oldSesi = await query<any>(`SELECT id FROM ehb_sesi WHERE ehb_event_id = ?`, [eventId])
+    const oldIds = new Set(oldSesi.map(s => s.id))
+    const currentIds = new Set(sesiList.map(s => s.id).filter(Boolean))
+    
+    // Cari ID yang dihapus
+    const deletedIds = Array.from(oldIds).filter(id => !currentIds.has(id))
+    if (deletedIds.length > 0) {
+      // Hapus jadwal yang nempel di sesi ini biar gak foreign key error
+      stmts.push({
+        sql: `DELETE FROM ehb_jadwal WHERE ehb_event_id = ? AND sesi_id IN (${deletedIds.join(',')})`,
+        params: [eventId]
+      })
+      stmts.push({
+        sql: `DELETE FROM ehb_sesi WHERE ehb_event_id = ? AND id IN (${deletedIds.join(',')})`,
+        params: [eventId]
+      })
+    }
 
-  const stmts = sesiList.map(s => ({
-    sql: `INSERT INTO ehb_sesi (ehb_event_id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    params: [eventId, s.nomor_sesi, s.label, s.jam_group, s.waktu_mulai || '', s.waktu_selesai || '']
-  }))
+    // Update / Insert
+    sesiList.forEach(s => {
+      if (s.id) {
+        stmts.push({
+          sql: `UPDATE ehb_sesi SET nomor_sesi = ?, label = ?, jam_group = ?, waktu_mulai = ?, waktu_selesai = ? WHERE id = ? AND ehb_event_id = ?`,
+          params: [s.nomor_sesi, s.label, s.jam_group, s.waktu_mulai || '', s.waktu_selesai || '', s.id, eventId]
+        })
+      } else {
+        stmts.push({
+          sql: `INSERT INTO ehb_sesi (ehb_event_id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai) VALUES (?, ?, ?, ?, ?, ?)`,
+          params: [eventId, s.nomor_sesi, s.label, s.jam_group, s.waktu_mulai || '', s.waktu_selesai || '']
+        })
+      }
+    })
 
-  await batch(stmts)
-  revalidatePath('/dashboard/ehb/jadwal')
-  return { success: true }
+    await batch(stmts)
+    revalidatePath('/dashboard/ehb/jadwal')
+    return { success: true }
+  } catch (e: any) {
+    return { error: 'Gagal menyimpan: ' + e.message }
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
