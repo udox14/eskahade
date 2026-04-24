@@ -174,6 +174,7 @@ export async function getKelasAktifList() {
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE m.nama NOT LIKE '%Mutaqaddimah%'
     ORDER BY m.urutan, k.nama_kelas
   `)
 }
