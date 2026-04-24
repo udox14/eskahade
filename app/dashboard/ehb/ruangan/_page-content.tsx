@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import {
-  getRuanganList, addRuangan, updateRuangan, deleteRuangan,
+  getRuanganList, addRuangan, updateRuangan, deleteRuangan, addRuanganBulk, addRuanganImport,
   getRuanganDetail, getActiveEventLight, getOtherRuangan, pindahSantri, hapusPeserta,
   cariSantriUnplotted, tambahPesertaManual,
   getDataCetakRuangan, getSesiListForRuangan, getDataBlankoAbsensi
 } from './actions'
+import * as XLSX from 'xlsx'
 import {
   LayoutList, Plus, Edit2, Trash2, MapPin, Users, Loader2, X, Printer,
   ArrowRightLeft, UserPlus, Search, FileText, AlertTriangle
@@ -23,7 +24,10 @@ export default function RuanganEhbPage() {
 
   // Modal Form Ruangan
   const [showForm, setShowForm] = useState(false)
+  const [addMode, setAddMode] = useState<'single'|'bulk'|'import'>('single')
   const [formData, setFormData] = useState({ id: 0, nomor_ruangan: 1, nama_ruangan: '', kapasitas: 20, jenis_kelamin: 'L' })
+  const [bulkData, setBulkData] = useState({ count: 10, start_nomor: 1, kapasitas: 20, jenis_kelamin: 'L' })
+  const [importFile, setImportFile] = useState<File | null>(null)
 
   // Drawer / Modal Detail Ruangan
   const [detailRuangan, setDetailRuangan] = useState<any>(null)
@@ -67,26 +71,49 @@ export default function RuanganEhbPage() {
   const handleOpenAdd = () => {
     const nextNo = ruanganList.length > 0 ? Math.max(...ruanganList.map(r => r.nomor_ruangan)) + 1 : 1
     setFormData({ id: 0, nomor_ruangan: nextNo, nama_ruangan: '', kapasitas: 20, jenis_kelamin: 'L' })
+    setAddMode('single')
+    setBulkData({ count: 10, start_nomor: nextNo, kapasitas: 20, jenis_kelamin: 'L' })
+    setImportFile(null)
     setShowForm(true)
   }
 
   const handleOpenEdit = (r: any, e: React.MouseEvent) => {
     e.stopPropagation()
     setFormData({ id: r.id, nomor_ruangan: r.nomor_ruangan, nama_ruangan: r.nama_ruangan || '', kapasitas: r.kapasitas, jenis_kelamin: r.jenis_kelamin })
+    setAddMode('single')
     setShowForm(true)
   }
 
   const handleSaveRuangan = async () => {
     if (!event) return
-    const isEdit = formData.id !== 0
     let res
-    if (isEdit) {
-      res = await updateRuangan(formData.id, formData)
-    } else {
-      res = await addRuangan(event.id, formData)
+    
+    if (addMode === 'single') {
+        const isEdit = formData.id !== 0
+        if (isEdit) {
+            res = await updateRuangan(formData.id, formData)
+        } else {
+            res = await addRuangan(event.id, formData)
+        }
+    } else if (addMode === 'bulk') {
+        if (!bulkData.count || !bulkData.start_nomor || !bulkData.kapasitas) return toast.error('Harap lengkapi form generate')
+        res = await addRuanganBulk(event.id, bulkData.count, bulkData.start_nomor, bulkData.kapasitas, bulkData.jenis_kelamin)
+    } else if (addMode === 'import') {
+        if (!importFile) return toast.error('Pilih file excel terlebih dahulu')
+        try {
+            const data = await importFile.arrayBuffer()
+            const workbook = XLSX.read(data, { type: 'array' })
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+            const json = XLSX.utils.sheet_to_json(worksheet)
+            if (json.length === 0) return toast.error('File excel kosong')
+            res = await addRuanganImport(event.id, json)
+        } catch (error) {
+            return toast.error('Gagal membaca file excel')
+        }
     }
-    if ('error' in res) return toast.error(res.error)
-    toast.success(isEdit ? 'Ruangan diupdate' : 'Ruangan ditambahkan')
+
+    if (res && 'error' in res) return toast.error(res.error)
+    toast.success('Berhasil menyimpan ruangan')
     setShowForm(false)
     loadData()
   }
@@ -287,55 +314,135 @@ export default function RuanganEhbPage() {
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-slate-800">{formData.id ? 'Edit Ruangan' : 'Tambah Ruangan'}</h3>
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
+            {!formData.id && (
+                <div className="flex border-b bg-slate-50/50">
+                    <button onClick={() => setAddMode('single')} className={`flex-1 py-2 text-sm font-bold ${addMode === 'single' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500'}`}>Satu per Satu</button>
+                    <button onClick={() => setAddMode('bulk')} className={`flex-1 py-2 text-sm font-bold ${addMode === 'bulk' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500'}`}>Generate Massal</button>
+                    <button onClick={() => setAddMode('import')} className={`flex-1 py-2 text-sm font-bold ${addMode === 'import' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500'}`}>Import Excel</button>
+                </div>
+            )}
             <div className="p-5 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500">Nomor Ruangan</label>
-                <input
-                  type="number"
-                  value={formData.nomor_ruangan}
-                  onChange={e => setFormData({ ...formData, nomor_ruangan: parseInt(e.target.value) })}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500">Nama Alias (Opsional)</label>
-                <input
-                  value={formData.nama_ruangan}
-                  onChange={e => setFormData({ ...formData, nama_ruangan: e.target.value })}
-                  placeholder="mis: Aula Utama"
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500">Kapasitas Kursi</label>
-                <input
-                  type="number"
-                  value={formData.kapasitas}
-                  onChange={e => setFormData({ ...formData, kapasitas: parseInt(e.target.value) })}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500">Jenis Kelamin</label>
-                <select
-                  value={formData.jenis_kelamin}
-                  onChange={e => setFormData({ ...formData, jenis_kelamin: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                >
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
-                </select>
-              </div>
+              {addMode === 'single' && (
+                  <>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Nomor Ruangan</label>
+                        <input
+                          type="number"
+                          value={formData.nomor_ruangan}
+                          onChange={e => setFormData({ ...formData, nomor_ruangan: parseInt(e.target.value) })}
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Nama Alias (Opsional)</label>
+                        <input
+                          value={formData.nama_ruangan}
+                          onChange={e => setFormData({ ...formData, nama_ruangan: e.target.value })}
+                          placeholder="mis: Aula Utama"
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Kapasitas Kursi</label>
+                        <input
+                          type="number"
+                          value={formData.kapasitas}
+                          onChange={e => setFormData({ ...formData, kapasitas: parseInt(e.target.value) })}
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Jenis Kelamin</label>
+                        <select
+                          value={formData.jenis_kelamin}
+                          onChange={e => setFormData({ ...formData, jenis_kelamin: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="L">Laki-laki (Putra)</option>
+                          <option value="P">Perempuan (Putri)</option>
+                        </select>
+                      </div>
+                  </>
+              )}
+              {addMode === 'bulk' && !formData.id && (
+                  <>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-500">Jumlah Ruangan</label>
+                              <input
+                                  type="number"
+                                  value={bulkData.count}
+                                  onChange={e => setBulkData({ ...bulkData, count: parseInt(e.target.value) })}
+                                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500">Mulai dari Nomor</label>
+                              <input
+                                  type="number"
+                                  value={bulkData.start_nomor}
+                                  onChange={e => setBulkData({ ...bulkData, start_nomor: parseInt(e.target.value) })}
+                                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                              />
+                          </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Kapasitas per Ruangan</label>
+                        <input
+                          type="number"
+                          value={bulkData.kapasitas}
+                          onChange={e => setBulkData({ ...bulkData, kapasitas: parseInt(e.target.value) })}
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">Setel Jenis Kelamin</label>
+                        <select
+                          value={bulkData.jenis_kelamin}
+                          onChange={e => setBulkData({ ...bulkData, jenis_kelamin: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="L">Laki-laki (Putra)</option>
+                          <option value="P">Perempuan (Putri)</option>
+                        </select>
+                      </div>
+                      <div className="bg-indigo-50 text-indigo-700 p-3 rounded-lg text-xs">
+                          Akan membuat <b>{bulkData.count} ruangan</b> baru dimulai dari <b>Nomor {bulkData.start_nomor}</b> hingga <b>Nomor {bulkData.start_nomor + bulkData.count - 1}</b> dengan kapasitas masing-masing <b>{bulkData.kapasitas} kursi</b>.
+                      </div>
+                  </>
+              )}
+              {addMode === 'import' && !formData.id && (
+                  <div className="space-y-4">
+                      <div className="bg-slate-50 p-4 border rounded-xl text-sm">
+                          <p className="font-bold text-slate-800 mb-2">Instruksi Import</p>
+                          <ul className="list-disc pl-5 text-slate-600 space-y-1 text-xs">
+                              <li>Buat file Excel (.xlsx) dengan kolom berikut di baris pertama: <b>Nomor Ruangan</b>, <b>Nama Ruangan</b>, <b>Kapasitas</b>, <b>L/P</b></li>
+                              <li>Isi baris selanjutnya dengan data ruangan.</li>
+                              <li>Contoh kolom L/P diisi 'L' untuk Putra, 'P' untuk Putri.</li>
+                              <li>Jika Nomor Ruangan sudah ada, data kapasitas dan jenis kelamin akan ditimpa (update).</li>
+                          </ul>
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500">Upload File Excel</label>
+                          <input 
+                              type="file" 
+                              accept=".xlsx,.xls"
+                              onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                          />
+                      </div>
+                  </div>
+              )}
               <button
                 onClick={handleSaveRuangan}
-                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
+                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 mt-4"
               >
-                Simpan
+                {addMode === 'import' ? 'Proses Import' : addMode === 'bulk' ? 'Generate Ruangan' : 'Simpan'}
               </button>
             </div>
           </div>

@@ -37,6 +37,53 @@ export async function addRuangan(eventId: number, data: { nomor_ruangan: number,
   }
 }
 
+export async function addRuanganBulk(eventId: number, count: number, startNo: number, kapasitas: number, jenis_kelamin: string) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  try {
+    const stmts = []
+    for (let i = 0; i < count; i++) {
+      const nomor_ruangan = startNo + i
+      stmts.push({
+        sql: `INSERT INTO ehb_ruangan (ehb_event_id, nomor_ruangan, nama_ruangan, kapasitas, jenis_kelamin) VALUES (?, ?, ?, ?, ?)`,
+        params: [eventId, nomor_ruangan, `Ruang ${nomor_ruangan}`, kapasitas, jenis_kelamin]
+      })
+    }
+    await batch(stmts)
+    revalidatePath('/dashboard/ehb/ruangan')
+    return { success: true }
+  } catch (err: any) {
+    if (err.message?.includes('UNIQUE')) return { error: 'Gagal generate. Ada bentrok dengan nomor ruangan yang sudah ada.' }
+    return { error: err.message }
+  }
+}
+
+export async function addRuanganImport(eventId: number, data: any[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  try {
+    const stmts = data.map(item => ({
+      sql: `INSERT INTO ehb_ruangan (ehb_event_id, nomor_ruangan, nama_ruangan, kapasitas, jenis_kelamin) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(ehb_event_id, nomor_ruangan) DO UPDATE SET 
+            nama_ruangan = excluded.nama_ruangan, kapasitas = excluded.kapasitas, jenis_kelamin = excluded.jenis_kelamin`,
+      params: [
+        eventId, 
+        parseInt(item['Nomor Ruangan']), 
+        item['Nama Ruangan'] || `Ruang ${item['Nomor Ruangan']}`, 
+        parseInt(item['Kapasitas']) || 20, 
+        item['L/P'] === 'P' || item['L/P'] === 'Wanita' ? 'P' : 'L'
+      ]
+    }))
+    await batch(stmts)
+    revalidatePath('/dashboard/ehb/ruangan')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message }
+  }
+}
+
 export async function updateRuangan(ruanganId: number, data: { nomor_ruangan: number, nama_ruangan: string, kapasitas: number, jenis_kelamin: string }) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }

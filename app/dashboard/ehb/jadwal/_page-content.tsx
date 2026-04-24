@@ -41,10 +41,9 @@ export default function JadwalEhbPage() {
   const [jadwal, setJadwal] = useState<any[]>([])
   const [mapelAktif, setMapelAktif] = useState<any[]>([])
   const [tanggalList, setTanggalList] = useState<string[]>([])
+  const [newTglStart, setNewTglStart] = useState('')
+  const [newTglEnd, setNewTglEnd] = useState('')
   const [loadingJadwal, setLoadingJadwal] = useState(false)
-
-  // Form Add Tanggal
-  const [newTanggal, setNewTanggal] = useState('')
 
   useEffect(() => {
     loadInitialData()
@@ -192,10 +191,22 @@ export default function JadwalEhbPage() {
   }
 
   const handleAddTanggal = () => {
-    if (!newTanggal) return
-    if (tanggalList.includes(newTanggal)) return toast.error('Tanggal sudah ada')
-    setTanggalList([...tanggalList, newTanggal].sort())
-    setNewTanggal('')
+    if (!newTglStart || !newTglEnd) return toast.error('Isi rentang tanggal mulai dan selesai')
+    const start = new Date(newTglStart)
+    const end = new Date(newTglEnd)
+    if (start > end) return toast.error('Tanggal mulai harus sebelum atau sama dengan tanggal selesai')
+    
+    const newDates: string[] = []
+    const curr = new Date(start)
+    while (curr <= end) {
+      newDates.push(curr.toISOString().split('T')[0])
+      curr.setDate(curr.getDate() + 1)
+    }
+
+    const uniqueDates = Array.from(new Set([...tanggalList, ...newDates])).sort()
+    setTanggalList(uniqueDates)
+    setNewTglStart('')
+    setNewTglEnd('')
   }
 
   const handleDeleteTanggal = async (tgl: string) => {
@@ -215,58 +226,18 @@ export default function JadwalEhbPage() {
     jadwalMap[j.tanggal][j.sesi_id][j.kelas_id] = j.mapel_id
   })
 
-  // State untuk form edit jadwal (sementara)
-  const [editJadwal, setEditJadwal] = useState<Record<string, number>>({}) // key: "tgl_sesi_kelas", value: mapel_id
-
-  const handleJadwalChange = (tgl: string, sesiId: number, kelasId: string, mapelId: number | '') => {
-    const key = `${tgl}_${sesiId}_${kelasId}`
-    if (mapelId === '') {
-      const newEdit = { ...editJadwal }
-      delete newEdit[key]
-      setEditJadwal(newEdit)
-    } else {
-      setEditJadwal({ ...editJadwal, [key]: mapelId })
-    }
-  }
-
-  const handleSaveJadwal = async () => {
+  const handleJadwalChange = async (tgl: string, sesiId: number, kelasId: string, mapelId: number | '') => {
     if (!activeEvent) return
-    const items: JadwalItem[] = []
+    const item = { tanggal: tgl, sesi_id: sesiId, kelas_id: kelasId, mapel_id: mapelId as number }
     
-    // Convert editJadwal ke array
-    Object.entries(editJadwal).forEach(([key, mapelId]) => {
-      const [tanggal, sesiIdStr, kelasId] = key.split('_')
-      items.push({
-        tanggal,
-        sesi_id: parseInt(sesiIdStr),
-        kelas_id: kelasId,
-        mapel_id: mapelId
-      })
-    })
-
-    if (!items.length) return toast.info('Tidak ada perubahan untuk disimpan')
-
-    const res = await saveJadwalEhb(activeEvent.id, items)
+    const res = await (mapelId === '' 
+      ? hapusJadwalCell(activeEvent.id, tgl, sesiId, kelasId)
+      : saveJadwalEhb(activeEvent.id, [item]))
+      
     if ('error' in res) return toast.error(res.error)
-    toast.success('Jadwal berhasil disimpan')
-    setEditJadwal({})
+    toast.success('Jadwal disimpan')
     loadJadwal()
   }
-
-  const handleHapusJadwalCell = async (tgl: string, sesiId: number, kelasId: string) => {
-    if (!activeEvent) return
-    const res = await hapusJadwalCell(activeEvent.id, tgl, sesiId, kelasId)
-    if ('error' in res) return toast.error(res.error)
-    // Remove from edit state if present
-    const key = `${tgl}_${sesiId}_${kelasId}`
-    if (editJadwal[key]) {
-        const newEdit = { ...editJadwal }
-        delete newEdit[key]
-        setEditJadwal(newEdit)
-    }
-    loadJadwal()
-  }
-
 
   // Helper render
   const renderTabBtn = (id: typeof activeTab, icon: React.ReactNode, label: string, disabled = false) => (
@@ -534,13 +505,26 @@ export default function JadwalEhbPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Group kelas by marhalah for display */}
                   {Array.from(new Set(kelasAktif.map(k => k.marhalah_nama))).map(marhalahNama => {
                     const kelasInMarhalah = kelasAktif.filter(k => k.marhalah_nama === marhalahNama)
                     return (
                       <div key={marhalahNama as string} className="border rounded-xl overflow-hidden">
-                        <div className="bg-slate-100 px-3 py-2 font-bold text-sm text-slate-700 border-b">
-                          {marhalahNama as string}
+                        <div className="bg-slate-100 px-3 py-2 font-bold text-sm text-slate-700 border-b flex justify-between items-center">
+                          <span>{marhalahNama as string}</span>
+                          <select 
+                            onChange={e => {
+                                const jg = e.target.value;
+                                if (!jg) return;
+                                const updates = {...kelasJamMapping};
+                                kelasInMarhalah.forEach(k => updates[k.id] = jg);
+                                setKelasJamMapping(updates);
+                                e.target.value = '';
+                            }}
+                            className="text-xs border rounded outline-none font-normal px-1 py-0.5 bg-white"
+                          >
+                            <option value="">-- Set Semua --</option>
+                            {jamGroups.map(jg => <option key={jg as string} value={jg as string}>{jg as string}</option>)}
+                          </select>
                         </div>
                         <div className="divide-y max-h-[300px] overflow-y-auto">
                           {kelasInMarhalah.map(k => (
@@ -585,23 +569,24 @@ export default function JadwalEhbPage() {
                 <div className="flex items-center gap-2 border rounded-lg px-2 bg-white">
                   <input 
                     type="date" 
-                    value={newTanggal}
-                    onChange={e => setNewTanggal(e.target.value)}
+                    value={newTglStart}
+                    onChange={e => setNewTglStart(e.target.value)}
+                    className="text-sm border-none outline-none py-2"
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input 
+                    type="date" 
+                    value={newTglEnd}
+                    onChange={e => setNewTglEnd(e.target.value)}
                     className="text-sm border-none outline-none py-2"
                   />
                   <button 
                     onClick={handleAddTanggal}
                     className="bg-slate-100 text-slate-700 px-3 py-1 rounded text-xs font-bold hover:bg-slate-200"
                   >
-                    Tambah Tgl
+                    Set Rentang
                   </button>
                 </div>
-                <button 
-                  onClick={handleSaveJadwal}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"
-                >
-                  <Save className="w-4 h-4"/> Simpan Perubahan
-                </button>
               </div>
             </div>
 
@@ -619,7 +604,6 @@ export default function JadwalEhbPage() {
                         <button onClick={() => handleDeleteTanggal(tgl)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"><Trash2 className="w-3 h-3"/> Hapus Tgl</button>
                       </div>
                       
-                      {/* Nested tables for each Sesi */}
                       <div className="divide-y">
                         {sesiList.map(sesi => {
                           // Filter kelas that belong to this sesi's jam_group
@@ -635,30 +619,19 @@ export default function JadwalEhbPage() {
                               </div>
                               <div className="flex-1 p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {kelasForSesi.map(k => {
-                                  const key = `${tgl}_${sesi.id}_${k.id}`
                                   const savedMapelId = jadwalMap[tgl]?.[sesi.id!]?.[k.id]
-                                  const currentMapelId = editJadwal[key] !== undefined ? editJadwal[key] : savedMapelId
 
                                   return (
                                     <div key={k.id} className="border rounded p-2 bg-white flex flex-col gap-1 relative group">
                                       <span className="text-xs font-bold text-slate-700">{k.nama_kelas}</span>
                                       <select 
-                                        value={currentMapelId || ''}
+                                        value={savedMapelId || ''}
                                         onChange={e => handleJadwalChange(tgl, sesi.id!, k.id, e.target.value ? parseInt(e.target.value) : '')}
-                                        className={`text-xs border rounded px-1 py-1 w-full outline-none ${currentMapelId ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'}`}
+                                        className={`text-xs border rounded px-1 py-1 w-full outline-none ${savedMapelId ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'}`}
                                       >
                                         <option value="">-- Kosong --</option>
                                         {mapelAktif.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                                       </select>
-                                      {savedMapelId && !editJadwal[key] && (
-                                         <button 
-                                            onClick={() => handleHapusJadwalCell(tgl, sesi.id!, k.id)}
-                                            className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 hidden group-hover:block hover:bg-red-200 shadow"
-                                            title="Hapus jadwal mapel ini"
-                                          >
-                                            <X className="w-3 h-3"/>
-                                         </button>
-                                      )}
                                     </div>
                                   )
                                 })}

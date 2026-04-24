@@ -60,17 +60,22 @@ export default function PengawasEhbPage() {
   const loadJadwalData = async () => {
     if (!event) return
     setLoading(true)
-    const [jdw, sesis, tgls, ruangs] = await Promise.all([
-      getJadwalPengawasAll(event.id),
-      getSesiList(event.id),
-      getTanggalList(event.id),
-      getRuanganList(event.id)
-    ])
-    setJadwal(jdw)
-    setSesiList(sesis)
-    setTanggalList(tgls)
-    setRuanganList(ruangs)
-    setLoading(false)
+    try {
+      const [jdw, sesis, tgls, ruangs] = await Promise.all([
+        getJadwalPengawasAll(event.id),
+        getSesiList(event.id),
+        getTanggalList(event.id),
+        getRuanganList(event.id)
+      ])
+      setJadwal(jdw)
+      setSesiList(sesis)
+      setTanggalList(tgls)
+      setRuanganList(ruangs)
+    } catch (err: any) {
+      toast.error('Gagal memuat matriks jadwal: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────────
