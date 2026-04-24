@@ -43,18 +43,23 @@ export default function PengawasEhbPage() {
 
   const loadData = async () => {
     setLoading(true)
-    const evt = await getActiveEventLight()
-    setEvent(evt || null)
-    
-    if (evt) {
-      const [pengawas, gurus] = await Promise.all([
-        getPengawasList(evt.id),
-        getGuruList()
-      ])
-      setPengawasList(pengawas)
-      setGuruList(gurus)
+    try {
+      const evt = await getActiveEventLight()
+      setEvent(evt || null)
+      
+      if (evt) {
+        const [pengawas, gurus] = await Promise.all([
+          getPengawasList(evt.id),
+          getGuruList()
+        ])
+        setPengawasList(pengawas)
+        setGuruList(gurus)
+      }
+    } catch (err: any) {
+      toast.error('Gagal memuat data: ' + err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const loadJadwalData = async () => {
