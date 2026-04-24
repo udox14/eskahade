@@ -51,8 +51,7 @@ export default function PlottingEhbPage() {
     // It's checked during the process, but we warn anyway
     if (!await confirm(
       'Mulai Auto Plotting?\n\n' +
-      'Sistem akan menempatkan seluruh santri aktif secara acak ke dalam ruangan berdasarkan Jenis Kelamin dan Jam Group. ' +
-      'Sistem akan berusaha memastikan santri dari marhalah yang sama tidak duduk berdekatan (Cross Seating). \n\n' +
+      'Sistem akan mengelompokkan santri berdasarkan Marhalah, lalu diurutkan secara Abjad. Santri dari marhalah yang berbeda kemudian akan disilang (Cross Seating) ke dalam kursi ruangan secara berurutan.\n\n' +
       'Perhatian: Tindakan ini akan MENGHAPUS semua plotting ruangan yang ada saat ini.'
     )) return
 
@@ -106,7 +105,7 @@ export default function PlottingEhbPage() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             Auto Plotting Ruangan
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Penempatan otomatis santri ke ruangan EHB dengan algoritma Cross Seating.</p>
+          <p className="text-sm text-slate-500 mt-1">Penempatan otomatis dengan Cross Seating yang tetap berurutan per kelas dan abjad.</p>
         </div>
       </div>
 
@@ -180,7 +179,7 @@ export default function PlottingEhbPage() {
                   <Info className="w-5 h-5 shrink-0 mt-0.5"/> 
                   <p>
                     Algoritma akan membagi santri berdasarkan <b>Jenis Kelamin</b> dan <b>Jam Group</b>, 
-                    lalu mengacak urutannya sambil memastikan santri dari marhalah yang sama tidak duduk berdampingan (Cross Seating).
+                    lalu menyilang mereka (Cross Seating) antar marhalah sambil tetap menjaga urutan abjad kelas (A-Z) di dalam ruangan.
                   </p>
                 </div>
 

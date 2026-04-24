@@ -83,40 +83,33 @@ export async function autoPlotSantri(eventId: number) {
           JOIN kelas k ON k.id = rp.kelas_id
           JOIN marhalah m ON m.id = k.marhalah_id
           WHERE s.status_global = 'aktif' AND s.jenis_kelamin = ?
+          ORDER BY m.urutan ASC, k.nama_kelas ASC, s.nama_lengkap ASC
         `, [eventId, jg, jk])
 
         if (santriList.length === 0) continue
 
-        // Shuffle within same marhalah to make it random but we still know their marhalah
+        // Group by marhalah, retaining the sorted order
         const groupedByMarhalah: Record<number, string[]> = {}
         santriList.forEach((s: any) => {
           if (!groupedByMarhalah[s.marhalah_urutan]) groupedByMarhalah[s.marhalah_urutan] = []
           groupedByMarhalah[s.marhalah_urutan].push(s.santri_id)
         })
 
-        // Shuffle arrays
-        Object.keys(groupedByMarhalah).forEach(k => {
-          groupedByMarhalah[parseInt(k)].sort(() => Math.random() - 0.5)
-        })
-
-        // Interleave algorithm for cross seating
-        // Misal: A, B, C marhalah yang berbeda
-        // Urutannya: A1, B1, C1, A2, B2, C2 ...
+        // Interleave by taking from the front (shift) of each marhalah array
         const interleavedSantri: string[] = []
         let hasMore = true
         while(hasMore) {
           hasMore = false
-          // Sort keys to pick predictably or we can randomize the pick order
           const keys = Object.keys(groupedByMarhalah).map(Number).sort((a,b)=>a-b)
           for (const k of keys) {
             if (groupedByMarhalah[k].length > 0) {
-              interleavedSantri.push(groupedByMarhalah[k].pop()!)
+              interleavedSantri.push(groupedByMarhalah[k].shift()!)
               hasMore = true
             }
           }
         }
 
-        // Mulai masukkan ke ruangan
+        // Mulai masukkan ke ruangan berurutan
         let sIdx = 0
         for (const r of ruanganList) {
           let kursi = 1
