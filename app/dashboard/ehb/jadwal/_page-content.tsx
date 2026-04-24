@@ -193,7 +193,9 @@ export default function JadwalEhbPage() {
   }
 
   // Unique jam groups dari sesi
-  const jamGroups = Array.from(new Set(sesiList.map(s => s.jam_group).filter(Boolean)))
+  const jamGroups = Array.from(new Set(
+    sesiList.flatMap(s => (s.jam_group || '').split(',').map(x => x.trim()).filter(Boolean))
+  ))
 
   // ──────────────────────────────────────────────────────────────────────────────
   // TAB JADWAL
@@ -558,7 +560,7 @@ export default function JadwalEhbPage() {
                         <input 
                           value={sesi.jam_group}
                           onChange={e => handleSesiChange(idx, 'jam_group', e.target.value)}
-                          placeholder="mis: Jam ke-1"
+                          placeholder="mis: Jam ke-1 atau Jam ke-1, Jam ke-2"
                           className="w-full border rounded px-3 py-2 text-sm"
                         />
                       </div>
@@ -750,7 +752,8 @@ export default function JadwalEhbPage() {
                       {isExpanded && (
                       <div className="divide-y">
                         {sesiList.map(sesi => {
-                          const kelasForSesi = kelasAktif.filter(k => kelasJamMapping[k.id] === sesi.jam_group)
+                          const sesiJamGroups = (sesi.jam_group || '').split(',').map(s => s.trim())
+                          const kelasForSesi = kelasAktif.filter(k => sesiJamGroups.includes(kelasJamMapping[k.id]))
                           if (kelasForSesi.length === 0) return null
 
                           // Group by marhalah
