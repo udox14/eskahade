@@ -88,39 +88,42 @@ export async function autoPlotSantri(eventId: number) {
 
         if (santriList.length === 0) continue
 
-        // Group by marhalah, retaining the sorted order
-        const groupedByMarhalah: Record<number, string[]> = {}
+        // Bagi marhalah menjadi 2 track (Ganjil/Genap) berdasarkan urutan marhalah
+        const uniqueMarhalahUrutan = Array.from(new Set(santriList.map((s:any) => s.marhalah_urutan))).sort((a:any, b:any) => a - b)
+        
+        const trackA: string[] = [] // Akan mengisi kursi ganjil
+        const trackB: string[] = [] // Akan mengisi kursi genap
+        
         santriList.forEach((s: any) => {
-          if (!groupedByMarhalah[s.marhalah_urutan]) groupedByMarhalah[s.marhalah_urutan] = []
-          groupedByMarhalah[s.marhalah_urutan].push(s.santri_id)
+          const idx = uniqueMarhalahUrutan.indexOf(s.marhalah_urutan)
+          if (idx % 2 === 0) {
+            trackA.push(s.santri_id)
+          } else {
+            trackB.push(s.santri_id)
+          }
         })
 
-        // Interleave by taking from the front (shift) of each marhalah array
-        const interleavedSantri: string[] = []
-        let hasMore = true
-        while(hasMore) {
-          hasMore = false
-          const keys = Object.keys(groupedByMarhalah).map(Number).sort((a,b)=>a-b)
-          for (const k of keys) {
-            if (groupedByMarhalah[k].length > 0) {
-              interleavedSantri.push(groupedByMarhalah[k].shift()!)
-              hasMore = true
-            }
-          }
-        }
-
         // Mulai masukkan ke ruangan berurutan
-        let sIdx = 0
         for (const r of ruanganList) {
           let kursi = 1
-          while (kursi <= r.kapasitas && sIdx < interleavedSantri.length) {
-            const sid = interleavedSantri[sIdx]
+          while (kursi <= r.kapasitas && (trackA.length > 0 || trackB.length > 0)) {
+            let sid: string | undefined
+            
+            if (kursi % 2 === 1) {
+              // Kursi ganjil prioritas ambil dari trackA
+              sid = trackA.shift() || trackB.shift()
+            } else {
+              // Kursi genap prioritas ambil dari trackB
+              sid = trackB.shift() || trackA.shift()
+            }
+
+            if (!sid) break
+
             insertStmts.push({
               sql: `INSERT INTO ehb_plotting_santri (ehb_event_id, ruangan_id, santri_id, nomor_kursi, jam_group) VALUES (?, ?, ?, ?, ?)`,
               params: [eventId, r.id, sid, kursi, jg]
             })
             kursi++
-            sIdx++
           }
         }
 
