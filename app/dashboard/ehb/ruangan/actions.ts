@@ -8,16 +8,30 @@ import { revalidatePath } from 'next/cache'
 // RUANGAN
 // ──────────────────────────────────────────────────────────────────────────────
 
-export async function getRuanganList(eventId: number) {
-  // Ambil list ruangan dan hitung jumlah peserta yang di-plot per jam group
-  return query<any>(`
-    SELECT 
-      r.*,
-      (SELECT COUNT(*) FROM ehb_plotting_santri p WHERE p.ruangan_id = r.id) as total_peserta
-    FROM ehb_ruangan r
-    WHERE r.ehb_event_id = ?
-    ORDER BY r.nomor_ruangan
-  `, [eventId])
+export async function getRuanganList(eventId: number, jamGroup?: string) {
+  if (jamGroup) {
+      return query<any>(`
+        SELECT 
+          r.*,
+          (SELECT COUNT(*) FROM ehb_plotting_santri p WHERE p.ruangan_id = r.id AND p.jam_group = ?) as total_peserta
+        FROM ehb_ruangan r
+        WHERE r.ehb_event_id = ?
+        ORDER BY r.nomor_ruangan
+      `, [jamGroup, eventId])
+  } else {
+      return query<any>(`
+        SELECT 
+          r.*,
+          (SELECT COUNT(*) FROM ehb_plotting_santri p WHERE p.ruangan_id = r.id) as total_peserta
+        FROM ehb_ruangan r
+        WHERE r.ehb_event_id = ?
+        ORDER BY r.nomor_ruangan
+      `, [eventId])
+  }
+}
+
+export async function getJamGroups(eventId: number) {
+    return query<{jam_group: string}>(`SELECT DISTINCT jam_group FROM ehb_kelas_jam WHERE ehb_event_id = ? ORDER BY jam_group`, [eventId])
 }
 
 export async function addRuangan(eventId: number, data: { nomor_ruangan: number, nama_ruangan: string, kapasitas: number, jenis_kelamin: string }) {

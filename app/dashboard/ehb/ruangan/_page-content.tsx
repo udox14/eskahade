@@ -5,7 +5,7 @@ import {
   getRuanganList, addRuangan, updateRuangan, deleteRuangan, addRuanganBulk, addRuanganImport,
   getRuanganDetail, getActiveEventLight, getOtherRuangan, pindahSantri, hapusPeserta,
   cariSantriUnplotted, tambahPesertaManual,
-  getDataCetakRuangan, getSesiListForRuangan, getDataBlankoAbsensi
+  getDataCetakRuangan, getSesiListForRuangan, getDataBlankoAbsensi, getJamGroups
 } from './actions'
 import * as XLSX from 'xlsx'
 import {
@@ -20,6 +20,8 @@ export default function RuanganEhbPage() {
   const confirm = useConfirm()
   const [event, setEvent] = useState<{ id: number, nama: string } | null>(null)
   const [ruanganList, setRuanganList] = useState<any[]>([])
+  const [jamGroups, setJamGroups] = useState<string[]>([])
+  const [activeJamTab, setActiveJamTab] = useState<string>('Semua')
   const [loading, setLoading] = useState(true)
 
   // Modal Form Ruangan
@@ -53,12 +55,24 @@ export default function RuanganEhbPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    if (event && !loading) {
+        getRuanganList(event.id, activeJamTab !== 'Semua' ? activeJamTab : undefined).then(list => {
+            setRuanganList(list)
+        })
+    }
+  }, [activeJamTab])
+
   const loadData = async () => {
     setLoading(true)
     const evt = await getActiveEventLight()
     setEvent(evt || null)
     if (evt) {
-      const list = await getRuanganList(evt.id)
+      const jgs = await getJamGroups(evt.id)
+      const groups = jgs.map(j => j.jam_group)
+      setJamGroups(groups)
+
+      const list = await getRuanganList(evt.id, activeJamTab !== 'Semua' ? activeJamTab : undefined)
       setRuanganList(list)
     }
     setLoading(false)
@@ -262,6 +276,26 @@ export default function RuanganEhbPage() {
           </button>
         </div>
       </div>
+
+      {jamGroups.length > 0 && (
+        <div className="flex gap-2 border-b">
+          <button 
+            onClick={() => setActiveJamTab('Semua')}
+            className={`px-4 py-3 font-bold text-sm border-b-2 transition-colors ${activeJamTab === 'Semua' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+          >
+            Total Gabungan
+          </button>
+          {jamGroups.map(jg => (
+            <button 
+              key={jg}
+              onClick={() => setActiveJamTab(jg)}
+              className={`px-4 py-3 font-bold text-sm border-b-2 transition-colors ${activeJamTab === jg ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+            >
+              {jg}
+            </button>
+          ))}
+        </div>
+      )}
 
       {ruanganList.length === 0 ? (
         <div className="text-center py-20 bg-white border rounded-xl">
