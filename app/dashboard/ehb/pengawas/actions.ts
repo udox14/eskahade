@@ -17,18 +17,28 @@ export async function getActiveEventLight() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function getPengawasList(eventId: number) {
-    return query<any>(`
-        SELECT p.*,
-            (SELECT COUNT(*) FROM ehb_jadwal_pengawas jp WHERE jp.pengawas_id = p.id) as total_tugas
-        FROM ehb_pengawas p
-        WHERE p.ehb_event_id = ?
-        ORDER BY p.nama_pengawas
-    `, [eventId])
+    try {
+        return await query<any>(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM ehb_jadwal_pengawas jp WHERE jp.pengawas_id = p.id) as total_tugas
+            FROM ehb_pengawas p
+            WHERE p.ehb_event_id = ?
+            ORDER BY p.nama_pengawas
+        `, [eventId])
+    } catch (e: any) {
+        console.error("DB ERROR in getPengawasList:", e.message)
+        return { __error: "getPengawasList: " + e.message } as any
+    }
 }
 
 // Ambil semua guru untuk pilihan tambah pengawas
 export async function getGuruList() {
-    return query<any>(`SELECT id, nama, status_kepegawaian FROM data_guru ORDER BY nama`)
+    try {
+        return await query<any>(`SELECT id, nama, status_kepegawaian FROM data_guru ORDER BY nama`)
+    } catch (e: any) {
+        console.error("DB ERROR in getGuruList:", e.message)
+        return { __error: "getGuruList: " + e.message } as any
+    }
 }
 
 export async function addPengawas(eventId: number, pengawas: { guru_id?: number, nama_pengawas: string, tag: string }[]) {

@@ -52,6 +52,9 @@ export default function PengawasEhbPage() {
           getPengawasList(evt.id),
           getGuruList()
         ])
+        if (pengawas && pengawas.__error) throw new Error(pengawas.__error)
+        if (gurus && gurus.__error) throw new Error(gurus.__error)
+        
         setPengawasList(pengawas)
         setGuruList(gurus)
       }
