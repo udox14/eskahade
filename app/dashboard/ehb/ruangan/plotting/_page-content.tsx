@@ -93,6 +93,10 @@ export default function PlottingEhbPage() {
   const kapL = kapasitas.find(k => k.jenis_kelamin === 'L') || { total_kapasitas: 0, total_ruangan: 0 }
   const kapP = kapasitas.find(k => k.jenis_kelamin === 'P') || { total_kapasitas: 0, total_ruangan: 0 }
 
+  const multiplier = Math.max(1, jamGroups.length)
+  const effKapL = kapL.total_kapasitas * multiplier
+  const effKapP = kapP.total_kapasitas * multiplier
+
   const readyToRun = jamGroups.length > 0 && (kapL.total_ruangan > 0 || kapP.total_ruangan > 0)
 
   return (
@@ -122,8 +126,8 @@ export default function PlottingEhbPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-blue-600 font-bold mb-1">Peserta / Kapasitas</p>
-                  <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > kapL.total_kapasitas ? 'text-red-500' : ''}>{kapL.total_kapasitas}</span></p>
-                  <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan</p>
+                  <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > effKapL ? 'text-red-500' : ''}>{effKapL}</span></p>
+                  <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan × {jamGroups.length} jam</p>
                 </div>
                 <div>
                   <p className="text-xs text-blue-600 font-bold mb-1">Status</p>
@@ -141,8 +145,8 @@ export default function PlottingEhbPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-pink-600 font-bold mb-1">Peserta / Kapasitas</p>
-                  <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > kapP.total_kapasitas ? 'text-red-500' : ''}>{kapP.total_kapasitas}</span></p>
-                  <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan</p>
+                  <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > effKapP ? 'text-red-500' : ''}>{effKapP}</span></p>
+                  <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan × {jamGroups.length} jam</p>
                 </div>
                 <div>
                   <p className="text-xs text-pink-600 font-bold mb-1">Status</p>
