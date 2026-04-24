@@ -186,7 +186,9 @@ export default function JadwalEhbPage() {
 
   const handleSaveMapping = async () => {
     if (!activeEvent) return
-    const mappings = Object.entries(kelasJamMapping).map(([k, j]) => ({ kelas_id: k, jam_group: j }))
+    const mappings = Object.entries(kelasJamMapping)
+      .filter(([_, j]) => j !== '')
+      .map(([k, j]) => ({ kelas_id: k, jam_group: j }))
     const res = await saveKelasJamMapping(activeEvent.id, mappings)
     if ('error' in res) return toast.error(res.error)
     toast.success('Mapping kelas berhasil disimpan')
