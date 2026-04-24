@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as XLSX from 'xlsx'
 import {
   getActiveEventLight, getPengawasList, getGuruList, addPengawas, updatePengawas, deletePengawas,
   getJadwalPengawasAll, getSesiList, getTanggalList, getRuanganList,
   saveAssignmentManual, deleteAssignment, getKartuPengawasData
 } from './actions'
 import {
-  UserCheck, Plus, Edit2, Trash2, CalendarDays, Loader2, AlertTriangle, 
-  X, Users, Printer, FileText, CheckCircle2, ChevronDown, ChevronRight
+  UserCheck, Plus, Edit2, Trash2, Loader2, AlertTriangle, 
+  X, Users, Printer, Upload, Download, FileSpreadsheet
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -23,10 +24,19 @@ export default function PengawasEhbPage() {
   const [guruList, setGuruList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Form Pengawas
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ id: 0, guru_id: 0, nama_pengawas: '', tag: 'junior' })
-  const [isManualName, setIsManualName] = useState(false)
+  // Form Pengawas (Edit saja - single)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [formData, setFormData] = useState({ id: 0, nama_pengawas: '', tag: 'junior' })
+
+  // Form Tambah Massal
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addTab, setAddTab] = useState<'guru'|'manual'>('guru')
+  const [selectedGurus, setSelectedGurus] = useState<Set<number>>(new Set())
+  const [defaultTag, setDefaultTag] = useState('junior')
+  const [manualName, setManualName] = useState('')
+  const [guruSearch, setGuruSearch] = useState('')
+  const [importedRows, setImportedRows] = useState<{nama: string, tag: string}[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Jadwal State
   const [jadwal, setJadwal] = useState<any[]>([])
@@ -91,37 +101,113 @@ export default function PengawasEhbPage() {
   // ──────────────────────────────────────────────────────────────────────────────
 
   const handleOpenAdd = () => {
-    setFormData({ id: 0, guru_id: 0, nama_pengawas: '', tag: 'junior' })
-    setIsManualName(false)
-    setShowForm(true)
+    setSelectedGurus(new Set())
+    setDefaultTag('junior')
+    setManualName('')
+    setGuruSearch('')
+    setAddTab('guru')
+    setShowAddModal(true)
   }
 
   const handleOpenEdit = (p: any) => {
-    setFormData({ id: p.id, guru_id: p.guru_id || 0, nama_pengawas: p.nama_pengawas, tag: p.tag })
-    setIsManualName(!p.guru_id)
-    setShowForm(true)
+    setFormData({ id: p.id, nama_pengawas: p.nama_pengawas, tag: p.tag })
+    setShowEditForm(true)
   }
 
+  // ── TAMBAH MASSAL DARI GURU ──
+  const handleSaveBulkGuru = async () => {
+    if (!event) return
+    if (selectedGurus.size === 0) return toast.error('Pilih minimal 1 guru')
+
+    // Filter guru yang sudah jadi pengawas
+    const sudahAda = new Set(pengawasList.filter(p => p.guru_id).map((p: any) => p.guru_id))
+    const toAdd = [...selectedGurus].filter(id => !sudahAda.has(id))
+    if (toAdd.length === 0) return toast.error('Semua guru yang dipilih sudah terdaftar sebagai pengawas')
+
+    const payload = toAdd.map(gid => {
+      const g = guruList.find((x: any) => x.id === gid)
+      return { guru_id: gid, nama_pengawas: g?.nama || '', tag: defaultTag }
+    })
+    const res = await addPengawas(event.id, payload)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${toAdd.length} pengawas berhasil ditambahkan!`)
+    setShowAddModal(false)
+    loadData()
+  }
+
+  // ── TAMBAH MANUAL (NAMA BEBAS) ──
+  const handleSaveManual = async () => {
+    if (!event) return
+    if (!manualName.trim()) return toast.error('Masukkan nama pengawas')
+    const res = await addPengawas(event.id, [{ nama_pengawas: manualName.trim(), tag: defaultTag }])
+    if ('error' in res) return toast.error(res.error)
+    toast.success('Pengawas ditambahkan!')
+    setManualName('')
+    setShowAddModal(false)
+    loadData()
+  }
+
+  // ── IMPORT EXCEL ──
+  const handleDownloadTemplate = () => {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['nama_pengawas', 'tag'],
+      ['Contoh: Ustadz Ahmad Fauzi', 'junior'],
+      ['Contoh: Ustadzah Siti Aminah', 'senior'],
+    ])
+    ws['!cols'] = [{ wch: 30 }, { wch: 10 }]
+    XLSX.utils.book_append_sheet(wb, ws, 'Pengawas')
+    XLSX.writeFile(wb, 'template_pengawas.xlsx')
+  }
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target?.result, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: '' })
+        const parsed = rows
+          .map((r: any) => ({
+            nama: (r['nama_pengawas'] || r['nama'] || '').toString().trim(),
+            tag: ['senior', 'junior'].includes((r['tag'] || '').toString().toLowerCase())
+              ? (r['tag'] || '').toString().toLowerCase()
+              : 'junior'
+          }))
+          .filter((r: any) => r.nama.length > 0)
+        if (parsed.length === 0) return toast.error('Tidak ada data yang bisa dibaca dari file Excel')
+        setImportedRows(parsed)
+        toast.success(`${parsed.length} baris berhasil diimpor. Cek preview lalu klik Simpan.`)
+      } catch {
+        toast.error('Gagal membaca file Excel')
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+    reader.readAsBinaryString(file)
+  }
+
+  const handleSaveImport = async () => {
+    if (!event || importedRows.length === 0) return
+    const payload = importedRows.map(r => ({ nama_pengawas: r.nama, tag: r.tag }))
+    const res = await addPengawas(event.id, payload)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${importedRows.length} pengawas berhasil ditambahkan!`)
+    setImportedRows([])
+    setShowAddModal(false)
+    loadData()
+  }
+
+  // ── EDIT PENGAWAS ──
   const handleSavePengawas = async () => {
     if (!event) return
-    if (!formData.nama_pengawas && !formData.guru_id) return toast.error('Pilih guru atau masukkan nama pengawas')
-
-    let nama = formData.nama_pengawas
-    if (!isManualName && formData.guru_id) {
-        const guru = guruList.find(g => g.id === formData.guru_id)
-        if (guru) nama = guru.nama
-    }
-
-    let res
-    if (formData.id) {
-        res = await updatePengawas(formData.id, { nama_pengawas: nama, tag: formData.tag })
-    } else {
-        res = await addPengawas(event.id, [{ guru_id: isManualName ? undefined : formData.guru_id, nama_pengawas: nama, tag: formData.tag }])
-    }
-
+    if (!formData.nama_pengawas.trim()) return toast.error('Nama pengawas tidak boleh kosong')
+    const res = await updatePengawas(formData.id, { nama_pengawas: formData.nama_pengawas, tag: formData.tag })
     if ('error' in res) return toast.error(res.error)
     toast.success('Data pengawas disimpan')
-    setShowForm(false)
+    setShowEditForm(false)
     loadData()
   }
 
@@ -359,65 +445,257 @@ export default function PengawasEhbPage() {
           </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────────── */}
-      {/* MODAL FORM PENGAWAS */}
-      {/* ──────────────────────────────────────────────────────────────────────────── */}
-      {showForm && (
+      {/* ── MODAL TAMBAH MASSAL ─────────────────────────────────────────────────── */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-slate-800">Tambah Pengawas</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+
+            {/* Tab */}
+            <div className="flex gap-1 px-5 pt-4 shrink-0">
+              <button
+                onClick={() => setAddTab('guru')}
+                className={`px-4 py-1.5 text-sm font-bold rounded-lg border transition-colors ${addTab === 'guru' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >Dari Data Guru</button>
+              <button
+                onClick={() => setAddTab('manual')}
+                className={`px-4 py-1.5 text-sm font-bold rounded-lg border transition-colors ${addTab === 'manual' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >Nama Manual</button>
+            </div>
+
+            {/* Tag default */}
+            <div className="px-5 pt-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-500">Tag Default:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" name="defaultTag" value="junior" checked={defaultTag === 'junior'} onChange={() => setDefaultTag('junior')} className="accent-indigo-600"/>
+                  <span className="text-xs text-slate-700">Junior</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" name="defaultTag" value="senior" checked={defaultTag === 'senior'} onChange={() => setDefaultTag('senior')} className="accent-indigo-600"/>
+                  <span className="text-xs text-slate-700">Senior</span>
+                </label>
+              </div>
+            </div>
+
+            {addTab === 'guru' && (
+              <>
+                {/* Search & Select All */}
+                <div className="px-5 pt-3 shrink-0 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Cari nama guru..."
+                    value={guruSearch}
+                    onChange={e => setGuruSearch(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">{selectedGurus.size} dipilih</span>
+                    <button
+                      onClick={() => {
+                        const sudahAda = new Set(pengawasList.filter(p => p.guru_id).map((p: any) => p.guru_id))
+                        const visible = guruList.filter((g: any) => !sudahAda.has(g.id) && g.nama.toLowerCase().includes(guruSearch.toLowerCase()))
+                        if (selectedGurus.size === visible.length) {
+                          setSelectedGurus(new Set())
+                        } else {
+                          setSelectedGurus(new Set(visible.map((g: any) => g.id)))
+                        }
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >Pilih Semua</button>
+                  </div>
+                </div>
+
+                {/* List guru dengan checkbox */}
+                <div className="flex-1 overflow-y-auto px-5 py-2 space-y-1 min-h-0">
+                  {(() => {
+                    const sudahAda = new Set(pengawasList.filter(p => p.guru_id).map((p: any) => p.guru_id))
+                    const filtered = guruList.filter((g: any) => g.nama.toLowerCase().includes(guruSearch.toLowerCase()))
+                    return filtered.map((g: any) => {
+                      const isAdded = sudahAda.has(g.id)
+                      const isChecked = selectedGurus.has(g.id)
+                      return (
+                        <label
+                          key={g.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                            isAdded ? 'opacity-40 cursor-not-allowed bg-slate-50' :
+                            isChecked ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={isAdded}
+                            checked={isChecked}
+                            onChange={e => {
+                              const next = new Set(selectedGurus)
+                              if (e.target.checked) next.add(g.id)
+                              else next.delete(g.id)
+                              setSelectedGurus(next)
+                            }}
+                            className="accent-indigo-600 w-4 h-4 shrink-0"
+                          />
+                          <span className="text-sm text-slate-800 flex-1">{g.nama}</span>
+                          {isAdded && <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">Sudah</span>}
+                        </label>
+                      )
+                    })
+                  })()}
+                </div>
+
+                <div className="px-5 py-4 border-t shrink-0">
+                  <button
+                    onClick={handleSaveBulkGuru}
+                    className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4"/> Tambah {selectedGurus.size > 0 ? selectedGurus.size + ' ' : ''}Pengawas
+                  </button>
+                </div>
+              </>
+            )}
+
+            {addTab === 'manual' && (
+              <div className="px-5 py-4 flex-1 overflow-y-auto space-y-4 min-h-0">
+                {/* Input nama satu-satu */}
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Tambah Satu Nama</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      value={manualName}
+                      onChange={e => setManualName(e.target.value)}
+                      placeholder="Masukkan nama pengawas..."
+                      className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                      onKeyDown={e => e.key === 'Enter' && handleSaveManual()}
+                    />
+                    <button
+                      onClick={handleSaveManual}
+                      className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shrink-0"
+                    >Tambah</button>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-slate-200"/>
+                  <span className="text-xs text-slate-400 font-bold">ATAU IMPORT EXCEL</span>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+
+                {/* Template & Upload */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">Import dari Excel</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Kolom: <code className="bg-slate-200 px-1 rounded text-[11px]">nama_pengawas</code>, <code className="bg-slate-200 px-1 rounded text-[11px]">tag</code></p>
+                    </div>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100"
+                    >
+                      <Download className="w-3.5 h-3.5"/> Template
+                    </button>
+                  </div>
+                  <label className="flex items-center gap-3 border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors">
+                    <FileSpreadsheet className="w-5 h-5 text-indigo-500 shrink-0"/>
+                    <span className="text-sm text-slate-600">
+                      {importedRows.length > 0
+                        ? <><span className="font-bold text-indigo-700">{importedRows.length} baris</span> siap diimpor</>  
+                        : 'Klik untuk pilih file .xlsx / .xls'}
+                    </span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={handleImportExcel}
+                    />
+                  </label>
+                </div>
+
+                {/* Preview tabel import */}
+                {importedRows.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-bold text-slate-600">Preview ({importedRows.length} baris)</p>
+                      <button onClick={() => setImportedRows([])} className="text-xs text-red-500 hover:underline">Hapus semua</button>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-bold text-slate-600">Nama</th>
+                            <th className="px-3 py-2 text-left font-bold text-slate-600 w-20">Tag</th>
+                            <th className="w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {importedRows.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-3 py-1.5">{r.nama}</td>
+                              <td className="px-3 py-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  r.tag === 'senior' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                                }`}>{r.tag}</span>
+                              </td>
+                              <td className="px-2">
+                                <button
+                                  onClick={() => setImportedRows(prev => prev.filter((_, j) => j !== i))}
+                                  className="text-slate-300 hover:text-red-500"
+                                ><X className="w-3.5 h-3.5"/></button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button
+                      onClick={handleSaveImport}
+                      className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
+                    >
+                      <Upload className="w-4 h-4"/> Simpan {importedRows.length} Pengawas
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDIT PENGAWAS ─────────────────────────────────────────────────── */}
+      {showEditForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">{formData.id ? 'Edit Pengawas' : 'Tambah Pengawas'}</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+              <h3 className="font-bold text-slate-800">Edit Pengawas</h3>
+              <button onClick={() => setShowEditForm(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                 <input type="checkbox" id="manualName" checked={isManualName} onChange={e => { setIsManualName(e.target.checked); setFormData({...formData, guru_id: 0}) }} className="rounded border-slate-300"/>
-                 <label htmlFor="manualName" className="text-xs font-bold text-slate-600">Input nama manual (Bukan guru aktif)</label>
+              <div>
+                <label className="text-xs font-bold text-slate-500">Nama Pengawas</label>
+                <input
+                  value={formData.nama_pengawas}
+                  onChange={e => setFormData({...formData, nama_pengawas: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                />
               </div>
-
-              {!isManualName ? (
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">Pilih Guru</label>
-                    <select 
-                        value={formData.guru_id} 
-                        onChange={e => setFormData({...formData, guru_id: parseInt(e.target.value)})}
-                        className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
-                    >
-                        <option value={0}>-- Pilih Guru --</option>
-                        {guruList.map(g => <option key={g.id} value={g.id}>{g.nama}</option>)}
-                    </select>
-                  </div>
-              ) : (
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">Nama Pengawas</label>
-                    <input 
-                        value={formData.nama_pengawas} 
-                        onChange={e => setFormData({...formData, nama_pengawas: e.target.value})}
-                        placeholder="Masukkan nama"
-                        className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
-                    />
-                  </div>
-              )}
-
               <div>
                 <label className="text-xs font-bold text-slate-500">Tag Status</label>
-                <select 
-                  value={formData.tag} 
+                <select
+                  value={formData.tag}
                   onChange={e => setFormData({...formData, tag: e.target.value})}
                   className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
                 >
-                  <option value="junior">Junior (Standard)</option>
-                  <option value="senior">Senior (Diprioritaskan/Aturan Khusus)</option>
+                  <option value="junior">Junior</option>
+                  <option value="senior">Senior</option>
                 </select>
-                <p className="text-[10px] text-slate-500 mt-1">Status Senior digunakan dalam algoritma Auto Plotting untuk mendapatkan perlakuan khusus (misal tidak jaga sesi malam).</p>
               </div>
-
-              <button 
+              <button
                 onClick={handleSavePengawas}
                 className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
-              >
-                Simpan
-              </button>
+              >Simpan Perubahan</button>
             </div>
           </div>
         </div>
