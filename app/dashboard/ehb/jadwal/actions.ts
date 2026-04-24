@@ -251,3 +251,84 @@ export async function hapusTanggal(eventId: number, tanggal: string) {
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
+
+export async function updateTanggalJadwal(eventId: number, oldTanggal: string, newTanggal: string) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  if (!newTanggal) return { error: 'Tanggal baru tidak boleh kosong' }
+
+  // Cek apakah tanggal baru sudah ada
+  const existing = await queryOne(`SELECT id FROM ehb_jadwal WHERE ehb_event_id = ? AND tanggal = ? LIMIT 1`, [eventId, newTanggal])
+  if (existing) return { error: 'Tanggal tersebut sudah memiliki jadwal' }
+
+  await execute(
+    `UPDATE ehb_jadwal SET tanggal = ? WHERE ehb_event_id = ? AND tanggal = ?`,
+    [newTanggal, eventId, oldTanggal]
+  )
+  revalidatePath('/dashboard/ehb/jadwal')
+  return { success: true }
+}
+
+export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: number) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  if (targetEventId === sourceEventId) return { error: 'Tidak bisa copy ke event yang sama' }
+
+  // 1. Bersihkan target event
+  await execute(`DELETE FROM ehb_jadwal WHERE ehb_event_id = ?`, [targetEventId])
+  await execute(`DELETE FROM ehb_kelas_jam WHERE ehb_event_id = ?`, [targetEventId])
+  await execute(`DELETE FROM ehb_sesi WHERE ehb_event_id = ?`, [targetEventId])
+
+  // 2. Copy Sesi
+  const oldSesi = await query<any>(`SELECT * FROM ehb_sesi WHERE ehb_event_id = ? ORDER BY nomor_sesi`, [sourceEventId])
+  const sesiMap = new Map<number, number>() // old_id -> new_id
+  
+  for (const s of oldSesi) {
+    const res = await execute(
+      `INSERT INTO ehb_sesi (ehb_event_id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      [targetEventId, s.nomor_sesi, s.label, s.jam_group, s.waktu_mulai, s.waktu_selesai]
+    )
+    // Di SQLite D1, result insert returning bisa diambil dari hasil query jika driver mendukung,
+    // tapi karena D1 execute mungkin tidak return rows di sini secara konsisten,
+    // mari kita query balik ID barunya.
+    const inserted = await queryOne<any>(
+      `SELECT id FROM ehb_sesi WHERE ehb_event_id = ? AND nomor_sesi = ?`, 
+      [targetEventId, s.nomor_sesi]
+    )
+    if (inserted) {
+      sesiMap.set(s.id, inserted.id)
+    }
+  }
+
+  // 3. Copy Kelas Jam Mapping
+  const oldMapping = await query<any>(`SELECT * FROM ehb_kelas_jam WHERE ehb_event_id = ?`, [sourceEventId])
+  if (oldMapping.length > 0) {
+    const mapStmts = oldMapping.map(m => ({
+      sql: `INSERT INTO ehb_kelas_jam (ehb_event_id, kelas_id, jam_group) VALUES (?, ?, ?)`,
+      params: [targetEventId, m.kelas_id, m.jam_group]
+    }))
+    await batch(mapStmts)
+  }
+
+  // 4. Copy Jadwal
+  const oldJadwal = await query<any>(`SELECT * FROM ehb_jadwal WHERE ehb_event_id = ?`, [sourceEventId])
+  if (oldJadwal.length > 0) {
+    const jadStmts = oldJadwal.map(j => {
+      const newSesiId = sesiMap.get(j.sesi_id)
+      if (!newSesiId) return null
+      return {
+        sql: `INSERT INTO ehb_jadwal (ehb_event_id, tanggal, sesi_id, kelas_id, mapel_id) VALUES (?, ?, ?, ?, ?)`,
+        params: [targetEventId, j.tanggal, newSesiId, j.kelas_id, j.mapel_id]
+      }
+    }).filter(Boolean) as any[]
+    
+    if (jadStmts.length > 0) {
+      await batch(jadStmts)
+    }
+  }
+
+  revalidatePath('/dashboard/ehb/jadwal')
+  return { success: true }
+}

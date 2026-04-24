@@ -6,7 +6,7 @@ import {
   getSesiList, saveSesiConfig,
   getKelasJamMapping, getKelasAktifList, saveKelasJamMapping,
   getJadwalEhb, getTanggalJadwal, getMapelAktifList, saveJadwalEhb,
-  getTahunAjaranList, hapusJadwalCell, hapusTanggal, SesiInput, JadwalItem
+  getTahunAjaranList, hapusJadwalCell, hapusTanggal, updateTanggalJadwal, copyJadwalFromEvent, SesiInput, JadwalItem
 } from './actions'
 import {
   CalendarDays, Settings, Users, BookOpen, Plus, Save, Trash2, 
@@ -50,6 +50,17 @@ export default function JadwalEhbPage() {
     tgl: string, sesiId: number, marhalahNama: string, kelasIds: string[]
   } | null>(null)
   const [bulkMapelId, setBulkMapelId] = useState<number | ''>()
+
+  // Set per Sesi (semua marhalah sekaligus)
+  const [sesiModal, setSesiModal] = useState<{
+    tgl: string, sesiId: number, sesiLabel: string, allKelasIds: string[]
+  } | null>(null)
+  const [sesiMapelId, setSesiMapelId] = useState<number | ''>()
+
+  // Fitur Copy Event & Ubah Tanggal
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState<number | ''>('')
+  const [editTanggalModal, setEditTanggalModal] = useState<{ oldTgl: string, newTgl: string } | null>(null)
 
   useEffect(() => {
     loadInitialData()
@@ -185,14 +196,22 @@ export default function JadwalEhbPage() {
   const loadJadwal = async () => {
     if (!activeEvent) return
     setLoadingJadwal(true)
-    const [jdw, mapel, tgls] = await Promise.all([
+    const [jdw, mapel, tgls, kelasRes, mappingRes] = await Promise.all([
       getJadwalEhb(activeEvent.id),
       getMapelAktifList(),
-      getTanggalJadwal(activeEvent.id)
+      getTanggalJadwal(activeEvent.id),
+      getKelasAktifList(),
+      getKelasJamMapping(activeEvent.id)
     ])
     setJadwal(jdw)
     setMapelAktif(mapel)
-    setTanggalList(tgls)
+    // Merge tanggal dari DB dengan tanggal lokal yang sudah ada (agar tanggal baru tidak hilang)
+    setTanggalList(prev => Array.from(new Set([...prev, ...tgls])).sort())
+    // Selalu sinkronkan kelas & mapping
+    setKelasAktif(kelasRes)
+    const map: Record<string, string> = {}
+    mappingRes.forEach((m: any) => map[m.kelas_id] = m.jam_group)
+    setKelasJamMapping(map)
     setLoadingJadwal(false)
   }
 
@@ -291,6 +310,52 @@ export default function JadwalEhbPage() {
       const res = await saveJadwalEhb(activeEvent.id, items)
       if ('error' in res) return toast.error(res.error)
     }
+    loadJadwal()
+  }
+
+  // Set mapel untuk SEMUA kelas di satu sesi sekaligus
+  const handleApplyBulkSesiMapel = async () => {
+    if (!activeEvent || !sesiModal || sesiMapelId === '') return toast.error('Pilih mata pelajaran terlebih dahulu')
+    const items = sesiModal.allKelasIds.map(kId => ({
+      tanggal: sesiModal.tgl,
+      sesi_id: sesiModal.sesiId,
+      kelas_id: kId,
+      mapel_id: sesiMapelId as number
+    }))
+    const res = await saveJadwalEhb(activeEvent.id, items)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`Sesi ${sesiModal.sesiLabel}: ${items.length} kelas berhasil diset!`)
+    setSesiModal(null)
+    setSesiMapelId('')
+    loadJadwal()
+  }
+
+  const handleCopyEvent = async () => {
+    if (!activeEvent || copySourceId === '') return toast.error('Pilih event sumber terlebih dahulu')
+    if (!await confirm('Peringatan: Menyalin jadwal akan menghapus semua konfigurasi sesi, mapping kelas, dan jadwal yang ada di event ini. Lanjutkan?')) return
+    
+    setLoadingJadwal(true)
+    const res = await copyJadwalFromEvent(activeEvent.id, copySourceId as number)
+    if ('error' in res) {
+      toast.error(res.error)
+      setLoadingJadwal(false)
+      return
+    }
+    
+    toast.success('Jadwal berhasil disalin dari event lain')
+    setCopyModalOpen(false)
+    setCopySourceId('')
+    loadJadwal() // Ini akan me-load semuanya karena logic loadJadwal sudah ambil sesi & mapping juga
+  }
+
+  const handleEditTanggal = async () => {
+    if (!activeEvent || !editTanggalModal || !editTanggalModal.newTgl) return toast.error('Tanggal baru tidak boleh kosong')
+    
+    const res = await updateTanggalJadwal(activeEvent.id, editTanggalModal.oldTgl, editTanggalModal.newTgl)
+    if ('error' in res) return toast.error(res.error)
+    
+    toast.success('Tanggal jadwal berhasil diperbarui')
+    setEditTanggalModal(null)
     loadJadwal()
   }
 
@@ -621,6 +686,12 @@ export default function JadwalEhbPage() {
                 <p className="text-xs text-slate-500 mt-1">Isi mata pelajaran yang diujikan untuk setiap kelas pada setiap sesi.</p>
               </div>
               <div className="flex gap-3">
+                <button 
+                  onClick={() => setCopyModalOpen(true)}
+                  className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-100 flex items-center gap-1"
+                >
+                  <BookOpen className="w-4 h-4"/> Salin dari Event Lain
+                </button>
                 <div className="flex items-center gap-2 border rounded-lg px-2 bg-white">
                   <input 
                     type="date" 
@@ -656,7 +727,17 @@ export default function JadwalEhbPage() {
                     <div key={tgl} className="border rounded-xl overflow-hidden">
                       <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3 flex justify-between items-center">
                         <h4 className="font-bold text-indigo-900">{new Date(tgl).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                        <button onClick={() => handleDeleteTanggal(tgl)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"><Trash2 className="w-3 h-3"/> Hapus Tgl</button>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => setEditTanggalModal({ oldTgl: tgl, newTgl: tgl })} 
+                            className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1"
+                          >
+                            <Settings className="w-3 h-3"/> Ubah Tgl
+                          </button>
+                          <button onClick={() => handleDeleteTanggal(tgl)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1">
+                            <Trash2 className="w-3 h-3"/> Hapus Tgl
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="divide-y">
@@ -673,10 +754,22 @@ export default function JadwalEhbPage() {
 
                           return (
                             <div key={sesi.id} className="flex">
-                              <div className="w-32 bg-slate-50 border-r p-3 shrink-0 flex flex-col justify-center items-center text-center">
+                              <div className="w-32 bg-slate-50 border-r p-3 shrink-0 flex flex-col justify-center items-center text-center gap-1">
                                 <span className="font-black text-slate-700 text-lg">Sesi {sesi.nomor_sesi}</span>
                                 <span className="text-xs text-slate-500">{sesi.label}</span>
-                                <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded mt-1">{sesi.jam_group}</span>
+                                <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded">{sesi.jam_group}</span>
+                                <button
+                                  onClick={() => {
+                                    setSesiMapelId('')
+                                    setSesiModal({
+                                      tgl,
+                                      sesiId: sesi.id!,
+                                      sesiLabel: sesi.label,
+                                      allKelasIds: kelasForSesi.map(k => k.id)
+                                    })
+                                  }}
+                                  className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded hover:bg-emerald-100 w-full"
+                                >⚡ Set Sesi</button>
                               </div>
                               <div className="flex-1 p-3 space-y-3">
                                 {Object.entries(byMarhalah).map(([marhalahId, { nama: marhalahNama, kelas }]) => {
@@ -794,6 +887,109 @@ export default function JadwalEhbPage() {
                 onClick={handleBulkSetMarhalah}
                 className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
               >Terapkan ke {bulkModal.kelasIds.length} Kelas</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL SET PER SESI ───────────────────────────────────────────── */}
+      {sesiModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-emerald-50">
+              <div>
+                <h3 className="font-bold text-slate-800">⚡ Set Semua Sesi</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{sesiModal.sesiLabel} — {sesiModal.allKelasIds.length} kelas (semua marhalah)</p>
+              </div>
+              <button onClick={() => setSesiModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Mata Pelajaran</label>
+                <select
+                  value={sesiMapelId}
+                  onChange={e => setSesiMapelId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-emerald-500"
+                  autoFocus
+                >
+                  <option value="">-- Pilih Mapel --</option>
+                  {mapelAktif.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                </select>
+              </div>
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                ⚠️ Semua kelas di sesi ini akan diisi mapel yang sama. Jadwal yang sudah ada akan ditimpa.
+              </p>
+              <button
+                onClick={handleApplyBulkSesiMapel}
+                className="w-full bg-emerald-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-emerald-700"
+              >Terapkan ke {sesiModal.allKelasIds.length} Kelas</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL COPY EVENT ───────────────────────────────────────────── */}
+      {copyModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-800">Salin Jadwal</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Duplikasi dari semester lalu</p>
+              </div>
+              <button onClick={() => setCopyModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Pilih Event Sumber</label>
+                <select
+                  value={copySourceId}
+                  onChange={e => setCopySourceId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Pilih Event --</option>
+                  {allEvents.filter(e => e.id !== activeEvent?.id).map(evt => (
+                    <option key={evt.id} value={evt.id}>{evt.nama} ({evt.tahun_ajaran_nama})</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                ⚠️ <b>Peringatan:</b> Tindakan ini akan <b>MENGHAPUS</b> Sesi, Mapping Kelas, dan Jadwal yang sudah ada di event saat ini, lalu menggantinya dengan data dari event yang dipilih.
+              </p>
+              <button
+                onClick={handleCopyEvent}
+                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
+              >Salin Sekarang</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL UBAH TANGGAL ───────────────────────────────────────────── */}
+      {editTanggalModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-800">Ubah Tanggal</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Jadwal pada tanggal ini akan digeser</p>
+              </div>
+              <button onClick={() => setEditTanggalModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Tanggal Baru</label>
+                <input
+                  type="date"
+                  value={editTanggalModal.newTgl}
+                  onChange={e => setEditTanggalModal({ ...editTanggalModal, newTgl: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                />
+              </div>
+              <button
+                onClick={handleEditTanggal}
+                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
+              >Simpan Perubahan</button>
             </div>
           </div>
         </div>
