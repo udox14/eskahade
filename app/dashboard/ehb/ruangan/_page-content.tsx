@@ -21,7 +21,7 @@ export default function RuanganEhbPage() {
   const [event, setEvent] = useState<{ id: number, nama: string } | null>(null)
   const [ruanganList, setRuanganList] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
-  const [activeJamTab, setActiveJamTab] = useState<string>('Semua')
+  const [activeJamTab, setActiveJamTab] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   // Modal Form Ruangan
@@ -56,8 +56,8 @@ export default function RuanganEhbPage() {
   }, [])
 
   useEffect(() => {
-    if (event && !loading) {
-        getRuanganList(event.id, activeJamTab !== 'Semua' ? activeJamTab : undefined).then(list => {
+    if (event && !loading && activeJamTab) {
+        getRuanganList(event.id, activeJamTab).then(list => {
             setRuanganList(list)
         })
     }
@@ -71,9 +71,17 @@ export default function RuanganEhbPage() {
       const jgs = await getJamGroups(evt.id)
       const groups = jgs.map(j => j.jam_group)
       setJamGroups(groups)
-
-      const list = await getRuanganList(evt.id, activeJamTab !== 'Semua' ? activeJamTab : undefined)
-      setRuanganList(list)
+      if (groups.length > 0 && !activeJamTab) {
+        setActiveJamTab(groups[0])
+        const list = await getRuanganList(evt.id, groups[0])
+        setRuanganList(list)
+      } else if (activeJamTab) {
+        const list = await getRuanganList(evt.id, activeJamTab)
+        setRuanganList(list)
+      } else {
+        const list = await getRuanganList(evt.id)
+        setRuanganList(list)
+      }
     }
     setLoading(false)
   }
@@ -153,6 +161,7 @@ export default function RuanganEhbPage() {
 
       const grouped: Record<string, any[]> = {}
       res.peserta.forEach((p: any) => {
+        if (activeJamTab && p.jam_group !== activeJamTab) return // Filter modal based on active tab
         if (!grouped[p.jam_group]) grouped[p.jam_group] = []
         grouped[p.jam_group].push(p)
       })
@@ -279,12 +288,6 @@ export default function RuanganEhbPage() {
 
       {jamGroups.length > 0 && (
         <div className="flex gap-2 border-b">
-          <button 
-            onClick={() => setActiveJamTab('Semua')}
-            className={`px-4 py-3 font-bold text-sm border-b-2 transition-colors ${activeJamTab === 'Semua' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
-          >
-            Total Gabungan
-          </button>
           {jamGroups.map(jg => (
             <button 
               key={jg}
