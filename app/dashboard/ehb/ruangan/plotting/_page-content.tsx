@@ -18,6 +18,7 @@ export default function PlottingEhbPage() {
   const [status, setStatus] = useState<any[]>([])
   const [kapasitas, setKapasitas] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
+  const [activeJamTab, setActiveJamTab] = useState<string>('')
   
   const [unplotted, setUnplotted] = useState<any[]>([])
   
@@ -38,6 +39,7 @@ export default function PlottingEhbPage() {
       setStatus(res.status)
       setKapasitas(res.kapasitas)
       setJamGroups(res.jamGroups)
+      if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
 
       const unp = await getUnplottedSantri(evt.id)
       setUnplotted(unp)
@@ -88,14 +90,15 @@ export default function PlottingEhbPage() {
   )
 
   // Calculate totals
-  const L = status.find(s => s.jenis_kelamin === 'L') || { total_santri: 0, terplot: 0 }
-  const P = status.find(s => s.jenis_kelamin === 'P') || { total_santri: 0, terplot: 0 }
+  const L = status.find(s => s.jenis_kelamin === 'L' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0 }
+  const P = status.find(s => s.jenis_kelamin === 'P' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0 }
   const kapL = kapasitas.find(k => k.jenis_kelamin === 'L') || { total_kapasitas: 0, total_ruangan: 0 }
   const kapP = kapasitas.find(k => k.jenis_kelamin === 'P') || { total_kapasitas: 0, total_ruangan: 0 }
 
-  const multiplier = Math.max(1, jamGroups.length)
-  const effKapL = kapL.total_kapasitas * multiplier
-  const effKapP = kapP.total_kapasitas * multiplier
+  const effKapL = kapL.total_kapasitas
+  const effKapP = kapP.total_kapasitas
+
+  const activeUnplotted = unplotted.filter(u => u.jam_group === activeJamTab)
 
   const readyToRun = jamGroups.length > 0 && (kapL.total_ruangan > 0 || kapP.total_ruangan > 0)
 
@@ -116,47 +119,68 @@ export default function PlottingEhbPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Status Panel */}
         <div className="bg-white border rounded-xl overflow-hidden flex flex-col">
-          <div className="bg-slate-50 px-5 py-4 border-b">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-600"/> Status Plotting</h3>
+          <div className="bg-slate-50 border-b flex flex-col">
+            <div className="px-5 py-4 border-b">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-600"/> Status Plotting Per Jam Group</h3>
+            </div>
+            {jamGroups.length > 0 && (
+              <div className="flex gap-2 px-5 pt-2">
+                {jamGroups.map(jg => (
+                  <button 
+                    key={jg}
+                    onClick={() => setActiveJamTab(jg)}
+                    className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeJamTab === jg ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
+                  >
+                    {jg}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="p-5 flex-1 flex flex-col gap-5">
-            {/* LAKI LAKI */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2">Putra</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-blue-600 font-bold mb-1">Peserta / Kapasitas</p>
-                  <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > effKapL ? 'text-red-500' : ''}>{effKapL}</span></p>
-                  <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan × {jamGroups.length} jam</p>
-                </div>
-                <div>
-                  <p className="text-xs text-blue-600 font-bold mb-1">Status</p>
-                  <p className="text-lg font-black text-blue-950">{L.terplot} <span className="text-sm font-normal">terplot</span></p>
-                  {L.terplot >= L.total_santri && L.total_santri > 0 && (
-                    <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> SELESAI</p>
-                  )}
+            {jamGroups.length === 0 ? (
+              <div className="text-sm text-slate-500 text-center py-10">Belum ada jam group.</div>
+            ) : (
+            <>
+              {/* LAKI LAKI */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2">Putra</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-blue-600 font-bold mb-1">Peserta / Kapasitas</p>
+                    <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > effKapL ? 'text-red-500' : ''}>{effKapL}</span></p>
+                    <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-600 font-bold mb-1">Status</p>
+                    <p className="text-lg font-black text-blue-950">{L.terplot} <span className="text-sm font-normal">terplot</span></p>
+                    {L.terplot >= L.total_santri && L.total_santri > 0 && (
+                      <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> SELESAI</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* PEREMPUAN */}
-            <div className="bg-pink-50 border border-pink-100 rounded-xl p-4">
-              <h4 className="font-bold text-pink-900 mb-3 flex items-center gap-2">Putri</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-pink-600 font-bold mb-1">Peserta / Kapasitas</p>
-                  <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > effKapP ? 'text-red-500' : ''}>{effKapP}</span></p>
-                  <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan × {jamGroups.length} jam</p>
-                </div>
-                <div>
-                  <p className="text-xs text-pink-600 font-bold mb-1">Status</p>
-                  <p className="text-lg font-black text-pink-950">{P.terplot} <span className="text-sm font-normal">terplot</span></p>
-                  {P.terplot >= P.total_santri && P.total_santri > 0 && (
-                    <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> SELESAI</p>
-                  )}
+              {/* PEREMPUAN */}
+              <div className="bg-pink-50 border border-pink-100 rounded-xl p-4">
+                <h4 className="font-bold text-pink-900 mb-3 flex items-center gap-2">Putri</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-pink-600 font-bold mb-1">Peserta / Kapasitas</p>
+                    <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > effKapP ? 'text-red-500' : ''}>{effKapP}</span></p>
+                    <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-pink-600 font-bold mb-1">Status</p>
+                    <p className="text-lg font-black text-pink-950">{P.terplot} <span className="text-sm font-normal">terplot</span></p>
+                    {P.terplot >= P.total_santri && P.total_santri > 0 && (
+                      <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> SELESAI</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
+            )}
           </div>
         </div>
 
@@ -213,15 +237,15 @@ export default function PlottingEhbPage() {
       </div>
 
       {/* Unplotted Santri List */}
-      {unplotted.length > 0 && (
+      {activeUnplotted.length > 0 && (
         <div className="bg-white border rounded-xl overflow-hidden mt-6">
           <div className="bg-red-50 px-5 py-4 border-b border-red-100 flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-red-800 flex items-center gap-2"><UserX className="w-5 h-5"/> Santri Belum Mendapat Ruangan</h3>
+              <h3 className="font-bold text-red-800 flex items-center gap-2"><UserX className="w-5 h-5"/> Santri Belum Mendapat Ruangan ({activeJamTab})</h3>
               <p className="text-xs text-red-600 mt-1">Daftar santri aktif yang belum terplot karena kapasitas ruangan kurang atau ada penambahan santri baru.</p>
             </div>
             <div className="bg-red-100 text-red-700 font-bold px-3 py-1 rounded-lg text-sm">
-              {unplotted.length} Santri
+              {activeUnplotted.length} Santri
             </div>
           </div>
           <div className="max-h-[400px] overflow-y-auto">
@@ -235,7 +259,7 @@ export default function PlottingEhbPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {unplotted.map(u => (
+                {activeUnplotted.map(u => (
                   <tr key={u.id} className="hover:bg-slate-50">
                     <td className="px-5 py-3">
                       <p className="font-bold text-slate-800">{u.nama_lengkap}</p>

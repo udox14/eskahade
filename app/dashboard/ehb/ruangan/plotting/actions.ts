@@ -10,6 +10,7 @@ export async function getPlottingStatus(eventId: number) {
   const status = await query<any>(`
     SELECT 
       s.jenis_kelamin,
+      kj.jam_group,
       COUNT(s.id) as total_santri,
       SUM(CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END) as terplot
     FROM santri s
@@ -17,9 +18,9 @@ export async function getPlottingStatus(eventId: number) {
     JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ?
     JOIN kelas k ON k.id = rp.kelas_id
     JOIN marhalah m ON m.id = k.marhalah_id
-    LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ?
+    LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ? AND p.jam_group = kj.jam_group
     WHERE s.status_global = 'aktif' AND m.nama NOT LIKE '%Mutaqaddimah%'
-    GROUP BY s.jenis_kelamin
+    GROUP BY s.jenis_kelamin, kj.jam_group
   `, [eventId, eventId])
 
   // Ambil total kapasitas ruangan per L/P
