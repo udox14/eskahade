@@ -26,7 +26,7 @@ export default function JadwalEhbPage() {
   const [loading, setLoading] = useState(true)
 
   // Form New Event
-  const [newEvent, setNewEvent] = useState({ tahunAjaranId: 0, semester: 2, nama: '' })
+  const [newEvent, setNewEvent] = useState({ tahunAjaranId: 0, semester: 2, nama: '', tanggal_mulai: '', tanggal_selesai: '' })
 
   // Sesi Data
   const [sesiList, setSesiList] = useState<SesiInput[]>([])
@@ -57,10 +57,12 @@ export default function JadwalEhbPage() {
   } | null>(null)
   const [sesiMapelId, setSesiMapelId] = useState<number | ''>()
 
-  // Fitur Copy Event & Ubah Tanggal
+  // Fitur Accordion Jadwal
+  const [expandedDates, setExpandedDates] = useState<string[]>([])
+
+  // Fitur Copy Event
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState<number | ''>('')
-  const [editTanggalModal, setEditTanggalModal] = useState<{ oldTgl: string, newTgl: string } | null>(null)
 
   useEffect(() => {
     loadInitialData()
@@ -87,11 +89,15 @@ export default function JadwalEhbPage() {
   // ──────────────────────────────────────────────────────────────────────────────
   
   const handleCreateEvent = async () => {
-    if (!newEvent.tahunAjaranId || !newEvent.nama) return toast.error('Lengkapi data event')
+    if (!newEvent.tahunAjaranId || !newEvent.nama || !newEvent.tanggal_mulai || !newEvent.tanggal_selesai) return toast.error('Lengkapi semua data event')
+    const start = new Date(newEvent.tanggal_mulai)
+    const end = new Date(newEvent.tanggal_selesai)
+    if (start > end) return toast.error('Tanggal mulai harus sebelum tanggal selesai')
+
     const res = await createEhbEvent(newEvent)
     if ('error' in res) return toast.error(res.error)
     toast.success('Event EHB berhasil dibuat dan diaktifkan')
-    setNewEvent({ tahunAjaranId: 0, semester: 2, nama: '' })
+    setNewEvent({ tahunAjaranId: 0, semester: 2, nama: '', tanggal_mulai: '', tanggal_selesai: '' })
     loadInitialData()
   }
 
@@ -196,51 +202,35 @@ export default function JadwalEhbPage() {
   const loadJadwal = async () => {
     if (!activeEvent) return
     setLoadingJadwal(true)
-    const [jdw, mapel, tgls, kelasRes, mappingRes] = await Promise.all([
+    const [jdw, mapel, kelasRes, mappingRes] = await Promise.all([
       getJadwalEhb(activeEvent.id),
       getMapelAktifList(),
-      getTanggalJadwal(activeEvent.id),
       getKelasAktifList(),
       getKelasJamMapping(activeEvent.id)
     ])
     setJadwal(jdw)
     setMapelAktif(mapel)
-    // Merge tanggal dari DB dengan tanggal lokal yang sudah ada (agar tanggal baru tidak hilang)
-    setTanggalList(prev => Array.from(new Set([...prev, ...tgls])).sort())
+    
+    // Generate tanggalList dari event
+    const start = activeEvent.tanggal_mulai ? new Date(activeEvent.tanggal_mulai) : null
+    const end = activeEvent.tanggal_selesai ? new Date(activeEvent.tanggal_selesai) : null
+    const newDates: string[] = []
+    if (start && end && start <= end) {
+      const curr = new Date(start)
+      while (curr <= end) {
+        newDates.push(curr.toISOString().split('T')[0])
+        curr.setDate(curr.getDate() + 1)
+      }
+    }
+    setTanggalList(newDates)
+    setExpandedDates(newDates.length > 0 ? [newDates[0]] : [])
+
     // Selalu sinkronkan kelas & mapping
     setKelasAktif(kelasRes)
     const map: Record<string, string> = {}
     mappingRes.forEach((m: any) => map[m.kelas_id] = m.jam_group)
     setKelasJamMapping(map)
     setLoadingJadwal(false)
-  }
-
-  const handleAddTanggal = () => {
-    if (!newTglStart || !newTglEnd) return toast.error('Isi rentang tanggal mulai dan selesai')
-    const start = new Date(newTglStart)
-    const end = new Date(newTglEnd)
-    if (start > end) return toast.error('Tanggal mulai harus sebelum atau sama dengan tanggal selesai')
-    
-    const newDates: string[] = []
-    const curr = new Date(start)
-    while (curr <= end) {
-      newDates.push(curr.toISOString().split('T')[0])
-      curr.setDate(curr.getDate() + 1)
-    }
-
-    const uniqueDates = Array.from(new Set([...tanggalList, ...newDates])).sort()
-    setTanggalList(uniqueDates)
-    setNewTglStart('')
-    setNewTglEnd('')
-  }
-
-  const handleDeleteTanggal = async (tgl: string) => {
-    if (!activeEvent) return
-    if (!await confirm(`Hapus jadwal EHB tanggal ${tgl}?`)) return
-    const res = await hapusTanggal(activeEvent.id, tgl)
-    if ('error' in res) return toast.error(res.error)
-    toast.success('Tanggal dihapus')
-    loadJadwal()
   }
 
   // Get current jadwal mapping: tanggal -> sesi_id -> kelas_id -> mapel_id
@@ -348,17 +338,6 @@ export default function JadwalEhbPage() {
     loadJadwal() // Ini akan me-load semuanya karena logic loadJadwal sudah ambil sesi & mapping juga
   }
 
-  const handleEditTanggal = async () => {
-    if (!activeEvent || !editTanggalModal || !editTanggalModal.newTgl) return toast.error('Tanggal baru tidak boleh kosong')
-    
-    const res = await updateTanggalJadwal(activeEvent.id, editTanggalModal.oldTgl, editTanggalModal.newTgl)
-    if ('error' in res) return toast.error(res.error)
-    
-    toast.success('Tanggal jadwal berhasil diperbarui')
-    setEditTanggalModal(null)
-    loadJadwal()
-  }
-
   // Helper render
   const renderTabBtn = (id: typeof activeTab, icon: React.ReactNode, label: string, disabled = false) => (
     <button 
@@ -455,6 +434,24 @@ export default function JadwalEhbPage() {
                     className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Tanggal Mulai</label>
+                  <input 
+                    type="date"
+                    value={newEvent.tanggal_mulai} 
+                    onChange={e => setNewEvent({...newEvent, tanggal_mulai: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Tanggal Selesai</label>
+                  <input 
+                    type="date"
+                    value={newEvent.tanggal_selesai} 
+                    onChange={e => setNewEvent({...newEvent, tanggal_selesai: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                  />
+                </div>
                 <button 
                   onClick={handleCreateEvent}
                   className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
@@ -481,6 +478,11 @@ export default function JadwalEhbPage() {
                         <td className="px-4 py-3">
                           <p className="font-bold text-slate-800">{evt.nama}</p>
                           <p className="text-xs text-slate-500">{evt.tahun_ajaran_nama}</p>
+                          {evt.tanggal_mulai && evt.tanggal_selesai && (
+                            <p className="text-[10px] text-indigo-600 mt-1">
+                              {new Date(evt.tanggal_mulai).toLocaleDateString('id-ID', {day:'numeric', month:'short'})} - {new Date(evt.tanggal_selesai).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {evt.is_active === 1 ? (
@@ -560,7 +562,7 @@ export default function JadwalEhbPage() {
                           className="w-full border rounded px-3 py-2 text-sm"
                         />
                       </div>
-                      <div className="w-24">
+                      <div className="w-32">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Mulai</label>
                         <input 
                           type="time"
@@ -569,7 +571,7 @@ export default function JadwalEhbPage() {
                           className="w-full border rounded px-2 py-2 text-sm"
                         />
                       </div>
-                      <div className="w-24">
+                      <div className="w-32">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Selesai</label>
                         <input 
                           type="time"
@@ -624,8 +626,26 @@ export default function JadwalEhbPage() {
                   Belum ada Jam Group yang didefinisikan. Silakan atur di tab <b>Sesi & Waktu</b> terlebih dahulu.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {Array.from(new Set(kelasAktif.map(k => k.marhalah_nama))).map(marhalahNama => {
+                <div className="space-y-4">
+                  <div className="flex gap-4 p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl overflow-x-auto">
+                    {jamGroups.map(jg => {
+                      let count = 0
+                      kelasAktif.forEach(k => {
+                        if (kelasJamMapping[k.id] === jg) {
+                          count += (k.jml_santri || 0)
+                        }
+                      })
+                      return (
+                        <div key={jg as string} className="bg-white px-4 py-2 rounded-lg border border-indigo-200 shadow-sm shrink-0">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase">{jg as string}</p>
+                          <p className="text-xl font-black text-indigo-700">{count} <span className="text-sm font-bold text-slate-400">santri</span></p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from(new Set(kelasAktif.map(k => k.marhalah_nama))).map(marhalahNama => {
                     const kelasInMarhalah = kelasAktif.filter(k => k.marhalah_nama === marhalahNama)
                     return (
                       <div key={marhalahNama as string} className="border rounded-xl overflow-hidden">
@@ -650,8 +670,11 @@ export default function JadwalEhbPage() {
                           {kelasInMarhalah.map(k => (
                             <div key={k.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
                               <div>
-                                <p className="text-sm font-bold text-slate-800">{k.nama_kelas}</p>
-                                <p className="text-[10px] text-slate-500">{k.jenis_kelamin === 'L' ? 'Laki-laki' : k.jenis_kelamin === 'P' ? 'Perempuan' : 'Campur'}</p>
+                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                  {k.nama_kelas}
+                                  <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold">{k.jml_santri || 0} santri</span>
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-0.5">{k.jenis_kelamin === 'L' ? 'Laki-laki' : k.jenis_kelamin === 'P' ? 'Perempuan' : 'Campur'}</p>
                               </div>
                               <select 
                                 value={kelasJamMapping[k.id] || ''}
@@ -668,6 +691,7 @@ export default function JadwalEhbPage() {
                     )
                   })}
                 </div>
+              </div>
               )}
             </div>
           </div>
@@ -692,54 +716,38 @@ export default function JadwalEhbPage() {
                 >
                   <BookOpen className="w-4 h-4"/> Salin dari Event Lain
                 </button>
-                <div className="flex items-center gap-2 border rounded-lg px-2 bg-white">
-                  <input 
-                    type="date" 
-                    value={newTglStart}
-                    onChange={e => setNewTglStart(e.target.value)}
-                    className="text-sm border-none outline-none py-2"
-                  />
-                  <span className="text-slate-400">-</span>
-                  <input 
-                    type="date" 
-                    value={newTglEnd}
-                    onChange={e => setNewTglEnd(e.target.value)}
-                    className="text-sm border-none outline-none py-2"
-                  />
-                  <button 
-                    onClick={handleAddTanggal}
-                    className="bg-slate-100 text-slate-700 px-3 py-1 rounded text-xs font-bold hover:bg-slate-200"
-                  >
-                    Set Rentang
-                  </button>
-                </div>
               </div>
             </div>
 
             <div className="p-5 overflow-x-auto">
               {tanggalList.length === 0 ? (
                 <div className="text-center py-10 text-slate-500">
-                  Belum ada tanggal jadwal. Tambahkan tanggal di pojok kanan atas.
+                  <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2"/>
+                  Rentang tanggal belum diatur pada Event aktif. Silakan atur di database atau buat Event baru.
                 </div>
               ) : (
-                <div className="space-y-8 min-w-[800px]">
-                  {tanggalList.map(tgl => (
-                    <div key={tgl} className="border rounded-xl overflow-hidden">
-                      <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3 flex justify-between items-center">
+                <div className="space-y-4 min-w-[800px]">
+                  {tanggalList.map(tgl => {
+                    const isExpanded = expandedDates.includes(tgl)
+                    return (
+                    <div key={tgl} className="border rounded-xl bg-white shadow-sm overflow-hidden">
+                      <div 
+                        className="bg-indigo-50 border-b border-indigo-100 px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-indigo-100 transition-colors"
+                        onClick={() => {
+                          if (isExpanded) {
+                            setExpandedDates(prev => prev.filter(d => d !== tgl))
+                          } else {
+                            setExpandedDates(prev => [...prev, tgl])
+                          }
+                        }}
+                      >
                         <h4 className="font-bold text-indigo-900">{new Date(tgl).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                        <div className="flex items-center gap-3">
-                          <button 
-                            onClick={() => setEditTanggalModal({ oldTgl: tgl, newTgl: tgl })} 
-                            className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1"
-                          >
-                            <Settings className="w-3 h-3"/> Ubah Tgl
-                          </button>
-                          <button onClick={() => handleDeleteTanggal(tgl)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1">
-                            <Trash2 className="w-3 h-3"/> Hapus Tgl
-                          </button>
+                        <div className="text-indigo-600">
+                          {isExpanded ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
                         </div>
                       </div>
                       
+                      {isExpanded && (
                       <div className="divide-y">
                         {sesiList.map(sesi => {
                           const kelasForSesi = kelasAktif.filter(k => kelasJamMapping[k.id] === sesi.jam_group)
@@ -845,8 +853,9 @@ export default function JadwalEhbPage() {
                           )
                         })}
                       </div>
+                      )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
@@ -960,36 +969,6 @@ export default function JadwalEhbPage() {
                 onClick={handleCopyEvent}
                 className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
               >Salin Sekarang</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL UBAH TANGGAL ───────────────────────────────────────────── */}
-      {editTanggalModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
-            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="font-bold text-slate-800">Ubah Tanggal</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Jadwal pada tanggal ini akan digeser</p>
-              </div>
-              <button onClick={() => setEditTanggalModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500">Tanggal Baru</label>
-                <input
-                  type="date"
-                  value={editTanggalModal.newTgl}
-                  onChange={e => setEditTanggalModal({ ...editTanggalModal, newTgl: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
-                />
-              </div>
-              <button
-                onClick={handleEditTanggal}
-                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
-              >Simpan Perubahan</button>
             </div>
           </div>
         </div>

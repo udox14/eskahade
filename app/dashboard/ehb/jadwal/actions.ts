@@ -32,6 +32,8 @@ export async function createEhbEvent(data: {
   tahunAjaranId: number
   semester: number
   nama: string
+  tanggal_mulai: string
+  tanggal_selesai: string
 }) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
@@ -40,8 +42,8 @@ export async function createEhbEvent(data: {
   await execute(`UPDATE ehb_event SET is_active = 0`)
 
   await execute(
-    `INSERT INTO ehb_event (tahun_ajaran_id, semester, nama, is_active) VALUES (?, ?, ?, 1)`,
-    [data.tahunAjaranId, data.semester, data.nama]
+    `INSERT INTO ehb_event (tahun_ajaran_id, semester, nama, tanggal_mulai, tanggal_selesai, is_active) VALUES (?, ?, ?, ?, ?, 1)`,
+    [data.tahunAjaranId, data.semester, data.nama, data.tanggal_mulai, data.tanggal_selesai]
   )
 
   revalidatePath('/dashboard/ehb/jadwal')
@@ -136,7 +138,8 @@ export async function getKelasJamMapping(eventId: number) {
 // Ambil semua kelas aktif (dari tahun ajaran aktif) untuk dipilih admin
 export async function getKelasAktifList() {
   return query<any>(`
-    SELECT k.id, k.nama_kelas, k.jenis_kelamin, m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan
+    SELECT k.id, k.nama_kelas, k.jenis_kelamin, m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan,
+           (SELECT COUNT(*) FROM riwayat_pendidikan rp WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif') as jml_santri
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     JOIN marhalah m ON m.id = k.marhalah_id
@@ -312,15 +315,31 @@ export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: 
     await batch(mapStmts)
   }
 
-  // 4. Copy Jadwal
-  const oldJadwal = await query<any>(`SELECT * FROM ehb_jadwal WHERE ehb_event_id = ?`, [sourceEventId])
+  // 4. Copy Jadwal dengan mapping tanggal
+  const oldJadwal = await query<any>(`SELECT * FROM ehb_jadwal WHERE ehb_event_id = ? ORDER BY tanggal`, [sourceEventId])
   if (oldJadwal.length > 0) {
+    // Ambil tanggal mulai target
+    const targetEvent = await queryOne<any>(`SELECT tanggal_mulai FROM ehb_event WHERE id = ?`, [targetEventId])
+    let newDateObj = targetEvent?.tanggal_mulai ? new Date(targetEvent.tanggal_mulai) : new Date()
+
+    // Cari urutan tanggal unik dari event lama
+    const oldDates = Array.from(new Set(oldJadwal.map((j: any) => j.tanggal))).sort()
+    
+    // Map old date ke new date (hari +1)
+    const dateMap = new Map<string, string>()
+    oldDates.forEach((oldDateStr, index) => {
+      const mappedDate = new Date(newDateObj)
+      mappedDate.setDate(mappedDate.getDate() + index)
+      dateMap.set(oldDateStr as string, mappedDate.toISOString().split('T')[0])
+    })
+
     const jadStmts = oldJadwal.map(j => {
       const newSesiId = sesiMap.get(j.sesi_id)
+      const mappedTgl = dateMap.get(j.tanggal) || j.tanggal
       if (!newSesiId) return null
       return {
         sql: `INSERT INTO ehb_jadwal (ehb_event_id, tanggal, sesi_id, kelas_id, mapel_id) VALUES (?, ?, ?, ?, ?)`,
-        params: [targetEventId, j.tanggal, newSesiId, j.kelas_id, j.mapel_id]
+        params: [targetEventId, mappedTgl, newSesiId, j.kelas_id, j.mapel_id]
       }
     }).filter(Boolean) as any[]
     
