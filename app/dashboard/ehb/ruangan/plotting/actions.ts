@@ -15,8 +15,10 @@ export async function getPlottingStatus(eventId: number) {
     FROM santri s
     JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ?
+    JOIN kelas k ON k.id = rp.kelas_id
+    JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ?
-    WHERE s.status_global = 'aktif'
+    WHERE s.status_global = 'aktif' AND m.nama NOT LIKE '%Mutaqaddimah%'
     GROUP BY s.jenis_kelamin
   `, [eventId, eventId])
 
@@ -82,7 +84,7 @@ export async function autoPlotSantri(eventId: number) {
           JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ? AND kj.jam_group = ?
           JOIN kelas k ON k.id = rp.kelas_id
           JOIN marhalah m ON m.id = k.marhalah_id
-          WHERE s.status_global = 'aktif' AND s.jenis_kelamin = ?
+          WHERE s.status_global = 'aktif' AND s.jenis_kelamin = ? AND m.nama NOT LIKE '%Mutaqaddimah%'
           ORDER BY m.urutan ASC, k.nama_kelas ASC, s.nama_lengkap ASC
         `, [eventId, jg, jk])
 
@@ -157,8 +159,9 @@ export async function getUnplottedSantri(eventId: number) {
     JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ?
     JOIN kelas k ON k.id = rp.kelas_id
+    JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ?
-    WHERE s.status_global = 'aktif' AND p.id IS NULL
+    WHERE s.status_global = 'aktif' AND p.id IS NULL AND m.nama NOT LIKE '%Mutaqaddimah%'
     ORDER BY s.jenis_kelamin, k.nama_kelas, s.nama_lengkap
   `, [eventId, eventId])
 }
