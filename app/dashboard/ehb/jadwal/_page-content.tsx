@@ -45,6 +45,12 @@ export default function JadwalEhbPage() {
   const [newTglEnd, setNewTglEnd] = useState('')
   const [loadingJadwal, setLoadingJadwal] = useState(false)
 
+  // Bulk Set Mapel per Marhalah
+  const [bulkModal, setBulkModal] = useState<{
+    tgl: string, sesiId: number, marhalahNama: string, kelasIds: string[]
+  } | null>(null)
+  const [bulkMapelId, setBulkMapelId] = useState<number | ''>()
+
   useEffect(() => {
     loadInitialData()
   }, [])
@@ -236,6 +242,23 @@ export default function JadwalEhbPage() {
       
     if ('error' in res) return toast.error(res.error)
     toast.success('Jadwal disimpan')
+    loadJadwal()
+  }
+
+  // Bulk set mapel untuk semua kelas dalam satu marhalah sekaligus
+  const handleBulkSetMarhalah = async () => {
+    if (!activeEvent || !bulkModal || bulkMapelId === '') return toast.error('Pilih mata pelajaran terlebih dahulu')
+    const items = bulkModal.kelasIds.map(kId => ({
+      tanggal: bulkModal.tgl,
+      sesi_id: bulkModal.sesiId,
+      kelas_id: kId,
+      mapel_id: bulkMapelId as number
+    }))
+    const res = await saveJadwalEhb(activeEvent.id, items)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`Jadwal ${bulkModal.marhalahNama} (${items.length} kelas) berhasil diset!`)
+    setBulkModal(null)
+    setBulkMapelId('')
     loadJadwal()
   }
 
@@ -606,9 +629,15 @@ export default function JadwalEhbPage() {
                       
                       <div className="divide-y">
                         {sesiList.map(sesi => {
-                          // Filter kelas that belong to this sesi's jam_group
                           const kelasForSesi = kelasAktif.filter(k => kelasJamMapping[k.id] === sesi.jam_group)
                           if (kelasForSesi.length === 0) return null
+
+                          // Group by marhalah
+                          const byMarhalah: Record<string, {nama: string, kelas: any[]}> = {}
+                          kelasForSesi.forEach(k => {
+                            if (!byMarhalah[k.marhalah_id]) byMarhalah[k.marhalah_id] = { nama: k.marhalah_nama, kelas: [] }
+                            byMarhalah[k.marhalah_id].kelas.push(k)
+                          })
 
                           return (
                             <div key={sesi.id} className="flex">
@@ -617,24 +646,45 @@ export default function JadwalEhbPage() {
                                 <span className="text-xs text-slate-500">{sesi.label}</span>
                                 <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded mt-1">{sesi.jam_group}</span>
                               </div>
-                              <div className="flex-1 p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                {kelasForSesi.map(k => {
-                                  const savedMapelId = jadwalMap[tgl]?.[sesi.id!]?.[k.id]
-
-                                  return (
-                                    <div key={k.id} className="border rounded p-2 bg-white flex flex-col gap-1 relative group">
-                                      <span className="text-xs font-bold text-slate-700">{k.nama_kelas}</span>
-                                      <select 
-                                        value={savedMapelId || ''}
-                                        onChange={e => handleJadwalChange(tgl, sesi.id!, k.id, e.target.value ? parseInt(e.target.value) : '')}
-                                        className={`text-xs border rounded px-1 py-1 w-full outline-none ${savedMapelId ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'}`}
-                                      >
-                                        <option value="">-- Kosong --</option>
-                                        {mapelAktif.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                                      </select>
+                              <div className="flex-1 p-3 space-y-4">
+                                {Object.entries(byMarhalah).map(([marhalahId, { nama: marhalahNama, kelas }]) => (
+                                  <div key={marhalahId}>
+                                    {/* Header marhalah + tombol set semua */}
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-black text-slate-600 uppercase tracking-wide">{marhalahNama}</span>
+                                      <button
+                                        onClick={() => {
+                                          setBulkMapelId('')
+                                          setBulkModal({
+                                            tgl,
+                                            sesiId: sesi.id!,
+                                            marhalahNama,
+                                            kelasIds: kelas.map(k => k.id)
+                                          })
+                                        }}
+                                        className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded hover:bg-indigo-100"
+                                      >⚡ Set Semua</button>
                                     </div>
-                                  )
-                                })}
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                      {kelas.map(k => {
+                                        const savedMapelId = jadwalMap[tgl]?.[sesi.id!]?.[k.id]
+                                        return (
+                                          <div key={k.id} className="border rounded p-2 bg-white flex flex-col gap-1">
+                                            <span className="text-xs font-bold text-slate-700">{k.nama_kelas}</span>
+                                            <select
+                                              value={savedMapelId || ''}
+                                              onChange={e => handleJadwalChange(tgl, sesi.id!, k.id, e.target.value ? parseInt(e.target.value) : '')}
+                                              className={`text-xs border rounded px-1 py-1 w-full outline-none ${savedMapelId ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'}`}
+                                            >
+                                              <option value="">-- Kosong --</option>
+                                              {mapelAktif.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                                            </select>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )
@@ -644,6 +694,42 @@ export default function JadwalEhbPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL BULK SET MARHALAH ──────────────────────────────────────── */}
+      {bulkModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-800">Set Semua Kelas</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{bulkModal.marhalahNama} — {bulkModal.kelasIds.length} kelas</p>
+              </div>
+              <button onClick={() => setBulkModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Mata Pelajaran</label>
+                <select
+                  value={bulkMapelId}
+                  onChange={e => setBulkMapelId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                  autoFocus
+                >
+                  <option value="">-- Pilih Mapel --</option>
+                  {mapelAktif.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                </select>
+              </div>
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                ⚠️ Tindakan ini akan menimpa jadwal yang sudah ada untuk semua kelas {bulkModal.marhalahNama} pada sesi ini.
+              </p>
+              <button
+                onClick={handleBulkSetMarhalah}
+                className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700"
+              >Terapkan ke {bulkModal.kelasIds.length} Kelas</button>
             </div>
           </div>
         </div>

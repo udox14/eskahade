@@ -136,7 +136,7 @@ export async function getKelasJamMapping(eventId: number) {
 // Ambil semua kelas aktif (dari tahun ajaran aktif) untuk dipilih admin
 export async function getKelasAktifList() {
   return query<any>(`
-    SELECT k.id, k.nama_kelas, k.jenis_kelamin, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan
+    SELECT k.id, k.nama_kelas, k.jenis_kelamin, m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     JOIN marhalah m ON m.id = k.marhalah_id
