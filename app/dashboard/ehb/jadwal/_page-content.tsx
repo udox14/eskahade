@@ -223,7 +223,7 @@ export default function JadwalEhbPage() {
       }
     }
     setTanggalList(newDates)
-    setExpandedDates(newDates.length > 0 ? [newDates[0]] : [])
+    setExpandedDates(prev => prev.length > 0 ? prev : (newDates.length > 0 ? [newDates[0]] : []))
 
     // Selalu sinkronkan kelas & mapping
     setKelasAktif(kelasRes)
