@@ -34,7 +34,7 @@ export async function getPengawasList(eventId: number) {
 // Ambil semua guru untuk pilihan tambah pengawas
 export async function getGuruList() {
     try {
-        return await query<any>(`SELECT id, nama_lengkap as nama, status_kepegawaian FROM data_guru ORDER BY nama_lengkap`)
+        return await query<any>(`SELECT id, nama_lengkap as nama FROM data_guru ORDER BY nama_lengkap`)
     } catch (e: any) {
         console.error("DB ERROR in getGuruList:", e.message)
         return { __error: "getGuruList: " + e.message } as any
