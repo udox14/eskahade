@@ -186,3 +186,76 @@ export async function getKartuPesertaData(
     ORDER BY r.nomor_ruangan, ps.nomor_kursi
   `, params)
 }
+export type DaftarHadirSesi = {
+  tanggal: string
+  label: string
+}
+
+export type DaftarHadirItem = {
+  nomor_peserta: string
+  nama_lengkap: string
+  asrama: string | null
+  kamar: string | null
+  nama_kelas: string | null
+}
+
+export async function getJamGroupList(eventId: number) {
+  return query<{ jam_group: string }>(`
+    SELECT DISTINCT jam_group 
+    FROM ehb_plotting_santri 
+    WHERE ehb_event_id = ? 
+    ORDER BY jam_group
+  `, [eventId])
+}
+
+export async function getDaftarHadirSesi(eventId: number) {
+  return query<DaftarHadirSesi>(`
+    SELECT DISTINCT tanggal, label
+    FROM ehb_jadwal j
+    JOIN ehb_sesi s ON s.id = j.sesi_id
+    WHERE j.ehb_event_id = ?
+    ORDER BY tanggal, s.nomor_sesi
+  `, [eventId])
+}
+
+export type DaftarHadirSemuaItem = DaftarHadirItem & { ruangan_id: number; nomor_ruangan: number }
+
+export async function getDaftarHadirData(eventId: number, ruanganId: number, jamGroup: string) {
+  return query<DaftarHadirItem>(`
+    SELECT
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      s.nama_lengkap,
+      s.asrama,
+      s.kamar,
+      k.nama_kelas
+    FROM ehb_plotting_santri ps
+    JOIN santri s ON s.id = ps.santri_id
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ps.ehb_event_id = ? 
+      AND ps.ruangan_id = ? 
+      AND ps.jam_group = ?
+    ORDER BY r.nomor_ruangan, ps.nomor_kursi
+  `, [eventId, ruanganId, jamGroup])
+}
+
+export async function getDaftarHadirSemuaData(eventId: number, jamGroup: string) {
+  return query<DaftarHadirSemuaItem>(`
+    SELECT
+      r.id as ruangan_id,
+      r.nomor_ruangan,
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      s.nama_lengkap,
+      s.asrama,
+      s.kamar,
+      k.nama_kelas
+    FROM ehb_plotting_santri ps
+    JOIN santri s ON s.id = ps.santri_id
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ps.ehb_event_id = ? AND ps.jam_group = ?
+    ORDER BY r.nomor_ruangan, ps.nomor_kursi
+  `, [eventId, jamGroup])
+}
