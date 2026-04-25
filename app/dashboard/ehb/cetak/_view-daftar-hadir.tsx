@@ -39,8 +39,8 @@ function abbreviateAsrama(asrama: string | null, kamar: string | null) {
 function abbreviateKelas(kelas: string | null) {
   if (!kelas) return '-'
   return kelas
-    .replace(/Tamhidiyah/i, 'TMH')
-    .replace(/Ibtidaiyah/i, 'IBT')
+    .replace(/Tamhidiyyah/i, 'TMH')
+    .replace(/Ibtidaiyyah/i, 'IBT')
     .replace(/Mutawassithah/i, 'MTW')
 }
 
@@ -78,7 +78,7 @@ function DaftarHadirPrint({
     <div style={{
       width: '320mm', // F4 Landscape is 330, use 320 to be safe
       minHeight: '200mm',
-      padding: '5mm',
+      padding: '15mm 5mm 5mm 5mm',
       boxSizing: 'border-box' as const,
       fontFamily: FONT,
       backgroundColor: '#fff',
@@ -95,11 +95,11 @@ function DaftarHadirPrint({
       <table style={{ width: '100%', borderCollapse: 'collapse', border: '1.2pt solid #000' }}>
         <thead>
           <tr>
-            <th rowSpan={2} style={thStyle}>NO</th>
-            <th rowSpan={2} style={thStyle}>NO. PESERTA</th>
-            <th rowSpan={2} style={thStyle}>NAMA LENGKAP</th>
-            <th rowSpan={2} style={thStyle}>ASRAMA</th>
-            <th rowSpan={2} style={thStyle}>KELAS</th>
+            <th rowSpan={2} style={{ ...thStyle, width: '8mm' }}>NO</th>
+            <th rowSpan={2} style={{ ...thStyle, width: '22mm' }}>NO. PESERTA</th>
+            <th rowSpan={2} style={{ ...thStyle, width: '60mm' }}>NAMA LENGKAP</th>
+            <th rowSpan={2} style={{ ...thStyle, width: '25mm' }}>ASRAMA</th>
+            <th rowSpan={2} style={{ ...thStyle, width: '18mm' }}>KELAS</th>
             {dates.map(date => (
               <th key={date} colSpan={sessionsByDate[date].length} style={thStyle}>
                 {getDayName(date)}
@@ -123,7 +123,7 @@ function DaftarHadirPrint({
               <td style={{ ...tdStyle, textAlign: 'center', fontSize: '8pt' }}>{abbreviateAsrama(p.asrama, p.kamar)}</td>
               <td style={{ ...tdStyle, textAlign: 'center' }}>{abbreviateKelas(p.nama_kelas)}</td>
               {dates.map(date => sessionsByDate[date].map((_, idx) => (
-                <td key={`${date}-${idx}`} style={{ ...tdStyle, width: '10mm' }}></td>
+                <td key={`${date}-${idx}`} style={{ ...tdStyle, minWidth: '15mm' }}></td>
               )))}
             </tr>
           ))}
