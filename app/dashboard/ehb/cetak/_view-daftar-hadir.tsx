@@ -76,8 +76,8 @@ function DaftarHadirPrint({
 
   return (
     <div style={{
-      width: '320mm', // F4 Landscape is 330, use 320 to be safe
-      minHeight: '200mm',
+      width: '320mm',
+      height: '200mm',
       padding: '15mm 5mm 5mm 5mm',
       boxSizing: 'border-box' as const,
       fontFamily: FONT,
@@ -162,9 +162,9 @@ const thStyle: React.CSSProperties = {
 
 const tdStyle: React.CSSProperties = {
   border: '1pt solid #000',
-  padding: '1.5mm 2mm',
+  padding: '1mm 2mm',
   fontSize: '9pt',
-  height: '8mm',
+  height: '7mm',
 }
 
 // ── Main View Component ──────────────────────────────────────────────────────
@@ -319,7 +319,7 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
         </div>
         <div className="flex items-end">
           <button onClick={handleCetakSemua} disabled={loadingBulk || loadingData} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold px-5 py-2 rounded-lg text-sm flex items-center justify-center gap-2 h-[38px]">
-            {loadingBulk ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} Cetak Masal Semua Ruangan
+            {loadingBulk ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} Cetak Semua
           </button>
         </div>
       </div>
