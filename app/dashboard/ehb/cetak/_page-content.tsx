@@ -570,8 +570,8 @@ function NomorPrint({ data }: { data: NomorPesertaItem }) {
 
   return (
     <div style={{
-      width: '68mm',
-      height: '80mm',
+      width: '100mm',
+      height: '53mm',
       border: '2pt solid #000',
       boxSizing: 'border-box' as const,
       fontFamily: FONT,
@@ -789,7 +789,7 @@ function NomorPesertaView({ onBack }: { onBack: () => void }) {
           {/* Hidden print area */}
           <div className="hidden">
             <div ref={printRef} style={{ width: '210mm' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 68mm)', gap: '1mm' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 100mm)', gap: '1mm' }}>
                 {nomorData.map((d, i) => <NomorPrint key={i} data={d} />)}
               </div>
             </div>
