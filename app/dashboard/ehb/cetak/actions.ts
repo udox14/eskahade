@@ -95,10 +95,50 @@ export async function getSantriListForCetak(eventId: number) {
   `, [eventId])
 }
 
+export type RuanganOption   = { id: number; nomor_ruangan: number }
+export type NomorPesertaItem = {
+  id: number
+  nomor_peserta: string
+  nomor_ruangan: number
+  semester: number
+  tahun_ajaran_nama: string
+}
+
+export async function getRuanganListForCetak(eventId: number) {
+  return query<RuanganOption>(`
+    SELECT DISTINCT r.id, r.nomor_ruangan
+    FROM ehb_ruangan r
+    JOIN ehb_plotting_santri ps ON ps.ruangan_id = r.id
+    WHERE ps.ehb_event_id = ?
+    ORDER BY r.nomor_ruangan
+  `, [eventId])
+}
+
+export async function getNomorPesertaData(eventId: number, ruanganId?: number) {
+  const params: unknown[] = [eventId]
+  const filter = ruanganId ? 'AND r.id = ?' : ''
+  if (ruanganId) params.push(ruanganId)
+
+  return query<NomorPesertaItem>(`
+    SELECT
+      ps.id,
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      r.nomor_ruangan,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE ps.ehb_event_id = ? ${filter}
+    ORDER BY r.nomor_ruangan, ps.nomor_kursi
+  `, params)
+}
+
 export async function getKartuPesertaData(
   eventId: number,
   filter: {
-    type: 'semua' | 'marhalah' | 'kelas' | 'pilihan'
+    type: 'semua' | 'marhalah' | 'kelas' | 'pilihan' | 'blanko'
     marhalahId?: number
     kelasId?: string
     santriIds?: string[]
