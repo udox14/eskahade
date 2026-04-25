@@ -29,7 +29,14 @@ export type KartuData = {
 }
 
 export type MarhalahOption = { id: number; nama: string }
-export type KelasOption = { id: string; nama_kelas: string }
+export type KelasOption    = { id: string; nama_kelas: string }
+export type PesertaOption  = {
+  santri_id: string
+  nama_lengkap: string
+  nomor_peserta: string
+  nama_kelas: string | null
+  asrama_kamar: string
+}
 
 // ── Server Actions ─────────────────────────────────────────────────────────────
 
@@ -69,9 +76,33 @@ export async function getKelasListForCetak(eventId: number, marhalahId?: number)
   `, params)
 }
 
+// Daftar ringan semua peserta (untuk search + checkbox pilih sendiri)
+export async function getSantriListForCetak(eventId: number) {
+  return query<PesertaOption>(`
+    SELECT
+      s.id as santri_id,
+      s.nama_lengkap,
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      k.nama_kelas,
+      COALESCE(s.asrama, '-') || ' / ' || COALESCE(s.kamar, '-') as asrama_kamar
+    FROM ehb_plotting_santri ps
+    JOIN santri s ON s.id = ps.santri_id
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ps.ehb_event_id = ?
+    ORDER BY s.nama_lengkap
+  `, [eventId])
+}
+
 export async function getKartuPesertaData(
   eventId: number,
-  filter: { type: 'semua' | 'marhalah' | 'kelas'; marhalahId?: number; kelasId?: string }
+  filter: {
+    type: 'semua' | 'marhalah' | 'kelas' | 'pilihan'
+    marhalahId?: number
+    kelasId?: string
+    santriIds?: string[]
+  }
 ) {
   const params: unknown[] = [eventId]
   let filterClause = ''
@@ -82,6 +113,10 @@ export async function getKartuPesertaData(
   } else if (filter.type === 'kelas' && filter.kelasId) {
     filterClause = 'AND k.id = ?'
     params.push(filter.kelasId)
+  } else if (filter.type === 'pilihan' && filter.santriIds && filter.santriIds.length > 0) {
+    const ph = filter.santriIds.map(() => '?').join(',')
+    filterClause = `AND s.id IN (${ph})`
+    params.push(...filter.santriIds)
   }
 
   return query<KartuData>(`

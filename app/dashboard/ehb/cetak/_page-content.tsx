@@ -5,12 +5,12 @@ import { useReactToPrint } from 'react-to-print'
 import {
   Printer, ChevronLeft, CreditCard, Hash,
   ClipboardList, LayoutList, CalendarCheck, Calendar,
-  Construction, Loader2, AlertTriangle, Users, Filter,
+  Construction, Loader2, AlertTriangle, Users, Filter, Search, X,
 } from 'lucide-react'
 import {
   getActiveEventForCetak, getMarhalahListForCetak, getKelasListForCetak,
-  getKartuPesertaData,
-  type ActiveEvent, type KartuData, type MarhalahOption, type KelasOption,
+  getKartuPesertaData, getSantriListForCetak,
+  type ActiveEvent, type KartuData, type MarhalahOption, type KelasOption, type PesertaOption,
 } from './actions'
 import { toast } from 'sonner'
 
@@ -25,7 +25,7 @@ type View =
   | 'jadwal-mengawas'
   | 'jadwal-ehb'
 
-type FilterType = 'semua' | 'marhalah' | 'kelas'
+type FilterType = 'semua' | 'marhalah' | 'kelas' | 'pilihan'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -53,9 +53,9 @@ function KartuPrint({ data }: { data: KartuData }) {
   const semLabel  = data.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
   const ta        = data.tahun_ajaran_nama.replace('/', '-')
 
-  // Format Nama: Singkat Muhammad -> M. dan Capitalize
+  // Format Nama: Singkat Muhammad -> M. (termasuk variasi Mochammad, Muchammad, dsb)
   const displayNama = data.nama_lengkap
-    .replace(/\bM[ou]ham+ad\b/gi, 'M.')
+    .replace(/\bM[ou]c?ham+ad\b/gi, 'M.')
     .toLowerCase()
     .replace(/\b\w/g, c => c.toUpperCase())
 
@@ -96,7 +96,7 @@ function KartuPrint({ data }: { data: KartuData }) {
           <div style={{ fontSize: '18pt', fontWeight: 900, letterSpacing: '0.5px', lineHeight: 0.5, marginBottom: '4mm' }}>
             EVALUASI HASIL BELAJAR
           </div>
-          <div style={{ fontSize: '15pt', fontWeight: 'bold', lineHeight: 0.5, marginBottom: '3mm' }}>
+          <div style={{ fontSize: '15pt', fontWeight: 'normal', lineHeight: 0.5, marginBottom: '3mm' }}>
             {semLabel} T.A. {ta}
           </div>
           <div style={{ fontSize: '8.5pt', fontWeight: 'normal', lineHeight: 0.5, textTransform: 'uppercase' }}>
@@ -260,6 +260,12 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
   const [loadingData, setLoadingData] = useState(false)
   const [hasLoaded, setHasLoaded]    = useState(false)
 
+  // State untuk mode "Pilih Sendiri"
+  const [pesertaPool, setPesertaPool]   = useState<PesertaOption[]>([])
+  const [loadingPool, setLoadingPool]   = useState(false)
+  const [searchQuery, setSearchQuery]   = useState('')
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
+
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -302,22 +308,32 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
     setHasLoaded(false)
     setKartuData([])
     setKelasList([])
+    setSearchQuery('')
+    setSelectedIds(new Set())
     if (type === 'kelas' && event) {
       const kl = await getKelasListForCetak(event.id)
       setKelasList(kl)
     }
-  }, [event])
+    if (type === 'pilihan' && event && pesertaPool.length === 0) {
+      setLoadingPool(true)
+      const pool = await getSantriListForCetak(event.id)
+      setPesertaPool(pool)
+      setLoadingPool(false)
+    }
+  }, [event, pesertaPool.length])
 
   const handleMuatPreview = async () => {
     if (!event) return
-    if (filterType === 'marhalah' && !selectedMarhalah) return toast.error('Pilih marhalah terlebih dahulu')
-    if (filterType === 'kelas' && !selectedKelas)       return toast.error('Pilih kelas terlebih dahulu')
+    if (filterType === 'marhalah' && !selectedMarhalah)  return toast.error('Pilih marhalah terlebih dahulu')
+    if (filterType === 'kelas' && !selectedKelas)         return toast.error('Pilih kelas terlebih dahulu')
+    if (filterType === 'pilihan' && selectedIds.size === 0) return toast.error('Pilih minimal 1 peserta')
     setLoadingData(true)
     setHasLoaded(false)
     const data = await getKartuPesertaData(event.id, {
-      type: filterType,
+      type:       filterType,
       marhalahId: filterType === 'marhalah' ? (selectedMarhalah as number) : undefined,
       kelasId:    filterType === 'kelas'    ? selectedKelas                : undefined,
+      santriIds:  filterType === 'pilihan'  ? Array.from(selectedIds)      : undefined,
     })
     setKartuData(data)
     setHasLoaded(true)
@@ -360,17 +376,22 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
         </div>
         <div className="p-5 space-y-4">
           <div className="flex gap-2 flex-wrap">
-            {(['semua', 'marhalah', 'kelas'] as FilterType[]).map(ft => (
+            {([
+              { val: 'semua',    label: 'Semua Peserta' },
+              { val: 'marhalah', label: 'Per Marhalah'  },
+              { val: 'kelas',    label: 'Per Kelas'     },
+              { val: 'pilihan',  label: 'Pilih Sendiri' },
+            ] as { val: FilterType; label: string }[]).map(({ val, label }) => (
               <button
-                key={ft}
-                onClick={() => handleFilterTypeChange(ft)}
+                key={val}
+                onClick={() => handleFilterTypeChange(val)}
                 className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
-                  filterType === ft
+                  filterType === val
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
                 }`}
               >
-                {ft === 'semua' ? 'Semua Peserta' : ft === 'marhalah' ? 'Per Marhalah' : 'Per Kelas'}
+                {label}
               </button>
             ))}
           </div>
@@ -405,13 +426,125 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
             </div>
           )}
 
+          {/* Mode Pilih Sendiri: search + checkbox */}
+          {filterType === 'pilihan' && (() => {
+            const filtered = searchQuery.trim()
+              ? pesertaPool.filter(p =>
+                  p.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  p.nomor_peserta.includes(searchQuery)
+                )
+              : pesertaPool
+
+            const toggleId = (id: string) =>
+              setSelectedIds(prev => {
+                const next = new Set(prev)
+                next.has(id) ? next.delete(id) : next.add(id)
+                return next
+              })
+
+            const selectAllFiltered = () =>
+              setSelectedIds(prev => new Set([...prev, ...filtered.map(p => p.santri_id)]))
+
+            const clearAll = () => setSelectedIds(new Set())
+
+            return (
+              <div className="space-y-2.5">
+                {/* Search bar */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama atau nomor peserta..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full border rounded-lg pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Toolbar: hasil + aksi massal */}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">
+                    {filtered.length} hasil&nbsp;·&nbsp;
+                    <span className="font-bold text-indigo-600">{selectedIds.size} dipilih</span>
+                  </span>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={selectAllFiltered}
+                      className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      Pilih Semua Hasil
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      onClick={clearAll}
+                      className="font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Batal Semua
+                    </button>
+                  </div>
+                </div>
+
+                {/* Daftar checkbox */}
+                <div className="border rounded-xl overflow-y-auto divide-y" style={{ maxHeight: '280px' }}>
+                  {loadingPool ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-slate-400">Tidak ada hasil pencarian</div>
+                  ) : (
+                    filtered.map(p => {
+                      const checked = selectedIds.has(p.santri_id)
+                      return (
+                        <label
+                          key={p.santri_id}
+                          className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                            checked ? 'bg-indigo-50' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleId(p.santri_id)}
+                            className="w-4 h-4 accent-indigo-600 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${checked ? 'text-indigo-800' : 'text-slate-800'}`}>
+                              {p.nama_lengkap}
+                            </p>
+                            <p className="text-xs text-slate-400 truncate">
+                              {p.nama_kelas ?? '-'}&nbsp;·&nbsp;No.&nbsp;{p.nomor_peserta}
+                            </p>
+                          </div>
+                          {checked && (
+                            <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                          )}
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
           <button
             onClick={handleMuatPreview}
-            disabled={loadingData}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60"
+            disabled={loadingData || (filterType === 'pilihan' && selectedIds.size === 0)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loadingData ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-            Muat Preview
+            {filterType === 'pilihan' && selectedIds.size > 0
+              ? `Muat ${selectedIds.size} Kartu`
+              : 'Muat Preview'}
           </button>
         </div>
       </div>
