@@ -53,6 +53,12 @@ function KartuPrint({ data }: { data: KartuData }) {
   const semLabel  = data.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
   const ta        = data.tahun_ajaran_nama.replace('/', '-')
 
+  // Format Nama: Singkat Muhammad -> M. dan Capitalize
+  const displayNama = data.nama_lengkap
+    .replace(/\bM[ou]ham+ad\b/gi, 'M.')
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase())
+
   return (
     <div style={{
       width: '158mm',
@@ -70,25 +76,33 @@ function KartuPrint({ data }: { data: KartuData }) {
       backgroundColor: '#fff',
     }}>
 
-      {/* ── HEADER: Logo + Judul ────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5mm', flexShrink: 0, marginBottom: '2mm' }}>
+      {/* ── HEADER: Logo + Judul (Centered) ────────────────────────────────── */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        gap: '4mm', 
+        flexShrink: 0, 
+        marginBottom: '2mm',
+        width: '100%'
+      }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logohitam.png"
           alt=""
-          style={{ width: '22mm', height: '22mm', objectFit: 'contain', flexShrink: 0 }}
+          style={{ width: '20mm', height: '20mm', objectFit: 'contain', flexShrink: 0 }}
         />
-        <div style={{ flex: 1, textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: '19pt', fontWeight: 900, letterSpacing: '0.5px', lineHeight: '1.1' }}>
+        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: '18pt', fontWeight: 900, letterSpacing: '0.5px', lineHeight: 0.5, marginBottom: '4mm' }}>
             EVALUASI HASIL BELAJAR
           </div>
-          <div style={{ fontSize: '16pt', fontWeight: 'bold', marginTop: '1mm' }}>
+          <div style={{ fontSize: '15pt', fontWeight: 'bold', lineHeight: 0.5, marginBottom: '3mm' }}>
             {semLabel} T.A. {ta}
           </div>
-          <div style={{ fontSize: '8.5pt', fontWeight: 'normal', marginTop: '1.5mm', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '8.5pt', fontWeight: 'normal', lineHeight: 0.5, textTransform: 'uppercase' }}>
             LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
           </div>
-          <div style={{ borderBottom: '1pt solid #000', marginTop: '2mm', width: '100%' }} />
+          <div style={{ borderBottom: '1pt solid #000', marginTop: '3mm', width: '100%' }} />
         </div>
       </div>
 
@@ -111,10 +125,10 @@ function KartuPrint({ data }: { data: KartuData }) {
           }}>
             {/* Nomor Peserta */}
             <div style={{
-              fontSize: '28pt',
+              fontSize: '20pt',
               fontWeight: 900,
               lineHeight: '1.2',
-              padding: '1mm 0',
+              padding: '1.5mm 0',
               backgroundColor: '#fff',
             }}>
               {data.nomor_peserta}
@@ -127,7 +141,7 @@ function KartuPrint({ data }: { data: KartuData }) {
               lineHeight: '1.2',
             }}>
               <div style={{ fontSize: '8pt', fontWeight: 'bold', letterSpacing: '1px' }}>JAM</div>
-              <div style={{ fontSize: '11pt', fontWeight: 900 }}>{jam}</div>
+              <div style={{ fontSize: '12pt', fontWeight: 900 }}>{jam}</div>
             </div>
           </div>
 
@@ -137,16 +151,17 @@ function KartuPrint({ data }: { data: KartuData }) {
             display: 'flex',
             flexDirection: 'column' as const,
             justifyContent: 'flex-start',
+            overflow: 'hidden'
           }}>
             <div style={{
-              fontSize: '34pt',
+              fontSize: '25pt',
               fontWeight: 900,
-              lineHeight: '1',
+              lineHeight: '1.1',
               marginBottom: '2mm',
               marginTop: '-1mm',
               whiteSpace: 'nowrap',
             }}>
-              {data.nama_lengkap}
+              {displayNama}
             </div>
             <div style={{ borderTop: '0.8pt solid #000', marginTop: '1mm', paddingTop: '2mm', display: 'flex', fontSize: '15pt', fontWeight: 'normal' }}>
               <div style={{ flex: 1, textAlign: 'left', paddingLeft: '2mm' }}>{data.asrama_kamar}</div>
