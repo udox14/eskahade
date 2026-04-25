@@ -120,8 +120,7 @@ export async function getNomorPesertaData(eventId: number, ruanganId?: number) {
   if (ruanganId) params.push(ruanganId)
 
   return query<NomorPesertaItem>(`
-    SELECT
-      ps.id,
+    SELECT DISTINCT
       printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
       r.nomor_ruangan,
       e.semester,

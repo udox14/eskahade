@@ -252,7 +252,7 @@ function BlankoKartuPrint({ event, jamLabel }: { event: ActiveEvent; jamLabel: s
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '4mm', paddingTop: '1mm' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '1.5mm', paddingTop: '0.5mm' }}>
             {[
               { label: 'Nama' },
               { label: 'Asrama' },
@@ -534,19 +534,24 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
       )}
 
       {filterType === 'blanko' && (
-        <div className="bg-slate-100 border rounded-2xl p-8 flex justify-center overflow-auto max-h-[600px]">
-          <div className="bg-white shadow-2xl p-[5mm]" style={{ width: '330mm', minWidth: '330mm' }}>
-             <div className="grid grid-cols-2 gap-[4mm]">
-               {[1, 2, 3, 4].map(i => (
-                 <BlankoKartuPrint key={i} event={event} jamLabel={`JAM ${jamBlanko.toUpperCase()}`} />
-               ))}
-             </div>
+        <div className="bg-slate-100 border rounded-2xl p-4 flex flex-col items-center gap-4">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pratinjau Cetak (Skala Tampilan)</div>
+          <div className="w-full overflow-auto flex justify-center bg-slate-200/50 rounded-xl p-4 shadow-inner" style={{ maxHeight: '600px' }}>
+            <div style={{ zoom: 0.5, transformOrigin: 'top center' }}>
+              <div className="bg-white shadow-2xl p-[5mm]" style={{ width: '330mm', minWidth: '330mm' }}>
+                 <div className="grid grid-cols-2 gap-[4mm]">
+                   {[1, 2, 3, 4].map(i => (
+                     <BlankoKartuPrint key={i} event={event} jamLabel={jamBlanko.toUpperCase()} />
+                   ))}
+                 </div>
+              </div>
+            </div>
           </div>
           <div className="hidden">
             <div ref={printRef} style={{ width: '330mm' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4mm' }}>
                 {[1, 2, 3, 4].map(i => (
-                  <BlankoKartuPrint key={i} event={event} jamLabel={`JAM ${jamBlanko.toUpperCase()}`} />
+                  <BlankoKartuPrint key={i} event={event} jamLabel={jamBlanko.toUpperCase()} />
                 ))}
               </div>
             </div>
@@ -565,10 +570,9 @@ function NomorPrint({ data }: { data: NomorPesertaItem }) {
 
   return (
     <div style={{
-      width: '77mm',
-      height: '64mm',
-      border: '1pt solid #000',
-      padding: '2.5mm',
+      width: '68mm',
+      height: '80mm',
+      border: '2pt solid #000',
       boxSizing: 'border-box' as const,
       fontFamily: FONT,
       display: 'flex',
@@ -578,27 +582,39 @@ function NomorPrint({ data }: { data: NomorPesertaItem }) {
       overflow: 'hidden',
       backgroundColor: '#fff',
     }}>
-      {/* Compact header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '2mm', flexShrink: 0 }}>
+      {/* Header section */}
+      <div style={{ 
+        padding: '3mm', 
+        borderBottom: '2pt solid #000', 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '2.5mm',
+        flexShrink: 0
+      }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logohitam.png"
           alt=""
-          style={{ width: '10mm', height: '10mm', objectFit: 'contain', flexShrink: 0 }}
+          style={{ width: '13mm', height: '13mm', objectFit: 'contain' }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column' as const }}>
-          <div style={{ fontSize: '9.5pt', fontWeight: 900, lineHeight: 1.1 }}>EVALUASI HASIL BELAJAR</div>
-          <div style={{ fontSize: '7.5pt', fontWeight: 'normal', lineHeight: 1.1 }}>{semLabel} T.A. {ta}</div>
-          <div style={{ fontSize: '5.5pt', fontWeight: 'normal', lineHeight: 1.1, textTransform: 'uppercase' as const }}>
+        <div style={{ display: 'flex', flexDirection: 'column' as const, textAlign: 'left' }}>
+          <div style={{ fontSize: '9pt', fontWeight: 900, lineHeight: 1.1 }}>EVALUASI HASIL BELAJAR</div>
+          <div style={{ fontSize: '8pt', fontWeight: 900, lineHeight: 1.1 }}>{semLabel}</div>
+          <div style={{ fontSize: '8pt', fontWeight: 900, lineHeight: 1.1 }}>T.A. {ta}</div>
+          <div style={{ fontSize: '4.5pt', fontWeight: 'normal', lineHeight: 1.1, marginTop: '1mm', textTransform: 'uppercase' as const }}>
             Lembaga Pendidikan Pondok Pesantren Sukahideng
           </div>
         </div>
       </div>
-      {/* Separator */}
-      <div style={{ borderBottom: '2pt solid #000', marginTop: '2mm', flexShrink: 0 }} />
-      {/* Nomor peserta */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '75pt', fontWeight: 900, lineHeight: 1 }}>
+      
+      {/* Number section */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2mm' }}>
+        <div style={{ 
+          fontSize: '75pt', 
+          fontWeight: 900, 
+          lineHeight: 1,
+          letterSpacing: '-1px'
+        }}>
           {data.nomor_peserta}
         </div>
       </div>
@@ -609,7 +625,7 @@ function NomorPrint({ data }: { data: NomorPesertaItem }) {
 function NomorPreview({ data }: { data: NomorPesertaItem }) {
   return (
     <div style={{ display: 'inline-block', border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-      <div style={{ zoom: 0.65 }}>
+      <div style={{ zoom: 0.6 }}>
         <NomorPrint data={data} />
       </div>
     </div>
@@ -633,7 +649,7 @@ function NomorPesertaView({ onBack }: { onBack: () => void }) {
     contentRef: printRef,
     documentTitle: 'Nomor Peserta EHB',
     pageStyle: `
-      @page { size: 330mm 210mm; margin: 5mm; }
+      @page { size: 210mm 330mm; margin: 5mm; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         * { font-family: "Times New Roman", Times, serif !important; }
@@ -772,8 +788,8 @@ function NomorPesertaView({ onBack }: { onBack: () => void }) {
 
           {/* Hidden print area */}
           <div className="hidden">
-            <div ref={printRef} style={{ width: '330mm' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 77mm)', gap: '3mm' }}>
+            <div ref={printRef} style={{ width: '210mm' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 68mm)', gap: '1mm' }}>
                 {nomorData.map((d, i) => <NomorPrint key={i} data={d} />)}
               </div>
             </div>
