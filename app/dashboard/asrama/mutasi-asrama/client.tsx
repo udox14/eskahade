@@ -231,7 +231,7 @@ export default function MutasiAsramaClient({
               )}
             >
               <p className="text-[10px] font-bold text-slate-400 uppercase">Semua</p>
-              <p className="text-xl font-black text-slate-800">{summary.perAsrama.reduce((a, b) => a + b.jumlah, 0) + summary.tanpaAsrama}</p>
+              <p className="text-xl font-black text-slate-800">{(summary?.perAsrama?.reduce((a: any, b: any) => a + (b.jumlah || 0), 0) || 0) + (summary?.tanpaAsrama || 0)}</p>
             </button>
             <button 
               onClick={() => setFilterAsrama('NONE')}
@@ -241,9 +241,9 @@ export default function MutasiAsramaClient({
               )}
             >
               <p className="text-[10px] font-bold text-slate-400 uppercase">Tanpa Asrama</p>
-              <p className="text-xl font-black text-amber-600">{summary.tanpaAsrama}</p>
+              <p className="text-xl font-black text-amber-600">{summary?.tanpaAsrama || 0}</p>
             </button>
-            {summary.perAsrama.map(a => (
+            {summary?.perAsrama?.map(a => (
               <button 
                 key={a.asrama}
                 onClick={() => setFilterAsrama(a.asrama)}
@@ -393,7 +393,7 @@ export default function MutasiAsramaClient({
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr><td colSpan={6} className="py-20 text-center text-slate-400">Memuat riwayat...</td></tr>
-                ) : logs.length === 0 ? (
+                ) : !logs || logs.length === 0 ? (
                   <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">Belum ada riwayat mutasi</td></tr>
                 ) : (
                   logs.map(log => (

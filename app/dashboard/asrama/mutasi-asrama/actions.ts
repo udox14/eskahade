@@ -7,11 +7,33 @@ import { revalidatePath } from 'next/cache'
 const REVALIDATE = '/dashboard/asrama/mutasi-asrama'
 const ASRAMA_LIST = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4', 'AL-BAGHORY']
 
+async function ensureTableExists() {
+  const db = await getDB()
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS mutasi_asrama_log (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        santri_id      TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
+        asrama_lama    TEXT,
+        kamar_lama     TEXT,
+        asrama_baru    TEXT NOT NULL,
+        kamar_baru     TEXT,
+        alasan         TEXT,
+        dilakukan_oleh TEXT REFERENCES users(id),
+        created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run()
+  } catch (e) {
+    // Ignore error if already exists or other issues
+  }
+}
+
 // ── GET: Semua santri aktif + info asrama/kamar ───────────────────────────────
 export async function getSantriUntukMutasi(filter?: {
   asrama?: string | null  // null = santri tanpa asrama, undefined = semua
   search?: string
 }) {
+  await ensureTableExists()
   let sql = `
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin,
            s.asrama, s.kamar, s.kelas_sekolah, s.sekolah,
@@ -69,6 +91,7 @@ export async function getRingkasanAsrama() {
 
 // ── GET: Log riwayat mutasi terbaru ──────────────────────────────────────────
 export async function getLogMutasi(limit = 100) {
+  await ensureTableExists()
   return query<any>(`
     SELECT mal.*, s.nama_lengkap, s.nis, u.full_name AS nama_operator
     FROM mutasi_asrama_log mal
@@ -90,6 +113,8 @@ export async function mutasiSantri(payload: {
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
     return { error: 'Unauthorized' }
   }
+
+  await ensureTableExists()
 
   // Pengurus asrama hanya bisa memindahkan KE asrama binaannya
   if (session.role === 'pengurus_asrama' && session.asrama_binaan) {
@@ -122,13 +147,14 @@ export async function mutasiSantri(payload: {
         payload.asramaBaru,
         payload.kamarBaru ?? null,
         payload.alasan ?? null,
-        session.id
+        session.id ?? null
       ),
     ])
     revalidatePath(REVALIDATE)
     return { success: true }
   } catch (e: any) {
-    return { error: e.message }
+    console.error('[mutasiSantri] Error:', e)
+    return { error: e.message || 'Terjadi kesalahan pada server' }
   }
 }
 
@@ -143,6 +169,8 @@ export async function mutasiBatch(payload: {
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
     return { error: 'Unauthorized' }
   }
+
+  await ensureTableExists()
 
   if (session.role === 'pengurus_asrama' && session.asrama_binaan) {
     if (payload.asramaBaru !== session.asrama_binaan) {
@@ -189,6 +217,7 @@ export async function mutasiBatch(payload: {
     revalidatePath(REVALIDATE)
     return { success: true, count: payload.santriIds.length }
   } catch (e: any) {
-    return { error: e.message }
+    console.error('[mutasiBatch] Error:', e)
+    return { error: e.message || 'Terjadi kesalahan pada server' }
   }
 }
