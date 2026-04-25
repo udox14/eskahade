@@ -57,8 +57,8 @@ function KartuPrint({ data }: { data: KartuData }) {
     <div style={{
       width: '158mm',
       height: '98mm',
-      border: '0.8pt solid #000',
-      padding: '3mm',
+      border: '1.2pt solid #000',
+      padding: '4mm',
       boxSizing: 'border-box' as const,
       fontFamily: FONT,
       display: 'flex',
@@ -67,75 +67,67 @@ function KartuPrint({ data }: { data: KartuData }) {
       breakInside: 'avoid' as const,
       pageBreakInside: 'avoid' as const,
       overflow: 'hidden',
+      backgroundColor: '#fff',
     }}>
 
       {/* ── HEADER: Logo + Judul ────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '3mm', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5mm', flexShrink: 0, marginBottom: '2mm' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logohitam.png"
           alt=""
-          style={{ width: '18mm', height: '18mm', objectFit: 'contain', flexShrink: 0 }}
+          style={{ width: '22mm', height: '22mm', objectFit: 'contain', flexShrink: 0 }}
         />
-        <div style={{ flex: 1, lineHeight: 1 }}>
-          <div style={{ fontSize: '13.5pt', fontWeight: 900, letterSpacing: '0.3px' }}>
+        <div style={{ flex: 1, textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: '19pt', fontWeight: 900, letterSpacing: '0.5px', lineHeight: '1.1' }}>
             EVALUASI HASIL BELAJAR
           </div>
-          <div style={{ fontSize: '10.5pt', fontWeight: 'bold', marginTop: '0.8mm' }}>
+          <div style={{ fontSize: '16pt', fontWeight: 'bold', marginTop: '1mm' }}>
             {semLabel} T.A. {ta}
           </div>
-          <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0' }} />
-          <div style={{ fontSize: '6.5pt', letterSpacing: '0.2px' }}>
+          <div style={{ fontSize: '8.5pt', fontWeight: 'normal', marginTop: '1.5mm', textTransform: 'uppercase' }}>
             LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
           </div>
+          <div style={{ borderBottom: '1pt solid #000', marginTop: '2mm', width: '100%' }} />
         </div>
       </div>
 
-      {/* ── SEPARATOR ───────────────────────────────────────────────────────── */}
-      <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0', flexShrink: 0 }} />
-
       {/* ── MAIN CONTENT: Nomor Peserta + Nama + Info ───────────────────────── */}
-      <div style={{ flexShrink: 0 }}>
-        <div style={{ fontSize: '5.5pt', color: '#333', marginBottom: '0.8mm', fontFamily: FONT }}>
+      <div style={{ marginTop: '2mm', flexShrink: 0 }}>
+        <div style={{ fontSize: '8pt', color: '#000', marginBottom: '1mm', paddingLeft: '2mm' }}>
           No. Peserta
         </div>
-        <div style={{ display: 'flex', gap: '3mm', alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', gap: '6mm', alignItems: 'flex-start' }}>
 
           {/* Kotak kiri: Nomor (putih) + JAM (hitam) */}
           <div style={{
-            width: '28mm',
+            width: '32mm',
             flexShrink: 0,
-            border: '0.8pt solid #000',
+            border: '1pt solid #000',
             display: 'flex',
             flexDirection: 'column' as const,
             textAlign: 'center' as const,
+            overflow: 'hidden'
           }}>
             {/* Nomor Peserta */}
             <div style={{
-              fontSize: '22pt',
+              fontSize: '28pt',
               fontWeight: 900,
-              lineHeight: 1,
-              padding: '1.5mm 1mm',
-              borderBottom: '0.8pt solid #000',
-              fontFamily: FONT,
+              lineHeight: '1.2',
+              padding: '1mm 0',
+              backgroundColor: '#fff',
             }}>
               {data.nomor_peserta}
             </div>
             {/* JAM label */}
             <div style={{
-              flex: 1,
-              backgroundColor: '#2a2a2a',
+              backgroundColor: '#333',
               color: '#fff',
-              display: 'flex',
-              flexDirection: 'column' as const,
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '1mm',
-              lineHeight: 1.15,
-              fontFamily: FONT,
+              padding: '1.5mm 1mm',
+              lineHeight: '1.2',
             }}>
               <div style={{ fontSize: '8pt', fontWeight: 'bold', letterSpacing: '1px' }}>JAM</div>
-              <div style={{ fontSize: '10pt', fontWeight: 900 }}>{jam}</div>
+              <div style={{ fontSize: '11pt', fontWeight: 900 }}>{jam}</div>
             </div>
           </div>
 
@@ -144,85 +136,73 @@ function KartuPrint({ data }: { data: KartuData }) {
             flex: 1,
             display: 'flex',
             flexDirection: 'column' as const,
-            justifyContent: 'space-between',
-            overflow: 'hidden',
+            justifyContent: 'flex-start',
           }}>
             <div style={{
-              fontSize: '21pt',
+              fontSize: '34pt',
               fontWeight: 900,
-              lineHeight: 1.1,
-              fontFamily: FONT,
-              overflow: 'hidden',
+              lineHeight: '1',
+              marginBottom: '2mm',
+              marginTop: '-1mm',
+              whiteSpace: 'nowrap',
             }}>
               {data.nama_lengkap}
             </div>
-            <div>
-              <div style={{ borderBottom: '0.5pt solid #000', margin: '1mm 0' }} />
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: '9pt',
-                fontFamily: FONT,
-                gap: '0',
-              }}>
-                <span style={{ paddingRight: '3mm' }}>{data.asrama_kamar}</span>
-                <span style={{ borderLeft: '0.6pt solid #555', paddingLeft: '3mm' }}>{data.nama_kelas || '-'}</span>
-              </div>
+            <div style={{ borderTop: '0.8pt solid #000', marginTop: '1mm', paddingTop: '2mm', display: 'flex', fontSize: '15pt', fontWeight: 'normal' }}>
+              <div style={{ flex: 1, textAlign: 'left', paddingLeft: '2mm' }}>{data.asrama_kamar}</div>
+              <div style={{ width: '1px', backgroundColor: '#000', height: '6mm', margin: '0 4mm' }} />
+              <div style={{ flex: 1.5, textAlign: 'left' }}>{data.nama_kelas || '-'}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── SEPARATOR ───────────────────────────────────────────────────────── */}
-      <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0', flexShrink: 0 }} />
-
       {/* ── TATA TERTIB ─────────────────────────────────────────────────────── */}
       <div style={{
-        flex: 1,
-        border: '0.5pt solid #000',
-        padding: '1.5mm 2mm 1.5mm 2mm',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column' as const,
+        marginTop: 'auto',
+        border: '0.8pt solid #000',
+        padding: '2mm 3mm',
+        position: 'relative' as const,
       }}>
-        {/* Judul */}
+        {/* Judul di tengah garis */}
         <div style={{
-          textAlign: 'center' as const,
+          position: 'absolute' as const,
+          top: '-1.5mm',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: '#fff',
+          padding: '0 3mm',
+          fontSize: '7.5pt',
           fontWeight: 'bold',
-          fontSize: '7pt',
-          borderBottom: '0.4pt solid #aaa',
-          paddingBottom: '0.8mm',
-          marginBottom: '1mm',
-          letterSpacing: '0.3px',
-          fontFamily: FONT,
+          whiteSpace: 'nowrap' as const,
         }}>
           TATA TERTIB PESERTA
         </div>
+
         {/* 2 kolom aturan */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0 4mm',
-          fontSize: '5.5pt',
-          lineHeight: 1.45,
+          gridTemplateColumns: '1.1fr 0.9fr',
+          gap: '0 6mm',
+          fontSize: '6.5pt',
+          lineHeight: '1.5',
           fontFamily: FONT,
-          flex: 1,
-          overflow: 'hidden',
+          paddingTop: '1mm',
         }}>
           <div>
-            <div>1.  Seluruh santri wajib mengikuti kegiatan EHB</div>
-            <div>2.  Membawa kartu peserta ke dalam ruangan</div>
-            <div>3.  Mengikuti EHB sesuai ruangan dan jadwal</div>
-            <div>4.  Ketentuan pakaian peserta:</div>
-            <div style={{ paddingLeft: '5mm' }}>a.  Putra: seragam berjama&#39;ah</div>
-            <div style={{ paddingLeft: '5mm' }}>b.  Putri: maksi hitam, baju dan kerudung putih</div>
-            <div>5.  Dilarang membawa catatan dalam bentuk apapun</div>
+            <div>1. Seluruh santri wajib mengikuti kegiatan EHB</div>
+            <div>2. Membawa kartu peserta ke dalam ruangan</div>
+            <div>3. Mengikuti EHB sesuai ruangan dan jadwal</div>
+            <div>4. Ketentuan pakaian peserta:</div>
+            <div style={{ paddingLeft: '5mm' }}>a. Putra: seragam berjama&#39;ah</div>
+            <div style={{ paddingLeft: '5mm' }}>b. Putri: maksi hitam, baju dan kerudung putih</div>
+            <div>5. Dilarang membawa catatan dalam bentuk apapun</div>
           </div>
           <div>
-            <div>6.  Menempati tempat duduk sesuai nomor urut</div>
-            <div>7.  Hadir di ruangan 10 menit sebelum EHB dimulai</div>
-            <div>8.  Dilarang bekerja sama dalam pengerjaan soal</div>
-            <div>9.  Mengisi dan melengkapi identitas pada lembar jawaban</div>
+            <div>6. Menempati tempat duduk sesuai nomor urut</div>
+            <div>7. Hadir di ruangan 10 menit sebelum EHB dimulai</div>
+            <div>8. Dilarang bekerja sama dalam pengerjaan soal</div>
+            <div>9. Mengisi dan melengkapi identitas pada lembar jawaban</div>
             <div>10. Mengisi daftar hadir sesuai dengan urutan nomor tes</div>
             <div>11. Boleh menanyakan hal yang tidak dimengerti kepada pengawas selain kisi-kisi atau jawaban</div>
           </div>
