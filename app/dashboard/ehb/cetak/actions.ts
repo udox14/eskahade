@@ -208,14 +208,14 @@ export async function getJamGroupList(eventId: number) {
   `, [eventId])
 }
 
-export async function getDaftarHadirSesi(eventId: number) {
+export async function getDaftarHadirSesi(eventId: number, jamGroup: string) {
   return query<DaftarHadirSesi>(`
     SELECT DISTINCT tanggal, label
     FROM ehb_jadwal j
     JOIN ehb_sesi s ON s.id = j.sesi_id
-    WHERE j.ehb_event_id = ?
+    WHERE j.ehb_event_id = ? AND s.jam_group = ?
     ORDER BY tanggal, s.nomor_sesi
-  `, [eventId])
+  `, [eventId, jamGroup])
 }
 
 export type DaftarHadirSemuaItem = DaftarHadirItem & { ruangan_id: number; nomor_ruangan: number }

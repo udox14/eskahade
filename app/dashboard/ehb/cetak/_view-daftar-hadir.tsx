@@ -23,16 +23,25 @@ function abbreviateAsrama(asrama: string | null, kamar: string | null) {
   if (!asrama) return '-'
   let abbr = asrama
   const mapping: Record<string, string> = {
-    'AL-FALAH': 'AFL',
-    'ASY-SYIFA 1': 'ASY1',
-    'ASY-SYIFA 2': 'ASY2',
-    'ASY-SYIFA 3': 'ASY3',
-    'ASY-SYIFA 4': 'ASY4',
-    'AS-SALAM': 'ASM',
+    'AL-FALAH': 'ALF',
+    'ASY-SYIFA 1': 'ASY 1',
+    'ASY-SYIFA 2': 'ASY 2',
+    'ASY-SYIFA 3': 'ASY 3',
+    'ASY-SYIFA 4': 'ASY 4',
+    'AS-SALAM': 'ASAS',
     'BAHAGIA': 'BHG',
+    'AL-BAGHORY': 'BGR',
   }
   abbr = mapping[asrama] || asrama.substring(0, 3).toUpperCase()
   return `${abbr}/ ${kamar || '-'}`
+}
+
+function abbreviateKelas(kelas: string | null) {
+  if (!kelas) return '-'
+  return kelas
+    .replace(/Tamhidiyah/i, 'TMH')
+    .replace(/Ibtidaiyah/i, 'IBT')
+    .replace(/Mutawassithah/i, 'MTW')
 }
 
 function getDayName(dateStr: string) {
@@ -42,14 +51,14 @@ function getDayName(dateStr: string) {
 
 // ── Print Component ──────────────────────────────────────────────────────────
 
-function DaftarHadirPrint({ 
-  event, 
-  ruangan, 
-  jamGroup, 
-  peserta, 
+function DaftarHadirPrint({
+  event,
+  ruangan,
+  jamGroup,
+  peserta,
   sesiList,
   pageInfo
-}: { 
+}: {
   event: ActiveEvent
   ruangan: number
   jamGroup: string
@@ -112,7 +121,7 @@ function DaftarHadirPrint({
               <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{p.nomor_peserta}</td>
               <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatNama(p.nama_lengkap)}</td>
               <td style={{ ...tdStyle, textAlign: 'center', fontSize: '8pt' }}>{abbreviateAsrama(p.asrama, p.kamar)}</td>
-              <td style={{ ...tdStyle, textAlign: 'center' }}>{p.nama_kelas || '-'}</td>
+              <td style={{ ...tdStyle, textAlign: 'center' }}>{abbreviateKelas(p.nama_kelas)}</td>
               {dates.map(date => sessionsByDate[date].map((_, idx) => (
                 <td key={`${date}-${idx}`} style={{ ...tdStyle, width: '10mm' }}></td>
               )))}
@@ -161,21 +170,21 @@ const tdStyle: React.CSSProperties = {
 // ── Main View Component ──────────────────────────────────────────────────────
 
 export function DaftarHadirView({ onBack }: { onBack: () => void }) {
-  const [event, setEvent]             = useState<ActiveEvent | null>(null)
+  const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [loadingInit, setLoadingInit] = useState(true)
   const [ruanganList, setRuanganList] = useState<RuanganOption[]>([])
   const [jamGroupList, setJamGroupList] = useState<{ jam_group: string }[]>([])
-  
+
   const [selectedRuangan, setSelectedRuangan] = useState<number | ''>('')
   const [selectedJamGroup, setSelectedJamGroup] = useState<string>('')
-  
+
   const [pesertaData, setPesertaData] = useState<DaftarHadirItem[]>([])
-  const [sesiList, setSesiList]       = useState<DaftarHadirSesi[]>([])
+  const [sesiList, setSesiList] = useState<DaftarHadirSesi[]>([])
   const [loadingData, setLoadingData] = useState(false)
-  const [hasLoaded, setHasLoaded]     = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   // Bulk Print State
-  const [bulkData, setBulkData]       = useState<DaftarHadirSemuaItem[]>([])
+  const [bulkData, setBulkData] = useState<DaftarHadirSemuaItem[]>([])
   const [loadingBulk, setLoadingBulk] = useState(false)
 
   const printRef = useRef<HTMLDivElement>(null)
@@ -203,26 +212,38 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
       const evt = await getActiveEventForCetak()
       setEvent(evt)
       if (evt) {
-        const [rl, jl, sl] = await Promise.all([
+        const [rl, jl] = await Promise.all([
           getRuanganListForCetak(evt.id),
-          getJamGroupList(evt.id),
-          getDaftarHadirSesi(evt.id)
+          getJamGroupList(evt.id)
         ])
         setRuanganList(rl)
         setJamGroupList(jl)
-        setSesiList(sl)
-        if (jl.length > 0) setSelectedJamGroup(jl[0].jam_group)
+        if (jl.length > 0) {
+          const firstJam = jl[0].jam_group
+          setSelectedJamGroup(firstJam)
+          const sl = await getDaftarHadirSesi(evt.id, firstJam)
+          setSesiList(sl)
+        }
       }
       setLoadingInit(false)
     }
     init()
   }, [])
 
+  const handleJamGroupChange = async (jg: string) => {
+    setSelectedJamGroup(jg)
+    setHasLoaded(false)
+    if (event) {
+      const sl = await getDaftarHadirSesi(event.id, jg)
+      setSesiList(sl)
+    }
+  }
+
   const handleMuatPreview = async () => {
     if (!event) return
     if (!selectedRuangan) return toast.error('Pilih ruangan terlebih dahulu')
     if (!selectedJamGroup) return toast.error('Pilih jam group terlebih dahulu')
-    
+
     setLoadingData(true)
     setHasLoaded(false)
     const data = await getDaftarHadirData(event.id, selectedRuangan as number, selectedJamGroup)
@@ -271,7 +292,7 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
   if (chunks.length === 0 && hasLoaded) chunks.push([]) // For empty preview
 
   // Group bulk data by room
-  const bulkRooms = Array.from(new Set(bulkData.map(d => d.nomor_ruangan))).sort((a,b) => a-b)
+  const bulkRooms = Array.from(new Set(bulkData.map(d => d.nomor_ruangan))).sort((a, b) => a - b)
 
   return (
     <div className="space-y-6">
@@ -287,7 +308,7 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
         </div>
         <div>
           <label className="text-xs font-bold text-slate-500 mb-1 block">Pilih Jam</label>
-          <select value={selectedJamGroup} onChange={e => setSelectedJamGroup(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+          <select value={selectedJamGroup} onChange={e => handleJamGroupChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
             {jamGroupList.map(j => <option key={j.jam_group} value={j.jam_group}>{j.jam_group}</option>)}
           </select>
         </div>
@@ -316,31 +337,31 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
           </div>
 
           <div className="bg-slate-100 border rounded-2xl p-4 flex flex-col items-center gap-6 overflow-auto max-h-[800px]">
-             {chunks.map((chunk, idx) => (
-               <div key={idx} className="bg-white shadow-xl flex-shrink-0" style={{ zoom: 0.35 }}>
-                 <DaftarHadirPrint 
-                   event={event} 
-                   ruangan={selectedRuangan as number} 
-                   jamGroup={selectedJamGroup} 
-                   peserta={chunk} 
-                   sesiList={sesiList}
-                   pageInfo={{ current: idx + 1, total: chunks.length }}
-                 />
-               </div>
-             ))}
+            {chunks.map((chunk, idx) => (
+              <div key={idx} className="bg-white shadow-xl flex-shrink-0" style={{ zoom: 0.35 }}>
+                <DaftarHadirPrint
+                  event={event}
+                  ruangan={selectedRuangan as number}
+                  jamGroup={selectedJamGroup}
+                  peserta={chunk}
+                  sesiList={sesiList}
+                  pageInfo={{ current: idx + 1, total: chunks.length }}
+                />
+              </div>
+            ))}
           </div>
 
           <div className="hidden">
             <div ref={printRef}>
               {chunks.map((chunk, idx) => (
-                <DaftarHadirPrint 
-                   key={idx}
-                   event={event} 
-                   ruangan={selectedRuangan as number} 
-                   jamGroup={selectedJamGroup} 
-                   peserta={chunk} 
-                   sesiList={sesiList}
-                   pageInfo={{ current: idx + 1, total: chunks.length }}
+                <DaftarHadirPrint
+                  key={idx}
+                  event={event}
+                  ruangan={selectedRuangan as number}
+                  jamGroup={selectedJamGroup}
+                  peserta={chunk}
+                  sesiList={sesiList}
+                  pageInfo={{ current: idx + 1, total: chunks.length }}
                 />
               ))}
             </div>
@@ -358,12 +379,12 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
               roomChunks.push(roomPeserta.slice(i, i + 20))
             }
             return roomChunks.map((chunk, idx) => (
-              <DaftarHadirPrint 
+              <DaftarHadirPrint
                 key={`${nr}-${idx}`}
-                event={event} 
-                ruangan={nr} 
-                jamGroup={selectedJamGroup} 
-                peserta={chunk} 
+                event={event}
+                ruangan={nr}
+                jamGroup={selectedJamGroup}
+                peserta={chunk}
                 sesiList={sesiList}
                 pageInfo={{ current: idx + 1, total: roomChunks.length }}
               />
