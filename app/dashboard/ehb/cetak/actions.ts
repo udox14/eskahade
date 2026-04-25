@@ -14,7 +14,7 @@ export type ActiveEvent = {
 export type KartuData = {
   id: number
   nama_lengkap: string
-  asrama: string
+  asrama_kamar: string
   nomor_ruangan: number
   nomor_kursi: number
   jam_group: string
@@ -88,7 +88,7 @@ export async function getKartuPesertaData(
     SELECT
       ps.id,
       s.nama_lengkap,
-      COALESCE(s.asrama, '-') as asrama,
+      COALESCE(s.asrama, '-') || ' / ' || COALESCE(s.kamar, '-') as asrama_kamar,
       r.nomor_ruangan,
       ps.nomor_kursi,
       ps.jam_group,

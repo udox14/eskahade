@@ -40,170 +40,212 @@ function parseJamGroup(jamGroup: string): string {
   return jamGroup.toUpperCase()
 }
 
-function semesterLabel(semester: number) {
-  return semester === 1 ? 'SMT. GANJIL' : 'SMT. GENAP'
-}
+// F4 Landscape: 330mm × 210mm, 4 kartu per lembar (2 kolom × 2 baris)
+// Margin halaman: 5mm → usable: 320 × 200mm
+// Gap antar kartu: 4mm → tiap kartu: (320-4)/2 × (200-4)/2 = 158 × 98mm
 
-// ── Card: Screen Preview ───────────────────────────────────────────────────────
+const FONT = '"Times New Roman", Times, serif'
 
-function KartuPreview({ data }: { data: KartuData }) {
-  const jam = parseJamGroup(data.jam_group)
+// ── Kartu Print (presisi mm, Times New Roman) ─────────────────────────────────
+
+function KartuPrint({ data }: { data: KartuData }) {
+  const jam       = parseJamGroup(data.jam_group)
+  const semLabel  = data.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
+  const ta        = data.tahun_ajaran_nama.replace('/', '-')
+
   return (
-    <div className="border border-dashed border-slate-400 p-3 bg-white flex flex-col gap-1.5 text-xs rounded"
-      style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" className="w-8 h-8 object-contain shrink-0" alt="logo" />
-          <div className="leading-tight">
-            <div className="text-[8px] uppercase tracking-wide text-slate-500">Lembaga Pendidikan</div>
-            <div className="text-[8px] uppercase tracking-wide text-slate-500">Pondok Pesantren</div>
-            <div className="font-bold text-sm leading-none text-slate-900">SUKAHIDENG</div>
-            <div className="text-[8px] text-slate-400 mt-0.5">Sukarame - Tasikmalaya - Jawa Barat</div>
+    <div style={{
+      width: '158mm',
+      height: '98mm',
+      border: '0.8pt solid #000',
+      padding: '3mm',
+      boxSizing: 'border-box' as const,
+      fontFamily: FONT,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '0',
+      breakInside: 'avoid' as const,
+      pageBreakInside: 'avoid' as const,
+      overflow: 'hidden',
+    }}>
+
+      {/* ── HEADER: Logo + Judul ────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '3mm', flexShrink: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logohitam.png"
+          alt=""
+          style={{ width: '18mm', height: '18mm', objectFit: 'contain', flexShrink: 0 }}
+        />
+        <div style={{ flex: 1, lineHeight: 1 }}>
+          <div style={{ fontSize: '13.5pt', fontWeight: 900, letterSpacing: '0.3px' }}>
+            EVALUASI HASIL BELAJAR
+          </div>
+          <div style={{ fontSize: '10.5pt', fontWeight: 'bold', marginTop: '0.8mm' }}>
+            {semLabel} T.A. {ta}
+          </div>
+          <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0' }} />
+          <div style={{ fontSize: '6.5pt', letterSpacing: '0.2px' }}>
+            LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-3xl font-black leading-none text-slate-900">EHB</div>
-          <div className="text-[10px] font-bold text-slate-700">{semesterLabel(data.semester)}</div>
-          <div className="text-[9px] text-slate-600">T.A. {data.tahun_ajaran_nama}</div>
+      </div>
+
+      {/* ── SEPARATOR ───────────────────────────────────────────────────────── */}
+      <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0', flexShrink: 0 }} />
+
+      {/* ── MAIN CONTENT: Nomor Peserta + Nama + Info ───────────────────────── */}
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontSize: '5.5pt', color: '#333', marginBottom: '0.8mm', fontFamily: FONT }}>
+          No. Peserta
+        </div>
+        <div style={{ display: 'flex', gap: '3mm', alignItems: 'stretch' }}>
+
+          {/* Kotak kiri: Nomor (putih) + JAM (hitam) */}
+          <div style={{
+            width: '28mm',
+            flexShrink: 0,
+            border: '0.8pt solid #000',
+            display: 'flex',
+            flexDirection: 'column' as const,
+            textAlign: 'center' as const,
+          }}>
+            {/* Nomor Peserta */}
+            <div style={{
+              fontSize: '22pt',
+              fontWeight: 900,
+              lineHeight: 1,
+              padding: '1.5mm 1mm',
+              borderBottom: '0.8pt solid #000',
+              fontFamily: FONT,
+            }}>
+              {data.nomor_peserta}
+            </div>
+            {/* JAM label */}
+            <div style={{
+              flex: 1,
+              backgroundColor: '#2a2a2a',
+              color: '#fff',
+              display: 'flex',
+              flexDirection: 'column' as const,
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1mm',
+              lineHeight: 1.15,
+              fontFamily: FONT,
+            }}>
+              <div style={{ fontSize: '8pt', fontWeight: 'bold', letterSpacing: '1px' }}>JAM</div>
+              <div style={{ fontSize: '10pt', fontWeight: 900 }}>{jam}</div>
+            </div>
+          </div>
+
+          {/* Kanan: Nama + Info */}
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column' as const,
+            justifyContent: 'space-between',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              fontSize: '21pt',
+              fontWeight: 900,
+              lineHeight: 1.1,
+              fontFamily: FONT,
+              overflow: 'hidden',
+            }}>
+              {data.nama_lengkap}
+            </div>
+            <div>
+              <div style={{ borderBottom: '0.5pt solid #000', margin: '1mm 0' }} />
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '9pt',
+                fontFamily: FONT,
+                gap: '0',
+              }}>
+                <span style={{ paddingRight: '3mm' }}>{data.asrama_kamar}</span>
+                <span style={{ borderLeft: '0.6pt solid #555', paddingLeft: '3mm' }}>{data.nama_kelas || '-'}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <hr className="border-slate-300" />
+      {/* ── SEPARATOR ───────────────────────────────────────────────────────── */}
+      <div style={{ borderBottom: '0.5pt solid #000', margin: '1.5mm 0 1mm 0', flexShrink: 0 }} />
 
-      <div>Nomor Peserta: <span className="font-black text-base">{data.nomor_peserta}</span></div>
-
-      <div className="text-base font-black leading-tight text-slate-900">{data.nama_lengkap}</div>
-
-      <hr className="border-slate-300" />
-
-      <div className="flex gap-3">
-        <div className="flex flex-col gap-1 text-slate-500">
-          <span>Marhalah</span><span>Asrama</span><span>Ruang</span>
+      {/* ── TATA TERTIB ─────────────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        border: '0.5pt solid #000',
+        padding: '1.5mm 2mm 1.5mm 2mm',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column' as const,
+      }}>
+        {/* Judul */}
+        <div style={{
+          textAlign: 'center' as const,
+          fontWeight: 'bold',
+          fontSize: '7pt',
+          borderBottom: '0.4pt solid #aaa',
+          paddingBottom: '0.8mm',
+          marginBottom: '1mm',
+          letterSpacing: '0.3px',
+          fontFamily: FONT,
+        }}>
+          TATA TERTIB PESERTA
         </div>
-        <div className="self-stretch border-l border-slate-300" />
-        <div className="flex flex-col gap-1 font-bold text-slate-800">
-          <span>{data.marhalah_nama || '-'}</span>
-          <span>{data.asrama || '-'}</span>
-          <span>{data.nomor_ruangan}</span>
-        </div>
-      </div>
-
-      <hr className="border-slate-300" />
-
-      <div className="flex items-end justify-between gap-2">
-        <div className="text-[9px] text-slate-600 leading-snug flex-1">
-          <div className="font-bold text-[10px] text-slate-800 mb-0.5">TATA TERTIB PESERTA</div>
-          <ol className="list-decimal list-inside space-y-px">
-            <li>Membawa kartu peserta ke dalam ruangan.</li>
-            <li>Menggunakan pakaian pengajian.</li>
-            <li>Mengikuti EHB sesuai ruangan dan jadwal.</li>
-            <li>Tidak membawa catatan dalam bentuk apapun.</li>
-            <li>Menempati tempat duduk sesuai nomor urut.</li>
-            <li>Hadir di ruangan 10 menit sebelum EHB dimulai.</li>
-            <li>Tidak bekerja sama dalam pengerjaan soal.</li>
-            <li>Mengisi identitas dan daftar hadir.</li>
-          </ol>
-        </div>
-        <div className="border border-slate-800 text-center px-2 py-1 shrink-0 min-w-[48px]">
-          <div className="text-[7px] font-bold tracking-widest">JAM</div>
-          <div className="font-black text-xs leading-none">{jam}</div>
+        {/* 2 kolom aturan */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '0 4mm',
+          fontSize: '5.5pt',
+          lineHeight: 1.45,
+          fontFamily: FONT,
+          flex: 1,
+          overflow: 'hidden',
+        }}>
+          <div>
+            <div>1.  Seluruh santri wajib mengikuti kegiatan EHB</div>
+            <div>2.  Membawa kartu peserta ke dalam ruangan</div>
+            <div>3.  Mengikuti EHB sesuai ruangan dan jadwal</div>
+            <div>4.  Ketentuan pakaian peserta:</div>
+            <div style={{ paddingLeft: '5mm' }}>a.  Putra: seragam berjama&#39;ah</div>
+            <div style={{ paddingLeft: '5mm' }}>b.  Putri: maksi hitam, baju dan kerudung putih</div>
+            <div>5.  Dilarang membawa catatan dalam bentuk apapun</div>
+          </div>
+          <div>
+            <div>6.  Menempati tempat duduk sesuai nomor urut</div>
+            <div>7.  Hadir di ruangan 10 menit sebelum EHB dimulai</div>
+            <div>8.  Dilarang bekerja sama dalam pengerjaan soal</div>
+            <div>9.  Mengisi dan melengkapi identitas pada lembar jawaban</div>
+            <div>10. Mengisi daftar hadir sesuai dengan urutan nomor tes</div>
+            <div>11. Boleh menanyakan hal yang tidak dimengerti kepada pengawas selain kisi-kisi atau jawaban</div>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Card: Print (presisi A4 — 2×3 = 6 per lembar) ────────────────────────────
+// ── Screen Preview (zoom dari KartuPrint agar 100% akurat) ────────────────────
 
-function KartuPrint({ data }: { data: KartuData }) {
-  const jam = parseJamGroup(data.jam_group)
-  const s: React.CSSProperties = {
-    width: '95mm',
-    height: '100mm',
-    border: '0.5pt dashed #888',
-    padding: '3.5mm',
-    boxSizing: 'border-box',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '7pt',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1.2mm',
-    overflow: 'hidden',
-    breakInside: 'avoid',
-  }
-
+function KartuPreview({ data }: { data: KartuData }) {
+  // Kartu cetak: 158mm ≈ 597px. Zoom 0.63 → ≈376px per kartu, proporsional
   return (
-    <div style={s}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '2mm' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" style={{ width: '12mm', height: '12mm', objectFit: 'contain', flexShrink: 0 }} alt="" />
-          <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontSize: '5pt', letterSpacing: '0.4px', color: '#555', textTransform: 'uppercase' }}>Lembaga Pendidikan</div>
-            <div style={{ fontSize: '5pt', letterSpacing: '0.4px', color: '#555', textTransform: 'uppercase' }}>Pondok Pesantren</div>
-            <div style={{ fontSize: '9pt', fontWeight: 'bold', color: '#000', lineHeight: 1 }}>SUKAHIDENG</div>
-            <div style={{ fontSize: '4.5pt', color: '#777', marginTop: '0.5mm' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: '20pt', fontWeight: 900, lineHeight: 1, color: '#000' }}>EHB</div>
-          <div style={{ fontSize: '7pt', fontWeight: 'bold' }}>{semesterLabel(data.semester)}</div>
-          <div style={{ fontSize: '6pt', color: '#444' }}>T.A. {data.tahun_ajaran_nama}</div>
-        </div>
-      </div>
-
-      <div style={{ borderBottom: '0.4pt solid #aaa' }} />
-
-      <div style={{ fontSize: '7pt' }}>
-        Nomor Peserta:&nbsp;
-        <span style={{ fontSize: '10pt', fontWeight: 900 }}>{data.nomor_peserta}</span>
-      </div>
-
-      <div style={{ fontSize: '13pt', fontWeight: 900, lineHeight: 1.1, color: '#000' }}>{data.nama_lengkap}</div>
-
-      <div style={{ borderBottom: '0.4pt solid #aaa' }} />
-
-      <div style={{ display: 'flex', gap: '3mm', fontSize: '7pt' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1mm', color: '#555', whiteSpace: 'nowrap' }}>
-          <span>Marhalah</span><span>Asrama</span><span>Ruang</span>
-        </div>
-        <div style={{ borderLeft: '0.4pt solid #aaa' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1mm', fontWeight: 'bold', color: '#000' }}>
-          <span>{data.marhalah_nama || '-'}</span>
-          <span>{data.asrama || '-'}</span>
-          <span>{data.nomor_ruangan}</span>
-        </div>
-      </div>
-
-      <div style={{ borderBottom: '0.4pt solid #aaa' }} />
-
-      {/* Tata Tertib + JAM */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '2mm', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ fontSize: '6.5pt', fontWeight: 'bold', marginBottom: '1mm' }}>TATA TERTIB PESERTA</div>
-          <ol style={{ margin: 0, paddingLeft: '3.5mm', fontSize: '5.5pt', lineHeight: 1.5 }}>
-            <li>Membawa kartu peserta ke dalam ruangan.</li>
-            <li>Menggunakan pakaian pengajian.</li>
-            <li>Mengikuti EHB sesuai ruangan dan jadwal.</li>
-            <li>Tidak membawa catatan dalam bentuk apapun.</li>
-            <li>Menempati tempat duduk sesuai nomor urut.</li>
-            <li>Hadir di ruangan 10 menit sebelum EHB dimulai.</li>
-            <li>Tidak bekerja sama dalam pengerjaan soal.</li>
-            <li>Mengisi identitas dan daftar hadir.</li>
-          </ol>
-        </div>
-        <div style={{
-          border: '0.8pt solid #000',
-          padding: '2mm 2.5mm',
-          textAlign: 'center',
-          flexShrink: 0,
-          minWidth: '16mm',
-        }}>
-          <div style={{ fontSize: '5.5pt', fontWeight: 'bold', letterSpacing: '1px' }}>JAM</div>
-          <div style={{ fontSize: '9pt', fontWeight: 900, lineHeight: 1.1 }}>{jam}</div>
-        </div>
+    <div style={{
+      display: 'inline-block',
+      border: '1px solid #e2e8f0',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+    }}>
+      <div style={{ zoom: 0.63 }}>
+        <KartuPrint data={data} />
       </div>
     </div>
   )
@@ -212,32 +254,32 @@ function KartuPrint({ data }: { data: KartuData }) {
 // ── Kartu Peserta View ────────────────────────────────────────────────────────
 
 function KartuPesertaView({ onBack }: { onBack: () => void }) {
-  const [event, setEvent] = useState<ActiveEvent | null>(null)
+  const [event, setEvent]           = useState<ActiveEvent | null>(null)
   const [loadingInit, setLoadingInit] = useState(true)
-
-  const [filterType, setFilterType] = useState<FilterType>('semua')
+  const [filterType, setFilterType]  = useState<FilterType>('semua')
   const [marhalahList, setMarhalahList] = useState<MarhalahOption[]>([])
-  const [kelasList, setKelasList] = useState<KelasOption[]>([])
+  const [kelasList, setKelasList]    = useState<KelasOption[]>([])
   const [selectedMarhalah, setSelectedMarhalah] = useState<number | ''>('')
   const [selectedKelas, setSelectedKelas] = useState<string>('')
-
-  const [kartuData, setKartuData] = useState<KartuData[]>([])
+  const [kartuData, setKartuData]    = useState<KartuData[]>([])
   const [loadingData, setLoadingData] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
+  const [hasLoaded, setHasLoaded]    = useState(false)
 
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: 'Kartu Peserta EHB',
+    // F4 Landscape: 330mm × 210mm
     pageStyle: `
-      @page { size: 210mm 330mm portrait; margin: 8mm; }
-      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      @page { size: 330mm 210mm; margin: 5mm; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        * { font-family: "Times New Roman", Times, serif !important; }
+      }
     `,
   })
 
-  useEffect(() => {
-    loadInit()
-  }, [])
+  useEffect(() => { loadInit() }, [])
 
   const loadInit = async () => {
     setLoadingInit(true)
@@ -253,7 +295,7 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
   const handleMarhalahChange = useCallback(async (id: number | '') => {
     setSelectedMarhalah(id)
     setSelectedKelas('')
-    if (!event || id === '') return
+    if (!event || id === '') { setKelasList([]); return }
     const kl = await getKelasListForCetak(event.id, id as number)
     setKelasList(kl)
   }, [event])
@@ -264,10 +306,9 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
     setSelectedKelas('')
     setHasLoaded(false)
     setKartuData([])
-    if (type !== 'semua' && event) {
-      const kl = type === 'kelas'
-        ? await getKelasListForCetak(event.id)
-        : []
+    setKelasList([])
+    if (type === 'kelas' && event) {
+      const kl = await getKelasListForCetak(event.id)
       setKelasList(kl)
     }
   }, [event])
@@ -275,14 +316,13 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
   const handleMuatPreview = async () => {
     if (!event) return
     if (filterType === 'marhalah' && !selectedMarhalah) return toast.error('Pilih marhalah terlebih dahulu')
-    if (filterType === 'kelas' && !selectedKelas) return toast.error('Pilih kelas terlebih dahulu')
-
+    if (filterType === 'kelas' && !selectedKelas)       return toast.error('Pilih kelas terlebih dahulu')
     setLoadingData(true)
     setHasLoaded(false)
     const data = await getKartuPesertaData(event.id, {
       type: filterType,
       marhalahId: filterType === 'marhalah' ? (selectedMarhalah as number) : undefined,
-      kelasId: filterType === 'kelas' ? selectedKelas : undefined,
+      kelasId:    filterType === 'kelas'    ? selectedKelas                : undefined,
     })
     setKartuData(data)
     setHasLoaded(true)
@@ -291,9 +331,7 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
   }
 
   if (loadingInit) return (
-    <div className="flex justify-center p-20">
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-    </div>
+    <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   )
 
   if (!event) return (
@@ -306,15 +344,17 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
     </div>
   )
 
+  const semLabel = event.semester === 1 ? 'Semester Ganjil' : 'Semester Genap'
+
   return (
     <div className="space-y-6">
       <PageHeader title="Kartu Peserta EHB" onBack={onBack} />
 
       {/* Event badge */}
       <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-3 flex items-center gap-3">
-        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
         <p className="text-sm font-bold text-indigo-800">{event.nama}</p>
-        <span className="text-xs text-indigo-500 ml-auto">{semesterLabel(event.semester)} • T.A. {event.tahun_ajaran_nama}</span>
+        <span className="text-xs text-indigo-500 ml-auto">{semLabel} · T.A. {event.tahun_ajaran_nama}</span>
       </div>
 
       {/* Filter Panel */}
@@ -324,7 +364,6 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
           <h3 className="font-bold text-slate-700 text-sm">Filter Peserta</h3>
         </div>
         <div className="p-5 space-y-4">
-          {/* Filter type tabs */}
           <div className="flex gap-2 flex-wrap">
             {(['semua', 'marhalah', 'kelas'] as FilterType[]).map(ft => (
               <button
@@ -341,7 +380,6 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
             ))}
           </div>
 
-          {/* Marhalah dropdown */}
           {(filterType === 'marhalah' || filterType === 'kelas') && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -352,12 +390,9 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">-- Pilih Marhalah --</option>
-                  {marhalahList.map(m => (
-                    <option key={m.id} value={m.id}>{m.nama}</option>
-                  ))}
+                  {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                 </select>
               </div>
-
               {filterType === 'kelas' && (
                 <div>
                   <label className="text-xs font-bold text-slate-500 mb-1 block">Kelas</label>
@@ -368,9 +403,7 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
                     disabled={!selectedMarhalah}
                   >
                     <option value="">-- Pilih Kelas --</option>
-                    {kelasList.map(k => (
-                      <option key={k.id} value={k.id}>{k.nama_kelas}</option>
-                    ))}
+                    {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
                   </select>
                 </div>
               )}
@@ -391,11 +424,10 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
       {/* Preview + Print */}
       {hasLoaded && kartuData.length > 0 && (
         <>
-          {/* Toolbar */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500 font-medium">
               <span className="font-bold text-slate-800">{kartuData.length}</span> kartu siap cetak
-              &nbsp;·&nbsp; {Math.ceil(kartuData.length / 6)} lembar A4
+              &nbsp;·&nbsp; {Math.ceil(kartuData.length / 4)} lembar F4
             </p>
             <button
               onClick={() => handlePrint()}
@@ -405,18 +437,18 @@ function KartuPesertaView({ onBack }: { onBack: () => void }) {
             </button>
           </div>
 
-          {/* Screen preview grid */}
+          {/* Screen preview */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {kartuData.map(d => <KartuPreview key={d.id} data={d} />)}
           </div>
 
-          {/* Print area — off-screen, 2×3 kartu per halaman A4 */}
+          {/* Print area — off-screen, 2×2 kartu per lembar F4 Landscape */}
           <div style={{ position: 'absolute', left: '-9999px', top: 0 }} aria-hidden>
             <div ref={printRef}>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 95mm)',
-                gap: '5mm 4mm',
+                gridTemplateColumns: 'repeat(2, 158mm)',
+                gap: '4mm',
               }}>
                 {kartuData.map(d => <KartuPrint key={d.id} data={d} />)}
               </div>
@@ -471,12 +503,12 @@ function PlaceholderView({ label, onBack }: { label: string; onBack: () => void 
 // ── Menu items ────────────────────────────────────────────────────────────────
 
 const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.ElementType }[] = [
-  { view: 'kartu-peserta',    label: 'Kartu Peserta EHB',  desc: 'Kartu identitas ujian untuk dipegang setiap peserta.',     icon: CreditCard },
-  { view: 'nomor-peserta',    label: 'Nomor Peserta',       desc: 'Nomor ujian besar untuk ditempel di meja peserta.',        icon: Hash },
-  { view: 'daftar-hadir',     label: 'Blanko Daftar Hadir', desc: 'Lembar daftar hadir kosong untuk diisi peserta tiap sesi.', icon: ClipboardList },
-  { view: 'tempelan-ruangan', label: 'Tempelan Ruangan',    desc: 'Nomor ruangan beserta daftar peserta di dalamnya.',        icon: LayoutList },
-  { view: 'jadwal-mengawas',  label: 'Jadwal Mengawas',     desc: 'Jadwal tugas mengawas seluruh pengawas EHB.',              icon: CalendarCheck },
-  { view: 'jadwal-ehb',       label: 'Jadwal EHB',          desc: 'Jadwal ujian keseluruhan untuk ditempel di mading.',       icon: Calendar },
+  { view: 'kartu-peserta',    label: 'Kartu Peserta EHB',   desc: 'Kartu identitas ujian untuk dipegang setiap peserta.',      icon: CreditCard },
+  { view: 'nomor-peserta',    label: 'Nomor Peserta',        desc: 'Nomor ujian besar untuk ditempel di meja peserta.',         icon: Hash },
+  { view: 'daftar-hadir',     label: 'Blanko Daftar Hadir',  desc: 'Lembar daftar hadir kosong untuk diisi peserta tiap sesi.',  icon: ClipboardList },
+  { view: 'tempelan-ruangan', label: 'Tempelan Ruangan',     desc: 'Nomor ruangan beserta daftar peserta di dalamnya.',         icon: LayoutList },
+  { view: 'jadwal-mengawas',  label: 'Jadwal Mengawas',      desc: 'Jadwal tugas mengawas seluruh pengawas EHB.',               icon: CalendarCheck },
+  { view: 'jadwal-ehb',       label: 'Jadwal EHB',           desc: 'Jadwal ujian keseluruhan untuk ditempel di mading.',        icon: Calendar },
 ]
 
 // ── Main component ────────────────────────────────────────────────────────────
