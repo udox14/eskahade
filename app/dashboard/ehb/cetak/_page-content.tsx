@@ -154,9 +154,9 @@ function KartuPrint({ data }: { data: KartuData }) {
             overflow: 'hidden'
           }}>
             <div style={{
-              fontSize: '25pt',
+              fontSize: displayNama.length > 35 ? '16pt' : displayNama.length > 25 ? '20pt' : '25pt',
               fontWeight: 900,
-              lineHeight: '1.1',
+              lineHeight: '1',
               marginBottom: '2mm',
               marginTop: '-1mm',
               whiteSpace: 'nowrap',
@@ -164,7 +164,7 @@ function KartuPrint({ data }: { data: KartuData }) {
               {displayNama}
             </div>
             <div style={{ borderTop: '0.8pt solid #000', marginTop: '1mm', paddingTop: '2mm', display: 'flex', fontSize: '15pt', fontWeight: 'normal' }}>
-              <div style={{ flex: 1, textAlign: 'left', paddingLeft: '2mm' }}>{data.asrama_kamar}</div>
+              <div style={{ flex: 1, textAlign: 'left' }}>{data.asrama_kamar}</div>
               <div style={{ width: '1px', backgroundColor: '#000', height: '6mm', margin: '0 4mm' }} />
               <div style={{ flex: 1.5, textAlign: 'left' }}>{data.nama_kelas || '-'}</div>
             </div>
