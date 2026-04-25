@@ -180,12 +180,18 @@ export async function mutasiBatch(payload: {
 
   if (!payload.santriIds.length) return { error: 'Tidak ada santri dipilih' }
 
-  // Ambil data lama semua santri sekaligus
-  const placeholders = payload.santriIds.map(() => '?').join(',')
-  const santriLama = await query<{ id: string; asrama: string | null; kamar: string | null }>(
-    `SELECT id, asrama, kamar FROM santri WHERE id IN (${placeholders})`,
-    payload.santriIds
-  )
+  // Ambil data lama semua santri sekaligus (Chunked to avoid SQL variable limit)
+  const santriLama: { id: string; asrama: string | null; kamar: string | null }[] = []
+  const chunkSize = 100
+  for (let i = 0; i < payload.santriIds.length; i += chunkSize) {
+    const chunk = payload.santriIds.slice(i, i + chunkSize)
+    const placeholders = chunk.map(() => '?').join(',')
+    const results = await query<{ id: string; asrama: string | null; kamar: string | null }>(
+      `SELECT id, asrama, kamar FROM santri WHERE id IN (${placeholders})`,
+      chunk
+    )
+    santriLama.push(...results)
+  }
 
   const db = await getDB()
   try {
