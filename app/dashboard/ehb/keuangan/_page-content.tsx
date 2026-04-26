@@ -8,19 +8,29 @@ import {
 import { toast } from 'sonner'
 import {
   getActiveEventForKeuangan,
-  getKetuaPelaksanaName,
+  getKeuanganSigners,
   getRabAutoBasis,
   getRabItems,
+  getTransaksiItems,
   saveRabItems,
+  saveTransaksiItems,
   type ActiveEvent,
   type RabAutoBasis,
   type RabItem,
   type RabItemInput,
   type RabKategori,
+  type TransaksiInput,
+  type TransaksiItem,
+  type TransaksiTipe,
 } from './actions'
 import { FONT } from '../cetak/_shared'
+import { formatDateKeyWib, shortDateWib } from '../_date-utils'
 
 type DraftRabItem = RabItemInput & {
+  draft_id: string
+}
+
+type DraftTransaksiItem = TransaksiInput & {
   draft_id: string
 }
 
@@ -58,9 +68,21 @@ function parseMoney(value: string) {
   return Number(value.replace(/[^\d]/g, '')) || 0
 }
 
+function todayKey() {
+  return formatDateKeyWib(new Date())
+}
+
 function lineTotal(item: Pick<DraftRabItem, 'qty' | 'harga' | 'system_key'>) {
+  if (item.system_key === 'honor_pemeriksaan_header') return 0
   if (item.system_key === 'honor_panitia') return Number(item.harga || 0)
   return Number(item.qty || 0) * Number(item.harga || 0)
+}
+
+function displayRabName(item: Pick<DraftRabItem, 'nama_barang' | 'system_key'>) {
+  if (item.system_key?.startsWith('honor_pemeriksaan_') && item.system_key !== 'honor_pemeriksaan_header') {
+    return item.nama_barang.replace(/^Insentif Pemeriksaan Hasil EHB\s*-\s*/i, '')
+  }
+  return item.nama_barang
 }
 
 function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
@@ -98,10 +120,21 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       system_key: 'honor_pembuatan_soal',
       urutan: 1,
     },
+    {
+      draft_id: uid(),
+      kategori: 'honorarium',
+      nama_barang: 'Insentif Pemeriksaan Hasil EHB',
+      qty: 0,
+      harga: 0,
+      keterangan: 'Rincian jumlah hasil pemeriksaan per marhalah.',
+      is_system: 1,
+      system_key: 'honor_pemeriksaan_header',
+      urutan: 9,
+    },
     ...basis.pemeriksaan.map((item, index) => ({
       draft_id: uid(),
       kategori: 'honorarium' as RabKategori,
-      nama_barang: `Insentif Pemeriksaan Hasil EHB - ${item.marhalah_nama}`,
+      nama_barang: item.marhalah_nama,
       qty: item.jumlah_hasil,
       harga: 0,
       keterangan: `${item.jumlah_santri.toLocaleString('id-ID')} santri x ${item.jumlah_mapel.toLocaleString('id-ID')} mapel`,
@@ -159,6 +192,98 @@ function rowsToDrafts(rows: RabItem[]) {
     system_key: row.system_key,
     urutan: row.urutan,
   }))
+}
+
+function transactionTotal(item: Pick<DraftTransaksiItem, 'qty' | 'harga' | 'nominal'>) {
+  return Number(item.nominal || 0) || Number(item.qty || 0) * Number(item.harga || 0)
+}
+
+function buildTransactionsFromRab(rows: Array<RabItem | DraftRabItem>, totalRab: number): DraftTransaksiItem[] {
+  const tanggal = todayKey()
+  const incomeRows: DraftTransaksiItem[] = [
+    {
+      draft_id: uid(),
+      tipe: 'pemasukan',
+      tanggal,
+      kategori: 'Dana Pesantren',
+      uraian: 'Dana dari Pesantren',
+      qty: 1,
+      harga: totalRab,
+      nominal: totalRab,
+      keterangan: 'Nominal diterima dari pesantren.',
+      is_system: 1,
+      system_key: 'income_pesantren',
+      urutan: 1,
+    },
+    {
+      draft_id: uid(),
+      tipe: 'pemasukan',
+      tanggal,
+      kategori: 'Denda',
+      uraian: 'Denda Kartu Hilang',
+      qty: 1,
+      harga: 0,
+      nominal: 0,
+      keterangan: 'Total pemasukan dari denda kartu hilang.',
+      is_system: 1,
+      system_key: 'income_denda_kartu_hilang',
+      urutan: 2,
+    },
+  ]
+
+  const expenseRows = rows
+    .filter(row => row.system_key !== 'honor_pemeriksaan_header')
+    .map((row, index) => {
+      const total = lineTotal({
+        qty: Number(row.qty || 0),
+        harga: Number(row.harga || 0),
+        system_key: row.system_key,
+      })
+      return {
+        draft_id: uid(),
+        tipe: 'pengeluaran' as TransaksiTipe,
+        tanggal,
+        kategori: KATEGORI.find(item => item.key === row.kategori)?.title || row.kategori,
+        uraian: displayRabName(row),
+        qty: Number(row.qty || 0),
+        harga: Number(row.harga || 0),
+        nominal: total,
+        keterangan: row.keterangan || '',
+        rab_item_id: 'id' in row ? row.id : null,
+        is_system: row.is_system,
+        system_key: row.system_key ? `expense_${row.system_key}` : null,
+        urutan: 100 + index,
+      }
+    })
+
+  return [...incomeRows, ...expenseRows]
+}
+
+function transaksiRowsToDrafts(rows: TransaksiItem[]) {
+  return rows.map(row => ({
+    draft_id: String(row.id),
+    tipe: row.tipe,
+    tanggal: row.tanggal,
+    kategori: row.kategori,
+    uraian: row.uraian,
+    qty: Number(row.qty || 0),
+    harga: Number(row.harga || 0),
+    nominal: Number(row.nominal || 0),
+    keterangan: row.keterangan || '',
+    rab_item_id: row.rab_item_id,
+    is_system: row.is_system,
+    system_key: row.system_key,
+    urutan: row.urutan,
+  }))
+}
+
+function sortTransaksi(items: DraftTransaksiItem[]) {
+  return [...items].sort((a, b) => {
+    const byDate = a.tanggal.localeCompare(b.tanggal)
+    if (byDate !== 0) return byDate
+    if (a.tipe !== b.tipe) return a.tipe === 'pemasukan' ? -1 : 1
+    return (a.urutan ?? 0) - (b.urutan ?? 0)
+  })
 }
 
 function PrintHeader({ event }: { event: ActiveEvent }) {
@@ -262,16 +387,27 @@ function RabPrint({
                     <td style={printTdRight}>-</td>
                     <td style={printTd}>-</td>
                   </tr>
-                ) : category.items.map((item, index) => (
-                  <tr key={item.draft_id}>
-                    <td style={printTdCenter}>{index + 1}</td>
-                    <td style={printTd}>{item.nama_barang}</td>
-                    <td style={printTdCenter}>{Number(item.qty || 0).toLocaleString('id-ID')}</td>
-                    <td style={printTdRight}>{rupiah(Number(item.harga || 0))}</td>
-                    <td style={printTdRight}>{rupiah(lineTotal(item))}</td>
-                    <td style={printTd}>{item.keterangan || '-'}</td>
-                  </tr>
-                ))}
+                ) : category.items.map((item, index) => {
+                  if (item.system_key === 'honor_pemeriksaan_header') {
+                    return (
+                      <tr key={item.draft_id}>
+                        <td style={printTdCenter}>{index + 1}</td>
+                        <td colSpan={5} style={{ ...printTd, fontWeight: 700, backgroundColor: '#f8fafc' }}>{item.nama_barang}</td>
+                      </tr>
+                    )
+                  }
+
+                  return (
+                    <tr key={item.draft_id}>
+                      <td style={printTdCenter}>{index + 1}</td>
+                      <td style={printTd}>{displayRabName(item)}</td>
+                      <td style={printTdCenter}>{Number(item.qty || 0).toLocaleString('id-ID')}</td>
+                      <td style={printTdRight}>{rupiah(Number(item.harga || 0))}</td>
+                      <td style={printTdRight}>{rupiah(lineTotal(item))}</td>
+                      <td style={printTd}>{item.keterangan || '-'}</td>
+                    </tr>
+                  )
+                })}
                 <tr key={`${category.key}-subtotal`}>
                   <td colSpan={4} style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>Subtotal {category.title}</td>
                   <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>{rupiah(subtotal)}</td>
@@ -289,7 +425,7 @@ function RabPrint({
       </table>
 
       <div style={{
-        marginTop: 'auto',
+        marginTop: '8mm',
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '6mm',
@@ -299,8 +435,119 @@ function RabPrint({
         paddingTop: '6mm',
       }}>
         <SignatureBox title="Ketua Pelaksana EHB" name={ketuaPelaksana} />
-        <SignatureBox title="Menyetujui: Wakil Pimpinan Bid. Akademik" name={wakilAkademik} />
+        <SignatureBox title="Wakil Pimpinan Bid. Akademik" name={wakilAkademik} />
         <SignatureBox title="Wakil Pimpinan Bid. Administrasi dan Keuangan" name={wakilKeuangan} />
+      </div>
+    </div>
+  )
+}
+
+function BukuKasPrint({
+  event,
+  items,
+  ketuaPelaksana,
+  bendahara,
+}: {
+  event: ActiveEvent
+  items: DraftTransaksiItem[]
+  ketuaPelaksana: string
+  bendahara: string
+}) {
+  const sorted = sortTransaksi(items)
+  const rowCount = sorted.length
+  const fontSize = rowCount > 34 ? '6.2pt' : rowCount > 26 ? '6.8pt' : '7.4pt'
+  let saldo = 0
+  const totalMasuk = sorted.filter(item => item.tipe === 'pemasukan').reduce((sum, item) => sum + transactionTotal(item), 0)
+  const totalKeluar = sorted.filter(item => item.tipe === 'pengeluaran').reduce((sum, item) => sum + transactionTotal(item), 0)
+
+  return (
+    <div style={{
+      width: '210mm',
+      height: '330mm',
+      padding: '8mm',
+      boxSizing: 'border-box',
+      fontFamily: FONT,
+      backgroundColor: '#fff',
+      color: '#000',
+      overflow: 'hidden',
+      breakAfter: 'page',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      <PrintHeader event={event} />
+      <div style={{
+        textAlign: 'center',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '15pt',
+        fontWeight: 700,
+        lineHeight: 1,
+        marginBottom: '3mm',
+      }}>
+        BUKU KAS EHB
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontFamily: 'Arial, Helvetica, sans-serif', fontSize, lineHeight: 1.08 }}>
+        <colgroup>
+          <col style={{ width: '20mm' }} />
+          <col style={{ width: '61mm' }} />
+          <col style={{ width: '28mm' }} />
+          <col style={{ width: '28mm' }} />
+          <col style={{ width: '29mm' }} />
+          <col style={{ width: '20mm' }} />
+        </colgroup>
+        <thead>
+          <tr>
+            {['TANGGAL', 'URAIAN', 'MASUK', 'KELUAR', 'SALDO', 'KET.'].map(label => (
+              <th key={label} style={{ border: '0.8pt solid #000', padding: '1.3mm 1.2mm', textAlign: 'center', fontWeight: 700, backgroundColor: '#e5e7eb' }}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.length === 0 ? (
+            <tr>
+              <td colSpan={6} style={{ ...printTdCenter, height: '12mm' }}>Belum ada transaksi</td>
+            </tr>
+          ) : sorted.map(item => {
+            const total = transactionTotal(item)
+            const masuk = item.tipe === 'pemasukan' ? total : 0
+            const keluar = item.tipe === 'pengeluaran' ? total : 0
+            saldo += masuk - keluar
+            return (
+              <tr key={item.draft_id}>
+                <td style={printTdCenter}>{shortDateWib(item.tanggal)}</td>
+                <td style={printTd}>
+                  <div style={{ fontWeight: 700 }}>{item.uraian}</div>
+                  <div style={{ fontSize: '6pt' }}>{item.kategori}</div>
+                </td>
+                <td style={printTdRight}>{masuk ? rupiah(masuk) : '-'}</td>
+                <td style={printTdRight}>{keluar ? rupiah(keluar) : '-'}</td>
+                <td style={printTdRight}>{rupiah(saldo)}</td>
+                <td style={printTd}>{item.keterangan || '-'}</td>
+              </tr>
+            )
+          })}
+          <tr>
+            <td colSpan={2} style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>JUMLAH</td>
+            <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>{rupiah(totalMasuk)}</td>
+            <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>{rupiah(totalKeluar)}</td>
+            <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>{rupiah(totalMasuk - totalKeluar)}</td>
+            <td style={{ ...printTd, backgroundColor: '#f8fafc' }} />
+          </tr>
+        </tbody>
+      </table>
+
+      <div style={{
+        marginTop: '8mm',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '18mm',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '8.4pt',
+        textAlign: 'center',
+        padding: '6mm 12mm 0',
+      }}>
+        <SignatureBox title="Ketua Pelaksana EHB" name={ketuaPelaksana} />
+        <SignatureBox title="Bendahara" name={bendahara} />
       </div>
     </div>
   )
@@ -343,12 +590,26 @@ export default function KeuanganEhbPageContent() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'rab' | 'transaksi' | 'honor_detail'>('rab')
   const [ketuaPelaksana, setKetuaPelaksana] = useState('')
+  const [bendahara, setBendahara] = useState('')
   const [wakilAkademik, setWakilAkademik] = useState('')
   const [wakilKeuangan, setWakilKeuangan] = useState('')
-  const printRef = useRef<HTMLDivElement>(null)
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
+  const [transaksiDrafts, setTransaksiDrafts] = useState<DraftTransaksiItem[]>([])
+  const [savingTransaksi, setSavingTransaksi] = useState(false)
+  const rabPrintRef = useRef<HTMLDivElement>(null)
+  const transaksiPrintRef = useRef<HTMLDivElement>(null)
+  const handlePrintRab = useReactToPrint({
+    contentRef: rabPrintRef,
     documentTitle: 'RAB EHB',
+    pageStyle: `
+      @page { size: 210mm 330mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+  const handlePrintTransaksi = useReactToPrint({
+    contentRef: transaksiPrintRef,
+    documentTitle: 'Buku Kas EHB',
     pageStyle: `
       @page { size: 210mm 330mm; margin: 0; }
       @media print {
@@ -362,14 +623,18 @@ export default function KeuanganEhbPageContent() {
     const evt = await getActiveEventForKeuangan()
     setEvent(evt || null)
     if (evt) {
-      const [savedRows, autoBasis, ketuaName] = await Promise.all([
+      const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
         getRabItems(evt.id),
         getRabAutoBasis(evt.id),
-        getKetuaPelaksanaName(evt.id),
+        getKeuanganSigners(evt.id),
+        getTransaksiItems(evt.id),
       ])
+      const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
       setBasis(autoBasis)
-      setDrafts(savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis))
-      setKetuaPelaksana(ketuaName)
+      setDrafts(rabDrafts)
+      setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildTransactionsFromRab(rabDrafts, rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)))
+      setKetuaPelaksana(signers.ketua)
+      setBendahara(signers.bendahara)
     }
     setLoading(false)
   }, [])
@@ -387,6 +652,16 @@ export default function KeuanganEhbPageContent() {
     const total = Array.from(byCategory.values()).reduce((sum, value) => sum + value, 0)
     return { byCategory, total }
   }, [drafts])
+
+  const transaksiSummary = useMemo(() => {
+    const pemasukan = transaksiDrafts
+      .filter(item => item.tipe === 'pemasukan')
+      .reduce((sum, item) => sum + transactionTotal(item), 0)
+    const pengeluaran = transaksiDrafts
+      .filter(item => item.tipe === 'pengeluaran')
+      .reduce((sum, item) => sum + transactionTotal(item), 0)
+    return { pemasukan, pengeluaran, saldo: pemasukan - pengeluaran }
+  }, [transaksiDrafts])
 
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
     setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
@@ -414,6 +689,47 @@ export default function KeuanganEhbPageContent() {
     setDrafts(prev => prev.filter(item => item.draft_id !== draftId))
   }
 
+  const updateTransaksi = (draftId: string, patch: Partial<DraftTransaksiItem>) => {
+    setTransaksiDrafts(prev => prev.map(item => {
+      if (item.draft_id !== draftId) return item
+      const next = { ...item, ...patch }
+      if ('qty' in patch || 'harga' in patch) {
+        next.nominal = Number(next.qty || 0) * Number(next.harga || 0)
+      }
+      return next
+    }))
+  }
+
+  const addTransaksi = (tipe: TransaksiTipe) => {
+    setTransaksiDrafts(prev => [
+      ...prev,
+      {
+        draft_id: uid(),
+        tipe,
+        tanggal: todayKey(),
+        kategori: tipe === 'pemasukan' ? 'Pemasukan Lain' : 'Pengeluaran Lain',
+        uraian: '',
+        qty: 1,
+        harga: 0,
+        nominal: 0,
+        keterangan: '',
+        rab_item_id: null,
+        is_system: 0,
+        system_key: null,
+        urutan: prev.length + 1,
+      },
+    ])
+  }
+
+  const deleteTransaksi = (draftId: string) => {
+    setTransaksiDrafts(prev => prev.filter(item => item.draft_id !== draftId))
+  }
+
+  const resetTransaksiFromRab = () => {
+    setTransaksiDrafts(buildTransactionsFromRab(drafts, summary.total))
+    toast.success('Transaksi dikembalikan dari daftar RAB')
+  }
+
   const resetRecommendation = () => {
     if (!basis) return
     setDrafts(buildSystemDrafts(basis))
@@ -430,6 +746,19 @@ export default function KeuanganEhbPageContent() {
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success(`${res.saved} item RAB disimpan`)
+    loadData()
+  }
+
+  const submitTransaksi = async () => {
+    if (!event) return
+    const invalid = transaksiDrafts.find(item => !item.tanggal || !item.uraian.trim() || !item.kategori.trim())
+    if (invalid) return toast.error('Tanggal, kategori, dan uraian transaksi wajib diisi')
+
+    setSavingTransaksi(true)
+    const res = await saveTransaksiItems(event.id, transaksiDrafts)
+    setSavingTransaksi(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${res.saved} transaksi disimpan`)
     loadData()
   }
 
@@ -498,10 +827,201 @@ export default function KeuanganEhbPageContent() {
         })}
       </div>
 
-      {activeTab !== 'rab' ? (
+      {activeTab === 'honor_detail' ? (
         <div className="bg-white border border-dashed rounded-2xl p-10 text-center">
           <p className="font-bold text-slate-700">Tab ini disiapkan untuk tahap berikutnya.</p>
           <p className="text-sm text-slate-500 mt-1">Sekarang kita fokus merapikan RAB dulu, bos.</p>
+        </div>
+      ) : activeTab === 'transaksi' ? (
+        <div className="space-y-5">
+          <div className="grid md:grid-cols-3 gap-3">
+            <div className="bg-white border rounded-2xl p-5">
+              <p className="text-xs font-bold text-slate-500 uppercase">Pemasukan</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{rupiah(transaksiSummary.pemasukan)}</p>
+            </div>
+            <div className="bg-white border rounded-2xl p-5">
+              <p className="text-xs font-bold text-slate-500 uppercase">Pengeluaran Real</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">{rupiah(transaksiSummary.pengeluaran)}</p>
+            </div>
+            <div className="bg-slate-900 text-white rounded-2xl p-5">
+              <p className="text-xs font-bold text-white/50 uppercase">Saldo</p>
+              <p className="text-2xl font-bold mt-1">{rupiah(transaksiSummary.saldo)}</p>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-800">Transaksi Realisasi</h2>
+                <p className="text-sm text-slate-500">Input nominal yang benar-benar diterima dan dikeluarkan. Draft pengeluaran diambil dari RAB.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={resetTransaksiFromRab} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                  <Calculator className="w-4 h-4" /> Reset dari RAB
+                </button>
+                <button onClick={() => addTransaksi('pemasukan')} className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Pemasukan
+                </button>
+                <button onClick={() => addTransaksi('pengeluaran')} className="bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Pengeluaran
+                </button>
+                <button onClick={submitTransaksi} disabled={savingTransaksi} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-60">
+                  {savingTransaksi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-800">Cetak Buku Kas</h2>
+                <p className="text-sm text-slate-500">Format F4 Portrait, margin narrow, urut berdasarkan tanggal pengeluaran/transaksi.</p>
+              </div>
+              <button
+                onClick={() => handlePrintTransaksi()}
+                disabled={transaksiDrafts.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <Printer className="w-4 h-4" /> Cetak Buku Kas
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Ketua Pelaksana EHB</label>
+                <input
+                  value={ketuaPelaksana}
+                  onChange={e => setKetuaPelaksana(e.target.value)}
+                  placeholder="Nama ketua pelaksana"
+                  className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Bendahara</label>
+                <input
+                  value={bendahara}
+                  onChange={e => setBendahara(e.target.value)}
+                  placeholder="Nama bendahara"
+                  className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <section className="bg-white border rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold w-36">Tanggal</th>
+                    <th className="px-4 py-3 text-left font-bold w-36">Tipe</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[180px]">Kategori</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[240px]">Uraian</th>
+                    <th className="px-4 py-3 text-left font-bold w-24">Qty</th>
+                    <th className="px-4 py-3 text-left font-bold w-36">Harga</th>
+                    <th className="px-4 py-3 text-right font-bold w-36">Nominal</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[180px]">Keterangan</th>
+                    <th className="px-4 py-3 w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {transaksiDrafts.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-10 text-center text-slate-400">Belum ada transaksi</td>
+                    </tr>
+                  ) : transaksiDrafts.map(item => (
+                    <tr key={item.draft_id} className={item.tipe === 'pemasukan' ? 'bg-emerald-50/20' : 'bg-white'}>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          type="date"
+                          value={item.tanggal}
+                          onChange={e => updateTransaksi(item.draft_id, { tanggal: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <select
+                          value={item.tipe}
+                          onChange={e => updateTransaksi(item.draft_id, { tipe: e.target.value as TransaksiTipe })}
+                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        >
+                          <option value="pemasukan">Pemasukan</option>
+                          <option value="pengeluaran">Pengeluaran</option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={item.kategori}
+                          onChange={e => updateTransaksi(item.draft_id, { kategori: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                        {item.rab_item_id || item.is_system ? <p className="text-[11px] text-indigo-600 font-bold mt-1">Draft dari RAB/default.</p> : null}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={item.uraian}
+                          onChange={e => updateTransaksi(item.draft_id, { uraian: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.qty || 0}
+                          onChange={e => updateTransaksi(item.draft_id, { qty: Number(e.target.value) })}
+                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={item.harga ? item.harga.toLocaleString('id-ID') : ''}
+                          onChange={e => {
+                            const harga = parseMoney(e.target.value)
+                            updateTransaksi(item.draft_id, { harga, nominal: Number(item.qty || 0) * harga })
+                          }}
+                          placeholder="0"
+                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top text-right">
+                        <input
+                          value={transactionTotal(item) ? transactionTotal(item).toLocaleString('id-ID') : ''}
+                          onChange={e => updateTransaksi(item.draft_id, { nominal: parseMoney(e.target.value) })}
+                          placeholder="0"
+                          className="w-full border rounded-lg px-3 py-2 text-right font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={item.keterangan || ''}
+                          onChange={e => updateTransaksi(item.draft_id, { keterangan: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <button onClick={() => deleteTransaksi(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="hidden">
+            <div ref={transaksiPrintRef}>
+              <BukuKasPrint
+                event={event}
+                items={transaksiDrafts}
+                ketuaPelaksana={ketuaPelaksana}
+                bendahara={bendahara}
+              />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-5">
@@ -527,7 +1047,7 @@ export default function KeuanganEhbPageContent() {
                 <p className="text-sm text-slate-500">Format F4 Portrait, margin narrow, dengan kop dan tanda tangan.</p>
               </div>
               <button
-                onClick={() => handlePrint()}
+                onClick={() => handlePrintRab()}
                 disabled={drafts.length === 0}
                 className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
               >
@@ -602,54 +1122,76 @@ export default function KeuanganEhbPageContent() {
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Belum ada item</td>
                         </tr>
-                      ) : items.map(item => (
-                        <tr key={item.draft_id} className={item.is_system ? 'bg-indigo-50/30' : 'bg-white'}>
-                          <td className="px-4 py-3 align-top">
-                            <input
-                              value={item.nama_barang}
-                              onChange={e => updateDraft(item.draft_id, { nama_barang: e.target.value })}
-                              className="w-full border rounded-lg px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                            />
-                            {item.is_system ? <p className="text-[11px] text-indigo-600 font-bold mt-1">Rekomendasi sistem, boleh diedit.</p> : null}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.qty}
-                              onChange={e => updateDraft(item.draft_id, { qty: Number(e.target.value) })}
-                              className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                            />
-                            {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">orang</p> : null}
-                            {item.system_key === 'atk_hvs' || item.system_key === 'atk_buram' ? <p className="text-[11px] text-slate-400 mt-1">rim</p> : null}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <input
-                              value={item.harga ? item.harga.toLocaleString('id-ID') : ''}
-                              onChange={e => updateDraft(item.draft_id, { harga: parseMoney(e.target.value) })}
-                              placeholder="0"
-                              className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                            />
-                            {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">total panitia</p> : null}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <input
-                              value={item.keterangan || ''}
-                              onChange={e => updateDraft(item.draft_id, { keterangan: e.target.value })}
-                              className="w-full border rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                            />
-                          </td>
-                          <td className="px-4 py-3 align-top text-right font-bold text-slate-800 whitespace-nowrap">
-                            {rupiah(lineTotal(item))}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <button onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      ) : items.map(item => {
+                        if (item.system_key === 'honor_pemeriksaan_header') {
+                          return (
+                            <tr key={item.draft_id} className="bg-slate-100">
+                              <td className="px-4 py-3 align-top" colSpan={5}>
+                                <input
+                                  value={item.nama_barang}
+                                  onChange={e => updateDraft(item.draft_id, { nama_barang: e.target.value })}
+                                  className="w-full border rounded-lg px-3 py-2 font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                                />
+                                <p className="text-[11px] text-slate-500 font-semibold mt-1">Judul rincian pemeriksaan. Item di bawahnya cukup nama marhalah.</p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <button onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        }
+
+                        return (
+                          <tr key={item.draft_id} className={item.is_system ? 'bg-indigo-50/30' : 'bg-white'}>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                value={displayRabName(item)}
+                                onChange={e => updateDraft(item.draft_id, { nama_barang: e.target.value })}
+                                className="w-full border rounded-lg px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                              />
+                              {item.is_system ? <p className="text-[11px] text-indigo-600 font-bold mt-1">Rekomendasi sistem, boleh diedit.</p> : null}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.qty}
+                                onChange={e => updateDraft(item.draft_id, { qty: Number(e.target.value) })}
+                                className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                              />
+                              {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">orang</p> : null}
+                              {item.system_key === 'atk_hvs' || item.system_key === 'atk_buram' ? <p className="text-[11px] text-slate-400 mt-1">rim</p> : null}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                value={item.harga ? item.harga.toLocaleString('id-ID') : ''}
+                                onChange={e => updateDraft(item.draft_id, { harga: parseMoney(e.target.value) })}
+                                placeholder="0"
+                                className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                              />
+                              {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">total panitia</p> : null}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <input
+                                value={item.keterangan || ''}
+                                onChange={e => updateDraft(item.draft_id, { keterangan: e.target.value })}
+                                className="w-full border rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top text-right font-bold text-slate-800 whitespace-nowrap">
+                              {rupiah(lineTotal(item))}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <button onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -658,7 +1200,7 @@ export default function KeuanganEhbPageContent() {
           })}
 
           <div className="hidden">
-            <div ref={printRef}>
+            <div ref={rabPrintRef}>
               <RabPrint
                 event={event}
                 items={drafts}

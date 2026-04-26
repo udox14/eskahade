@@ -37,6 +37,40 @@ export type RabItemInput = {
   urutan?: number
 }
 
+export type TransaksiTipe = 'pemasukan' | 'pengeluaran'
+
+export type TransaksiItem = {
+  id: number
+  ehb_event_id: number
+  tipe: TransaksiTipe
+  tanggal: string
+  kategori: string
+  uraian: string
+  qty: number
+  harga: number
+  nominal: number
+  keterangan: string | null
+  rab_item_id: number | null
+  is_system: number
+  system_key: string | null
+  urutan: number
+}
+
+export type TransaksiInput = {
+  tipe: TransaksiTipe
+  tanggal: string
+  kategori: string
+  uraian: string
+  qty?: number
+  harga?: number
+  nominal: number
+  keterangan?: string | null
+  rab_item_id?: number | null
+  is_system?: number
+  system_key?: string | null
+  urutan?: number
+}
+
 export type PemeriksaanBasis = {
   marhalah_id: number | null
   marhalah_nama: string
@@ -76,6 +110,30 @@ export async function ensureKeuanganSchema() {
   await execute(`
     CREATE INDEX IF NOT EXISTS idx_ehb_rab_item_event
     ON ehb_rab_item(ehb_event_id, kategori, urutan)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_keuangan_transaksi (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      tipe           TEXT NOT NULL,
+      tanggal        TEXT NOT NULL,
+      kategori       TEXT NOT NULL,
+      uraian         TEXT NOT NULL,
+      qty            REAL NOT NULL DEFAULT 1,
+      harga          INTEGER NOT NULL DEFAULT 0,
+      nominal        INTEGER NOT NULL DEFAULT 0,
+      keterangan     TEXT,
+      rab_item_id    INTEGER REFERENCES ehb_rab_item(id) ON DELETE SET NULL,
+      is_system      INTEGER NOT NULL DEFAULT 0,
+      system_key     TEXT,
+      urutan         INTEGER NOT NULL DEFAULT 0,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_keuangan_transaksi_event
+    ON ehb_keuangan_transaksi(ehb_event_id, tanggal, tipe, urutan)
   `)
   await execute(`
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
@@ -120,6 +178,19 @@ export async function getKetuaPelaksanaName(eventId: number) {
     LIMIT 1
   `, [eventId])
   return row?.nama || ''
+}
+
+export async function getKeuanganSigners(eventId: number) {
+  await ensureKeuanganSchema()
+  const rows = await query<{ jabatan_key: string; nama: string }>(`
+    SELECT jabatan_key, nama
+    FROM ehb_panitia
+    WHERE ehb_event_id = ? AND tipe = 'inti' AND jabatan_key IN ('ketua', 'bendahara')
+  `, [eventId])
+  return {
+    ketua: rows.find(row => row.jabatan_key === 'ketua')?.nama || '',
+    bendahara: rows.find(row => row.jabatan_key === 'bendahara')?.nama || '',
+  }
 }
 
 export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
@@ -230,6 +301,74 @@ export async function saveRabItems(eventId: number, items: RabItemInput[]) {
         item.qty,
         item.harga,
         item.keterangan,
+        item.is_system,
+        item.system_key ?? null,
+        item.urutan,
+      ],
+    })))
+  }
+
+  revalidatePath('/dashboard/ehb/keuangan')
+  return { success: true, saved: cleanItems.length }
+}
+
+export async function getTransaksiItems(eventId: number) {
+  await ensureKeuanganSchema()
+  return query<TransaksiItem>(`
+    SELECT
+      id, ehb_event_id, tipe, tanggal, kategori, uraian, qty, harga, nominal,
+      keterangan, rab_item_id, is_system, system_key, urutan
+    FROM ehb_keuangan_transaksi
+    WHERE ehb_event_id = ?
+    ORDER BY tanggal, CASE tipe WHEN 'pemasukan' THEN 0 ELSE 1 END, urutan, id
+  `, [eventId])
+}
+
+export async function saveTransaksiItems(eventId: number, items: TransaksiInput[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKeuanganSchema()
+
+  const cleanItems = items
+    .map((item, index) => {
+      const qty = Number.isFinite(Number(item.qty)) ? Number(item.qty) : 1
+      const harga = Math.max(0, Math.round(Number(item.harga) || 0))
+      const nominal = Math.max(0, Math.round(Number(item.nominal) || qty * harga || 0))
+      return {
+        ...item,
+        tanggal: item.tanggal || '',
+        kategori: item.kategori.trim(),
+        uraian: item.uraian.trim(),
+        qty,
+        harga,
+        nominal,
+        keterangan: item.keterangan?.trim() || null,
+        is_system: item.is_system ? 1 : 0,
+        urutan: item.urutan ?? index + 1,
+      }
+    })
+    .filter(item => item.tanggal && item.kategori && item.uraian)
+
+  await execute(`DELETE FROM ehb_keuangan_transaksi WHERE ehb_event_id = ?`, [eventId])
+
+  if (cleanItems.length > 0) {
+    await batch(cleanItems.map(item => ({
+      sql: `
+        INSERT INTO ehb_keuangan_transaksi
+          (ehb_event_id, tipe, tanggal, kategori, uraian, qty, harga, nominal, keterangan, rab_item_id, is_system, system_key, urutan)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        eventId,
+        item.tipe,
+        item.tanggal,
+        item.kategori,
+        item.uraian,
+        item.qty,
+        item.harga,
+        item.nominal,
+        item.keterangan,
+        item.rab_item_id ?? null,
         item.is_system,
         item.system_key ?? null,
         item.urutan,
