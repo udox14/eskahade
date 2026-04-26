@@ -155,7 +155,7 @@ function TempelanPrint({ data }: { data: TempelanRuanganItem[] }) {
             alignItems: 'center',
             justifyContent: 'center',
             fontFamily: 'Arial, Helvetica, sans-serif',
-            fontSize: '230pt',
+            fontSize: '210pt',
             fontWeight: 900,
             lineHeight: 0.8,
             letterSpacing: '-8pt',
