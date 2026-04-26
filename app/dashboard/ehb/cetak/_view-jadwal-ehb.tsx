@@ -28,6 +28,13 @@ type JadwalEhbCetakData = {
   panitia: JadwalEhbCetakPanitia
 }
 
+type JadwalColumn = {
+  id: string
+  label: string
+  kelasIds: string[]
+  order: number
+}
+
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu']
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -61,18 +68,60 @@ function formatTimeRange(sesi: JadwalEhbCetakSesi) {
 }
 
 function buildJadwalMap(jadwal: JadwalEhbCetakItem[]) {
-  const map = new Map<string, string>()
+  const map = new Map<string, string[]>()
   jadwal.forEach(item => {
-    map.set(`${item.tanggal}|${item.sesi_id}|${item.kelas_id}`, item.mapel_nama)
+    const key = `${item.tanggal}|${item.sesi_id}|${item.kelas_id}`
+    const existing = map.get(key) ?? []
+    existing.push(item.mapel_nama)
+    map.set(key, existing)
   })
   return map
 }
 
-function classHeader(kelas: JadwalEhbCetakKelas) {
-  return kelas.nama_kelas
+function abbreviateColumnLabel(label: string) {
+  return label
     .replace(/Tamhidiyyah/i, 'TMHD')
     .replace(/Ibtidaiyyah/i, 'IBT.')
     .replace(/Mutawassithah/i, 'MTW')
+}
+
+function buildColumns(kelasList: JadwalEhbCetakKelas[]): JadwalColumn[] {
+  const columns = new Map<string, JadwalColumn>()
+
+  kelasList.forEach(kelas => {
+    const marhalah = kelas.marhalah_nama ?? kelas.nama_kelas
+    const isMutawassithah = /mutawassithah/i.test(marhalah) || /mutawassithah/i.test(kelas.nama_kelas)
+
+    if (isMutawassithah) {
+      columns.set(`kelas-${kelas.id}`, {
+        id: `kelas-${kelas.id}`,
+        label: abbreviateColumnLabel(kelas.nama_kelas),
+        kelasIds: [kelas.id],
+        order: (kelas.marhalah_urutan ?? 999) * 1000 + columns.size,
+      })
+      return
+    }
+
+    const id = `marhalah-${marhalah}`
+    const existing = columns.get(id)
+    if (existing) {
+      existing.kelasIds.push(kelas.id)
+    } else {
+      columns.set(id, {
+        id,
+        label: abbreviateColumnLabel(marhalah),
+        kelasIds: [kelas.id],
+        order: (kelas.marhalah_urutan ?? 999) * 1000,
+      })
+    }
+  })
+
+  return Array.from(columns.values()).sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'id-ID', { numeric: true }))
+}
+
+function getColumnMapel(jadwalMap: Map<string, string[]>, tanggal: string, sesiId: number, column: JadwalColumn) {
+  const names = column.kelasIds.flatMap(kelasId => jadwalMap.get(`${tanggal}|${sesiId}|${kelasId}`) ?? [])
+  return Array.from(new Set(names)).join(' / ')
 }
 
 function PrintHeader({ event }: { event: ActiveEvent }) {
@@ -115,8 +164,9 @@ function JadwalEhbPrint({ data }: { data: JadwalEhbCetakData }) {
   const event = data.event
   const dates = getDatesBetween(event?.tanggal_mulai, event?.tanggal_selesai)
   const jadwalMap = buildJadwalMap(data.jadwal)
+  const columns = buildColumns(data.kelasList)
   const rows = dates.flatMap(tanggal => data.sesiList.map(sesi => ({ tanggal, sesi })))
-  const classCount = Math.max(data.kelasList.length, 1)
+  const classCount = Math.max(columns.length, 1)
   const rowHeight = Math.max(5.2, Math.min(7.5, 110 / Math.max(rows.length, 1)))
   const classFont = classCount > 10 ? '6.8pt' : classCount > 8 ? '7.3pt' : '8pt'
   const mapelFont = classCount > 10 ? '6.4pt' : classCount > 8 ? '6.8pt' : '7.4pt'
@@ -155,8 +205,8 @@ function JadwalEhbPrint({ data }: { data: JadwalEhbCetakData }) {
           <col style={{ width: '17mm' }} />
           <col style={{ width: '9mm' }} />
           <col style={{ width: '21mm' }} />
-          {data.kelasList.map(kelas => (
-            <col key={kelas.id} />
+          {columns.map(column => (
+            <col key={column.id} />
           ))}
         </colgroup>
         <thead>
@@ -165,9 +215,9 @@ function JadwalEhbPrint({ data }: { data: JadwalEhbCetakData }) {
             <th style={thStyle}>TGL</th>
             <th style={thStyle}>SESI</th>
             <th style={thStyle}>WAKTU</th>
-            {data.kelasList.map(kelas => (
-              <th key={kelas.id} style={{ ...thStyle, fontSize: classFont }}>
-                {classHeader(kelas)}
+            {columns.map(column => (
+              <th key={column.id} style={{ ...thStyle, fontSize: classFont }}>
+                {column.label}
               </th>
             ))}
           </tr>
@@ -188,12 +238,12 @@ function JadwalEhbPrint({ data }: { data: JadwalEhbCetakData }) {
                 )}
                 <td style={{ ...tdStyle, height: `${rowHeight}mm`, fontWeight: 700 }}>{sesi.nomor_sesi}</td>
                 <td style={{ ...tdStyle, height: `${rowHeight}mm`, fontWeight: 700, fontSize: '7.2pt' }}>{formatTimeRange(sesi)}</td>
-                {data.kelasList.map(kelas => {
-                  const mapel = jadwalMap.get(`${tanggal}|${sesi.id}|${kelas.id}`)
+                {columns.map(column => {
+                  const mapel = getColumnMapel(jadwalMap, tanggal, sesi.id, column)
                   const empty = !mapel
                   return (
                     <td
-                      key={`${tanggal}-${sesi.id}-${kelas.id}`}
+                      key={`${tanggal}-${sesi.id}-${column.id}`}
                       style={{
                         ...tdStyle,
                         height: `${rowHeight}mm`,
@@ -304,7 +354,7 @@ export function JadwalEhbView({ onBack }: { onBack: () => void }) {
     return {
       tanggal: dates.length,
       sesi: data.sesiList.length,
-      kelas: data.kelasList.length,
+      kolom: buildColumns(data.kelasList).length,
       jadwal: data.jadwal.length,
     }
   }, [data])
@@ -376,7 +426,7 @@ export function JadwalEhbView({ onBack }: { onBack: () => void }) {
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-slate-500 font-medium">
               <span className="font-bold text-slate-800">{stats?.tanggal}</span> tanggal
-              <span className="text-slate-400 ml-2">· {stats?.sesi} sesi · {stats?.kelas} kelas · {stats?.jadwal} jadwal terisi</span>
+              <span className="text-slate-400 ml-2">· {stats?.sesi} sesi · {stats?.kolom} kolom · {stats?.jadwal} jadwal terisi</span>
             </p>
             <button
               onClick={() => handlePrint()}
