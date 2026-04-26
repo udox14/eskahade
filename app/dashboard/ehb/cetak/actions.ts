@@ -490,11 +490,26 @@ export async function getJadwalEhbCetakData(eventId: number) {
     `, [eventId]),
   ])
 
+  let panitia: JadwalEhbCetakPanitia = { ketua: '', sekretaris: '' }
+  try {
+    const rows = await query<{ jabatan_key: string; nama: string }>(`
+      SELECT jabatan_key, nama
+      FROM ehb_panitia
+      WHERE ehb_event_id = ? AND tipe = 'inti' AND jabatan_key IN ('ketua', 'sekretaris')
+    `, [eventId])
+    panitia = {
+      ketua: rows.find(row => row.jabatan_key === 'ketua')?.nama ?? '',
+      sekretaris: rows.find(row => row.jabatan_key === 'sekretaris')?.nama ?? '',
+    }
+  } catch {
+    panitia = { ketua: '', sekretaris: '' }
+  }
+
   return {
     event,
     sesiList,
     kelasList,
     jadwal,
-    panitia: { ketua: '', sekretaris: '' } satisfies JadwalEhbCetakPanitia,
+    panitia,
   }
 }
