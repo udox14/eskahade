@@ -10,6 +10,7 @@ import { NomorPesertaView } from './_view-nomor'
 import { DaftarHadirView } from './_view-daftar-hadir'
 import { TempelanRuanganView } from './_view-tempelan-ruangan'
 import { JadwalMengawasView } from './_view-jadwal-mengawas'
+import { JadwalEhbView } from './_view-jadwal-ehb'
 import { PlaceholderView } from './_shared'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export default function CetakEhbPage() {
   if (view === 'daftar-hadir')  return <div className="max-w-6xl mx-auto pb-20 space-y-6"><DaftarHadirView onBack={() => setView('menu')} /></div>
   if (view === 'tempelan-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanRuanganView onBack={() => setView('menu')} /></div>
   if (view === 'jadwal-mengawas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalMengawasView onBack={() => setView('menu')} /></div>
+  if (view === 'jadwal-ehb') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalEhbView onBack={() => setView('menu')} /></div>
 
   const activeMenu = MENU_ITEMS.find(m => m.view === view)
   if (view !== 'menu' && activeMenu) return <div className="max-w-6xl mx-auto pb-20 space-y-6"><PlaceholderView label={activeMenu.label} onBack={() => setView('menu')} /></div>

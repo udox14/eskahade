@@ -418,3 +418,83 @@ export async function getJadwalPengawasCetakData(eventId: number) {
 
   return { sesiList, tanggalList, activeSlots, ruanganList, jadwal, pengawasList }
 }
+
+export type JadwalEhbCetakSesi = {
+  id: number
+  nomor_sesi: number
+  label: string
+  jam_group: string
+  waktu_mulai: string | null
+  waktu_selesai: string | null
+}
+
+export type JadwalEhbCetakKelas = {
+  id: string
+  nama_kelas: string
+  marhalah_nama: string | null
+  marhalah_urutan: number | null
+  jam_group: string
+}
+
+export type JadwalEhbCetakItem = {
+  tanggal: string
+  sesi_id: number
+  kelas_id: string
+  mapel_nama: string
+}
+
+export type JadwalEhbCetakPanitia = {
+  ketua: string
+  sekretaris: string
+}
+
+export async function getJadwalEhbCetakData(eventId: number) {
+  const event = await queryOne<ActiveEvent & { tanggal_mulai: string | null; tanggal_selesai: string | null }>(`
+    SELECT e.id, e.nama, e.semester, e.tanggal_mulai, e.tanggal_selesai, ta.nama as tahun_ajaran_nama
+    FROM ehb_event e
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE e.id = ?
+    LIMIT 1
+  `, [eventId])
+
+  const [sesiList, kelasList, jadwal] = await Promise.all([
+    query<JadwalEhbCetakSesi>(`
+      SELECT id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai
+      FROM ehb_sesi
+      WHERE ehb_event_id = ?
+      ORDER BY nomor_sesi
+    `, [eventId]),
+    query<JadwalEhbCetakKelas>(`
+      SELECT DISTINCT
+        k.id,
+        k.nama_kelas,
+        m.nama as marhalah_nama,
+        m.urutan as marhalah_urutan,
+        kj.jam_group
+      FROM ehb_kelas_jam kj
+      JOIN kelas k ON k.id = kj.kelas_id
+      JOIN marhalah m ON m.id = k.marhalah_id
+      WHERE kj.ehb_event_id = ?
+      ORDER BY m.urutan, k.nama_kelas
+    `, [eventId]),
+    query<JadwalEhbCetakItem>(`
+      SELECT
+        j.tanggal,
+        j.sesi_id,
+        j.kelas_id,
+        mp.nama as mapel_nama
+      FROM ehb_jadwal j
+      JOIN mapel mp ON mp.id = j.mapel_id
+      WHERE j.ehb_event_id = ?
+      ORDER BY j.tanggal, j.sesi_id, j.kelas_id
+    `, [eventId]),
+  ])
+
+  return {
+    event,
+    sesiList,
+    kelasList,
+    jadwal,
+    panitia: { ketua: '', sekretaris: '' } satisfies JadwalEhbCetakPanitia,
+  }
+}
