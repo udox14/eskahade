@@ -319,3 +319,102 @@ export async function getDaftarHadirSemuaData(eventId: number, jamGroup: string)
     ORDER BY r.nomor_ruangan, ps.nomor_kursi
   `, [eventId, jamGroup])
 }
+
+export type JadwalPengawasCetakEvent = ActiveEvent
+
+export type JadwalPengawasCetakSesi = {
+  id: number
+  nomor_sesi: number
+  label: string
+  jam_group: string
+  waktu_mulai: string | null
+  waktu_selesai: string | null
+}
+
+export type JadwalPengawasCetakRuangan = {
+  id: number
+  nomor_ruangan: number
+  nama_ruangan: string | null
+}
+
+export type JadwalPengawasCetakTanggal = {
+  tanggal: string
+}
+
+export type JadwalPengawasCetakSlot = {
+  tanggal: string
+  sesi_id: number
+}
+
+export type JadwalPengawasCetakItem = {
+  id: number
+  tanggal: string
+  sesi_id: number
+  nomor_sesi: number
+  ruangan_id: number
+  nomor_ruangan: number
+  pengawas_id: number
+  nama_pengawas: string
+  tag: string
+}
+
+export type PengawasCetakItem = {
+  id: number
+  nama_pengawas: string
+  tag: string
+}
+
+export async function getJadwalPengawasCetakData(eventId: number) {
+  const [sesiList, tanggalList, activeSlots, ruanganList, jadwal, pengawasList] = await Promise.all([
+    query<JadwalPengawasCetakSesi>(`
+      SELECT id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai
+      FROM ehb_sesi
+      WHERE ehb_event_id = ?
+      ORDER BY nomor_sesi
+    `, [eventId]),
+    query<JadwalPengawasCetakTanggal>(`
+      SELECT DISTINCT tanggal
+      FROM ehb_jadwal
+      WHERE ehb_event_id = ?
+      ORDER BY tanggal
+    `, [eventId]),
+    query<JadwalPengawasCetakSlot>(`
+      SELECT DISTINCT tanggal, sesi_id
+      FROM ehb_jadwal
+      WHERE ehb_event_id = ?
+      ORDER BY tanggal, sesi_id
+    `, [eventId]),
+    query<JadwalPengawasCetakRuangan>(`
+      SELECT id, nomor_ruangan, nama_ruangan
+      FROM ehb_ruangan
+      WHERE ehb_event_id = ?
+      ORDER BY nomor_ruangan
+    `, [eventId]),
+    query<JadwalPengawasCetakItem>(`
+      SELECT
+        jp.id,
+        jp.tanggal,
+        jp.sesi_id,
+        s.nomor_sesi,
+        jp.ruangan_id,
+        r.nomor_ruangan,
+        jp.pengawas_id,
+        p.nama_pengawas,
+        p.tag
+      FROM ehb_jadwal_pengawas jp
+      JOIN ehb_pengawas p ON p.id = jp.pengawas_id
+      JOIN ehb_ruangan r ON r.id = jp.ruangan_id
+      JOIN ehb_sesi s ON s.id = jp.sesi_id
+      WHERE jp.ehb_event_id = ?
+      ORDER BY jp.tanggal, s.nomor_sesi, r.nomor_ruangan, p.nama_pengawas
+    `, [eventId]),
+    query<PengawasCetakItem>(`
+      SELECT id, nama_pengawas, tag
+      FROM ehb_pengawas
+      WHERE ehb_event_id = ?
+      ORDER BY nama_pengawas
+    `, [eventId]),
+  ])
+
+  return { sesiList, tanggalList, activeSlots, ruanganList, jadwal, pengawasList }
+}
