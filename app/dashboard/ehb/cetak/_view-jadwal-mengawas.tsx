@@ -28,8 +28,8 @@ type JadwalPengawasCetakData = {
 
 const DAY_NAMES = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
 const MONTH_NAMES = [
-  'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
-  'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER',
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ]
 
 const TUGAS_PENGAWAS = [
@@ -51,9 +51,9 @@ function longDate(date: string) {
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function shortDate(date: string) {
+function mediumDate(date: string) {
   const d = new Date(`${date}T00:00:00`)
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`
 }
 
 function formatTimeRange(sesi: JadwalPengawasCetakSesi) {
@@ -99,7 +99,7 @@ function PrintHeader({ event }: { event: ActiveEvent }) {
         style={{ width: '25mm', height: '25mm', objectFit: 'contain', flexShrink: 0 }}
       />
       <div style={{ width: '130mm' }}>
-        <div style={{ fontSize: '21pt', fontWeight: 900, lineHeight: 0.95 }}>
+        <div style={{ fontSize: '21pt', fontWeight: 700, lineHeight: 0.95 }}>
           EVALUASI HASIL BELAJAR
         </div>
         <div style={{ fontSize: '17pt', lineHeight: 1 }}>
@@ -153,7 +153,7 @@ function JadwalPage({
         textAlign: 'center',
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontSize: '15pt',
-        fontWeight: 900,
+        fontWeight: 700,
         lineHeight: 1,
         marginBottom: '2mm',
       }}>
@@ -186,7 +186,7 @@ function JadwalPage({
               const sessions = slotByDate.get(tanggal) ?? []
               return (
                 <th key={tanggal} colSpan={Math.max(1, sessions.length)} style={{ ...jadwalThStyle, fontSize: '6.8pt' }}>
-                  {shortDate(tanggal)}
+                  {mediumDate(tanggal)}
                 </th>
               )
             })}
@@ -205,7 +205,7 @@ function JadwalPage({
         <tbody>
           {data.ruanganList.map(ruangan => (
             <tr key={ruangan.id}>
-              <td style={{ ...jadwalTdStyle, fontWeight: 900, backgroundColor: '#f2f2f2' }}>
+              <td style={{ ...jadwalTdStyle, fontWeight: 700, backgroundColor: '#f2f2f2' }}>
                 {ruangan.nomor_ruangan}
               </td>
               {data.tanggalList.flatMap(({ tanggal }) => {
@@ -225,25 +225,54 @@ function JadwalPage({
         </tbody>
       </table>
 
-      <div style={{ marginTop: '6mm', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        <div style={{ fontSize: '8.5pt', fontWeight: 900, marginBottom: '2.5mm' }}>
+      <div style={{
+        marginTop: '6mm',
+        border: '1pt solid #000',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+      }}>
+        <div style={{
+          backgroundColor: '#e5e7eb',
+          borderBottom: '1pt solid #000',
+          textAlign: 'center',
+          fontSize: '9pt',
+          fontWeight: 700,
+          padding: '1.5mm',
+        }}>
           WAKTU PELAKSANAAN EHB
         </div>
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '3mm 12mm',
-          fontSize: '8.5pt',
-          lineHeight: 1.35,
+          gap: '0',
+          fontSize: '8.2pt',
+          lineHeight: 1.25,
         }}>
-          {data.tanggalList.map(({ tanggal }) => {
+          {data.tanggalList.map(({ tanggal }, index) => {
             const sessions = slotByDate.get(tanggal) ?? []
             return (
-              <div key={tanggal} style={{ breakInside: 'avoid' }}>
-                <div style={{ fontWeight: 900 }}>{dayName(tanggal)} - {longDate(tanggal)}</div>
+              <div key={tanggal} style={{
+                breakInside: 'avoid',
+                padding: '2.5mm 3mm',
+                borderRight: index % 2 === 0 ? '1pt solid #000' : '0',
+                borderBottom: index < data.tanggalList.length - 2 ? '1pt solid #000' : '0',
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '1.5mm' }}>{dayName(tanggal)} - {longDate(tanggal)}</div>
                 {sessions.map(sesi => (
-                  <div key={sesi.id}>
-                    <strong>SESI {romanize(sesi.nomor_sesi)}</strong> : {formatTimeRange(sesiById.get(sesi.id) ?? sesi)}
+                  <div key={sesi.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '18mm 1fr',
+                    gap: '2mm',
+                    marginBottom: '0.8mm',
+                  }}>
+                    <span style={{
+                      border: '0.8pt solid #000',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      padding: '0.5mm 0',
+                    }}>
+                      SESI {romanize(sesi.nomor_sesi)}
+                    </span>
+                    <span style={{ paddingTop: '0.5mm' }}>{formatTimeRange(sesiById.get(sesi.id) ?? sesi)}</span>
                   </div>
                 ))}
               </div>
@@ -271,7 +300,7 @@ function PengawasPage({
         textAlign: 'center',
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontSize: '15pt',
-        fontWeight: 900,
+        fontWeight: 700,
         lineHeight: 1,
         marginBottom: '2mm',
       }}>
@@ -309,15 +338,23 @@ function PengawasPage({
 
       <div style={{
         marginTop: '6mm',
+        border: '1pt solid #000',
         fontFamily: 'Arial, Helvetica, sans-serif',
       }}>
-        <div style={{ fontSize: '10pt', fontWeight: 900, marginBottom: '3mm' }}>
-          TUGAS PENGAWAS
+        <div style={{
+          backgroundColor: '#e5e7eb',
+          borderBottom: '1pt solid #000',
+          textAlign: 'center',
+          fontSize: '10pt',
+          fontWeight: 700,
+          padding: '1.8mm',
+        }}>
+          TATA TERTIB PENGAWAS
         </div>
-        <div style={{ display: 'grid', gap: '2.5mm', fontSize: '10pt', lineHeight: 1.35 }}>
+        <div style={{ display: 'grid', gap: '1.8mm', fontSize: '9.4pt', lineHeight: 1.3, padding: '3mm 4mm' }}>
           {TUGAS_PENGAWAS.map((task, index) => (
-            <div key={task} style={{ display: 'grid', gridTemplateColumns: '8mm 1fr', gap: '4mm' }}>
-              <div>{index + 1}.</div>
+            <div key={task} style={{ display: 'grid', gridTemplateColumns: '7mm 1fr', gap: '3mm', alignItems: 'start' }}>
+              <div style={{ fontWeight: 700 }}>{index + 1}.</div>
               <div>{task}</div>
             </div>
           ))}
@@ -363,7 +400,7 @@ const jadwalThStyle: React.CSSProperties = {
   padding: '0.5mm',
   textAlign: 'center',
   fontFamily: 'Arial, Helvetica, sans-serif',
-  fontWeight: 900,
+  fontWeight: 700,
 }
 
 const jadwalTdStyle: React.CSSProperties = {
@@ -373,7 +410,7 @@ const jadwalTdStyle: React.CSSProperties = {
   textAlign: 'center',
   verticalAlign: 'middle',
   fontFamily: 'Arial, Helvetica, sans-serif',
-  fontSize: '7.4pt',
+  fontSize: '8.4pt',
   lineHeight: 1,
 }
 
@@ -386,7 +423,7 @@ const pengawasThStyle: React.CSSProperties = {
   textAlign: 'center',
   fontFamily: 'Arial, Helvetica, sans-serif',
   fontSize: '8.5pt',
-  fontWeight: 900,
+  fontWeight: 700,
 }
 
 const pengawasTdStyle: React.CSSProperties = {
