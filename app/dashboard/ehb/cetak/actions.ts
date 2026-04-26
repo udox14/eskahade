@@ -186,6 +186,66 @@ export async function getKartuPesertaData(
     ORDER BY r.nomor_ruangan, ps.nomor_kursi
   `, params)
 }
+
+export type TempelanRuanganItem = {
+  ruangan_id: number
+  nomor_ruangan: number
+  kapasitas: number | null
+  nomor_kursi: number
+  nomor_peserta: string
+  jam_group: string
+  nama_kelas: string | null
+  semester: number
+  tahun_ajaran_nama: string
+}
+
+export type TempelanRuanganSemuaItem = TempelanRuanganItem
+
+export async function getTempelanRuanganData(eventId: number, ruanganId: number) {
+  return query<TempelanRuanganItem>(`
+    SELECT
+      r.id as ruangan_id,
+      r.nomor_ruangan,
+      r.kapasitas,
+      ps.nomor_kursi,
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      ps.jam_group,
+      k.nama_kelas,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ps.ehb_event_id = ? AND ps.ruangan_id = ?
+    ORDER BY ps.jam_group, ps.nomor_kursi
+  `, [eventId, ruanganId])
+}
+
+export async function getTempelanRuanganSemuaData(eventId: number) {
+  return query<TempelanRuanganSemuaItem>(`
+    SELECT
+      r.id as ruangan_id,
+      r.nomor_ruangan,
+      r.kapasitas,
+      ps.nomor_kursi,
+      printf('%02d-%02d', r.nomor_ruangan, ps.nomor_kursi) as nomor_peserta,
+      ps.jam_group,
+      k.nama_kelas,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE ps.ehb_event_id = ?
+    ORDER BY r.nomor_ruangan, ps.jam_group, ps.nomor_kursi
+  `, [eventId])
+}
 export type DaftarHadirSesi = {
   tanggal: string
   label: string
