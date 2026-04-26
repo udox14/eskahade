@@ -89,6 +89,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/ehb/susulan':                          'Kelola peserta yang mengikuti ujian susulan EHB.',
   '/dashboard/ehb/cetak':                            'Cetak administrasi EHB: kartu peserta, blanko, jadwal, dan tempelan ruangan.',
   '/dashboard/ehb/kepanitiaan':                       'Kelola susunan panitia EHB dan cetak organigram kepanitiaan.',
+  '/dashboard/ehb/keuangan':                          'Susun RAB dan kelola anggaran pelaksanaan EHB.',
 }
 
 // ── Accent per grup — hanya dot + garis, bukan badge ─────────────────────────
