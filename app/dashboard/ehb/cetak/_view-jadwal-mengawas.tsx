@@ -16,6 +16,7 @@ import {
   type PengawasCetakItem,
 } from './actions'
 import { FONT, PageHeader } from './_shared'
+import { dayNameWib, longDateWib } from '../_date-utils'
 
 type JadwalPengawasCetakData = {
   sesiList: JadwalPengawasCetakSesi[]
@@ -25,12 +26,6 @@ type JadwalPengawasCetakData = {
   jadwal: JadwalPengawasCetakItem[]
   pengawasList: PengawasCetakItem[]
 }
-
-const DAY_NAMES = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
-const MONTH_NAMES = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-]
 
 const TUGAS_PENGAWAS = [
   'Mengambil amplop soal 10 menit sebelum EHB dimulai.',
@@ -43,17 +38,15 @@ const TUGAS_PENGAWAS = [
 ]
 
 function dayName(date: string) {
-  return DAY_NAMES[new Date(`${date}T00:00:00`).getDay()]
+  return dayNameWib(date, true)
 }
 
 function longDate(date: string) {
-  const d = new Date(`${date}T00:00:00`)
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
+  return longDateWib(date)
 }
 
 function mediumDate(date: string) {
-  const d = new Date(`${date}T00:00:00`)
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`
+  return longDateWib(date, false)
 }
 
 function formatTimeRange(sesi: JadwalPengawasCetakSesi) {

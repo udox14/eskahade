@@ -2,18 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from 'react-to-print'
+import * as XLSX from 'xlsx'
 import {
-  AlertTriangle, Crown, Edit2, Loader2, Plus, Printer, Trash2, UserCog, Users,
+  AlertTriangle, Copy, Crown, Download, FileSpreadsheet, Loader2, Plus, Printer, Trash2, Upload, UserCog, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  deletePanitia,
+  copyPanitiaFromEvent,
   getActiveEventForKepanitiaan,
+  getEventOptionsForCopy,
   getGuruOptionsForKepanitiaan,
   getPanitiaList,
-  savePanitia,
+  importPanitiaBatch,
+  replacePanitiaBatch,
   type ActiveEvent,
+  type EventOption,
   type GuruOption,
+  type PanitiaBatchItem,
   type PanitiaInput,
   type PanitiaRow,
 } from './actions'
@@ -37,25 +42,19 @@ const SEKSI = [
   { key: 'keamanan_ketertiban', label: 'Keamanan & Ketertiban', hasKetua: true },
 ]
 
-type FormState = {
-  id?: number
+type ImportRow = PanitiaInput & {
+  rowNumber: number
+}
+
+type DraftPanitia = {
+  id: string
   tipe: 'inti' | 'seksi'
-  jabatan_key: string
-  seksi_key: string
-  peran: 'ketua' | 'anggota'
+  jabatan_key?: string
+  seksi_key?: string
+  peran?: 'ketua' | 'anggota' | null
   source: 'guru' | 'manual'
   guru_id: number | ''
   nama: string
-}
-
-const EMPTY_FORM: FormState = {
-  tipe: 'inti',
-  jabatan_key: 'ketua',
-  seksi_key: 'tim_editor',
-  peran: 'anggota',
-  source: 'guru',
-  guru_id: '',
-  nama: '',
 }
 
 function PrintHeader({ event }: { event: ActiveEvent }) {
@@ -171,15 +170,147 @@ function KepanitiaanPrint({ event, rows }: { event: ActiveEvent; rows: PanitiaRo
   )
 }
 
+function normalizeImportRow(raw: Record<string, unknown>, rowNumber: number, guruList: GuruOption[]): ImportRow | null {
+  const get = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = raw[key]
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim()
+    }
+    return ''
+  }
+
+  const tipeRaw = get('tipe', 'Tipe').toLowerCase()
+  const tipe = tipeRaw === 'seksi' ? 'seksi' : tipeRaw === 'inti' ? 'inti' : null
+  if (!tipe) return null
+
+  const nama = get('nama', 'Nama', 'nama_panitia', 'Nama Panitia')
+  const guruIdRaw = get('guru_id', 'Guru ID', 'guruId')
+  const guruId = guruIdRaw ? Number(guruIdRaw) : null
+  const guruName = guruId ? guruList.find(guru => guru.id === guruId)?.nama : ''
+  const finalNama = guruName || nama
+  if (!finalNama) return null
+
+  if (tipe === 'inti') {
+    const jabatanKey = get('jabatan_key', 'Jabatan Key', 'jabatan').toLowerCase()
+    if (!INTI.some(item => item.key === jabatanKey)) return null
+    return {
+      rowNumber,
+      tipe,
+      jabatan_key: jabatanKey,
+      guru_id: guruId,
+      nama: finalNama,
+    }
+  }
+
+  const seksiKey = get('seksi_key', 'Seksi Key', 'seksi').toLowerCase()
+  if (!SEKSI.some(item => item.key === seksiKey)) return null
+  const seksi = SEKSI.find(item => item.key === seksiKey)
+  const peranRaw = get('peran', 'Peran').toLowerCase()
+  const peran = seksi?.hasKetua && peranRaw === 'ketua' ? 'ketua' : 'anggota'
+
+  return {
+    rowNumber,
+    tipe,
+    seksi_key: seksiKey,
+    peran,
+    guru_id: guruId,
+    nama: finalNama,
+  }
+}
+
+function rowToDraft(row: PanitiaRow): DraftPanitia {
+  return {
+    id: `row-${row.id}`,
+    tipe: row.tipe,
+    jabatan_key: row.jabatan_key ?? undefined,
+    seksi_key: row.seksi_key ?? undefined,
+    peran: row.peran,
+    source: row.guru_id ? 'guru' : 'manual',
+    guru_id: row.guru_id ?? '',
+    nama: row.nama,
+  }
+}
+
+function makeEmptyDraft(tipe: 'inti' | 'seksi', key: string, peran: 'ketua' | 'anggota' | null = null): DraftPanitia {
+  return {
+    id: `new-${crypto.randomUUID()}`,
+    tipe,
+    jabatan_key: tipe === 'inti' ? key : undefined,
+    seksi_key: tipe === 'seksi' ? key : undefined,
+    peran,
+    source: 'guru',
+    guru_id: '',
+    nama: '',
+  }
+}
+
+function DraftPersonInput({
+  draft,
+  guruList,
+  onChange,
+  onRemove,
+  removable = true,
+}: {
+  draft: DraftPanitia
+  guruList: GuruOption[]
+  onChange: (patch: Partial<DraftPanitia>) => void
+  onRemove?: () => void
+  removable?: boolean
+}) {
+  return (
+    <div className="rounded-lg border bg-white p-3 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        {(['guru', 'manual'] as const).map(source => (
+          <button
+            key={source}
+            onClick={() => onChange({ source })}
+            className={`px-2 py-1.5 rounded-md border text-xs font-bold ${draft.source === source ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}
+          >
+            {source === 'guru' ? 'Guru' : 'Manual'}
+          </button>
+        ))}
+      </div>
+      {draft.source === 'guru' ? (
+        <select
+          value={draft.guru_id}
+          onChange={e => onChange({ guru_id: e.target.value ? Number(e.target.value) : '' })}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">-- Pilih Guru --</option>
+          {guruList.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
+        </select>
+      ) : (
+        <input
+          value={draft.nama}
+          onChange={e => onChange({ nama: e.target.value })}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+          placeholder="Nama panitia"
+        />
+      )}
+      {removable && (
+        <button onClick={onRemove} className="text-xs font-bold text-red-600 flex items-center gap-1">
+          <Trash2 className="w-3 h-3" /> Hapus baris
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function KepanitiaanPageContent() {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [guruList, setGuruList] = useState<GuruOption[]>([])
+  const [eventOptions, setEventOptions] = useState<EventOption[]>([])
   const [rows, setRows] = useState<PanitiaRow[]>([])
+  const [drafts, setDrafts] = useState<DraftPanitia[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [importing, setImporting] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [selectedCopyEvent, setSelectedCopyEvent] = useState<number | ''>('')
+  const [importRows, setImportRows] = useState<ImportRow[]>([])
 
   const printRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: 'Susunan Panitia EHB',
@@ -194,12 +325,15 @@ export default function KepanitiaanPageContent() {
     const evt = await getActiveEventForKepanitiaan()
     setEvent(evt)
     if (evt) {
-      const [gurus, panitia] = await Promise.all([
+      const [gurus, panitia, events] = await Promise.all([
         getGuruOptionsForKepanitiaan(),
         getPanitiaList(evt.id),
+        getEventOptionsForCopy(evt.id),
       ])
       setGuruList(gurus)
       setRows(panitia)
+      setDrafts(panitia.map(rowToDraft))
+      setEventOptions(events)
     }
     setLoading(false)
   }
@@ -212,13 +346,16 @@ export default function KepanitiaanPageContent() {
       if (cancelled) return
       setEvent(evt)
       if (evt) {
-        const [gurus, panitia] = await Promise.all([
+        const [gurus, panitia, events] = await Promise.all([
           getGuruOptionsForKepanitiaan(),
           getPanitiaList(evt.id),
+          getEventOptionsForCopy(evt.id),
         ])
         if (cancelled) return
         setGuruList(gurus)
         setRows(panitia)
+        setDrafts(panitia.map(rowToDraft))
+        setEventOptions(events)
       }
       setLoading(false)
     }
@@ -228,50 +365,133 @@ export default function KepanitiaanPageContent() {
     }
   }, [])
 
-  const intiMap = useMemo(() => new Map(rows.filter(r => r.tipe === 'inti').map(r => [r.jabatan_key, r])), [rows])
-  const selectedGuru = guruList.find(guru => guru.id === form.guru_id)
+  const draftIntiMap = useMemo(() => new Map(drafts.filter(d => d.tipe === 'inti').map(d => [d.jabatan_key, d])), [drafts])
 
-  const resetForm = () => setForm(EMPTY_FORM)
-
-  const editRow = (row: PanitiaRow) => {
-    setForm({
-      id: row.id,
-      tipe: row.tipe,
-      jabatan_key: row.jabatan_key ?? 'ketua',
-      seksi_key: row.seksi_key ?? 'tim_editor',
-      peran: row.peran === 'ketua' ? 'ketua' : 'anggota',
-      source: row.guru_id ? 'guru' : 'manual',
-      guru_id: row.guru_id ?? '',
-      nama: row.nama,
-    })
+  const updateDraft = (draftId: string, patch: Partial<DraftPanitia>) => {
+    setDrafts(prev => prev.map(draft => {
+      if (draft.id !== draftId) return draft
+      const next = { ...draft, ...patch }
+      if (patch.guru_id !== undefined) {
+        next.nama = guruList.find(guru => guru.id === patch.guru_id)?.nama ?? ''
+      }
+      if (patch.source) {
+        next.guru_id = ''
+        next.nama = ''
+      }
+      return next
+    }))
   }
 
-  const submit = async () => {
+  const getOrCreateIntiDraft = (jabatanKey: string) => {
+    const existing = draftIntiMap.get(jabatanKey)
+    if (existing) return existing
+    return makeEmptyDraft('inti', jabatanKey)
+  }
+
+  const addSeksiDraft = (seksiKey: string, peran: 'ketua' | 'anggota') => {
+    setDrafts(prev => [...prev, makeEmptyDraft('seksi', seksiKey, peran)])
+  }
+
+  const removeDraft = (draftId: string) => {
+    setDrafts(prev => prev.filter(draft => draft.id !== draftId))
+  }
+
+  const submitBatchDrafts = async () => {
     if (!event) return
-    const nama = form.source === 'guru' ? selectedGuru?.nama ?? '' : form.nama
-    const payload: PanitiaInput = {
-      tipe: form.tipe,
-      jabatan_key: form.tipe === 'inti' ? form.jabatan_key : undefined,
-      seksi_key: form.tipe === 'seksi' ? form.seksi_key : undefined,
-      peran: form.tipe === 'seksi' ? form.peran : null,
-      guru_id: form.source === 'guru' && form.guru_id ? Number(form.guru_id) : null,
-      nama,
-    }
+    const payload: PanitiaBatchItem[] = drafts
+      .map(draft => {
+        const nama = draft.source === 'guru'
+          ? guruList.find(guru => guru.id === draft.guru_id)?.nama ?? ''
+          : draft.nama
+        return {
+          tipe: draft.tipe,
+          jabatan_key: draft.tipe === 'inti' ? draft.jabatan_key : undefined,
+          seksi_key: draft.tipe === 'seksi' ? draft.seksi_key : undefined,
+          peran: draft.tipe === 'seksi' ? draft.peran ?? 'anggota' : null,
+          guru_id: draft.source === 'guru' && draft.guru_id ? Number(draft.guru_id) : null,
+          nama,
+        }
+      })
+      .filter(item => item.nama.trim())
+
     setSaving(true)
-    const res = await savePanitia(event.id, payload, form.id)
+    const res = await replacePanitiaBatch(event.id, payload)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
-    toast.success('Data panitia disimpan')
-    resetForm()
+    toast.success(`${res.saved} data panitia disimpan`)
     loadData()
   }
 
-  const remove = async (row: PanitiaRow) => {
-    if (!event) return
-    if (!confirm(`Hapus ${row.nama} dari kepanitiaan?`)) return
-    const res = await deletePanitia(row.id, event.id)
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['tipe', 'jabatan_key', 'seksi_key', 'peran', 'nama', 'guru_id'],
+      ['inti', 'ketua', '', '', 'Contoh Ketua Panitia', ''],
+      ['inti', 'sekretaris', '', '', 'Contoh Sekretaris', ''],
+      ['seksi', '', 'tim_editor', 'anggota', 'Contoh Editor 1', ''],
+      ['seksi', '', 'kesekretariatan', 'ketua', 'Contoh Ketua Seksi', ''],
+      ['seksi', '', 'kesekretariatan', 'anggota', 'Contoh Anggota Seksi', ''],
+      [],
+      ['KODE JABATAN INTI'],
+      ...INTI.map(item => [item.key, item.label]),
+      [],
+      ['KODE SEKSI'],
+      ...SEKSI.map(item => [item.key, item.label]),
+      [],
+      ['CATATAN'],
+      ['tipe: inti/seksi. peran: ketua/anggota. guru_id opsional; jika kosong nama dipakai sebagai input manual.'],
+    ])
+    ws['!cols'] = [{ wch: 14 }, { wch: 22 }, { wch: 28 }, { wch: 14 }, { wch: 34 }, { wch: 10 }]
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Panitia')
+    XLSX.writeFile(wb, 'template_kepanitiaan_ehb.xlsx')
+  }
+
+  const parseImportFile = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = evt => {
+      try {
+        const wb = XLSX.read(evt.target?.result, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const parsed = rawRows
+          .map((raw, index) => normalizeImportRow(raw, index + 2, guruList))
+          .filter((row): row is ImportRow => Boolean(row))
+
+        setImportRows(parsed)
+        if (parsed.length === 0) {
+          toast.error('Tidak ada baris valid yang bisa diimpor')
+        } else {
+          toast.success(`${parsed.length} baris siap diimpor`)
+        }
+      } catch {
+        toast.error('Gagal membaca file Excel')
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+    reader.readAsBinaryString(file)
+  }
+
+  const submitImport = async () => {
+    if (!event || importRows.length === 0) return
+    setImporting(true)
+    const res = await importPanitiaBatch(event.id, importRows)
+    setImporting(false)
     if ('error' in res) return toast.error(res.error)
-    toast.success('Panitia dihapus')
+    toast.success(`${res.imported} data panitia berhasil diimpor`)
+    setImportRows([])
+    loadData()
+  }
+
+  const submitCopy = async () => {
+    if (!event || !selectedCopyEvent) return toast.error('Pilih event sumber terlebih dahulu')
+    if (!confirm('Salin seluruh panitia dari event sumber? Data panitia event aktif akan diganti.')) return
+    setCopying(true)
+    const res = await copyPanitiaFromEvent(event.id, selectedCopyEvent as number)
+    setCopying(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${res.copied} data panitia berhasil disalin`)
+    setSelectedCopyEvent('')
     loadData()
   }
 
@@ -308,83 +528,92 @@ export default function KepanitiaanPageContent() {
         <span className="text-xs text-indigo-500 ml-auto">T.A. {event.tahun_ajaran_nama}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
-        <div className="bg-white border rounded-xl overflow-hidden h-fit">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border rounded-xl overflow-hidden">
           <div className="bg-slate-50 border-b px-5 py-3 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-slate-500" />
-            <h3 className="font-bold text-slate-700 text-sm">{form.id ? 'Edit Panitia' : 'Tambah Panitia'}</h3>
+            <FileSpreadsheet className="w-4 h-4 text-slate-500" />
+            <h3 className="font-bold text-slate-700 text-sm">Import Batch Excel</h3>
           </div>
           <div className="p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              {(['inti', 'seksi'] as const).map(tipe => (
-                <button key={tipe} onClick={() => setForm(prev => ({ ...prev, tipe }))} className={`px-3 py-2 rounded-lg border text-sm font-bold ${form.tipe === tipe ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}>
-                  {tipe === 'inti' ? 'Panitia Inti' : 'Seksi'}
-                </button>
-              ))}
-            </div>
-
-            {form.tipe === 'inti' ? (
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">Jabatan</label>
-                <select value={form.jabatan_key} onChange={e => setForm(prev => ({ ...prev, jabatan_key: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                  {INTI.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
-                </select>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">Seksi</label>
-                  <select value={form.seksi_key} onChange={e => {
-                    const seksi = SEKSI.find(item => item.key === e.target.value)
-                    setForm(prev => ({ ...prev, seksi_key: e.target.value, peran: seksi?.hasKetua ? prev.peran : 'anggota' }))
-                  }} className="w-full border rounded-lg px-3 py-2 text-sm">
-                    {SEKSI.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
-                  </select>
-                </div>
-                {SEKSI.find(item => item.key === form.seksi_key)?.hasKetua && (
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">Peran</label>
-                    <select value={form.peran} onChange={e => setForm(prev => ({ ...prev, peran: e.target.value as 'ketua' | 'anggota' }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                      <option value="ketua">Ketua Seksi</option>
-                      <option value="anggota">Anggota</option>
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              {(['guru', 'manual'] as const).map(source => (
-                <button key={source} onClick={() => setForm(prev => ({ ...prev, source, guru_id: '', nama: '' }))} className={`px-3 py-2 rounded-lg border text-sm font-bold ${form.source === source ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}>
-                  {source === 'guru' ? 'Dari Guru' : 'Manual'}
-                </button>
-              ))}
-            </div>
-
-            {form.source === 'guru' ? (
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">Pilih Guru</label>
-                <select value={form.guru_id} onChange={e => setForm(prev => ({ ...prev, guru_id: e.target.value ? Number(e.target.value) : '', nama: guruList.find(g => g.id === Number(e.target.value))?.nama ?? '' }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                  <option value="">-- Pilih Guru --</option>
-                  {guruList.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">Nama Manual</label>
-                <input value={form.nama} onChange={e => setForm(prev => ({ ...prev, nama: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nama panitia" />
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <button onClick={submit} disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Simpan
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button onClick={downloadTemplate} className="flex-1 border border-slate-200 hover:border-indigo-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2">
+                <Download className="w-4 h-4" /> Unduh Template
               </button>
-              {form.id && <button onClick={resetForm} className="px-4 py-2.5 border rounded-lg text-sm font-bold text-slate-600">Batal</button>}
+              <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" /> Pilih File Excel
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) parseImportFile(file)
+                }}
+              />
             </div>
+            {importRows.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800">
+                  {importRows.length} baris siap diimpor
+                </div>
+                <div className="max-h-40 overflow-y-auto divide-y">
+                  {importRows.slice(0, 8).map(row => (
+                    <div key={row.rowNumber} className="px-3 py-2 text-xs flex items-center gap-2">
+                      <span className="font-bold text-slate-400 w-8">#{row.rowNumber}</span>
+                      <span className="font-bold text-slate-700">{row.nama}</span>
+                      <span className="ml-auto text-slate-400">{row.tipe === 'inti' ? row.jabatan_key : `${row.seksi_key} / ${row.peran}`}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-3 bg-slate-50 flex gap-2">
+                  <button onClick={submitImport} disabled={importing} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                    {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Import
+                  </button>
+                  <button onClick={() => setImportRows([])} className="border px-4 py-2 rounded-lg text-sm font-bold text-slate-600">Batal</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        <div className="bg-white border rounded-xl overflow-hidden">
+          <div className="bg-slate-50 border-b px-5 py-3 flex items-center gap-2">
+            <Copy className="w-4 h-4 text-slate-500" />
+            <h3 className="font-bold text-slate-700 text-sm">Salin dari Semester Sebelumnya</h3>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">Event Sumber</label>
+              <select value={selectedCopyEvent} onChange={e => setSelectedCopyEvent(e.target.value ? Number(e.target.value) : '')} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">-- Pilih Event --</option>
+                {eventOptions.map(evt => (
+                  <option key={evt.id} value={evt.id}>{evt.nama} · T.A. {evt.tahun_ajaran_nama}</option>
+                ))}
+              </select>
+            </div>
+            <button onClick={submitCopy} disabled={copying || !selectedCopyEvent} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2">
+              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />} Salin Semua Panitia
+            </button>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Proses ini mengganti seluruh data panitia pada event aktif dengan data dari event sumber.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border rounded-xl p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-bold text-slate-800">Editor Cepat Kepanitiaan</h3>
+          <p className="text-sm text-slate-500">Isi langsung di kotak masing-masing bidang, lalu simpan semuanya sekaligus.</p>
+        </div>
+        <button onClick={submitBatchDrafts} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Simpan Semua Perubahan
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
           <div className="bg-white border rounded-xl overflow-hidden">
             <div className="bg-slate-50 border-b px-5 py-3 flex items-center gap-2">
@@ -393,16 +622,20 @@ export default function KepanitiaanPageContent() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-5">
               {INTI.map(item => {
-                const row = intiMap.get(item.key)
+                const draft = getOrCreateIntiDraft(item.key)
                 return (
                   <div key={item.key} className="border rounded-lg p-4 bg-slate-50/50">
                     <p className="text-xs font-bold text-slate-500 uppercase mb-1">{item.label}</p>
-                    <p className="font-bold text-slate-800 min-h-6">{row?.nama ?? '-'}</p>
-                    {row && (
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={() => editRow(row)} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Edit2 className="w-3 h-3" /> Edit</button>
-                        <button onClick={() => remove(row)} className="text-xs font-bold text-red-600 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Hapus</button>
-                      </div>
+                    {!drafts.some(d => d.id === draft.id) && (
+                      <button onClick={() => setDrafts(prev => [...prev, draft])} className="mb-2 text-xs font-bold text-indigo-600">Aktifkan input</button>
+                    )}
+                    {drafts.some(d => d.id === draft.id) && (
+                      <DraftPersonInput
+                        draft={draft}
+                        guruList={guruList}
+                        removable={false}
+                        onChange={patch => updateDraft(draft.id, patch)}
+                      />
                     )}
                   </div>
                 )
@@ -412,26 +645,51 @@ export default function KepanitiaanPageContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {SEKSI.map(seksi => {
-              const members = rows.filter(row => row.tipe === 'seksi' && row.seksi_key === seksi.key)
+              const members = drafts.filter(row => row.tipe === 'seksi' && row.seksi_key === seksi.key)
+              const ketuaDraft = members.find(row => row.peran === 'ketua')
+              const anggotaDrafts = members.filter(row => row.peran !== 'ketua')
               return (
                 <div key={seksi.key} className="bg-white border rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 border-b px-4 py-3 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-500" />
-                    <h3 className="font-bold text-slate-700 text-sm">{seksi.label}</h3>
+                  <div className="bg-slate-50 border-b px-4 py-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-slate-500" />
+                      <h3 className="font-bold text-slate-700 text-sm">{seksi.label}</h3>
+                    </div>
+                    <button onClick={() => addSeksiDraft(seksi.key, 'anggota')} className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+                      <Plus className="w-3 h-3" /> Anggota
+                    </button>
                   </div>
-                  <div className="divide-y">
-                    {members.length === 0 ? (
-                      <div className="p-4 text-sm text-slate-400">Belum ada anggota.</div>
-                    ) : members.map(row => (
-                      <div key={row.id} className="p-4 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-800 text-sm truncate">{row.nama}</p>
-                          <p className="text-xs text-slate-400">{row.peran === 'ketua' ? 'Ketua Seksi' : 'Anggota'}</p>
+                  <div className="p-4 space-y-3">
+                    {seksi.hasKetua && (
+                      <div className="rounded-xl bg-amber-50/60 border border-amber-100 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-amber-700 uppercase">Ketua Seksi</p>
+                          {!ketuaDraft && <button onClick={() => addSeksiDraft(seksi.key, 'ketua')} className="text-xs font-bold text-amber-700">Tambah Ketua</button>}
                         </div>
-                        <button onClick={() => editRow(row)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => remove(row)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                        {ketuaDraft && (
+                          <DraftPersonInput
+                            draft={ketuaDraft}
+                            guruList={guruList}
+                            onChange={patch => updateDraft(ketuaDraft.id, patch)}
+                            onRemove={() => removeDraft(ketuaDraft.id)}
+                          />
+                        )}
                       </div>
-                    ))}
+                    )}
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase">{seksi.hasKetua ? 'Anggota' : 'Tim'}</p>
+                      {anggotaDrafts.length === 0 ? (
+                        <div className="text-sm text-slate-400 border rounded-lg p-3">Belum ada anggota.</div>
+                      ) : anggotaDrafts.map(draft => (
+                        <DraftPersonInput
+                          key={draft.id}
+                          draft={draft}
+                          guruList={guruList}
+                          onChange={patch => updateDraft(draft.id, patch)}
+                          onRemove={() => removeDraft(draft.id)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )

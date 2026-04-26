@@ -14,6 +14,7 @@ import {
   type JadwalEhbCetakSesi,
 } from './actions'
 import { FONT, PageHeader } from './_shared'
+import { dayNameWib, getDatesBetweenWib, shortDateWib } from '../_date-utils'
 
 type JadwalEhbEvent = ActiveEvent & {
   tanggal_mulai: string | null
@@ -35,31 +36,12 @@ type JadwalColumn = {
   order: number
 }
 
-const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu']
-const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
-]
-
-function getDatesBetween(start?: string | null, end?: string | null) {
-  if (!start || !end) return []
-  const dates: string[] = []
-  const current = new Date(`${start}T00:00:00`)
-  const last = new Date(`${end}T00:00:00`)
-  while (current <= last) {
-    dates.push(current.toISOString().split('T')[0])
-    current.setDate(current.getDate() + 1)
-  }
-  return dates
-}
-
 function dayName(date: string) {
-  return DAY_NAMES[new Date(`${date}T00:00:00`).getDay()]
+  return dayNameWib(date)
 }
 
 function shortDate(date: string) {
-  const d = new Date(`${date}T00:00:00`)
-  return `${d.getDate()}-${MONTH_NAMES[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`
+  return shortDateWib(date)
 }
 
 function formatTimeRange(sesi: JadwalEhbCetakSesi) {
@@ -162,7 +144,7 @@ function PrintHeader({ event }: { event: ActiveEvent }) {
 
 function JadwalEhbPrint({ data }: { data: JadwalEhbCetakData }) {
   const event = data.event
-  const dates = getDatesBetween(event?.tanggal_mulai, event?.tanggal_selesai)
+  const dates = getDatesBetweenWib(event?.tanggal_mulai, event?.tanggal_selesai)
   const jadwalMap = buildJadwalMap(data.jadwal)
   const columns = buildColumns(data.kelasList)
   const rows = dates.flatMap(tanggal => data.sesiList.map(sesi => ({ tanggal, sesi })))
@@ -350,7 +332,7 @@ export function JadwalEhbView({ onBack }: { onBack: () => void }) {
 
   const stats = useMemo(() => {
     if (!data) return null
-    const dates = getDatesBetween(data.event?.tanggal_mulai, data.event?.tanggal_selesai)
+    const dates = getDatesBetweenWib(data.event?.tanggal_mulai, data.event?.tanggal_selesai)
     return {
       tanggal: dates.length,
       sesi: data.sesiList.length,

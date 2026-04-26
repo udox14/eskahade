@@ -12,6 +12,7 @@ import {
 } from './actions'
 import { toast } from 'sonner'
 import { FONT, PageHeader } from './_shared'
+import { dayNameWib, nowWibString } from '../_date-utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,8 +46,7 @@ function abbreviateKelas(kelas: string | null) {
 }
 
 function getDayName(dateStr: string) {
-  const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
-  return days[new Date(dateStr).getDay()]
+  return dayNameWib(dateStr, true)
 }
 
 // ── Print Component ──────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ function DaftarHadirPrint({
       {/* Footer Info */}
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: '8pt', paddingTop: '2mm' }}>
         <div>Halaman {pageInfo.current} dari {pageInfo.total}</div>
-        <div>Dicetak pada: {new Date().toLocaleString('id-ID')}</div>
+        <div>Dicetak pada: {nowWibString()} WIB</div>
       </div>
     </div>
   )

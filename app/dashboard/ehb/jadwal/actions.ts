@@ -3,6 +3,7 @@
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
+import { formatDateKeyWib, parseDateKeyWib } from '../_date-utils'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // EVENT EHB
@@ -352,7 +353,7 @@ export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: 
   if (oldJadwal.length > 0) {
     // Ambil tanggal mulai target
     const targetEvent = await queryOne<any>(`SELECT tanggal_mulai FROM ehb_event WHERE id = ?`, [targetEventId])
-    let newDateObj = targetEvent?.tanggal_mulai ? new Date(targetEvent.tanggal_mulai) : new Date()
+    const newDateObj = targetEvent?.tanggal_mulai ? parseDateKeyWib(targetEvent.tanggal_mulai) : new Date()
 
     // Cari urutan tanggal unik dari event lama
     const oldDates = Array.from(new Set(oldJadwal.map((j: any) => j.tanggal))).sort()
@@ -362,7 +363,7 @@ export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: 
     oldDates.forEach((oldDateStr, index) => {
       const mappedDate = new Date(newDateObj)
       mappedDate.setDate(mappedDate.getDate() + index)
-      dateMap.set(oldDateStr as string, mappedDate.toISOString().split('T')[0])
+      dateMap.set(oldDateStr as string, formatDateKeyWib(mappedDate))
     })
 
     const jadStmts = oldJadwal.map(j => {

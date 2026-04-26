@@ -9,8 +9,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, UserMinus 
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
+import { fullDateWib, shortDateWib } from '../_date-utils'
 
 export default function AbsensiEhbPage() {
   const [event, setEvent] = useState<{ id: number, nama: string } | null>(null)
@@ -139,7 +138,7 @@ export default function AbsensiEhbPage() {
                         <div key={tgl} className="space-y-3">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2 px-1">
                                 <Calendar className="w-4 h-4 text-indigo-500"/>
-                                {format(new Date(tgl), 'EEEE, dd MMMM yyyy', { locale: id })}
+                                {fullDateWib(tgl)}
                             </h3>
                             {groupedSesi[tgl].map(s => (
                                 <div 
@@ -178,7 +177,7 @@ export default function AbsensiEhbPage() {
                 </button>
                 <div>
                     <h2 className="font-bold text-slate-800 text-lg leading-tight">Daftar Ruangan</h2>
-                    <p className="text-xs text-indigo-600 font-bold">{selectedSesi?.label} • {selectedSesi ? format(new Date(selectedSesi.tanggal), 'dd MMM', { locale: id }) : ''}</p>
+                    <p className="text-xs text-indigo-600 font-bold">{selectedSesi?.label} • {selectedSesi ? shortDateWib(selectedSesi.tanggal, false) : ''}</p>
                 </div>
             </div>
 
@@ -235,7 +234,7 @@ export default function AbsensiEhbPage() {
                     </button>
                     <div>
                         <h2 className="font-bold text-slate-800 text-lg leading-tight">{selectedRuangan?.nama_ruangan || `Ruang ${selectedRuangan?.nomor_ruangan}`}</h2>
-                        <p className="text-xs text-slate-500">{selectedSesi?.label} • {selectedSesi ? format(new Date(selectedSesi.tanggal), 'dd MMM', { locale: id }) : ''}</p>
+                        <p className="text-xs text-slate-500">{selectedSesi?.label} • {selectedSesi ? shortDateWib(selectedSesi.tanggal, false) : ''}</p>
                     </div>
                 </div>
             </div>

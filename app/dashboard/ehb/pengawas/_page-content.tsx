@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
+import { fullDateWib } from '../_date-utils'
 
 export default function PengawasEhbPage() {
   const confirm = useConfirm()
@@ -370,7 +371,7 @@ export default function PengawasEhbPage() {
                              {tanggalList.map(tgl => (
                                  <div key={tgl} className="border rounded-xl overflow-hidden">
                                     <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3 font-bold text-indigo-900">
-                                        {new Date(tgl).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                        {fullDateWib(tgl)}
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left border-collapse">

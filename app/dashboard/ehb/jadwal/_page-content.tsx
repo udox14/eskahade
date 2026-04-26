@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { formatDateRangeWib, fullDateWib, getDatesBetweenWib, parseDateKeyWib } from '../_date-utils'
 
 export default function JadwalEhbPage() {
   const confirm = useConfirm()
@@ -90,8 +91,8 @@ export default function JadwalEhbPage() {
   
   const handleCreateEvent = async () => {
     if (!newEvent.tahunAjaranId || !newEvent.nama || !newEvent.tanggal_mulai || !newEvent.tanggal_selesai) return toast.error('Lengkapi semua data event')
-    const start = new Date(newEvent.tanggal_mulai)
-    const end = new Date(newEvent.tanggal_selesai)
+    const start = parseDateKeyWib(newEvent.tanggal_mulai)
+    const end = parseDateKeyWib(newEvent.tanggal_selesai)
     if (start > end) return toast.error('Tanggal mulai harus sebelum tanggal selesai')
 
     const res = await createEhbEvent(newEvent)
@@ -215,17 +216,7 @@ export default function JadwalEhbPage() {
     setJadwal(jdw)
     setMapelAktif(mapel)
     
-    // Generate tanggalList dari event
-    const start = activeEvent.tanggal_mulai ? new Date(activeEvent.tanggal_mulai) : null
-    const end = activeEvent.tanggal_selesai ? new Date(activeEvent.tanggal_selesai) : null
-    const newDates: string[] = []
-    if (start && end && start <= end) {
-      const curr = new Date(start)
-      while (curr <= end) {
-        newDates.push(curr.toISOString().split('T')[0])
-        curr.setDate(curr.getDate() + 1)
-      }
-    }
+    const newDates = getDatesBetweenWib(activeEvent.tanggal_mulai, activeEvent.tanggal_selesai)
     setTanggalList(newDates)
     setExpandedDates(prev => prev.length > 0 ? prev : [])
 
@@ -484,7 +475,7 @@ export default function JadwalEhbPage() {
                           <p className="text-xs text-slate-500">{evt.tahun_ajaran_nama}</p>
                           {evt.tanggal_mulai && evt.tanggal_selesai && (
                             <p className="text-[10px] text-indigo-600 mt-1">
-                              {new Date(evt.tanggal_mulai).toLocaleDateString('id-ID', {day:'numeric', month:'short'})} - {new Date(evt.tanggal_selesai).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}
+                              {formatDateRangeWib(evt.tanggal_mulai, evt.tanggal_selesai)}
                             </p>
                           )}
                         </td>
@@ -745,7 +736,7 @@ export default function JadwalEhbPage() {
                           }
                         }}
                       >
-                        <h4 className="font-bold text-indigo-900">{new Date(tgl).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
+                        <h4 className="font-bold text-indigo-900">{fullDateWib(tgl)}</h4>
                         <div className="text-indigo-600">
                           {isExpanded ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
                         </div>

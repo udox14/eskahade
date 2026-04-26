@@ -13,3 +13,9 @@
 Failed to benchmark file I/O: The system cannot find the path specified. (os error 3)
 ✓ Ready in 4.5s
 ○ Compiling / ...
+ GET / 200 in 8.1s (compile: 7.6s, render: 433ms)
+○ Compiling /api/version ...
+ GET /api/version 200 in 3.2s
+ GET /login 200 in 1878ms (compile: 1828ms, render: 50ms)
+[LOGIN] Step 1: email= udox@***
+ POST /login 200 in 51s (compile: 41ms, render: 51s)

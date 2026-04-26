@@ -7,8 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
+import { shortDateWib } from '../_date-utils'
 
 export default function SusulanEhbPage() {
   const confirm = useConfirm()
@@ -164,7 +163,7 @@ export default function SusulanEhbPage() {
                       <p className="text-xs text-slate-500">{s.nis} • <span className="font-semibold">{s.nama_kelas}</span></p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-slate-700 font-medium">{format(new Date(s.tanggal), 'dd MMM yyyy', { locale: id })}</p>
+                      <p className="text-slate-700 font-medium">{shortDateWib(s.tanggal)}</p>
                     </td>
                     <td className="px-4 py-3">
                       <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold">{s.mapel_nama}</span>

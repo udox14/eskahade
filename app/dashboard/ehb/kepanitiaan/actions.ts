@@ -16,6 +16,15 @@ export type GuruOption = {
   nama: string
 }
 
+export type EventOption = {
+  id: number
+  nama: string
+  semester: number
+  tahun_ajaran_nama: string
+  tanggal_mulai: string | null
+  tanggal_selesai: string | null
+}
+
 export type PanitiaRow = {
   id: number
   ehb_event_id: number
@@ -35,6 +44,10 @@ export type PanitiaInput = {
   peran?: 'ketua' | 'anggota' | null
   guru_id?: number | null
   nama: string
+}
+
+export type PanitiaBatchItem = PanitiaInput & {
+  id?: number
 }
 
 export async function ensureKepanitiaanSchema() {
@@ -85,6 +98,17 @@ export async function getGuruOptionsForKepanitiaan() {
     FROM data_guru
     ORDER BY nama_lengkap
   `)
+}
+
+export async function getEventOptionsForCopy(currentEventId: number) {
+  await ensureKepanitiaanSchema()
+  return query<EventOption>(`
+    SELECT e.id, e.nama, e.semester, e.tanggal_mulai, e.tanggal_selesai, ta.nama as tahun_ajaran_nama
+    FROM ehb_event e
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE e.id <> ?
+    ORDER BY e.id DESC
+  `, [currentEventId])
 }
 
 export async function getPanitiaList(eventId: number) {
@@ -164,6 +188,138 @@ export async function savePanitia(eventId: number, input: PanitiaInput, id?: num
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
   return { success: true }
+}
+
+export async function importPanitiaBatch(eventId: number, inputs: PanitiaInput[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKepanitiaanSchema()
+
+  const cleanInputs = inputs
+    .map(input => ({ ...input, nama: input.nama.trim() }))
+    .filter(input => input.nama)
+
+  if (cleanInputs.length === 0) return { error: 'Tidak ada data valid untuk diimpor' }
+
+  let imported = 0
+
+  for (const input of cleanInputs) {
+    if (input.tipe === 'inti') {
+      if (!input.jabatan_key) continue
+      const urutan = INTI_ORDER[input.jabatan_key] ?? 99
+      const existing = await queryOne<{ id: number }>(`
+        SELECT id FROM ehb_panitia
+        WHERE ehb_event_id = ? AND tipe = 'inti' AND jabatan_key = ?
+        LIMIT 1
+      `, [eventId, input.jabatan_key])
+
+      if (existing) {
+        await execute(`
+          UPDATE ehb_panitia
+          SET guru_id = ?, nama = ?, urutan = ?, updated_at = datetime('now')
+          WHERE id = ? AND ehb_event_id = ?
+        `, [input.guru_id ?? null, input.nama, urutan, existing.id, eventId])
+      } else {
+        await execute(`
+          INSERT INTO ehb_panitia (ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan)
+          VALUES (?, 'inti', ?, NULL, NULL, ?, ?, ?)
+        `, [eventId, input.jabatan_key, input.guru_id ?? null, input.nama, urutan])
+      }
+      imported++
+    } else {
+      if (!input.seksi_key) continue
+      const urutan = await nextSeksiUrutan(eventId, input.seksi_key)
+      await execute(`
+        INSERT INTO ehb_panitia (ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan)
+        VALUES (?, 'seksi', NULL, ?, ?, ?, ?, ?)
+      `, [eventId, input.seksi_key, input.peran ?? 'anggota', input.guru_id ?? null, input.nama, urutan])
+      imported++
+    }
+  }
+
+  revalidatePath('/dashboard/ehb/kepanitiaan')
+  revalidatePath('/dashboard/ehb/cetak')
+  return { success: true, imported }
+}
+
+export async function replacePanitiaBatch(eventId: number, inputs: PanitiaBatchItem[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKepanitiaanSchema()
+
+  const cleanInputs = inputs
+    .map(input => ({ ...input, nama: input.nama.trim() }))
+    .filter(input => input.nama)
+
+  await execute(`DELETE FROM ehb_panitia WHERE ehb_event_id = ?`, [eventId])
+
+  if (cleanInputs.length > 0) {
+    await batch(cleanInputs.map((input, index) => {
+      if (input.tipe === 'inti') {
+        return {
+          sql: `
+            INSERT INTO ehb_panitia (ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan)
+            VALUES (?, 'inti', ?, NULL, NULL, ?, ?, ?)
+          `,
+          params: [
+            eventId,
+            input.jabatan_key ?? null,
+            input.guru_id ?? null,
+            input.nama,
+            input.jabatan_key ? INTI_ORDER[input.jabatan_key] ?? index + 1 : index + 1,
+          ],
+        }
+      }
+
+      return {
+        sql: `
+          INSERT INTO ehb_panitia (ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan)
+          VALUES (?, 'seksi', NULL, ?, ?, ?, ?, ?)
+        `,
+        params: [
+          eventId,
+          input.seksi_key ?? null,
+          input.peran ?? 'anggota',
+          input.guru_id ?? null,
+          input.nama,
+          index + 1,
+        ],
+      }
+    }))
+  }
+
+  revalidatePath('/dashboard/ehb/kepanitiaan')
+  revalidatePath('/dashboard/ehb/cetak')
+  return { success: true, saved: cleanInputs.length }
+}
+
+export async function copyPanitiaFromEvent(targetEventId: number, sourceEventId: number) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKepanitiaanSchema()
+  if (targetEventId === sourceEventId) return { error: 'Event sumber tidak boleh sama dengan event aktif' }
+
+  const sourceRows = await query<PanitiaRow>(`
+    SELECT id, ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan
+    FROM ehb_panitia
+    WHERE ehb_event_id = ?
+    ORDER BY CASE tipe WHEN 'inti' THEN 0 ELSE 1 END, urutan, nama
+  `, [sourceEventId])
+
+  if (sourceRows.length === 0) return { error: 'Event sumber belum memiliki data panitia' }
+
+  await execute(`DELETE FROM ehb_panitia WHERE ehb_event_id = ?`, [targetEventId])
+  await batch(sourceRows.map(row => ({
+    sql: `
+      INSERT INTO ehb_panitia (ehb_event_id, tipe, jabatan_key, seksi_key, peran, guru_id, nama, urutan)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    params: [targetEventId, row.tipe, row.jabatan_key, row.seksi_key, row.peran, row.guru_id, row.nama, row.urutan],
+  })))
+
+  revalidatePath('/dashboard/ehb/kepanitiaan')
+  revalidatePath('/dashboard/ehb/cetak')
+  return { success: true, copied: sourceRows.length }
 }
 
 export async function deletePanitia(id: number, eventId: number) {
