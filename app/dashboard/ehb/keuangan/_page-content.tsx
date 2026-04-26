@@ -8,13 +8,24 @@ import {
 import { toast } from 'sonner'
 import {
   getActiveEventForKeuangan,
+  getGuruOptionsForHonor,
+  getHonorItems,
+  getHonorMapelConfig,
+  getHonorTarif,
   getKeuanganSigners,
   getRabAutoBasis,
   getRabItems,
   getTransaksiItems,
   saveRabItems,
+  saveHonorMapelConfig,
+  savePembuatanSoalManual,
   saveTransaksiItems,
   type ActiveEvent,
+  type HonorItem,
+  type HonorJenis,
+  type HonorMapelConfig,
+  type HonorTarif,
+  type HonorWaktu,
   type RabAutoBasis,
   type RabItem,
   type RabItemInput,
@@ -51,6 +62,19 @@ type TransaksiForm = {
   system_key: string | null
 }
 
+type GuruOption = {
+  id: number
+  nama: string
+}
+
+type ManualSoalDraft = {
+  draft_id: string
+  guru_id: number | ''
+  nama: string
+  qty: number
+  keterangan: string
+}
+
 const KATEGORI: { key: RabKategori; title: string; desc: string }[] = [
   {
     key: 'atk_administrasi',
@@ -68,6 +92,19 @@ const KATEGORI: { key: RabKategori; title: string; desc: string }[] = [
     desc: 'Insentif pembuatan soal, pemeriksaan, rapor, pengawasan, dan panitia.',
   },
 ]
+
+const HONOR_LABEL: Record<HonorJenis, string> = {
+  pembuatan_soal: 'Pembuatan Soal',
+  pengisian_rapor: 'Pengisian Rapor',
+  pemeriksaan_hasil: 'Pemeriksaan Hasil EHB',
+  pengawasan: 'Pengawasan',
+}
+
+const WAKTU_LABEL: Record<HonorWaktu, string> = {
+  shubuh: 'Shubuh',
+  ashar: 'Ashar',
+  maghrib: 'Maghrib',
+}
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -650,6 +687,12 @@ export default function KeuanganEhbPageContent() {
   const [savingTransaksi, setSavingTransaksi] = useState(false)
   const [showTransaksiModal, setShowTransaksiModal] = useState(false)
   const [transaksiForm, setTransaksiForm] = useState<TransaksiForm>(() => emptyTransaksiForm())
+  const [honorItems, setHonorItems] = useState<HonorItem[]>([])
+  const [honorTarif, setHonorTarif] = useState<HonorTarif>({ pembuatan_soal: 0, pengisian_rapor: 0, pemeriksaan_hasil: 0, pengawasan: 0 })
+  const [mapelConfigs, setMapelConfigs] = useState<HonorMapelConfig[]>([])
+  const [guruOptions, setGuruOptions] = useState<GuruOption[]>([])
+  const [manualSoalDrafts, setManualSoalDrafts] = useState<ManualSoalDraft[]>([])
+  const [savingHonor, setSavingHonor] = useState(false)
   const rabPrintRef = useRef<HTMLDivElement>(null)
   const transaksiPrintRef = useRef<HTMLDivElement>(null)
   const handlePrintRab = useReactToPrint({
@@ -678,11 +721,15 @@ export default function KeuanganEhbPageContent() {
     const evt = await getActiveEventForKeuangan()
     setEvent(evt || null)
     if (evt) {
-      const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
+      const [savedRows, autoBasis, signers, transaksiRows, tarifRows, configRows, honorRows, gurus] = await Promise.all([
         getRabItems(evt.id),
         getRabAutoBasis(evt.id),
         getKeuanganSigners(evt.id),
         getTransaksiItems(evt.id),
+        getHonorTarif(evt.id),
+        getHonorMapelConfig(evt.id),
+        getHonorItems(evt.id),
+        getGuruOptionsForHonor(),
       ])
       const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
       setBasis(autoBasis)
@@ -691,6 +738,19 @@ export default function KeuanganEhbPageContent() {
       setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab))
       setKetuaPelaksana(signers.ketua)
       setBendahara(signers.bendahara)
+      setHonorTarif(tarifRows)
+      setMapelConfigs(configRows)
+      setHonorItems(honorRows)
+      setGuruOptions(gurus)
+      setManualSoalDrafts(honorRows
+        .filter(item => item.jenis === 'pembuatan_soal')
+        .map(item => ({
+          draft_id: item.id,
+          guru_id: item.guru_id ?? '',
+          nama: item.nama,
+          qty: item.qty,
+          keterangan: item.detail,
+        })))
     }
     setLoading(false)
   }, [])
@@ -722,6 +782,15 @@ export default function KeuanganEhbPageContent() {
   const rabOptions = useMemo(() => (
     drafts.filter(item => item.system_key !== 'honor_pemeriksaan_header' && item.nama_barang.trim())
   ), [drafts])
+
+  const honorSummary = useMemo(() => {
+    const byJenis = new Map<HonorJenis, number>()
+    for (const item of honorItems) {
+      byJenis.set(item.jenis, (byJenis.get(item.jenis) || 0) + item.total)
+    }
+    const total = Array.from(byJenis.values()).reduce((sum, value) => sum + value, 0)
+    return { byJenis, total }
+  }, [honorItems])
 
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
     setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
@@ -933,6 +1002,57 @@ export default function KeuanganEhbPageContent() {
     loadData()
   }
 
+  const updateMapelConfig = (configId: number, jumlahMapel: number) => {
+    setMapelConfigs(prev => prev.map(item => item.id === configId ? { ...item, jumlah_mapel: jumlahMapel } : item))
+  }
+
+  const updateManualSoal = (draftId: string, patch: Partial<ManualSoalDraft>) => {
+    setManualSoalDrafts(prev => prev.map(item => {
+      if (item.draft_id !== draftId) return item
+      const next = { ...item, ...patch }
+      if (patch.guru_id !== undefined && patch.guru_id) {
+        next.nama = guruOptions.find(guru => guru.id === patch.guru_id)?.nama || next.nama
+      }
+      return next
+    }))
+  }
+
+  const addManualSoal = () => {
+    setManualSoalDrafts(prev => [
+      ...prev,
+      { draft_id: uid(), guru_id: '', nama: '', qty: 1, keterangan: '' },
+    ])
+  }
+
+  const deleteManualSoal = (draftId: string) => {
+    setManualSoalDrafts(prev => prev.filter(item => item.draft_id !== draftId))
+  }
+
+  const submitHonorSettings = async () => {
+    if (!event) return
+    setSavingHonor(true)
+    const configRes = await saveHonorMapelConfig(event.id, mapelConfigs.map(config => ({
+      marhalah_id: Number(config.marhalah_id),
+      waktu: config.waktu,
+      jumlah_mapel: Number(config.jumlah_mapel || 0),
+    })))
+    if ('error' in configRes) {
+      setSavingHonor(false)
+      return toast.error(configRes.error)
+    }
+
+    const soalRes = await savePembuatanSoalManual(event.id, manualSoalDrafts.map(item => ({
+      guru_id: item.guru_id ? Number(item.guru_id) : null,
+      nama: item.nama,
+      qty: Number(item.qty || 0),
+      keterangan: item.keterangan,
+    })))
+    setSavingHonor(false)
+    if ('error' in soalRes) return toast.error(soalRes.error)
+    toast.success('Rincian honor diperbarui')
+    loadData()
+  }
+
   if (loading) {
     return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   }
@@ -999,9 +1119,144 @@ export default function KeuanganEhbPageContent() {
       </div>
 
       {activeTab === 'honor_detail' ? (
-        <div className="bg-white border border-dashed rounded-2xl p-10 text-center">
-          <p className="font-bold text-slate-700">Tab ini disiapkan untuk tahap berikutnya.</p>
-          <p className="text-sm text-slate-500 mt-1">Sekarang kita fokus merapikan RAB dulu, bos.</p>
+        <div className="space-y-5">
+          <div className="grid md:grid-cols-5 gap-3">
+            {(['pembuatan_soal', 'pengisian_rapor', 'pemeriksaan_hasil', 'pengawasan'] as HonorJenis[]).map(jenis => (
+              <div key={jenis} className="bg-white border rounded-2xl p-4">
+                <p className="text-[11px] font-bold text-slate-500 uppercase">{HONOR_LABEL[jenis]}</p>
+                <p className="text-lg font-bold text-slate-800 mt-1">{rupiah(honorSummary.byJenis.get(jenis) || 0)}</p>
+                <p className="text-[11px] text-slate-400">Tarif {rupiah(honorTarif[jenis])}</p>
+              </div>
+            ))}
+            <div className="bg-slate-900 text-white rounded-2xl p-4">
+              <p className="text-[11px] font-bold text-white/50 uppercase">Total Honor</p>
+              <p className="text-lg font-bold mt-1">{rupiah(honorSummary.total)}</p>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-800">Konfigurasi Pemeriksaan Hasil</h2>
+                <p className="text-sm text-slate-500">Atur jumlah mapel per waktu. Mutawassithah default 0 dan bisa diisi manual.</p>
+              </div>
+              <button onClick={submitHonorSettings} disabled={savingHonor} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-60">
+                {savingHonor ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Rincian Honor
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold min-w-[180px]">Marhalah</th>
+                    {(['shubuh', 'ashar', 'maghrib'] as HonorWaktu[]).map(waktu => (
+                      <th key={waktu} className="px-4 py-3 text-left font-bold w-32">{WAKTU_LABEL[waktu]}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {Array.from(new Map(mapelConfigs.map(config => [config.marhalah_id, config.marhalah_nama])).entries()).map(([marhalahId, marhalahName]) => (
+                    <tr key={marhalahId || marhalahName}>
+                      <td className="px-4 py-3 font-bold text-slate-800">{marhalahName}</td>
+                      {(['shubuh', 'ashar', 'maghrib'] as HonorWaktu[]).map(waktu => {
+                        const config = mapelConfigs.find(item => item.marhalah_id === marhalahId && item.waktu === waktu)
+                        return (
+                          <td key={waktu} className="px-4 py-3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={config?.jumlah_mapel ?? 0}
+                              onChange={e => config && updateMapelConfig(config.id, Number(e.target.value))}
+                              className="w-24 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-slate-800">Pembuatan Soal</h2>
+                <p className="text-sm text-slate-500">Isi jumlah soal yang dibuat masing-masing guru.</p>
+              </div>
+              <button onClick={addManualSoal} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-3 py-2 rounded-xl text-sm flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Tambah Guru
+              </button>
+            </div>
+            <div className="space-y-2">
+              {manualSoalDrafts.length === 0 ? (
+                <div className="border border-dashed rounded-xl p-6 text-center text-slate-400 text-sm">Belum ada data pembuatan soal.</div>
+              ) : manualSoalDrafts.map(item => (
+                <div key={item.draft_id} className="grid md:grid-cols-[1.4fr_1fr_120px_44px] gap-2 items-start">
+                  <select
+                    value={item.guru_id}
+                    onChange={e => updateManualSoal(item.draft_id, { guru_id: e.target.value ? Number(e.target.value) : '' })}
+                    className="border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                  >
+                    <option value="">Pilih guru / input manual</option>
+                    {guruOptions.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
+                  </select>
+                  <input
+                    value={item.nama}
+                    onChange={e => updateManualSoal(item.draft_id, { nama: e.target.value, guru_id: '' })}
+                    placeholder="Nama guru"
+                    className="border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.qty}
+                    onChange={e => updateManualSoal(item.draft_id, { qty: Number(e.target.value) })}
+                    className="border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                  />
+                  <button onClick={() => deleteManualSoal(item.draft_id)} className="p-2.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <section className="bg-white border rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50">
+              <h2 className="font-bold text-slate-800">Daftar Rincian Honor</h2>
+              <p className="text-sm text-slate-500">Semua jenis honor digabung per penerima dan jenis tugas.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold min-w-[170px]">Jenis</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[220px]">Penerima</th>
+                    <th className="px-4 py-3 text-right font-bold w-28">Qty</th>
+                    <th className="px-4 py-3 text-right font-bold w-36">Tarif</th>
+                    <th className="px-4 py-3 text-right font-bold w-36">Total</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[260px]">Detail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {honorItems.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Belum ada rincian honor.</td></tr>
+                  ) : honorItems.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-bold text-slate-700">{HONOR_LABEL[item.jenis]}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{item.nama}</td>
+                      <td className="px-4 py-3 text-right">{Number(item.qty || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-3 text-right">{rupiah(item.tarif)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-900">{rupiah(item.total)}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{item.detail || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       ) : activeTab === 'transaksi' ? (
         <div className="space-y-5">

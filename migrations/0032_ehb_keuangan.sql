@@ -42,5 +42,31 @@ CREATE TABLE IF NOT EXISTS ehb_keuangan_transaksi (
 CREATE INDEX IF NOT EXISTS idx_ehb_keuangan_transaksi_event
   ON ehb_keuangan_transaksi(ehb_event_id, tanggal, tipe, urutan);
 
+CREATE TABLE IF NOT EXISTS ehb_honor_mapel_config (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+  marhalah_id    INTEGER REFERENCES marhalah(id),
+  waktu          TEXT NOT NULL,
+  jumlah_mapel   INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT,
+  UNIQUE(ehb_event_id, marhalah_id, waktu)
+);
+
+CREATE TABLE IF NOT EXISTS ehb_honor_manual (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+  jenis          TEXT NOT NULL,
+  guru_id        INTEGER REFERENCES data_guru(id),
+  nama           TEXT NOT NULL,
+  qty            REAL NOT NULL DEFAULT 0,
+  keterangan     TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ehb_honor_manual_event
+  ON ehb_honor_manual(ehb_event_id, jenis, nama);
+
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan) VALUES
 ('EHB', 'Keuangan', '/dashboard/ehb/keuangan', 'Wallet', '["admin"]', 1, 12);
