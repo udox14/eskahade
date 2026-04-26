@@ -50,6 +50,20 @@ export type PanitiaBatchItem = PanitiaInput & {
   id?: number
 }
 
+export type PembuatSoalRow = {
+  mapel_id: number
+  mapel_nama: string
+  guru_id: number | null
+  nama_guru: string | null
+  digunakan_di: string | null
+}
+
+export type PembuatSoalInput = {
+  mapel_id: number
+  guru_id?: number | null
+  nama_guru?: string | null
+}
+
 export async function ensureKepanitiaanSchema() {
   await execute(`
     CREATE TABLE IF NOT EXISTS ehb_panitia (
@@ -78,6 +92,22 @@ export async function ensureKepanitiaanSchema() {
   await execute(`
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
     VALUES ('EHB', 'Kepanitiaan', '/dashboard/ehb/kepanitiaan', 'UserCog', '["admin"]', 1, 11)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_event
+    ON ehb_pembuat_soal(ehb_event_id, guru_id)
   `)
 }
 
@@ -341,6 +371,56 @@ export async function reorderPanitia(eventId: number, ids: number[]) {
   })))
   revalidatePath('/dashboard/ehb/kepanitiaan')
   return { success: true }
+}
+
+export async function getPembuatSoalList(eventId: number) {
+  await ensureKepanitiaanSchema()
+  return query<PembuatSoalRow>(`
+    SELECT
+      mp.id as mapel_id,
+      mp.nama as mapel_nama,
+      ps.guru_id,
+      COALESCE(dg.nama_lengkap, ps.nama_guru) as nama_guru,
+      GROUP_CONCAT(DISTINCT COALESCE(m.nama, k.nama_kelas)) as digunakan_di
+    FROM ehb_jadwal j
+    JOIN mapel mp ON mp.id = j.mapel_id
+    JOIN kelas k ON k.id = j.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN ehb_pembuat_soal ps ON ps.ehb_event_id = j.ehb_event_id AND ps.mapel_id = mp.id
+    LEFT JOIN data_guru dg ON dg.id = ps.guru_id
+    WHERE j.ehb_event_id = ?
+    GROUP BY mp.id, mp.nama, ps.guru_id, ps.nama_guru, dg.nama_lengkap
+    ORDER BY mp.nama
+  `, [eventId])
+}
+
+export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalInput[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKepanitiaanSchema()
+
+  const cleanInputs = inputs
+    .map(input => ({
+      mapel_id: Number(input.mapel_id),
+      guru_id: input.guru_id ? Number(input.guru_id) : null,
+      nama_guru: input.nama_guru?.trim() || null,
+    }))
+    .filter(input => input.mapel_id && (input.guru_id || input.nama_guru))
+
+  await execute(`DELETE FROM ehb_pembuat_soal WHERE ehb_event_id = ?`, [eventId])
+  if (cleanInputs.length > 0) {
+    await batch(cleanInputs.map(input => ({
+      sql: `
+        INSERT INTO ehb_pembuat_soal (ehb_event_id, mapel_id, guru_id, nama_guru)
+        VALUES (?, ?, ?, ?)
+      `,
+      params: [eventId, input.mapel_id, input.guru_id, input.nama_guru],
+    })))
+  }
+
+  revalidatePath('/dashboard/ehb/kepanitiaan')
+  revalidatePath('/dashboard/ehb/keuangan')
+  return { success: true, saved: cleanInputs.length }
 }
 
 const INTI_ORDER: Record<string, number> = {

@@ -3,6 +3,7 @@
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
+import { syncWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 
 export type ActiveEvent = {
   id: number
@@ -90,10 +91,17 @@ export type HonorMapelConfig = {
   jumlah_mapel: number
 }
 
+export type MapelEhbOption = {
+  id: number
+  nama: string
+}
+
 export type HonorItem = {
   id: string
   jenis: HonorJenis
   guru_id: number | null
+  mapel_id?: number | null
+  mapel_nama?: string | null
   nama: string
   qty: number
   tarif: number
@@ -185,6 +193,8 @@ export async function ensureKeuanganSchema() {
       jenis          TEXT NOT NULL,
       guru_id        INTEGER REFERENCES data_guru(id),
       nama           TEXT NOT NULL,
+      mapel_id       INTEGER REFERENCES mapel(id),
+      mapel_nama     TEXT,
       qty            REAL NOT NULL DEFAULT 0,
       keterangan     TEXT,
       created_at     TEXT NOT NULL DEFAULT (datetime('now')),
@@ -195,6 +205,28 @@ export async function ensureKeuanganSchema() {
     CREATE INDEX IF NOT EXISTS idx_ehb_honor_manual_event
     ON ehb_honor_manual(ehb_event_id, jenis, nama)
   `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_event
+    ON ehb_pembuat_soal(ehb_event_id, guru_id)
+  `)
+  try {
+    await execute(`ALTER TABLE ehb_honor_manual ADD COLUMN mapel_id INTEGER REFERENCES mapel(id)`)
+  } catch {}
+  try {
+    await execute(`ALTER TABLE ehb_honor_manual ADD COLUMN mapel_nama TEXT`)
+  } catch {}
   await execute(`
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
     VALUES ('EHB', 'Keuangan', '/dashboard/ehb/keuangan', 'Wallet', '["admin"]', 1, 12)
@@ -302,7 +334,7 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
     queryOne<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM (
-        SELECT DISTINCT j.kelas_id, j.mapel_id
+        SELECT DISTINCT j.mapel_id
         FROM ehb_jadwal j
         WHERE j.ehb_event_id = ?
       )
@@ -550,37 +582,32 @@ export async function getGuruOptionsForHonor() {
   `)
 }
 
+export async function getMapelEhbOptions(eventId: number) {
+  await ensureKeuanganSchema()
+  return query<MapelEhbOption>(`
+    SELECT DISTINCT mp.id, mp.nama
+    FROM ehb_jadwal j
+    JOIN mapel mp ON mp.id = j.mapel_id
+    WHERE j.ehb_event_id = ?
+    ORDER BY mp.nama
+  `, [eventId])
+}
+
 export async function getPembuatanSoalManual(eventId: number) {
   await ensureKeuanganSchema()
-  const rows = await query<{ id: number; guru_id: number | null; nama: string; qty: number; keterangan: string | null }>(`
-    SELECT id, guru_id, nama, qty, keterangan
+  const rows = await query<{ id: number; guru_id: number | null; nama: string; mapel_id: number | null; mapel_nama: string | null; qty: number; keterangan: string | null }>(`
+    SELECT id, guru_id, nama, mapel_id, mapel_nama, qty, keterangan
     FROM ehb_honor_manual
     WHERE ehb_event_id = ? AND jenis = 'pembuatan_soal'
-    ORDER BY nama
+    ORDER BY nama, mapel_nama
   `, [eventId])
 
   if (rows.length > 0) return rows
 
-  return query<{ id: number; guru_id: number | null; nama: string; qty: number; keterangan: string | null }>(`
-    SELECT
-      0 as id,
-      dg.id as guru_id,
-      dg.nama_lengkap as nama,
-      0 as qty,
-      'Isi jumlah soal yang dibuat' as keterangan
-    FROM data_guru dg
-    WHERE dg.id IN (
-      SELECT guru_shubuh_id FROM kelas WHERE guru_shubuh_id IS NOT NULL
-      UNION
-      SELECT guru_ashar_id FROM kelas WHERE guru_ashar_id IS NOT NULL
-      UNION
-      SELECT guru_maghrib_id FROM kelas WHERE guru_maghrib_id IS NOT NULL
-    )
-    ORDER BY dg.nama_lengkap
-  `)
+  return []
 }
 
-export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?: number | null; nama: string; qty: number; keterangan?: string | null }[]) {
+export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?: number | null; nama: string; mapel_id?: number | null; mapel_nama?: string | null; qty: number; keterangan?: string | null }[]) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
   await ensureKeuanganSchema()
@@ -589,19 +616,21 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
     .map(row => ({
       guru_id: row.guru_id ?? null,
       nama: row.nama.trim(),
+      mapel_id: row.mapel_id ?? null,
+      mapel_nama: row.mapel_nama?.trim() || null,
       qty: Number(row.qty || 0),
       keterangan: row.keterangan?.trim() || null,
     }))
-    .filter(row => row.nama && row.qty > 0)
+    .filter(row => row.nama && row.mapel_id && row.qty > 0)
 
   await execute(`DELETE FROM ehb_honor_manual WHERE ehb_event_id = ? AND jenis = 'pembuatan_soal'`, [eventId])
   if (cleanRows.length > 0) {
     await batch(cleanRows.map(row => ({
       sql: `
-        INSERT INTO ehb_honor_manual (ehb_event_id, jenis, guru_id, nama, qty, keterangan)
-        VALUES (?, 'pembuatan_soal', ?, ?, ?, ?)
+        INSERT INTO ehb_honor_manual (ehb_event_id, jenis, guru_id, nama, mapel_id, mapel_nama, qty, keterangan)
+        VALUES (?, 'pembuatan_soal', ?, ?, ?, ?, ?, ?)
       `,
-      params: [eventId, row.guru_id, row.nama, row.qty, row.keterangan],
+      params: [eventId, row.guru_id, row.nama, row.mapel_id, row.mapel_nama, row.qty, row.keterangan],
     })))
   }
 
@@ -611,21 +640,37 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
 
 export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
   await ensureHonorMapelDefaults(eventId)
+  await syncWaliKelasFromGuruMaghrib()
   const tarif = await getHonorTarif(eventId)
-  const manualSoal = await getPembuatanSoalManual(eventId)
 
-  const soalItems: HonorItem[] = manualSoal
+  const pembuatSoalRows = await query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
+    SELECT
+      ps.guru_id,
+      COALESCE(dg.nama_lengkap, ps.nama_guru, 'Pembuat soal belum diatur') as nama,
+      COUNT(DISTINCT ps.mapel_id) as qty,
+      GROUP_CONCAT(mp.nama, ', ') as detail
+    FROM ehb_pembuat_soal ps
+    JOIN mapel mp ON mp.id = ps.mapel_id
+    LEFT JOIN data_guru dg ON dg.id = ps.guru_id
+    WHERE ps.ehb_event_id = ? AND (ps.guru_id IS NOT NULL OR COALESCE(ps.nama_guru, '') <> '')
+    GROUP BY ps.guru_id, dg.nama_lengkap, ps.nama_guru
+    ORDER BY nama
+  `, [eventId])
+
+  const soalItems: HonorItem[] = pembuatSoalRows
     .filter(row => Number(row.qty || 0) > 0)
     .map(row => ({
       id: `soal-${row.guru_id ?? row.nama}`,
       jenis: 'pembuatan_soal',
       guru_id: row.guru_id,
+      mapel_id: null,
+      mapel_nama: null,
       nama: row.nama,
       qty: Number(row.qty || 0),
       tarif: tarif.pembuatan_soal,
       total: Number(row.qty || 0) * tarif.pembuatan_soal,
-      detail: row.keterangan || 'Jumlah soal dibuat',
-      editable: true,
+      detail: row.detail || 'Soal EHB',
+      editable: false,
     }))
 
   const raporRows = await query<{ wali_id: string | null; nama: string; qty: number; detail: string }>(`

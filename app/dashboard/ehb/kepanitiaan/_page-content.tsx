@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import * as XLSX from 'xlsx'
 import {
-  AlertTriangle, Copy, Crown, Download, FileSpreadsheet, Loader2, Plus, Printer, Trash2, Upload, UserCog, Users,
+  AlertTriangle, BookOpenCheck, Copy, Crown, Download, FileSpreadsheet, Loader2, Plus, Printer, Save, Trash2, Upload, UserCog, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -13,14 +13,17 @@ import {
   getEventOptionsForCopy,
   getGuruOptionsForKepanitiaan,
   getPanitiaList,
+  getPembuatSoalList,
   importPanitiaBatch,
   replacePanitiaBatch,
+  savePembuatSoalBatch,
   type ActiveEvent,
   type EventOption,
   type GuruOption,
   type PanitiaBatchItem,
   type PanitiaInput,
   type PanitiaRow,
+  type PembuatSoalRow,
 } from './actions'
 import { FONT } from '../cetak/_shared'
 
@@ -55,6 +58,10 @@ type DraftPanitia = {
   source: 'guru' | 'manual'
   guru_id: number | ''
   nama: string
+}
+
+type DraftPembuatSoal = PembuatSoalRow & {
+  draft_guru_id: number | ''
 }
 
 function PrintHeader({ event }: { event: ActiveEvent }) {
@@ -302,8 +309,11 @@ export default function KepanitiaanPageContent() {
   const [eventOptions, setEventOptions] = useState<EventOption[]>([])
   const [rows, setRows] = useState<PanitiaRow[]>([])
   const [drafts, setDrafts] = useState<DraftPanitia[]>([])
+  const [activeTab, setActiveTab] = useState<'panitia' | 'pembuat_soal'>('panitia')
+  const [soalDrafts, setSoalDrafts] = useState<DraftPembuatSoal[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingSoal, setSavingSoal] = useState(false)
   const [importing, setImporting] = useState(false)
   const [copying, setCopying] = useState(false)
   const [selectedCopyEvent, setSelectedCopyEvent] = useState<number | ''>('')
@@ -325,15 +335,17 @@ export default function KepanitiaanPageContent() {
     const evt = await getActiveEventForKepanitiaan()
     setEvent(evt)
     if (evt) {
-      const [gurus, panitia, events] = await Promise.all([
+      const [gurus, panitia, events, pembuatSoal] = await Promise.all([
         getGuruOptionsForKepanitiaan(),
         getPanitiaList(evt.id),
         getEventOptionsForCopy(evt.id),
+        getPembuatSoalList(evt.id),
       ])
       setGuruList(gurus)
       setRows(panitia)
       setDrafts(panitia.map(rowToDraft))
       setEventOptions(events)
+      setSoalDrafts(pembuatSoal.map(row => ({ ...row, draft_guru_id: row.guru_id ?? '' })))
     }
     setLoading(false)
   }
@@ -346,16 +358,18 @@ export default function KepanitiaanPageContent() {
       if (cancelled) return
       setEvent(evt)
       if (evt) {
-        const [gurus, panitia, events] = await Promise.all([
+        const [gurus, panitia, events, pembuatSoal] = await Promise.all([
           getGuruOptionsForKepanitiaan(),
           getPanitiaList(evt.id),
           getEventOptionsForCopy(evt.id),
+          getPembuatSoalList(evt.id),
         ])
         if (cancelled) return
         setGuruList(gurus)
         setRows(panitia)
         setDrafts(panitia.map(rowToDraft))
         setEventOptions(events)
+        setSoalDrafts(pembuatSoal.map(row => ({ ...row, draft_guru_id: row.guru_id ?? '' })))
       }
       setLoading(false)
     }
@@ -419,6 +433,33 @@ export default function KepanitiaanPageContent() {
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success(`${res.saved} data panitia disimpan`)
+    loadData()
+  }
+
+  const updatePembuatSoal = (mapelId: number, guruId: number | '') => {
+    setSoalDrafts(prev => prev.map(row => {
+      if (row.mapel_id !== mapelId) return row
+      const guru = guruId ? guruList.find(item => item.id === guruId) : null
+      return {
+        ...row,
+        draft_guru_id: guruId,
+        guru_id: guruId || null,
+        nama_guru: guru?.nama || null,
+      }
+    }))
+  }
+
+  const submitPembuatSoal = async () => {
+    if (!event) return
+    setSavingSoal(true)
+    const res = await savePembuatSoalBatch(event.id, soalDrafts.map(row => ({
+      mapel_id: row.mapel_id,
+      guru_id: row.draft_guru_id ? Number(row.draft_guru_id) : null,
+      nama_guru: row.nama_guru,
+    })))
+    setSavingSoal(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${res.saved} pembuat soal disimpan`)
     loadData()
   }
 
@@ -515,11 +556,17 @@ export default function KepanitiaanPageContent() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <UserCog className="w-7 h-7 text-indigo-600" /> Kepanitiaan EHB
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola susunan panitia inti dan seksi pelaksana EHB.</p>
+          <p className="text-sm text-slate-500 mt-1">Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB.</p>
         </div>
-        <button onClick={() => handlePrint()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg">
-          <Printer className="w-4 h-4" /> Cetak Organigram
-        </button>
+        {activeTab === 'panitia' ? (
+          <button onClick={() => handlePrint()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg">
+            <Printer className="w-4 h-4" /> Cetak Organigram
+          </button>
+        ) : (
+          <button onClick={submitPembuatSoal} disabled={savingSoal} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg">
+            {savingSoal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pembuat Soal
+          </button>
+        )}
       </div>
 
       <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-3 flex items-center gap-3">
@@ -528,6 +575,83 @@ export default function KepanitiaanPageContent() {
         <span className="text-xs text-indigo-500 ml-auto">T.A. {event.tahun_ajaran_nama}</span>
       </div>
 
+      <div className="bg-white border rounded-xl p-1 flex flex-wrap gap-1 w-fit">
+        {[
+          { key: 'panitia', label: 'Kepanitiaan', icon: UserCog },
+          { key: 'pembuat_soal', label: 'Pembuat Soal', icon: BookOpenCheck },
+        ].map(tab => {
+          const Icon = tab.icon
+          const active = activeTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as typeof activeTab)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${active ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <Icon className="w-4 h-4" /> {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {activeTab === 'pembuat_soal' ? (
+        <div className="space-y-5">
+          <div className="bg-white border rounded-xl p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-bold text-slate-800">Penetapan Pembuat Soal</h3>
+              <p className="text-sm text-slate-500">Semua mapel EHB aktif muncul otomatis. Pilih pembuat soal per mapel, lalu simpan sekaligus.</p>
+            </div>
+            <button onClick={submitPembuatSoal} disabled={savingSoal} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+              {savingSoal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Semua
+            </button>
+          </div>
+
+          <section className="bg-white border rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50">
+              <h2 className="font-bold text-slate-800">Daftar Mapel EHB</h2>
+              <p className="text-sm text-slate-500">Data ini dipakai otomatis oleh Keuangan untuk menghitung honor pembuatan soal.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold w-14">No</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[240px]">Mapel EHB</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[220px]">Dipakai di</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[280px]">Pembuat Soal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {soalDrafts.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Belum ada mapel EHB pada jadwal aktif.</td>
+                    </tr>
+                  ) : soalDrafts.map((row, index) => (
+                    <tr key={row.mapel_id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-400 font-bold">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-800">{row.mapel_nama}</p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{row.digunakan_di || '-'}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={row.draft_guru_id}
+                          onChange={e => updatePembuatSoal(row.mapel_id, e.target.value ? Number(e.target.value) : '')}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                        >
+                          <option value="">-- Belum ditentukan --</option>
+                          {guruList.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      ) : (
+        <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white border rounded-xl overflow-hidden">
           <div className="bg-slate-50 border-b px-5 py-3 flex items-center gap-2">
@@ -703,6 +827,8 @@ export default function KepanitiaanPageContent() {
           <KepanitiaanPrint event={event} rows={rows} />
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

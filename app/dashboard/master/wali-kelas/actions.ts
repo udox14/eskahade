@@ -4,14 +4,32 @@ import { query, queryOne, batch } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCachedDataGuru } from '@/lib/cache/master'
+import { syncWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.com`
 }
 
+type KelasMasterRow = {
+  id: string
+  nama_kelas: string
+  marhalah_nama: string | null
+  guru_shubuh_id: number | null
+  guru_shubuh_nama: string | null
+  guru_ashar_id: number | null
+  guru_ashar_nama: string | null
+  guru_maghrib_id: number | null
+  guru_maghrib_nama: string | null
+  wali_kelas_nama: string | null
+}
+
+type ImportGuruRow = Record<string, unknown>
+
 export async function getDataMaster() {
-  const kelas = await query<any>(`
+  await syncWaliKelasFromGuruMaghrib()
+
+  const kelas = await query<KelasMasterRow>(`
     SELECT
       k.id, k.nama_kelas,
       m.nama as marhalah_nama,
@@ -30,7 +48,7 @@ export async function getDataMaster() {
 
   const guru = await getCachedDataGuru()
 
-  const sortedKelas = kelas.sort((a: any, b: any) =>
+  const sortedKelas = kelas.sort((a, b) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
 
@@ -48,7 +66,7 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
 }
 
 export async function hapusGuru(id: number): Promise<{ success: boolean } | { error: string }> {
-  const used = await queryOne<any>(
+  const used = await queryOne<{ id: string }>(
     'SELECT id FROM kelas WHERE guru_shubuh_id = ? OR guru_ashar_id = ? OR guru_maghrib_id = ? LIMIT 1',
     [id, id, id]
   )
@@ -63,7 +81,7 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
 export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!ids.length) return { error: 'Tidak ada data.' }
   const placeholders = ids.map(() => '?').join(',')
-  const usedCheck = await query<any>(
+  const usedCheck = await query<{ id: string }>(
     `SELECT id FROM kelas WHERE guru_shubuh_id IN (${placeholders}) OR guru_ashar_id IN (${placeholders}) OR guru_maghrib_id IN (${placeholders}) LIMIT 1`,
     [...ids, ...ids, ...ids]
   )
@@ -75,13 +93,13 @@ export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean
   return { success: true, count: ids.length }
 }
 
-export async function importGuruMassal(dataExcel: any[]): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
   if (!dataExcel.length) return { error: 'Data kosong.' }
 
   const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
-  const existingNames = new Set(existing.map((g: any) => g.nama_lengkap.toLowerCase().trim()))
+  const existingNames = new Set(existing.map(g => g.nama_lengkap.toLowerCase().trim()))
 
-  const toInsert: any[] = []
+  const toInsert: [string, string, string][] = []
   let skipped = 0
 
   for (const row of dataExcel) {
@@ -122,6 +140,7 @@ export async function simpanJadwalBatch(
       ],
     }))
   )
+  await syncWaliKelasFromGuruMaghrib(payload.map(p => p.kelasId))
 
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: payload.length }
@@ -129,6 +148,7 @@ export async function simpanJadwalBatch(
 
 export async function setWaliKelas(kelasId: string, userId: string | null) {
   await query('UPDATE kelas SET wali_kelas_id = ? WHERE id = ?', [userId, kelasId])
+  await syncWaliKelasFromGuruMaghrib([kelasId])
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -143,16 +163,17 @@ export async function setGuruKelas(
     'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
     [guruShubuhId, guruAsharId, guruMaghribId, kelasId]
   )
+  await syncWaliKelasFromGuruMaghrib([kelasId])
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
 
 export async function getUsersForWaliKelas() {
-  return query<any>("SELECT id, full_name FROM users WHERE role IN ('wali_kelas', 'sekpen') ORDER BY full_name")
+  return query<{ id: string; full_name: string | null }>("SELECT id, full_name FROM users WHERE role IN ('wali_kelas', 'sekpen') ORDER BY full_name")
 }
 
 export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: boolean; email?: string } | { error: string }> {
-  const guru = await queryOne<any>('SELECT * FROM data_guru WHERE id = ?', [guruId])
+  const guru = await queryOne<{ id: number; nama_lengkap: string }>('SELECT id, nama_lengkap FROM data_guru WHERE id = ?', [guruId])
   if (!guru) return { error: 'Data guru tidak ditemukan.' }
 
   const email = generateEmail(guru.nama_lengkap)
