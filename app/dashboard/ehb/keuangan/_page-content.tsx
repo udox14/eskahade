@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import {
-  AlertTriangle, Calculator, FileText, Loader2, Plus, Printer, ReceiptText, Save, Trash2, Wallet,
+  AlertTriangle, Calculator, FileText, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Wallet, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -32,6 +32,23 @@ type DraftRabItem = RabItemInput & {
 
 type DraftTransaksiItem = TransaksiInput & {
   draft_id: string
+}
+
+type TransaksiForm = {
+  mode: 'create' | 'edit'
+  draft_id?: string
+  tipe: TransaksiTipe
+  tanggal: string
+  source: string
+  kategori: string
+  uraian: string
+  qty: number
+  harga: number
+  nominal: number
+  keterangan: string
+  rab_item_id: number | null
+  is_system: number
+  system_key: string | null
 }
 
 const KATEGORI: { key: RabKategori; title: string; desc: string }[] = [
@@ -73,15 +90,11 @@ function todayKey() {
 }
 
 function lineTotal(item: Pick<DraftRabItem, 'qty' | 'harga' | 'system_key'>) {
-  if (item.system_key === 'honor_pemeriksaan_header') return 0
   if (item.system_key === 'honor_panitia') return Number(item.harga || 0)
   return Number(item.qty || 0) * Number(item.harga || 0)
 }
 
 function displayRabName(item: Pick<DraftRabItem, 'nama_barang' | 'system_key'>) {
-  if (item.system_key?.startsWith('honor_pemeriksaan_') && item.system_key !== 'honor_pemeriksaan_header') {
-    return item.nama_barang.replace(/^Insentif Pemeriksaan Hasil EHB\s*-\s*/i, '')
-  }
   return item.nama_barang
 }
 
@@ -124,24 +137,13 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Pemeriksaan Hasil EHB',
-      qty: 0,
+      qty: basis.totalHasilUjian,
       harga: 0,
-      keterangan: 'Rincian jumlah hasil pemeriksaan per marhalah.',
+      keterangan: `Total ${basis.totalHasilUjian.toLocaleString('id-ID')} hasil ujian dari seluruh marhalah.`,
       is_system: 1,
-      system_key: 'honor_pemeriksaan_header',
-      urutan: 9,
+      system_key: 'honor_pemeriksaan_hasil',
+      urutan: 10,
     },
-    ...basis.pemeriksaan.map((item, index) => ({
-      draft_id: uid(),
-      kategori: 'honorarium' as RabKategori,
-      nama_barang: item.marhalah_nama,
-      qty: item.jumlah_hasil,
-      harga: 0,
-      keterangan: `${item.jumlah_santri.toLocaleString('id-ID')} santri x ${item.jumlah_mapel.toLocaleString('id-ID')} mapel`,
-      is_system: 1,
-      system_key: `honor_pemeriksaan_${item.marhalah_id ?? index}`,
-      urutan: 10 + index,
-    })),
     {
       draft_id: uid(),
       kategori: 'honorarium',
@@ -180,8 +182,8 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
   return drafts
 }
 
-function rowsToDrafts(rows: RabItem[]) {
-  return rows.map(row => ({
+function rowsToDrafts(rows: RabItem[]): DraftRabItem[] {
+  const drafts = rows.map(row => ({
     draft_id: String(row.id),
     kategori: row.kategori,
     nama_barang: row.nama_barang,
@@ -192,6 +194,37 @@ function rowsToDrafts(rows: RabItem[]) {
     system_key: row.system_key,
     urutan: row.urutan,
   }))
+
+  const pemeriksaanRows = drafts.filter(item => item.system_key?.startsWith('honor_pemeriksaan_'))
+  if (pemeriksaanRows.length <= 1 && pemeriksaanRows[0]?.system_key !== 'honor_pemeriksaan_header') return drafts
+
+  const otherRows = drafts.filter(item => !item.system_key?.startsWith('honor_pemeriksaan_'))
+  const detailRows = pemeriksaanRows.filter(item => item.system_key !== 'honor_pemeriksaan_header')
+  const totalQty = detailRows.reduce((sum, item) => sum + Number(item.qty || 0), 0)
+  const totalNominal = detailRows.reduce((sum, item) => sum + lineTotal(item), 0)
+  const samePrice = detailRows.every(item => Number(item.harga || 0) === Number(detailRows[0]?.harga || 0))
+  const harga = samePrice ? Number(detailRows[0]?.harga || 0) : totalQty > 0 ? Math.round(totalNominal / totalQty) : 0
+
+  const combinedPemeriksaan: DraftRabItem = {
+    draft_id: uid(),
+    kategori: 'honorarium',
+    nama_barang: 'Insentif Pemeriksaan Hasil EHB',
+    qty: totalQty,
+    harga,
+    keterangan: `Gabungan ${totalQty.toLocaleString('id-ID')} hasil ujian dari seluruh marhalah.`,
+    is_system: 1,
+    system_key: 'honor_pemeriksaan_hasil',
+    urutan: 10,
+  }
+
+  return [
+    ...otherRows,
+    combinedPemeriksaan,
+  ].sort((a, b) => {
+    const kategoriA = KATEGORI.findIndex(item => item.key === a.kategori)
+    const kategoriB = KATEGORI.findIndex(item => item.key === b.kategori)
+    return kategoriA - kategoriB || Number(a.urutan || 0) - Number(b.urutan || 0)
+  })
 }
 
 function transactionTotal(item: Pick<DraftTransaksiItem, 'qty' | 'harga' | 'nominal'>) {
@@ -199,8 +232,37 @@ function transactionTotal(item: Pick<DraftTransaksiItem, 'qty' | 'harga' | 'nomi
 }
 
 function buildTransactionsFromRab(rows: Array<RabItem | DraftRabItem>, totalRab: number): DraftTransaksiItem[] {
+  const expenseRows = rows
+    .filter(row => row.system_key !== 'honor_pemeriksaan_header')
+    .map((row, index) => {
+      const total = lineTotal({
+        qty: Number(row.qty || 0),
+        harga: Number(row.harga || 0),
+        system_key: row.system_key,
+      })
+      return {
+        draft_id: uid(),
+        tipe: 'pengeluaran' as TransaksiTipe,
+        tanggal: todayKey(),
+        kategori: KATEGORI.find(item => item.key === row.kategori)?.title || row.kategori,
+        uraian: displayRabName(row),
+        qty: Number(row.qty || 0),
+        harga: Number(row.harga || 0),
+        nominal: total,
+        keterangan: row.keterangan || '',
+        rab_item_id: 'id' in row ? row.id : null,
+        is_system: row.is_system,
+        system_key: row.system_key ? `expense_${row.system_key}` : null,
+        urutan: 100 + index,
+      }
+    })
+
+  return [...buildDefaultIncomeTransactions(totalRab), ...expenseRows]
+}
+
+function buildDefaultIncomeTransactions(totalRab: number): DraftTransaksiItem[] {
   const tanggal = todayKey()
-  const incomeRows: DraftTransaksiItem[] = [
+  return [
     {
       draft_id: uid(),
       tipe: 'pemasukan',
@@ -230,33 +292,6 @@ function buildTransactionsFromRab(rows: Array<RabItem | DraftRabItem>, totalRab:
       urutan: 2,
     },
   ]
-
-  const expenseRows = rows
-    .filter(row => row.system_key !== 'honor_pemeriksaan_header')
-    .map((row, index) => {
-      const total = lineTotal({
-        qty: Number(row.qty || 0),
-        harga: Number(row.harga || 0),
-        system_key: row.system_key,
-      })
-      return {
-        draft_id: uid(),
-        tipe: 'pengeluaran' as TransaksiTipe,
-        tanggal,
-        kategori: KATEGORI.find(item => item.key === row.kategori)?.title || row.kategori,
-        uraian: displayRabName(row),
-        qty: Number(row.qty || 0),
-        harga: Number(row.harga || 0),
-        nominal: total,
-        keterangan: row.keterangan || '',
-        rab_item_id: 'id' in row ? row.id : null,
-        is_system: row.is_system,
-        system_key: row.system_key ? `expense_${row.system_key}` : null,
-        urutan: 100 + index,
-      }
-    })
-
-  return [...incomeRows, ...expenseRows]
 }
 
 function transaksiRowsToDrafts(rows: TransaksiItem[]) {
@@ -284,6 +319,24 @@ function sortTransaksi(items: DraftTransaksiItem[]) {
     if (a.tipe !== b.tipe) return a.tipe === 'pemasukan' ? -1 : 1
     return (a.urutan ?? 0) - (b.urutan ?? 0)
   })
+}
+
+function emptyTransaksiForm(tipe: TransaksiTipe = 'pengeluaran'): TransaksiForm {
+  return {
+    mode: 'create',
+    tipe,
+    tanggal: todayKey(),
+    source: tipe === 'pemasukan' ? 'income_pesantren' : 'manual',
+    kategori: tipe === 'pemasukan' ? 'Dana Pesantren' : 'Pengeluaran Lain',
+    uraian: tipe === 'pemasukan' ? 'Dana dari Pesantren' : '',
+    qty: 1,
+    harga: 0,
+    nominal: 0,
+    keterangan: '',
+    rab_item_id: null,
+    is_system: tipe === 'pemasukan' ? 1 : 0,
+    system_key: tipe === 'pemasukan' ? 'income_pesantren' : null,
+  }
 }
 
 function PrintHeader({ event }: { event: ActiveEvent }) {
@@ -595,6 +648,8 @@ export default function KeuanganEhbPageContent() {
   const [wakilKeuangan, setWakilKeuangan] = useState('')
   const [transaksiDrafts, setTransaksiDrafts] = useState<DraftTransaksiItem[]>([])
   const [savingTransaksi, setSavingTransaksi] = useState(false)
+  const [showTransaksiModal, setShowTransaksiModal] = useState(false)
+  const [transaksiForm, setTransaksiForm] = useState<TransaksiForm>(() => emptyTransaksiForm())
   const rabPrintRef = useRef<HTMLDivElement>(null)
   const transaksiPrintRef = useRef<HTMLDivElement>(null)
   const handlePrintRab = useReactToPrint({
@@ -632,7 +687,8 @@ export default function KeuanganEhbPageContent() {
       const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
       setBasis(autoBasis)
       setDrafts(rabDrafts)
-      setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildTransactionsFromRab(rabDrafts, rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)))
+      const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
+      setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab))
       setKetuaPelaksana(signers.ketua)
       setBendahara(signers.bendahara)
     }
@@ -663,6 +719,10 @@ export default function KeuanganEhbPageContent() {
     return { pemasukan, pengeluaran, saldo: pemasukan - pengeluaran }
   }, [transaksiDrafts])
 
+  const rabOptions = useMemo(() => (
+    drafts.filter(item => item.system_key !== 'honor_pemeriksaan_header' && item.nama_barang.trim())
+  ), [drafts])
+
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
     setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
   }
@@ -689,36 +749,147 @@ export default function KeuanganEhbPageContent() {
     setDrafts(prev => prev.filter(item => item.draft_id !== draftId))
   }
 
-  const updateTransaksi = (draftId: string, patch: Partial<DraftTransaksiItem>) => {
-    setTransaksiDrafts(prev => prev.map(item => {
-      if (item.draft_id !== draftId) return item
-      const next = { ...item, ...patch }
+  const openTransaksiModal = (tipe: TransaksiTipe = 'pengeluaran') => {
+    setTransaksiForm(emptyTransaksiForm(tipe))
+    setShowTransaksiModal(true)
+  }
+
+  const editTransaksi = (item: DraftTransaksiItem) => {
+    setTransaksiForm({
+      mode: 'edit',
+      draft_id: item.draft_id,
+      tipe: item.tipe,
+      tanggal: item.tanggal,
+      source: item.rab_item_id ? `rab:${item.rab_item_id}` : item.system_key || 'manual',
+      kategori: item.kategori,
+      uraian: item.uraian,
+      qty: Number(item.qty || 0),
+      harga: Number(item.harga || 0),
+      nominal: Number(item.nominal || 0),
+      keterangan: item.keterangan || '',
+      rab_item_id: item.rab_item_id ?? null,
+      is_system: item.is_system || 0,
+      system_key: item.system_key ?? null,
+    })
+    setShowTransaksiModal(true)
+  }
+
+  const updateTransaksiForm = (patch: Partial<TransaksiForm>) => {
+    setTransaksiForm(prev => {
+      const next = { ...prev, ...patch }
       if ('qty' in patch || 'harga' in patch) {
         next.nominal = Number(next.qty || 0) * Number(next.harga || 0)
       }
       return next
-    }))
+    })
   }
 
-  const addTransaksi = (tipe: TransaksiTipe) => {
-    setTransaksiDrafts(prev => [
-      ...prev,
-      {
-        draft_id: uid(),
-        tipe,
-        tanggal: todayKey(),
-        kategori: tipe === 'pemasukan' ? 'Pemasukan Lain' : 'Pengeluaran Lain',
-        uraian: '',
+  const handleTransaksiTipeChange = (tipe: TransaksiTipe) => {
+    setTransaksiForm(emptyTransaksiForm(tipe))
+  }
+
+  const handleTransaksiSourceChange = (source: string) => {
+    if (source.startsWith('rab:')) {
+      const rabDraftId = source.replace('rab:', '')
+      const rabItem = rabOptions.find(item => item.draft_id === rabDraftId)
+      if (rabItem) {
+        const numericRabId = /^\d+$/.test(rabItem.draft_id) ? Number(rabItem.draft_id) : null
+        updateTransaksiForm({
+          source,
+          tipe: 'pengeluaran',
+          kategori: KATEGORI.find(item => item.key === rabItem.kategori)?.title || rabItem.kategori,
+          uraian: displayRabName(rabItem),
+          qty: Number(rabItem.qty || 0),
+          harga: Number(rabItem.harga || 0),
+          nominal: lineTotal(rabItem),
+          keterangan: rabItem.keterangan || '',
+          rab_item_id: numericRabId,
+          is_system: rabItem.is_system || 0,
+          system_key: rabItem.system_key ? `expense_${rabItem.system_key}` : null,
+        })
+      }
+      return
+    }
+
+    if (source === 'income_pesantren') {
+      updateTransaksiForm({
+        source,
+        tipe: 'pemasukan',
+        kategori: 'Dana Pesantren',
+        uraian: 'Dana dari Pesantren',
+        qty: 1,
+        harga: summary.total,
+        nominal: summary.total,
+        keterangan: 'Nominal diterima dari pesantren.',
+        rab_item_id: null,
+        is_system: 1,
+        system_key: source,
+      })
+      return
+    }
+
+    if (source === 'income_denda_kartu_hilang') {
+      updateTransaksiForm({
+        source,
+        tipe: 'pemasukan',
+        kategori: 'Denda',
+        uraian: 'Denda Kartu Hilang',
         qty: 1,
         harga: 0,
         nominal: 0,
-        keterangan: '',
+        keterangan: 'Total pemasukan dari denda kartu hilang.',
         rab_item_id: null,
-        is_system: 0,
-        system_key: null,
-        urutan: prev.length + 1,
-      },
-    ])
+        is_system: 1,
+        system_key: source,
+      })
+      return
+    }
+
+    updateTransaksiForm({
+      source,
+      rab_item_id: null,
+      is_system: 0,
+      system_key: null,
+      kategori: transaksiForm.tipe === 'pemasukan' ? 'Pemasukan Lain' : 'Pengeluaran Lain',
+      uraian: '',
+      qty: 1,
+      harga: 0,
+      nominal: 0,
+      keterangan: '',
+    })
+  }
+
+  const saveTransaksiForm = () => {
+    if (!transaksiForm.tanggal || !transaksiForm.kategori.trim() || !transaksiForm.uraian.trim()) {
+      toast.error('Tanggal, kategori, dan uraian transaksi wajib diisi')
+      return
+    }
+
+    const payload: DraftTransaksiItem = {
+      draft_id: transaksiForm.draft_id || uid(),
+      tipe: transaksiForm.tipe,
+      tanggal: transaksiForm.tanggal,
+      kategori: transaksiForm.kategori.trim(),
+      uraian: transaksiForm.uraian.trim(),
+      qty: Number(transaksiForm.qty || 0),
+      harga: Number(transaksiForm.harga || 0),
+      nominal: Number(transaksiForm.nominal || 0),
+      keterangan: transaksiForm.keterangan.trim(),
+      rab_item_id: transaksiForm.rab_item_id,
+      is_system: transaksiForm.is_system,
+      system_key: transaksiForm.system_key,
+      urutan: transaksiForm.mode === 'edit'
+        ? transaksiDrafts.find(item => item.draft_id === transaksiForm.draft_id)?.urutan ?? transaksiDrafts.length + 1
+        : transaksiDrafts.length + 1,
+    }
+
+    setTransaksiDrafts(prev => (
+      transaksiForm.mode === 'edit'
+        ? prev.map(item => item.draft_id === payload.draft_id ? payload : item)
+        : [...prev, payload]
+    ))
+    setShowTransaksiModal(false)
+    toast.success(transaksiForm.mode === 'edit' ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
   }
 
   const deleteTransaksi = (draftId: string) => {
@@ -853,17 +1024,14 @@ export default function KeuanganEhbPageContent() {
             <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
               <div>
                 <h2 className="font-bold text-slate-800">Transaksi Realisasi</h2>
-                <p className="text-sm text-slate-500">Input nominal yang benar-benar diterima dan dikeluarkan. Draft pengeluaran diambil dari RAB.</p>
+                <p className="text-sm text-slate-500">Catat pemasukan dan pengeluaran lewat modal supaya inputnya tidak bikin pusing.</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button onClick={() => openTransaksiModal('pengeluaran')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Catat Transaksi
+                </button>
                 <button onClick={resetTransaksiFromRab} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                   <Calculator className="w-4 h-4" /> Reset dari RAB
-                </button>
-                <button onClick={() => addTransaksi('pemasukan')} className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Pemasukan
-                </button>
-                <button onClick={() => addTransaksi('pengeluaran')} className="bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Pengeluaran
                 </button>
                 <button onClick={submitTransaksi} disabled={savingTransaksi} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-60">
                   {savingTransaksi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan
@@ -913,97 +1081,51 @@ export default function KeuanganEhbPageContent() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 text-left font-bold w-36">Tanggal</th>
-                    <th className="px-4 py-3 text-left font-bold w-36">Tipe</th>
-                    <th className="px-4 py-3 text-left font-bold min-w-[180px]">Kategori</th>
-                    <th className="px-4 py-3 text-left font-bold min-w-[240px]">Uraian</th>
-                    <th className="px-4 py-3 text-left font-bold w-24">Qty</th>
-                    <th className="px-4 py-3 text-left font-bold w-36">Harga</th>
+                    <th className="px-4 py-3 text-left font-bold w-32">Tanggal</th>
+                    <th className="px-4 py-3 text-left font-bold w-32">Tipe</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[260px]">Uraian</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[160px]">Kategori</th>
                     <th className="px-4 py-3 text-right font-bold w-36">Nominal</th>
                     <th className="px-4 py-3 text-left font-bold min-w-[180px]">Keterangan</th>
-                    <th className="px-4 py-3 w-12"></th>
+                    <th className="px-4 py-3 text-right font-bold w-24">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {transaksiDrafts.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-slate-400">Belum ada transaksi</td>
+                      <td colSpan={7} className="px-4 py-10 text-center text-slate-400">Belum ada transaksi</td>
                     </tr>
-                  ) : transaksiDrafts.map(item => (
-                    <tr key={item.draft_id} className={item.tipe === 'pemasukan' ? 'bg-emerald-50/20' : 'bg-white'}>
+                  ) : sortTransaksi(transaksiDrafts).map(item => (
+                    <tr key={item.draft_id} className={item.tipe === 'pemasukan' ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'bg-white hover:bg-slate-50'}>
+                      <td className="px-4 py-3 align-top font-semibold text-slate-700 whitespace-nowrap">{shortDateWib(item.tanggal)}</td>
                       <td className="px-4 py-3 align-top">
-                        <input
-                          type="date"
-                          value={item.tanggal}
-                          onChange={e => updateTransaksi(item.draft_id, { tanggal: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${item.tipe === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {item.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 align-top">
-                        <select
-                          value={item.tipe}
-                          onChange={e => updateTransaksi(item.draft_id, { tipe: e.target.value as TransaksiTipe })}
-                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        >
-                          <option value="pemasukan">Pemasukan</option>
-                          <option value="pengeluaran">Pengeluaran</option>
-                        </select>
+                        <p className="font-bold text-slate-800">{item.uraian}</p>
+                        <p className="text-xs text-slate-400">
+                          Qty {Number(item.qty || 0).toLocaleString('id-ID')} x {rupiah(Number(item.harga || 0))}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <input
-                          value={item.kategori}
-                          onChange={e => updateTransaksi(item.draft_id, { kategori: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
+                      <td className="px-4 py-3 align-top text-slate-600">
+                        <p className="font-semibold">{item.kategori}</p>
                         {item.rab_item_id || item.is_system ? <p className="text-[11px] text-indigo-600 font-bold mt-1">Draft dari RAB/default.</p> : null}
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <input
-                          value={item.uraian}
-                          onChange={e => updateTransaksi(item.draft_id, { uraian: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
+                      <td className={`px-4 py-3 align-top text-right font-bold whitespace-nowrap ${item.tipe === 'pemasukan' ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {rupiah(transactionTotal(item))}
                       </td>
+                      <td className="px-4 py-3 align-top text-slate-500">{item.keterangan || '-'}</td>
                       <td className="px-4 py-3 align-top">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.qty || 0}
-                          onChange={e => updateTransaksi(item.draft_id, { qty: Number(e.target.value) })}
-                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <input
-                          value={item.harga ? item.harga.toLocaleString('id-ID') : ''}
-                          onChange={e => {
-                            const harga = parseMoney(e.target.value)
-                            updateTransaksi(item.draft_id, { harga, nominal: Number(item.qty || 0) * harga })
-                          }}
-                          placeholder="0"
-                          className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top text-right">
-                        <input
-                          value={transactionTotal(item) ? transactionTotal(item).toLocaleString('id-ID') : ''}
-                          onChange={e => updateTransaksi(item.draft_id, { nominal: parseMoney(e.target.value) })}
-                          placeholder="0"
-                          className="w-full border rounded-lg px-3 py-2 text-right font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <input
-                          value={item.keterangan || ''}
-                          onChange={e => updateTransaksi(item.draft_id, { keterangan: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <button onClick={() => deleteTransaksi(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => editTransaksi(item)} className="p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" title="Edit transaksi">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => deleteTransaksi(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" title="Hapus transaksi">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1011,6 +1133,159 @@ export default function KeuanganEhbPageContent() {
               </table>
             </div>
           </section>
+
+          {showTransaksiModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+                <div className="px-5 py-4 border-b flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-bold text-slate-800">{transaksiForm.mode === 'edit' ? 'Edit Transaksi' : 'Catat Transaksi'}</h2>
+                    <p className="text-sm text-slate-500">Pilih sumber transaksi, lalu isi nominal realnya.</p>
+                  </div>
+                  <button onClick={() => setShowTransaksiModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-5 overflow-y-auto space-y-4">
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleTransaksiTipeChange('pengeluaran')}
+                      className={`border rounded-xl px-4 py-3 text-left transition-all ${transaksiForm.tipe === 'pengeluaran' ? 'border-red-300 bg-red-50 text-red-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                    >
+                      <p className="font-bold">Pengeluaran</p>
+                      <p className="text-xs opacity-70 mt-0.5">Realisasi belanja</p>
+                    </button>
+                    <button
+                      onClick={() => handleTransaksiTipeChange('pemasukan')}
+                      className={`border rounded-xl px-4 py-3 text-left transition-all ${transaksiForm.tipe === 'pemasukan' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                    >
+                      <p className="font-bold">Pemasukan</p>
+                      <p className="text-xs opacity-70 mt-0.5">Dana diterima</p>
+                    </button>
+                    <div className="border rounded-xl px-4 py-3 bg-slate-50">
+                      <p className="text-xs font-bold text-slate-500 uppercase">Nominal</p>
+                      <p className={`text-lg font-bold ${transaksiForm.tipe === 'pemasukan' ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {rupiah(Number(transaksiForm.nominal || 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Tanggal</label>
+                      <input
+                        type="date"
+                        value={transaksiForm.tanggal}
+                        onChange={e => updateTransaksiForm({ tanggal: e.target.value })}
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">
+                        {transaksiForm.tipe === 'pengeluaran' ? 'Item RAB / Manual' : 'Jenis Penerimaan'}
+                      </label>
+                      <select
+                        value={transaksiForm.source}
+                        onChange={e => handleTransaksiSourceChange(e.target.value)}
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      >
+                        {transaksiForm.tipe === 'pengeluaran' ? (
+                          <>
+                            <option value="manual">Item baru di luar RAB</option>
+                            {rabOptions.map(item => (
+                              <option key={item.draft_id} value={`rab:${item.draft_id}`}>
+                                {displayRabName(item)}
+                              </option>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            <option value="income_pesantren">Dana dari Pesantren</option>
+                            <option value="income_denda_kartu_hilang">Denda Kartu Hilang</option>
+                            <option value="manual">Pemasukan Lain</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Kategori</label>
+                      <input
+                        value={transaksiForm.kategori}
+                        onChange={e => updateTransaksiForm({ kategori: e.target.value })}
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Uraian</label>
+                      <input
+                        value={transaksiForm.uraian}
+                        onChange={e => updateTransaksiForm({ uraian: e.target.value })}
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Qty Real</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={transaksiForm.qty}
+                        onChange={e => updateTransaksiForm({ qty: Number(e.target.value) })}
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Harga Real</label>
+                      <input
+                        value={transaksiForm.harga ? transaksiForm.harga.toLocaleString('id-ID') : ''}
+                        onChange={e => {
+                          const harga = parseMoney(e.target.value)
+                          updateTransaksiForm({ harga, nominal: Number(transaksiForm.qty || 0) * harga })
+                        }}
+                        placeholder="0"
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Nominal Total</label>
+                      <input
+                        value={transaksiForm.nominal ? transaksiForm.nominal.toLocaleString('id-ID') : ''}
+                        onChange={e => updateTransaksiForm({ nominal: parseMoney(e.target.value) })}
+                        placeholder="0"
+                        className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Keterangan</label>
+                    <input
+                      value={transaksiForm.keterangan}
+                      onChange={e => updateTransaksiForm({ keterangan: e.target.value })}
+                      placeholder="Opsional"
+                      className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="px-5 py-4 border-t bg-slate-50 flex justify-end gap-2">
+                  <button onClick={() => setShowTransaksiModal(false)} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm">
+                    Batal
+                  </button>
+                  <button onClick={saveTransaksiForm} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-xl text-sm flex items-center gap-2">
+                    <Save className="w-4 h-4" /> Simpan Draft
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="hidden">
             <div ref={transaksiPrintRef}>
