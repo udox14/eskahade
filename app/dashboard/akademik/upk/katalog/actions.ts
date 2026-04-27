@@ -47,7 +47,6 @@ type MasterKitabOption = {
 
 type KatalogStockSnapshot = {
   stok_lama: number
-  stok_baru: number
   stok_updated_at: string | null
 }
 
@@ -176,7 +175,6 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
   const marhalahId = toNullableInt(formData.get('marhalah_id'))
   const tokoId = toNullableInt(formData.get('toko_id'))
   const stokLama = toInt(formData.get('stok_lama'))
-  const stokBaru = toInt(formData.get('stok_baru'))
   const hargaBeli = toInt(formData.get('harga_beli'))
   const hargaJual = toInt(formData.get('harga_jual'))
   const isActive = formData.get('is_active') === 'on' ? 1 : 0
@@ -184,7 +182,7 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
 
   if (!namaKitab) return { error: 'Nama kitab wajib diisi.' }
   if (!marhalahId) return { error: 'Marhalah wajib dipilih.' }
-  if (stokLama < 0 || stokBaru < 0) return { error: 'Stok tidak boleh minus.' }
+  if (stokLama < 0) return { error: 'Stok tidak boleh minus.' }
   if (hargaBeli < 0 || hargaJual < 0) return { error: 'Harga tidak boleh minus.' }
 
   const duplicate = kitabId
@@ -198,19 +196,19 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
   const timestamp = now()
   if (id) {
     const currentStock = await queryOne<KatalogStockSnapshot>(
-      'SELECT stok_lama, stok_baru, stok_updated_at FROM upk_katalog WHERE id = ?',
+      'SELECT stok_lama, stok_updated_at FROM upk_katalog WHERE id = ?',
       [id]
     )
-    const stockChanged = !currentStock || currentStock.stok_lama !== stokLama || currentStock.stok_baru !== stokBaru
+    const stockChanged = !currentStock || currentStock.stok_lama !== stokLama
     const stockUpdatedAt = stockChanged ? timestamp : currentStock.stok_updated_at
 
     await execute(`
       UPDATE upk_katalog
       SET kitab_id = ?, nama_kitab = ?, marhalah_id = ?, toko_id = ?,
-          stok_lama = ?, stok_baru = ?, harga_beli = ?, harga_jual = ?,
+          stok_lama = ?, harga_beli = ?, harga_jual = ?,
           is_active = ?, catatan = ?, stok_updated_at = ?, updated_at = ?
       WHERE id = ?
-    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, stokBaru, hargaBeli, hargaJual,
+    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, hargaBeli, hargaJual,
         isActive, catatan || null, stockUpdatedAt, timestamp, id])
   } else {
     await execute(`
@@ -218,7 +216,7 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
         (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
          harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, stokBaru, hargaBeli, hargaJual,
+    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, 0, hargaBeli, hargaJual,
         isActive, catatan || null, timestamp, timestamp, timestamp])
   }
 
@@ -264,7 +262,6 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
     const marhalahNama = cleanText(pick(row, ['MARHALAH', 'Marhalah', 'marhalah']))
     const tokoNama = cleanText(pick(row, ['TOKO', 'Toko', 'toko']))
     const stokLama = toImportInt(pick(row, ['STOK LAMA', 'Stok Lama', 'stok lama']))
-    const stokBaru = toImportInt(pick(row, ['STOK BARU', 'Stok Baru', 'stok baru']))
     const hargaBeli = toImportInt(pick(row, ['HARGA BELI', 'Harga Beli', 'harga beli']))
     const hargaJual = toImportInt(pick(row, ['HARGA JUAL', 'Harga Jual', 'harga jual']))
     const catatan = cleanText(pick(row, ['CATATAN', 'Catatan', 'catatan']))
@@ -300,20 +297,20 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
 
     if (existing) {
       const currentStock = await queryOne<KatalogStockSnapshot>(
-        'SELECT stok_lama, stok_baru, stok_updated_at FROM upk_katalog WHERE id = ?',
+        'SELECT stok_lama, stok_updated_at FROM upk_katalog WHERE id = ?',
         [existing.id]
       )
-      const stockChanged = !currentStock || currentStock.stok_lama !== stokLama || currentStock.stok_baru !== stokBaru
+      const stockChanged = !currentStock || currentStock.stok_lama !== stokLama
       const stockUpdatedAt = stockChanged ? timestamp : currentStock.stok_updated_at
 
       await execute(`
         UPDATE upk_katalog
         SET kitab_id = ?, nama_kitab = ?, marhalah_id = ?, toko_id = ?,
-            stok_lama = ?, stok_baru = ?, harga_beli = ?, harga_jual = ?,
+            stok_lama = ?, harga_beli = ?, harga_jual = ?,
             is_active = 1, catatan = ?, stok_updated_at = ?, updated_at = ?
         WHERE id = ?
       `, [master?.id ?? existing.kitab_id ?? null, namaKitab, marhalah.id, tokoId,
-          stokLama, stokBaru, hargaBeli, hargaJual, catatan || null, stockUpdatedAt, timestamp, existing.id])
+          stokLama, hargaBeli, hargaJual, catatan || null, stockUpdatedAt, timestamp, existing.id])
       updated++
     } else {
       await execute(`
@@ -321,7 +318,7 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
           (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
            harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-      `, [master?.id ?? null, namaKitab, marhalah.id, tokoId, stokLama, stokBaru,
+      `, [master?.id ?? null, namaKitab, marhalah.id, tokoId, stokLama, 0,
           hargaBeli, hargaJual, catatan || null, timestamp, timestamp, timestamp])
 
       const insertedRow = await queryOne<{ id: number; kitab_id: number | null; nama_kitab: string; marhalah_id: number }>(

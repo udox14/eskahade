@@ -46,6 +46,7 @@ type RencanaHitungRow = {
   katalog_id: number
   nama_kitab: string
   marhalah_id: number | null
+  toko_nama: string | null
   stok_lama: number
   stok_baru: number
   harga_beli: number
@@ -124,9 +125,11 @@ export async function hitungRencanaBelanja(persenTarget: number) {
   const persen = Math.max(1, Math.min(100, toInt(persenTarget)))
   const rows = await query<RencanaHitungRow>(`
     SELECT uk.id AS katalog_id, uk.nama_kitab, uk.marhalah_id, uk.stok_lama, uk.stok_baru, uk.harga_beli,
+           t.nama AS toko_nama,
            m.nama AS marhalah_nama, COUNT(DISTINCT s.id) AS jumlah_santri
     FROM upk_katalog uk
     LEFT JOIN marhalah m ON m.id = uk.marhalah_id
+    LEFT JOIN upk_toko t ON t.id = uk.toko_id
     LEFT JOIN kelas k ON k.marhalah_id = uk.marhalah_id
     LEFT JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
@@ -145,6 +148,7 @@ export async function hitungRencanaBelanja(persenTarget: number) {
       nama_kitab: row.nama_kitab,
       marhalah_id: row.marhalah_id,
       marhalah_nama: row.marhalah_nama,
+      toko_nama: row.toko_nama,
       jumlah_santri: jumlahSantri,
       stok_lama: stokLama,
       stok_baru: toInt(row.stok_baru),

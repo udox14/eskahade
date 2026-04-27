@@ -3241,3 +3241,2874 @@
  GET /api/version 200 in 12ms
  GET /api/version 200 in 11ms
  GET /api/version 200 in 17ms
+ GET /api/version 200 in 19ms
+ GET /api/version 200 in 33ms
+ GET /api/version 200 in 28ms
+ GET /api/version 200 in 51ms
+ GET /api/version 200 in 22ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 1647ms (compile: 81ms, render: 1566ms)
+ GET /dashboard 200 in 1983ms (compile: 93ms, render: 1890ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 166ms (compile: 7ms, render: 158ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 3.1s (compile: 470ms, render: 2.6s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 115ms (compile: 9ms, render: 106ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.4s (compile: 75ms, render: 2.3s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.2s (compile: 136ms, render: 2.1s)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 125ms (compile: 43ms, render: 82ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 272ms (compile: 119ms, render: 153ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 207ms (compile: 120ms, render: 87ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 4.2s (compile: 200ms, render: 4.0s)
+ GET /dashboard/asrama/spp 200 in 1543ms (compile: 82ms, render: 1461ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 206ms (compile: 23ms, render: 184ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 258ms (compile: 152ms, render: 106ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1998ms (compile: 26ms, render: 1972ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 113ms (compile: 7ms, render: 106ms)
+ GET /dashboard/asrama/spp 200 in 1858ms (compile: 47ms, render: 1811ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1746ms (compile: 61ms, render: 1685ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 170ms (compile: 69ms, render: 101ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 191ms (compile: 75ms, render: 117ms)
+ GET /dashboard/asrama/spp 200 in 1834ms (compile: 102ms, render: 1731ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1817ms (compile: 83ms, render: 1734ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 340ms (compile: 70ms, render: 270ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 462ms (compile: 261ms, render: 201ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.4s (compile: 35ms, render: 2.4s)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 269ms (compile: 143ms, render: 126ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.8s (compile: 47ms, render: 2.8s)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 137ms (compile: 11ms, render: 127ms)
+ GET /dashboard/asrama/spp 200 in 2.7s (compile: 81ms, render: 2.6s)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 2.5s (compile: 67ms, render: 2.5s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 165ms (compile: 68ms, render: 98ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 181ms (compile: 94ms, render: 87ms)
+ GET /dashboard/asrama/spp 200 in 2.4s (compile: 40ms, render: 2.4s)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 194ms (compile: 97ms, render: 97ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1952ms (compile: 57ms, render: 1895ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 74ms (compile: 6ms, render: 67ms)
+ GET /dashboard/asrama/spp 200 in 1721ms (compile: 58ms, render: 1664ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 146ms (compile: 53ms, render: 92ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1781ms (compile: 55ms, render: 1726ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1494ms (compile: 63ms, render: 1431ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 116ms (compile: 8ms, render: 108ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1616ms (compile: 78ms, render: 1538ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 267ms (compile: 138ms, render: 130ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1531ms (compile: 77ms, render: 1454ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 247ms (compile: 130ms, render: 116ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 194ms (compile: 68ms, render: 126ms)
+ GET /dashboard/asrama/spp 200 in 1775ms (compile: 65ms, render: 1711ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 138ms (compile: 49ms, render: 89ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1848ms (compile: 42ms, render: 1806ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 166ms (compile: 57ms, render: 109ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1928ms (compile: 48ms, render: 1880ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1600ms (compile: 75ms, render: 1524ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 56ms (compile: 3ms, render: 53ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1439ms (compile: 41ms, render: 1399ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 147ms (compile: 58ms, render: 89ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1403ms (compile: 10ms, render: 1392ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 154ms (compile: 72ms, render: 82ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 204ms (compile: 85ms, render: 120ms)
+ GET /dashboard/asrama/spp 200 in 1361ms (compile: 58ms, render: 1303ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 165ms (compile: 54ms, render: 111ms)
+ GET /dashboard/asrama/spp 200 in 1395ms (compile: 28ms, render: 1367ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 49ms (compile: 9ms, render: 41ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1709ms (compile: 29ms, render: 1680ms)
+ GET /dashboard/asrama/spp 200 in 1495ms (compile: 62ms, render: 1433ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 85ms (compile: 11ms, render: 74ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1528ms (compile: 56ms, render: 1472ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 198ms (compile: 112ms, render: 86ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 278ms (compile: 135ms, render: 143ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1583ms (compile: 43ms, render: 1539ms)
+ GET /dashboard/asrama/spp 200 in 2.0s (compile: 99ms, render: 1935ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 135ms (compile: 8ms, render: 128ms)
+ GET /dashboard/asrama/spp 200 in 1506ms (compile: 55ms, render: 1451ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 137ms (compile: 59ms, render: 79ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 182ms (compile: 69ms, render: 113ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1629ms (compile: 36ms, render: 1593ms)
+ GET /dashboard/asrama/spp 200 in 1313ms (compile: 73ms, render: 1240ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 91ms (compile: 5ms, render: 86ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 146ms (compile: 62ms, render: 84ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1198ms (compile: 38ms, render: 1161ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 83ms (compile: 24ms, render: 59ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1182ms (compile: 38ms, render: 1144ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1103ms (compile: 41ms, render: 1061ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 150ms (compile: 6ms, render: 145ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 202ms (compile: 91ms, render: 112ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1457ms (compile: 41ms, render: 1416ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 49ms (compile: 6ms, render: 44ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1350ms (compile: 54ms, render: 1297ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 84ms (compile: 24ms, render: 60ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 946ms (compile: 58ms, render: 888ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 85ms (compile: 4ms, render: 81ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 514ms (compile: 3ms, render: 510ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 417ms (compile: 50ms, render: 366ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 208ms (compile: 114ms, render: 94ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 205ms (compile: 50ms, render: 155ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 201ms (compile: 66ms, render: 135ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 2.2s (compile: 22ms, render: 2.1s)
+ GET /dashboard/asrama/spp 200 in 1580ms (compile: 49ms, render: 1532ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 3.9s (compile: 49ms, render: 3.9s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 153ms (compile: 43ms, render: 109ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 180ms (compile: 77ms, render: 103ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1281ms (compile: 66ms, render: 1215ms)
+ GET /dashboard/asrama/spp 200 in 842ms (compile: 31ms, render: 811ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 53ms (compile: 4ms, render: 49ms)
+ GET /dashboard/asrama/spp 200 in 777ms (compile: 14ms, render: 763ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 251ms (compile: 150ms, render: 102ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 196ms (compile: 66ms, render: 130ms)
+ GET /dashboard/asrama/spp 200 in 990ms (compile: 57ms, render: 933ms)
+ GET /dashboard/asrama/spp 200 in 2.3s (compile: 146ms, render: 2.1s)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 197ms (compile: 48ms, render: 150ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 187ms (compile: 60ms, render: 126ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 164ms (compile: 79ms, render: 85ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1717ms (compile: 62ms, render: 1655ms)
+ GET /dashboard/asrama/spp 200 in 1323ms (compile: 40ms, render: 1283ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 88ms (compile: 5ms, render: 83ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1255ms (compile: 33ms, render: 1222ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1179ms (compile: 78ms, render: 1101ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 203ms (compile: 61ms, render: 142ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 155ms (compile: 47ms, render: 107ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1040ms (compile: 66ms, render: 974ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 296ms (compile: 78ms, render: 218ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 547ms (compile: 280ms, render: 267ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1715ms (compile: 50ms, render: 1665ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 195ms (compile: 67ms, render: 128ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 210ms (compile: 115ms, render: 95ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.4s (compile: 130ms, render: 2.2s)
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 81ms, render: 2.0s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 75ms (compile: 5ms, render: 70ms)
+ GET /dashboard/asrama/spp 200 in 1969ms (compile: 158ms, render: 1811ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 207ms (compile: 68ms, render: 139ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1668ms (compile: 156ms, render: 1512ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 205ms (compile: 97ms, render: 109ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1570ms (compile: 44ms, render: 1526ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 289ms (compile: 151ms, render: 138ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1644ms (compile: 68ms, render: 1576ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 189ms (compile: 92ms, render: 97ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 370ms (compile: 178ms, render: 192ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 26ms, render: 2.1s)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1978ms (compile: 69ms, render: 1909ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 63ms (compile: 9ms, render: 54ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 139ms (compile: 49ms, render: 91ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1652ms (compile: 74ms, render: 1578ms)
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 81ms, render: 2.0s)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 215ms (compile: 45ms, render: 170ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 179ms (compile: 78ms, render: 101ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1967ms (compile: 73ms, render: 1893ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 42ms (compile: 3ms, render: 38ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1022ms (compile: 7ms, render: 1015ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 35ms (compile: 3ms, render: 31ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 959ms (compile: 81ms, render: 878ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 62ms (compile: 3ms, render: 58ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 50ms, render: 2.1s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 118ms (compile: 4ms, render: 114ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1251ms (compile: 34ms, render: 1217ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 156ms (compile: 5ms, render: 151ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1401ms (compile: 65ms, render: 1337ms)
+ GET /dashboard/asrama/spp 200 in 1508ms (compile: 4ms, render: 1504ms)
+ GET /dashboard/asrama/spp 200 in 2.3s (compile: 46ms, render: 2.3s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 160ms (compile: 5ms, render: 155ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 249ms (compile: 76ms, render: 173ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1709ms (compile: 40ms, render: 1669ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 123ms (compile: 41ms, render: 83ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 227ms (compile: 72ms, render: 155ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1375ms (compile: 18ms, render: 1357ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 71ms (compile: 16ms, render: 55ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1432ms (compile: 61ms, render: 1371ms)
+ GET /dashboard/asrama/spp 200 in 2.0s (compile: 76ms, render: 1964ms)
+ GET /dashboard/asrama/spp 200 in 1208ms (compile: 85ms, render: 1123ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 54ms (compile: 5ms, render: 49ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 216ms (compile: 113ms, render: 103ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 202ms (compile: 45ms, render: 157ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1376ms (compile: 63ms, render: 1314ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 79ms (compile: 5ms, render: 74ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1378ms (compile: 139ms, render: 1238ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1209ms (compile: 30ms, render: 1179ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 99ms (compile: 5ms, render: 94ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 114ms (compile: 55ms, render: 59ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1617ms (compile: 90ms, render: 1527ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 102ms (compile: 27ms, render: 76ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1612ms (compile: 35ms, render: 1577ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 87ms (compile: 21ms, render: 66ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1515ms (compile: 56ms, render: 1458ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 93ms (compile: 28ms, render: 65ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1691ms (compile: 5ms, render: 1685ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 59ms (compile: 6ms, render: 54ms)
+ GET /dashboard/asrama/spp 200 in 1368ms (compile: 65ms, render: 1303ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 148ms (compile: 60ms, render: 88ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.8s (compile: 23ms, render: 2.8s)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1170ms (compile: 68ms, render: 1102ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 82ms (compile: 8ms, render: 74ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 111ms (compile: 44ms, render: 67ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1279ms (compile: 8ms, render: 1271ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 73ms (compile: 22ms, render: 51ms)
+ GET /dashboard/asrama/spp 200 in 1291ms (compile: 37ms, render: 1254ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 123ms (compile: 26ms, render: 97ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1582ms (compile: 5ms, render: 1577ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 87ms (compile: 5ms, render: 82ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1449ms (compile: 79ms, render: 1369ms)
+ GET /dashboard/asrama/spp 200 in 1612ms (compile: 44ms, render: 1567ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1241ms (compile: 37ms, render: 1204ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 125ms (compile: 11ms, render: 113ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 93ms (compile: 22ms, render: 72ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1226ms (compile: 6ms, render: 1220ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 130ms (compile: 6ms, render: 124ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1188ms (compile: 62ms, render: 1126ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 130ms (compile: 67ms, render: 63ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 141ms (compile: 62ms, render: 79ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1132ms (compile: 16ms, render: 1116ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 66ms (compile: 5ms, render: 61ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1144ms (compile: 57ms, render: 1087ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 171ms (compile: 65ms, render: 106ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 175ms (compile: 59ms, render: 116ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1493ms (compile: 84ms, render: 1410ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 71ms (compile: 5ms, render: 66ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 937ms (compile: 54ms, render: 883ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 85ms (compile: 3ms, render: 82ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1713ms (compile: 36ms, render: 1677ms)
+ GET /dashboard/asrama/spp 200 in 1525ms (compile: 46ms, render: 1479ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 96ms (compile: 8ms, render: 88ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 178ms (compile: 93ms, render: 85ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1812ms (compile: 40ms, render: 1771ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 85ms (compile: 5ms, render: 80ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1266ms (compile: 44ms, render: 1222ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1517ms (compile: 8ms, render: 1509ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 207ms (compile: 43ms, render: 164ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 150ms (compile: 95ms, render: 56ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1538ms (compile: 40ms, render: 1497ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.5s (compile: 57ms, render: 2.4s)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 92ms (compile: 29ms, render: 63ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 123ms (compile: 55ms, render: 68ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1780ms (compile: 77ms, render: 1703ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1349ms (compile: 9ms, render: 1339ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 65ms (compile: 10ms, render: 56ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 146ms (compile: 47ms, render: 100ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1341ms (compile: 52ms, render: 1289ms)
+ GET /dashboard/asrama/spp 200 in 1105ms (compile: 33ms, render: 1072ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 70ms (compile: 8ms, render: 62ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 147ms (compile: 71ms, render: 76ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1218ms (compile: 47ms, render: 1171ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 151ms (compile: 34ms, render: 117ms)
+ GET /dashboard/asrama/spp 200 in 1259ms (compile: 53ms, render: 1206ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 92ms (compile: 41ms, render: 51ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1477ms (compile: 6ms, render: 1471ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 40ms (compile: 3ms, render: 37ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1207ms (compile: 47ms, render: 1160ms)
+ GET /dashboard/asrama/spp 200 in 1021ms (compile: 59ms, render: 962ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 109ms (compile: 6ms, render: 103ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 164ms (compile: 92ms, render: 72ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1013ms (compile: 38ms, render: 975ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 103ms (compile: 13ms, render: 90ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 864ms (compile: 5ms, render: 860ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 89ms (compile: 4ms, render: 85ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 942ms (compile: 23ms, render: 919ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 790ms (compile: 52ms, render: 738ms)
+ GET /dashboard/asrama/spp 200 in 1617ms (compile: 59ms, render: 1558ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 142ms (compile: 26ms, render: 116ms)
+ GET /dashboard/asrama/spp 200 in 663ms (compile: 56ms, render: 607ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 109ms (compile: 9ms, render: 99ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 140ms (compile: 54ms, render: 86ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 129ms (compile: 45ms, render: 84ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 3.4s (compile: 14ms, render: 3.4s)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 60ms (compile: 3ms, render: 57ms)
+ GET /dashboard/asrama/spp 200 in 1241ms (compile: 10ms, render: 1230ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 74ms (compile: 28ms, render: 46ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1221ms (compile: 69ms, render: 1152ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 976ms (compile: 44ms, render: 932ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 47ms (compile: 4ms, render: 43ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 105ms (compile: 7ms, render: 99ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 955ms (compile: 30ms, render: 925ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1807ms (compile: 43ms, render: 1763ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 177ms (compile: 52ms, render: 125ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 216ms (compile: 116ms, render: 100ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1366ms (compile: 32ms, render: 1334ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1263ms (compile: 42ms, render: 1221ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 67ms (compile: 5ms, render: 62ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 113ms (compile: 5ms, render: 107ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 161ms (compile: 52ms, render: 109ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 175ms (compile: 61ms, render: 115ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 30ms, render: 2.1s)
+ GET /dashboard/asrama/spp 200 in 1768ms (compile: 55ms, render: 1713ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 53ms (compile: 4ms, render: 49ms)
+ GET /dashboard/asrama/spp 200 in 1496ms (compile: 51ms, render: 1445ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 104ms (compile: 51ms, render: 53ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 170ms (compile: 79ms, render: 91ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1789ms (compile: 43ms, render: 1746ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 83ms (compile: 4ms, render: 79ms)
+ GET /dashboard/asrama/spp 200 in 1530ms (compile: 61ms, render: 1469ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1445ms (compile: 57ms, render: 1388ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 159ms (compile: 58ms, render: 101ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 99ms (compile: 57ms, render: 43ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1420ms (compile: 33ms, render: 1387ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1278ms (compile: 69ms, render: 1209ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 58ms (compile: 5ms, render: 53ms)
+ GET /dashboard/asrama/spp 200 in 1106ms (compile: 58ms, render: 1048ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 119ms (compile: 44ms, render: 75ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 168ms (compile: 62ms, render: 106ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1374ms (compile: 54ms, render: 1320ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 82ms (compile: 23ms, render: 59ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1223ms (compile: 5ms, render: 1218ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1163ms (compile: 23ms, render: 1140ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 85ms (compile: 22ms, render: 63ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 153ms (compile: 86ms, render: 67ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1183ms (compile: 15ms, render: 1168ms)
+ GET /dashboard/asrama/spp 200 in 993ms (compile: 41ms, render: 952ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 66ms (compile: 5ms, render: 60ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 905ms (compile: 70ms, render: 835ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 160ms (compile: 77ms, render: 83ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 165ms (compile: 72ms, render: 93ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 628ms (compile: 31ms, render: 597ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 64ms (compile: 3ms, render: 60ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1526ms (compile: 4ms, render: 1521ms)
+ GET /dashboard/asrama/spp 200 in 551ms (compile: 69ms, render: 482ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 46ms (compile: 3ms, render: 42ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 149ms (compile: 48ms, render: 101ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1656ms (compile: 31ms, render: 1625ms)
+ GET /dashboard/asrama/spp 200 in 1453ms (compile: 49ms, render: 1404ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 129ms (compile: 5ms, render: 124ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 158ms (compile: 65ms, render: 93ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1061ms (compile: 37ms, render: 1024ms)
+ GET /dashboard/asrama/spp 200 in 792ms (compile: 53ms, render: 740ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 67ms (compile: 5ms, render: 61ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 191ms (compile: 85ms, render: 105ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.9s (compile: 47ms, render: 2.8s)
+ GET /dashboard/asrama/spp 200 in 1016ms (compile: 32ms, render: 984ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 138ms (compile: 30ms, render: 109ms)
+ GET /dashboard/asrama/spp 200 in 1796ms (compile: 7ms, render: 1789ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 118ms (compile: 47ms, render: 70ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1182ms (compile: 29ms, render: 1153ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 179ms (compile: 62ms, render: 117ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 196ms (compile: 92ms, render: 104ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1430ms (compile: 35ms, render: 1394ms)
+ GET /dashboard/asrama/spp 200 in 1160ms (compile: 63ms, render: 1097ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 63ms (compile: 3ms, render: 60ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 129ms (compile: 45ms, render: 84ms)
+ GET /dashboard/asrama/spp 200 in 1180ms (compile: 62ms, render: 1118ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1088ms (compile: 82ms, render: 1006ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 93ms (compile: 34ms, render: 59ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 215ms (compile: 93ms, render: 123ms)
+ GET /dashboard/asrama/spp 200 in 1100ms (compile: 68ms, render: 1031ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1135ms (compile: 38ms, render: 1097ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 175ms (compile: 87ms, render: 88ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 168ms (compile: 79ms, render: 90ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1467ms (compile: 30ms, render: 1436ms)
+ GET /dashboard/asrama/spp 200 in 1272ms (compile: 12ms, render: 1259ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1156ms (compile: 66ms, render: 1090ms)
+ GET /dashboard/asrama/spp 200 in 921ms (compile: 77ms, render: 843ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 553ms (compile: 65ms, render: 488ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 518ms (compile: 4ms, render: 515ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 398ms (compile: 4ms, render: 394ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 326ms (compile: 4ms, render: 322ms)
+ POST /dashboard/asrama/spp 200 in 17ms (compile: 4ms, render: 13ms)
+ POST /dashboard/asrama/spp 500 in 374ms (compile: 3ms, render: 371ms)
+ GET /api/version 200 in 75ms
+ POST /dashboard/asrama/spp 200 in 13ms (compile: 3ms, render: 10ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1406ms (compile: 6ms, render: 1401ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1441ms (compile: 44ms, render: 1397ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.8s (compile: 54ms, render: 2.7s)
+ POST /dashboard/asrama/spp 500 in 1322ms (compile: 5ms, render: 1317ms)
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 16ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 1490ms (compile: 407ms, render: 1083ms)
+ GET /dashboard 200 in 772ms (compile: 112ms, render: 660ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 91ms (compile: 7ms, render: 84ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1710ms (compile: 220ms, render: 1490ms)
+ GET /dashboard/asrama/spp 200 in 1089ms (compile: 82ms, render: 1006ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 73ms (compile: 8ms, render: 65ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 970ms (compile: 69ms, render: 901ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 146ms (compile: 6ms, render: 140ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 244ms (compile: 63ms, render: 182ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 2.5s (compile: 459ms, render: 2.1s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 168ms (compile: 80ms, render: 89ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 199ms (compile: 89ms, render: 110ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1627ms (compile: 27ms, render: 1600ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 68ms (compile: 4ms, render: 64ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1628ms (compile: 39ms, render: 1589ms)
+ GET /dashboard/asrama/spp 200 in 1491ms (compile: 28ms, render: 1463ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 79ms (compile: 7ms, render: 73ms)
+ GET /dashboard/asrama/spp 200 in 1407ms (compile: 91ms, render: 1316ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 176ms (compile: 95ms, render: 81ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 215ms (compile: 107ms, render: 108ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1504ms (compile: 43ms, render: 1462ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1367ms (compile: 50ms, render: 1316ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 147ms (compile: 9ms, render: 138ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 191ms (compile: 85ms, render: 106ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1665ms (compile: 38ms, render: 1627ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 58ms (compile: 3ms, render: 55ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1630ms (compile: 37ms, render: 1592ms)
+ GET /dashboard/asrama/spp 200 in 1423ms (compile: 95ms, render: 1328ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 76ms (compile: 4ms, render: 73ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1142ms (compile: 48ms, render: 1094ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 148ms (compile: 53ms, render: 95ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 183ms (compile: 57ms, render: 126ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1207ms (compile: 55ms, render: 1153ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1308ms (compile: 69ms, render: 1239ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 172ms (compile: 13ms, render: 159ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 198ms (compile: 72ms, render: 126ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1557ms (compile: 4ms, render: 1553ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 92ms (compile: 6ms, render: 86ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1674ms (compile: 29ms, render: 1645ms)
+ GET /dashboard/asrama/spp 200 in 1503ms (compile: 31ms, render: 1472ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 147ms (compile: 8ms, render: 139ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1617ms (compile: 62ms, render: 1555ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 223ms (compile: 122ms, render: 101ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 223ms (compile: 89ms, render: 134ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1554ms (compile: 54ms, render: 1500ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 160ms (compile: 14ms, render: 146ms)
+ GET /dashboard/asrama/spp 200 in 1651ms (compile: 66ms, render: 1585ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 227ms (compile: 92ms, render: 135ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1864ms (compile: 49ms, render: 1815ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 83ms (compile: 5ms, render: 78ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1965ms (compile: 86ms, render: 1879ms)
+ GET /dashboard/asrama/spp 200 in 1694ms (compile: 61ms, render: 1633ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 84ms (compile: 11ms, render: 72ms)
+ GET /dashboard/asrama/spp 200 in 1561ms (compile: 63ms, render: 1498ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 188ms (compile: 109ms, render: 79ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 240ms (compile: 113ms, render: 127ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1731ms (compile: 52ms, render: 1679ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1665ms (compile: 60ms, render: 1605ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 165ms (compile: 33ms, render: 132ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 189ms (compile: 70ms, render: 119ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1925ms (compile: 44ms, render: 1881ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 84ms (compile: 8ms, render: 77ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1786ms (compile: 27ms, render: 1759ms)
+ GET /dashboard/asrama/spp 200 in 1574ms (compile: 85ms, render: 1489ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 55ms (compile: 6ms, render: 49ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1370ms (compile: 51ms, render: 1319ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 136ms (compile: 77ms, render: 59ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 163ms (compile: 77ms, render: 87ms)
+ GET /dashboard/asrama/spp 200 in 1296ms (compile: 37ms, render: 1259ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 226ms (compile: 39ms, render: 187ms)
+ GET /dashboard/asrama/spp 200 in 1366ms (compile: 48ms, render: 1318ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 172ms (compile: 69ms, render: 104ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1516ms (compile: 21ms, render: 1496ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 89ms (compile: 5ms, render: 84ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1601ms (compile: 51ms, render: 1550ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 69ms (compile: 22ms, render: 47ms)
+ GET /dashboard/asrama/spp 200 in 1507ms (compile: 50ms, render: 1457ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1468ms (compile: 57ms, render: 1411ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 139ms (compile: 30ms, render: 109ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 152ms (compile: 63ms, render: 89ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1440ms (compile: 78ms, render: 1361ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 176ms (compile: 75ms, render: 101ms)
+ GET /dashboard/asrama/spp 200 in 1359ms (compile: 53ms, render: 1306ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 152ms (compile: 48ms, render: 104ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1518ms (compile: 18ms, render: 1500ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 84ms (compile: 3ms, render: 80ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1409ms (compile: 26ms, render: 1383ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 59ms (compile: 20ms, render: 39ms)
+ GET /dashboard/asrama/spp 200 in 1234ms (compile: 59ms, render: 1175ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1132ms (compile: 4ms, render: 1128ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 106ms (compile: 49ms, render: 57ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 217ms (compile: 75ms, render: 142ms)
+ GET /dashboard/asrama/spp 200 in 1228ms (compile: 51ms, render: 1178ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 217ms (compile: 61ms, render: 156ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1401ms (compile: 41ms, render: 1360ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 103ms (compile: 5ms, render: 98ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1637ms (compile: 41ms, render: 1596ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 64ms (compile: 25ms, render: 39ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1686ms (compile: 7ms, render: 1680ms)
+ GET /dashboard/asrama/spp 200 in 1532ms (compile: 30ms, render: 1502ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 89ms (compile: 5ms, render: 84ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1425ms (compile: 57ms, render: 1369ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 186ms (compile: 94ms, render: 92ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 142ms (compile: 50ms, render: 91ms)
+ GET /dashboard/asrama/spp 200 in 1351ms (compile: 58ms, render: 1293ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 144ms (compile: 51ms, render: 92ms)
+ GET /dashboard/asrama/spp 200 in 1369ms (compile: 50ms, render: 1319ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 65ms (compile: 6ms, render: 59ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1377ms (compile: 34ms, render: 1342ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 68ms (compile: 3ms, render: 64ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1307ms (compile: 45ms, render: 1261ms)
+ GET /dashboard/asrama/spp 200 in 1083ms (compile: 39ms, render: 1044ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 118ms (compile: 6ms, render: 113ms)
+ GET /dashboard/asrama/spp 200 in 1006ms (compile: 51ms, render: 955ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 192ms (compile: 121ms, render: 71ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 264ms (compile: 79ms, render: 185ms)
+ GET /dashboard/asrama/spp 200 in 1302ms (compile: 30ms, render: 1272ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 152ms (compile: 14ms, render: 138ms)
+ GET /dashboard/asrama/spp 200 in 1475ms (compile: 6ms, render: 1469ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 219ms (compile: 76ms, render: 143ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1882ms (compile: 50ms, render: 1831ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 88ms (compile: 27ms, render: 61ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1919ms (compile: 21ms, render: 1898ms)
+ GET /dashboard/asrama/spp 200 in 1602ms (compile: 48ms, render: 1554ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 94ms (compile: 7ms, render: 87ms)
+ GET /dashboard/asrama/spp 200 in 1456ms (compile: 105ms, render: 1350ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 188ms (compile: 36ms, render: 152ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1500ms (compile: 79ms, render: 1421ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 97ms (compile: 26ms, render: 72ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1429ms (compile: 59ms, render: 1370ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 154ms (compile: 85ms, render: 70ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 186ms (compile: 53ms, render: 132ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1756ms (compile: 29ms, render: 1727ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 56ms (compile: 3ms, render: 52ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1720ms (compile: 5ms, render: 1715ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1555ms (compile: 71ms, render: 1484ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 71ms (compile: 10ms, render: 62ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 187ms (compile: 73ms, render: 114ms)
+ GET /dashboard/asrama/spp 200 in 1588ms (compile: 61ms, render: 1526ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 176ms (compile: 26ms, render: 149ms)
+ GET /dashboard/asrama/spp 200 in 1646ms (compile: 25ms, render: 1621ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1584ms (compile: 104ms, render: 1481ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 156ms (compile: 53ms, render: 103ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 192ms (compile: 95ms, render: 97ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1619ms (compile: 5ms, render: 1614ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 79ms (compile: 5ms, render: 74ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1486ms (compile: 36ms, render: 1450ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1343ms (compile: 85ms, render: 1259ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 87ms (compile: 6ms, render: 81ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1180ms (compile: 71ms, render: 1109ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 173ms (compile: 100ms, render: 72ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 229ms (compile: 116ms, render: 113ms)
+ GET /dashboard/asrama/spp 200 in 1275ms (compile: 62ms, render: 1213ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 235ms (compile: 79ms, render: 155ms)
+ GET /dashboard/asrama/spp 200 in 1482ms (compile: 53ms, render: 1429ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 122ms (compile: 32ms, render: 91ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1791ms (compile: 48ms, render: 1743ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 67ms (compile: 7ms, render: 60ms)
+ GET /dashboard/asrama/spp 200 in 1669ms (compile: 25ms, render: 1643ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 178ms (compile: 35ms, render: 144ms)
+ GET /dashboard/asrama/spp 200 in 1700ms (compile: 80ms, render: 1620ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1558ms (compile: 38ms, render: 1520ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 160ms (compile: 53ms, render: 106ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 168ms (compile: 62ms, render: 106ms)
+ GET /dashboard/asrama/spp 200 in 1528ms (compile: 52ms, render: 1476ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 159ms (compile: 48ms, render: 111ms)
+ GET /dashboard/asrama/spp 200 in 1662ms (compile: 59ms, render: 1604ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 160ms (compile: 32ms, render: 128ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 2.2s (compile: 44ms, render: 2.2s)
+ GET /dashboard/asrama/spp 200 in 1932ms (compile: 52ms, render: 1880ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 57ms (compile: 4ms, render: 53ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 176ms (compile: 89ms, render: 87ms)
+ GET /dashboard/asrama/spp 200 in 1905ms (compile: 45ms, render: 1859ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1921ms (compile: 92ms, render: 1829ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 216ms (compile: 81ms, render: 135ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 186ms (compile: 66ms, render: 120ms)
+ GET /dashboard/asrama/spp 200 in 1960ms (compile: 265ms, render: 1695ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 180ms (compile: 65ms, render: 114ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1690ms (compile: 47ms, render: 1643ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 66ms (compile: 6ms, render: 60ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1694ms (compile: 43ms, render: 1651ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 97ms (compile: 25ms, render: 72ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1285ms (compile: 82ms, render: 1203ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1030ms (compile: 44ms, render: 986ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 68ms (compile: 11ms, render: 57ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1906ms (compile: 67ms, render: 1839ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 197ms (compile: 85ms, render: 113ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1077ms (compile: 55ms, render: 1021ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 239ms (compile: 102ms, render: 137ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1468ms (compile: 32ms, render: 1436ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 61ms (compile: 7ms, render: 54ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1504ms (compile: 4ms, render: 1500ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 86ms (compile: 5ms, render: 81ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1482ms (compile: 35ms, render: 1447ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1347ms (compile: 71ms, render: 1276ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 112ms (compile: 34ms, render: 78ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 246ms (compile: 98ms, render: 148ms)
+ GET /dashboard/asrama/spp 200 in 1447ms (compile: 115ms, render: 1332ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 116ms (compile: 49ms, render: 67ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 200ms (compile: 110ms, render: 91ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1497ms (compile: 106ms, render: 1392ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 147ms (compile: 12ms, render: 135ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1713ms (compile: 35ms, render: 1679ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 77ms (compile: 3ms, render: 74ms)
+ GET /dashboard/asrama/spp 200 in 1563ms (compile: 74ms, render: 1489ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 156ms (compile: 55ms, render: 102ms)
+ GET /dashboard/asrama/spp 200 in 1377ms (compile: 56ms, render: 1321ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 176ms (compile: 65ms, render: 111ms)
+ GET /dashboard/asrama/spp 200 in 1406ms (compile: 29ms, render: 1377ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 152ms (compile: 37ms, render: 115ms)
+ GET /dashboard/asrama/spp 200 in 1396ms (compile: 26ms, render: 1371ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 124ms (compile: 76ms, render: 48ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1484ms (compile: 16ms, render: 1467ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 141ms (compile: 20ms, render: 121ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1574ms (compile: 22ms, render: 1552ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 118ms (compile: 31ms, render: 86ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1538ms (compile: 45ms, render: 1493ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 72ms (compile: 23ms, render: 49ms)
+ GET /dashboard/asrama/spp 200 in 1393ms (compile: 48ms, render: 1344ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1269ms (compile: 62ms, render: 1207ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 144ms (compile: 36ms, render: 107ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 128ms (compile: 54ms, render: 75ms)
+ GET /dashboard/asrama/spp 200 in 1237ms (compile: 30ms, render: 1207ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 88ms (compile: 36ms, render: 52ms)
+ GET /dashboard/asrama/spp 200 in 1199ms (compile: 45ms, render: 1154ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 167ms (compile: 45ms, render: 122ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1409ms (compile: 5ms, render: 1404ms)
+ GET /dashboard/asrama/spp 200 in 1228ms (compile: 37ms, render: 1191ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 103ms (compile: 4ms, render: 99ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 249ms (compile: 105ms, render: 145ms)
+ GET /dashboard/asrama/spp 200 in 1383ms (compile: 54ms, render: 1329ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 163ms (compile: 78ms, render: 84ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1617ms (compile: 6ms, render: 1612ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1844ms (compile: 44ms, render: 1800ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 68ms (compile: 7ms, render: 62ms)
+ GET /dashboard/asrama/spp 200 in 1322ms (compile: 60ms, render: 1263ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 229ms (compile: 70ms, render: 159ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1621ms (compile: 68ms, render: 1553ms)
+ GET /dashboard/asrama/spp 200 in 1268ms (compile: 76ms, render: 1192ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 96ms (compile: 19ms, render: 77ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1122ms (compile: 61ms, render: 1061ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 210ms (compile: 57ms, render: 153ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 312ms (compile: 117ms, render: 195ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 151ms (compile: 8ms, render: 143ms)
+ GET /dashboard/asrama/spp 200 in 1398ms (compile: 35ms, render: 1363ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 121ms (compile: 63ms, render: 58ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1805ms (compile: 45ms, render: 1760ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 69ms (compile: 6ms, render: 63ms)
+ GET /dashboard/asrama/spp 200 in 1523ms (compile: 54ms, render: 1468ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1242ms (compile: 78ms, render: 1164ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 143ms (compile: 33ms, render: 110ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 192ms (compile: 63ms, render: 129ms)
+ GET /dashboard/asrama/spp 200 in 3.0s (compile: 30ms, render: 3.0s)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1411ms (compile: 70ms, render: 1341ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 217ms (compile: 106ms, render: 111ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 141ms (compile: 91ms, render: 50ms)
+ GET /dashboard/asrama/spp 200 in 1452ms (compile: 53ms, render: 1400ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 136ms (compile: 64ms, render: 72ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1426ms (compile: 57ms, render: 1370ms)
+ GET /dashboard/asrama/spp 200 in 1145ms (compile: 34ms, render: 1111ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 67ms (compile: 3ms, render: 64ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1013ms (compile: 80ms, render: 934ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 150ms (compile: 36ms, render: 113ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1010ms (compile: 19ms, render: 991ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 262ms (compile: 107ms, render: 154ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 186ms (compile: 79ms, render: 107ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1312ms (compile: 37ms, render: 1275ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1315ms (compile: 24ms, render: 1290ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 218ms (compile: 90ms, render: 128ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 231ms (compile: 102ms, render: 129ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1733ms (compile: 15ms, render: 1718ms)
+ GET /dashboard/asrama/spp 200 in 1548ms (compile: 76ms, render: 1472ms)
+ GET /dashboard/asrama/spp 200 in 1288ms (compile: 83ms, render: 1205ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 110ms (compile: 5ms, render: 106ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 259ms (compile: 122ms, render: 137ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1400ms (compile: 79ms, render: 1322ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 188ms (compile: 99ms, render: 88ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 202ms (compile: 96ms, render: 106ms)
+ GET /dashboard/asrama/spp 200 in 1379ms (compile: 54ms, render: 1325ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 222ms (compile: 102ms, render: 120ms)
+ GET /dashboard/asrama/spp 200 in 1538ms (compile: 66ms, render: 1472ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 220ms (compile: 63ms, render: 157ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1866ms (compile: 58ms, render: 1807ms)
+ GET /dashboard/asrama/spp 200 in 1555ms (compile: 60ms, render: 1495ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 81ms (compile: 4ms, render: 77ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1411ms (compile: 89ms, render: 1322ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 165ms (compile: 73ms, render: 92ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 304ms (compile: 125ms, render: 180ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1548ms (compile: 39ms, render: 1509ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.0s (compile: 72ms, render: 1972ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 74ms (compile: 20ms, render: 54ms)
+ GET /dashboard/asrama/spp 200 in 1371ms (compile: 61ms, render: 1310ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 121ms (compile: 52ms, render: 69ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 199ms (compile: 106ms, render: 93ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1647ms (compile: 45ms, render: 1602ms)
+ GET /dashboard/asrama/spp 200 in 1387ms (compile: 93ms, render: 1294ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 63ms (compile: 3ms, render: 60ms)
+ GET /dashboard/asrama/spp 200 in 1120ms (compile: 88ms, render: 1032ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 139ms (compile: 68ms, render: 71ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1119ms (compile: 35ms, render: 1084ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 78ms (compile: 5ms, render: 72ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 976ms (compile: 53ms, render: 923ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 186ms (compile: 47ms, render: 139ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 183ms (compile: 87ms, render: 97ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1874ms (compile: 50ms, render: 1824ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1552ms (compile: 35ms, render: 1518ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 152ms (compile: 53ms, render: 99ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1603ms (compile: 50ms, render: 1554ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 220ms (compile: 113ms, render: 107ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 199ms (compile: 96ms, render: 103ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 2.1s (compile: 41ms, render: 2.0s)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 68ms (compile: 4ms, render: 64ms)
+ GET /dashboard/asrama/spp 200 in 1817ms (compile: 64ms, render: 1754ms)
+ GET /dashboard/asrama/spp 200 in 1548ms (compile: 63ms, render: 1484ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1135ms (compile: 79ms, render: 1055ms)
+ GET /dashboard/asrama/spp 200 in 816ms (compile: 55ms, render: 761ms)
+ GET /dashboard/asrama/spp 200 in 503ms (compile: 57ms, render: 446ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 394ms (compile: 330ms, render: 64ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 384ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 97ms (compile: 7ms, render: 90ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 174ms (compile: 45ms, render: 129ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 242ms (compile: 106ms, render: 136ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 248ms (compile: 53ms, render: 195ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 190ms (compile: 66ms, render: 124ms)
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1879ms (compile: 379ms, render: 1500ms)
+ GET /dashboard/asrama/spp 200 in 1460ms (compile: 36ms, render: 1424ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 99ms (compile: 5ms, render: 94ms)
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1584ms (compile: 70ms, render: 1513ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 334ms (compile: 218ms, render: 116ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1315ms (compile: 134ms, render: 1181ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 205ms (compile: 62ms, render: 143ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1121ms (compile: 41ms, render: 1080ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 196ms (compile: 94ms, render: 103ms)
+ GET /dashboard/asrama/spp 200 in 2.0s (compile: 89ms, render: 1939ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 172ms (compile: 84ms, render: 88ms)
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 225ms (compile: 97ms, render: 128ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 1569ms (compile: 68ms, render: 1501ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 82ms (compile: 6ms, render: 76ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1147ms (compile: 65ms, render: 1082ms)
+ GET /dashboard/asrama/spp 200 in 1013ms (compile: 58ms, render: 955ms)
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 152ms (compile: 22ms, render: 130ms)
+ GET /dashboard/asrama/spp 200 in 939ms (compile: 68ms, render: 871ms)
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 187ms (compile: 76ms, render: 111ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard/asrama/spp 200 in 1184ms (compile: 40ms, render: 1143ms)
+ GET /dashboard/asrama/spp 200 in 2.2s (compile: 26ms, render: 2.2s)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ GET /dashboard 200 in 336ms (compile: 176ms, render: 159ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard 200 in 158ms (compile: 98ms, render: 60ms)
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /dashboard/asrama/spp 200 in 1734ms (compile: 6ms, render: 1728ms)
+ GET /dashboard/asrama/spp 200 in 1350ms (compile: 70ms, render: 1280ms)
+ GET /dashboard/asrama/spp 200 in 1113ms (compile: 92ms, render: 1021ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 639ms (compile: 69ms, render: 570ms)
+ GET /dashboard/asrama/spp 200 in 442ms (compile: 43ms, render: 399ms)
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 311ms (compile: 11ms, render: 300ms)
+ GET /api/version 200 in 47ms
+[layout] fiturAkses count: 0
+[layout] fiturAkses count: 0
+ GET /api/version 200 in 14ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/spp 200 in 657ms (compile: 10ms, render: 647ms)
+ GET /api/version 200 in 8ms
+ POST /dashboard/asrama/spp 200 in 18ms (compile: 5ms, render: 13ms)
+ POST /dashboard/asrama/spp 500 in 556ms (compile: 4ms, render: 552ms)
+ POST /dashboard/asrama/spp 200 in 14ms (compile: 3ms, render: 10ms)
+ POST /dashboard/asrama/spp 500 in 393ms (compile: 4ms, render: 390ms)
+ GET /dashboard/ehb/keuangan 200 in 445ms (compile: 397ms, render: 48ms)
+ GET /dashboard 200 in 110ms (compile: 5ms, render: 105ms)
+ GET /login 200 in 125ms (compile: 66ms, render: 59ms)
+ GET /login 307 in 120ms (compile: 7ms, render: 113ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 502ms (compile: 4ms, render: 498ms)
+ GET /api/version 200 in 7ms
+✓ Compiled in 370ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 492ms (compile: 7ms, render: 485ms)
+ GET /api/version 200 in 7ms
+○ Compiling /dashboard/keamanan/perizinan ...
+[layout] session null → redirect /login
+ GET /dashboard/keamanan/perizinan 307 in 5.1s (compile: 5.0s, render: 189ms)
+ GET /login 200 in 173ms (compile: 14ms, render: 159ms)
+✓ Compiled in 363ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 1158ms (compile: 35ms, render: 1123ms)
+ GET /api/version 200 in 52ms
+✓ Compiled in 226ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 1106ms (compile: 31ms, render: 1075ms)
+ GET /api/version 200 in 19ms

@@ -287,7 +287,6 @@ export default function KatalogUPKPage() {
         'MARHALAH': contohMarhalah,
         'TOKO': 'Katara Printgraph',
         'STOK LAMA': 10,
-        'STOK BARU': 40,
         'HARGA BELI': 12000,
         'HARGA JUAL': 15000,
         'CATATAN': 'Contoh, boleh dikosongkan',
@@ -297,7 +296,6 @@ export default function KatalogUPKPage() {
         'MARHALAH': contohMarhalah,
         'TOKO': 'Online',
         'STOK LAMA': 0,
-        'STOK BARU': 25,
         'HARGA BELI': 8000,
         'HARGA JUAL': 10000,
         'CATATAN': '',
@@ -578,7 +576,10 @@ export default function KatalogUPKPage() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase">Stok Baru</label>
-                  <input name="stok_baru" type="number" min="0" value={form.stok_baru} onChange={e => setField('stok_baru', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm" />
+                  <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-sm font-extrabold text-slate-800">{Number(form.stok_baru || 0).toLocaleString('id-ID')}</p>
+                    <p className="text-[11px] font-semibold text-slate-400">Ditambah otomatis dari Belanja</p>
+                  </div>
                 </div>
               </div>
 
@@ -661,7 +662,7 @@ export default function KatalogUPKPage() {
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                Kolom utama: <b>NAMA KITAB</b>, <b>MARHALAH</b>, <b>TOKO</b>, <b>STOK LAMA</b>, <b>STOK BARU</b>, <b>HARGA BELI</b>, <b>HARGA JUAL</b>, <b>CATATAN</b>. Jika nama kitab dan marhalah cocok dengan Manajemen Kitab, data otomatis ditautkan; jika tidak, tetap masuk sebagai item manual.
+                Kolom utama: <b>NAMA KITAB</b>, <b>MARHALAH</b>, <b>TOKO</b>, <b>STOK LAMA</b>, <b>HARGA BELI</b>, <b>HARGA JUAL</b>, <b>CATATAN</b>. Stok baru ditambah otomatis dari fitur Belanja. Jika nama kitab dan marhalah cocok dengan Manajemen Kitab, data otomatis ditautkan; jika tidak, tetap masuk sebagai item manual.
               </div>
 
               {importRows.length > 0 ? (
@@ -678,7 +679,6 @@ export default function KatalogUPKPage() {
                           <th className="px-3 py-2">Marhalah</th>
                           <th className="px-3 py-2">Toko</th>
                           <th className="px-3 py-2 text-right">Stok Lama</th>
-                          <th className="px-3 py-2 text-right">Stok Baru</th>
                           <th className="px-3 py-2 text-right">Beli</th>
                           <th className="px-3 py-2 text-right">Jual</th>
                           <th className="px-3 py-2">Catatan</th>
@@ -691,7 +691,6 @@ export default function KatalogUPKPage() {
                             <td className="px-3 py-2">{row['MARHALAH'] || row['Marhalah'] || row['marhalah']}</td>
                             <td className="px-3 py-2">{row['TOKO'] || row['Toko'] || row['toko']}</td>
                             <td className="px-3 py-2 text-right font-mono">{row['STOK LAMA'] || row['Stok Lama'] || row['stok lama']}</td>
-                            <td className="px-3 py-2 text-right font-mono">{row['STOK BARU'] || row['Stok Baru'] || row['stok baru']}</td>
                             <td className="px-3 py-2 text-right font-mono">{row['HARGA BELI'] || row['Harga Beli'] || row['harga beli']}</td>
                             <td className="px-3 py-2 text-right font-mono">{row['HARGA JUAL'] || row['Harga Jual'] || row['harga jual']}</td>
                             <td className="px-3 py-2">{row['CATATAN'] || row['Catatan'] || row['catatan']}</td>

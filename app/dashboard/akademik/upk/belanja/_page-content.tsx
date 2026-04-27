@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useReactToPrint } from 'react-to-print'
 import {
   bayarHutangBelanja,
   getBelanjaList,
@@ -12,7 +13,7 @@ import {
   simpanBelanja,
   simpanRencanaBelanja,
 } from './actions'
-import { CheckCircle, ClipboardList, Loader2, Plus, RefreshCw, Save, ShoppingBag, Store, Wallet, X } from 'lucide-react'
+import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 type KatalogItem = {
@@ -31,6 +32,7 @@ type RencanaItem = {
   nama_kitab: string
   marhalah_id: number | null
   marhalah_nama: string | null
+  toko_nama: string | null
   jumlah_santri: number
   stok_lama: number
   stok_baru: number
@@ -94,6 +96,7 @@ export default function BelanjaUPKPage() {
   const [hutangList, setHutangList] = useState<HutangListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [persenTarget, setPersenTarget] = useState(75)
+  const [groupRencanaByToko, setGroupRencanaByToko] = useState(true)
   const [namaRencana, setNamaRencana] = useState(`Rencana Belanja ${todayInput()}`)
   const [isBelanjaModalOpen, setIsBelanjaModalOpen] = useState(false)
   const [belanjaCart, setBelanjaCart] = useState<BelanjaCartItem[]>([])
@@ -105,6 +108,8 @@ export default function BelanjaUPKPage() {
   const [catatanBelanja, setCatatanBelanja] = useState('')
   const [bayarHutangId, setBayarHutangId] = useState('')
   const [nominalHutang, setNominalHutang] = useState('')
+  const rencanaPrintRef = useRef<HTMLDivElement>(null)
+  const belanjaPrintRef = useRef<HTMLDivElement>(null)
 
   const totalRencana = rencanaHitung.reduce((sum, item) => sum + item.qty_rencana * item.harga_beli, 0)
   const totalBelanja = belanjaCart.reduce((sum, item) => sum + item.qty * item.harga_beli_input, 0)
@@ -115,6 +120,37 @@ export default function BelanjaUPKPage() {
     if (!keyword) return katalog
     return katalog.filter(item => item.nama_kitab.toLowerCase().includes(keyword) || (item.marhalah_nama || '').toLowerCase().includes(keyword))
   }, [belanjaSearch, katalog])
+
+  const groupedRencana = useMemo(() => {
+    if (!groupRencanaByToko) return [{ toko: 'Semua Toko', items: rencanaHitung }]
+    const grouped = new Map<string, RencanaItem[]>()
+    rencanaHitung.forEach(item => {
+      const key = item.toko_nama || 'Toko belum ditentukan'
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key)!.push(item)
+    })
+    return Array.from(grouped.entries()).map(([toko, items]) => ({ toko, items }))
+  }, [groupRencanaByToko, rencanaHitung])
+
+  const pageStyle = `
+    @page { size: A4; margin: 12mm; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; }
+    th { background: #f1f5f9; font-weight: 700; }
+  `
+
+  const printRencana = useReactToPrint({
+    contentRef: rencanaPrintRef,
+    documentTitle: namaRencana || 'Rencana Belanja',
+    pageStyle,
+  })
+
+  const printBelanja = useReactToPrint({
+    contentRef: belanjaPrintRef,
+    documentTitle: 'Daftar Belanja Kitab',
+    pageStyle,
+  })
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -253,11 +289,18 @@ export default function BelanjaUPKPage() {
               <input type="number" min="1" max="100" value={persenTarget} onChange={e => setPersenTarget(parseInt(e.target.value || '75', 10))} className="w-20 px-3 py-2.5 border rounded-lg font-bold text-sm" />
               <span className="text-sm font-bold text-slate-500">%</span>
             </div>
+            <label className="flex items-center gap-2 px-3 py-2.5 border rounded-lg text-sm font-bold text-slate-600">
+              <input type="checkbox" checked={groupRencanaByToko} onChange={e => setGroupRencanaByToko(e.target.checked)} />
+              Kelompokkan toko
+            </label>
             <button onClick={hitungRencana} className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardList className="w-4 h-4" />} Hitung Rencana
             </button>
             <button onClick={saveRencana} disabled={!rencanaHitung.length} className="px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
               <Save className="w-4 h-4" /> Simpan Rencana
+            </button>
+            <button onClick={printRencana} disabled={!rencanaHitung.length} className="px-4 py-2.5 bg-slate-800 text-white rounded-lg font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+              <Printer className="w-4 h-4" /> Cetak
             </button>
           </div>
 
@@ -279,23 +322,30 @@ export default function BelanjaUPKPage() {
                 <tbody className="divide-y">
                   {rencanaHitung.length === 0 ? (
                     <tr><td colSpan={8} className="text-center py-14 text-slate-400">Klik Hitung Rencana untuk membuat saran belanja.</td></tr>
-                  ) : rencanaHitung.map(item => (
-                    <tr key={item.katalog_id}>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{item.nama_kitab}</p>
-                        <p className="text-xs text-slate-500">{item.marhalah_nama || '-'}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center font-bold">{item.jumlah_santri}</td>
-                      <td className="px-4 py-3 text-center">{item.stok_lama}</td>
-                      <td className="px-4 py-3 text-center">{item.stok_baru}</td>
-                      <td className="px-4 py-3 text-center font-bold text-emerald-700">{item.saran_qty}</td>
-                      <td className="px-4 py-3 text-center">
-                        <input type="number" min="0" value={item.qty_rencana} onChange={e => updateQtyRencana(item.katalog_id, parseInt(e.target.value || '0', 10))} className="w-20 px-2 py-1.5 border rounded-lg text-center font-bold" />
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">{rupiah(item.harga_beli)}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold">{rupiah(item.qty_rencana * item.harga_beli)}</td>
-                    </tr>
-                  ))}
+                  ) : groupedRencana.flatMap(group => [
+                    ...(groupRencanaByToko ? [(
+                      <tr key={`group-${group.toko}`} className="bg-emerald-50 font-bold text-emerald-900">
+                        <td colSpan={8} className="px-4 py-2">{group.toko}</td>
+                      </tr>
+                    )] : []),
+                    ...group.items.map(item => (
+                      <tr key={item.katalog_id}>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{item.nama_kitab}</p>
+                          <p className="text-xs text-slate-500">{item.marhalah_nama || '-'}{!groupRencanaByToko && item.toko_nama ? ` - ${item.toko_nama}` : ''}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold">{item.jumlah_santri}</td>
+                        <td className="px-4 py-3 text-center">{item.stok_lama}</td>
+                        <td className="px-4 py-3 text-center">{item.stok_baru}</td>
+                        <td className="px-4 py-3 text-center font-bold text-emerald-700">{item.saran_qty}</td>
+                        <td className="px-4 py-3 text-center">
+                          <input type="number" min="0" value={item.qty_rencana} onChange={e => updateQtyRencana(item.katalog_id, parseInt(e.target.value || '0', 10))} className="w-20 px-2 py-1.5 border rounded-lg text-center font-bold" />
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{rupiah(item.harga_beli)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold">{rupiah(item.qty_rencana * item.harga_beli)}</td>
+                      </tr>
+                    )),
+                  ])}
                 </tbody>
                 {rencanaHitung.length > 0 && <tfoot><tr className="bg-slate-50 font-bold"><td colSpan={7} className="px-4 py-3 text-right">Total Estimasi</td><td className="px-4 py-3 text-right">{rupiah(totalRencana)}</td></tr></tfoot>}
               </table>
@@ -435,12 +485,103 @@ export default function BelanjaUPKPage() {
                 <div className="flex justify-between font-bold"><span>Total</span><span>{rupiah(totalBelanja)}</span></div>
                 <input type="number" value={dibayar} onChange={e => setDibayar(e.target.value)} className="w-full px-3 py-3 border rounded-lg font-bold font-mono" placeholder="Dibayar sekarang (0 jika hutang)" />
                 <textarea value={catatanBelanja} onChange={e => setCatatanBelanja(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm min-h-20" placeholder="Catatan" />
+                <button onClick={printBelanja} disabled={!belanjaCart.length} className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                  <Printer className="w-4 h-4" /> Cetak Daftar
+                </button>
                 <button onClick={saveBelanja} disabled={!belanjaCart.length} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">Simpan Belanja</button>
               </aside>
             </div>
           </div>
         </div>
       )}
+
+      <div className="fixed -left-[10000px] top-0 bg-white text-black">
+        <div ref={rencanaPrintRef} className="w-[190mm] p-2 text-[11px]">
+          <div className="mb-4 border-b border-slate-300 pb-3">
+            <h2 className="text-xl font-bold text-slate-900">{namaRencana}</h2>
+            <p className="text-sm text-slate-600">Target {persenTarget}% - Total estimasi {rupiah(totalRencana)}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Kitab</th>
+                <th>Santri</th>
+                <th>Stok Lama</th>
+                <th>Stok Baru</th>
+                <th>Saran</th>
+                <th>Rencana</th>
+                <th>Harga Beli</th>
+                <th>Estimasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupedRencana.flatMap(group => [
+                ...(groupRencanaByToko ? [(
+                  <tr key={`print-group-${group.toko}`}>
+                    <td colSpan={8} className="font-bold bg-emerald-50">{group.toko}</td>
+                  </tr>
+                )] : []),
+                ...group.items.map(item => (
+                  <tr key={`print-${item.katalog_id}`}>
+                    <td>
+                      <div className="font-bold">{item.nama_kitab}</div>
+                      <div className="text-[10px] text-slate-500">{item.marhalah_nama || '-'}{!groupRencanaByToko && item.toko_nama ? ` - ${item.toko_nama}` : ''}</div>
+                    </td>
+                    <td className="text-center">{item.jumlah_santri}</td>
+                    <td className="text-center">{item.stok_lama}</td>
+                    <td className="text-center">{item.stok_baru}</td>
+                    <td className="text-center font-bold">{item.saran_qty}</td>
+                    <td className="text-center font-bold">{item.qty_rencana}</td>
+                    <td className="text-right">{rupiah(item.harga_beli)}</td>
+                    <td className="text-right font-bold">{rupiah(item.qty_rencana * item.harga_beli)}</td>
+                  </tr>
+                )),
+              ])}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={7} className="text-right font-bold">Total Estimasi</td>
+                <td className="text-right font-bold">{rupiah(totalRencana)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div ref={belanjaPrintRef} className="w-[190mm] p-2 text-[11px]">
+          <div className="mb-4 border-b border-slate-300 pb-3">
+            <h2 className="text-xl font-bold text-slate-900">Daftar Belanja Kitab</h2>
+            <p className="text-sm text-slate-600">Tanggal {tanggalBelanja} - {jenisBelanja} - {tokoList.find(t => String(t.id) === tokoId)?.nama || 'Toko belum dipilih'}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Kitab</th>
+                <th>Marhalah</th>
+                <th>Qty</th>
+                <th>Harga</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {belanjaCart.map(item => (
+                <tr key={`belanja-print-${item.id}`}>
+                  <td className="font-bold">{item.nama_kitab}</td>
+                  <td>{item.marhalah_nama || '-'}</td>
+                  <td className="text-center">{item.qty}</td>
+                  <td className="text-right">{rupiah(item.harga_beli_input)}</td>
+                  <td className="text-right font-bold">{rupiah(item.qty * item.harga_beli_input)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={4} className="text-right font-bold">Total</td>
+                <td className="text-right font-bold">{rupiah(totalBelanja)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

@@ -5,6 +5,70 @@ import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
+const ALASAN_IZIN_KEY = 'keamanan_perizinan_alasan'
+const DEFAULT_ALASAN_IZIN = [
+  "SAKIT", "BEROBAT", "KONTROL", "ACARA KELUARGA", "ACARA",
+  "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH",
+  "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
+]
+
+async function ensureAppSettingsTable() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `)
+}
+
+function normalizeAlasanList(items: unknown[]) {
+  return [...new Set(
+    items
+      .map(item => String(item ?? '').trim().toUpperCase())
+      .filter(Boolean)
+  )]
+}
+
+export async function getAlasanIzinList() {
+  await ensureAppSettingsTable()
+  const row = await queryOne<{ value: string }>(
+    'SELECT value FROM app_settings WHERE key = ?',
+    [ALASAN_IZIN_KEY]
+  )
+
+  if (!row?.value) return DEFAULT_ALASAN_IZIN
+
+  try {
+    const parsed = JSON.parse(row.value)
+    if (!Array.isArray(parsed)) return DEFAULT_ALASAN_IZIN
+    const normalized = normalizeAlasanList(parsed)
+    return normalized.length ? normalized : DEFAULT_ALASAN_IZIN
+  } catch {
+    return DEFAULT_ALASAN_IZIN
+  }
+}
+
+export async function simpanAlasanIzinList(items: string[]) {
+  const session = await getSession()
+  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
+    return { error: 'Akses ditolak' }
+  }
+
+  const normalized = normalizeAlasanList(items)
+  if (normalized.length === 0) return { error: 'Minimal harus ada 1 alasan izin.' }
+
+  await ensureAppSettingsTable()
+  await execute(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [ALASAN_IZIN_KEY, JSON.stringify(normalized)]
+  )
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true, rows: normalized }
+}
 
 // ─── Helper asrama list ───────────────────────────────────────────────────────
 export async function getAsramaList() {

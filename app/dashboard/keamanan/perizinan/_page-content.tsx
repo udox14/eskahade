@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { 
   getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin, 
-  getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin 
+  getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin,
+  getAlasanIzinList, simpanAlasanIzinList
 } from './actions'
 import { 
   Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, 
-  AlertTriangle, Trash2, Filter, Download, BarChart2, List, Edit2, TrendingUp 
+  AlertTriangle, Trash2, Filter, Download, BarChart2, List, Edit2, TrendingUp, Settings, Save
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -22,7 +23,7 @@ const LIST_PEMBERI_IZIN = [
   "Ryan M. Ridwan", "M. Jihad Robbani", "Wahid Hasyim", "Abdul Halim"
 ]
 
-const LIST_ALASAN = [
+const DEFAULT_LIST_ALASAN = [
   "SAKIT", "BEROBAT", "KONTROL", "ACARA KELUARGA", "ACARA",
   "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH", 
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
@@ -39,6 +40,7 @@ export default function PerizinanPage() {
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [asramaOptions, setAsramaOptions] = useState<string[]>([])
+  const [alasanOptions, setAlasanOptions] = useState<string[]>(DEFAULT_LIST_ALASAN)
   const [analitikData, setAnalitikData] = useState<any>(null)
   const [topSantri, setTopSantri] = useState<any[]>([])
 
@@ -57,6 +59,7 @@ export default function PerizinanPage() {
   // Modal Input & Edit
   const [isOpenInput, setIsOpenInput] = useState(false)
   const [isOpenEdit, setIsOpenEdit] = useState(false)
+  const [isOpenAlasan, setIsOpenAlasan] = useState(false)
   const [editData, setEditData] = useState<any>(null)
 
   const [searchSantri, setSearchSantri] = useState('')
@@ -79,9 +82,17 @@ export default function PerizinanPage() {
   const [selectedReturnId, setSelectedReturnId] = useState('')
   const [waktuKembali, setWaktuKembali] = useState(new Date().toISOString().slice(0, 16))
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [draftAlasan, setDraftAlasan] = useState<string[]>(DEFAULT_LIST_ALASAN)
+  const [newAlasan, setNewAlasan] = useState('')
+  const [savingAlasan, setSavingAlasan] = useState(false)
 
   useEffect(() => {
     getAsramaList().then(setAsramaOptions)
+    getAlasanIzinList().then(rows => {
+      setAlasanOptions(rows)
+      setDraftAlasan(rows)
+      if (rows.length > 0) setAlasanDropdown(rows[0])
+    })
   }, [])
 
   const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, ta = tglAwal, tk = tglAkhir, st = statusFilter) => {
@@ -122,7 +133,7 @@ export default function PerizinanPage() {
 
   const resetFormState = () => {
     setJenisIzin('KELUAR_KOMPLEK')
-    setAlasanDropdown('SAKIT')
+    setAlasanDropdown(alasanOptions[0] || 'SAKIT')
     setDeskripsiIzin('')
     setPemberiIzin('')
     setFormDateSingle(new Date().toLocaleDateString('en-CA'))
@@ -147,15 +158,15 @@ export default function PerizinanPage() {
     setJenisIzin(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
     
     // Parse Alasan
-    let parsedAlasan = item.alasan || ''
-    let dAlasan = LIST_ALASAN[0]
+    const parsedAlasan = item.alasan || ''
+    let dAlasan = alasanOptions[0] || DEFAULT_LIST_ALASAN[0]
     let dDesk = ''
     
-    const matchedPrefix = LIST_ALASAN.find(a => parsedAlasan.startsWith(a + " - "))
+    const matchedPrefix = alasanOptions.find(a => parsedAlasan.startsWith(a + " - "))
     if (matchedPrefix) {
       dAlasan = matchedPrefix
       dDesk = parsedAlasan.replace(matchedPrefix + " - ", "")
-    } else if (LIST_ALASAN.includes(parsedAlasan)) {
+    } else if (alasanOptions.includes(parsedAlasan)) {
       dAlasan = parsedAlasan
     } else {
       dDesk = parsedAlasan
@@ -284,6 +295,49 @@ export default function PerizinanPage() {
     }
   }
 
+  const openAlasanModal = () => {
+    setDraftAlasan(alasanOptions)
+    setNewAlasan('')
+    setIsOpenAlasan(true)
+  }
+
+  const handleTambahAlasan = () => {
+    const normalized = newAlasan.trim().toUpperCase()
+    if (!normalized) return
+    if (draftAlasan.includes(normalized)) {
+      toast.info('Alasan itu sudah ada.')
+      setNewAlasan('')
+      return
+    }
+    setDraftAlasan(prev => [...prev, normalized])
+    setNewAlasan('')
+  }
+
+  const handleHapusAlasan = (nama: string) => {
+    if (draftAlasan.length <= 1) {
+      toast.warning('Minimal harus ada 1 alasan izin.')
+      return
+    }
+    setDraftAlasan(prev => prev.filter(item => item !== nama))
+  }
+
+  const handleSimpanAlasan = async () => {
+    setSavingAlasan(true)
+    const res = await simpanAlasanIzinList(draftAlasan)
+    setSavingAlasan(false)
+
+    if ('error' in res) {
+      toast.error('Gagal menyimpan alasan', { description: (res as any).error })
+      return
+    }
+
+    const rows = (res as any).rows as string[]
+    setAlasanOptions(rows)
+    if (!rows.includes(alasanDropdown)) setAlasanDropdown(rows[0])
+    setIsOpenAlasan(false)
+    toast.success('Alasan izin diperbarui')
+  }
+
   // Common Form Fields for Tambah & Edit Modal
   const renderFormFields = () => (
     <>
@@ -337,7 +391,7 @@ export default function PerizinanPage() {
         <div>
           <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Keperluan Dasar</label>
           <select value={alasanDropdown} onChange={e => setAlasanDropdown(e.target.value)} required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
-            {LIST_ALASAN.map(nama => <option key={nama} value={nama}>{nama}</option>)}
+            {alasanOptions.map(nama => <option key={nama} value={nama}>{nama}</option>)}
           </select>
         </div>
         <div>
@@ -367,9 +421,14 @@ export default function PerizinanPage() {
           <h1 className="text-2xl font-bold text-slate-900">Perizinan Santri</h1>
           <p className="text-slate-500 text-sm">Monitoring santri keluar/masuk komplek dan pulang.</p>
         </div>
-        <button onClick={openTambahModal} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
-          <Plus className="w-4 h-4" /> Izin Baru
-        </button>
+        <div className="flex gap-2">
+          <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
+            <Settings className="w-4 h-4" /> Alasan
+          </button>
+          <button onClick={openTambahModal} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
+            <Plus className="w-4 h-4" /> Izin Baru
+          </button>
+        </div>
       </div>
 
       {/* TABS */}
@@ -733,6 +792,66 @@ export default function PerizinanPage() {
         </div>
       )}
 
+
+      {/* --- MODAL PENGATURAN ALASAN --- */}
+      {isOpenAlasan && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">Atur Alasan Izin</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Daftar ini dipakai di pilihan keperluan dasar.</p>
+              </div>
+              <button type="button" onClick={() => setIsOpenAlasan(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
+            </div>
+
+            <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+              <div className="flex gap-2">
+                <input
+                  value={newAlasan}
+                  onChange={e => setNewAlasan(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleTambahAlasan()
+                    }
+                  }}
+                  placeholder="Tulis alasan baru..."
+                  className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
+                />
+                <button type="button" onClick={handleTambahAlasan} className="bg-slate-900 hover:bg-black text-white px-4 rounded-xl font-bold text-sm flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Tambah
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {draftAlasan.map(alasan => (
+                  <div key={alasan} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                    <span className="text-sm font-bold text-slate-700">{alasan}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleHapusAlasan(alasan)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Hapus alasan"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
+              <button type="button" onClick={() => setIsOpenAlasan(false)} className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                Batal
+              </button>
+              <button type="button" onClick={handleSimpanAlasan} disabled={savingAlasan} className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                <Save className="w-4 h-4" /> {savingAlasan ? 'Menyimpan...' : 'Simpan Alasan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- MODAL INPUT & EDIT IZIN --- */}
       {(isOpenInput || isOpenEdit) && (
