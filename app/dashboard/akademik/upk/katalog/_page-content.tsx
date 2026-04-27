@@ -127,10 +127,13 @@ export default function KatalogUPKPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [submittedSearch, setSubmittedSearch] = useState('')
   const [filterMarhalah, setFilterMarhalah] = useState('')
   const [filterStatus, setFilterStatus] = useState('SEMUA')
   const [form, setForm] = useState<KatalogForm>(emptyKatalogForm)
   const [tokoForm, setTokoForm] = useState<TokoForm>(emptyTokoForm)
+  const [isKatalogModalOpen, setIsKatalogModalOpen] = useState(false)
+  const [isTokoModalOpen, setIsTokoModalOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
@@ -152,10 +155,10 @@ export default function KatalogUPKPage() {
 
   const loadKatalog = useCallback(async () => {
     setLoading(true)
-    const data = await getKatalogUPK(search, filterMarhalah, filterStatus)
+    const data = await getKatalogUPK(submittedSearch, filterMarhalah, filterStatus)
     setKatalog(data)
     setLoading(false)
-  }, [filterMarhalah, filterStatus, search])
+  }, [filterMarhalah, filterStatus, submittedSearch])
 
   const loadToko = async () => {
     const toko = await getTokoList(true)
@@ -177,6 +180,15 @@ export default function KatalogUPKPage() {
   }
 
   const resetForm = () => setForm(emptyKatalogForm)
+
+  const openTambahModal = () => {
+    resetForm()
+    setIsKatalogModalOpen(true)
+  }
+
+  const applySearch = () => {
+    setSubmittedSearch(search)
+  }
 
   const handlePilihMaster = (id: string) => {
     const selected = masterKitab.find(k => String(k.id) === id)
@@ -202,7 +214,7 @@ export default function KatalogUPKPage() {
       is_active: !!item.is_active,
       catatan: item.catatan ?? '',
     })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setIsKatalogModalOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -219,6 +231,7 @@ export default function KatalogUPKPage() {
 
     toast.success(form.id ? 'Katalog diperbarui' : 'Katalog ditambahkan')
     resetForm()
+    setIsKatalogModalOpen(false)
     loadKatalog()
   }
 
@@ -242,6 +255,7 @@ export default function KatalogUPKPage() {
     }
     toast.success(tokoForm.id ? 'Toko diperbarui' : 'Toko ditambahkan')
     setTokoForm(emptyTokoForm)
+    setIsTokoModalOpen(false)
     loadToko()
   }
 
@@ -291,22 +305,122 @@ export default function KatalogUPKPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-4 space-y-6">
-          <div className="bg-white border rounded-xl shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
+      <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
+            <button onClick={openTambahModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
+              <Plus className="w-4 h-4" /> Tambah Item
+            </button>
+            <button onClick={() => setIsTokoModalOpen(true)} className="px-4 py-2.5 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-blue-700">
+              <Store className="w-4 h-4" /> Master Toko
+            </button>
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && applySearch()}
+                placeholder="Cari kitab, toko, atau catatan..."
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+              />
+            </div>
+            <select value={filterMarhalah} onChange={e => setFilterMarhalah(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm font-bold text-slate-700">
+              <option value="">Semua Marhalah</option>
+              {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+            </select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm font-bold text-slate-700">
+              <option value="SEMUA">Semua Status</option>
+              <option value="AKTIF">Aktif</option>
+              <option value="NONAKTIF">Nonaktif</option>
+            </select>
+            <button onClick={applySearch} className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
+              <RefreshCw className="w-4 h-4" /> Muat
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left min-w-[1050px]">
+                <thead className="bg-slate-50 text-slate-600 font-bold border-b">
+                  <tr>
+                    <th className="px-4 py-3">Kitab</th>
+                    <th className="px-4 py-3">Toko</th>
+                    <th className="px-4 py-3 text-center">Stok</th>
+                    <th className="px-4 py-3 text-right">Beli</th>
+                    <th className="px-4 py-3 text-right">Jual</th>
+                    <th className="px-4 py-3 text-right">Modal</th>
+                    <th className="px-4 py-3 text-right">Laba Kotor</th>
+                    <th className="px-4 py-3 text-right">Laba Bersih</th>
+                    <th className="px-4 py-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {loading ? (
+                    <tr><td colSpan={9} className="text-center py-16"><Loader2 className="w-7 h-7 animate-spin mx-auto text-amber-600" /></td></tr>
+                  ) : paged.length === 0 ? (
+                    <tr><td colSpan={9} className="text-center py-16 text-slate-400">Belum ada data katalog.</td></tr>
+                  ) : (
+                    paged.map(item => (
+                      <tr key={item.id} className={!item.is_active ? 'bg-slate-50 text-slate-400' : 'hover:bg-slate-50'}>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{item.nama_kitab}</p>
+                          <p className="text-xs text-slate-500">{item.marhalah_nama || '-'}{item.kitab_id ? ' - dari master kitab' : ' - manual'}</p>
+                          {item.catatan && <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.catatan}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{item.toko_nama || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <p className="font-extrabold text-slate-800">{item.jumlah_stok}</p>
+                          <p className="text-[10px] text-slate-400">L {item.stok_lama} / B {item.stok_baru}</p>
+                          <p className="text-[10px] text-slate-400">{tanggalPendek(item.stok_updated_at)}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{rupiah(item.harga_beli)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">{rupiah(item.harga_jual)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-blue-700">{rupiah(item.modal)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{rupiah(item.laba_kotor)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">{rupiah(item.laba_bersih)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-center gap-1">
+                            <button onClick={() => handleEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit item">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus item">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              total={katalog.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+            />
+          </div>
+        </div>
+
+      {isKatalogModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <PackagePlus className="w-4 h-4 text-amber-600" />
-                {form.id ? 'Edit Item' : 'Tambah Item'}
+                {form.id ? 'Edit Item Katalog' : 'Tambah Item Katalog'}
               </h2>
-              {form.id && (
-                <button onClick={resetForm} className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
-                  <X className="w-3 h-3" /> Batal
-                </button>
-              )}
+              <button
+                onClick={() => { resetForm(); setIsKatalogModalOpen(false) }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
               <input type="hidden" name="id" value={form.id} />
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Ambil dari Manajemen Kitab</label>
@@ -412,142 +526,70 @@ export default function KatalogUPKPage() {
                 Aktif dan bisa dipakai di kasir
               </label>
 
-              <button disabled={saving} className="w-full bg-amber-600 text-white py-2.5 rounded-lg font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                {form.id ? 'Simpan Perubahan' : 'Tambah ke Katalog'}
-              </button>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t">
+                <button type="button" onClick={() => { resetForm(); setIsKatalogModalOpen(false) }} className="px-4 py-2.5 border border-slate-200 rounded-lg font-bold text-sm text-slate-600 hover:bg-slate-50">
+                  Batal
+                </button>
+                <button disabled={saving} className="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {form.id ? 'Simpan Perubahan' : 'Tambah ke Katalog'}
+                </button>
+              </div>
             </form>
           </div>
+        </div>
+      )}
 
-          <div className="bg-white border rounded-xl shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-              <Store className="w-4 h-4 text-blue-600" /> Master Toko
-            </h2>
-            <form onSubmit={handleSubmitToko} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 mb-3">
-              <input type="hidden" name="id" value={tokoForm.id} />
-              <input name="nama" required value={tokoForm.nama} onChange={e => setTokoForm(prev => ({ ...prev, nama: e.target.value }))} className="p-2.5 border border-slate-200 rounded-lg text-sm" placeholder="Nama toko" />
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> {tokoForm.id ? 'Update' : 'Tambah'}
+      {isTokoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Store className="w-4 h-4 text-blue-600" /> Master Toko
+              </h2>
+              <button
+                onClick={() => { setTokoForm(emptyTokoForm); setIsTokoModalOpen(false) }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
               </button>
-              <label className="sm:col-span-2 flex items-center gap-2 text-xs font-bold text-slate-600">
-                <input name="is_active" type="checkbox" checked={tokoForm.is_active} onChange={e => setTokoForm(prev => ({ ...prev, is_active: e.target.checked }))} />
-                Toko aktif
-              </label>
-            </form>
-            <div className="divide-y border rounded-lg overflow-hidden">
-              {tokoList.map(toko => (
-                <div key={toko.id} className="flex items-center justify-between gap-2 p-2 text-sm">
-                  <div>
-                    <p className="font-bold text-slate-700">{toko.nama}</p>
-                    {!toko.is_active && <p className="text-[10px] font-bold text-slate-400 uppercase">Nonaktif</p>}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <form onSubmit={handleSubmitToko} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                <input type="hidden" name="id" value={tokoForm.id} />
+                <input name="nama" required value={tokoForm.nama} onChange={e => setTokoForm(prev => ({ ...prev, nama: e.target.value }))} className="p-2.5 border border-slate-200 rounded-lg text-sm" placeholder="Nama toko" />
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" /> {tokoForm.id ? 'Update' : 'Tambah'}
+                </button>
+                <label className="sm:col-span-2 flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <input name="is_active" type="checkbox" checked={tokoForm.is_active} onChange={e => setTokoForm(prev => ({ ...prev, is_active: e.target.checked }))} />
+                  Toko aktif
+                </label>
+              </form>
+
+              <div className="divide-y border rounded-lg overflow-hidden">
+                {tokoList.map(toko => (
+                  <div key={toko.id} className="flex items-center justify-between gap-2 p-3 text-sm">
+                    <div>
+                      <p className="font-bold text-slate-700">{toko.nama}</p>
+                      {!toko.is_active && <p className="text-[10px] font-bold text-slate-400 uppercase">Nonaktif</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setTokoForm({ id: String(toko.id), nama: toko.nama, is_active: toko.is_active })} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit toko">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeleteToko(toko.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus toko">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setTokoForm({ id: String(toko.id), nama: toko.nama, is_active: toko.is_active })} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit toko">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDeleteToko(toko.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus toko">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="xl:col-span-8 space-y-4">
-          <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && loadKatalog()}
-                placeholder="Cari kitab, toko, atau catatan..."
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm"
-              />
-            </div>
-            <select value={filterMarhalah} onChange={e => setFilterMarhalah(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm font-bold text-slate-700">
-              <option value="">Semua Marhalah</option>
-              {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-            </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm font-bold text-slate-700">
-              <option value="SEMUA">Semua Status</option>
-              <option value="AKTIF">Aktif</option>
-              <option value="NONAKTIF">Nonaktif</option>
-            </select>
-            <button onClick={loadKatalog} className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
-              <RefreshCw className="w-4 h-4" /> Muat
-            </button>
-          </div>
-
-          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left min-w-[1050px]">
-                <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-                  <tr>
-                    <th className="px-4 py-3">Kitab</th>
-                    <th className="px-4 py-3">Toko</th>
-                    <th className="px-4 py-3 text-center">Stok</th>
-                    <th className="px-4 py-3 text-right">Beli</th>
-                    <th className="px-4 py-3 text-right">Jual</th>
-                    <th className="px-4 py-3 text-right">Modal</th>
-                    <th className="px-4 py-3 text-right">Laba Kotor</th>
-                    <th className="px-4 py-3 text-right">Laba Bersih</th>
-                    <th className="px-4 py-3 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {loading ? (
-                    <tr><td colSpan={9} className="text-center py-16"><Loader2 className="w-7 h-7 animate-spin mx-auto text-amber-600" /></td></tr>
-                  ) : paged.length === 0 ? (
-                    <tr><td colSpan={9} className="text-center py-16 text-slate-400">Belum ada data katalog.</td></tr>
-                  ) : (
-                    paged.map(item => (
-                      <tr key={item.id} className={!item.is_active ? 'bg-slate-50 text-slate-400' : 'hover:bg-slate-50'}>
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-800">{item.nama_kitab}</p>
-                          <p className="text-xs text-slate-500">{item.marhalah_nama || '-'}{item.kitab_id ? ' - dari master kitab' : ' - manual'}</p>
-                          {item.catatan && <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.catatan}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{item.toko_nama || '-'}</td>
-                        <td className="px-4 py-3 text-center">
-                          <p className="font-extrabold text-slate-800">{item.jumlah_stok}</p>
-                          <p className="text-[10px] text-slate-400">L {item.stok_lama} / B {item.stok_baru}</p>
-                          <p className="text-[10px] text-slate-400">{tanggalPendek(item.stok_updated_at)}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono">{rupiah(item.harga_beli)}</td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">{rupiah(item.harga_jual)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-blue-700">{rupiah(item.modal)}</td>
-                        <td className="px-4 py-3 text-right font-mono">{rupiah(item.laba_kotor)}</td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">{rupiah(item.laba_bersih)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center gap-1">
-                            <button onClick={() => handleEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit item">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus item">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              total={katalog.length}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-            />
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

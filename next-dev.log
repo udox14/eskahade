@@ -3138,3 +3138,13 @@
  GET /dashboard/asrama/spp 200 in 5.1s (compile: 73ms, render: 5.0s)
  GET /api/version 200 in 11ms
  GET /api/version 200 in 46ms
+ GET /api/version 200 in 18ms
+ GET /api/version 200 in 10ms
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 26ms
+✓ Compiled in 340ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 2.0s (compile: 22ms, render: 1984ms)
+ GET /api/version 200 in 6ms
