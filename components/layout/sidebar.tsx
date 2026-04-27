@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList, ToggleRight
+  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList, ToggleRight,
+  LogOut, CalendarRange, Download, FileWarning, Shuffle, Home, UserX
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -19,7 +20,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight,
+  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
+  FileWarning, Shuffle, Home, UserX,
 };
 
 function getIcon(name: string): React.ElementType {
@@ -28,10 +30,17 @@ function getIcon(name: string): React.ElementType {
 
 const GROUP_ICON: Record<string, React.ElementType> = {
   '_standalone': LayoutDashboard,
-  'Kesantrian': ShieldAlert,
+  'Data Santri': Users,
+  'Kesantrian': FileText,
+  'Asrama': Home,
+  'Perizinan & Disiplin': ShieldAlert,
+  'Akademik': School,
   'Pengkelasan': School,
   'Nilai & Rapor': BookOpen,
+  'Absensi Akademik': CalendarCheck,
   'Absensi': CalendarCheck,
+  'Keuangan Pusat': Coins,
+  'Keuangan Santri': Wallet,
   'Keuangan': Coins,
   'UPK': Package,
   'EHB': ClipboardList,
@@ -40,7 +49,24 @@ const GROUP_ICON: Record<string, React.ElementType> = {
 
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
-const THEME_COLORS: Record<ThemeKey, any> = {
+type ThemeColor = {
+  bg: string;
+  toggleBtn: string;
+  glowText: string;
+  activeText: string;
+  activeBg: string;
+  activeBorder: string;
+  hoverBg: string;
+  mutedText: string;
+  folderActiveBg: string;
+  folderOpenBg: string;
+  indicator: string;
+  glowBg: string;
+  roleBadge: string;
+  roleLabel: string;
+};
+
+const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
   emerald: {
     bg: "bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950",
     toggleBtn: "bg-emerald-900 border-emerald-500/30 text-emerald-400 hover:bg-emerald-700 hover:text-emerald-100 hover:border-emerald-400",
@@ -133,7 +159,24 @@ const ROLE_LABEL: Record<string, string> = {
   bendahara: 'Bendahara',
 };
 
-const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'EHB', 'Master Data'];
+const GROUP_ORDER = [
+  '_standalone',
+  'Data Santri',
+  'Kesantrian',
+  'Asrama',
+  'Perizinan & Disiplin',
+  'Akademik',
+  'Pengkelasan',
+  'Nilai & Rapor',
+  'Absensi Akademik',
+  'Absensi',
+  'Keuangan Pusat',
+  'Keuangan Santri',
+  'Keuangan',
+  'UPK',
+  'EHB',
+  'Master Data',
+];
 
 interface SidebarProps {
   userRole?: string;

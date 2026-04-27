@@ -71,8 +71,8 @@ INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_acti
 ('Keuangan', 'Pengaturan Tarif',   '/dashboard/keuangan/tarif',          'Settings',   '["admin","bendahara"]',         1, 6),
 
 -- UPK
-('UPK', 'Kasir UPK',      '/dashboard/akademik/upk/kasir',     'ShoppingCart', '["admin","sekpen"]', 1, 0),
-('UPK', 'Manajemen UPK',  '/dashboard/akademik/upk/manajemen', 'Package',      '["admin","sekpen"]', 1, 1),
+('UPK', 'Kasir',          '/dashboard/akademik/upk/kasir',     'ShoppingCart', '["admin","sekpen"]', 1, 0),
+('UPK', 'Manajemen',      '/dashboard/akademik/upk/manajemen', 'Package',      '["admin","sekpen"]', 1, 1),
 
 -- Master Data
 ('Master Data', 'Manajemen User',          '/dashboard/pengaturan/users',          'UserCog',    '["admin"]', 1, 0),

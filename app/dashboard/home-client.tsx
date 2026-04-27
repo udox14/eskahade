@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -11,7 +12,8 @@ import {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight, ChevronRight
+  Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
+  Download, FileWarning, Shuffle, Home, UserX
 } from 'lucide-react'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
@@ -22,7 +24,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight,
+  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
+  FileWarning, Shuffle, Home, UserX,
 }
 function getIcon(name: string): React.ElementType {
   return ICON_MAP[name] ?? Settings
@@ -33,6 +36,9 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
   '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
   '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
+  '/dashboard/santri/input':                         'Input data santri baru beserta identitas awalnya.',
+  '/dashboard/santri/export':                        'Export data santri aktif sesuai kebutuhan administrasi.',
+  '/dashboard/santri/keluar':                        'Catat santri yang keluar atau berhenti di tengah tahun.',
   '/dashboard/santri/foto':                          'Upload dan kelola foto profil santri.',
   '/dashboard/dewan-santri/surat':                   'Buat surat izin, keterangan, dan tagihan untuk santri.',
   '/dashboard/asrama/absen-malam':                   'Catat kehadiran santri saat apel malam per kamar.',
@@ -41,6 +47,8 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/asrama/mutasi-asrama':                 'Pindahkan santri antar asrama, assign santri baru, atau mutasi batch.',
   '/dashboard/asrama/absen-sakit':                   'Input data santri yang sakit dan tidak bisa mengikuti kegiatan.',
   '/dashboard/asrama/layanan':                       'Kelola data katering (tempat makan) dan laundry santri.',
+  '/dashboard/asrama/perpulangan':                   'Kelola izin perpulangan santri per periode.',
+  '/dashboard/asrama/perpulangan/monitoring':        'Pantau status perpulangan dan kedatangan santri.',
   '/dashboard/keamanan/perizinan':                   'Input dan pantau perizinan pulang atau keluar komplek santri.',
   '/dashboard/keamanan/perizinan/cetak-telat':       'Cetak daftar santri yang terlambat kembali.',
   '/dashboard/keamanan/perizinan/verifikasi-telat':  'Proses sidang dan vonis santri yang terlambat datang.',
@@ -71,7 +79,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/dewan-santri/setoran':                 'Monitor status setoran SPP dari semua asrama.',
   '/dashboard/dewan-santri/uang-jajan':              'Pantau saldo & topup uang jajan santri per asrama.',
   '/dashboard/keuangan/tarif':                       'Atur nominal biaya masuk dan SPP per angkatan.',
-  '/dashboard/akademik/upk/kasir':                   'Kasir UPK — proses pembelian kitab dan kebutuhan santri.',
+  '/dashboard/akademik/upk/kasir':                   'Proses pembelian kitab dan kebutuhan santri.',
   '/dashboard/akademik/upk/katalog':                 'Kelola katalog, stok, toko, harga beli, dan harga jual UPK.',
   '/dashboard/akademik/upk/manajemen':               'Kelola distribusi barang dan transaksi toko UPK pesantren.',
   '/dashboard/pengaturan/users':                     'Kelola akun pengguna, reset password, dan hak akses.',
@@ -97,10 +105,17 @@ const FITUR_DESC: Record<string, string> = {
 // ── Accent per grup — hanya dot + garis, bukan badge ─────────────────────────
 const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
   '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
+  'Data Santri':  { dot: 'bg-sky-400',      line: 'bg-sky-100',      label: 'text-sky-600',     iconHover: 'group-hover:text-sky-600' },
   'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
+  'Asrama':       { dot: 'bg-lime-500',     line: 'bg-lime-100',     label: 'text-lime-700',    iconHover: 'group-hover:text-lime-700' },
+  'Perizinan & Disiplin': { dot: 'bg-red-400', line: 'bg-red-100',   label: 'text-red-600',     iconHover: 'group-hover:text-red-600' },
+  'Akademik':     { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
   'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
   'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
+  'Absensi Akademik': { dot: 'bg-teal-400', line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
   'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
+  'Keuangan Pusat': { dot: 'bg-emerald-500', line: 'bg-emerald-100', label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
+  'Keuangan Santri': { dot: 'bg-cyan-500',  line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
   'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
   'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
   'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
@@ -118,7 +133,24 @@ const ROLE_EMOJI: Record<string, string> = {
   dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰',
 }
 
-const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'EHB', 'Absensi', 'Keuangan', 'UPK', 'Master Data']
+const GROUP_ORDER = [
+  '_standalone',
+  'Data Santri',
+  'Kesantrian',
+  'Asrama',
+  'Perizinan & Disiplin',
+  'Akademik',
+  'Pengkelasan',
+  'Nilai & Rapor',
+  'Absensi Akademik',
+  'Absensi',
+  'Keuangan Pusat',
+  'Keuangan Santri',
+  'Keuangan',
+  'UPK',
+  'EHB',
+  'Master Data',
+]
 
 function getGreeting(hour: number) {
   if (hour >= 4  && hour < 11) return { text: 'Selamat Pagi',  sub: 'Semoga hari ini penuh berkah.', emoji: '🌅' }
@@ -146,7 +178,9 @@ function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROU
     >
       {/* Icon — plain, no colored badge */}
       <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center transition-all duration-200 group-hover:bg-slate-100 group-hover:border-slate-200">
-        <Icon className={cn('w-5 h-5 text-slate-500 transition-colors duration-200', accent.iconHover)} />
+        {React.createElement(Icon, {
+          className: cn('w-5 h-5 text-slate-500 transition-colors duration-200', accent.iconHover),
+        })}
       </div>
 
       {/* Label */}
@@ -164,7 +198,10 @@ function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROU
 export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props) {
   const [now, setNow] = useState<Date | null>(null)
 
-  useEffect(() => { setNow(new Date()) }, [])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(new Date()), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)

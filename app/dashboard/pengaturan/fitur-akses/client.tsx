@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, getBottomNavGlobalStatus } from './actions'
+import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal } from './actions'
 import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -57,7 +57,24 @@ const ROLE_HEADER: Record<string, string> = {
   bendahara:       'from-yellow-500 to-yellow-600',
 }
 
-const GROUP_ORDER = ['_standalone', 'Kesantrian', 'Pengkelasan', 'Nilai & Rapor', 'Absensi', 'Keuangan', 'UPK', 'Master Data']
+const GROUP_ORDER = [
+  '_standalone',
+  'Data Santri',
+  'Kesantrian',
+  'Asrama',
+  'Perizinan & Disiplin',
+  'Akademik',
+  'Pengkelasan',
+  'Nilai & Rapor',
+  'Absensi Akademik',
+  'Absensi',
+  'Keuangan Pusat',
+  'Keuangan Santri',
+  'Keuangan',
+  'UPK',
+  'EHB',
+  'Master Data',
+]
 
 interface FiturItem {
   id: number
@@ -420,7 +437,7 @@ function TabBottomNav({
       <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
         <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
         <span>
-          Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu "Menu"</strong> yang mengarah ke halaman Dashboard.
+          Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu &quot;Menu&quot;</strong> yang mengarah ke halaman Dashboard.
           Tiap role hanya melihat fitur yang ia miliki sekaligus ditandai bottom nav. Maksimal <strong>4 fitur aktif per role</strong>.
         </span>
       </div>
