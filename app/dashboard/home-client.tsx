@@ -85,6 +85,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/ehb/jadwal':                           'Atur jadwal ujian EHB: event, sesi, dan distribusi kelas.',
   '/dashboard/ehb/ruangan':                          'Kelola ruangan ujian dan plotting penempatan santri.',
   '/dashboard/ehb/pengawas':                         'Kelola pengawas EHB dan jadwal tugasnya per ruangan.',
+  '/dashboard/ehb/absensi-pengawas':                 'Catat kehadiran pengawas EHB dan badal per hari dan sesi.',
   '/dashboard/ehb/absensi':                          'Catat kehadiran peserta EHB per sesi dan ruangan.',
   '/dashboard/ehb/susulan':                          'Kelola peserta yang mengikuti ujian susulan EHB.',
   '/dashboard/ehb/cetak':                            'Cetak administrasi EHB: kartu peserta, blanko, jadwal, dan tempelan ruangan.',

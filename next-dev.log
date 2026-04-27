@@ -139,3 +139,23 @@
 [layout] fiturAkses count: 66
  GET /dashboard/asrama/spp 200 in 605ms (compile: 61ms, render: 544ms)
 ✓ Compiled in 123ms
+ GET /api/version 200 in 4ms
+ POST /dashboard/asrama/spp 200 in 787ms (compile: 72ms, render: 715ms)
+ POST /dashboard/asrama/spp 200 in 403ms (compile: 4ms, render: 398ms)
+ POST /dashboard/asrama/spp 200 in 336ms (compile: 6ms, render: 330ms)
+ POST /dashboard/asrama/spp 200 in 329ms (compile: 4ms, render: 325ms)
+ POST /dashboard/asrama/spp 200 in 171ms (compile: 5ms, render: 165ms)
+ POST /dashboard/asrama/spp 200 in 182ms (compile: 8ms, render: 174ms)
+ GET /dashboard/ehb/keuangan 200 in 178ms (compile: 113ms, render: 65ms)
+ POST /dashboard/ehb/keuangan 200 in 2.9s (compile: 3ms, render: 2.8s)
+ POST /dashboard/ehb/keuangan 200 in 4.4s (compile: 3ms, render: 4.4s)
+ POST /dashboard/ehb/keuangan 200 in 5.9s (compile: 8ms, render: 5.8s)
+ POST /dashboard/ehb/keuangan 200 in 6.6s (compile: 4ms, render: 6.6s)
+ POST /dashboard/ehb/keuangan 200 in 4.2s (compile: 4ms, render: 4.1s)
+ GET /dashboard/ehb/keuangan/transaksi 200 in 911ms (compile: 825ms, render: 86ms)
+ POST /dashboard/ehb/keuangan 200 in 4.1s (compile: 7ms, render: 4.1s)
+ POST /dashboard/ehb/keuangan/transaksi 200 in 4.1s (compile: 9ms, render: 4.1s)
+ POST /dashboard/ehb/keuangan/transaksi 200 in 2.6s (compile: 27ms, render: 2.6s)
+ POST /dashboard/ehb/keuangan/transaksi 200 in 4.7s (compile: 3ms, render: 4.7s)
+ POST /dashboard/ehb/keuangan/transaksi 200 in 4.0s (compile: 6ms, render: 3.9s)
+ POST /dashboard/ehb/keuangan/transaksi 200 in 5.8s (compile: 6ms, render: 5.8s)
