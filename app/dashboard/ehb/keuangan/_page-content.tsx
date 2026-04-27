@@ -1252,24 +1252,6 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
           <h1 className="text-2xl font-bold text-slate-800">Keuangan EHB</h1>
           <p className="text-sm text-slate-500 mt-1">Kelola rencana anggaran, transaksi, dan honorarium EHB.</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="bg-white border rounded-xl px-4 py-3">
-            <p className="text-[11px] text-slate-500 font-bold uppercase">ATK</p>
-            <p className="text-sm font-bold text-slate-800">{rupiah(summary.byCategory.get('atk_administrasi') || 0)}</p>
-          </div>
-          <div className="bg-white border rounded-xl px-4 py-3">
-            <p className="text-[11px] text-slate-500 font-bold uppercase">Konsumsi</p>
-            <p className="text-sm font-bold text-slate-800">{rupiah(summary.byCategory.get('konsumsi') || 0)}</p>
-          </div>
-          <div className="bg-white border rounded-xl px-4 py-3">
-            <p className="text-[11px] text-slate-500 font-bold uppercase">Honor</p>
-            <p className="text-sm font-bold text-slate-800">{rupiah(summary.byCategory.get('honorarium') || 0)}</p>
-          </div>
-          <div className="bg-slate-900 text-white rounded-xl px-4 py-3">
-            <p className="text-[11px] text-white/50 font-bold uppercase">Total RAB</p>
-            <p className="text-sm font-bold">{rupiah(summary.total)}</p>
-          </div>
-        </div>
       </div>
 
       <div className="bg-white border rounded-2xl p-1 flex flex-wrap gap-1 w-fit">
@@ -1294,6 +1276,27 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
           )
         })}
       </div>
+
+      {activeTab === 'rab' ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white border rounded-2xl p-4">
+            <p className="text-[11px] text-slate-500 font-bold uppercase">ATK</p>
+            <p className="text-lg font-bold text-slate-800 mt-1">{rupiah(summary.byCategory.get('atk_administrasi') || 0)}</p>
+          </div>
+          <div className="bg-white border rounded-2xl p-4">
+            <p className="text-[11px] text-slate-500 font-bold uppercase">Konsumsi</p>
+            <p className="text-lg font-bold text-slate-800 mt-1">{rupiah(summary.byCategory.get('konsumsi') || 0)}</p>
+          </div>
+          <div className="bg-white border rounded-2xl p-4">
+            <p className="text-[11px] text-slate-500 font-bold uppercase">Honor</p>
+            <p className="text-lg font-bold text-slate-800 mt-1">{rupiah(summary.byCategory.get('honorarium') || 0)}</p>
+          </div>
+          <div className="bg-slate-900 text-white rounded-2xl p-4">
+            <p className="text-[11px] text-white/50 font-bold uppercase">Total RAB</p>
+            <p className="text-lg font-bold mt-1">{rupiah(summary.total)}</p>
+          </div>
+        </div>
+      ) : null}
 
       {activeTab === 'honor_panitia' ? (
         <div className="space-y-5">
