@@ -84,5 +84,20 @@ CREATE TABLE IF NOT EXISTS ehb_pembuat_soal (
 CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_event
   ON ehb_pembuat_soal(ehb_event_id, guru_id);
 
+CREATE TABLE IF NOT EXISTS ehb_pembuat_soal_marhalah (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+  marhalah_id    INTEGER NOT NULL REFERENCES marhalah(id),
+  mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+  guru_id        INTEGER REFERENCES data_guru(id),
+  nama_guru      TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT,
+  UNIQUE(ehb_event_id, marhalah_id, mapel_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_marhalah_event
+  ON ehb_pembuat_soal_marhalah(ehb_event_id, marhalah_id, guru_id);
+
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan) VALUES
 ('EHB', 'Keuangan', '/dashboard/ehb/keuangan', 'Wallet', '["admin"]', 1, 12);

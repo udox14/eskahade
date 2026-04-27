@@ -15,6 +15,19 @@ export async function getNominalSPP() {
   return 70000
 }
 
+export async function getSppBillingStart() {
+  const row = await queryOne<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'spp_tagihan_mulai'`
+  )
+  const value = row?.value ?? '2026-01'
+  const [tahunMulai, bulanMulai] = value.split('-').map(Number)
+  return {
+    tahun: Number.isFinite(tahunMulai) ? tahunMulai : 2026,
+    bulan: Number.isFinite(bulanMulai) ? bulanMulai : 1,
+    value,
+  }
+}
+
 // Hanya ambil daftar kamar — dipanggil saat halaman pertama dibuka
 export async function getKamarsSPP(tahun: number, asrama: string) {
   const rows = await query<{ kamar: string }>(
@@ -29,8 +42,11 @@ export async function getKamarsSPP(tahun: number, asrama: string) {
 
 // Ambil santri + status SPP hanya untuk 1 kamar
 export async function getDashboardSPPKamar(tahun: number, asrama: string, kamar: string) {
+  const billingStart = await getSppBillingStart()
   const currentMonth = new Date().getMonth() + 1
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
+  const startMonth = tahun === billingStart.tahun ? billingStart.bulan : (tahun < billingStart.tahun ? 13 : 1)
+  const billableCount = Math.max(0, maxCheck - startMonth + 1)
 
   // Gunakan CTE flat — tidak ada correlated subquery per baris santri
   const rows = await query<any>(`
@@ -38,7 +54,7 @@ export async function getDashboardSPPKamar(tahun: number, asrama: string, kamar:
       bayar_tahun AS (
         SELECT santri_id, COUNT(*) AS jumlah_bayar
         FROM spp_log
-        WHERE tahun = ? AND bulan BETWEEN 1 AND ?
+        WHERE tahun = ? AND bulan BETWEEN ? AND ?
         GROUP BY santri_id
       ),
       bayar_bulan_ini AS (
@@ -57,12 +73,12 @@ export async function getDashboardSPPKamar(tahun: number, asrama: string, kamar:
       AND s.asrama = ?
       AND s.kamar = ?
     ORDER BY s.nama_lengkap
-  `, [tahun, maxCheck, tahun, currentMonth, asrama, kamar])
+  `, [tahun, startMonth, maxCheck, tahun, currentMonth, asrama, kamar])
 
   return rows.map((s: any) => ({
     ...s,
     bulan_ini_lunas: s.bulan_ini_lunas === 1,
-    jumlah_tunggakan: Math.max(0, maxCheck - (s.jumlah_bayar ?? 0)),
+    jumlah_tunggakan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)),
   }))
 }
 
@@ -76,6 +92,10 @@ export async function getStatusSPP(santriId: string, tahun: number) {
 
 export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
+  const billingStart = await getSppBillingStart()
+  const invalidMonth = bulans.some(b => (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
+  if (invalidMonth) return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+
   const ph = bulans.map(() => '?').join(',')
 
   const exist = await query<any>(
@@ -91,6 +111,46 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
   })))
 
   revalidatePath('/dashboard/asrama/spp')
+  return { success: true }
+}
+
+export async function updatePembayaranSPP(
+  logId: string,
+  bulan: number,
+  nominalBayar: number
+): Promise<{ success: boolean } | { error: string }> {
+  if (!logId) return { error: 'Data pembayaran tidak valid.' }
+  if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) return { error: 'Bulan tidak valid.' }
+  if (!Number.isFinite(nominalBayar) || nominalBayar <= 0) return { error: 'Nominal tidak valid.' }
+
+  const current = await queryOne<{ santri_id: string; tahun: number }>(
+    `SELECT santri_id, tahun FROM spp_log WHERE id = ?`,
+    [logId]
+  )
+  if (!current) return { error: 'Data pembayaran tidak ditemukan.' }
+
+  const billingStart = await getSppBillingStart()
+  if ((current.tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
+    return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+  }
+
+  const duplicate = await queryOne<{ id: string }>(
+    `SELECT id FROM spp_log
+     WHERE santri_id = ? AND tahun = ? AND bulan = ? AND id <> ?
+     LIMIT 1`,
+    [current.santri_id, current.tahun, bulan, logId]
+  )
+  if (duplicate) return { error: 'Bulan tujuan sudah memiliki pembayaran.' }
+
+  await execute(
+    `UPDATE spp_log
+     SET bulan = ?, nominal_bayar = ?, keterangan = 'Pembayaran Diedit'
+     WHERE id = ?`,
+    [bulan, nominalBayar, logId]
+  )
+
+  revalidatePath('/dashboard/asrama/spp')
+  revalidatePath('/dashboard/dewan-santri/setoran')
   return { success: true }
 }
 

@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction } from './actions'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, UserX, ArrowLeftRight, Eye, X, Check, Search
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -29,6 +29,7 @@ type AsramaRow = {
   tanggal_setor: string | null
   nama_penyetor: string | null
   jumlah_aktual: number | null
+  belum_ada_tagihan?: boolean
 }
 
 export default function MonitoringSetoranPage() {
@@ -40,6 +41,9 @@ export default function MonitoringSetoranPage() {
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
+  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 1, value: '2026-01' })
+  const [billingStartInput, setBillingStartInput] = useState('2026-01')
+  const [savingBillingStart, setSavingBillingStart] = useState(false)
   
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -75,6 +79,10 @@ export default function MonitoringSetoranPage() {
 
   useEffect(() => {
     getClientRestriction().then(setUserAsrama)
+    getSppBillingStart().then(res => {
+      setBillingStart(res)
+      setBillingStartInput(res.value)
+    })
   }, [])
 
   function prevBulan() {
@@ -112,6 +120,22 @@ export default function MonitoringSetoranPage() {
     }
   }
 
+  async function handleSimpanBillingStart(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingBillingStart(true)
+    try {
+      const res = await simpanSppBillingStart(billingStartInput)
+      if ('error' in res) { toast.error(res.error); return }
+      const updated = await getSppBillingStart()
+      setBillingStart(updated)
+      setBillingStartInput(updated.value)
+      toast.success('Awal tagihan SPP diperbarui')
+      load()
+    } finally {
+      setSavingBillingStart(false)
+    }
+  }
+
   const totalSantri    = data.reduce((a, r) => a + r.total_santri, 0)
   const totalBebasSpp  = data.reduce((a, r) => a + r.bebas_spp, 0)
   const totalWajib     = data.reduce((a, r) => a + r.wajib_bayar, 0)
@@ -119,6 +143,7 @@ export default function MonitoringSetoranPage() {
   const totalTunggak   = data.reduce((a, r) => a + r.penunggak, 0)
   const totalNominal   = data.reduce((a, r) => a + r.total_nominal, 0)
   const pctKeseluruhan = totalWajib > 0 ? Math.round((totalBayar / totalWajib) * 100) : 0
+  const selectedBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
 
   function fmt(n: number) { return new Intl.NumberFormat('id-ID').format(n) }
   function fmtRp(n: number) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(n) }
@@ -145,12 +170,32 @@ export default function MonitoringSetoranPage() {
             <Banknote className="w-4 h-4 text-emerald-600" />
             <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
           </div>
+          <div className="w-px h-5 bg-slate-200"></div>
+          <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 px-2">
+            <CalendarCheck className="w-4 h-4 text-blue-600" />
+            <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</label>
+            <input
+              type="month"
+              value={billingStartInput}
+              onChange={e => setBillingStartInput(e.target.value)}
+              className="h-8 rounded-md border border-slate-200 px-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" disabled={savingBillingStart} className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
+              {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            </button>
+          </form>
           <button onClick={load} disabled={loading} className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Memuat...' : 'Tarik Data'}
           </button>
         </div>
       </div>
+
+      {selectedBeforeBillingStart && hasLoaded && (
+        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Periode {BULAN_NAMA[bulan]} {tahun} berstatus <span className="font-bold">BELUM ADA TAGIHAN</span>. Awal tagihan aktif dimulai {BULAN_NAMA[billingStart.bulan]} {billingStart.tahun}.
+        </div>
+      )}
 
       {/* ── Ringkasan Total - Sleek Version ── */}
       {!userAsrama && hasLoaded && data.length > 0 && (
@@ -201,20 +246,30 @@ export default function MonitoringSetoranPage() {
                       <p className="text-[11px] text-slate-500 mt-0.5">{fmt(row.total_santri)} Santri ({fmt(row.wajib_bayar)} Wajib)</p>
                     </td>
                     <td className="py-3 px-5 w-48 lg:w-64">
-                      <div className="flex justify-between items-center text-[11px] font-medium mb-1.5">
-                        <span className="text-slate-500">{fmt(row.bayar_bulan_ini)} Lunas</span>
-                        <span className={row.persentase >= 80 ? 'text-emerald-600' : row.persentase >= 50 ? 'text-yellow-600' : 'text-rose-600'}>{row.persentase}%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full transition-all duration-700 ${row.persentase >= 80 ? 'bg-emerald-500' : row.persentase >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} style={{ width: `${row.persentase}%`}}></div>
-                      </div>
+                      {row.belum_ada_tagihan ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                          <CalendarCheck className="w-3.5 h-3.5"/> Belum Ada Tagihan
+                        </span>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center text-[11px] font-medium mb-1.5">
+                            <span className="text-slate-500">{fmt(row.bayar_bulan_ini)} Lunas</span>
+                            <span className={row.persentase >= 80 ? 'text-emerald-600' : row.persentase >= 50 ? 'text-yellow-600' : 'text-rose-600'}>{row.persentase}%</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full transition-all duration-700 ${row.persentase >= 80 ? 'bg-emerald-500' : row.persentase >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} style={{ width: `${row.persentase}%`}}></div>
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td className="py-3 px-5 text-right">
-                      <p className="font-semibold text-slate-900">{fmtRp(row.total_nominal)}</p>
+                      <p className="font-semibold text-slate-900">{row.belum_ada_tagihan ? '-' : fmtRp(row.total_nominal)}</p>
                       {row.penunggak > 0 && <p className="text-[10px] font-medium text-rose-500 mt-0.5">-{fmt(row.penunggak)} Orang Nunggak</p>}
                     </td>
                     <td className="py-3 px-5 text-center">
-                      {row.tanggal_setor ? (
+                      {row.belum_ada_tagihan ? (
+                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md inline-block">Tidak Ditagihkan</span>
+                      ) : row.tanggal_setor ? (
                         <div className="inline-flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50">
                           <CheckCircle2 className="w-3.5 h-3.5"/> Disetor {format(new Date(row.tanggal_setor), 'dd/MM')}
                         </div>
@@ -262,7 +317,13 @@ export default function MonitoringSetoranPage() {
                <div>
                   <h3 className="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2 mb-4">Validasi Setoran Tunai</h3>
                   
-                  {activeRow.tanggal_setor && !isEditingForm ? (
+                  {activeRow.belum_ada_tagihan ? (
+                    <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3"><CalendarCheck className="w-5 h-5"/></div>
+                      <p className="text-lg font-bold text-blue-800 leading-tight mb-1">Belum Ada Tagihan</p>
+                      <p className="text-xs text-blue-600/80">Periode ini berada sebelum awal tagihan SPP yang ditetapkan.</p>
+                    </div>
+                  ) : activeRow.tanggal_setor && !isEditingForm ? (
                     <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 text-center">
                       <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3"><CheckCircle2 className="w-5 h-5"/></div>
                       <p className="text-2xl font-bold text-emerald-700 leading-tight mb-1">{fmtRp(activeRow.jumlah_aktual ?? activeRow.total_nominal)}</p>

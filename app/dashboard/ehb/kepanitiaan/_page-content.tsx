@@ -436,9 +436,9 @@ export default function KepanitiaanPageContent() {
     loadData()
   }
 
-  const updatePembuatSoal = (mapelId: number, guruId: number | '') => {
+  const updatePembuatSoal = (marhalahId: number, mapelId: number, guruId: number | '') => {
     setSoalDrafts(prev => prev.map(row => {
-      if (row.mapel_id !== mapelId) return row
+      if (row.marhalah_id !== marhalahId || row.mapel_id !== mapelId) return row
       const guru = guruId ? guruList.find(item => item.id === guruId) : null
       return {
         ...row,
@@ -453,6 +453,7 @@ export default function KepanitiaanPageContent() {
     if (!event) return
     setSavingSoal(true)
     const res = await savePembuatSoalBatch(event.id, soalDrafts.map(row => ({
+      marhalah_id: row.marhalah_id,
       mapel_id: row.mapel_id,
       guru_id: row.draft_guru_id ? Number(row.draft_guru_id) : null,
       nama_guru: row.nama_guru,
@@ -599,7 +600,7 @@ export default function KepanitiaanPageContent() {
           <div className="bg-white border rounded-xl p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
             <div>
               <h3 className="font-bold text-slate-800">Penetapan Pembuat Soal</h3>
-              <p className="text-sm text-slate-500">Semua mapel EHB aktif muncul otomatis. Pilih pembuat soal per mapel, lalu simpan sekaligus.</p>
+              <p className="text-sm text-slate-500">Mapel EHB dipecah per marhalah. Pilih pembuat soal untuk tiap marhalah-mapel, lalu simpan sekaligus.</p>
             </div>
             <button onClick={submitPembuatSoal} disabled={savingSoal} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
               {savingSoal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Semua
@@ -608,7 +609,7 @@ export default function KepanitiaanPageContent() {
 
           <section className="bg-white border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b bg-slate-50">
-              <h2 className="font-bold text-slate-800">Daftar Mapel EHB</h2>
+              <h2 className="font-bold text-slate-800">Daftar Mapel EHB per Marhalah</h2>
               <p className="text-sm text-slate-500">Data ini dipakai otomatis oleh Keuangan untuk menghitung honor pembuatan soal.</p>
             </div>
             <div className="overflow-x-auto">
@@ -616,27 +617,29 @@ export default function KepanitiaanPageContent() {
                 <thead className="bg-white text-slate-500">
                   <tr>
                     <th className="px-4 py-3 text-left font-bold w-14">No</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[180px]">Marhalah</th>
                     <th className="px-4 py-3 text-left font-bold min-w-[240px]">Mapel EHB</th>
-                    <th className="px-4 py-3 text-left font-bold min-w-[220px]">Dipakai di</th>
+                    <th className="px-4 py-3 text-left font-bold min-w-[220px]">Kelas</th>
                     <th className="px-4 py-3 text-left font-bold min-w-[280px]">Pembuat Soal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {soalDrafts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Belum ada mapel EHB pada jadwal aktif.</td>
+                      <td colSpan={5} className="px-4 py-10 text-center text-slate-400">Belum ada mapel EHB pada jadwal aktif.</td>
                     </tr>
                   ) : soalDrafts.map((row, index) => (
-                    <tr key={row.mapel_id} className="hover:bg-slate-50">
+                    <tr key={`${row.marhalah_id}-${row.mapel_id}`} className="hover:bg-slate-50">
                       <td className="px-4 py-3 text-slate-400 font-bold">{index + 1}</td>
+                      <td className="px-4 py-3 font-bold text-slate-700">{row.marhalah_nama}</td>
                       <td className="px-4 py-3">
                         <p className="font-bold text-slate-800">{row.mapel_nama}</p>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">{row.digunakan_di || '-'}</td>
+                      <td className="px-4 py-3 text-slate-500">{row.kelas || '-'}</td>
                       <td className="px-4 py-3">
                         <select
                           value={row.draft_guru_id}
-                          onChange={e => updatePembuatSoal(row.mapel_id, e.target.value ? Number(e.target.value) : '')}
+                          onChange={e => updatePembuatSoal(row.marhalah_id, row.mapel_id, e.target.value ? Number(e.target.value) : '')}
                           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                         >
                           <option value="">-- Belum ditentukan --</option>

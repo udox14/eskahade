@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import Link from 'next/link'
 import { useReactToPrint } from 'react-to-print'
 import {
   AlertTriangle, Calculator, FileText, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Wallet, X,
@@ -657,13 +658,14 @@ function SignatureBox({ title, name }: { title: string; name: string }) {
   )
 }
 
-export default function KeuanganEhbPageContent() {
+type KeuanganTab = 'rab' | 'transaksi' | 'honor_detail'
+
+export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTab?: KeuanganTab }) {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [basis, setBasis] = useState<RabAutoBasis | null>(null)
   const [drafts, setDrafts] = useState<DraftRabItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'rab' | 'transaksi' | 'honor_detail'>('rab')
   const [ketuaPelaksana, setKetuaPelaksana] = useState('')
   const [bendahara, setBendahara] = useState('')
   const [wakilAkademik, setWakilAkademik] = useState('')
@@ -705,28 +707,44 @@ export default function KeuanganEhbPageContent() {
     const evt = await getActiveEventForKeuangan()
     setEvent(evt || null)
     if (evt) {
-      const [savedRows, autoBasis, signers, transaksiRows, tarifRows, configRows, honorRows] = await Promise.all([
-        getRabItems(evt.id),
-        getRabAutoBasis(evt.id),
-        getKeuanganSigners(evt.id),
-        getTransaksiItems(evt.id),
-        getHonorTarif(evt.id),
-        getHonorMapelConfig(evt.id),
-        getHonorItems(evt.id),
-      ])
-      const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
-      setBasis(autoBasis)
-      setDrafts(rabDrafts)
-      const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
-      setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab))
-      setKetuaPelaksana(signers.ketua)
-      setBendahara(signers.bendahara)
-      setHonorTarif(tarifRows)
-      setMapelConfigs(configRows)
-      setHonorItems(honorRows)
+      if (activeTab === 'rab') {
+        const [savedRows, autoBasis, signers] = await Promise.all([
+          getRabItems(evt.id),
+          getRabAutoBasis(evt.id),
+          getKeuanganSigners(evt.id),
+        ])
+        const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
+        setBasis(autoBasis)
+        setDrafts(rabDrafts)
+        setKetuaPelaksana(signers.ketua)
+        setBendahara(signers.bendahara)
+      } else if (activeTab === 'transaksi') {
+        const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
+          getRabItems(evt.id),
+          getRabAutoBasis(evt.id),
+          getKeuanganSigners(evt.id),
+          getTransaksiItems(evt.id),
+        ])
+        const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
+        const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
+        setBasis(autoBasis)
+        setDrafts(rabDrafts)
+        setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab))
+        setKetuaPelaksana(signers.ketua)
+        setBendahara(signers.bendahara)
+      } else {
+        const [tarifRows, configRows, honorRows] = await Promise.all([
+          getHonorTarif(evt.id),
+          getHonorMapelConfig(evt.id),
+          getHonorItems(evt.id),
+        ])
+        setHonorTarif(tarifRows)
+        setMapelConfigs(configRows)
+        setHonorItems(honorRows)
+      }
     }
     setLoading(false)
-  }, [])
+  }, [activeTab])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1102,20 +1120,20 @@ export default function KeuanganEhbPageContent() {
 
       <div className="bg-white border rounded-2xl p-1 flex flex-wrap gap-1 w-fit">
         {[
-          { key: 'rab', label: 'RAB', icon: FileText },
-          { key: 'transaksi', label: 'Transaksi', icon: ReceiptText },
-          { key: 'honor_detail', label: 'Rincian Honor', icon: Calculator },
+          { key: 'rab', label: 'RAB', icon: FileText, href: '/dashboard/ehb/keuangan' },
+          { key: 'transaksi', label: 'Transaksi', icon: ReceiptText, href: '/dashboard/ehb/keuangan/transaksi' },
+          { key: 'honor_detail', label: 'Rincian Honor', icon: Calculator, href: '/dashboard/ehb/keuangan/honor' },
         ].map(tab => {
           const Icon = tab.icon
           const active = activeTab === tab.key
           return (
-            <button
+            <Link
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
+              href={tab.href}
               className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${active ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <Icon className="w-4 h-4" /> {tab.label}
-            </button>
+            </Link>
           )
         })}
       </div>

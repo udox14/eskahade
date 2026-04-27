@@ -51,14 +51,17 @@ export type PanitiaBatchItem = PanitiaInput & {
 }
 
 export type PembuatSoalRow = {
+  marhalah_id: number
+  marhalah_nama: string
   mapel_id: number
   mapel_nama: string
   guru_id: number | null
   nama_guru: string | null
-  digunakan_di: string | null
+  kelas: string | null
 }
 
 export type PembuatSoalInput = {
+  marhalah_id: number
   mapel_id: number
   guru_id?: number | null
   nama_guru?: string | null
@@ -108,6 +111,23 @@ export async function ensureKepanitiaanSchema() {
   await execute(`
     CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_event
     ON ehb_pembuat_soal(ehb_event_id, guru_id)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal_marhalah (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      marhalah_id    INTEGER NOT NULL REFERENCES marhalah(id),
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, marhalah_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_marhalah_event
+    ON ehb_pembuat_soal_marhalah(ehb_event_id, marhalah_id, guru_id)
   `)
 }
 
@@ -377,20 +397,23 @@ export async function getPembuatSoalList(eventId: number) {
   await ensureKepanitiaanSchema()
   return query<PembuatSoalRow>(`
     SELECT
+      m.id as marhalah_id,
+      m.nama as marhalah_nama,
       mp.id as mapel_id,
       mp.nama as mapel_nama,
       ps.guru_id,
       COALESCE(dg.nama_lengkap, ps.nama_guru) as nama_guru,
-      GROUP_CONCAT(DISTINCT COALESCE(m.nama, k.nama_kelas)) as digunakan_di
+      GROUP_CONCAT(DISTINCT k.nama_kelas) as kelas
     FROM ehb_jadwal j
     JOIN mapel mp ON mp.id = j.mapel_id
     JOIN kelas k ON k.id = j.kelas_id
-    LEFT JOIN marhalah m ON m.id = k.marhalah_id
-    LEFT JOIN ehb_pembuat_soal ps ON ps.ehb_event_id = j.ehb_event_id AND ps.mapel_id = mp.id
+    JOIN marhalah m ON m.id = k.marhalah_id
+    LEFT JOIN ehb_pembuat_soal_marhalah ps
+      ON ps.ehb_event_id = j.ehb_event_id AND ps.marhalah_id = m.id AND ps.mapel_id = mp.id
     LEFT JOIN data_guru dg ON dg.id = ps.guru_id
     WHERE j.ehb_event_id = ?
-    GROUP BY mp.id, mp.nama, ps.guru_id, ps.nama_guru, dg.nama_lengkap
-    ORDER BY mp.nama
+    GROUP BY m.id, m.nama, m.urutan, mp.id, mp.nama, ps.guru_id, ps.nama_guru, dg.nama_lengkap
+    ORDER BY m.urutan, mp.nama
   `, [eventId])
 }
 
@@ -401,20 +424,21 @@ export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalI
 
   const cleanInputs = inputs
     .map(input => ({
+      marhalah_id: Number(input.marhalah_id),
       mapel_id: Number(input.mapel_id),
       guru_id: input.guru_id ? Number(input.guru_id) : null,
       nama_guru: input.nama_guru?.trim() || null,
     }))
-    .filter(input => input.mapel_id && (input.guru_id || input.nama_guru))
+    .filter(input => input.marhalah_id && input.mapel_id && (input.guru_id || input.nama_guru))
 
-  await execute(`DELETE FROM ehb_pembuat_soal WHERE ehb_event_id = ?`, [eventId])
+  await execute(`DELETE FROM ehb_pembuat_soal_marhalah WHERE ehb_event_id = ?`, [eventId])
   if (cleanInputs.length > 0) {
     await batch(cleanInputs.map(input => ({
       sql: `
-        INSERT INTO ehb_pembuat_soal (ehb_event_id, mapel_id, guru_id, nama_guru)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO ehb_pembuat_soal_marhalah (ehb_event_id, marhalah_id, mapel_id, guru_id, nama_guru)
+        VALUES (?, ?, ?, ?, ?)
       `,
-      params: [eventId, input.mapel_id, input.guru_id, input.nama_guru],
+      params: [eventId, input.marhalah_id, input.mapel_id, input.guru_id, input.nama_guru],
     })))
   }
 

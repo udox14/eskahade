@@ -221,6 +221,23 @@ export async function ensureKeuanganSchema() {
     CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_event
     ON ehb_pembuat_soal(ehb_event_id, guru_id)
   `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal_marhalah (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      marhalah_id    INTEGER NOT NULL REFERENCES marhalah(id),
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, marhalah_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_marhalah_event
+    ON ehb_pembuat_soal_marhalah(ehb_event_id, marhalah_id, guru_id)
+  `)
   try {
     await execute(`ALTER TABLE ehb_honor_manual ADD COLUMN mapel_id INTEGER REFERENCES mapel(id)`)
   } catch {}
@@ -334,8 +351,9 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
     queryOne<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM (
-        SELECT DISTINCT j.mapel_id
+        SELECT DISTINCT k.marhalah_id, j.mapel_id
         FROM ehb_jadwal j
+        JOIN kelas k ON k.id = j.kelas_id
         WHERE j.ehb_event_id = ?
       )
     `, [eventId]),
@@ -647,10 +665,11 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     SELECT
       ps.guru_id,
       COALESCE(dg.nama_lengkap, ps.nama_guru, 'Pembuat soal belum diatur') as nama,
-      COUNT(DISTINCT ps.mapel_id) as qty,
-      GROUP_CONCAT(mp.nama, ', ') as detail
-    FROM ehb_pembuat_soal ps
+      COUNT(*) as qty,
+      GROUP_CONCAT(m.nama || ' - ' || mp.nama, ', ') as detail
+    FROM ehb_pembuat_soal_marhalah ps
     JOIN mapel mp ON mp.id = ps.mapel_id
+    JOIN marhalah m ON m.id = ps.marhalah_id
     LEFT JOIN data_guru dg ON dg.id = ps.guru_id
     WHERE ps.ehb_event_id = ? AND (ps.guru_id IS NOT NULL OR COALESCE(ps.nama_guru, '') <> '')
     GROUP BY ps.guru_id, dg.nama_lengkap, ps.nama_guru

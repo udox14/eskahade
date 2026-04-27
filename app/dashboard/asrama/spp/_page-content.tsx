@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getClientRestriction, simpanSppBatch } from './actions'
-import { Search, CreditCard, User, CheckCircle, AlertCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, XCircle } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getClientRestriction, simpanSppBatch, updatePembayaranSPP, getSppBillingStart } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, Edit2, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -42,6 +42,11 @@ export default function SPPPage() {
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [riwayatBayar, setRiwayatBayar] = useState<any[]>([])
   const [selectedMonths, setSelectedMonths] = useState<number[]>([])
+  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 1, value: '2026-01' })
+  const [editingPayment, setEditingPayment] = useState<any | null>(null)
+  const [editBulan, setEditBulan] = useState(1)
+  const [editNominal, setEditNominal] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -49,6 +54,7 @@ export default function SPPPage() {
   // Init
   useEffect(() => {
     getNominalSPP().then(setNominal)
+    getSppBillingStart().then(setBillingStart)
     getClientRestriction().then(res => {
       if (res) { setUserAsrama(res); setAsrama(res) }
     })
@@ -170,8 +176,44 @@ export default function SPPPage() {
   }
 
   const toggleBulan = (idx: number) => {
+    if (isBeforeBillingStart(tahun, idx)) return
     if (riwayatBayar.some(r => r.bulan === idx)) return
     setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx])
+  }
+
+  const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
+
+  const openEditPayment = (e: React.MouseEvent, dataBayar: any) => {
+    e.stopPropagation()
+    setEditingPayment(dataBayar)
+    setEditBulan(dataBayar.bulan)
+    setEditNominal(String(dataBayar.nominal_bayar ?? nominal))
+  }
+
+  const closeEditPayment = () => {
+    setEditingPayment(null)
+    setIsSavingEdit(false)
+  }
+
+  const handleUpdatePembayaran = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingPayment) return
+    const nominalBaru = Number(editNominal.replace(/\D/g, ''))
+    if (!await confirm(`Simpan revisi pembayaran menjadi ${BULAN_LIST[editBulan - 1]} dengan nominal Rp ${nominalBaru.toLocaleString('id-ID')}?`)) return
+    setIsSavingEdit(true)
+    const res = await updatePembayaranSPP(editingPayment.id, editBulan, nominalBaru)
+    setIsSavingEdit(false)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    toast.success('Pembayaran berhasil direvisi')
+    invalidateKamar(selectedSantri.kamar)
+    getStatusSPP(selectedSantri.id, tahun).then(data => {
+      setRiwayatBayar(data)
+      setSelectedMonths([])
+      closeEditPayment()
+    })
   }
 
   const handleBackToList = () => { window.history.back() }
@@ -364,9 +406,11 @@ export default function SPPPage() {
           const bulanIndex = idx + 1
           const dataBayar = riwayatBayar.find(r => r.bulan === bulanIndex)
           const isSelected = selectedMonths.includes(bulanIndex)
+          const belumAdaTagihan = isBeforeBillingStart(tahun, bulanIndex)
           let style = 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'
           if (dataBayar) style = 'bg-green-100 border-green-500 text-green-800 cursor-default'
           else if (isSelected) style = 'bg-emerald-600 text-white border-emerald-600 shadow-sm transform scale-105'
+          else if (belumAdaTagihan) style = 'bg-slate-50 border-slate-200 text-slate-400 cursor-default'
           else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
             style = 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
           }
@@ -375,14 +419,24 @@ export default function SPPPage() {
               className={`p-4 rounded-xl border-2 flex flex-col justify-between h-32 transition-all cursor-pointer ${style}`}>
               <div className="flex justify-between items-start">
                 <span className="font-bold text-lg">{namaBulan}</span>
-                {dataBayar && <CheckCircle className="w-5 h-5"/>}
+                {dataBayar && (
+                  <button onClick={(e) => openEditPayment(e, dataBayar)} className="p-1 rounded-md bg-white/70 hover:bg-white text-green-700 border border-green-200" title="Edit pembayaran">
+                    <Edit2 className="w-4 h-4"/>
+                  </button>
+                )}
                 {!dataBayar && isSelected && <CheckCircle className="w-5 h-5 text-white/50"/>}
               </div>
               <div className="text-xs mt-2">
                 {dataBayar ? (
                   <>
                     <p className="font-medium opacity-80">LUNAS</p>
+                    <p className="font-bold">Rp {(dataBayar.nominal_bayar ?? nominal).toLocaleString('id-ID')}</p>
                     <p className="opacity-60">{format(new Date(dataBayar.tanggal_bayar), 'dd/MM/yy', { locale: id })}</p>
+                  </>
+                ) : belumAdaTagihan ? (
+                  <>
+                    <p className="font-medium opacity-80">BELUM ADA</p>
+                    <p className="font-bold text-base">TAGIHAN</p>
                   </>
                 ) : (
                   <>
@@ -396,6 +450,55 @@ export default function SPPPage() {
           )
         })}
       </div>
+
+      {editingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <form onSubmit={handleUpdatePembayaran} className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <div className="flex items-start justify-between p-5 border-b bg-slate-50">
+              <div>
+                <h2 className="font-bold text-slate-900">Edit Pembayaran</h2>
+                <p className="text-xs text-slate-500 mt-1">{selectedSantri.nama_lengkap}</p>
+              </div>
+              <button type="button" onClick={closeEditPayment} className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
+                <X className="w-4 h-4"/>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Bulan Pembayaran</label>
+                <select
+                  value={editBulan}
+                  onChange={e => setEditBulan(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {BULAN_LIST.map((b, idx) => (
+                    <option key={b} value={idx + 1} disabled={isBeforeBillingStart(tahun, idx + 1)}>
+                      {b}{isBeforeBillingStart(tahun, idx + 1) ? ' - belum ada tagihan' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Nominal</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    value={Number(editNominal.replace(/\D/g, '') || 0).toLocaleString('id-ID')}
+                    onChange={e => setEditNominal(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <button type="submit" disabled={isSavingEdit} className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-black disabled:opacity-60">
+                {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4"/>}
+                {isSavingEdit ? 'Menyimpan...' : 'Simpan Revisi'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {selectedMonths.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
