@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CalendarDays,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   Loader2,
   Save,
+  Search,
   UserMinus,
   Users,
   X,
@@ -62,12 +64,144 @@ function statusStyle(status: AbsensiStatus) {
   return 'border-amber-200 bg-amber-50 text-amber-700'
 }
 
+type BadalComboOption = {
+  id: number
+  label: string
+  description?: string
+}
+
+function BadalCombobox({
+  value,
+  options,
+  placeholder,
+  onSelect,
+}: {
+  value: number | ''
+  options: BadalComboOption[]
+  placeholder: string
+  onSelect: (option: BadalComboOption | null) => void
+}) {
+  const selectedOption = options.find(option => option.id === value)
+  const [query, setQuery] = useState(selectedOption?.label || '')
+  const [open, setOpen] = useState(false)
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return options.slice(0, 20)
+    return options
+      .filter(option => (
+        option.label.toLowerCase().includes(needle)
+        || option.description?.toLowerCase().includes(needle)
+      ))
+      .slice(0, 20)
+  }, [options, query])
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          value={query}
+          onChange={e => {
+            setQuery(e.target.value)
+            setOpen(true)
+            if (value) onSelect(null)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="w-full border rounded-xl pl-9 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
+        />
+      </div>
+      {open ? (
+        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+          {filtered.length > 0 ? filtered.map(option => (
+            <button
+              key={option.id}
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => {
+                setQuery(option.label)
+                setOpen(false)
+                onSelect(option)
+              }}
+              className="w-full px-3 py-2.5 text-left text-sm hover:bg-amber-50 flex items-start justify-between gap-2"
+            >
+              <span className="min-w-0">
+                <span className="block font-bold text-slate-800 truncate">{option.label}</span>
+                {option.description ? <span className="block text-xs text-slate-500 truncate">{option.description}</span> : null}
+              </span>
+              {value === option.id ? <Check className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" /> : null}
+            </button>
+          )) : (
+            <div className="px-3 py-4 text-sm text-slate-400 text-center">Tidak ada hasil</div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ManualBadalCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const filtered = useMemo(() => {
+    const needle = value.trim().toLowerCase()
+    const unique = Array.from(new Set(options.filter(Boolean)))
+    if (!needle) return unique.slice(0, 12)
+    return unique.filter(name => name.toLowerCase().includes(needle)).slice(0, 12)
+  }, [options, value])
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          value={value}
+          onChange={e => {
+            onChange(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Ketik nama badal"
+          className="w-full border rounded-xl pl-9 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
+        />
+      </div>
+      {open && filtered.length > 0 ? (
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+          {filtered.map(name => (
+            <button
+              key={name}
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => {
+                onChange(name)
+                setOpen(false)
+              }}
+              className="w-full px-3 py-2.5 text-left text-sm font-bold text-slate-800 hover:bg-amber-50 flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{name}</span>
+              {value === name ? <Check className="w-4 h-4 text-amber-600 flex-shrink-0" /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function AbsensiPengawasPageContent() {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [tanggalList, setTanggalList] = useState<TanggalOption[]>([])
   const [sesiByTanggal, setSesiByTanggal] = useState<Record<string, SesiOption[]>>({})
   const [rows, setRows] = useState<AbsensiPengawasRow[]>([])
-  const [badalOptions, setBadalOptions] = useState<BadalOptions>({ pengawas: [], panitia: [] })
+  const [badalOptions, setBadalOptions] = useState<BadalOptions>({ pengawas: [], panitia: [], manual: [] })
   const [selected, setSelected] = useState<SelectedSchedule | null>(null)
   const [drafts, setDrafts] = useState<Record<number, DraftAbsensi>>({})
   const [badalModalId, setBadalModalId] = useState<number | null>(null)
@@ -137,6 +271,14 @@ export default function AbsensiPengawasPageContent() {
   const selectedBadalDraft = selectedBadalRow
     ? drafts[selectedBadalRow.jadwal_pengawas_id] || makeDraft(selectedBadalRow)
     : null
+
+  const manualNameOptions = useMemo(() => {
+    const savedNames = badalOptions.manual.map(item => item.nama)
+    const draftNames = Object.values(drafts)
+      .filter(item => item.status === 'BADAL' && item.badal_source === 'manual' && item.badal_nama.trim())
+      .map(item => item.badal_nama.trim())
+    return Array.from(new Set([...savedNames, ...draftNames])).sort((a, b) => a.localeCompare(b))
+  }, [badalOptions.manual, drafts])
 
   const updateDraft = (jadwalId: number, patch: Partial<DraftAbsensi>) => {
     setDrafts(prev => {
@@ -435,41 +577,32 @@ export default function AbsensiPengawasPageContent() {
               </div>
 
               {selectedBadalDraft.badal_source === 'pengawas' ? (
-                <select
+                <BadalCombobox
                   value={selectedBadalDraft.badal_pengawas_id}
-                  onChange={e => {
-                    const id = e.target.value ? Number(e.target.value) : ''
-                    const selectedOption = badalOptions.pengawas.find(item => item.id === id)
-                    updateDraft(selectedBadalRow.jadwal_pengawas_id, { badal_pengawas_id: id, badal_nama: selectedOption?.nama || '' })
-                  }}
-                  className="w-full border rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
-                >
-                  <option value="">-- Pilih pengawas --</option>
-                  {badalOptions.pengawas
+                  placeholder="Cari nama pengawas"
+                  options={badalOptions.pengawas
                     .filter(item => item.id !== selectedBadalRow.pengawas_id)
-                    .map(item => <option key={item.id} value={item.id}>{item.nama}</option>)}
-                </select>
+                    .map(item => ({ id: item.id, label: item.nama, description: item.guru_id ? 'Guru / Pengawas' : 'Pengawas' }))}
+                  onSelect={option => updateDraft(selectedBadalRow.jadwal_pengawas_id, {
+                    badal_pengawas_id: option?.id || '',
+                    badal_nama: option?.label || '',
+                  })}
+                />
               ) : selectedBadalDraft.badal_source === 'panitia' ? (
-                <select
+                <BadalCombobox
                   value={selectedBadalDraft.badal_panitia_id}
-                  onChange={e => {
-                    const id = e.target.value ? Number(e.target.value) : ''
-                    const selectedOption = badalOptions.panitia.find(item => item.id === id)
-                    updateDraft(selectedBadalRow.jadwal_pengawas_id, { badal_panitia_id: id, badal_nama: selectedOption?.nama || '' })
-                  }}
-                  className="w-full border rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
-                >
-                  <option value="">-- Pilih panitia --</option>
-                  {badalOptions.panitia.map(item => (
-                    <option key={item.id} value={item.id}>{item.nama} - {item.label}</option>
-                  ))}
-                </select>
+                  placeholder="Cari nama panitia"
+                  options={badalOptions.panitia.map(item => ({ id: item.id, label: item.nama, description: item.label }))}
+                  onSelect={option => updateDraft(selectedBadalRow.jadwal_pengawas_id, {
+                    badal_panitia_id: option?.id || '',
+                    badal_nama: option?.label || '',
+                  })}
+                />
               ) : (
-                <input
+                <ManualBadalCombobox
                   value={selectedBadalDraft.badal_nama}
-                  onChange={e => updateDraft(selectedBadalRow.jadwal_pengawas_id, { badal_nama: e.target.value })}
-                  placeholder="Nama badal"
-                  className="w-full border rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
+                  options={manualNameOptions}
+                  onChange={nama => updateDraft(selectedBadalRow.jadwal_pengawas_id, { badal_nama: nama })}
                 />
               )}
 

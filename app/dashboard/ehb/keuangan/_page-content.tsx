@@ -4,13 +4,14 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSPr
 import Link from 'next/link'
 import { useReactToPrint } from 'react-to-print'
 import {
-  AlertTriangle, Calculator, FileText, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Wallet, X,
+  AlertTriangle, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getActiveEventForKeuangan,
   getHonorItems,
   getHonorMapelConfig,
+  getHonorPanitiaData,
   getHonorTarif,
   getKeuanganSigners,
   getRabAutoBasis,
@@ -18,11 +19,13 @@ import {
   getTransaksiItems,
   saveRabItems,
   saveHonorMapelConfig,
+  saveHonorPanitiaBatch,
   saveTransaksiItems,
   type ActiveEvent,
   type HonorItem,
   type HonorJenis,
   type HonorMapelConfig,
+  type HonorPanitiaRow,
   type HonorTarif,
   type HonorWaktu,
   type RabAutoBasis,
@@ -92,6 +95,24 @@ const WAKTU_LABEL: Record<HonorWaktu, string> = {
   maghrib: 'Maghrib',
 }
 
+const PANITIA_INTI_LABEL: Record<string, string> = {
+  ketua: 'Ketua',
+  wakil_ketua: 'Wakil Ketua',
+  sekretaris: 'Sekretaris',
+  wakil_sekretaris: 'Wakil Sekretaris',
+  bendahara: 'Bendahara',
+  wakil_bendahara: 'Wakil Bendahara',
+}
+
+const PANITIA_SEKSI_LABEL: Record<string, string> = {
+  tim_editor: 'Tim Editor',
+  kesekretariatan: 'Kesekretariatan',
+  penggandaan_pengepakan: 'Penggandaan & Pengepakan',
+  humas: 'Humas',
+  konsumsi_kebersihan: 'Konsumsi & Kebersihan',
+  keamanan_ketertiban: 'Keamanan & Ketertiban',
+}
+
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
@@ -106,6 +127,13 @@ function rupiah(value: number) {
 
 function parseMoney(value: string) {
   return Number(value.replace(/[^\d]/g, '')) || 0
+}
+
+function panitiaRoleLabel(row: Pick<HonorPanitiaRow, 'tipe' | 'jabatan_key' | 'seksi_key' | 'peran'>) {
+  if (row.tipe === 'inti') return row.jabatan_key ? PANITIA_INTI_LABEL[row.jabatan_key] || row.jabatan_key : 'Panitia Inti'
+  const seksi = row.seksi_key ? PANITIA_SEKSI_LABEL[row.seksi_key] || row.seksi_key : 'Seksi'
+  if (row.seksi_key === 'tim_editor') return seksi
+  return `${row.peran === 'ketua' ? 'Ketua' : 'Anggota'} ${seksi}`
 }
 
 function todayKey() {
@@ -658,7 +686,7 @@ function SignatureBox({ title, name }: { title: string; name: string }) {
   )
 }
 
-type KeuanganTab = 'rab' | 'transaksi' | 'honor_detail'
+type KeuanganTab = 'rab' | 'transaksi' | 'honor_detail' | 'honor_panitia'
 
 type LoadedTabData =
   | {
@@ -679,6 +707,11 @@ type LoadedTabData =
       tarifRows: HonorTarif
       configRows: HonorMapelConfig[]
       honorRows: HonorItem[]
+    }
+  | {
+      tab: 'honor_panitia'
+      honorPanitiaBudget: number
+      honorPanitiaRows: HonorPanitiaRow[]
     }
 
 const tabDataCache = new Map<string, Promise<LoadedTabData>>()
@@ -717,6 +750,15 @@ async function fetchTabData(eventId: number, tab: KeuanganTab): Promise<LoadedTa
       rabDrafts,
       transaksiDrafts: transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab),
       signers,
+    }
+  }
+
+  if (tab === 'honor_panitia') {
+    const data = await getHonorPanitiaData(eventId)
+    return {
+      tab,
+      honorPanitiaBudget: data.budget,
+      honorPanitiaRows: data.rows,
     }
   }
 
@@ -762,6 +804,9 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   const [mapelConfigs, setMapelConfigs] = useState<HonorMapelConfig[]>([])
   const [savingHonor, setSavingHonor] = useState(false)
   const [showHonorConfigModal, setShowHonorConfigModal] = useState(false)
+  const [honorPanitiaBudget, setHonorPanitiaBudget] = useState(0)
+  const [honorPanitiaRows, setHonorPanitiaRows] = useState<HonorPanitiaRow[]>([])
+  const [savingHonorPanitia, setSavingHonorPanitia] = useState(false)
   const rabPrintRef = useRef<HTMLDivElement>(null)
   const transaksiPrintRef = useRef<HTMLDivElement>(null)
   const handlePrintRab = useReactToPrint({
@@ -802,6 +847,9 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         setTransaksiDrafts(data.transaksiDrafts)
         setKetuaPelaksana(data.signers.ketua)
         setBendahara(data.signers.bendahara)
+      } else if (data.tab === 'honor_panitia') {
+        setHonorPanitiaBudget(data.honorPanitiaBudget)
+        setHonorPanitiaRows(data.honorPanitiaRows)
       } else {
         setHonorTarif(data.tarifRows)
         setMapelConfigs(data.configRows)
@@ -907,6 +955,20 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     return Array.from(rows.values()).sort((a, b) => a.nama.localeCompare(b.nama, 'id-ID'))
   }, [honorItems])
 
+  const honorPanitiaTotal = useMemo(
+    () => honorPanitiaRows.reduce((sum, row) => sum + Number(row.nominal || 0), 0),
+    [honorPanitiaRows]
+  )
+
+  const honorPanitiaByGroup = useMemo(() => {
+    const groups = new Map<string, HonorPanitiaRow[]>()
+    for (const row of honorPanitiaRows) {
+      const key = row.tipe === 'inti' ? 'Panitia Inti' : row.seksi_key ? PANITIA_SEKSI_LABEL[row.seksi_key] || row.seksi_key : 'Seksi'
+      groups.set(key, [...(groups.get(key) || []), row])
+    }
+    return Array.from(groups.entries())
+  }, [honorPanitiaRows])
+
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
     setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
   }
@@ -931,6 +993,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
 
   const deleteItem = (draftId: string) => {
     setDrafts(prev => prev.filter(item => item.draft_id !== draftId))
+  }
+
+  const updateHonorPanitia = (panitiaId: number, patch: Partial<Pick<HonorPanitiaRow, 'nominal' | 'keterangan'>>) => {
+    setHonorPanitiaRows(prev => prev.map(row => row.panitia_id === panitiaId ? { ...row, ...patch } : row))
   }
 
   const openTransaksiModal = (tipe: TransaksiTipe = 'pengeluaran') => {
@@ -1100,7 +1166,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     const res = await saveRabItems(event.id, drafts)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
-    clearKeuanganCache(event.id, ['rab', 'transaksi', 'honor_detail'])
+    clearKeuanganCache(event.id, ['rab', 'transaksi', 'honor_detail', 'honor_panitia'])
     toast.success(`${res.saved} item RAB disimpan`)
     loadData()
   }
@@ -1138,6 +1204,21 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     setSavingHonor(false)
     clearKeuanganCache(event.id, ['honor_detail'])
     toast.success('Rincian honor diperbarui')
+    loadData()
+  }
+
+  const submitHonorPanitia = async () => {
+    if (!event) return
+    setSavingHonorPanitia(true)
+    const res = await saveHonorPanitiaBatch(event.id, honorPanitiaRows.map(row => ({
+      panitia_id: row.panitia_id,
+      nominal: Number(row.nominal || 0),
+      keterangan: row.keterangan || null,
+    })))
+    setSavingHonorPanitia(false)
+    if ('error' in res) return toast.error(res.error)
+    clearKeuanganCache(event.id, ['honor_panitia'])
+    toast.success(`${res.saved} honor panitia disimpan`)
     loadData()
   }
 
@@ -1196,6 +1277,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
           { key: 'rab', label: 'RAB', icon: FileText, href: '/dashboard/ehb/keuangan' },
           { key: 'transaksi', label: 'Transaksi', icon: ReceiptText, href: '/dashboard/ehb/keuangan/transaksi' },
           { key: 'honor_detail', label: 'Rincian Honor', icon: Calculator, href: '/dashboard/ehb/keuangan/honor' },
+          { key: 'honor_panitia', label: 'Honor Panitia', icon: HandCoins, href: '/dashboard/ehb/keuangan/honor-panitia' },
         ].map(tab => {
           const Icon = tab.icon
           const active = activeTab === tab.key
@@ -1213,7 +1295,105 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         })}
       </div>
 
-      {activeTab === 'honor_detail' ? (
+      {activeTab === 'honor_panitia' ? (
+        <div className="space-y-5">
+          <div className="grid md:grid-cols-3 gap-3">
+            <div className="bg-white border rounded-2xl p-5">
+              <p className="text-xs font-bold text-slate-500 uppercase">Anggaran Honor Panitia</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{rupiah(honorPanitiaBudget)}</p>
+              <p className="text-xs text-slate-400 mt-1">Acuan dari RAB item Insentif Panitia.</p>
+            </div>
+            <div className="bg-white border rounded-2xl p-5">
+              <p className="text-xs font-bold text-slate-500 uppercase">Sudah Dibagi</p>
+              <p className="text-2xl font-bold text-indigo-700 mt-1">{rupiah(honorPanitiaTotal)}</p>
+              <p className="text-xs text-slate-400 mt-1">{honorPanitiaRows.length.toLocaleString('id-ID')} orang panitia.</p>
+            </div>
+            <div className={`${honorPanitiaBudget - honorPanitiaTotal < 0 ? 'bg-red-600' : 'bg-slate-900'} text-white rounded-2xl p-5`}>
+              <p className="text-xs font-bold text-white/60 uppercase">{honorPanitiaTotal > honorPanitiaBudget ? 'Kelebihan' : 'Sisa'}</p>
+              <p className="text-2xl font-bold mt-1">{rupiah(Math.abs(honorPanitiaBudget - honorPanitiaTotal))}</p>
+              <p className="text-xs text-white/60 mt-1">
+                {honorPanitiaTotal > honorPanitiaBudget
+                  ? 'Tetap boleh disimpan walaupun melebihi RAB.'
+                  : 'Sisa dari acuan anggaran honor panitia.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h2 className="font-bold text-slate-800">Honor Panitia</h2>
+              <p className="text-sm text-slate-500">Isi nominal per individu, lalu simpan sekaligus. Total boleh melebihi acuan RAB jika diperlukan.</p>
+            </div>
+            <button
+              onClick={submitHonorPanitia}
+              disabled={savingHonorPanitia || honorPanitiaRows.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {savingHonorPanitia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Batch
+            </button>
+          </div>
+
+          {honorPanitiaByGroup.length === 0 ? (
+            <div className="bg-white border rounded-2xl p-10 text-center text-slate-400">
+              <Users className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+              <p className="font-bold text-slate-500">Belum ada data panitia</p>
+              <p className="text-sm">Tambahkan panitia dulu dari menu Kepanitiaan.</p>
+            </div>
+          ) : honorPanitiaByGroup.map(([groupName, rows]) => {
+            const subtotal = rows.reduce((sum, row) => sum + Number(row.nominal || 0), 0)
+            return (
+              <section key={groupName} className="bg-white border rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <h3 className="font-bold text-slate-800">{groupName}</h3>
+                    <p className="text-sm text-slate-500">{rows.length} orang</p>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-[11px] text-slate-400 font-bold uppercase">Subtotal</p>
+                    <p className="font-bold text-slate-800">{rupiah(subtotal)}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-white text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-bold min-w-[220px]">Nama</th>
+                        <th className="px-4 py-3 text-left font-bold min-w-[180px]">Jabatan/Bidang</th>
+                        <th className="px-4 py-3 text-left font-bold w-44">Nominal Honor</th>
+                        <th className="px-4 py-3 text-left font-bold min-w-[240px]">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {rows.map(row => (
+                        <tr key={row.panitia_id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 align-top font-semibold text-slate-800">{row.nama}</td>
+                          <td className="px-4 py-3 align-top text-slate-600">{panitiaRoleLabel(row)}</td>
+                          <td className="px-4 py-3 align-top">
+                            <input
+                              value={row.nominal ? row.nominal.toLocaleString('id-ID') : ''}
+                              onChange={e => updateHonorPanitia(row.panitia_id, { nominal: parseMoney(e.target.value) })}
+                              placeholder="0"
+                              className="w-full border rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <input
+                              value={row.keterangan || ''}
+                              onChange={e => updateHonorPanitia(row.panitia_id, { keterangan: e.target.value })}
+                              placeholder="Opsional"
+                              className="w-full border rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      ) : activeTab === 'honor_detail' ? (
         <div className="space-y-5">
           <div className="grid md:grid-cols-5 gap-3">
             {(['pembuatan_soal', 'pengisian_rapor', 'pemeriksaan_hasil', 'pengawasan'] as HonorJenis[]).map(jenis => (

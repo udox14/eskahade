@@ -55,9 +55,14 @@ export type BadalPanitiaOption = {
   label: string
 }
 
+export type BadalManualOption = {
+  nama: string
+}
+
 export type BadalOptions = {
   pengawas: BadalPengawasOption[]
   panitia: BadalPanitiaOption[]
+  manual: BadalManualOption[]
 }
 
 export type AbsensiPengawasInput = {
@@ -151,7 +156,7 @@ export async function getAbsensiPengawasRows(eventId: number, tanggal: string, s
 
 export async function getBadalOptions(eventId: number): Promise<BadalOptions> {
   await ensureAbsensiPengawasSchema()
-  const [pengawas, panitia] = await Promise.all([
+  const [pengawas, panitia, manual] = await Promise.all([
     query<BadalPengawasOption>(`
       SELECT id, guru_id, nama_pengawas as nama
       FROM ehb_pengawas
@@ -172,8 +177,16 @@ export async function getBadalOptions(eventId: number): Promise<BadalOptions> {
       WHERE ehb_event_id = ?
       ORDER BY tipe, urutan, nama
     `, [eventId]),
+    query<BadalManualOption>(`
+      SELECT DISTINCT TRIM(badal_nama) as nama
+      FROM ehb_absensi_pengawas
+      WHERE ehb_event_id = ?
+        AND badal_source = 'manual'
+        AND COALESCE(TRIM(badal_nama), '') <> ''
+      ORDER BY nama
+    `, [eventId]),
   ])
-  return { pengawas, panitia }
+  return { pengawas, panitia, manual }
 }
 
 export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiPengawasInput[]) {
@@ -188,7 +201,7 @@ export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiP
       badal_source: input.status === 'BADAL' ? input.badal_source ?? null : null,
       badal_pengawas_id: input.status === 'BADAL' && input.badal_source === 'pengawas' ? input.badal_pengawas_id ?? null : null,
       badal_panitia_id: input.status === 'BADAL' && input.badal_source === 'panitia' ? input.badal_panitia_id ?? null : null,
-      badal_nama: input.status === 'BADAL' ? input.badal_nama?.trim() || null : null,
+      badal_nama: input.status === 'BADAL' ? input.badal_nama?.trim().replace(/\s+/g, ' ') || null : null,
     }))
     .filter(input => input.jadwal_pengawas_id && ['HADIR', 'TIDAK_HADIR', 'BADAL'].includes(input.status))
 
@@ -230,4 +243,3 @@ export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiP
   revalidatePath('/dashboard/ehb/keuangan')
   return { success: true, saved: cleanInputs.length }
 }
-

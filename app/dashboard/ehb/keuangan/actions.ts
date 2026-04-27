@@ -110,6 +110,29 @@ export type HonorItem = {
   editable: boolean
 }
 
+export type HonorPanitiaRow = {
+  panitia_id: number
+  tipe: 'inti' | 'seksi'
+  jabatan_key: string | null
+  seksi_key: string | null
+  peran: 'ketua' | 'anggota' | null
+  nama: string
+  nominal: number
+  keterangan: string | null
+  urutan: number
+}
+
+export type HonorPanitiaData = {
+  budget: number
+  rows: HonorPanitiaRow[]
+}
+
+export type HonorPanitiaInput = {
+  panitia_id: number
+  nominal: number
+  keterangan?: string | null
+}
+
 export type PemeriksaanBasis = {
   marhalah_id: number | null
   marhalah_nama: string
@@ -277,6 +300,22 @@ export async function ensureKeuanganSchema() {
   await execute(`
     CREATE INDEX IF NOT EXISTS idx_ehb_absensi_pengawas_event
     ON ehb_absensi_pengawas(ehb_event_id, status)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_honor_panitia (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      panitia_id     INTEGER NOT NULL REFERENCES ehb_panitia(id) ON DELETE CASCADE,
+      nominal        INTEGER NOT NULL DEFAULT 0,
+      keterangan     TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, panitia_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_honor_panitia_event
+    ON ehb_honor_panitia(ehb_event_id, panitia_id)
   `)
   try {
     await execute(`ALTER TABLE ehb_honor_manual ADD COLUMN mapel_id INTEGER REFERENCES mapel(id)`)
@@ -907,4 +946,80 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
   }))
 
   return [...soalItems, ...raporItems, ...pemeriksaanItems, ...pengawasanItems]
+}
+
+export async function getHonorPanitiaData(eventId: number): Promise<HonorPanitiaData> {
+  await ensureKeuanganSchema()
+
+  const [budgetRow, rows] = await Promise.all([
+    queryOne<{ budget: number }>(`
+      SELECT harga as budget
+      FROM ehb_rab_item
+      WHERE ehb_event_id = ? AND kategori = 'honorarium' AND system_key = 'honor_panitia'
+      ORDER BY id
+      LIMIT 1
+    `, [eventId]),
+    query<HonorPanitiaRow>(`
+      SELECT
+        p.id as panitia_id,
+        p.tipe,
+        p.jabatan_key,
+        p.seksi_key,
+        p.peran,
+        p.nama,
+        COALESCE(hp.nominal, 0) as nominal,
+        hp.keterangan,
+        p.urutan
+      FROM ehb_panitia p
+      LEFT JOIN ehb_honor_panitia hp
+        ON hp.panitia_id = p.id AND hp.ehb_event_id = p.ehb_event_id
+      WHERE p.ehb_event_id = ?
+      ORDER BY
+        CASE p.tipe WHEN 'inti' THEN 0 ELSE 1 END,
+        p.urutan,
+        p.seksi_key,
+        CASE p.peran WHEN 'ketua' THEN 0 ELSE 1 END,
+        p.nama
+    `, [eventId]),
+  ])
+
+  return {
+    budget: Number(budgetRow?.budget || 0),
+    rows: rows.map(row => ({
+      ...row,
+      nominal: Number(row.nominal || 0),
+    })),
+  }
+}
+
+export async function saveHonorPanitiaBatch(eventId: number, rows: HonorPanitiaInput[]) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  await ensureKeuanganSchema()
+
+  const cleanRows = rows
+    .map(row => ({
+      panitia_id: Number(row.panitia_id),
+      nominal: Math.max(0, Math.round(Number(row.nominal) || 0)),
+      keterangan: row.keterangan?.trim() || null,
+    }))
+    .filter(row => row.panitia_id)
+
+  if (cleanRows.length > 0) {
+    await batch(cleanRows.map(row => ({
+      sql: `
+        INSERT INTO ehb_honor_panitia (ehb_event_id, panitia_id, nominal, keterangan)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(ehb_event_id, panitia_id) DO UPDATE SET
+          nominal = excluded.nominal,
+          keterangan = excluded.keterangan,
+          updated_at = datetime('now')
+      `,
+      params: [eventId, row.panitia_id, row.nominal, row.keterangan],
+    })))
+  }
+
+  revalidatePath('/dashboard/ehb/keuangan')
+  revalidatePath('/dashboard/ehb/keuangan/honor-panitia')
+  return { success: true, saved: cleanRows.length }
 }
