@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, updateHargaKitab, getTahunAjaranAktif } from './actions'
-import { Book, Plus, Trash2, Save, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, Edit, List, CalendarDays, AlertTriangle } from 'lucide-react'
+import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif } from './actions'
+import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
@@ -29,10 +29,6 @@ export default function MasterKitabPage() {
   // State Import
   const [excelData, setExcelData] = useState<any[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
-
-  // State Edit Harga
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editHarga, setEditHarga] = useState('')
 
   useEffect(() => {
     initData()
@@ -81,26 +77,12 @@ export default function MasterKitabPage() {
     loadKitab()
   }
 
-  const handleUpdateHarga = async (id: string) => {
-    const harga = parseInt(editHarga)
-    if (isNaN(harga)) return toast.warning("Harga tidak valid")
-    
-    const res = await updateHargaKitab(id, harga)
-    if ((res as any).success) {
-        toast.success("Harga diupdate")
-        setEditingId(null)
-        loadKitab()
-    } else {
-        toast.error((res as any).error)
-    }
-  }
-
   // --- HANDLER EXCEL ---
   const downloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows = [
-       { "NAMA KITAB": "Jurumiyah", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Nahwu", "HARGA": 15000 },
-       { "NAMA KITAB": "Kailani", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Shorof", "HARGA": 12000 }
+       { "NAMA KITAB": "Jurumiyah", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Nahwu" },
+       { "NAMA KITAB": "Kailani", "MARHALAH": "Ibtidaiyyah 1", "MAPEL": "Shorof" }
     ]
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
@@ -154,9 +136,9 @@ export default function MasterKitabPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab & Harga
+             <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab
            </h1>
-           <p className="text-slate-500 text-sm">Database kitab kuning dan harga jual (UPK) per tahun ajaran.</p>
+           <p className="text-slate-500 text-sm">Database kitab kuning per marhalah dan mapel. Harga UPK dikelola di Katalog UPK.</p>
         </div>
         
         <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -218,10 +200,6 @@ export default function MasterKitabPage() {
                                 {mapelList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Harga (Rp)</label>
-                            <input name="harga" type="number" required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="0"/>
-                        </div>
                         <button className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold shadow hover:bg-emerald-700">Simpan</button>
                     </form>
                 </div>
@@ -248,15 +226,14 @@ export default function MasterKitabPage() {
                         <thead className="bg-slate-50 text-slate-600 font-bold border-b">
                             <tr>
                                 <th className="px-4 py-3">Nama Kitab</th>
-                                <th className="px-4 py-3 text-right">Harga</th>
                                 <th className="px-4 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
                             {loading ? (
-                                <tr><td colSpan={3} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400"/></td></tr>
+                                <tr><td colSpan={2} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400"/></td></tr>
                             ) : kitabList.length === 0 ? (
-                                <tr><td colSpan={3} className="text-center py-10 text-slate-400">Belum ada data.</td></tr>
+                                <tr><td colSpan={2} className="text-center py-10 text-slate-400">Belum ada data.</td></tr>
                             ) : (
                                 pagedKitabList.map(k => (
                                     <tr key={k.id} className="hover:bg-slate-50">
@@ -264,32 +241,8 @@ export default function MasterKitabPage() {
                                             <p className="font-bold text-slate-800">{k.nama_kitab}</p>
                                             <p className="text-xs text-slate-500">{k.marhalah_nama} • {k.mapel_nama}</p>
                                         </td>
-                                        <td className="px-4 py-3 text-right font-mono text-emerald-700 font-bold">
-                                            {editingId === k.id ? (
-                                                <input 
-                                                    autoFocus
-                                                    className="w-20 border rounded px-1 py-0.5 text-right text-sm"
-                                                    value={editHarga}
-                                                    onChange={e => setEditHarga(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if(e.key === 'Enter') handleUpdateHarga(k.id)
-                                                        if(e.key === 'Escape') setEditingId(null)
-                                                    }}
-                                                    onBlur={() => setEditingId(null)}
-                                                />
-                                            ) : (
-                                                `Rp ${k.harga.toLocaleString()}`
-                                            )}
-                                        </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex justify-center gap-1">
-                                                <button 
-                                                    onClick={() => { setEditingId(k.id); setEditHarga(k.harga.toString()); }}
-                                                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" 
-                                                    title="Edit Harga"
-                                                >
-                                                    <Edit className="w-4 h-4"/>
-                                                </button>
                                                 <button onClick={() => handleHapus(k.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
                                             </div>
                                         </td>
@@ -343,7 +296,7 @@ export default function MasterKitabPage() {
                     <div className="max-h-64 overflow-auto border rounded">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-100 sticky top-0">
-                                <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Mapel</th><th className="p-2">Harga</th></tr>
+                                <tr><th className="p-2">Kitab</th><th className="p-2">Marhalah</th><th className="p-2">Mapel</th></tr>
                             </thead>
                             <tbody>
                                 {excelData.map((d,i)=>(
@@ -351,7 +304,6 @@ export default function MasterKitabPage() {
                                         <td className="p-2">{d['NAMA KITAB']||d['nama kitab']}</td>
                                         <td className="p-2">{d['MARHALAH']||d['marhalah']}</td>
                                         <td className="p-2">{d['MAPEL']||d['mapel']}</td>
-                                        <td className="p-2 font-mono">{d['HARGA']||d['harga']}</td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -42,14 +42,12 @@ export async function tambahKitab(formData: FormData): Promise<{ success: boolea
   const nama = formData.get('nama_kitab') as string
   const marhalah = formData.get('marhalah_id') as string
   const mapel = formData.get('mapel_id') as string
-  const harga = parseInt(formData.get('harga') as string) || 0
-
   const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
   await query(
-    'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
-    [nama, marhalah, mapel, harga, aktif.id]
+    'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, tahun_ajaran_id) VALUES (?, ?, ?, ?)',
+    [nama, marhalah, mapel, aktif.id]
   )
 
   revalidatePath('/dashboard/master/kitab')
@@ -61,12 +59,6 @@ export async function hapusKitab(id: string): Promise<{ success: boolean } | { e
   if (used) return { error: 'Kitab ini sudah pernah digunakan di transaksi UPK dan tidak bisa dihapus.' }
 
   await query('DELETE FROM kitab WHERE id = ?', [id])
-  revalidatePath('/dashboard/master/kitab')
-  return { success: true }
-}
-
-export async function updateHargaKitab(id: string, hargaBaru: number): Promise<{ success: boolean } | { error: string }> {
-  await query('UPDATE kitab SET harga = ? WHERE id = ?', [hargaBaru, id])
   revalidatePath('/dashboard/master/kitab')
   return { success: true }
 }
@@ -100,8 +92,6 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
     const namaKitab = row['NAMA KITAB'] || row['nama kitab']
     const namaMarhalah = row['MARHALAH'] || row['marhalah']
     const namaMapel = row['MAPEL'] || row['mapel']
-    const harga = parseInt(row['HARGA'] || row['harga']) || 0
-
     if (!namaKitab || !namaMarhalah || !namaMapel) { failCount++; continue }
 
     const marhalahId = mapMarhalah.get(String(namaMarhalah).toLowerCase().trim())
@@ -115,14 +105,14 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
     if (existingId) {
       // Sudah ada → UPDATE mapel dan harga
       toUpdate.push({
-        sql: 'UPDATE kitab SET mapel_id = ?, harga = ? WHERE id = ?',
-        params: [mapelId, harga, existingId],
+        sql: 'UPDATE kitab SET mapel_id = ? WHERE id = ?',
+        params: [mapelId, existingId],
       })
     } else {
       // Belum ada → INSERT baru
       toInsert.push({
-        sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, harga, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?)',
-        params: [namaKitab, marhalahId, mapelId, harga, aktif.id],
+        sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, tahun_ajaran_id) VALUES (?, ?, ?, ?)',
+        params: [namaKitab, marhalahId, mapelId, aktif.id],
       })
     }
   }
