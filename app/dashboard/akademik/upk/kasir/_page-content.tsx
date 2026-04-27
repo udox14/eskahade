@@ -1,373 +1,417 @@
 'use client'
 
-import React from 'react'
-
-import { useState, useEffect } from 'react'
-import { getDaftarKitab, cariSantri, simpanTransaksiUPK } from './actions'
-import { Search, ShoppingCart, User, Package, Check, Trash2, Loader2, Save, Gift, X, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react'
+import type React from 'react'
+import { useMemo, useState } from 'react'
+import {
+  buatAntrianUPK,
+  cariSantriUPK,
+  getAntrianAktif,
+  getAntrianDetail,
+  getKatalogKasir,
+  selesaikanAntrianUPK,
+} from './actions'
+import { ArrowLeft, Check, CheckCircle, Loader2, Minus, Package, Plus, Search, ShoppingCart, Ticket, User, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { useConfirm } from '@/components/ui/confirm-dialog'
+
+type UnitUPK = 'PUTRA' | 'PUTRI'
+
+type SantriOption = {
+  id: string
+  nis: string
+  nama_lengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelas_id: string | null
+  nama_kelas: string | null
+  marhalah_id: number | null
+  marhalah_nama: string | null
+}
+
+type KatalogItem = {
+  id: number
+  nama_kitab: string
+  marhalah_id: number | null
+  marhalah_nama: string | null
+  harga_jual: number
+  jumlah_stok: number
+  is_default: boolean
+}
+
+type CartItem = KatalogItem & {
+  qty: number
+  selected: boolean
+}
+
+type Antrian = {
+  id: string
+  nomor: number
+  nama_santri: string
+  nis: string | null
+  kelas_nama: string | null
+  marhalah_nama: string | null
+  total_tagihan: number
+  total_item?: number
+}
+
+type AntrianDetail = Antrian & {
+  items: Array<{
+    id: string
+    katalog_id: number | null
+    nama_kitab: string
+    qty: number
+    harga_jual: number
+    subtotal: number
+    jumlah_stok: number
+  }>
+}
+
+type FinalItem = {
+  itemId: string
+  qty: number
+  diserahkan: boolean
+}
+
+function rupiah(value: number) {
+  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+}
+
+function nomor(value: number) {
+  return String(value || 0).padStart(3, '0')
+}
 
 export default function KasirUPKPage() {
-  const confirm = useConfirm()
-  // Data Master
-  const [katalog, setKatalog] = useState<Record<string, any[]>>({})
-  const [loadingKatalog, setLoadingKatalog] = useState(true)
+  const [unit, setUnit] = useState<UnitUPK | null>(null)
+  const [mode, setMode] = useState<'CATAT' | 'KASIR'>('CATAT')
+  const [searchSantri, setSearchSantri] = useState('')
+  const [hasilSantri, setHasilSantri] = useState<SantriOption[]>([])
+  const [selectedSantri, setSelectedSantri] = useState<SantriOption | null>(null)
+  const [katalog, setKatalog] = useState<CartItem[]>([])
+  const [katalogSearch, setKatalogSearch] = useState('')
+  const [catatan, setCatatan] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [lastNomor, setLastNomor] = useState<number | null>(null)
 
-  // State Transaksi
-  const [modeUser, setModeUser] = useState<'SANTRI' | 'UMUM'>('SANTRI')
-  const [search, setSearch] = useState('')
-  const [hasilCari, setHasilCari] = useState<any[]>([])
-  const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [namaUmum, setNamaUmum] = useState('')
-  
-  // Keranjang
-  const [cart, setCart] = useState<any[]>([])
-  
-  // Pembayaran
+  const [searchAntrian, setSearchAntrian] = useState('')
+  const [antrianList, setAntrianList] = useState<Antrian[]>([])
+  const [selectedAntrian, setSelectedAntrian] = useState<AntrianDetail | null>(null)
+  const [finalItems, setFinalItems] = useState<FinalItem[]>([])
   const [uangBayar, setUangBayar] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+  const [kembalianDitahan, setKembalianDitahan] = useState(false)
 
-  // State Mobile View
-  // DEFAULT: CART (Agar user input nama dulu di HP)
-  const [mobileView, setMobileView] = useState<'CATALOG' | 'CART'>('CART')
+  const selectedItems = katalog.filter(item => item.selected)
+  const totalCatat = selectedItems.reduce((sum, item) => sum + item.qty * item.harga_jual, 0)
+  const totalKasir = finalItems.reduce((sum, item) => {
+    const row = selectedAntrian?.items.find(i => i.id === item.itemId)
+    return sum + (row ? item.qty * row.harga_jual : 0)
+  }, 0)
+  const bayar = parseInt(uangBayar || '0', 10) || 0
+  const diff = bayar - totalKasir
 
-  // HITUNG TOTAL
-  const totalTagihan = cart.reduce((sum, item) => sum + (item.isGratis ? 0 : item.hargaAsli), 0)
-  const totalItems = cart.length
-  
-  // INIT DATA
-  useEffect(() => {
-    getDaftarKitab().then(data => {
-        if (Array.isArray(data) && data.length === 0) {
-            setKatalog({})
-        } else {
-            setKatalog(data as Record<string, any[]>)
-        }
-        setLoadingKatalog(false)
+  const filteredKatalog = useMemo(() => {
+    const keyword = katalogSearch.toLowerCase().trim()
+    if (!keyword) return katalog
+    return katalog.filter(item => item.nama_kitab.toLowerCase().includes(keyword) || (item.marhalah_nama || '').toLowerCase().includes(keyword))
+  }, [katalog, katalogSearch])
+
+  const pilihUnit = (nextUnit: UnitUPK) => {
+    setUnit(nextUnit)
+    setMode('CATAT')
+  }
+
+  const resetCatat = () => {
+    setSearchSantri('')
+    setHasilSantri([])
+    setSelectedSantri(null)
+    setKatalog([])
+    setKatalogSearch('')
+    setCatatan('')
+  }
+
+  const cariSantri = async () => {
+    if (!unit) return
+    if (searchSantri.trim().length < 2) return toast.warning('Ketik minimal 2 huruf.')
+    setLoading(true)
+    const data = await cariSantriUPK(unit, searchSantri)
+    setHasilSantri(data)
+    setLoading(false)
+    if (!data.length) toast.info('Santri tidak ditemukan.')
+  }
+
+  const pilihSantri = async (santri: SantriOption) => {
+    setSelectedSantri(santri)
+    setHasilSantri([])
+    setSearchSantri('')
+    setLoading(true)
+    const data = await getKatalogKasir(santri.marhalah_id)
+    setKatalog(data.map((item: KatalogItem) => ({ ...item, qty: 1, selected: item.is_default })))
+    setLoading(false)
+    if (!santri.marhalah_id) toast.warning('Santri ini belum punya marhalah aktif.')
+  }
+
+  const toggleItem = (id: number) => {
+    setKatalog(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item))
+  }
+
+  const ubahQty = (id: number, delta: number) => {
+    setKatalog(prev => prev.map(item => item.id === id ? { ...item, qty: Math.max(1, item.qty + delta), selected: true } : item))
+  }
+
+  const simpanAntrian = async () => {
+    if (!unit || !selectedSantri) return toast.warning('Pilih santri dulu.')
+    if (!selectedItems.length) return toast.warning('Pilih minimal satu kitab.')
+    setLoading(true)
+    const result = await buatAntrianUPK({
+      unit,
+      santri: selectedSantri,
+      catatan,
+      items: selectedItems.map(item => ({
+        katalogId: item.id,
+        namaKitab: item.nama_kitab,
+        marhalahId: item.marhalah_id,
+        marhalahNama: item.marhalah_nama,
+        qty: item.qty,
+        hargaJual: item.harga_jual,
+      })),
     })
-  }, [])
-
-  // Auto Fill Uang Bayar
-  useEffect(() => {
-    if (totalTagihan > 0) {
-        setUangBayar(totalTagihan.toString())
-    } else {
-        setUangBayar('')
-    }
-  }, [totalTagihan])
-
-
-  // --- LOGIC CART ---
-  const addToCart = (kitab: any) => {
-    if (cart.some(c => c.id === kitab.id)) return 
-    setCart(prev => [...prev, { ...kitab, hargaAsli: kitab.harga, isGratis: false }])
-    toast.success("Ditambahkan")
+    setLoading(false)
+    if ('error' in result) return toast.error(result.error)
+    setLastNomor(result.nomor)
+    toast.success(`Antrian ${nomor(result.nomor)} dibuat`)
+    resetCatat()
   }
 
-  const addPaket = (listKitab: any[]) => {
-    const newItems = listKitab.filter(k => !cart.some(c => c.id === k.id))
-        .map(k => ({ ...k, hargaAsli: k.harga, isGratis: false }))
-    setCart(prev => [...prev, ...newItems])
-    toast.success(`${newItems.length} kitab ditambahkan`)
+  const loadAntrian = async () => {
+    if (!unit) return
+    setLoading(true)
+    const data = await getAntrianAktif(unit, searchAntrian)
+    setAntrianList(data)
+    setLoading(false)
   }
 
-  const toggleGratis = (id: number) => {
-    setCart(prev => prev.map(c => {
-        if (c.id === id) return { ...c, isGratis: !c.isGratis }
-        return c
-    }))
+  const pilihAntrian = async (id: string) => {
+    setLoading(true)
+    const detail = await getAntrianDetail(id)
+    setLoading(false)
+    if (!detail) return toast.error('Antrian tidak ditemukan.')
+    setSelectedAntrian(detail)
+    setFinalItems(detail.items.map(item => ({ itemId: item.id, qty: item.qty, diserahkan: true })))
+    setUangBayar(String(detail.total_tagihan || detail.items.reduce((sum, item) => sum + item.subtotal, 0)))
+    setKembalianDitahan(false)
   }
 
-  const removeFromCart = (id: number) => {
-    setCart(prev => prev.filter(c => c.id !== id))
+  const updateFinalItem = (itemId: string, patch: Partial<FinalItem>) => {
+    setFinalItems(prev => prev.map(item => item.itemId === itemId ? { ...item, ...patch, qty: Math.max(1, patch.qty ?? item.qty) } : item))
   }
 
-  // --- LOGIC SEARCH SANTRI ---
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (search.length < 3) return toast.warning("Ketik minimal 3 huruf")
-    const res = await cariSantri(search)
-    setHasilCari(res)
-    if(res.length === 0) toast.info("Tidak ditemukan")
+  const prosesBayar = async () => {
+    if (!unit || !selectedAntrian) return
+    setLoading(true)
+    const result = await selesaikanAntrianUPK({
+      antrianId: selectedAntrian.id,
+      unit,
+      totalBayar: bayar,
+      kembalianDitahan,
+      items: finalItems,
+    })
+    setLoading(false)
+    if ('error' in result) return toast.error(result.error)
+    toast.success('Transaksi selesai')
+    setSelectedAntrian(null)
+    setFinalItems([])
+    setUangBayar('')
+    setKembalianDitahan(false)
+    loadAntrian()
   }
 
-  // --- HITUNG KEMBALIAN/HUTANG ---
-  const bayar = parseInt(uangBayar.replace(/\./g, '')) || 0
-  const diff = bayar - totalTagihan
-  const kembalian = diff > 0 ? diff : 0
-  const tunggakan = diff < 0 ? Math.abs(diff) : 0
-
-  // --- SIMPAN ---
-  const handleSimpan = async () => {
-    if (cart.length === 0) return toast.warning("Keranjang kosong!")
-    if (modeUser === 'SANTRI' && !selectedSantri) return toast.warning("Pilih santri dulu!")
-    if (modeUser === 'UMUM' && !namaUmum) return toast.warning("Isi nama pemesan!")
-
-    let pesanKonfirmasi = `Total: Rp ${totalTagihan.toLocaleString()}\nBayar: Rp ${bayar.toLocaleString()}`
-    if (tunggakan > 0) pesanKonfirmasi += `\n\n⚠️ Sisa Tunggakan: Rp ${tunggakan.toLocaleString()} (Hutang)`
-    
-    if (!await confirm(`Simpan Transaksi?\n${pesanKonfirmasi}`)) return
-
-    setIsSaving(true)
-    const toastId = toast.loading("Memproses transaksi...")
-
-    const payload = {
-        santriId: selectedSantri?.id || null,
-        namaPemesan: selectedSantri ? selectedSantri.nama_lengkap : namaUmum,
-        infoTambahan: selectedSantri ? `${selectedSantri.asrama} - ${selectedSantri.kamar}` : 'Umum/Guru',
-        totalTagihan,
-        totalBayar: bayar,
-        items: cart
-    }
-
-    const res = await simpanTransaksiUPK(payload)
-    setIsSaving(false)
-    toast.dismiss(toastId)
-
-    if ('error' in res) {
-        toast.error((res as any).error)
-    } else {
-        toast.success("Transaksi Berhasil Disimpan!")
-        // Reset Form
-        setCart([])
-        setUangBayar('')
-        setSelectedSantri(null)
-        setNamaUmum('')
-        setSearch('')
-        setHasilCari([])
-        setMobileView('CART') // Balik ke input santri
-    }
+  if (!unit) {
+    return (
+      <div className="max-w-5xl mx-auto pb-20 space-y-6">
+        <div className="border-b pb-4">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-blue-600" /> Kasir UPK</h1>
+          <p className="text-sm text-slate-500">Pilih unit untuk memulai pencatatan dan pembayaran.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button onClick={() => pilihUnit('PUTRA')} className="bg-white border rounded-xl p-8 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors">
+            <p className="text-3xl font-extrabold text-blue-700">UPK Putra</p>
+            <p className="text-sm text-slate-500 mt-2">Menampilkan santri putra saja.</p>
+          </button>
+          <button onClick={() => pilihUnit('PUTRI')} className="bg-white border rounded-xl p-8 text-left hover:border-rose-300 hover:bg-rose-50 transition-colors">
+            <p className="text-3xl font-extrabold text-rose-700">UPK Putri</p>
+            <p className="text-sm text-slate-500 mt-2">Menampilkan santri putri saja.</p>
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6 max-w-[95vw] mx-auto pb-32">
-      
-      {/* HEADER (Sticky Dihapus) */}
-      <div className="flex items-center gap-4 border-b pb-4 pt-2">
-        <div className="bg-blue-100 p-3 rounded-full text-blue-700 hidden md:block">
-            <ShoppingCart className="w-6 h-6"/>
+    <div className="max-w-[1500px] mx-auto pb-28 space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b pb-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => { setUnit(null); resetCatat() }} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200"><ArrowLeft className="w-4 h-4" /></button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Kasir UPK {unit === 'PUTRA' ? 'Putra' : 'Putri'}</h1>
+            <p className="text-sm text-slate-500">Nomor antrian harian, pencatatan pesanan, dan pembayaran.</p>
+          </div>
         </div>
-        <div>
-            <h1 className="text-2xl font-bold text-slate-800">Kasir UPK</h1>
-            <p className="text-slate-500 text-sm">Pemesanan & Distribusi Kitab.</p>
+        <div className="flex bg-slate-100 p-1 rounded-lg">
+          <button onClick={() => setMode('CATAT')} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'CATAT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Pencatat</button>
+          <button onClick={() => { setMode('KASIR'); loadAntrian() }} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'KASIR' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Kasir</button>
         </div>
       </div>
 
-      {/* GRID UTAMA (KIRI: PEMESAN, KANAN: KATALOG) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-         
-         {/* KOLOM KIRI (1/3): DATA PEMESAN & KERANJANG (STEP 1) */}
-         {/* Di Mobile: Sembunyi jika sedang view CATALOG */}
-         <div className={`lg:col-span-1 space-y-6 ${mobileView === 'CATALOG' ? 'hidden lg:block' : 'block'}`}>
-            
-            {/* Header Step Mobile */}
-            <div className="lg:hidden mb-2 bg-blue-50 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold flex justify-between items-center">
-                <span>Langkah 1: Data Pemesan</span>
-                {cart.length > 0 && <span className="text-xs bg-white px-2 py-0.5 rounded-full border">{cart.length} Item</span>}
-            </div>
+      {lastNomor && mode === 'CATAT' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-amber-700 uppercase">Nomor Antrian Terakhir</p>
+            <p className="text-4xl font-extrabold text-amber-900">{nomor(lastNomor)}</p>
+          </div>
+          <button onClick={() => setLastNomor(null)} className="p-2 hover:bg-amber-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
-            {/* 1. DATA PEMESAN */}
-            <div className="bg-white p-4 md:p-5 rounded-xl border shadow-sm ring-1 ring-blue-100">
-                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <User className="w-4 h-4 text-blue-500"/> Identitas
-                </h3>
-                <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg">
-                    <button onClick={() => setModeUser('SANTRI')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'SANTRI' ? 'bg-white shadow text-blue-700' : 'text-slate-500'}`}>Santri</button>
-                    <button onClick={() => setModeUser('UMUM')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${modeUser === 'UMUM' ? 'bg-white shadow text-blue-700' : 'text-slate-500'}`}>Umum/Guru</button>
+      {mode === 'CATAT' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr_320px] gap-4">
+          <section className="bg-white border rounded-xl p-4 space-y-3">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2"><User className="w-4 h-4 text-blue-600" /> Santri</h2>
+            {selectedSantri ? (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                <p className="font-bold text-blue-900">{selectedSantri.nama_lengkap}</p>
+                <p className="text-xs text-blue-700">{selectedSantri.nis} - {selectedSantri.nama_kelas || '-'} - {selectedSantri.marhalah_nama || '-'}</p>
+                <button onClick={resetCatat} className="mt-3 text-xs font-bold text-blue-700">Ganti santri</button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input value={searchSantri} onChange={e => setSearchSantri(e.target.value)} onKeyDown={e => e.key === 'Enter' && cariSantri()} className="w-full pl-9 pr-3 py-2.5 border rounded-lg text-sm" placeholder="Nama / NIS" />
                 </div>
-
-                {modeUser === 'SANTRI' ? (
-                    !selectedSantri ? (
-                        <div className="relative">
-                            <input 
-                                className="w-full p-3 border rounded-xl pr-12 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                                placeholder="Cari Nama / NIS..." 
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleSearch(e)}
-                            />
-                            <button onClick={handleSearch} className="absolute right-1 top-1 bottom-1 px-3 bg-blue-600 text-white rounded-lg"><Search className="w-4 h-4"/></button>
-                            {hasilCari.length > 0 && (
-                                <div className="absolute top-12 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
-                                    {hasilCari.map(s => (
-                                        <div key={s.id} onClick={() => { setSelectedSantri(s); setHasilCari([]); setSearch(''); }} className="p-3 hover:bg-slate-50 cursor-pointer border-b text-sm last:border-0">
-                                            <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
-                                            <p className="text-xs text-slate-500">{s.asrama}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="bg-green-50 p-3 rounded-xl border border-green-200 flex justify-between items-center animate-in zoom-in-95">
-                            <div>
-                                <p className="font-bold text-green-900 text-sm">{selectedSantri.nama_lengkap}</p>
-                                <p className="text-xs text-green-700">{selectedSantri.asrama} ({selectedSantri.nis})</p>
-                            </div>
-                            <button onClick={() => setSelectedSantri(null)} className="p-2 hover:bg-green-100 rounded-full"><X className="w-4 h-4 text-green-600"/></button>
-                        </div>
-                    )
-                ) : (
-                    <input 
-                        className="w-full p-3 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                        placeholder="Nama Pemesan (Guru/Keluarga)..."
-                        value={namaUmum}
-                        onChange={e => setNamaUmum(e.target.value)}
-                    />
-                )}
-            </div>
-
-            {/* Tombol Buka Katalog (Mobile Only) */}
-            <button 
-                onClick={() => setMobileView('CATALOG')}
-                className="lg:hidden w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-sm flex items-center justify-center gap-2"
-            >
-                <BookOpen className="w-5 h-5"/> Pilih Kitab (Katalog)
-            </button>
-
-            {/* 2. RINCIAN BELANJA (CART) */}
-            <div className="bg-white p-0 rounded-xl border shadow-sm overflow-hidden flex flex-col h-auto lg:h-[500px]">
-                <div className="bg-slate-50 p-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
-                    <span>Keranjang</span>
-                    <span className="bg-white px-2 py-0.5 rounded text-xs border">{cart.length} Item</span>
-                </div>
-                
-                {/* List Item */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[150px]">
-                    {cart.length === 0 && <div className="text-center text-slate-400 py-10 text-sm flex flex-col items-center gap-2"><ShoppingCart className="w-8 h-8 opacity-20"/>Belum ada kitab</div>}
-                    {cart.map(item => (
-                        <div key={item.id} className={`p-3 rounded-lg border flex justify-between items-center shadow-sm ${item.isGratis ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-slate-800">{item.nama}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <p className={`text-xs font-mono ${item.isGratis ? 'line-through text-slate-400' : 'text-slate-600 font-bold'}`}>
-                                        Rp {item.hargaAsli.toLocaleString()}
-                                    </p>
-                                    {item.isGratis && <span className="text-[10px] bg-green-200 text-green-800 px-1.5 rounded font-bold">GRATIS</span>}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => toggleGratis(item.id)}
-                                    className={`p-2 rounded-lg transition-colors ${item.isGratis ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-green-100 hover:text-green-600'}`}
-                                    title="Gratiskan Item Ini"
-                                >
-                                    <Gift className="w-4 h-4"/>
-                                </button>
-                                <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                                    <Trash2 className="w-4 h-4"/>
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* FOOTER BAYAR (DESKTOP & MOBILE CART VIEW) */}
-                <div className="bg-slate-50 p-4 border-t space-y-4">
-                    <div className="flex justify-between items-center text-lg font-bold text-slate-800">
-                        <span>Total Tagihan</span>
-                        <span>Rp {totalTagihan.toLocaleString()}</span>
-                    </div>
-                    
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Uang Diterima</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
-                            <input 
-                                type="number" 
-                                className="w-full pl-10 pr-3 py-3 border rounded-xl font-mono text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="0"
-                                value={uangBayar}
-                                onChange={e => setUangBayar(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    {(kembalian > 0 || tunggakan > 0) && (
-                        <div className="flex justify-between text-xs font-bold pt-1">
-                            {kembalian > 0 && <span className="text-green-700 bg-green-100 px-3 py-1.5 rounded-lg flex-1 text-center mr-2">Kembali: {kembalian.toLocaleString()}</span>}
-                            {tunggakan > 0 && <span className="text-red-700 bg-red-100 px-3 py-1.5 rounded-lg flex-1 text-center">Kurang: {tunggakan.toLocaleString()}</span>}
-                        </div>
-                    )}
-
-                    <button 
-                        onClick={handleSimpan}
-                        disabled={isSaving}
-                        className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold shadow-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                    >
-                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>} 
-                        SIMPAN TRANSAKSI
+                <button onClick={cariSantri} className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm">Cari Santri</button>
+                <div className="divide-y border rounded-lg overflow-hidden max-h-[360px] overflow-y-auto">
+                  {hasilSantri.map(s => (
+                    <button key={s.id} onClick={() => pilihSantri(s)} className="w-full text-left p-3 hover:bg-slate-50">
+                      <p className="font-bold text-slate-800 text-sm">{s.nama_lengkap}</p>
+                      <p className="text-xs text-slate-500">{s.nis} - {s.nama_kelas || '-'} - {s.marhalah_nama || '-'}</p>
                     </button>
+                  ))}
                 </div>
+              </>
+            )}
+          </section>
+
+          <section className="bg-white border rounded-xl overflow-hidden">
+            <div className="p-4 border-b flex flex-col md:flex-row gap-3">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2 flex-shrink-0"><Package className="w-4 h-4 text-amber-600" /> Kitab</h2>
+              <input value={katalogSearch} onChange={e => setKatalogSearch(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="Cari kitab tambahan..." />
             </div>
+            <div className="divide-y max-h-[62vh] overflow-y-auto">
+              {!selectedSantri && <div className="p-10 text-center text-slate-400">Pilih santri dulu.</div>}
+              {selectedSantri && filteredKatalog.map(item => (
+                <div key={item.id} className={`p-3 flex items-center gap-3 ${item.selected ? 'bg-blue-50/40' : 'bg-white'}`}>
+                  <button onClick={() => toggleItem(item.id)} className={`w-7 h-7 rounded-lg border flex items-center justify-center flex-shrink-0 ${item.selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white'}`}>
+                    {item.selected && <Check className="w-4 h-4" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-slate-800 truncate">{item.nama_kitab}</p>
+                    <p className="text-xs text-slate-500">{item.marhalah_nama || '-'} - stok {item.jumlah_stok}</p>
+                  </div>
+                  <p className="font-mono font-bold text-sm text-emerald-700">{rupiah(item.harga_jual)}</p>
+                  <div className="flex items-center border rounded-lg overflow-hidden">
+                    <button onClick={() => ubahQty(item.id, -1)} className="p-2 hover:bg-slate-50"><Minus className="w-3 h-3" /></button>
+                    <span className="w-8 text-center text-sm font-bold">{item.qty}</span>
+                    <button onClick={() => ubahQty(item.id, 1)} className="p-2 hover:bg-slate-50"><Plus className="w-3 h-3" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-         </div>
-
-         {/* KOLOM KANAN (2/3): KATALOG KITAB (STEP 2) */}
-         {/* Di Mobile: Sembunyi jika sedang view CART */}
-         <div className={`lg:col-span-2 space-y-6 ${mobileView === 'CART' ? 'hidden lg:block' : 'block'}`}>
-            
-            {/* Navigasi Mobile Back */}
-            <div className="lg:hidden flex items-center gap-2 mb-4">
-                <button onClick={() => setMobileView('CART')} className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">
-                    <ArrowLeft className="w-4 h-4"/> Kembali ke Kasir
+          <aside className="bg-white border rounded-xl p-4 space-y-3 h-fit xl:sticky xl:top-4">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2"><Ticket className="w-4 h-4 text-amber-600" /> Ringkasan</h2>
+            <div className="flex justify-between text-sm"><span>Item</span><b>{selectedItems.length}</b></div>
+            <div className="flex justify-between text-sm"><span>Total</span><b>{rupiah(totalCatat)}</b></div>
+            <textarea value={catatan} onChange={e => setCatatan(e.target.value)} className="w-full p-3 border rounded-lg text-sm min-h-20" placeholder="Catatan opsional" />
+            <button onClick={simpanAntrian} disabled={loading || !selectedItems.length} className="w-full bg-amber-600 text-white py-3 rounded-lg font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
+              Buat Antrian
+            </button>
+          </aside>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr_320px] gap-4">
+          <section className="bg-white border rounded-xl p-4 space-y-3">
+            <h2 className="font-bold text-slate-800">Antrian Hari Ini</h2>
+            <div className="flex gap-2">
+              <input value={searchAntrian} onChange={e => setSearchAntrian(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadAntrian()} className="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="Nomor / nama / NIS" />
+              <button onClick={loadAntrian} className="px-3 bg-slate-100 rounded-lg"><Search className="w-4 h-4" /></button>
+            </div>
+            <div className="divide-y border rounded-lg overflow-hidden max-h-[65vh] overflow-y-auto">
+              {antrianList.map(a => (
+                <button key={a.id} onClick={() => pilihAntrian(a.id)} className={`w-full text-left p-3 hover:bg-slate-50 ${selectedAntrian?.id === a.id ? 'bg-emerald-50' : ''}`}>
+                  <div className="flex justify-between gap-3">
+                    <p className="text-2xl font-extrabold text-slate-800">{nomor(a.nomor)}</p>
+                    <p className="font-bold text-emerald-700 text-sm">{rupiah(a.total_tagihan)}</p>
+                  </div>
+                  <p className="font-bold text-sm text-slate-800">{a.nama_santri}</p>
+                  <p className="text-xs text-slate-500">{a.nis || '-'} - {a.marhalah_nama || '-'}</p>
                 </button>
-                <div className="flex-1 text-right text-xs text-blue-600 font-bold">
-                    Keranjang: {cart.length} Item
-                </div>
+              ))}
+              {!antrianList.length && <div className="p-8 text-center text-slate-400 text-sm">Belum ada antrian.</div>}
             </div>
+          </section>
 
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="bg-slate-50 p-4 border-b font-bold text-slate-700 flex justify-between items-center sticky top-0 z-10">
-                    <span>Katalog Kitab</span>
-                    <span className="text-xs font-normal bg-white border px-2 py-1 rounded hidden sm:inline-block">Klik untuk tambah</span>
-                </div>
-                
-                <div className="p-2 md:p-4 h-[calc(100vh-200px)] lg:h-[600px] overflow-y-auto space-y-4 md:space-y-6 scroll-smooth">
-                    {loadingKatalog ? (
-                        <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-                    ) : (
-                        Object.entries(katalog).map(([marhalah, items]) => (
-                            <div key={marhalah} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <div className="bg-blue-50/80 p-3 flex justify-between items-center px-4">
-                                    <h3 className="font-bold text-blue-900 text-sm">{marhalah}</h3>
-                                    <button 
-                                        onClick={() => addPaket(items as any[])}
-                                        className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 flex items-center gap-1 shadow-sm active:scale-95"
-                                    >
-                                        <Package className="w-3 h-3"/> Paket
-                                    </button>
-                                </div>
-                                <div className="divide-y bg-white">
-                                    {(items as any[]).map(k => {
-                                        const isInCart = cart.some(c => c.id === k.id)
-                                        return (
-                                            <div 
-                                                key={k.id} 
-                                                onClick={() => !isInCart && addToCart(k)}
-                                                className={`p-3 md:p-4 flex justify-between items-center cursor-pointer transition-colors active:bg-blue-50 ${isInCart ? 'bg-slate-50/80 opacity-60 cursor-default' : 'hover:bg-blue-50'}`}
-                                            >
-                                                <span className="text-sm font-medium text-slate-800 line-clamp-2">{k.nama}</span>
-                                                <div className="flex items-center gap-2 md:gap-3 flex-shrink-0 ml-2">
-                                                    <span className="text-sm font-mono font-bold text-slate-600">
-                                                        {k.harga > 0 ? (k.harga / 1000) + 'k' : 'Free'}
-                                                    </span>
-                                                    {isInCart ? <Check className="w-5 h-5 text-green-600"/> : <div className="w-5 h-5 rounded-full border border-slate-300"></div>}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
+          <section className="bg-white border rounded-xl overflow-hidden">
+            <div className="p-4 border-b">
+              <h2 className="font-bold text-slate-800">Serah Barang</h2>
+              {selectedAntrian && <p className="text-sm text-slate-500">{nomor(selectedAntrian.nomor)} - {selectedAntrian.nama_santri}</p>}
             </div>
-         </div>
+            <div className="divide-y max-h-[65vh] overflow-y-auto">
+              {!selectedAntrian && <div className="p-10 text-center text-slate-400">Pilih antrian dulu.</div>}
+              {selectedAntrian?.items.map(row => {
+                const final = finalItems.find(item => item.itemId === row.id)
+                return (
+                  <div key={row.id} className="p-3 flex items-center gap-3">
+                    <button onClick={() => updateFinalItem(row.id, { diserahkan: !final?.diserahkan })} className={`w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 ${final?.diserahkan ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                      {final?.diserahkan ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-slate-800 truncate">{row.nama_kitab}</p>
+                      <p className="text-xs text-slate-500">stok {row.jumlah_stok} - {final?.diserahkan ? 'diserahkan' : 'masuk pesanan'}</p>
+                    </div>
+                    <p className="font-mono font-bold text-sm">{rupiah(row.harga_jual)}</p>
+                    <div className="flex items-center border rounded-lg overflow-hidden">
+                      <button onClick={() => updateFinalItem(row.id, { qty: (final?.qty || row.qty) - 1 })} className="p-2 hover:bg-slate-50"><Minus className="w-3 h-3" /></button>
+                      <span className="w-8 text-center text-sm font-bold">{final?.qty || row.qty}</span>
+                      <button onClick={() => updateFinalItem(row.id, { qty: (final?.qty || row.qty) + 1 })} className="p-2 hover:bg-slate-50"><Plus className="w-3 h-3" /></button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
 
-      </div>
-
+          <aside className="bg-white border rounded-xl p-4 space-y-3 h-fit xl:sticky xl:top-4">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-600" /> Pembayaran</h2>
+            <div className="flex justify-between text-sm"><span>Total</span><b>{rupiah(totalKasir)}</b></div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Uang diterima</label>
+              <input value={uangBayar} onChange={e => setUangBayar(e.target.value)} type="number" className="w-full mt-1 px-3 py-3 border rounded-lg text-lg font-bold font-mono" />
+            </div>
+            {diff > 0 && <div className="text-sm font-bold text-green-700 bg-green-50 p-2 rounded-lg">Kembalian: {rupiah(diff)}</div>}
+            {diff < 0 && <div className="text-sm font-bold text-red-700 bg-red-50 p-2 rounded-lg">Tunggakan: {rupiah(Math.abs(diff))}</div>}
+            {diff > 0 && (
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={kembalianDitahan} onChange={e => setKembalianDitahan(e.target.checked)} />
+                Kembalian belum diserahkan
+              </label>
+            )}
+            <button onClick={prosesBayar} disabled={loading || !selectedAntrian} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              Selesaikan
+            </button>
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

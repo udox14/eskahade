@@ -9,13 +9,16 @@ import {
   getTokoList,
   hapusKatalogUPK,
   hapusTokoUPK,
+  importKatalogUPK,
   simpanKatalogUPK,
   simpanTokoUPK,
 } from './actions'
 import {
   BookOpen,
   CheckCircle,
+  Download,
   Edit,
+  FileSpreadsheet,
   Loader2,
   PackagePlus,
   Plus,
@@ -23,6 +26,7 @@ import {
   Search,
   Store,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -88,6 +92,10 @@ type KatalogItem = {
   laba_bersih: number
 }
 
+type ImportPreviewRow = {
+  [key: string]: string | number | null | undefined
+}
+
 const emptyKatalogForm: KatalogForm = {
   id: '',
   kitab_id: '',
@@ -134,6 +142,9 @@ export default function KatalogUPKPage() {
   const [tokoForm, setTokoForm] = useState<TokoForm>(emptyTokoForm)
   const [isKatalogModalOpen, setIsKatalogModalOpen] = useState(false)
   const [isTokoModalOpen, setIsTokoModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importRows, setImportRows] = useState<ImportPreviewRow[]>([])
+  const [isImporting, setIsImporting] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
@@ -166,12 +177,10 @@ export default function KatalogUPKPage() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     initData()
   }, [initData])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadKatalog()
   }, [loadKatalog])
 
@@ -269,6 +278,86 @@ export default function KatalogUPKPage() {
     }
   }
 
+  const downloadTemplateImport = async () => {
+    const XLSX = await import('xlsx')
+    const contohMarhalah = marhalahList[0]?.nama || 'Ibtidaiyyah 1'
+    const rows = [
+      {
+        'NAMA KITAB': 'Jurumiyah',
+        'MARHALAH': contohMarhalah,
+        'TOKO': 'Katara Printgraph',
+        'STOK LAMA': 10,
+        'STOK BARU': 40,
+        'HARGA BELI': 12000,
+        'HARGA JUAL': 15000,
+        'CATATAN': 'Contoh, boleh dikosongkan',
+      },
+      {
+        'NAMA KITAB': 'Kitab Tambahan Manual',
+        'MARHALAH': contohMarhalah,
+        'TOKO': 'Online',
+        'STOK LAMA': 0,
+        'STOK BARU': 25,
+        'HARGA BELI': 8000,
+        'HARGA JUAL': 10000,
+        'CATATAN': '',
+      },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Katalog UPK')
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(marhalahList.map(m => ({ 'MARHALAH YANG VALID': m.nama }))),
+      'Daftar Marhalah'
+    )
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(tokoList.map(t => ({ 'TOKO': t.nama }))),
+      'Daftar Toko'
+    )
+    XLSX.writeFile(wb, 'Template_Katalog_UPK.xlsx')
+  }
+
+  const handleUploadImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const XLSX = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const sheet = wb.Sheets['Katalog UPK'] || wb.Sheets[wb.SheetNames[0]]
+      const data = XLSX.utils.sheet_to_json<ImportPreviewRow>(sheet, { defval: '' })
+      setImportRows(data)
+      toast.success(`${data.length} baris terbaca`)
+    } catch {
+      toast.error('Gagal membaca file Excel.')
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  const handleImportKatalog = async () => {
+    if (!importRows.length) return toast.warning('Upload file Excel dulu.')
+    setIsImporting(true)
+    const result = await importKatalogUPK(importRows)
+    setIsImporting(false)
+
+    if ('error' in result) {
+      toast.error(result.error)
+      return
+    }
+
+    const parts = [`${result.inserted} baru`, `${result.updated} diperbarui`]
+    if (result.failed) parts.push(`${result.failed} dilewati`)
+    toast.success(`Import selesai: ${parts.join(', ')}`)
+    result.errors.forEach(msg => toast.warning(msg))
+    setImportRows([])
+    setIsImportModalOpen(false)
+    loadKatalog()
+    loadToko()
+  }
+
   const summary = useMemo(() => {
     return katalog.reduce((acc, item) => {
       acc.stok += item.jumlah_stok || 0
@@ -309,6 +398,9 @@ export default function KatalogUPKPage() {
           <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
             <button onClick={openTambahModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
               <Plus className="w-4 h-4" /> Tambah Item
+            </button>
+            <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700">
+              <FileSpreadsheet className="w-4 h-4" /> Import Excel
             </button>
             <button onClick={() => setIsTokoModalOpen(true)} className="px-4 py-2.5 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-blue-700">
               <Store className="w-4 h-4" /> Master Toko
@@ -536,6 +628,96 @@ export default function KatalogUPKPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Import Katalog UPK
+              </h2>
+              <button
+                onClick={() => { setImportRows([]); setIsImportModalOpen(false) }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button onClick={downloadTemplateImport} className="border border-blue-200 bg-blue-50 text-blue-700 rounded-lg px-4 py-4 font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-100">
+                  <Download className="w-5 h-5" /> Download Template Excel
+                </button>
+                <div className="relative">
+                  <input type="file" accept=".xlsx,.xls" onChange={handleUploadImport} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  <button className="w-full border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg px-4 py-4 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-100">
+                    <Upload className="w-5 h-5" /> Upload File Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                Kolom utama: <b>NAMA KITAB</b>, <b>MARHALAH</b>, <b>TOKO</b>, <b>STOK LAMA</b>, <b>STOK BARU</b>, <b>HARGA BELI</b>, <b>HARGA JUAL</b>, <b>CATATAN</b>. Jika nama kitab dan marhalah cocok dengan Manajemen Kitab, data otomatis ditautkan; jika tidak, tetap masuk sebagai item manual.
+              </div>
+
+              {importRows.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <p className="font-bold text-slate-700 text-sm">Preview {importRows.length} baris</p>
+                    <button onClick={() => setImportRows([])} className="text-xs font-bold text-slate-500 hover:text-slate-800">Bersihkan preview</button>
+                  </div>
+                  <div className="overflow-x-auto max-h-80">
+                    <table className="w-full min-w-[900px] text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-600 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2">Nama Kitab</th>
+                          <th className="px-3 py-2">Marhalah</th>
+                          <th className="px-3 py-2">Toko</th>
+                          <th className="px-3 py-2 text-right">Stok Lama</th>
+                          <th className="px-3 py-2 text-right">Stok Baru</th>
+                          <th className="px-3 py-2 text-right">Beli</th>
+                          <th className="px-3 py-2 text-right">Jual</th>
+                          <th className="px-3 py-2">Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {importRows.slice(0, 50).map((row, index) => (
+                          <tr key={index}>
+                            <td className="px-3 py-2 font-medium text-slate-800">{row['NAMA KITAB'] || row['Nama Kitab'] || row['nama kitab']}</td>
+                            <td className="px-3 py-2">{row['MARHALAH'] || row['Marhalah'] || row['marhalah']}</td>
+                            <td className="px-3 py-2">{row['TOKO'] || row['Toko'] || row['toko']}</td>
+                            <td className="px-3 py-2 text-right font-mono">{row['STOK LAMA'] || row['Stok Lama'] || row['stok lama']}</td>
+                            <td className="px-3 py-2 text-right font-mono">{row['STOK BARU'] || row['Stok Baru'] || row['stok baru']}</td>
+                            <td className="px-3 py-2 text-right font-mono">{row['HARGA BELI'] || row['Harga Beli'] || row['harga beli']}</td>
+                            <td className="px-3 py-2 text-right font-mono">{row['HARGA JUAL'] || row['Harga Jual'] || row['harga jual']}</td>
+                            <td className="px-3 py-2">{row['CATATAN'] || row['Catatan'] || row['catatan']}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 50 && <p className="px-4 py-2 text-xs text-slate-500 bg-slate-50">Preview hanya menampilkan 50 baris pertama.</p>}
+                </div>
+              ) : (
+                <div className="text-center py-14 border border-dashed rounded-lg text-slate-400">
+                  Upload file template untuk melihat preview.
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t bg-slate-50 flex flex-col sm:flex-row justify-end gap-2">
+              <button type="button" onClick={() => { setImportRows([]); setIsImportModalOpen(false) }} className="px-4 py-2.5 border border-slate-200 rounded-lg font-bold text-sm text-slate-600 hover:bg-white">
+                Batal
+              </button>
+              <button onClick={handleImportKatalog} disabled={isImporting || importRows.length === 0} className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Simpan Import
+              </button>
+            </div>
           </div>
         </div>
       )}
