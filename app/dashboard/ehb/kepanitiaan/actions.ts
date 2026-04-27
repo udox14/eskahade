@@ -431,7 +431,6 @@ export async function getPembuatSoalList(eventId: number) {
         m.id as marhalah_id,
         CASE WHEN m.nama LIKE '%Mutawassithah%' THEN k.id ELSE NULL END as kelas_id,
         m.urutan as marhalah_urutan,
-        k.nama_kelas,
         mp.id as mapel_id,
         mp.nama as mapel_nama
       FROM ehb_jadwal j
@@ -466,7 +465,18 @@ export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalI
   if (!session) return { error: 'Unauthorized' }
   await ensureKepanitiaanSchema()
 
-  const cleanInputs = inputs
+  const cleanInputsMap = new Map<string, {
+    scope_type: 'marhalah' | 'kelas'
+    scope_id: string
+    scope_nama: string
+    marhalah_id: number | null
+    kelas_id: string | null
+    mapel_id: number
+    guru_id: number | null
+    nama_guru: string | null
+  }>()
+
+  inputs
     .map(input => ({
       scope_type: input.scope_type,
       scope_id: input.scope_id.trim(),
@@ -478,6 +488,11 @@ export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalI
       nama_guru: input.nama_guru?.trim() || null,
     }))
     .filter(input => input.scope_id && input.scope_nama && input.mapel_id && (input.guru_id || input.nama_guru))
+    .forEach(input => {
+      cleanInputsMap.set(`${input.scope_type}:${input.scope_id}:${input.mapel_id}`, input)
+    })
+
+  const cleanInputs = Array.from(cleanInputsMap.values())
 
   await execute(`DELETE FROM ehb_pembuat_soal_scope WHERE ehb_event_id = ?`, [eventId])
   if (cleanInputs.length > 0) {

@@ -1655,3 +1655,13 @@
  GET /dashboard/asrama/spp 200 in 330ms (compile: 25ms, render: 305ms)
 [layout] fiturAkses count: 0
  GET /dashboard/asrama/spp 200 in 272ms (compile: 4ms, render: 268ms)
+ GET /api/version 200 in 97ms
+ GET /api/version 200 in 12ms
+ GET /api/version 200 in 9ms
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 10ms
+ GET /api/version 200 in 9ms
+ GET /api/version 200 in 16ms
+ GET /api/version 200 in 17ms
+ GET /api/version 200 in 34ms
+✓ Compiled in 546ms

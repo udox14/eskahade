@@ -13,15 +13,26 @@ interface Props {
   kelasSekolah: string
   marhalah: string
   kelasPesantren: string
+  status: string
+  jenisKelamin: string
+  golDarah: string
+  tahunMasuk: string
+  provinsi: string
+  kabKota: string
+  kecamatan: string
+  jemaah: string
+  alamat: string
   userAsrama: string | null
 }
 
 export async function SantriTable({
-  page, limit, q, asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren, userAsrama
+  page, limit, q, asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren,
+  status, jenisKelamin, golDarah, tahunMasuk, provinsi, kabKota, kecamatan, jemaah, alamat,
+  userAsrama
 }: Props) {
   const offset = (page - 1) * limit
 
-  let whereClauses: string[] = ["s.status_global = 'aktif'"]
+  let whereClauses: string[] = []
   const params: any[] = []
 
   let joinClause = ''
@@ -35,11 +46,23 @@ export async function SantriTable({
     params.push(marhalah)
   }
 
-  if (q)            { whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${q}%`, `%${q}%`) }
-  if (asrama)       { whereClauses.push('s.asrama = ?');           params.push(asrama) }
-  if (kamar)        { whereClauses.push('s.kamar = ?');            params.push(kamar) }
-  if (sekolah)      { whereClauses.push('s.sekolah = ?');          params.push(sekolah) }
-  if (kelasSekolah) { whereClauses.push('s.kelas_sekolah LIKE ?'); params.push(`%${kelasSekolah}%`) }
+  if (status && status !== 'all') { whereClauses.push('s.status_global = ?'); params.push(status) }
+  if (q)             { whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${q}%`, `%${q}%`) }
+  if (asrama)        { whereClauses.push('s.asrama = ?');           params.push(asrama) }
+  if (kamar)         { whereClauses.push('s.kamar = ?');            params.push(kamar) }
+  if (sekolah)       { whereClauses.push('s.sekolah = ?');          params.push(sekolah) }
+  if (kelasSekolah)  { whereClauses.push('s.kelas_sekolah = ?');    params.push(kelasSekolah) }
+  if (jenisKelamin)  { whereClauses.push('s.jenis_kelamin = ?');    params.push(jenisKelamin) }
+  if (golDarah)      { whereClauses.push('s.gol_darah = ?');        params.push(golDarah) }
+  if (tahunMasuk)    { whereClauses.push("COALESCE(s.tahun_masuk, CAST(SUBSTR(NULLIF(s.tanggal_masuk, ''), 1, 4) AS INTEGER)) = ?"); params.push(Number(tahunMasuk)) }
+  if (provinsi)      { whereClauses.push('s.provinsi = ?');         params.push(provinsi) }
+  if (kabKota)       { whereClauses.push('s.kab_kota = ?');         params.push(kabKota) }
+  if (kecamatan)     { whereClauses.push('s.kecamatan = ?');        params.push(kecamatan) }
+  if (jemaah)        { whereClauses.push('s.jemaah = ?');           params.push(jemaah) }
+  if (alamat)        {
+    whereClauses.push('(s.alamat LIKE ? OR s.alamat_lengkap LIKE ?)')
+    params.push(`%${alamat}%`, `%${alamat}%`)
+  }
 
   const whereStr = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
