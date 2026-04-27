@@ -51,17 +51,23 @@ export type PanitiaBatchItem = PanitiaInput & {
 }
 
 export type PembuatSoalRow = {
-  marhalah_id: number
-  marhalah_nama: string
+  scope_type: 'marhalah' | 'kelas'
+  scope_id: string
+  scope_nama: string
+  marhalah_id: number | null
+  kelas_id: string | null
   mapel_id: number
   mapel_nama: string
   guru_id: number | null
   nama_guru: string | null
-  kelas: string | null
 }
 
 export type PembuatSoalInput = {
-  marhalah_id: number
+  scope_type: 'marhalah' | 'kelas'
+  scope_id: string
+  scope_nama: string
+  marhalah_id?: number | null
+  kelas_id?: string | null
   mapel_id: number
   guru_id?: number | null
   nama_guru?: string | null
@@ -128,6 +134,27 @@ export async function ensureKepanitiaanSchema() {
   await execute(`
     CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_marhalah_event
     ON ehb_pembuat_soal_marhalah(ehb_event_id, marhalah_id, guru_id)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal_scope (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      scope_type     TEXT NOT NULL,
+      scope_id       TEXT NOT NULL,
+      scope_nama     TEXT NOT NULL,
+      marhalah_id    INTEGER REFERENCES marhalah(id),
+      kelas_id       TEXT REFERENCES kelas(id),
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, scope_type, scope_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_scope_event
+    ON ehb_pembuat_soal_scope(ehb_event_id, scope_type, guru_id)
   `)
 }
 
@@ -396,25 +423,42 @@ export async function reorderPanitia(eventId: number, ids: number[]) {
 export async function getPembuatSoalList(eventId: number) {
   await ensureKepanitiaanSchema()
   return query<PembuatSoalRow>(`
+    WITH base AS (
+      SELECT DISTINCT
+        CASE WHEN m.nama LIKE '%Mutawassithah%' THEN 'kelas' ELSE 'marhalah' END as scope_type,
+        CASE WHEN m.nama LIKE '%Mutawassithah%' THEN k.id ELSE CAST(m.id AS TEXT) END as scope_id,
+        CASE WHEN m.nama LIKE '%Mutawassithah%' THEN k.nama_kelas ELSE m.nama END as scope_nama,
+        m.id as marhalah_id,
+        CASE WHEN m.nama LIKE '%Mutawassithah%' THEN k.id ELSE NULL END as kelas_id,
+        m.urutan as marhalah_urutan,
+        k.nama_kelas,
+        mp.id as mapel_id,
+        mp.nama as mapel_nama
+      FROM ehb_jadwal j
+      JOIN mapel mp ON mp.id = j.mapel_id
+      JOIN kelas k ON k.id = j.kelas_id
+      JOIN marhalah m ON m.id = k.marhalah_id
+      WHERE j.ehb_event_id = ?
+    )
     SELECT
-      m.id as marhalah_id,
-      m.nama as marhalah_nama,
-      mp.id as mapel_id,
-      mp.nama as mapel_nama,
+      b.scope_type,
+      b.scope_id,
+      b.scope_nama,
+      b.marhalah_id,
+      b.kelas_id,
+      b.mapel_id,
+      b.mapel_nama,
       ps.guru_id,
-      COALESCE(dg.nama_lengkap, ps.nama_guru) as nama_guru,
-      GROUP_CONCAT(DISTINCT k.nama_kelas) as kelas
-    FROM ehb_jadwal j
-    JOIN mapel mp ON mp.id = j.mapel_id
-    JOIN kelas k ON k.id = j.kelas_id
-    JOIN marhalah m ON m.id = k.marhalah_id
-    LEFT JOIN ehb_pembuat_soal_marhalah ps
-      ON ps.ehb_event_id = j.ehb_event_id AND ps.marhalah_id = m.id AND ps.mapel_id = mp.id
+      COALESCE(dg.nama_lengkap, ps.nama_guru) as nama_guru
+    FROM base b
+    LEFT JOIN ehb_pembuat_soal_scope ps
+      ON ps.ehb_event_id = ?
+      AND ps.scope_type = b.scope_type
+      AND ps.scope_id = b.scope_id
+      AND ps.mapel_id = b.mapel_id
     LEFT JOIN data_guru dg ON dg.id = ps.guru_id
-    WHERE j.ehb_event_id = ?
-    GROUP BY m.id, m.nama, m.urutan, mp.id, mp.nama, ps.guru_id, ps.nama_guru, dg.nama_lengkap
-    ORDER BY m.urutan, mp.nama
-  `, [eventId])
+    ORDER BY b.marhalah_urutan, b.scope_nama, b.mapel_nama
+  `, [eventId, eventId])
 }
 
 export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalInput[]) {
@@ -424,21 +468,36 @@ export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalI
 
   const cleanInputs = inputs
     .map(input => ({
-      marhalah_id: Number(input.marhalah_id),
+      scope_type: input.scope_type,
+      scope_id: input.scope_id.trim(),
+      scope_nama: input.scope_nama.trim(),
+      marhalah_id: input.marhalah_id ? Number(input.marhalah_id) : null,
+      kelas_id: input.kelas_id?.trim() || null,
       mapel_id: Number(input.mapel_id),
       guru_id: input.guru_id ? Number(input.guru_id) : null,
       nama_guru: input.nama_guru?.trim() || null,
     }))
-    .filter(input => input.marhalah_id && input.mapel_id && (input.guru_id || input.nama_guru))
+    .filter(input => input.scope_id && input.scope_nama && input.mapel_id && (input.guru_id || input.nama_guru))
 
-  await execute(`DELETE FROM ehb_pembuat_soal_marhalah WHERE ehb_event_id = ?`, [eventId])
+  await execute(`DELETE FROM ehb_pembuat_soal_scope WHERE ehb_event_id = ?`, [eventId])
   if (cleanInputs.length > 0) {
     await batch(cleanInputs.map(input => ({
       sql: `
-        INSERT INTO ehb_pembuat_soal_marhalah (ehb_event_id, marhalah_id, mapel_id, guru_id, nama_guru)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO ehb_pembuat_soal_scope
+          (ehb_event_id, scope_type, scope_id, scope_nama, marhalah_id, kelas_id, mapel_id, guru_id, nama_guru)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [eventId, input.marhalah_id, input.mapel_id, input.guru_id, input.nama_guru],
+      params: [
+        eventId,
+        input.scope_type,
+        input.scope_id,
+        input.scope_nama,
+        input.marhalah_id,
+        input.kelas_id,
+        input.mapel_id,
+        input.guru_id,
+        input.nama_guru,
+      ],
     })))
   }
 

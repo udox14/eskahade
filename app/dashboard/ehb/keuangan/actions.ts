@@ -238,6 +238,27 @@ export async function ensureKeuanganSchema() {
     CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_marhalah_event
     ON ehb_pembuat_soal_marhalah(ehb_event_id, marhalah_id, guru_id)
   `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_pembuat_soal_scope (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      scope_type     TEXT NOT NULL,
+      scope_id       TEXT NOT NULL,
+      scope_nama     TEXT NOT NULL,
+      marhalah_id    INTEGER REFERENCES marhalah(id),
+      kelas_id       TEXT REFERENCES kelas(id),
+      mapel_id       INTEGER NOT NULL REFERENCES mapel(id),
+      guru_id        INTEGER REFERENCES data_guru(id),
+      nama_guru      TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, scope_type, scope_id, mapel_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_ehb_pembuat_soal_scope_event
+    ON ehb_pembuat_soal_scope(ehb_event_id, scope_type, guru_id)
+  `)
   try {
     await execute(`ALTER TABLE ehb_honor_manual ADD COLUMN mapel_id INTEGER REFERENCES mapel(id)`)
   } catch {}
@@ -351,9 +372,13 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
     queryOne<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM (
-        SELECT DISTINCT k.marhalah_id, j.mapel_id
+        SELECT DISTINCT
+          CASE WHEN m.nama LIKE '%Mutawassithah%' THEN 'kelas' ELSE 'marhalah' END as scope_type,
+          CASE WHEN m.nama LIKE '%Mutawassithah%' THEN k.id ELSE CAST(m.id AS TEXT) END as scope_id,
+          j.mapel_id
         FROM ehb_jadwal j
         JOIN kelas k ON k.id = j.kelas_id
+        JOIN marhalah m ON m.id = k.marhalah_id
         WHERE j.ehb_event_id = ?
       )
     `, [eventId]),
@@ -666,10 +691,9 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       ps.guru_id,
       COALESCE(dg.nama_lengkap, ps.nama_guru, 'Pembuat soal belum diatur') as nama,
       COUNT(*) as qty,
-      GROUP_CONCAT(m.nama || ' - ' || mp.nama, ', ') as detail
-    FROM ehb_pembuat_soal_marhalah ps
+      GROUP_CONCAT(ps.scope_nama || ' - ' || mp.nama, ', ') as detail
+    FROM ehb_pembuat_soal_scope ps
     JOIN mapel mp ON mp.id = ps.mapel_id
-    JOIN marhalah m ON m.id = ps.marhalah_id
     LEFT JOIN data_guru dg ON dg.id = ps.guru_id
     WHERE ps.ehb_event_id = ? AND (ps.guru_id IS NOT NULL OR COALESCE(ps.nama_guru, '') <> '')
     GROUP BY ps.guru_id, dg.nama_lengkap, ps.nama_guru

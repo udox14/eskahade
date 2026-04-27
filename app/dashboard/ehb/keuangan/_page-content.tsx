@@ -660,6 +660,89 @@ function SignatureBox({ title, name }: { title: string; name: string }) {
 
 type KeuanganTab = 'rab' | 'transaksi' | 'honor_detail'
 
+type LoadedTabData =
+  | {
+      tab: 'rab'
+      autoBasis: RabAutoBasis
+      rabDrafts: DraftRabItem[]
+      signers: { ketua: string; bendahara: string }
+    }
+  | {
+      tab: 'transaksi'
+      autoBasis: RabAutoBasis
+      rabDrafts: DraftRabItem[]
+      transaksiDrafts: DraftTransaksiItem[]
+      signers: { ketua: string; bendahara: string }
+    }
+  | {
+      tab: 'honor_detail'
+      tarifRows: HonorTarif
+      configRows: HonorMapelConfig[]
+      honorRows: HonorItem[]
+    }
+
+const tabDataCache = new Map<string, Promise<LoadedTabData>>()
+
+function tabCacheKey(eventId: number, tab: KeuanganTab) {
+  return `${eventId}:${tab}`
+}
+
+async function fetchTabData(eventId: number, tab: KeuanganTab): Promise<LoadedTabData> {
+  if (tab === 'rab') {
+    const [savedRows, autoBasis, signers] = await Promise.all([
+      getRabItems(eventId),
+      getRabAutoBasis(eventId),
+      getKeuanganSigners(eventId),
+    ])
+    return {
+      tab,
+      autoBasis,
+      rabDrafts: savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis),
+      signers,
+    }
+  }
+
+  if (tab === 'transaksi') {
+    const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
+      getRabItems(eventId),
+      getRabAutoBasis(eventId),
+      getKeuanganSigners(eventId),
+      getTransaksiItems(eventId),
+    ])
+    const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
+    const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
+    return {
+      tab,
+      autoBasis,
+      rabDrafts,
+      transaksiDrafts: transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab),
+      signers,
+    }
+  }
+
+  const [tarifRows, configRows, honorRows] = await Promise.all([
+    getHonorTarif(eventId),
+    getHonorMapelConfig(eventId),
+    getHonorItems(eventId),
+  ])
+  return { tab, tarifRows, configRows, honorRows }
+}
+
+function getCachedTabData(eventId: number, tab: KeuanganTab) {
+  const key = tabCacheKey(eventId, tab)
+  if (!tabDataCache.has(key)) {
+    tabDataCache.set(key, fetchTabData(eventId, tab).catch(error => {
+      tabDataCache.delete(key)
+      throw error
+    }))
+  }
+  return tabDataCache.get(key)!
+}
+
+function clearKeuanganCache(eventId: number, tabs: KeuanganTab[]) {
+  for (const tab of tabs) tabDataCache.delete(tabCacheKey(eventId, tab))
+}
+
 export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTab?: KeuanganTab }) {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [basis, setBasis] = useState<RabAutoBasis | null>(null)
@@ -707,40 +790,22 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     const evt = await getActiveEventForKeuangan()
     setEvent(evt || null)
     if (evt) {
-      if (activeTab === 'rab') {
-        const [savedRows, autoBasis, signers] = await Promise.all([
-          getRabItems(evt.id),
-          getRabAutoBasis(evt.id),
-          getKeuanganSigners(evt.id),
-        ])
-        const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
-        setBasis(autoBasis)
-        setDrafts(rabDrafts)
-        setKetuaPelaksana(signers.ketua)
-        setBendahara(signers.bendahara)
-      } else if (activeTab === 'transaksi') {
-        const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
-          getRabItems(evt.id),
-          getRabAutoBasis(evt.id),
-          getKeuanganSigners(evt.id),
-          getTransaksiItems(evt.id),
-        ])
-        const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
-        const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
-        setBasis(autoBasis)
-        setDrafts(rabDrafts)
-        setTransaksiDrafts(transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab))
-        setKetuaPelaksana(signers.ketua)
-        setBendahara(signers.bendahara)
+      const data = await getCachedTabData(evt.id, activeTab)
+      if (data.tab === 'rab') {
+        setBasis(data.autoBasis)
+        setDrafts(data.rabDrafts)
+        setKetuaPelaksana(data.signers.ketua)
+        setBendahara(data.signers.bendahara)
+      } else if (data.tab === 'transaksi') {
+        setBasis(data.autoBasis)
+        setDrafts(data.rabDrafts)
+        setTransaksiDrafts(data.transaksiDrafts)
+        setKetuaPelaksana(data.signers.ketua)
+        setBendahara(data.signers.bendahara)
       } else {
-        const [tarifRows, configRows, honorRows] = await Promise.all([
-          getHonorTarif(evt.id),
-          getHonorMapelConfig(evt.id),
-          getHonorItems(evt.id),
-        ])
-        setHonorTarif(tarifRows)
-        setMapelConfigs(configRows)
-        setHonorItems(honorRows)
+        setHonorTarif(data.tarifRows)
+        setMapelConfigs(data.configRows)
+        setHonorItems(data.honorRows)
       }
     }
     setLoading(false)
@@ -1035,6 +1100,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     const res = await saveRabItems(event.id, drafts)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
+    clearKeuanganCache(event.id, ['rab', 'transaksi', 'honor_detail'])
     toast.success(`${res.saved} item RAB disimpan`)
     loadData()
   }
@@ -1048,6 +1114,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     const res = await saveTransaksiItems(event.id, transaksiDrafts)
     setSavingTransaksi(false)
     if ('error' in res) return toast.error(res.error)
+    clearKeuanganCache(event.id, ['transaksi'])
     toast.success(`${res.saved} transaksi disimpan`)
     loadData()
   }
@@ -1069,8 +1136,14 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
       return toast.error(configRes.error)
     }
     setSavingHonor(false)
+    clearKeuanganCache(event.id, ['honor_detail'])
     toast.success('Rincian honor diperbarui')
     loadData()
+  }
+
+  const prefetchTab = (tab: KeuanganTab) => {
+    if (!event || tab === activeTab) return
+    void getCachedTabData(event.id, tab)
   }
 
   if (loading) {
@@ -1130,6 +1203,8 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
             <Link
               key={tab.key}
               href={tab.href}
+              onFocus={() => prefetchTab(tab.key as KeuanganTab)}
+              onMouseEnter={() => prefetchTab(tab.key as KeuanganTab)}
               className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${active ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <Icon className="w-4 h-4" /> {tab.label}

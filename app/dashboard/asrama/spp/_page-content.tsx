@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getClientRestriction, simpanSppBatch, updatePembayaranSPP, getSppBillingStart } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, Edit2, X, Check } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -34,6 +34,8 @@ export default function SPPPage() {
   const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [loadingSearch, setLoadingSearch] = useState(false)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('SEMUA')
   const [drafts, setDrafts] = useState<Record<string, any>>({})
   const [isSavingBatch, setIsSavingBatch] = useState(false)
@@ -43,10 +45,7 @@ export default function SPPPage() {
   const [riwayatBayar, setRiwayatBayar] = useState<any[]>([])
   const [selectedMonths, setSelectedMonths] = useState<number[]>([])
   const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 1, value: '2026-01' })
-  const [editingPayment, setEditingPayment] = useState<any | null>(null)
-  const [editBulan, setEditBulan] = useState(1)
-  const [editNominal, setEditNominal] = useState('')
-  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [cancelingPaymentId, setCancelingPaymentId] = useState<string | null>(null)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -95,6 +94,24 @@ export default function SPPPage() {
       setLoadingKamar(false)
     })
   }, [kamarIdx, kamars])
+
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      setSearchResults([])
+      setLoadingSearch(false)
+      return
+    }
+
+    setLoadingSearch(true)
+    const timer = window.setTimeout(() => {
+      searchDashboardSPP(tahun, asrama, q)
+        .then(setSearchResults)
+        .finally(() => setLoadingSearch(false))
+    }, 250)
+
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, tahun, asrama])
 
   // Invalidate cache kamar tertentu setelah simpan batch
   const invalidateKamar = (kamar: string) => {
@@ -183,36 +200,21 @@ export default function SPPPage() {
 
   const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
 
-  const openEditPayment = (e: React.MouseEvent, dataBayar: any) => {
+  const handleBatalkanPembayaran = async (e: React.MouseEvent, dataBayar: any) => {
     e.stopPropagation()
-    setEditingPayment(dataBayar)
-    setEditBulan(dataBayar.bulan)
-    setEditNominal(String(dataBayar.nominal_bayar ?? nominal))
-  }
-
-  const closeEditPayment = () => {
-    setEditingPayment(null)
-    setIsSavingEdit(false)
-  }
-
-  const handleUpdatePembayaran = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingPayment) return
-    const nominalBaru = Number(editNominal.replace(/\D/g, ''))
-    if (!await confirm(`Simpan revisi pembayaran menjadi ${BULAN_LIST[editBulan - 1]} dengan nominal Rp ${nominalBaru.toLocaleString('id-ID')}?`)) return
-    setIsSavingEdit(true)
-    const res = await updatePembayaranSPP(editingPayment.id, editBulan, nominalBaru)
-    setIsSavingEdit(false)
+    if (!await confirm(`Batalkan status lunas bulan ${BULAN_LIST[dataBayar.bulan - 1]}? Bulan ini akan kembali menjadi belum bayar / nunggak.`)) return
+    setCancelingPaymentId(dataBayar.id)
+    const res = await batalkanPembayaranSPP(dataBayar.id)
+    setCancelingPaymentId(null)
     if ('error' in res) {
       toast.error(res.error)
       return
     }
-    toast.success('Pembayaran berhasil direvisi')
+    toast.success('Status lunas dibatalkan')
     invalidateKamar(selectedSantri.kamar)
     getStatusSPP(selectedSantri.id, tahun).then(data => {
       setRiwayatBayar(data)
       setSelectedMonths([])
-      closeEditPayment()
     })
   }
 
@@ -220,9 +222,9 @@ export default function SPPPage() {
 
   const activeKamar = kamars[kamarIdx] ?? ''
 
-  const filteredSantri = santriKamar.filter(s => {
-    const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase())
-    if (!matchSearch) return false
+  const isSearching = searchQuery.trim().length >= 2
+  const sourceSantri = isSearching ? searchResults : santriKamar
+  const filteredSantri = sourceSantri.filter(s => {
     if (filterStatus === 'SUDAH_BAYAR_INI') return s.bulan_ini_lunas
     if (filterStatus === 'NUNGGAK') return s.jumlah_tunggakan > 0
     if (filterStatus === 'AMAN') return s.jumlah_tunggakan === 0
@@ -317,16 +319,16 @@ export default function SPPPage() {
       )}
 
       {/* SANTRI LIST */}
-      {loadingKamar ? (
+      {loadingKamar || loadingSearch ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-      ) : !activeKamar ? null : filteredSantri.length === 0 ? (
+      ) : !activeKamar && !isSearching ? null : filteredSantri.length === 0 ? (
         <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
-          {santriKamar.length === 0 ? 'Tidak ada santri di kamar ini.' : 'Tidak ada santri yang cocok dengan filter.'}
+          {isSearching ? 'Tidak ada santri yang cocok dengan pencarian.' : santriKamar.length === 0 ? 'Tidak ada santri di kamar ini.' : 'Tidak ada santri yang cocok dengan filter.'}
         </div>
       ) : (
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
           <div className="bg-slate-50 px-4 py-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
-            <span className="text-lg">KAMAR {activeKamar}</span>
+            <span className="text-lg">{isSearching ? 'HASIL PENCARIAN' : `KAMAR ${activeKamar}`}</span>
             <span className="text-xs bg-white border px-2 py-1 rounded font-normal text-slate-500">{filteredSantri.length} Santri</span>
           </div>
           <div className="divide-y">
@@ -335,29 +337,37 @@ export default function SPPPage() {
               const isDraft = !!drafts[s.id]
               return (
                 <div key={s.id} onClick={() => handleSelectSantri(s)}
-                  className={`p-4 flex items-center justify-between transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600 group-hover:bg-white group-hover:text-emerald-600 border flex-shrink-0">
-                      {s.nis.slice(-2)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
+                  className={`p-4 flex items-center justify-between gap-3 transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {s.foto_url ? (
+                      <img
+                        src={s.foto_url}
+                        alt={s.nama_lengkap}
+                        className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600 group-hover:bg-white group-hover:text-emerald-600 border flex-shrink-0">
+                        {String(s.nama_lengkap || '?').split(' ').slice(0, 2).map((part: string) => part[0]).join('')}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 leading-snug line-clamp-2">{s.nama_lengkap}</p>
                       <div className="flex gap-2 text-xs text-slate-400 items-center">
-                        <span>{s.nis}</span>
+                        <span>Kamar {s.kamar || '-'}</span>
                         {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     {isCurrentYear && !isPaid ? (
                       <button onClick={(e) => toggleDraft(e, s)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1 transition-all ${
+                        className={`w-32 h-10 px-3 rounded-lg text-xs font-bold border inline-flex items-center justify-center gap-1 transition-all ${
                           isDraft ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 hover:border-emerald-500 hover:text-emerald-600'
                         }`}>
                         {isDraft ? <><CheckCircle className="w-3 h-3"/> Siap Bayar</> : <><PlusCircle className="w-3 h-3"/> Bayar {BULAN_LIST[currentMonthIdx - 1]}</>}
                       </button>
                     ) : (
-                      <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                      <span className="w-32 h-10 text-xs font-bold text-green-600 inline-flex items-center justify-center gap-1 bg-green-50 px-2 rounded-lg border border-green-100">
                         <CheckCircle className="w-3 h-3"/> Lunas
                       </span>
                     )}
@@ -420,8 +430,13 @@ export default function SPPPage() {
               <div className="flex justify-between items-start">
                 <span className="font-bold text-lg">{namaBulan}</span>
                 {dataBayar && (
-                  <button onClick={(e) => openEditPayment(e, dataBayar)} className="p-1 rounded-md bg-white/70 hover:bg-white text-green-700 border border-green-200" title="Edit pembayaran">
-                    <Edit2 className="w-4 h-4"/>
+                  <button
+                    onClick={(e) => handleBatalkanPembayaran(e, dataBayar)}
+                    disabled={cancelingPaymentId === dataBayar.id}
+                    className="p-1 rounded-md bg-white/70 hover:bg-white text-rose-700 border border-rose-200 disabled:opacity-60"
+                    title="Batalkan status lunas"
+                  >
+                    {cancelingPaymentId === dataBayar.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <RotateCcw className="w-4 h-4"/>}
                   </button>
                 )}
                 {!dataBayar && isSelected && <CheckCircle className="w-5 h-5 text-white/50"/>}
@@ -450,55 +465,6 @@ export default function SPPPage() {
           )
         })}
       </div>
-
-      {editingPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={handleUpdatePembayaran} className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="flex items-start justify-between p-5 border-b bg-slate-50">
-              <div>
-                <h2 className="font-bold text-slate-900">Edit Pembayaran</h2>
-                <p className="text-xs text-slate-500 mt-1">{selectedSantri.nama_lengkap}</p>
-              </div>
-              <button type="button" onClick={closeEditPayment} className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
-                <X className="w-4 h-4"/>
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Bulan Pembayaran</label>
-                <select
-                  value={editBulan}
-                  onChange={e => setEditBulan(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {BULAN_LIST.map((b, idx) => (
-                    <option key={b} value={idx + 1} disabled={isBeforeBillingStart(tahun, idx + 1)}>
-                      {b}{isBeforeBillingStart(tahun, idx + 1) ? ' - belum ada tagihan' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Nominal</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
-                  <input
-                    type="text"
-                    required
-                    value={Number(editNominal.replace(/\D/g, '') || 0).toLocaleString('id-ID')}
-                    onChange={e => setEditNominal(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-              <button type="submit" disabled={isSavingEdit} className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-black disabled:opacity-60">
-                {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4"/>}
-                {isSavingEdit ? 'Menyimpan...' : 'Simpan Revisi'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {selectedMonths.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">

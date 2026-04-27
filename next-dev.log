@@ -13,3 +13,129 @@
 ✓ Ready in 1751ms
  GET /login 200 in 1083ms (compile: 900ms, render: 183ms)
  GET /api/version 200 in 97ms
+ GET /login 200 in 65ms (compile: 7ms, render: 58ms)
+ GET /api/version 200 in 8ms
+[LOGIN] Step 1: email= udox@***
+[LOGIN] Step 2: user found= true role= admin
+[LOGIN] Step 3: hash preview= 265ae2b4db
+[LOGIN] Step 3: password valid= true
+[LOGIN] Step 4: setting session for roles= [ 'admin' ]
+[LOGIN] Step 4: session set OK
+[LOGIN] Step 5: redirecting to /dashboard
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard 200 in 2.1s (compile: 1533ms, render: 578ms)
+ POST /login 303 in 2.8s (compile: 6ms, render: 2.8s)
+ GET /dashboard/ehb/keuangan 200 in 725ms (compile: 700ms, render: 25ms)
+ POST /dashboard/ehb/keuangan 200 in 4.5s (compile: 4ms, render: 4.5s)
+ POST /dashboard/ehb/keuangan 200 in 3.0s (compile: 6ms, render: 3.0s)
+ POST /dashboard/ehb/keuangan 200 in 3.8s (compile: 8ms, render: 3.8s)
+ POST /dashboard/ehb/keuangan 200 in 3.0s (compile: 3ms, render: 3.0s)
+ POST /dashboard/ehb/keuangan 200 in 3.6s (compile: 5ms, render: 3.6s)
+ POST /dashboard/ehb/keuangan 200 in 3.8s (compile: 5ms, render: 3.8s)
+ GET /dashboard/asrama/spp 200 in 1102ms (compile: 1080ms, render: 22ms)
+ POST /dashboard/ehb/keuangan 200 in 3.7s (compile: 6ms, render: 3.7s)
+ POST /dashboard/asrama/spp 200 in 18ms (compile: 5ms, render: 12ms)
+ POST /dashboard/asrama/spp 200 in 143ms (compile: 5ms, render: 138ms)
+ POST /dashboard/asrama/spp 200 in 24ms (compile: 5ms, render: 19ms)
+ POST /dashboard/asrama/spp 200 in 133ms (compile: 5ms, render: 128ms)
+ POST /dashboard/asrama/spp 200 in 14ms (compile: 5ms, render: 8ms)
+ POST /dashboard/asrama/spp 200 in 161ms (compile: 3ms, render: 158ms)
+ POST /dashboard/asrama/spp 200 in 19ms (compile: 5ms, render: 14ms)
+ POST /dashboard/asrama/spp 200 in 846ms (compile: 3ms, render: 843ms)
+ POST /dashboard/ehb/keuangan 200 in 3.6s (compile: 2ms, render: 3.6s)
+ POST /dashboard/asrama/spp 200 in 3.6s (compile: 3ms, render: 3.6s)
+ GET /api/version 200 in 13ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 375ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 568ms (compile: 5ms, render: 562ms)
+ GET /api/version 200 in 8ms
+✓ Compiled in 133ms
+✓ Compiled in 200ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 550ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 1337ms (compile: 3ms, render: 1334ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 111ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 453ms (compile: 2ms, render: 451ms)
+ GET /api/version 200 in 11ms
+ POST /dashboard/asrama/spp 200 in 625ms (compile: 3ms, render: 622ms)
+ POST /dashboard/asrama/spp 200 in 161ms (compile: 8ms, render: 153ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 730ms (compile: 11ms, render: 719ms)
+ GET /api/version 200 in 5ms
+ POST /dashboard/asrama/spp 200 in 9ms (compile: 3ms, render: 6ms)
+ POST /dashboard/asrama/spp 200 in 161ms (compile: 3ms, render: 158ms)
+ POST /dashboard/asrama/spp 200 in 15ms (compile: 3ms, render: 12ms)
+ POST /dashboard/asrama/spp 200 in 174ms (compile: 3ms, render: 171ms)
+✓ Compiled in 173ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ POST /dashboard/asrama/spp 200 in 16ms (compile: 4ms, render: 12ms)
+[layout] userRoles: [ 'admin' ]
+ POST /dashboard/asrama/spp 200 in 393ms (compile: 4ms, render: 389ms)
+ POST /dashboard/asrama/spp 200 in 26ms (compile: 5ms, render: 21ms)
+ POST /dashboard/asrama/spp 200 in 284ms (compile: 4ms, render: 280ms)
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 1153ms (compile: 187ms, render: 966ms)
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 6ms
+ POST /dashboard/asrama/spp 200 in 910ms (compile: 8ms, render: 902ms)
+ POST /dashboard/asrama/spp 200 in 210ms (compile: 6ms, render: 204ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+ POST /dashboard/asrama/spp 200 in 175ms (compile: 3ms, render: 172ms)
+[layout] fiturAkses count: 66
+ POST /dashboard/asrama/spp 200 in 1170ms (compile: 3ms, render: 1168ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ POST /dashboard/asrama/spp 200 in 742ms (compile: 3ms, render: 739ms)
+ POST /dashboard/asrama/spp 200 in 834ms (compile: 3ms, render: 831ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 610ms (compile: 57ms, render: 553ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ POST /dashboard/asrama/spp 200 in 10ms (compile: 3ms, render: 7ms)
+[layout] userRoles: [ 'admin' ]
+ POST /dashboard/asrama/spp 200 in 172ms (compile: 9ms, render: 163ms)
+ POST /dashboard/asrama/spp 200 in 13ms (compile: 3ms, render: 10ms)
+ POST /dashboard/asrama/spp 200 in 152ms (compile: 2ms, render: 150ms)
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 564ms (compile: 59ms, render: 505ms)
+ POST /dashboard/asrama/spp 200 in 412ms (compile: 7ms, render: 405ms)
+ POST /dashboard/asrama/spp 200 in 347ms (compile: 6ms, render: 341ms)
+ POST /dashboard/asrama/spp 200 in 358ms (compile: 5ms, render: 353ms)
+ POST /dashboard/asrama/spp 200 in 351ms (compile: 6ms, render: 345ms)
+ POST /dashboard/asrama/spp 200 in 364ms (compile: 5ms, render: 359ms)
+ POST /dashboard/asrama/spp 200 in 312ms (compile: 3ms, render: 309ms)
+ POST /dashboard/asrama/spp 200 in 332ms (compile: 6ms, render: 327ms)
+ POST /dashboard/asrama/spp 200 in 328ms (compile: 4ms, render: 323ms)
+ POST /dashboard/asrama/spp 200 in 304ms (compile: 2ms, render: 302ms)
+ GET /api/version 200 in 9ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 1802ms (compile: 69ms, render: 1733ms)
+✓ Compiled in 113ms
+ GET /api/version 200 in 7ms
+✓ Compiled in 158ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 885ms (compile: 55ms, render: 830ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 66
+ GET /dashboard/asrama/spp 200 in 605ms (compile: 61ms, render: 544ms)
+✓ Compiled in 123ms
