@@ -3240,3 +3240,4 @@
  GET /api/version 200 in 15ms
  GET /api/version 200 in 12ms
  GET /api/version 200 in 11ms
+ GET /api/version 200 in 17ms

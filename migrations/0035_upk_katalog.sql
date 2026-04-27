@@ -41,5 +41,3 @@ CREATE INDEX IF NOT EXISTS idx_upk_katalog_toko
 
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
 VALUES ('UPK', 'Katalog', '/dashboard/akademik/upk/katalog', 'BookOpen', '["admin","sekpen"]', 1, 1);
-
-UPDATE fitur_akses SET urutan = 2 WHERE href = '/dashboard/akademik/upk/manajemen';

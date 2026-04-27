@@ -62,7 +62,7 @@ INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_acti
 
 ('UPK', 'Kasir', '/dashboard/akademik/upk/kasir', 'ShoppingCart', '["admin","sekpen"]', 1, 0),
 ('UPK', 'Katalog', '/dashboard/akademik/upk/katalog', 'BookOpen', '["admin","sekpen"]', 1, 1),
-('UPK', 'Manajemen', '/dashboard/akademik/upk/manajemen', 'Package', '["admin","sekpen"]', 1, 2),
+('UPK', 'Belanja', '/dashboard/akademik/upk/belanja', 'ShoppingBag', '["admin","sekpen"]', 1, 2),
 
 ('EHB', 'Jadwal', '/dashboard/ehb/jadwal', 'CalendarDays', '["admin"]', 1, 0),
 ('EHB', 'Ruangan', '/dashboard/ehb/ruangan', 'LayoutList', '["admin"]', 1, 1),
@@ -153,7 +153,7 @@ SET
     WHEN '/dashboard/keamanan/rekap-asrama' THEN 'Rekap Absen Malam'
     WHEN '/dashboard/akademik/upk/kasir' THEN 'Kasir'
     WHEN '/dashboard/akademik/upk/katalog' THEN 'Katalog'
-    WHEN '/dashboard/akademik/upk/manajemen' THEN 'Manajemen'
+    WHEN '/dashboard/akademik/upk/belanja' THEN 'Belanja'
     WHEN '/dashboard/ehb/jadwal' THEN 'Jadwal'
     WHEN '/dashboard/ehb/ruangan' THEN 'Ruangan'
     WHEN '/dashboard/ehb/pengawas' THEN 'Pengawas'
@@ -223,7 +223,7 @@ SET
 
     WHEN '/dashboard/akademik/upk/kasir' THEN 0
     WHEN '/dashboard/akademik/upk/katalog' THEN 1
-    WHEN '/dashboard/akademik/upk/manajemen' THEN 2
+    WHEN '/dashboard/akademik/upk/belanja' THEN 2
 
     WHEN '/dashboard/ehb/jadwal' THEN 0
     WHEN '/dashboard/ehb/ruangan' THEN 1
@@ -307,7 +307,7 @@ WHERE href IN (
   '/dashboard/dewan-santri/uang-jajan',
   '/dashboard/akademik/upk/kasir',
   '/dashboard/akademik/upk/katalog',
-  '/dashboard/akademik/upk/manajemen',
+  '/dashboard/akademik/upk/belanja',
   '/dashboard/ehb/jadwal',
   '/dashboard/ehb/ruangan',
   '/dashboard/ehb/pengawas',

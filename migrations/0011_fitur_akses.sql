@@ -72,7 +72,6 @@ INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_acti
 
 -- UPK
 ('UPK', 'Kasir',          '/dashboard/akademik/upk/kasir',     'ShoppingCart', '["admin","sekpen"]', 1, 0),
-('UPK', 'Manajemen',      '/dashboard/akademik/upk/manajemen', 'Package',      '["admin","sekpen"]', 1, 1),
 
 -- Master Data
 ('Master Data', 'Manajemen User',          '/dashboard/pengaturan/users',          'UserCog',    '["admin"]', 1, 0),
