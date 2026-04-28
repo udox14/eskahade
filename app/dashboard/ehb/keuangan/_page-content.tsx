@@ -778,29 +778,29 @@ function HonorEnvelopePrint({
     <>
       {rows.map(row => (
         <div key={row.nama} style={{
-          width: '230mm',
-          height: '110mm',
+          width: '162mm',
+          height: '114mm',
           boxSizing: 'border-box',
-          padding: '14mm 18mm 10mm 28mm',
+          padding: '13mm 10mm 9mm 16mm',
           fontFamily: FONT,
           backgroundColor: '#fff',
           color: '#000',
           overflow: 'hidden',
           breakAfter: 'page',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6mm', marginLeft: '-2mm' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5mm', marginLeft: '-1mm' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logohitam.png" alt="" style={{ width: '24mm', height: '24mm', objectFit: 'contain' }} />
-            <div style={{ fontSize: '19pt', lineHeight: 1.12, letterSpacing: 0 }}>
+            <img src="/logohitam.png" alt="" style={{ width: '21mm', height: '21mm', objectFit: 'contain' }} />
+            <div style={{ fontSize: '15.5pt', lineHeight: 1.12, letterSpacing: 0 }}>
               <div>EVALUASI HASIL BELAJAR</div>
               <div>PONDOK PESANTREN SUKAHIDENG</div>
               <div>{semesterLabel} TAHUN AJARAN {tahunAjaran}</div>
             </div>
           </div>
 
-          <div style={{ marginTop: '20mm', fontSize: '30pt', lineHeight: 1.05 }}>{row.nama}</div>
+          <div style={{ marginTop: '17mm', fontSize: '24pt', lineHeight: 1.05 }}>{row.nama}</div>
 
-          <table style={{ marginTop: '10mm', fontSize: '16pt', lineHeight: 1.32, borderCollapse: 'collapse' }}>
+          <table style={{ marginTop: '9mm', fontSize: '13.5pt', lineHeight: 1.32, borderCollapse: 'collapse' }}>
             <tbody>
               <EnvelopeHonorLine label="Pembuatan soal" tarif={row.pembuatanTarif} qty={row.pembuatanQty} total={row.pembuatanTotal} />
               <EnvelopeHonorLine label="Pengisian Rapor" tarif={row.raporTarif} qty={row.raporQty} total={row.raporTotal} />
@@ -810,7 +810,7 @@ function HonorEnvelopePrint({
                 <td style={{ paddingTop: '5mm', fontWeight: 700 }}>Jumlah</td>
                 <td />
                 <td />
-                <td style={{ paddingTop: '5mm', paddingLeft: '10mm', fontWeight: 700, whiteSpace: 'nowrap' }}>= Rp. {angkaRupiah(row.total)}</td>
+                <td style={{ paddingTop: '5mm', paddingLeft: '7mm', fontWeight: 700, whiteSpace: 'nowrap' }}>= Rp. {angkaRupiah(row.total)}</td>
               </tr>
             </tbody>
           </table>
@@ -823,10 +823,10 @@ function HonorEnvelopePrint({
 function EnvelopeHonorLine({ label, tarif, qty, total }: { label: string; tarif: number; qty: number; total: number }) {
   return (
     <tr>
-      <td style={{ minWidth: '54mm' }}>{label}</td>
-      <td style={{ minWidth: '24mm', textAlign: 'right' }}>{angkaRupiah(tarif)}</td>
-      <td style={{ minWidth: '20mm', textAlign: 'center' }}>x {qty || 0}</td>
-      <td style={{ minWidth: '42mm', paddingLeft: '10mm', whiteSpace: 'nowrap' }}>= Rp. {total ? angkaRupiah(total) : '0'}</td>
+      <td style={{ minWidth: '43mm' }}>{label}</td>
+      <td style={{ minWidth: '20mm', textAlign: 'right' }}>{angkaRupiah(tarif)}</td>
+      <td style={{ minWidth: '15mm', textAlign: 'center' }}>x {qty || 0}</td>
+      <td style={{ minWidth: '34mm', paddingLeft: '7mm', whiteSpace: 'nowrap' }}>= Rp. {total ? angkaRupiah(total) : '0'}</td>
     </tr>
   )
 }
@@ -1009,7 +1009,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     contentRef: honorEnvelopePrintRef,
     documentTitle: 'Amplop Honor EHB',
     pageStyle: `
-      @page { size: 230mm 110mm; margin: 0; }
+      @page { size: 162mm 114mm; margin: 0; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
