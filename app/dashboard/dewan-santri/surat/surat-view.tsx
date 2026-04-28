@@ -5,9 +5,72 @@ import { id } from 'date-fns/locale'
 
 interface SuratProps {
   jenis: 'MONDOK' | 'IZIN' | 'BERHENTI' | 'TAGIHAN';
-  dataSantri: any;
-  dataTambahan?: any; 
-  dataTunggakan?: any; 
+  dataSantri: {
+    nama_lengkap?: string | null
+    tempat_lahir?: string | null
+    tanggal_lahir?: string | null
+    jenis_kelamin?: string | null
+    sekolah?: string | null
+    kelas_sekolah?: string | null
+    nama_ayah?: string | null
+    alamat?: string | null
+    asrama?: string | null
+    kamar?: string | null
+  };
+  dataTambahan?: {
+    alasan?: string
+    tglMulai?: string
+    tglSelesai?: string
+  };
+  dataTunggakan?: {
+    listBulan?: string
+    total?: number
+  };
+}
+
+function safeFormatDate(value: string | null | undefined, fallback = '.....................') {
+  if (!value) return fallback
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return fallback
+  return format(date, 'dd MMMM yyyy', { locale: id })
+}
+
+function TandaTanganSection({
+  kota = 'Tasikmalaya',
+  tglCetak,
+  jabatanTtd,
+  namaTtd,
+  stempelImage,
+  ttdImage,
+}: {
+  kota?: string
+  tglCetak: string
+  jabatanTtd: string
+  namaTtd: string
+  stempelImage: string
+  ttdImage: string
+}) {
+  return (
+    <div className="mt-8 flex justify-end px-4">
+      <div className="text-center relative min-w-[280px]">
+        <p className="mb-1">{kota}, {tglCetak}</p>
+        <p className="font-bold relative z-10">{jabatanTtd},</p>
+        <div className="relative w-full h-28 flex items-end justify-center -mt-6 z-20">
+           <img
+             src={stempelImage}
+             alt="Stempel"
+             className="absolute left-6 top-0 w-32 opacity-80 rotate-[-5deg] mix-blend-multiply"
+           />
+           <img
+             src={ttdImage}
+             alt="TTD"
+             className="absolute bottom-2 w-40 h-24 object-contain"
+           />
+        </div>
+        <p className="font-bold underline relative z-30 -mt-6 text-[15px]">{namaTtd}</p>
+      </div>
+    </div>
+  )
 }
 
 export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: SuratProps) {
@@ -15,7 +78,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
   const tahunIni = new Date().getFullYear()
   
   // Helper: Jika data kosong, ganti dengan titik-titik panjang untuk tulis manual
-  const chk = (val: any) => val || "......................................................"
+  const chk = (val: string | null | undefined) => val || "......................................................"
 
   // --- KONFIGURASI KOP & PENANDATANGAN UTAMA ---
   let kopImage = '/kop-dewan-santri.png'
@@ -38,34 +101,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
     jabatanTtd = 'Pimpinan Pesantren'
   }
 
-  // Component Tanda Tangan Standard (Reusable untuk selain Pimpinan)
-  const TandaTanganSection = ({ kota = "Tasikmalaya" }) => (
-    <div className="mt-8 flex justify-end px-4">
-      <div className="text-center relative min-w-[280px]">
-        <p className="mb-1">{kota}, {tglCetak}</p>
-        
-        {/* Jabatan */}
-        <p className="font-bold relative z-10">{jabatanTtd},</p>
-        
-        {/* Container Gambar Standard */}
-        <div className="relative w-full h-28 flex items-end justify-center -mt-6 z-20">
-           <img 
-             src={stempelImage} 
-             alt="Stempel" 
-             className="absolute left-6 top-0 w-32 opacity-80 rotate-[-5deg] mix-blend-multiply" 
-           />
-           <img 
-             src={ttdImage} 
-             alt="TTD" 
-             className="absolute bottom-2 w-40 h-24 object-contain" 
-           />
-        </div>
-        
-        {/* Nama Terang */}
-        <p className="font-bold underline relative z-30 -mt-6 text-[15px]">{namaTtd}</p>
-      </div>
-    </div>
-  )
+  const tandaTanganProps = { tglCetak, jabatanTtd, namaTtd, stempelImage, ttdImage }
 
   return (
     <div className="w-[210mm] min-h-[297mm] bg-white p-10 mx-auto text-black font-serif relative print:shadow-none shadow-lg text-[14px] leading-relaxed">
@@ -98,7 +134,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
             <table className="w-full mb-4 ml-4">
               <tbody>
                 <tr><td className="w-48 font-bold align-top py-1">Nama</td><td className="align-top">: {chk(dataSantri.nama_lengkap)}</td></tr>
-                <tr><td className="font-bold align-top py-1">Tempat Tanggal Lahir</td><td className="align-top">: {dataSantri.tempat_lahir || '.....................'}, {dataSantri.tanggal_lahir ? format(new Date(dataSantri.tanggal_lahir), 'dd MMMM yyyy', {locale:id}) : '.....................'}</td></tr>
+                <tr><td className="font-bold align-top py-1">Tempat Tanggal Lahir</td><td className="align-top">: {dataSantri.tempat_lahir || '.....................'}, {safeFormatDate(dataSantri.tanggal_lahir)}</td></tr>
                 <tr><td className="font-bold align-top py-1">Jenis Kelamin</td><td className="align-top">: {dataSantri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td></tr>
                 <tr><td className="font-bold align-top py-1">Orang Tua</td><td className="align-top">: {chk(dataSantri.nama_ayah)}</td></tr>
                 <tr><td className="font-bold align-top py-1">Alamat</td><td className="align-top">: {chk(dataSantri.alamat)}</td></tr>
@@ -112,7 +148,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
               Demikian surat keterangan ini, kami buat dengan sebenar-benarnya dan dapat digunakan sebagaimana mestinya.
             </p>
 
-            <TandaTanganSection />
+            <TandaTanganSection {...tandaTanganProps} />
           </>
         )}
 
@@ -131,7 +167,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
             <table className="w-full mb-4 ml-4">
               <tbody>
                 <tr><td className="w-48 font-bold align-top py-1">Nama</td><td className="align-top">: {chk(dataSantri.nama_lengkap)}</td></tr>
-                <tr><td className="font-bold align-top py-1">TTL</td><td className="align-top">: {dataSantri.tempat_lahir || '.....................'}, {dataSantri.tanggal_lahir ? format(new Date(dataSantri.tanggal_lahir), 'dd MMMM yyyy', {locale:id}) : '.....................'}</td></tr>
+                <tr><td className="font-bold align-top py-1">TTL</td><td className="align-top">: {dataSantri.tempat_lahir || '.....................'}, {safeFormatDate(dataSantri.tanggal_lahir)}</td></tr>
                 <tr><td className="font-bold align-top py-1">Jenis Kelamin</td><td className="align-top">: {dataSantri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td></tr>
                 <tr><td className="font-bold align-top py-1">Sekolah</td><td className="align-top">: {chk(dataSantri.sekolah)}</td></tr>
                 <tr><td className="font-bold align-top py-1">Nama Orang Tua</td><td className="align-top">: {chk(dataSantri.nama_ayah)}</td></tr>
@@ -140,13 +176,13 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
             </table>
 
             <p className="mb-4 text-justify">
-              Nama tersebut di atas diberikan izin untuk melaksanakan <b>{dataTambahan?.alasan || '...................................................'}</b> terhitung sejak tanggal <b>{dataTambahan?.tglMulai ? format(new Date(dataTambahan.tglMulai), 'dd MMMM yyyy', {locale:id}) : '.....................'}</b> s.d. <b>{dataTambahan?.tglSelesai ? format(new Date(dataTambahan.tglSelesai), 'dd MMMM yyyy', {locale:id}) : '.....................'}</b>.
+              Nama tersebut di atas diberikan izin untuk melaksanakan <b>{dataTambahan?.alasan || '...................................................'}</b> terhitung sejak tanggal <b>{safeFormatDate(dataTambahan?.tglMulai)}</b> s.d. <b>{safeFormatDate(dataTambahan?.tglSelesai)}</b>.
             </p>
             <p>
               Demikian surat keterangan ini, dibuat dengan sebenar-benarnya dan dapat digunakan sebagaimana mestinya.
             </p>
 
-            <TandaTanganSection />
+            <TandaTanganSection {...tandaTanganProps} />
           </>
         )}
 
@@ -199,7 +235,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
                 <p className="mb-4 italic">Wassalaamu’alaikum warahmatullaahi wabarakaatuh.</p>
             </div>
 
-            <TandaTanganSection kota="Sukahideng" />
+            <TandaTanganSection {...tandaTanganProps} kota="Sukahideng" />
           </>
         )}
 
@@ -230,7 +266,7 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
             </table>
 
             <p className="mb-4 text-justify">
-              Dengan ini kami menyatakan untuk mengundurkan diri dari Pondok Pesantren Sukahideng dikarenakan <b>"{dataTambahan?.alasan || '................................................'}"</b>. Demikian pernyataan ini kami buat dengan sesungguhnya.
+              Dengan ini kami menyatakan untuk mengundurkan diri dari Pondok Pesantren Sukahideng dikarenakan <b>&quot;{dataTambahan?.alasan || '................................................'}&quot;</b>. Demikian pernyataan ini kami buat dengan sesungguhnya.
             </p>
 
             <p className="text-right mb-2 font-bold">Sukahideng, {tglCetak}</p>

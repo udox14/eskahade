@@ -4,10 +4,40 @@ import { query, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
+type SantriSuratRow = {
+  id: string
+  nama_lengkap: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
+  tempat_lahir: string | null
+  tanggal_lahir: string | null
+  jenis_kelamin: string | null
+  alamat: string | null
+  nama_ayah: string | null
+  sekolah: string | null
+  kelas_sekolah: string | null
+}
+
+type SppLogRow = {
+  bulan: number
+  nominal_bayar: number
+}
+
+type RiwayatSuratRow = {
+  id: string
+  jenis_surat: string
+  detail_info: string | null
+  created_at: string
+  nama_lengkap: string
+  asrama: string | null
+  admin_nama: string | null
+}
+
 export async function cariSantri(keyword: string) {
-  return query<any>(`
+  return query<SantriSuratRow>(`
     SELECT id, nama_lengkap, nis, asrama, kamar, tempat_lahir, tanggal_lahir,
-           alamat, nama_ayah, sekolah, kelas_sekolah
+           jenis_kelamin, alamat, nama_ayah, sekolah, kelas_sekolah
     FROM santri
     WHERE status_global = 'aktif' AND nama_lengkap LIKE ?
     LIMIT 5
@@ -18,7 +48,7 @@ export async function cekTunggakanSantri(santriId: string) {
   const tahun = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
 
-  const logs = await query<any>(
+  const logs = await query<SppLogRow>(
     'SELECT bulan, nominal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?',
     [santriId, tahun]
   )
@@ -30,7 +60,7 @@ export async function cekTunggakanSantri(santriId: string) {
   let totalHutang = 0
 
   for (let i = 1; i <= currentMonth; i++) {
-    if (!logs.some((l: any) => l.bulan === i)) {
+    if (!logs.some((log) => log.bulan === i)) {
       bulanNunggak.push(BULAN_NAMA[i - 1])
       totalHutang += 70000
     }
@@ -73,7 +103,7 @@ export async function getRiwayatSurat(bulan: number, tahun: number) {
   const startDate = new Date(tahun, bulan - 1, 1).toISOString()
   const endDate = new Date(tahun, bulan, 0, 23, 59, 59).toISOString()
 
-  return query<any>(`
+  return query<RiwayatSuratRow>(`
     SELECT rs.id, rs.jenis_surat, rs.detail_info, rs.created_at,
            s.nama_lengkap, s.asrama,
            u.full_name AS admin_nama

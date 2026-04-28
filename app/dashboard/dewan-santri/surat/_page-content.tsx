@@ -2,12 +2,11 @@
 
 import React from 'react'
 
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapusRiwayatSurat } from './actions'
 import { SuratView } from './surat-view'
 import { useReactToPrint } from 'react-to-print'
-import { Printer, Search, FileText, ArrowLeft, Loader2, History, Filter, Calendar, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import { Printer, Search, FileText, ArrowLeft, Loader2, History, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -15,28 +14,68 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
+type JenisSurat = 'MONDOK' | 'IZIN' | 'BERHENTI' | 'TAGIHAN'
+
+type SantriSurat = {
+  id: string
+  nama_lengkap: string
+  nis?: string | null
+  asrama?: string | null
+  kamar?: string | null
+  tempat_lahir?: string | null
+  tanggal_lahir?: string | null
+  jenis_kelamin?: string | null
+  alamat?: string | null
+  nama_ayah?: string | null
+  sekolah?: string | null
+  kelas_sekolah?: string | null
+}
+
+type DataTambahanSurat = {
+  alasan?: string
+  tglMulai?: string
+  tglSelesai?: string
+}
+
+type DataTunggakanSurat = {
+  adaTunggakan: boolean
+  listBulan: string
+  total: number
+  tahun: number
+}
+
+type RiwayatSurat = {
+  id: string
+  jenis_surat: JenisSurat | string
+  detail_info: string | null
+  created_at: string
+  nama_lengkap: string
+  asrama: string | null
+  admin_nama: string | null
+}
+
 export default function LayananSuratPage() {
   const confirm = useConfirm()
   // State Navigasi Generator
   const [step, setStep] = useState(1) 
-  const [jenisSurat, setJenisSurat] = useState<'MONDOK' | 'IZIN' | 'BERHENTI' | 'TAGIHAN' | null>(null)
+  const [jenisSurat, setJenisSurat] = useState<JenisSurat | null>(null)
   
   // State Data Generator
   const [search, setSearch] = useState('')
-  const [hasilCari, setHasilCari] = useState<any[]>([])
-  const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [dataTambahan, setDataTambahan] = useState<any>({})
-  const [dataTunggakan, setDataTunggakan] = useState<any>(null)
+  const [hasilCari, setHasilCari] = useState<SantriSurat[]>([])
+  const [selectedSantri, setSelectedSantri] = useState<SantriSurat | null>(null)
+  const [dataTambahan, setDataTambahan] = useState<DataTambahanSurat>({})
+  const [dataTunggakan, setDataTunggakan] = useState<DataTunggakanSurat | null>(null)
   const [loading, setLoading] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
 
   // State Riwayat
-  const [riwayat, setRiwayat] = useState<any[]>([])
+  const [riwayat, setRiwayat] = useState<RiwayatSurat[]>([])
   const [filterBulan, setFilterBulan] = useState(new Date().getMonth() + 1)
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear())
   const [loadingRiwayat, setLoadingRiwayat] = useState(true)
 
-  const printRef = useRef(null)
+  const printRef = useRef<HTMLDivElement>(null)
   
   // Hook Print
   const triggerPrint = useReactToPrint({
@@ -48,20 +87,21 @@ export default function LayananSuratPage() {
     }
   })
 
-  // Load Riwayat saat filter berubah
-  useEffect(() => {
-    loadRiwayat()
-  }, [filterBulan, filterTahun])
-
-  const loadRiwayat = async () => {
+  const loadRiwayat = useCallback(async () => {
     setLoadingRiwayat(true)
     const res = await getRiwayatSurat(filterBulan, filterTahun)
     setRiwayat(res)
     setLoadingRiwayat(false)
-  }
+  }, [filterBulan, filterTahun])
+
+  // Load Riwayat saat filter berubah
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRiwayat()
+  }, [loadRiwayat])
 
   // STEP 1: PILIH JENIS
-  const selectJenis = (jenis: any) => {
+  const selectJenis = (jenis: JenisSurat) => {
     setJenisSurat(jenis)
     setStep(2)
   }
@@ -76,7 +116,7 @@ export default function LayananSuratPage() {
     setLoading(false)
   }
 
-  const selectSantri = async (s: any) => {
+  const selectSantri = async (s: SantriSurat) => {
     setSelectedSantri(s)
     
     if (jenisSurat === 'TAGIHAN') {
@@ -100,23 +140,30 @@ export default function LayananSuratPage() {
 
   // STEP 4: PROSES CETAK & CATAT
   const handlePrintProcess = async () => {
+    if (!selectedSantri || !jenisSurat) return
     setIsPrinting(true)
     
     // 1. Catat ke Database dulu
-    const info = jenisSurat === 'IZIN' ? dataTambahan.alasan :
+    const info = jenisSurat === 'IZIN' ? (dataTambahan.alasan || 'Izin Pulang') :
                  jenisSurat === 'TAGIHAN' ? `Total Rp ${dataTunggakan?.total?.toLocaleString('id-ID')}` : 
                  jenisSurat === 'BERHENTI' ? "Pengunduran Diri" : "Keterangan Aktif"
 
-    const res = await catatSuratKeluar(selectedSantri.id, jenisSurat!, info)
-    
-    if ('error' in res) {
+    try {
+      const res = await catatSuratKeluar(selectedSantri.id, jenisSurat, info)
+      
+      if ('error' in res) {
         toast.error("Gagal mencatat riwayat surat", { description: "Tapi proses cetak tetap dilanjutkan." })
-    } else {
+      } else {
         loadRiwayat() // Refresh tabel bawah
-    }
+      }
 
-    // 2. Trigger Print Dialog
-    triggerPrint()
+      // 2. Trigger Print Dialog
+      triggerPrint()
+    } catch (error) {
+      console.error(error)
+      toast.error("Terjadi kendala saat menyiapkan cetak", { description: "Silakan coba cetak ulang." })
+      setIsPrinting(false)
+    }
   }
 
   // HAPUS RIWAYAT
@@ -128,7 +175,7 @@ export default function LayananSuratPage() {
     toast.dismiss(toastId)
 
     if ('error' in res) {
-        toast.error("Gagal hapus", { description: (res as any).error })
+        toast.error("Gagal hapus", { description: res.error })
     } else {
         toast.success("Berhasil dihapus")
         loadRiwayat()
@@ -204,7 +251,7 @@ export default function LayananSuratPage() {
           )}
 
           {/* STEP 4: PREVIEW */}
-          {step === 4 && (
+          {step === 4 && selectedSantri && jenisSurat && (
             <div className="flex flex-col items-center gap-4 animate-in fade-in">
                 {/* Tombol Aksi (Sembunyikan saat print) */}
                 <div className="flex gap-4 print:hidden">
@@ -218,10 +265,10 @@ export default function LayananSuratPage() {
                 <div className="bg-slate-200 p-8 border rounded-xl overflow-auto max-w-full print:p-0 print:bg-white print:border-none print:w-full print:overflow-visible">
                     <div ref={printRef} className="bg-white shadow-2xl print:shadow-none print:w-full">
                         <SuratView 
-                            jenis={jenisSurat!} 
+                            jenis={jenisSurat} 
                             dataSantri={selectedSantri} 
                             dataTambahan={dataTambahan}
-                            dataTunggakan={dataTunggakan}
+                            dataTunggakan={dataTunggakan || undefined}
                         />
                     </div>
                 </div>
@@ -281,10 +328,10 @@ export default function LayananSuratPage() {
                                             {row.jenis_surat}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-3 font-bold text-slate-800">{row.santri?.nama_lengkap}</td>
-                                    <td className="px-6 py-3 text-xs text-slate-500">{row.santri?.asrama}</td>
+                                    <td className="px-6 py-3 font-bold text-slate-800">{row.nama_lengkap}</td>
+                                    <td className="px-6 py-3 text-xs text-slate-500">{row.asrama}</td>
                                     <td className="px-6 py-3 text-xs italic text-slate-600 max-w-xs truncate">{row.detail_info}</td>
-                                    <td className="px-6 py-3 text-xs text-slate-500">{row.admin?.full_name}</td>
+                                    <td className="px-6 py-3 text-xs text-slate-500">{row.admin_nama}</td>
                                     <td className="px-6 py-3 text-right">
                                         <button 
                                             onClick={() => handleDeleteRiwayat(row.id)}
@@ -307,7 +354,19 @@ export default function LayananSuratPage() {
   )
 }
 
-function MenuCard({ title, desc, icon: Icon, color, onClick }: any) {
+function MenuCard({
+  title,
+  desc,
+  icon: Icon,
+  color,
+  onClick,
+}: {
+  title: string
+  desc: string
+  icon: React.ElementType
+  color: string
+  onClick: () => void
+}) {
   return (
     <div onClick={onClick} className={`${color} text-white p-6 rounded-2xl shadow-sm cursor-pointer hover:scale-105 transition-transform flex flex-col items-center text-center justify-center h-40`}>
        <Icon className="w-10 h-10 mb-3 opacity-80"/>
