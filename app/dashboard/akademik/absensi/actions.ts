@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId, batch } from '@/lib/db'
+import { query, generateId, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
@@ -105,9 +105,12 @@ export async function simpanAbsensi(dataInput: any[]) {
   }
 
   try {
-    await batch(statements)
+    const chunkSize = 50
+    for (let i = 0; i < statements.length; i += chunkSize) {
+      await batch(statements.slice(i, i + chunkSize))
+    }
     revalidatePath('/dashboard/akademik/absensi')
-    return { success: true }
+    return { success: true, saved: dataInput.length }
   } catch (err: any) {
     console.error("Batch save error:", err)
     return { error: err?.message || 'Gagal menyimpan batch' }

@@ -43,13 +43,6 @@ export const getCachedTahunAjaranList = unstable_cache(
   { tags: ['tahun-ajaran'], revalidate: 3600 }
 )
 
-// ─── MASTER PELANGGARAN ────────────────────────────────────────────────────
-export const getCachedMasterPelanggaran = unstable_cache(
-  async () => query<any>('SELECT id, nama_pelanggaran, kategori, poin FROM master_pelanggaran ORDER BY kategori DESC, nama_pelanggaran'),
-  ['master-pelanggaran'],
-  { tags: ['master-pelanggaran'], revalidate: 3600 }
-)
-
 // ─── BIAYA SETTINGS ────────────────────────────────────────────────────────
 export const getCachedBiayaSettings = unstable_cache(
   async () => query<any>('SELECT * FROM biaya_settings ORDER BY tahun_angkatan DESC'),

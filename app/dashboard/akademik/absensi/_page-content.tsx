@@ -27,6 +27,7 @@ export default function AbsensiPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
 
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
@@ -65,8 +66,13 @@ export default function AbsensiPage() {
       setGridData(grid)
       setLoading(false)
       setHasUnsavedChanges(false)
+      setDirtyKeys(new Set())
       setHasLoaded(true)
       toast.dismiss(loadToast)
+    }).catch((err: any) => {
+      setLoading(false)
+      toast.dismiss(loadToast)
+      toast.error('Gagal memuat data absensi', { description: err?.message ?? 'Terjadi kesalahan saat memuat data' })
     })
   }
 
@@ -146,6 +152,12 @@ export default function AbsensiPage() {
     if (!['H', 'S', 'I', 'A', ''].includes(upperVal)) return
 
     setHasUnsavedChanges(true)
+    const dirtyKey = `${santriId}-${dateStr}`
+    setDirtyKeys(prev => {
+      const next = new Set(prev)
+      next.add(dirtyKey)
+      return next
+    })
     setGridData(prev => ({
       ...prev,
       [santriId]: {
@@ -161,6 +173,11 @@ export default function AbsensiPage() {
   // Handler: Isi Satu Baris Full (A/S/I/H)
   const handleFillRow = (santriId: string, value: string) => {
     setHasUnsavedChanges(true)
+    setDirtyKeys(prev => {
+      const next = new Set(prev)
+      days.forEach(day => next.add(`${santriId}-${day.dateStr}`))
+      return next
+    })
     setGridData(prev => {
       const currentSantriData = prev[santriId] ? JSON.parse(JSON.stringify(prev[santriId])) : {}
       
@@ -232,6 +249,10 @@ export default function AbsensiPage() {
   // Handler: Simpan
   const handleSimpan = async () => {
     if (dataSantri.length === 0) return
+    if (dirtyKeys.size === 0) {
+      toast.info('Tidak ada perubahan untuk disimpan')
+      return
+    }
 
     setSaving(true)
     const loadToast = toast.loading("Menyimpan absensi...") // Toast Loading
@@ -241,6 +262,7 @@ export default function AbsensiPage() {
     dataSantri.forEach(s => {
       const santriGrid = gridData[s.id] || {}
       days.forEach(day => {
+        if (!dirtyKeys.has(`${s.id}-${day.dateStr}`)) return
         const dayData = santriGrid[day.dateStr]
         if (dayData) {
           const s_ = dayData.shubuh || 'H'
@@ -259,16 +281,20 @@ export default function AbsensiPage() {
       })
     })
 
-    const res = await simpanAbsensi(payload)
-    
-    setSaving(false)
-    toast.dismiss(loadToast)
-
-    if (res?.error) {
-      toast.error("Gagal menyimpan absensi", { description: res.error })
-    } else {
+    try {
+      const res = await simpanAbsensi(payload)
+      if (res?.error) {
+        toast.error("Gagal menyimpan absensi", { description: res.error })
+        return
+      }
+      setDirtyKeys(new Set())
       setHasUnsavedChanges(false)
-      toast.success("Alhamdulillah!", { description: "Absensi mingguan berhasil disimpan." })
+      toast.success("Alhamdulillah!", { description: `Absensi berhasil disimpan (${res.saved ?? payload.length} baris).` })
+    } catch (err: any) {
+      toast.error("Gagal menyimpan absensi", { description: err?.message ?? 'Terjadi kesalahan saat menyimpan' })
+    } finally {
+      setSaving(false)
+      toast.dismiss(loadToast)
     }
   }
 

@@ -89,7 +89,6 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/master/wali-kelas':                    'Kelola data guru pengajar dan jadwal mengajar.',
   '/dashboard/master/kelas':                         'Kelola daftar kelas, marhalah, dan kapasitas.',
   '/dashboard/master/kitab':                         'Kelola daftar kitab pelajaran per marhalah dan mapel.',
-  '/dashboard/master/pelanggaran':                   'Atur jenis-jenis pelanggaran dan poin sanksi.',
   '/dashboard/santri/arsip':                         'Kelola santri yang lulus, keluar, atau diarsipkan.',
   '/dashboard/pengaturan/fitur-akses':               'Atur fitur apa saja yang bisa diakses oleh tiap role.',
   '/dashboard/ehb/jadwal':                           'Atur jadwal ujian EHB: event, sesi, dan distribusi kelas.',

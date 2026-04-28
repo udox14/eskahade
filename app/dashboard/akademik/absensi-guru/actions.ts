@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId } from '@/lib/db'
+import { query, batch, generateId } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
@@ -54,18 +54,35 @@ export async function simpanAbsensiGuru(payload: any[]) {
   const session = await getSession()
   if (payload.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
-  for (const item of payload) {
-    await execute(`
-      INSERT INTO absensi_guru (id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
-        shubuh = excluded.shubuh,
-        ashar = excluded.ashar,
-        maghrib = excluded.maghrib,
-        updated_by = excluded.updated_by
-    `, [generateId(), item.kelas_id, item.guru_id_wali, item.tanggal, item.shubuh, item.ashar, item.maghrib, session?.id ?? null])
+  const statements = payload.map(item => ({
+    sql: `
+        INSERT INTO absensi_guru (id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
+          guru_id = excluded.guru_id,
+          shubuh = excluded.shubuh,
+          ashar = excluded.ashar,
+          maghrib = excluded.maghrib,
+          updated_by = excluded.updated_by
+      `,
+    params: [
+      generateId(),
+      item.kelas_id,
+      item.guru_id_wali ?? null,
+      item.tanggal,
+      item.shubuh ?? '',
+      item.ashar ?? '',
+      item.maghrib ?? '',
+      session?.id ?? null,
+    ],
+  }))
+
+  // D1 lebih stabil jika banyak upsert dikirim dalam beberapa batch kecil.
+  const chunkSize = 50
+  for (let i = 0; i < statements.length; i += chunkSize) {
+    await batch(statements.slice(i, i + chunkSize))
   }
 
   revalidatePath('/dashboard/akademik/absensi-guru')
-  return { success: true }
+  return { success: true, saved: payload.length }
 }

@@ -196,3 +196,10 @@
  POST /dashboard/akademik/absensi 200 in 9.3s (compile: 10ms, render: 9.3s)
  POST /dashboard/akademik/absensi 200 in 588ms (compile: 7ms, render: 581ms)
 ✓ Compiled in 1320ms
+✓ Compiled in 506ms
+ GET / 200 in 1533ms (compile: 589ms, render: 944ms)
+ GET /api/version 200 in 164ms
+ GET /api/version 200 in 10ms
+ GET /api/version 200 in 10ms
+✓ Compiled in 496ms
+ GET / 200 in 103ms (compile: 11ms, render: 92ms)

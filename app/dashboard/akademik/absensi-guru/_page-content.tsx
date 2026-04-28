@@ -23,6 +23,7 @@ export default function AbsensiGuruPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
 
   // Init Marhalah
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function AbsensiGuruPage() {
     setLoading(false)
     setHasLoaded(true)
     setHasUnsavedChanges(false)
+    setDirtyKeys(new Set())
   }
 
   // --- LOGIC 1: ARRAY HARI ---
@@ -180,6 +182,11 @@ export default function AbsensiGuruPage() {
     
     setHasUnsavedChanges(true)
     const key = `${kelasId}-${dateStr}`
+    setDirtyKeys(prev => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
     setGridData(prev => ({
       ...prev,
       [key]: {
@@ -190,6 +197,11 @@ export default function AbsensiGuruPage() {
   }, []) // Empty dependency karena state updater (setGridData) stabil
 
   const handleSimpan = async () => {
+    if (dirtyKeys.size === 0) {
+      toast.info('Tidak ada perubahan untuk disimpan')
+      return
+    }
+
     setSaving(true)
     const loadToast = toast.loading("Menyimpan jurnal...")
     const payload: any[] = []
@@ -197,11 +209,12 @@ export default function AbsensiGuruPage() {
     dataList.forEach(k => {
       days.forEach(day => {
         const key = `${k.id}-${day.dateStr}`
+        if (!dirtyKeys.has(key)) return
         const val = gridData[key]
         if (val) {
           payload.push({
             kelas_id: k.id,
-            guru_id_wali: k.guru_maghrib?.id || null, 
+            guru_id_wali: k.guru_maghrib_id || k.guru_ashar_id || k.guru_shubuh_id || null,
             tanggal: day.dateStr,
             shubuh: val.shubuh || '',
             ashar: val.ashar || '',
@@ -211,14 +224,20 @@ export default function AbsensiGuruPage() {
       })
     })
 
-    const res = await simpanAbsensiGuru(payload)
-    setSaving(false)
-    toast.dismiss(loadToast)
-
-    if (res?.error) toast.error("Gagal menyimpan", { description: res.error })
-    else {
-        setHasUnsavedChanges(false)
-        toast.success("Jurnal Tersimpan!")
+    try {
+      const res = await simpanAbsensiGuru(payload)
+      if (res?.error) {
+        toast.error("Gagal menyimpan", { description: res.error })
+        return
+      }
+      setDirtyKeys(new Set())
+      setHasUnsavedChanges(false)
+      toast.success(`Jurnal tersimpan (${res.saved ?? payload.length} baris)`)
+    } catch (err: any) {
+      toast.error("Gagal menyimpan", { description: err?.message ?? 'Terjadi kesalahan saat menyimpan' })
+    } finally {
+      setSaving(false)
+      toast.dismiss(loadToast)
     }
   }
 
@@ -260,7 +279,7 @@ export default function AbsensiGuruPage() {
         }
       }
     }
-  }, [])
+  }, [days]) 
 
   return (
     <div className="space-y-6 max-w-[95vw] mx-auto pb-20">
