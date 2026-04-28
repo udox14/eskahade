@@ -208,6 +208,7 @@ export default function AbsensiPengawasPageContent() {
   const [loading, setLoading] = useState(true)
   const [loadingRows, setLoadingRows] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [rowSearch, setRowSearch] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -247,6 +248,7 @@ export default function AbsensiPengawasPageContent() {
     setSelected(schedule)
     setRows([])
     setDrafts({})
+    setRowSearch('')
     setLoadingRows(true)
     const list = await getAbsensiPengawasRows(event.id, schedule.tanggal, schedule.sesi.id)
     setRows(list)
@@ -279,6 +281,32 @@ export default function AbsensiPengawasPageContent() {
       .map(item => item.badal_nama.trim())
     return Array.from(new Set([...savedNames, ...draftNames])).sort((a, b) => a.localeCompare(b))
   }, [badalOptions.manual, drafts])
+
+  const filteredRows = useMemo(() => {
+    const needle = rowSearch.trim().toLowerCase()
+    if (!needle) return rows
+
+    return rows.filter(row => {
+      const draft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
+      const statusLabel = draft.status === 'TIDAK_HADIR' ? 'tidak hadir tidak'
+        : draft.status === 'BADAL' ? 'badal tidak hadir'
+        : 'hadir'
+      const badalLabel = draft.status !== 'BADAL' ? ''
+        : draft.badal_nama
+          || (draft.badal_pengawas_id ? badalOptions.pengawas.find(item => item.id === draft.badal_pengawas_id)?.nama : '')
+          || (draft.badal_panitia_id ? badalOptions.panitia.find(item => item.id === draft.badal_panitia_id)?.nama : '')
+          || ''
+
+      return [
+        row.nama_pengawas,
+        row.nama_ruangan,
+        row.nomor_ruangan,
+        row.tag,
+        statusLabel,
+        badalLabel,
+      ].some(value => String(value || '').toLowerCase().includes(needle))
+    })
+  }, [badalOptions.panitia, badalOptions.pengawas, drafts, rowSearch, rows])
 
   const updateDraft = (jadwalId: number, patch: Partial<DraftAbsensi>) => {
     setDrafts(prev => {
@@ -411,13 +439,14 @@ export default function AbsensiPengawasPageContent() {
         </div>
       ) : (
         <div className="flex flex-col min-h-screen pb-28">
-          <div className="bg-white px-4 py-4 border-b sticky top-0 z-20 shadow-sm">
+          <div className="bg-white px-4 py-4 border-b sticky -top-4 md:-top-8 z-20 shadow-sm">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => {
                   setSelected(null)
                   setRows([])
                   setDrafts({})
+                  setRowSearch('')
                 }}
                 className="p-2 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200"
                 aria-label="Kembali"
@@ -445,6 +474,15 @@ export default function AbsensiPengawasPageContent() {
                 <p className="font-bold text-amber-800">{summary.badal}</p>
               </div>
             </div>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                value={rowSearch}
+                onChange={e => setRowSearch(e.target.value)}
+                placeholder="Cari pengawas, ruangan, atau status tidak hadir"
+                className="w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+              />
+            </div>
           </div>
 
           <div className="p-3">
@@ -458,9 +496,15 @@ export default function AbsensiPengawasPageContent() {
                 <p className="font-bold text-slate-500">Belum ada pengawas</p>
                 <p className="text-xs">Tidak ada jadwal pengawas pada sesi ini.</p>
               </div>
+            ) : filteredRows.length === 0 ? (
+              <div className="p-10 text-center bg-white border border-dashed rounded-2xl text-slate-400">
+                <Search className="w-9 h-9 mx-auto mb-3 text-slate-300" />
+                <p className="font-bold text-slate-500">Tidak ada hasil</p>
+                <p className="text-xs">Coba kata kunci lain.</p>
+              </div>
             ) : (
               <div className="space-y-3">
-                {rows.map(row => {
+                {filteredRows.map(row => {
                   const draft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
                   const badalLabel = getBadalLabel(draft)
                   return (

@@ -1,15 +1,43 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import {
   getActiveEventLight, getJadwalAktifList, getRuanganForJadwal, getPesertaForAbsensi, saveAbsensiBatch
 } from './actions'
 import { 
   Calendar, MapPin, Users, Loader2, ChevronLeft, ChevronRight, 
-  CheckCircle2, XCircle, AlertTriangle, UserMinus 
+  CheckCircle2, AlertTriangle, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { fullDateWib, shortDateWib } from '../_date-utils'
+
+type SesiAktif = {
+  tanggal: string
+  sesi_id: number
+  label: string
+  jam_group: string
+  waktu_mulai: string | null
+  waktu_selesai: string | null
+}
+
+type RuanganAbsensi = {
+  id: number
+  nomor_ruangan: number
+  nama_ruangan: string | null
+  jenis_kelamin: string
+  jumlah_peserta: number
+  kelas_list: string
+}
+
+type PesertaAbsensi = {
+  nomor_kursi: number
+  santri_id: string
+  nama_lengkap: string
+  nis: string | null
+  nama_kelas: string
+  marhalah_nama: string
+  status_absen: string | null
+}
 
 export default function AbsensiEhbPage() {
   const [event, setEvent] = useState<{ id: number, nama: string } | null>(null)
@@ -18,23 +46,20 @@ export default function AbsensiEhbPage() {
   const [view, setView] = useState<'list-sesi' | 'list-ruangan' | 'input-absensi'>('list-sesi')
   
   // Data States
-  const [sesiList, setSesiList] = useState<any[]>([])
-  const [ruanganList, setRuanganList] = useState<any[]>([])
-  const [pesertaList, setPesertaList] = useState<any[]>([])
+  const [sesiList, setSesiList] = useState<SesiAktif[]>([])
+  const [ruanganList, setRuanganList] = useState<RuanganAbsensi[]>([])
+  const [pesertaList, setPesertaList] = useState<PesertaAbsensi[]>([])
+  const [pesertaSearch, setPesertaSearch] = useState('')
   
   // Selections
-  const [selectedSesi, setSelectedSesi] = useState<any>(null)
-  const [selectedRuangan, setSelectedRuangan] = useState<any>(null)
+  const [selectedSesi, setSelectedSesi] = useState<SesiAktif | null>(null)
+  const [selectedRuangan, setSelectedRuangan] = useState<RuanganAbsensi | null>(null)
   
   // Input State
   const [absensiMap, setAbsensiMap] = useState<Record<string, string | null>>({})
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    loadInitialData()
-  }, [])
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setLoading(true)
     const evt = await getActiveEventLight()
     setEvent(evt || null)
@@ -43,9 +68,14 @@ export default function AbsensiEhbPage() {
       setSesiList(list)
     }
     setLoading(false)
-  }
+  }, [])
 
-  const handleSelectSesi = async (sesi: any) => {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadInitialData()
+  }, [loadInitialData])
+
+  const handleSelectSesi = async (sesi: SesiAktif) => {
     if (!event) return
     setSelectedSesi(sesi)
     setLoading(true)
@@ -55,9 +85,10 @@ export default function AbsensiEhbPage() {
     setLoading(false)
   }
 
-  const handleSelectRuangan = async (ruangan: any) => {
+  const handleSelectRuangan = async (ruangan: RuanganAbsensi) => {
     if (!event || !selectedSesi) return
     setSelectedRuangan(ruangan)
+    setPesertaSearch('')
     setLoading(true)
     setView('input-absensi')
     const pList = await getPesertaForAbsensi(event.id, ruangan.id, selectedSesi.tanggal, selectedSesi.sesi_id, selectedSesi.jam_group)
@@ -65,7 +96,7 @@ export default function AbsensiEhbPage() {
     
     // Set initial absensi map
     const initialMap: Record<string, string | null> = {}
-    pList.forEach((p: any) => {
+    pList.forEach((p: PesertaAbsensi) => {
         initialMap[p.santri_id] = p.status_absen || null // null = Hadir
     })
     setAbsensiMap(initialMap)
@@ -76,6 +107,23 @@ export default function AbsensiEhbPage() {
   const handleSetAbsen = (santriId: string, status: string | null) => {
     setAbsensiMap(prev => ({ ...prev, [santriId]: status }))
   }
+
+  const filteredPesertaList = pesertaList.filter(p => {
+    const needle = pesertaSearch.trim().toLowerCase()
+    if (!needle) return true
+    const status = absensiMap[p.santri_id]
+    const statusLabel = status === 'A' ? 'alpha tidak hadir'
+      : status === 'I' ? 'izin tidak hadir'
+      : status === 'S' ? 'sakit tidak hadir'
+      : 'hadir'
+    return [
+      p.nama_lengkap,
+      p.nis,
+      p.nama_kelas,
+      String(p.nomor_kursi || ''),
+      statusLabel,
+    ].some(value => String(value || '').toLowerCase().includes(needle))
+  })
 
   const handleSaveAbsensi = async () => {
     if (!event || !selectedSesi || !selectedRuangan) return
@@ -98,7 +146,7 @@ export default function AbsensiEhbPage() {
   }
 
   // Helper for grouping Sesi by Tanggal
-  const groupedSesi: Record<string, any[]> = {}
+  const groupedSesi: Record<string, SesiAktif[]> = {}
   sesiList.forEach(s => {
       if (!groupedSesi[s.tanggal]) groupedSesi[s.tanggal] = []
       groupedSesi[s.tanggal].push(s)
@@ -168,7 +216,7 @@ export default function AbsensiEhbPage() {
       {/* ────────────────────────────────────────────────────────────────────────────── */}
       {view === 'list-ruangan' && (
         <div className="flex flex-col h-full pb-10">
-            <div className="bg-white px-4 py-4 border-b sticky top-0 z-10 flex items-center gap-3 shadow-sm">
+            <div className="bg-white px-4 py-4 border-b sticky -top-4 md:-top-8 z-10 flex items-center gap-3 shadow-sm">
                 <button 
                     onClick={() => setView('list-sesi')}
                     className="p-2 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200"
@@ -224,7 +272,7 @@ export default function AbsensiEhbPage() {
       {/* ────────────────────────────────────────────────────────────────────────────── */}
       {view === 'input-absensi' && (
         <div className="flex flex-col h-full pb-28">
-            <div className="bg-white px-4 py-4 border-b sticky top-0 z-10 flex flex-col gap-2 shadow-sm">
+            <div className="bg-white px-4 py-4 border-b sticky -top-4 md:-top-8 z-10 flex flex-col gap-2 shadow-sm">
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => setView('list-ruangan')}
@@ -237,6 +285,15 @@ export default function AbsensiEhbPage() {
                         <p className="text-xs text-slate-500">{selectedSesi?.label} • {selectedSesi ? shortDateWib(selectedSesi.tanggal, false) : ''}</p>
                     </div>
                 </div>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        value={pesertaSearch}
+                        onChange={e => setPesertaSearch(e.target.value)}
+                        placeholder="Cari nama, kelas, kursi, atau status tidak hadir"
+                        className="w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                    />
+                </div>
             </div>
 
             <div className="p-3">
@@ -244,7 +301,13 @@ export default function AbsensiEhbPage() {
                     <div className="flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
                 ) : (
                     <div className="space-y-2">
-                        {pesertaList.map(p => {
+                        {filteredPesertaList.length === 0 ? (
+                            <div className="bg-white border border-dashed rounded-2xl p-10 text-center text-slate-400">
+                                <Search className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                <p className="font-bold text-slate-500 text-sm">Tidak ada hasil</p>
+                                <p className="text-xs">Coba kata kunci lain.</p>
+                            </div>
+                        ) : filteredPesertaList.map(p => {
                             const val = absensiMap[p.santri_id]
                             const isAlpha = val === 'A'
                             const isIzin = val === 'I'

@@ -781,26 +781,26 @@ function HonorEnvelopePrint({
           width: '162mm',
           height: '114mm',
           boxSizing: 'border-box',
-          padding: '13mm 10mm 9mm 16mm',
+          padding: '14mm 9mm 9mm 14mm',
           fontFamily: FONT,
           backgroundColor: '#fff',
           color: '#000',
           overflow: 'hidden',
           breakAfter: 'page',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5mm', marginLeft: '-1mm' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5mm' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logohitam.png" alt="" style={{ width: '21mm', height: '21mm', objectFit: 'contain' }} />
-            <div style={{ fontSize: '15.5pt', lineHeight: 1.12, letterSpacing: 0 }}>
+            <img src="/logohitam.png" alt="" style={{ width: '18mm', height: '18mm', objectFit: 'contain', flex: '0 0 auto' }} />
+            <div style={{ fontSize: '12.5pt', lineHeight: 1.12, letterSpacing: 0, width: '116mm', whiteSpace: 'nowrap' }}>
               <div>EVALUASI HASIL BELAJAR</div>
               <div>PONDOK PESANTREN SUKAHIDENG</div>
               <div>{semesterLabel} TAHUN AJARAN {tahunAjaran}</div>
             </div>
           </div>
 
-          <div style={{ marginTop: '17mm', fontSize: '24pt', lineHeight: 1.05 }}>{row.nama}</div>
+          <div style={{ marginTop: '16mm', fontSize: '24pt', lineHeight: 1.05 }}>{row.nama}</div>
 
-          <table style={{ marginTop: '9mm', fontSize: '13.5pt', lineHeight: 1.32, borderCollapse: 'collapse' }}>
+          <table style={{ marginTop: '8mm', fontSize: '11pt', lineHeight: 1.32, borderCollapse: 'collapse' }}>
             <tbody>
               <EnvelopeHonorLine label="Pembuatan soal" tarif={row.pembuatanTarif} qty={row.pembuatanQty} total={row.pembuatanTotal} />
               <EnvelopeHonorLine label="Pengisian Rapor" tarif={row.raporTarif} qty={row.raporQty} total={row.raporTotal} />
@@ -810,10 +810,130 @@ function HonorEnvelopePrint({
                 <td style={{ paddingTop: '5mm', fontWeight: 700 }}>Jumlah</td>
                 <td />
                 <td />
-                <td style={{ paddingTop: '5mm', paddingLeft: '7mm', fontWeight: 700, whiteSpace: 'nowrap' }}>= Rp. {angkaRupiah(row.total)}</td>
+                <td style={{ paddingTop: '5mm', paddingLeft: '6mm', fontWeight: 700, whiteSpace: 'nowrap' }}>= Rp. {angkaRupiah(row.total)}</td>
               </tr>
             </tbody>
           </table>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function HonorPanitiaTablePrint({
+  event,
+  rows,
+}: {
+  event: ActiveEvent
+  rows: HonorPanitiaRow[]
+}) {
+  const total = rows.reduce((sum, row) => sum + Number(row.nominal || 0), 0)
+  const rowCount = rows.length
+  const fontSize = rowCount > 40 ? '6.6pt' : rowCount > 28 ? '7.2pt' : '8pt'
+
+  return (
+    <div style={{
+      width: '330mm',
+      minHeight: '210mm',
+      padding: '6mm',
+      boxSizing: 'border-box',
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      backgroundColor: '#fff',
+      color: '#000',
+      breakAfter: 'page',
+    }}>
+      <PrintHeader event={event} />
+      <div style={{
+        textAlign: 'center',
+        fontSize: '14pt',
+        fontWeight: 700,
+        lineHeight: 1,
+        marginBottom: '3mm',
+      }}>
+        DAFTAR HONOR PANITIA EHB
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize, lineHeight: 1.12 }}>
+        <colgroup>
+          <col style={{ width: '10mm' }} />
+          <col style={{ width: '72mm' }} />
+          <col style={{ width: '58mm' }} />
+          <col style={{ width: '44mm' }} />
+          <col style={{ width: '84mm' }} />
+          <col style={{ width: '43mm' }} />
+        </colgroup>
+        <thead>
+          <tr>
+            {['NO', 'NAMA', 'JABATAN/BIDANG', 'KELOMPOK', 'KETERANGAN', 'NOMINAL'].map(label => (
+              <th key={label} style={{ border: '0.8pt solid #000', padding: '1.3mm 1.2mm', textAlign: 'center', fontWeight: 700, backgroundColor: '#b7b7b7' }}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={6} style={{ ...printTdCenter, height: '12mm' }}>Belum ada honor panitia.</td>
+            </tr>
+          ) : rows.map((row, index) => (
+            <tr key={row.panitia_id}>
+              <td style={printTdCenter}>{index + 1}</td>
+              <td style={{ ...printTd, fontWeight: 700 }}>{row.nama}</td>
+              <td style={printTd}>{panitiaRoleLabel(row)}</td>
+              <td style={printTd}>{row.tipe === 'inti' ? 'Panitia Inti' : row.seksi_key ? PANITIA_SEKSI_LABEL[row.seksi_key] || row.seksi_key : 'Seksi'}</td>
+              <td style={printTd}>{row.keterangan || '-'}</td>
+              <td style={{ ...printTdRight, fontWeight: 700 }}>{rupiah(Number(row.nominal || 0))}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={5} style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f3f4f6' }}>JUMLAH</td>
+            <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f3f4f6' }}>{rupiah(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function HonorPanitiaEnvelopePrint({
+  event,
+  rows,
+}: {
+  event: ActiveEvent
+  rows: HonorPanitiaRow[]
+}) {
+  const semesterLabel = event.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
+  const tahunAjaran = event.tahun_ajaran_nama.replace('/', '-')
+
+  return (
+    <>
+      {rows.map(row => (
+        <div key={row.panitia_id} style={{
+          width: '162mm',
+          height: '114mm',
+          boxSizing: 'border-box',
+          padding: '14mm 9mm 9mm 14mm',
+          fontFamily: FONT,
+          backgroundColor: '#fff',
+          color: '#000',
+          overflow: 'hidden',
+          breakAfter: 'page',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5mm' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logohitam.png" alt="" style={{ width: '18mm', height: '18mm', objectFit: 'contain', flex: '0 0 auto' }} />
+            <div style={{ fontSize: '12.5pt', lineHeight: 1.12, letterSpacing: 0, width: '116mm', whiteSpace: 'nowrap' }}>
+              <div>EVALUASI HASIL BELAJAR</div>
+              <div>PONDOK PESANTREN SUKAHIDENG</div>
+              <div>{semesterLabel} TAHUN AJARAN {tahunAjaran}</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '31mm', marginLeft: '64mm' }}>
+            <div style={{ fontSize: '24pt', lineHeight: 1.05 }}>{row.nama}</div>
+            <div style={{ marginTop: '2mm', fontSize: '13pt', fontStyle: 'italic', lineHeight: 1.2 }}>
+              {panitiaRoleLabel(row)}
+            </div>
+          </div>
         </div>
       ))}
     </>
@@ -824,9 +944,9 @@ function EnvelopeHonorLine({ label, tarif, qty, total }: { label: string; tarif:
   return (
     <tr>
       <td style={{ minWidth: '43mm' }}>{label}</td>
-      <td style={{ minWidth: '20mm', textAlign: 'right' }}>{angkaRupiah(tarif)}</td>
-      <td style={{ minWidth: '15mm', textAlign: 'center' }}>x {qty || 0}</td>
-      <td style={{ minWidth: '34mm', paddingLeft: '7mm', whiteSpace: 'nowrap' }}>= Rp. {total ? angkaRupiah(total) : '0'}</td>
+      <td style={{ minWidth: '19mm', textAlign: 'right' }}>{angkaRupiah(tarif)}</td>
+      <td style={{ minWidth: '14mm', textAlign: 'center' }}>x {qty || 0}</td>
+      <td style={{ minWidth: '34mm', paddingLeft: '6mm', whiteSpace: 'nowrap' }}>= Rp. {total ? angkaRupiah(total) : '0'}</td>
     </tr>
   )
 }
@@ -985,6 +1105,8 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   const transaksiPrintRef = useRef<HTMLDivElement>(null)
   const honorTablePrintRef = useRef<HTMLDivElement>(null)
   const honorEnvelopePrintRef = useRef<HTMLDivElement>(null)
+  const honorPanitiaTablePrintRef = useRef<HTMLDivElement>(null)
+  const honorPanitiaEnvelopePrintRef = useRef<HTMLDivElement>(null)
   const handlePrintRab = useReactToPrint({
     contentRef: rabPrintRef,
     documentTitle: 'RAB EHB',
@@ -1008,6 +1130,26 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   const handlePrintHonorEnvelopes = useReactToPrint({
     contentRef: honorEnvelopePrintRef,
     documentTitle: 'Amplop Honor EHB',
+    pageStyle: `
+      @page { size: 162mm 114mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+  const handlePrintHonorPanitiaTable = useReactToPrint({
+    contentRef: honorPanitiaTablePrintRef,
+    documentTitle: 'Daftar Honor Panitia EHB',
+    pageStyle: `
+      @page { size: 330mm 210mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+  const handlePrintHonorPanitiaEnvelopes = useReactToPrint({
+    contentRef: honorPanitiaEnvelopePrintRef,
+    documentTitle: 'Amplop Honor Panitia EHB',
     pageStyle: `
       @page { size: 162mm 114mm; margin: 0; }
       @media print {
@@ -1228,6 +1370,11 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     }
     return Array.from(groups.entries())
   }, [honorPanitiaRows])
+
+  const honorPanitiaEnvelopeRows = useMemo(
+    () => honorPanitiaRows.filter(row => Number(row.nominal || 0) > 0),
+    [honorPanitiaRows]
+  )
 
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
     setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
@@ -1581,13 +1728,29 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
               <h2 className="font-bold text-slate-800">Honor Panitia</h2>
               <p className="text-sm text-slate-500">Isi nominal per individu, lalu simpan sekaligus. Total boleh melebihi acuan RAB jika diperlukan.</p>
             </div>
-            <button
-              onClick={submitHonorPanitia}
-              disabled={savingHonorPanitia || honorPanitiaRows.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {savingHonorPanitia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Batch
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handlePrintHonorPanitiaTable()}
+                disabled={honorPanitiaRows.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Cetak Tabel
+              </button>
+              <button
+                onClick={() => handlePrintHonorPanitiaEnvelopes()}
+                disabled={honorPanitiaEnvelopeRows.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Cetak Amplop
+              </button>
+              <button
+                onClick={submitHonorPanitia}
+                disabled={savingHonorPanitia || honorPanitiaRows.length === 0}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {savingHonorPanitia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Batch
+              </button>
+            </div>
           </div>
 
           {honorPanitiaByGroup.length === 0 ? (
@@ -1649,6 +1812,14 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
               </section>
             )
           })}
+          <div className="hidden">
+            <div ref={honorPanitiaTablePrintRef}>
+              <HonorPanitiaTablePrint event={event} rows={honorPanitiaRows} />
+            </div>
+            <div ref={honorPanitiaEnvelopePrintRef}>
+              <HonorPanitiaEnvelopePrint event={event} rows={honorPanitiaEnvelopeRows} />
+            </div>
+          </div>
         </div>
       ) : activeTab === 'honor_detail' ? (
         <div className="space-y-5">

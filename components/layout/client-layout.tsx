@@ -75,8 +75,8 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
       {/* 2. AREA KONTEN (DYNAMIC PADDING) */}
       <div 
         className={cn(
-          "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out h-full",
-          isCollapsed ? "md:pl-16" : "md:pl-60"
+          "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out h-full [--dashboard-sidebar-offset:0px]",
+          isCollapsed ? "md:pl-16 md:[--dashboard-sidebar-offset:4rem]" : "md:pl-60 md:[--dashboard-sidebar-offset:15rem]"
         )}
       >
         {/* HEADER */}

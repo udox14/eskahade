@@ -55,7 +55,7 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
     JOIN santri s ON s.id = rp.santri_id
     JOIN kelas k ON k.id = rp.kelas_id
     WHERE ${whereSql}
-    ORDER BY s.asrama, s.kamar, s.nama_lengkap
+    ORDER BY s.nama_lengkap COLLATE NOCASE ASC, s.nis ASC
   `, params)
 
   if (!santri.length) return { santri: [], absensi: [] }

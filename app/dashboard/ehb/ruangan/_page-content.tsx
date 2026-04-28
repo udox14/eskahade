@@ -5,16 +5,22 @@ import {
   getRuanganList, addRuangan, updateRuangan, deleteRuangan, addRuanganBulk, addRuanganImport,
   getRuanganDetail, getActiveEventLight, getOtherRuangan, pindahSantri, hapusPeserta,
   cariSantriUnplotted, tambahPesertaManual,
-  getDataCetakRuangan, getSesiListForRuangan, getDataBlankoAbsensi, getJamGroups
+  getJamGroups
 } from './actions'
 import * as XLSX from 'xlsx'
 import {
-  LayoutList, Plus, Edit2, Trash2, MapPin, Users, Loader2, X, Printer,
-  ArrowRightLeft, UserPlus, Search, FileText, AlertTriangle
+  LayoutList, Plus, Edit2, Trash2, MapPin, Users, Loader2, X,
+  ArrowRightLeft, UserPlus, Search, AlertTriangle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
+
+const dashboardModalOverlay = 'fixed inset-y-0 left-[var(--dashboard-sidebar-offset,0px)] right-0 bg-black/50 flex items-center justify-center p-4'
+
+function isValidJamGroup(value: string) {
+  return /^Jam ke-\d+$/i.test(value.trim())
+}
 
 export default function RuanganEhbPage() {
   const confirm = useConfirm()
@@ -47,10 +53,6 @@ export default function RuanganEhbPage() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
 
-  // Modal Cetak Blanko
-  const [showCetakBlanko, setShowCetakBlanko] = useState<number | null>(null) // ruangan_id
-  const [sesiList, setSesiList] = useState<any[]>([])
-
   useEffect(() => {
     loadData()
   }, [])
@@ -69,14 +71,16 @@ export default function RuanganEhbPage() {
     setEvent(evt || null)
     if (evt) {
       const jgs = await getJamGroups(evt.id)
-      const groups = jgs.map(j => j.jam_group)
+      const groups = jgs
+        .map(j => j.jam_group)
+        .filter(isValidJamGroup)
       setJamGroups(groups)
-      if (groups.length > 0 && !activeJamTab) {
-        setActiveJamTab(groups[0])
-        const list = await getRuanganList(evt.id, groups[0])
-        setRuanganList(list)
-      } else if (activeJamTab) {
-        const list = await getRuanganList(evt.id, activeJamTab)
+      const selectedJamTab = activeJamTab && groups.includes(activeJamTab) ? activeJamTab : groups[0]
+      if (selectedJamTab) {
+        if (activeJamTab !== selectedJamTab) {
+          setActiveJamTab(selectedJamTab)
+        }
+        const list = await getRuanganList(evt.id, selectedJamTab)
         setRuanganList(list)
       } else {
         const list = await getRuanganList(evt.id)
@@ -224,36 +228,6 @@ export default function RuanganEhbPage() {
     loadData()
   }
 
-  // ──────────────────────────────────────────────────────────────────────────────
-  // CETAK MOCKUP (CONSOLE LOG OR JSON PREVIEW UNTUK SEKARANG)
-  // ──────────────────────────────────────────────────────────────────────────────
-
-  const handlePrintList = async (ruanganId: number) => {
-    const data = await getDataCetakRuangan(ruanganId)
-    if (!data) return toast.error('Data tidak ditemukan')
-
-    // In real app, open a new window or trigger print modal
-    console.log("PRINT DATA LIST:", data)
-    toast.success('Data siap dicetak. Cek console.')
-  }
-
-  const handleOpenCetakBlanko = async (ruanganId: number) => {
-    if (!event) return
-    const list = await getSesiListForRuangan(event.id)
-    setSesiList(list)
-    setShowCetakBlanko(ruanganId)
-  }
-
-  const handlePrintBlanko = async (sesiId: number) => {
-    if (!showCetakBlanko) return
-    const data = await getDataBlankoAbsensi(showCetakBlanko, sesiId)
-    if (!data) return toast.error('Data tidak ditemukan')
-
-    console.log("PRINT DATA BLANKO:", data)
-    toast.success('Data siap dicetak. Cek console.')
-    setShowCetakBlanko(null)
-  }
-
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
 
   if (!event) return (
@@ -350,7 +324,7 @@ export default function RuanganEhbPage() {
       {/* MODAL FORM RUANGAN */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className={`${dashboardModalOverlay} z-50`}>
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-slate-800">{formData.id ? 'Edit Ruangan' : 'Tambah Ruangan'}</h3>
@@ -490,7 +464,7 @@ export default function RuanganEhbPage() {
       {/* MODAL DETAIL RUANGAN */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {detailRuangan && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+        <div className={`${dashboardModalOverlay} z-40`}>
           <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
               <div className="flex items-center gap-3">
@@ -503,19 +477,6 @@ export default function RuanganEhbPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePrintList(detailRuangan.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Cetak List
-                </button>
-                <button
-                  onClick={() => handleOpenCetakBlanko(detailRuangan.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200"
-                >
-                  <FileText className="w-3.5 h-3.5" /> Cetak Blanko
-                </button>
-                <div className="w-px h-6 bg-slate-200 mx-1"></div>
                 <button onClick={() => setDetailRuangan(null)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
                   <X className="w-5 h-5" />
                 </button>
@@ -586,7 +547,7 @@ export default function RuanganEhbPage() {
       {/* MODAL PINDAH RUANGAN */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {showPindah && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className={`${dashboardModalOverlay} z-50`}>
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-slate-800">Pindah Ruangan</h3>
@@ -628,7 +589,7 @@ export default function RuanganEhbPage() {
       {/* MODAL TAMBAH PESERTA MANUAL */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {showTambah && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className={`${dashboardModalOverlay} z-50`}>
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
               <div>
@@ -674,36 +635,6 @@ export default function RuanganEhbPage() {
                   <p className="text-[10px] mt-1">Hanya menampilkan santri {showTambah.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} yang belum diplotting.</p>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ──────────────────────────────────────────────────────────────────────────── */}
-      {/* MODAL PILIH SESI UNTUK CETAK BLANKO */}
-      {/* ──────────────────────────────────────────────────────────────────────────── */}
-      {showCetakBlanko && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
-            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">Cetak Blanko Absensi</h3>
-              <button onClick={() => setShowCetakBlanko(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-sm text-slate-600 mb-2">Pilih sesi yang akan dicetak blankonya:</p>
-              {sesiList.map(sesi => (
-                <button
-                  key={sesi.id}
-                  onClick={() => handlePrintBlanko(sesi.id)}
-                  className="w-full text-left p-3 border rounded-xl hover:border-indigo-500 hover:bg-indigo-50 flex justify-between items-center group transition-all"
-                >
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">Sesi {sesi.nomor_sesi} - {sesi.label}</p>
-                    <p className="text-[10px] text-slate-500">{sesi.jam_group}</p>
-                  </div>
-                  <Printer className="w-4 h-4 text-indigo-300 group-hover:text-indigo-600" />
-                </button>
-              ))}
             </div>
           </div>
         </div>
