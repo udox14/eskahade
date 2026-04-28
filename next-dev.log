@@ -162,3 +162,37 @@
 [layout] userRoles: [ 'admin' ]
 [layout] fiturAkses count: 68
  GET /dashboard/ehb/ruangan 200 in 1455ms (compile: 136ms, render: 1319ms)
+ POST /dashboard/ehb/ruangan 200 in 584ms (compile: 3ms, render: 581ms)
+ POST /dashboard/ehb/ruangan 200 in 584ms (compile: 4ms, render: 579ms)
+ GET /dashboard/ehb/absensi 200 in 770ms (compile: 742ms, render: 28ms)
+ POST /dashboard/ehb/absensi 200 in 315ms (compile: 2ms, render: 312ms)
+ POST /dashboard/ehb/absensi 200 in 221ms (compile: 4ms, render: 217ms)
+ POST /dashboard/ehb/absensi 200 in 266ms (compile: 2ms, render: 263ms)
+ POST /dashboard/ehb/absensi 200 in 633ms (compile: 2ms, render: 631ms)
+ POST /dashboard/ehb/absensi 200 in 460ms (compile: 4ms, render: 456ms)
+ POST /dashboard/ehb/absensi 200 in 341ms (compile: 4ms, render: 337ms)
+✓ Compiled in 184ms
+ POST /dashboard/ehb/absensi 200 in 530ms (compile: 95ms, render: 435ms)
+ POST /dashboard/ehb/absensi 200 in 245ms (compile: 6ms, render: 240ms)
+ GET /api/version 200 in 17ms
+ GET /dashboard/ehb/ruangan 200 in 40ms (compile: 7ms, render: 33ms)
+ POST /dashboard/ehb/ruangan 200 in 2.7s (compile: 4ms, render: 2.7s)
+ POST /dashboard/ehb/ruangan 200 in 568ms (compile: 4ms, render: 564ms)
+ POST /dashboard/ehb/ruangan 200 in 239ms (compile: 4ms, render: 235ms)
+ POST /dashboard/ehb/ruangan 200 in 1599ms (compile: 6ms, render: 1593ms)
+ POST /dashboard/ehb/ruangan 200 in 260ms (compile: 6ms, render: 254ms)
+ POST /dashboard/ehb/ruangan 200 in 229ms (compile: 6ms, render: 223ms)
+ GET /dashboard/akademik/absensi 200 in 138ms (compile: 96ms, render: 42ms)
+ POST /dashboard/akademik/absensi 200 in 236ms (compile: 2ms, render: 234ms)
+ POST /dashboard/akademik/absensi 200 in 213ms (compile: 3ms, render: 210ms)
+ POST /dashboard/akademik/absensi 200 in 8ms (compile: 3ms, render: 6ms)
+ POST /dashboard/akademik/absensi 200 in 629ms (compile: 3ms, render: 627ms)
+ POST /dashboard/akademik/absensi 200 in 221ms (compile: 3ms, render: 218ms)
+ POST /dashboard/akademik/absensi 200 in 11ms (compile: 4ms, render: 7ms)
+ POST /dashboard/akademik/absensi 200 in 582ms (compile: 3ms, render: 579ms)
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 27ms
+ GET /api/version 200 in 15ms
+ POST /dashboard/akademik/absensi 200 in 9.3s (compile: 10ms, render: 9.3s)
+ POST /dashboard/akademik/absensi 200 in 588ms (compile: 7ms, render: 581ms)
+✓ Compiled in 1320ms

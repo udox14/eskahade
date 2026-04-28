@@ -107,10 +107,11 @@ export async function SantriTable({
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
+                : santri.status_global === 'nonaktif_sementara' ? 'bg-amber-100 text-amber-700'
                 : santri.status_global === 'lulus' ? 'bg-blue-100 text-blue-700'
                 : 'bg-red-100 text-red-700'
               }`}>
-                {santri.status_global?.toUpperCase()}
+                {santri.status_global === 'nonaktif_sementara' ? 'NONAKTIF SEMENTARA' : santri.status_global?.toUpperCase()}
               </span>
             </div>
             <div className="mt-3 flex gap-3 text-xs text-gray-500">
@@ -173,10 +174,11 @@ export async function SantriTable({
                   <td className="px-5 py-3.5">
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                       santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
+                      : santri.status_global === 'nonaktif_sementara' ? 'bg-amber-100 text-amber-700'
                       : santri.status_global === 'lulus' ? 'bg-blue-100 text-blue-700'
                       : 'bg-red-100 text-red-700'
                     }`}>
-                      {santri.status_global?.toUpperCase()}
+                      {santri.status_global === 'nonaktif_sementara' ? 'NONAKTIF SEMENTARA' : santri.status_global?.toUpperCase()}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-right">

@@ -169,6 +169,7 @@ function SelectField({ label, value, onChange, options, allLabel, disabled = fal
 
 const statusLabel = (status: string) => {
   if (status === 'aktif') return 'Aktif'
+  if (status === 'nonaktif_sementara') return 'Nonaktif Sementara'
   if (status === 'keluar') return 'Keluar'
   if (status === 'lulus') return 'Lulus'
   if (status === 'arsip') return 'Arsip'
