@@ -152,7 +152,17 @@ export type RabAutoBasis = {
   jumlahPengawas: number
 }
 
+let keuanganSchemaReady: Promise<void> | null = null
+
 export async function ensureKeuanganSchema() {
+  keuanganSchemaReady ??= ensureKeuanganSchemaOnce().catch(error => {
+    keuanganSchemaReady = null
+    throw error
+  })
+  await keuanganSchemaReady
+}
+
+async function ensureKeuanganSchemaOnce() {
   await execute(`
     CREATE TABLE IF NOT EXISTS ehb_rab_item (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -125,6 +125,10 @@ function rupiah(value: number) {
   }).format(value || 0)
 }
 
+function angkaRupiah(value: number) {
+  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(value || 0)
+}
+
 function parseMoney(value: string) {
   return Number(value.replace(/[^\d]/g, '')) || 0
 }
@@ -657,6 +661,176 @@ function BukuKasPrint({
   )
 }
 
+type HonorPrintRow = {
+  nama: string
+  mengajarDi: Set<string>
+  waktu: Set<string>
+  jumlahSantri: string[]
+  pembuatanQty: number
+  pembuatanTarif: number
+  pembuatanTotal: number
+  raporQty: number
+  raporTarif: number
+  raporTotal: number
+  pemeriksaanQty: number
+  pemeriksaanTarif: number
+  pemeriksaanTotal: number
+  pengawasanQty: number
+  pengawasanTarif: number
+  pengawasanTotal: number
+  total: number
+}
+
+function HonorTablePrint({
+  event,
+  rows,
+}: {
+  event: ActiveEvent
+  rows: HonorPrintRow[]
+}) {
+  const rowCount = rows.length
+  const fontSize = rowCount > 36 ? '6pt' : rowCount > 26 ? '6.6pt' : '7.2pt'
+
+  return (
+    <div style={{
+      width: '330mm',
+      minHeight: '210mm',
+      padding: '6mm',
+      boxSizing: 'border-box',
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      backgroundColor: '#fff',
+      color: '#000',
+      breakAfter: 'page',
+    }}>
+      <PrintHeader event={event} />
+      <div style={{
+        textAlign: 'center',
+        fontSize: '14pt',
+        fontWeight: 700,
+        lineHeight: 1,
+        marginBottom: '3mm',
+      }}>
+        DAFTAR RINCIAN HONOR EHB
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize, lineHeight: 1.08 }}>
+        <colgroup>
+          <col style={{ width: '9mm' }} />
+          <col style={{ width: '45mm' }} />
+          <col style={{ width: '42mm' }} />
+          <col style={{ width: '27mm' }} />
+          <col style={{ width: '24mm' }} />
+          <col style={{ width: '24mm' }} />
+          <col style={{ width: '24mm' }} />
+          <col style={{ width: '25mm' }} />
+          <col style={{ width: '33mm' }} />
+          <col style={{ width: '24mm' }} />
+          <col style={{ width: '34mm' }} />
+        </colgroup>
+        <thead>
+          <tr>
+            {['NO', 'NAMA', 'MENGAJAR DI', 'WAKTU', 'JML SANTRI', 'MEMBUAT SOAL', 'MENGISI RAPOR', 'MEMERIKSA', 'JUMLAH MEMERIKSA', 'MENGAWAS', 'JUMLAH TOTAL'].map(label => (
+              <th key={label} style={{ border: '0.8pt solid #000', padding: '1.2mm 1mm', textAlign: 'center', fontWeight: 700, backgroundColor: '#b7b7b7' }}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={11} style={{ ...printTdCenter, height: '12mm' }}>Belum ada rincian honor.</td>
+            </tr>
+          ) : rows.map((row, index) => (
+            <tr key={row.nama}>
+              <td style={printTdCenter}>{index + 1}</td>
+              <td style={{ ...printTd, fontWeight: 700 }}>{row.nama}</td>
+              <td style={printTd}>{Array.from(row.mengajarDi).join(', ') || '-'}</td>
+              <td style={printTd}>{Array.from(row.waktu).join(', ') || '-'}</td>
+              <td style={printTdCenter}>{row.jumlahSantri.length ? row.jumlahSantri.join(' + ') : '-'}</td>
+              <td style={printTdCenter}>{row.pembuatanQty || '-'}</td>
+              <td style={printTdCenter}>{row.raporQty || '-'}</td>
+              <td style={printTdCenter}>{row.pemeriksaanQty || '-'}</td>
+              <td style={printTdRight}>{row.pemeriksaanTotal ? rupiah(row.pemeriksaanTotal) : '-'}</td>
+              <td style={printTdCenter}>{row.pengawasanQty || '-'}</td>
+              <td style={{ ...printTdRight, fontWeight: 700 }}>{rupiah(row.total)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={10} style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f3f4f6' }}>JUMLAH</td>
+            <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f3f4f6' }}>{rupiah(rows.reduce((sum, row) => sum + row.total, 0))}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function HonorEnvelopePrint({
+  event,
+  rows,
+}: {
+  event: ActiveEvent
+  rows: HonorPrintRow[]
+}) {
+  const semesterLabel = event.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
+  const tahunAjaran = event.tahun_ajaran_nama.replace('/', '-')
+
+  return (
+    <>
+      {rows.map(row => (
+        <div key={row.nama} style={{
+          width: '230mm',
+          height: '110mm',
+          boxSizing: 'border-box',
+          padding: '14mm 18mm 10mm 28mm',
+          fontFamily: FONT,
+          backgroundColor: '#fff',
+          color: '#000',
+          overflow: 'hidden',
+          breakAfter: 'page',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6mm', marginLeft: '-2mm' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logohitam.png" alt="" style={{ width: '24mm', height: '24mm', objectFit: 'contain' }} />
+            <div style={{ fontSize: '19pt', lineHeight: 1.12, letterSpacing: 0 }}>
+              <div>EVALUASI HASIL BELAJAR</div>
+              <div>PONDOK PESANTREN SUKAHIDENG</div>
+              <div>{semesterLabel} TAHUN AJARAN {tahunAjaran}</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '20mm', fontSize: '30pt', lineHeight: 1.05 }}>{row.nama}</div>
+
+          <table style={{ marginTop: '10mm', fontSize: '16pt', lineHeight: 1.32, borderCollapse: 'collapse' }}>
+            <tbody>
+              <EnvelopeHonorLine label="Pembuatan soal" tarif={row.pembuatanTarif} qty={row.pembuatanQty} total={row.pembuatanTotal} />
+              <EnvelopeHonorLine label="Pengisian Rapor" tarif={row.raporTarif} qty={row.raporQty} total={row.raporTotal} />
+              <EnvelopeHonorLine label="Pemeriksaan hasil" tarif={row.pemeriksaanTarif} qty={row.pemeriksaanQty} total={row.pemeriksaanTotal} />
+              <EnvelopeHonorLine label="Pengawasan" tarif={row.pengawasanTarif} qty={row.pengawasanQty} total={row.pengawasanTotal} />
+              <tr>
+                <td style={{ paddingTop: '5mm', fontWeight: 700 }}>Jumlah</td>
+                <td />
+                <td />
+                <td style={{ paddingTop: '5mm', paddingLeft: '10mm', fontWeight: 700, whiteSpace: 'nowrap' }}>= Rp. {angkaRupiah(row.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function EnvelopeHonorLine({ label, tarif, qty, total }: { label: string; tarif: number; qty: number; total: number }) {
+  return (
+    <tr>
+      <td style={{ minWidth: '54mm' }}>{label}</td>
+      <td style={{ minWidth: '24mm', textAlign: 'right' }}>{angkaRupiah(tarif)}</td>
+      <td style={{ minWidth: '20mm', textAlign: 'center' }}>x {qty || 0}</td>
+      <td style={{ minWidth: '42mm', paddingLeft: '10mm', whiteSpace: 'nowrap' }}>= Rp. {total ? angkaRupiah(total) : '0'}</td>
+    </tr>
+  )
+}
+
 const printTd: CSSProperties = {
   border: '0.8pt solid #000',
   padding: '1mm 1.2mm',
@@ -809,11 +983,33 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   const [savingHonorPanitia, setSavingHonorPanitia] = useState(false)
   const rabPrintRef = useRef<HTMLDivElement>(null)
   const transaksiPrintRef = useRef<HTMLDivElement>(null)
+  const honorTablePrintRef = useRef<HTMLDivElement>(null)
+  const honorEnvelopePrintRef = useRef<HTMLDivElement>(null)
   const handlePrintRab = useReactToPrint({
     contentRef: rabPrintRef,
     documentTitle: 'RAB EHB',
     pageStyle: `
       @page { size: 210mm 330mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+  const handlePrintHonorTable = useReactToPrint({
+    contentRef: honorTablePrintRef,
+    documentTitle: 'Rincian Honor EHB',
+    pageStyle: `
+      @page { size: 330mm 210mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+  const handlePrintHonorEnvelopes = useReactToPrint({
+    contentRef: honorEnvelopePrintRef,
+    documentTitle: 'Amplop Honor EHB',
+    pageStyle: `
+      @page { size: 230mm 110mm; margin: 0; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
@@ -954,6 +1150,70 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
 
     return Array.from(rows.values()).sort((a, b) => a.nama.localeCompare(b.nama, 'id-ID'))
   }, [honorItems])
+
+  const honorPrintRows = useMemo<HonorPrintRow[]>(() => {
+    const rows = new Map<string, HonorPrintRow>()
+
+    const ensureRow = (nama: string) => {
+      if (!rows.has(nama)) {
+        rows.set(nama, {
+          nama,
+          mengajarDi: new Set<string>(),
+          waktu: new Set<string>(),
+          jumlahSantri: [],
+          pembuatanQty: 0,
+          pembuatanTarif: honorTarif.pembuatan_soal,
+          pembuatanTotal: 0,
+          raporQty: 0,
+          raporTarif: honorTarif.pengisian_rapor,
+          raporTotal: 0,
+          pemeriksaanQty: 0,
+          pemeriksaanTarif: honorTarif.pemeriksaan_hasil,
+          pemeriksaanTotal: 0,
+          pengawasanQty: 0,
+          pengawasanTarif: honorTarif.pengawasan,
+          pengawasanTotal: 0,
+          total: 0,
+        })
+      }
+      return rows.get(nama)!
+    }
+
+    for (const item of honorItems) {
+      const row = ensureRow(item.nama)
+      const qty = Number(item.qty || 0)
+      const total = Number(item.total || 0)
+      row.total += total
+
+      if (item.jenis === 'pembuatan_soal') {
+        row.pembuatanQty += qty
+        row.pembuatanTarif = Number(item.tarif || row.pembuatanTarif || 0)
+        row.pembuatanTotal += total
+      } else if (item.jenis === 'pengisian_rapor') {
+        row.raporQty += qty
+        row.raporTarif = Number(item.tarif || row.raporTarif || 0)
+        row.raporTotal += total
+      } else if (item.jenis === 'pengawasan') {
+        row.pengawasanQty += qty
+        row.pengawasanTarif = Number(item.tarif || row.pengawasanTarif || 0)
+        row.pengawasanTotal += total
+      } else if (item.jenis === 'pemeriksaan_hasil') {
+        row.pemeriksaanQty += qty
+        row.pemeriksaanTarif = Number(item.tarif || row.pemeriksaanTarif || 0)
+        row.pemeriksaanTotal += total
+        item.detail.split(';').map(part => part.trim()).filter(Boolean).forEach(part => {
+          const match = part.match(/^(.+)\s+(shubuh|ashar|maghrib):\s*(\d+)\s*x\s*(\d+)/i)
+          if (match) {
+            row.mengajarDi.add(match[1].trim())
+            row.waktu.add(WAKTU_LABEL[match[2].toLowerCase() as HonorWaktu] || match[2])
+            row.jumlahSantri.push(match[3])
+          }
+        })
+      }
+    }
+
+    return Array.from(rows.values()).sort((a, b) => a.nama.localeCompare(b.nama, 'id-ID'))
+  }, [honorItems, honorTarif])
 
   const honorPanitiaTotal = useMemo(
     () => honorPanitiaRows.reduce((sum, row) => sum + Number(row.nominal || 0), 0),
@@ -1222,11 +1482,6 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     loadData()
   }
 
-  const prefetchTab = (tab: KeuanganTab) => {
-    if (!event || tab === activeTab) return
-    void getCachedTabData(event.id, tab)
-  }
-
   if (loading) {
     return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   }
@@ -1267,8 +1522,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
             <Link
               key={tab.key}
               href={tab.href}
-              onFocus={() => prefetchTab(tab.key as KeuanganTab)}
-              onMouseEnter={() => prefetchTab(tab.key as KeuanganTab)}
+              prefetch={false}
               className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${active ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <Icon className="w-4 h-4" /> {tab.label}
@@ -1418,6 +1672,20 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
               <p className="text-sm text-slate-500">Pembuat soal diatur dari Kepanitiaan. Di sini tinggal hitung dan rapikan konfigurasi pemeriksaan.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handlePrintHonorTable()}
+                disabled={honorPrintRows.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Cetak Tabel
+              </button>
+              <button
+                onClick={() => handlePrintHonorEnvelopes()}
+                disabled={honorPrintRows.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Cetak Amplop
+              </button>
               <button onClick={() => setShowHonorConfigModal(true)} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                 <Calculator className="w-4 h-4" /> Konfigurasi Pemeriksaan
               </button>
@@ -1538,6 +1806,14 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
             </div>
           )}
 
+          <div className="hidden">
+            <div ref={honorTablePrintRef}>
+              <HonorTablePrint event={event} rows={honorPrintRows} />
+            </div>
+            <div ref={honorEnvelopePrintRef}>
+              <HonorEnvelopePrint event={event} rows={honorPrintRows} />
+            </div>
+          </div>
         </div>
       ) : activeTab === 'transaksi' ? (
         <div className="space-y-5">
