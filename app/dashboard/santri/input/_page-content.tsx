@@ -58,7 +58,7 @@ export default function InputSantriPage() {
     const res = await tambahSantriSatuSatu(form)
     toast.dismiss(toastId)
     setIsSavingForm(false)
-    if (res?.error) { toast.error("Gagal", { description: res.error }); return }
+    if ('error' in res) { toast.error("Gagal", { description: res.error }); return }
     toast.success("Santri berhasil ditambahkan!")
     setForm(FORM_INIT)
   }

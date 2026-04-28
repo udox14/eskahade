@@ -23,12 +23,14 @@ interface Props {
   jemaah: string
   alamat: string
   userAsrama: string | null
+  canUpdate: boolean
 }
 
 export async function SantriTable({
   page, limit, q, asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren,
   status, jenisKelamin, golDarah, tahunMasuk, provinsi, kabKota, kecamatan, jemaah, alamat,
-  userAsrama
+  userAsrama,
+  canUpdate
 }: Props) {
   const offset = (page - 1) * limit
 
@@ -125,7 +127,7 @@ export async function SantriTable({
               </span>
             </div>
             <div className="mt-3 flex gap-2">
-              {!userAsrama && (
+              {!userAsrama && canUpdate && (
                 <Link
                   href={`/dashboard/santri/${santri.id}/edit`}
                   className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg transition-colors"
@@ -183,7 +185,7 @@ export async function SantriTable({
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {!userAsrama && (
+                      {!userAsrama && canUpdate && (
                         <Link
                           href={`/dashboard/santri/${santri.id}/edit`}
                           className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"

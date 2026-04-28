@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { guardPage } from '@/lib/auth/guard'
+import { canCrud } from '@/lib/auth/crud'
 import { query } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession, hasRole } from '@/lib/auth/session'
@@ -17,6 +18,10 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   await guardPage('/dashboard/santri')
   const searchParams = await props.searchParams
   const session = await getSession()
+  const [canCreateSantri, canUpdateSantri] = await Promise.all([
+    canCrud('/dashboard/santri', 'create'),
+    canCrud('/dashboard/santri', 'update'),
+  ])
 
   let userAsrama: string | null = null
   if (session && hasRole(session, 'pengurus_asrama')) {
@@ -151,7 +156,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           </h1>
           <p className="text-gray-500 text-xs mt-0.5">Data induk santri Pesantren Sukahideng</p>
         </div>
-        {!userAsrama && (
+        {!userAsrama && canCreateSantri && (
           <Link
             href="/dashboard/santri/input"
             className="bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-sm text-sm font-semibold w-full sm:w-auto justify-center"
@@ -205,6 +210,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           jemaah={jemaah}
           alamat={alamat}
           userAsrama={userAsrama}
+          canUpdate={canUpdateSantri}
         />
       </Suspense>
     </div>

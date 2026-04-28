@@ -2,6 +2,7 @@
 
 import { execute, query } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getCrudPermissionsForAdmin, type CrudAction } from '@/lib/auth/crud'
 import { revalidateTag } from 'next/cache'
 
 const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
@@ -72,6 +73,45 @@ export async function getAllFiturForAdmin() {
     is_active: r.is_active === 1,
     is_bottomnav: r.is_bottomnav === 1,
   }))
+}
+
+export async function getAllCrudPermissionsForAdmin() {
+  await assertAdmin()
+  return getCrudPermissionsForAdmin()
+}
+
+export async function toggleCrudPermission(
+  fiturHref: string,
+  role: string,
+  action: CrudAction,
+  currentValue: boolean
+) {
+  await assertAdmin()
+  if (!ALL_ROLES.includes(role)) throw new Error('Role tidak valid')
+  if (role === 'admin') return { success: false, message: 'Admin selalu full CRUD' }
+  if (!['create', 'update', 'delete'].includes(action)) throw new Error('Aksi tidak valid')
+
+  const column =
+    action === 'create' ? 'can_create' :
+    action === 'update' ? 'can_update' :
+    'can_delete'
+  const newVal = currentValue ? 0 : 1
+
+  await execute(
+    `INSERT INTO role_fitur_crud_permission
+       (fitur_href, role, can_create, can_update, can_delete, created_at, updated_at)
+     VALUES (?, ?, 0, 0, 0, datetime('now'), datetime('now'))
+     ON CONFLICT(fitur_href, role) DO NOTHING`,
+    [fiturHref, role]
+  )
+  await execute(
+    `UPDATE role_fitur_crud_permission
+     SET ${column} = ?, updated_at = datetime('now')
+     WHERE fitur_href = ? AND role = ?`,
+    [newVal, fiturHref, role]
+  )
+
+  return { success: true }
 }
 
 // Toggle bottom nav secara global (admin only)

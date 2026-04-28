@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { guardRole } from '@/lib/auth/guard'
+import { canCrud } from '@/lib/auth/crud'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { getSantriDetail } from './actions'
 import { SantriDetailContent } from './detail-content'
@@ -34,7 +35,8 @@ export default async function SantriDetailPage({ params }: Props) {
     }
   }
 
-  const isReadOnly = hasRole(session, 'pengurus_asrama')
+  const canUpdateSantri = await canCrud('/dashboard/santri', 'update')
+  const isReadOnly = hasRole(session, 'pengurus_asrama') || !canUpdateSantri
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">

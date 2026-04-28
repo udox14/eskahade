@@ -1,6 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
+import { assertCrud } from '@/lib/auth/crud'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -10,6 +11,9 @@ export async function getSantriById(id: string) {
 }
 
 export async function updateSantri(id: string, formData: FormData) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return access
+
   const now = new Date().toISOString()
 
   await query(

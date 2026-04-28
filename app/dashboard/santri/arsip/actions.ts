@@ -1,6 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch } from '@/lib/db'
+import { assertCrud } from '@/lib/auth/crud'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -152,6 +153,8 @@ export async function getSantriDalamGrup(
 }
 
 export async function arsipkanSantri(santriIds: string[], catatan: string): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'delete')
+  if ('error' in access) return access
   if (!santriIds || santriIds.length === 0) return { error: 'Pilih minimal 1 santri' }
 
   let berhasil = 0, gagal = 0
@@ -216,6 +219,8 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
 }
 
 export async function restoreSantri(arsipIds: string[]): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'create')
+  if ('error' in access) return access
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data untuk direstore' }
 
   let berhasil = 0, gagal = 0
@@ -292,12 +297,16 @@ export async function getArsipForDownload(arsipIds?: string[]): Promise<{ data: 
 }
 
 export async function hapusArsipPermanen(arsipId: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'delete')
+  if ('error' in access) return access
   await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
   revalidatePath('/dashboard/santri/arsip')
   return { success: true }
 }
 
 export async function hapusArsipMassal(arsipIds: string[]): Promise<{ success: boolean; count: number } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'delete')
+  if ('error' in access) return access
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data' }
   const ph = arsipIds.map(() => '?').join(',')
   await query(`DELETE FROM santri_arsip WHERE id IN (${ph})`, arsipIds)

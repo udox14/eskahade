@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal } from './actions'
-import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone } from 'lucide-react'
+import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { CrudAction } from '@/lib/auth/crud'
 
 const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
 
@@ -87,9 +88,18 @@ interface FiturItem {
   bottomnav_urutan: number
 }
 
+interface CrudPermissionItem {
+  fitur_href: string
+  role: string
+  can_create: boolean
+  can_update: boolean
+  can_delete: boolean
+}
+
 interface Props {
   fiturList: FiturItem[]
   globalBottomNavEnabled: boolean
+  crudPermissions: CrudPermissionItem[]
 }
 
 // ── Tab: Per Fitur ────────────────────────────────────────────────────────────
@@ -369,6 +379,145 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
   )
 }
 
+// ── Tab: CRUD ────────────────────────────────────────────────────────────────
+function TabCrudMatrix({
+  fiturList,
+  crudPermissions,
+  loadingId,
+  pending,
+  onToggleCrud,
+}: {
+  fiturList: FiturItem[]
+  crudPermissions: CrudPermissionItem[]
+  loadingId: string | null
+  pending: boolean
+  onToggleCrud: (fitur: FiturItem, role: string, action: CrudAction, currentValue: boolean) => void
+}) {
+  const [selectedRole, setSelectedRole] = useState<string>('sekpen')
+  const crudMap = new Map(crudPermissions.map(p => [`${p.fitur_href}::${p.role}`, p]))
+  const fiturForRole = fiturList.filter(f => f.roles.includes(selectedRole))
+
+  function hasCrud(fitur: FiturItem, role: string, action: CrudAction) {
+    if (role === 'admin') return true
+    const row = crudMap.get(`${fitur.href}::${role}`)
+    if (!row) return false
+    if (action === 'create') return row.can_create
+    if (action === 'update') return row.can_update
+    return row.can_delete
+  }
+
+  const grouped = new Map<string, FiturItem[]>()
+  for (const f of fiturForRole) {
+    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
+    grouped.get(f.group_name)!.push(f)
+  }
+  const groups = GROUP_ORDER.filter(g => grouped.has(g))
+  const actionLabels: { action: CrudAction; label: string; title: string }[] = [
+    { action: 'create', label: 'C', title: 'Create / tambah / import / catat' },
+    { action: 'update', label: 'U', title: 'Update / simpan / verifikasi / reset' },
+    { action: 'delete', label: 'D', title: 'Delete / hapus / batalkan' },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        {ALL_ROLES.map(role => {
+          const isSelected = selectedRole === role
+          return (
+            <button
+              key={role}
+              onClick={() => setSelectedRole(role)}
+              className={cn(
+                "flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-center transition-all duration-200 text-xs font-bold",
+                isSelected
+                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm`
+                  : `bg-white ${ROLE_BG_SOFT[role]} hover:shadow-sm`
+              )}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              {ROLE_LABEL[role]}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+        <span>
+          <strong>R</strong> tetap diatur dari tab Per Fitur. Di sini admin mengatur <strong>C/U/D</strong> untuk role terpilih. Admin selalu full CRUD.
+        </span>
+      </div>
+
+      {groups.map(group => (
+        <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-slate-400" />
+            <h2 className="font-semibold text-slate-700 text-sm">
+              {group === '_standalone' ? 'Menu Utama' : group}
+            </h2>
+            <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Fitur</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-14">R</th>
+                  {actionLabels.map(item => (
+                    <th key={item.action} className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-14">
+                      {item.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {grouped.get(group)!.map(fitur => (
+                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-slate-800">{fitur.title}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">{fitur.href}</div>
+                    </td>
+                    <td className="px-3 py-3.5 text-center">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-blue-50 border-blue-200 text-blue-700 text-xs font-black">
+                        R
+                      </span>
+                    </td>
+                    {actionLabels.map(item => {
+                      const value = hasCrud(fitur, selectedRole, item.action)
+                      const key = `crud-${fitur.href}-${selectedRole}-${item.action}`
+                      const disabled = selectedRole === 'admin' || loadingId === key || pending
+                      return (
+                        <td key={item.action} className="px-3 py-3.5 text-center">
+                          <button
+                            onClick={() => onToggleCrud(fitur, selectedRole, item.action, value)}
+                            disabled={disabled}
+                            title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : item.title}
+                            className={cn(
+                              "inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-black transition-all",
+                              loadingId === key && "opacity-50 cursor-wait",
+                              disabled && selectedRole === 'admin' && "cursor-not-allowed",
+                              value
+                                ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                : "bg-slate-50 border-slate-200 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                            )}
+                          >
+                            {item.label}
+                          </button>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Tab: Bottom Nav ───────────────────────────────────────────────────────────
 function TabBottomNav({
   fiturList,
@@ -588,11 +737,12 @@ function TabBottomNav({
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: initialGlobal }: Props) {
+export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: initialGlobal, crudPermissions: initialCrudPermissions }: Props) {
   const [fiturList, setFiturList] = useState<FiturItem[]>(initial)
+  const [crudPermissions, setCrudPermissions] = useState<CrudPermissionItem[]>(initialCrudPermissions)
   const [globalEnabled, setGlobalEnabled] = useState(initialGlobal)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'bottomnav'>('fitur')
+  const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'crud' | 'bottomnav'>('fitur')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -604,6 +754,33 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
 
   function updateLocal(id: number, updater: (f: FiturItem) => FiturItem) {
     setFiturList(prev => prev.map(f => f.id === id ? updater(f) : f))
+  }
+
+  function updateCrudLocal(fiturHref: string, role: string, action: CrudAction, value: boolean) {
+    setCrudPermissions(prev => {
+      const existing = prev.find(p => p.fitur_href === fiturHref && p.role === role)
+      if (existing) {
+        return prev.map(p => {
+          if (p.fitur_href !== fiturHref || p.role !== role) return p
+          return {
+            ...p,
+            can_create: action === 'create' ? value : p.can_create,
+            can_update: action === 'update' ? value : p.can_update,
+            can_delete: action === 'delete' ? value : p.can_delete,
+          }
+        })
+      }
+      return [
+        ...prev,
+        {
+          fitur_href: fiturHref,
+          role,
+          can_create: action === 'create' ? value : false,
+          can_update: action === 'update' ? value : false,
+          can_delete: action === 'delete' ? value : false,
+        },
+      ]
+    })
   }
 
   function handleToggleActive(fitur: FiturItem) {
@@ -691,6 +868,23 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
     })
   }
 
+  function handleToggleCrud(fitur: FiturItem, role: string, action: CrudAction, currentValue: boolean) {
+    if (role === 'admin') return
+    const key = `crud-${fitur.href}-${role}-${action}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await toggleCrudPermission(fitur.href, role, action, currentValue)
+        updateCrudLocal(fitur.href, role, action, !currentValue)
+        showToast(`${action.toUpperCase()} "${fitur.title}" untuk ${ROLE_LABEL[role]} ${currentValue ? 'dinonaktifkan' : 'diaktifkan'}`)
+      } catch {
+        showToast('Gagal mengubah izin CRUD', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
   return (
     <div className="space-y-5">
 
@@ -751,6 +945,18 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
           <Smartphone className="w-4 h-4" />
           Bottom Nav
         </button>
+        <button
+          onClick={() => setActiveTab('crud')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'crud'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          CRUD
+        </button>
       </div>
 
       {/* Tab content */}
@@ -764,6 +970,14 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
         />
       ) : activeTab === 'role' ? (
         <TabPerRole fiturList={fiturList} />
+      ) : activeTab === 'crud' ? (
+        <TabCrudMatrix
+          fiturList={fiturList}
+          crudPermissions={crudPermissions}
+          loadingId={loadingId}
+          pending={pending}
+          onToggleCrud={handleToggleCrud}
+        />
       ) : (
         <TabBottomNav
           fiturList={fiturList}

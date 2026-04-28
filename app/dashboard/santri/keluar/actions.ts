@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { revalidatePath } from 'next/cache'
 
 // Default page size if not provided
@@ -114,6 +115,8 @@ export async function tetapkanKeluar(params: {
   alasanKeluar: string
   buatSurat: boolean
 }): Promise<{ success: boolean; santriNama?: string } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return access
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
@@ -162,6 +165,8 @@ export async function tetapkanKeluar(params: {
 export async function aktifkanKembali(
   santriId: string
 ): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return access
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
@@ -211,6 +216,8 @@ export async function catatSuratBerhenti(
   santriId: string,
   keterangan: string
 ): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'create')
+  if ('error' in access) return access
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 

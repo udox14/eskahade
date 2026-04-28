@@ -1,7 +1,7 @@
 import { guardPage } from '@/lib/auth/guard'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
-import { getAllFiturForAdmin, getBottomNavGlobalStatus } from './actions'
+import { getAllCrudPermissionsForAdmin, getAllFiturForAdmin, getBottomNavGlobalStatus } from './actions'
 import { FiturAksesClient } from './client'
 
 export const dynamic = 'force-dynamic'
@@ -11,9 +11,10 @@ export default async function FiturAksesPage() {
   const session = await getSession()
   if (!session || !isAdmin(session)) redirect('/dashboard')
 
-  const [fiturList, globalBottomNavEnabled] = await Promise.all([
+  const [fiturList, globalBottomNavEnabled, crudPermissions] = await Promise.all([
     getAllFiturForAdmin(),
     getBottomNavGlobalStatus(),
+    getAllCrudPermissionsForAdmin(),
   ])
 
   return (
@@ -24,7 +25,11 @@ export default async function FiturAksesPage() {
           Kelola akses fitur per role pengguna. Perubahan berlaku dalam ~5 menit (cache).
         </p>
       </div>
-      <FiturAksesClient fiturList={fiturList} globalBottomNavEnabled={globalBottomNavEnabled} />
+      <FiturAksesClient
+        fiturList={fiturList}
+        globalBottomNavEnabled={globalBottomNavEnabled}
+        crudPermissions={crudPermissions}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
-import { guardRole } from '@/lib/auth/guard'
+import { guardPage } from '@/lib/auth/guard'
+import { canCrud } from '@/lib/auth/crud'
 import { getSantriById, updateSantri } from './actions'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
 
@@ -18,7 +19,8 @@ const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500
 const labelCls = "block text-xs font-bold text-gray-500 uppercase mb-1"
 
 export default async function EditSantriPage({ params }: Props) {
-  await guardRole(['admin'])
+  await guardPage('/dashboard/santri')
+  if (!(await canCrud('/dashboard/santri', 'update'))) redirect('/dashboard/santri')
   const { id } = await params
   const { data: santri, error } = await getSantriById(id)
 
