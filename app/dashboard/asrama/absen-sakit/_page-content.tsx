@@ -11,15 +11,18 @@ import {
   Lock,
   Plus,
   Search,
+  Trash2,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   cariSantriSakit,
   getDaftarAsramaSakit,
   getDataSakit,
   getRiwayatSakit,
   getSessionInfo,
+  hapusDataSakit,
   simpanDataSakit,
   tandaiSembuh,
   type DataSakitRow,
@@ -124,7 +127,9 @@ export default function DataSakitPage() {
   const [detailSantri, setDetailSantri] = useState<DataSakitRow | null>(null)
   const [riwayat, setRiwayat] = useState<RiwayatSakitItem[]>([])
   const [loadingRiwayat, setLoadingRiwayat] = useState(false)
+  const [deletingEpisodeId, setDeletingEpisodeId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirm = useConfirm()
 
   const loadBootstrap = async () => {
     const [info, asramas] = await Promise.all([getSessionInfo(), getDaftarAsramaSakit()])
@@ -289,6 +294,26 @@ export default function DataSakitPage() {
     })
   }
 
+  const handleHapus = async (row: DataSakitRow) => {
+    if (!await confirm(`Hapus data sakit ${row.nama_lengkap}?\n\nSemua catatan episode ini akan dihapus.`)) return
+
+    setDeletingEpisodeId(row.episode_id)
+    const res = await hapusDataSakit({ episodeId: row.episode_id })
+    setDeletingEpisodeId(null)
+
+    if ('error' in res) {
+      toast.error('Gagal menghapus data', { description: res.error })
+      return
+    }
+
+    toast.success('Data sakit dihapus', { description: row.nama_lengkap })
+    if (detailSantri?.episode_id === row.episode_id) {
+      setDetailSantri(null)
+      setRiwayat([])
+    }
+    await loadData()
+  }
+
   const selectedActiveRow = selectedSantri ? rows.find(row => row.santri_id === selectedSantri.id) : null
 
   return (
@@ -389,6 +414,15 @@ export default function DataSakitPage() {
                     </button>
                     <button onClick={() => handleSembuh(row)} disabled={pending} className="text-xs font-bold text-sky-700 hover:text-sky-900 disabled:text-slate-400">
                       Sembuh
+                    </button>
+                    <button
+                      onClick={() => handleHapus(row)}
+                      disabled={pending || deletingEpisodeId === row.episode_id}
+                      className="text-xs font-bold text-rose-700 hover:text-rose-900 disabled:text-slate-400 ml-3 inline-flex items-center gap-1"
+                      title="Hapus data sakit"
+                    >
+                      {deletingEpisodeId === row.episode_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      Hapus
                     </button>
                   </td>
                 </tr>
@@ -589,7 +623,18 @@ export default function DataSakitPage() {
                           <p className="text-xs text-sky-600 mt-1">Sembuh: {formatDateTime(item.sembuh_at)}</p>
                         ) : null}
                       </div>
-                      <BookOpen className="w-5 h-5 text-slate-300 hidden md:block" />
+                      <div className="flex items-center gap-2 self-start md:self-center">
+                        <button
+                          onClick={() => handleHapus(item)}
+                          disabled={pending || deletingEpisodeId === item.episode_id}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 hover:text-rose-900 disabled:text-slate-400 bg-rose-50 hover:bg-rose-100 px-2.5 py-2 rounded-xl"
+                          title="Hapus episode sakit"
+                        >
+                          {deletingEpisodeId === item.episode_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          Hapus
+                        </button>
+                        <BookOpen className="w-5 h-5 text-slate-300 hidden md:block" />
+                      </div>
                     </div>
                   ))}
                 </div>

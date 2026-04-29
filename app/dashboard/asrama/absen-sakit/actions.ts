@@ -326,6 +326,46 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
   return { success: true }
 }
 
+export async function hapusDataSakit(payload: { episodeId: string }) {
+  await ensureSchema()
+
+  const session = await requireAllowedSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const target = await queryOne<{
+    episode_id: string
+    santri_id: string
+    asrama: string | null
+    nama_lengkap: string
+  }>(`
+    SELECT
+      COALESCE(ab.episode_id, ab.id) AS episode_id,
+      ab.santri_id,
+      s.asrama,
+      s.nama_lengkap
+    FROM absen_sakit ab
+    JOIN santri s ON s.id = ab.santri_id
+    WHERE COALESCE(ab.episode_id, ab.id) = ?
+    ORDER BY ab.created_at DESC
+    LIMIT 1
+  `, [payload.episodeId])
+
+  if (!target) return { error: 'Data sakit tidak ditemukan.' }
+
+  const restrictedAsrama = await getRestrictedAsrama()
+  if (restrictedAsrama && target.asrama !== restrictedAsrama) {
+    return { error: 'Pengurus asrama hanya bisa menghapus data santri asramanya.' }
+  }
+
+  await execute(`
+    DELETE FROM absen_sakit
+    WHERE COALESCE(episode_id, id) = ?
+  `, [target.episode_id])
+
+  revalidatePath(FEATURE_PATH)
+  return { success: true, nama: target.nama_lengkap }
+}
+
 export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitItem[]> {
   await ensureSchema()
 
