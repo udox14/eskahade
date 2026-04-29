@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { getKelasList, getAbsensiData, simpanAbsensi, getAbsensiGlobalA, getAsramaList, getMarhalahList } from './actions'
-import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X, Filter, ChevronDown } from 'lucide-react'
+import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X, Filter, ChevronDown, Smartphone, Table2, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner' // IMPORT WAJIB
@@ -10,6 +10,10 @@ import { toast } from 'sonner' // IMPORT WAJIB
 // Tipe Data untuk Navigasi Grid
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
+type InputMode = 'table' | 'mobile'
+
+const STATUS_CYCLE = ['H', 'A', 'I', 'S'] as const
+const SESSION_LABEL: Record<SessionType, string> = { shubuh: 'S', ashar: 'A', maghrib: 'M' }
 
 export default function AbsensiPage() {
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -32,6 +36,8 @@ export default function AbsensiPage() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [inputMode, setInputMode] = useState<InputMode>('table')
+  const [mobileSearch, setMobileSearch] = useState('')
 
   // 1. Load Data Master
   useEffect(() => {
@@ -39,6 +45,16 @@ export default function AbsensiPage() {
     getAsramaList().then(setAsramaList)
     getMarhalahList().then(setMarhalahList)
   }, [])
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('absensi-input-mode')
+    if (saved === 'table' || saved === 'mobile') setInputMode(saved)
+  }, [])
+
+  const changeInputMode = (mode: InputMode) => {
+    setInputMode(mode)
+    window.localStorage.setItem('absensi-input-mode', mode)
+  }
 
   // 2. Load Data Utama
   const loadData = () => {
@@ -170,6 +186,13 @@ export default function AbsensiPage() {
     }))
   }
 
+  const cycleCellValue = (santriId: string, dateStr: string, session: SessionType) => {
+    const current = gridData[santriId]?.[dateStr]?.[session] || 'H'
+    const index = STATUS_CYCLE.indexOf(current as any)
+    const next = STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length]
+    handleCellChange(santriId, dateStr, session, next)
+  }
+
   // Handler: Isi Satu Baris Full (A/S/I/H)
   const handleFillRow = (santriId: string, value: string) => {
     setHasUnsavedChanges(true)
@@ -199,6 +222,17 @@ export default function AbsensiPage() {
     // Feedback visual kecil
     toast.success(`Set ${value === 'H' ? 'Reset' : value} seminggu`, { duration: 1000 })
   }
+
+  const filteredMobileSantri = useMemo(() => {
+    const q = mobileSearch.trim().toLowerCase()
+    if (!q) return dataSantri
+    return dataSantri.filter(s =>
+      String(s.nama_lengkap || '').toLowerCase().includes(q) ||
+      String(s.nis || '').toLowerCase().includes(q) ||
+      String(s.asrama || '').toLowerCase().includes(q) ||
+      String(s.kamar || '').toLowerCase().includes(q)
+    )
+  }, [dataSantri, mobileSearch])
 
   // LOGIKA NAVIGASI KEYBOARD
   const getTotalActiveSessions = () => {
@@ -491,7 +525,27 @@ export default function AbsensiPage() {
           <p className="text-slate-500 mt-1">Input absensi mingguan (rapel) santri</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => changeInputMode('table')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                inputMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Table2 className="w-4 h-4" />
+              Tabel
+            </button>
+            <button
+              onClick={() => changeInputMode('mobile')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                inputMode === 'mobile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              HP
+            </button>
+          </div>
            <button 
             onClick={handleSimpan} 
             disabled={saving || dataSantri.length === 0}
@@ -595,6 +649,25 @@ export default function AbsensiPage() {
         </div>
       </div>
 
+      {hasLoaded && inputMode === 'mobile' && dataSantri.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={mobileSearch}
+              onChange={e => setMobileSearch(e.target.value)}
+              placeholder="Cari santri, NIS, asrama, kamar..."
+              className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+            <span className="font-bold text-slate-700">{filteredMobileSantri.length}</span>
+            <span>dari {dataSantri.length} santri</span>
+            <span className="ml-auto">Tap: H → A → I → S</span>
+          </div>
+        </div>
+      )}
+
       {!hasLoaded ? (
         <div className="text-center py-20 bg-white rounded-xl border shadow-sm flex flex-col items-center justify-center gap-4">
           <Calendar className="w-16 h-16 text-slate-200" />
@@ -622,6 +695,15 @@ export default function AbsensiPage() {
             Tidak ditemukan santri yang sesuai dengan kriteria filter yang Anda pilih.
           </p>
         </div>
+      ) : inputMode === 'mobile' ? (
+        <MobileAbsensiCards
+          santriList={filteredMobileSantri}
+          days={days}
+          gridData={gridData}
+          isHoliday={isHoliday}
+          onCycleCell={cycleCellValue}
+          onFillRow={handleFillRow}
+        />
       ) : (
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
           <div className="overflow-y-auto overflow-x-hidden hover:overflow-x-auto flex-1">
@@ -733,6 +815,19 @@ export default function AbsensiPage() {
         </div>
       )}
 
+      {hasLoaded && inputMode === 'mobile' && dataSantri.length > 0 && hasUnsavedChanges && (
+        <div className="fixed left-0 right-0 bottom-0 z-50 bg-white/95 border-t border-slate-200 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+          <button
+            onClick={handleSimpan}
+            disabled={saving}
+            className="w-full bg-green-600 text-white py-3 rounded-2xl flex items-center justify-center gap-2 font-black shadow-lg shadow-green-200 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            Simpan {dirtyKeys.size} perubahan
+          </button>
+        </div>
+      )}
+
       {/* MODAL EXPORT GLOBAL ALFA */}
       {showExportModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
@@ -784,6 +879,108 @@ export default function AbsensiPage() {
       )}
     </div>
   )
+}
+
+function MobileAbsensiCards({
+  santriList,
+  days,
+  gridData,
+  isHoliday,
+  onCycleCell,
+  onFillRow,
+}: {
+  santriList: any[]
+  days: { dateStr: string; label: string; shortDate: string }[]
+  gridData: Record<string, any>
+  isHoliday: (dayName: string, session: SessionType) => boolean
+  onCycleCell: (santriId: string, dateStr: string, session: SessionType) => void
+  onFillRow: (santriId: string, value: string) => void
+}) {
+  if (santriList.length === 0) {
+    return (
+      <div className="text-center py-14 bg-white rounded-2xl border border-dashed border-slate-200">
+        <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-500">Santri tidak ditemukan</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 pb-24">
+      {santriList.map(s => {
+        const santriGrid = gridData[s.id] || {}
+        return (
+          <div key={s.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-3 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-black text-slate-900 text-sm leading-tight truncate">{s.nama_lengkap}</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {s.nis} · {s.asrama || '-'} / {s.kamar || '-'} · {s.kelas_pesantren || '-'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-4 gap-1 shrink-0">
+                  {(['H', 'A', 'I', 'S'] as const).map(status => (
+                    <button
+                      key={status}
+                      onClick={() => onFillRow(s.id, status)}
+                      className={`w-7 h-7 rounded-lg text-[11px] font-black border ${statusButtonClass(status)}`}
+                      title={`Set ${status} seminggu`}
+                    >
+                      {status === 'H' ? <Trash2 className="w-3.5 h-3.5 mx-auto" /> : status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2">
+              <div className="grid grid-cols-[2.4rem_repeat(7,minmax(0,1fr))] gap-1 mb-1">
+                <div />
+                {days.map(day => (
+                  <div key={day.dateStr} className="text-center">
+                    <div className="text-[9px] font-black text-slate-500 uppercase leading-tight">{day.label.slice(0, 3)}</div>
+                    <div className="text-[9px] text-slate-400 leading-tight">{day.shortDate}</div>
+                  </div>
+                ))}
+              </div>
+
+              {SESSIONS.map(session => (
+                <div key={session} className="grid grid-cols-[2.4rem_repeat(7,minmax(0,1fr))] gap-1 mb-1 last:mb-0">
+                  <div className="h-8 flex items-center justify-center text-[10px] font-black text-slate-500 bg-slate-50 rounded-lg border border-slate-100">
+                    {SESSION_LABEL[session]}
+                  </div>
+                  {days.map(day => {
+                    const off = isHoliday(day.label, session)
+                    const value = santriGrid[day.dateStr]?.[session] || 'H'
+                    return (
+                      <button
+                        key={`${day.dateStr}-${session}`}
+                        disabled={off}
+                        onClick={() => onCycleCell(s.id, day.dateStr, session)}
+                        className={`h-8 rounded-lg text-xs font-black border transition-colors active:scale-95 ${
+                          off ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : statusButtonClass(value)
+                        }`}
+                      >
+                        {off ? '-' : value}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function statusButtonClass(value: string) {
+  if (value === 'A') return 'bg-red-100 text-red-800 border-red-200'
+  if (value === 'I') return 'bg-blue-100 text-blue-800 border-blue-200'
+  if (value === 'S') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  return 'bg-slate-50 text-slate-500 border-slate-200'
 }
 
 function CellInput({ 

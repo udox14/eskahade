@@ -13,9 +13,7 @@ type PemasukanPayload = {
   tanggal: string
   kategori: KategoriPemasukan
   sumber?: string
-  lembar100: number
-  lembar50: number
-  nominalTambahan: number
+  nominal: number
   penjualanSeharusnya?: number
   catatan?: string
 }
@@ -34,9 +32,6 @@ type PemasukanRow = {
   waktu_catat: string
   kategori: KategoriPemasukan
   sumber: string | null
-  lembar_100: number
-  lembar_50: number
-  nominal_tambahan: number
   nominal: number
   penjualan_seharusnya: number
   selisih: number
@@ -115,10 +110,7 @@ export async function simpanPemasukanUPK(payload: PemasukanPayload): Promise<{ s
   const id = payload.id?.trim()
   const tanggal = payload.tanggal || today()
   const kategori = normalizeKategori(payload.kategori)
-  const lembar100 = Math.max(0, toInt(payload.lembar100))
-  const lembar50 = Math.max(0, toInt(payload.lembar50))
-  const nominalTambahan = Math.max(0, toInt(payload.nominalTambahan))
-  const nominal = lembar100 * 100000 + lembar50 * 50000 + nominalTambahan
+  const nominal = Math.max(0, toInt(payload.nominal))
   const penjualanSeharusnya = kategori === 'SETORAN_PENJUALAN'
     ? Math.max(0, toInt(payload.penjualanSeharusnya))
     : 0
@@ -129,20 +121,19 @@ export async function simpanPemasukanUPK(payload: PemasukanPayload): Promise<{ s
   if (id) {
     await execute(`
       UPDATE upk_pemasukan
-      SET tanggal = ?, kategori = ?, sumber = ?, lembar_100 = ?, lembar_50 = ?,
-          nominal_tambahan = ?, nominal = ?, penjualan_seharusnya = ?, selisih = ?,
+      SET tanggal = ?, kategori = ?, sumber = ?, nominal = ?, penjualan_seharusnya = ?, selisih = ?,
           catatan = ?, updated_at = ?
       WHERE id = ?
-    `, [tanggal, kategori, payload.sumber?.trim() || null, lembar100, lembar50,
-        nominalTambahan, nominal, penjualanSeharusnya, selisih, payload.catatan?.trim() || null, now(), id])
+    `, [tanggal, kategori, payload.sumber?.trim() || null, nominal,
+        penjualanSeharusnya, selisih, payload.catatan?.trim() || null, now(), id])
   } else {
     await execute(`
       INSERT INTO upk_pemasukan
-        (id, tanggal, waktu_catat, kategori, sumber, lembar_100, lembar_50,
-         nominal_tambahan, nominal, penjualan_seharusnya, selisih, catatan, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [generateId(), tanggal, now(), kategori, payload.sumber?.trim() || null, lembar100, lembar50,
-        nominalTambahan, nominal, penjualanSeharusnya, selisih, payload.catatan?.trim() || null, session?.id ?? null, now(), now()])
+        (id, tanggal, waktu_catat, kategori, sumber, nominal, penjualan_seharusnya,
+         selisih, catatan, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [generateId(), tanggal, now(), kategori, payload.sumber?.trim() || null, nominal,
+        penjualanSeharusnya, selisih, payload.catatan?.trim() || null, session?.id ?? null, now(), now()])
   }
 
   revalidatePath(PEMASUKAN_PATH)

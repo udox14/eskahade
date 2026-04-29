@@ -1,7 +1,7 @@
 'use client'
 
 import type React from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Banknote,
   CalendarDays,
@@ -46,9 +46,6 @@ type PemasukanItem = {
   waktu_catat: string
   kategori: KategoriPemasukan
   sumber: string | null
-  lembar_100: number
-  lembar_50: number
-  nominal_tambahan: number
   nominal: number
   penjualan_seharusnya: number
   selisih: number
@@ -60,9 +57,7 @@ type FormState = {
   id: string
   kategori: KategoriPemasukan
   sumber: string
-  lembar100: string
-  lembar50: string
-  nominalTambahan: string
+  nominal: string
   penjualanSeharusnya: string
   catatan: string
 }
@@ -71,9 +66,7 @@ const emptyForm: FormState = {
   id: '',
   kategori: 'SETORAN_PENJUALAN',
   sumber: '',
-  lembar100: '0',
-  lembar50: '0',
-  nominalTambahan: '0',
+  nominal: '0',
   penjualanSeharusnya: '0',
   catatan: '',
 }
@@ -118,10 +111,7 @@ export default function PemasukanUPKPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
 
-  const nominalForm = useMemo(() => {
-    return toInt(form.lembar100) * 100000 + toInt(form.lembar50) * 50000 + toInt(form.nominalTambahan)
-  }, [form.lembar100, form.lembar50, form.nominalTambahan])
-
+  const nominalForm = toInt(form.nominal)
   const selisihForm = nominalForm - toInt(form.penjualanSeharusnya)
 
   const loadData = useCallback(async () => {
@@ -172,9 +162,7 @@ export default function PemasukanUPKPage() {
       id: item.id,
       kategori: item.kategori,
       sumber: item.sumber ?? '',
-      lembar100: String(item.lembar_100 ?? 0),
-      lembar50: String(item.lembar_50 ?? 0),
-      nominalTambahan: String(item.nominal_tambahan ?? 0),
+      nominal: String(item.nominal ?? 0),
       penjualanSeharusnya: String(item.penjualan_seharusnya ?? 0),
       catatan: item.catatan ?? '',
     })
@@ -189,9 +177,7 @@ export default function PemasukanUPKPage() {
       tanggal,
       kategori: form.kategori,
       sumber: form.sumber,
-      lembar100: toInt(form.lembar100),
-      lembar50: toInt(form.lembar50),
-      nominalTambahan: toInt(form.nominalTambahan),
+      nominal: toInt(form.nominal),
       penjualanSeharusnya: toInt(form.penjualanSeharusnya),
       catatan: form.catatan,
     })
@@ -230,7 +216,7 @@ export default function PemasukanUPKPage() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Wallet className="w-6 h-6 text-emerald-600" /> Pemasukan
           </h1>
-          <p className="text-slate-500 text-sm">Catatan uang fisik, setoran pecahan besar, dan pinjaman modal UPK.</p>
+          <p className="text-slate-500 text-sm">Catatan uang fisik, setoran harian, dan pinjaman modal UPK.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative">
@@ -260,7 +246,7 @@ export default function PemasukanUPKPage() {
         <div className="bg-white border rounded-lg p-4">
           <p className="text-[11px] font-bold text-slate-400 uppercase">Setoran Dicatat</p>
           <p className="text-lg font-extrabold text-emerald-700">{rupiah(ringkasan?.total_setoran ?? 0)}</p>
-          <p className="text-xs text-slate-500">pecahan besar dan tambahan</p>
+          <p className="text-xs text-slate-500">uang fisik yang dicatat</p>
         </div>
         <div className="bg-white border rounded-lg p-4">
           <p className="text-[11px] font-bold text-slate-400 uppercase">Belum Direkap</p>
@@ -283,7 +269,7 @@ export default function PemasukanUPKPage() {
         <button onClick={() => openTambah('SETORAN_PENJUALAN')} className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-left hover:bg-emerald-100">
           <Banknote className="w-5 h-5 text-emerald-700 mb-2" />
           <p className="font-extrabold text-emerald-900">Setoran Penjualan</p>
-          <p className="text-xs text-emerald-700">Catat uang fisik dari hasil kasir, biasanya lembar 100/50 ribu.</p>
+          <p className="text-xs text-emerald-700">Catat total uang fisik dari hasil kasir.</p>
         </button>
         <button onClick={() => openTambah('PINJAMAN_MODAL')} className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left hover:bg-blue-100">
           <HandCoins className="w-5 h-5 text-blue-700 mb-2" />
@@ -303,12 +289,11 @@ export default function PemasukanUPKPage() {
           <p className="text-xs font-semibold text-slate-500">{pemasukan.length} catatan</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-sm text-left">
+          <table className="w-full min-w-[950px] text-sm text-left">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
                 <th className="px-4 py-3">Waktu</th>
                 <th className="px-4 py-3">Kategori</th>
-                <th className="px-4 py-3 text-right">Pecahan</th>
                 <th className="px-4 py-3 text-right">Nominal</th>
                 <th className="px-4 py-3 text-right">Penjualan</th>
                 <th className="px-4 py-3 text-right">Selisih</th>
@@ -318,9 +303,9 @@ export default function PemasukanUPKPage() {
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={8} className="py-16 text-center"><Loader2 className="w-7 h-7 animate-spin mx-auto text-emerald-600" /></td></tr>
+                <tr><td colSpan={7} className="py-16 text-center"><Loader2 className="w-7 h-7 animate-spin mx-auto text-emerald-600" /></td></tr>
               ) : pemasukan.length === 0 ? (
-                <tr><td colSpan={8} className="py-16 text-center text-slate-400">Belum ada pemasukan pada tanggal ini.</td></tr>
+                <tr><td colSpan={7} className="py-16 text-center text-slate-400">Belum ada pemasukan pada tanggal ini.</td></tr>
               ) : pemasukan.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
@@ -330,11 +315,6 @@ export default function PemasukanUPKPage() {
                   <td className="px-4 py-3">
                     <p className="font-bold text-slate-800">{kategoriLabel(item.kategori)}</p>
                     {item.sumber && <p className="text-xs text-slate-500">{item.sumber}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-xs">
-                    <p>100rb x {item.lembar_100}</p>
-                    <p>50rb x {item.lembar_50}</p>
-                    {item.nominal_tambahan > 0 && <p>Tambah {rupiah(item.nominal_tambahan)}</p>}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-extrabold text-emerald-700">{rupiah(item.nominal)}</td>
                   <td className="px-4 py-3 text-right font-mono">{item.kategori === 'SETORAN_PENJUALAN' ? rupiah(item.penjualan_seharusnya) : '-'}</td>
@@ -413,19 +393,16 @@ export default function PemasukanUPKPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Lembar 100rb</label>
-                  <input type="number" min="0" value={form.lembar100} onChange={e => setField('lembar100', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Lembar 50rb</label>
-                  <input type="number" min="0" value={form.lembar50} onChange={e => setField('lembar50', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Tambahan Manual</label>
-                  <input type="number" min="0" value={form.nominalTambahan} onChange={e => setField('nominalTambahan', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm" />
-                </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Nominal Uang Dicatat</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.nominal}
+                  onChange={e => setField('nominal', e.target.value)}
+                  className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm"
+                  placeholder="Masukkan total uang fisik"
+                />
               </div>
 
               <div className="grid grid-cols-3 gap-2 bg-slate-50 border rounded-lg p-3 text-xs">

@@ -8,9 +8,6 @@ CREATE TABLE IF NOT EXISTS upk_pemasukan (
   waktu_catat           TEXT NOT NULL,
   kategori              TEXT NOT NULL DEFAULT 'SETORAN_PENJUALAN', -- SETORAN_PENJUALAN | PINJAMAN_MODAL | LAINNYA
   sumber                TEXT,
-  lembar_100            INTEGER NOT NULL DEFAULT 0,
-  lembar_50             INTEGER NOT NULL DEFAULT 0,
-  nominal_tambahan      INTEGER NOT NULL DEFAULT 0,
   nominal               INTEGER NOT NULL DEFAULT 0,
   penjualan_seharusnya  INTEGER NOT NULL DEFAULT 0,
   selisih               INTEGER NOT NULL DEFAULT 0,
