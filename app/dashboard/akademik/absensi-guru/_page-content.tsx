@@ -2,13 +2,18 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { getJurnalGuru, simpanAbsensiGuru, getMarhalahList } from './actions'
-import { Save, Loader2, Briefcase, User, Filter, Search } from 'lucide-react'
+import { Save, Loader2, Briefcase, User, Filter, Search, Smartphone, Table2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner'
 
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
+type InputMode = 'table' | 'mobile'
+
+const STATUS_CYCLE = ['H', 'A', 'B'] as const
+const SESSION_LABEL: Record<SessionType, string> = { shubuh: 'S', ashar: 'A', maghrib: 'M' }
+const SESSION_NAME: Record<SessionType, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib' }
 
 export default function AbsensiGuruPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -24,11 +29,23 @@ export default function AbsensiGuruPage() {
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
+  const [inputMode, setInputMode] = useState<InputMode>('table')
+  const [mobileSearch, setMobileSearch] = useState('')
 
   // Init Marhalah
   useEffect(() => {
     getMarhalahList().then(setMarhalahList)
   }, [])
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('absensi-guru-input-mode')
+    if (saved === 'table' || saved === 'mobile') setInputMode(saved)
+  }, [])
+
+  const changeInputMode = (mode: InputMode) => {
+    setInputMode(mode)
+    window.localStorage.setItem('absensi-guru-input-mode', mode)
+  }
 
   // EFFECT UNTUK WARNING KETIKA BELUM SAVE
   useEffect(() => {
@@ -177,8 +194,7 @@ export default function AbsensiGuruPage() {
   // --- HANDLERS (Gunakan useCallback) ---
   const handleCellChange = useCallback((kelasId: string, dateStr: string, session: SessionType, value: string) => {
     const upperVal = value.toUpperCase()
-    // Validasi input: hanya H, A, S, I, B, L atau kosong
-    if (!['H', 'A', 'S', 'I', 'B', 'L', ''].includes(upperVal)) return
+    if (!['H', 'A', 'B', ''].includes(upperVal)) return
     
     setHasUnsavedChanges(true)
     const key = `${kelasId}-${dateStr}`
@@ -191,10 +207,29 @@ export default function AbsensiGuruPage() {
       ...prev,
       [key]: {
         ...(prev[key] || { shubuh:'', ashar:'', maghrib:'' }),
-        [session]: upperVal
+        [session]: upperVal || 'H'
       }
     }))
   }, []) // Empty dependency karena state updater (setGridData) stabil
+
+  const cycleCellValue = (kelasId: string, dateStr: string, session: SessionType) => {
+    const current = gridData[`${kelasId}-${dateStr}`]?.[session] || 'H'
+    const index = STATUS_CYCLE.indexOf(current as any)
+    const next = STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length]
+    handleCellChange(kelasId, dateStr, session, next)
+  }
+
+  const filteredMobileKelas = useMemo(() => {
+    const q = mobileSearch.trim().toLowerCase()
+    if (!q) return dataList
+    return dataList.filter(k =>
+      String(k.nama_kelas || '').toLowerCase().includes(q) ||
+      String(k.marhalah_nama || '').toLowerCase().includes(q) ||
+      String(k.guru_shubuh_nama || '').toLowerCase().includes(q) ||
+      String(k.guru_ashar_nama || '').toLowerCase().includes(q) ||
+      String(k.guru_maghrib_nama || '').toLowerCase().includes(q)
+    )
+  }, [dataList, mobileSearch])
 
   const handleSimpan = async () => {
     if (dirtyKeys.size === 0) {
@@ -294,6 +329,26 @@ export default function AbsensiGuruPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                <button
+                    onClick={() => changeInputMode('table')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                        inputMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                    <Table2 className="w-4 h-4" />
+                    Tabel
+                </button>
+                <button
+                    onClick={() => changeInputMode('mobile')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                        inputMode === 'mobile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                    <Smartphone className="w-4 h-4" />
+                    HP
+                </button>
+            </div>
              <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex items-center gap-2 shadow-sm">
                 <Filter className="w-4 h-4 text-slate-400 ml-2"/>
                 <select 
@@ -340,10 +395,36 @@ export default function AbsensiGuruPage() {
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-green-100 text-green-700 font-bold border rounded flex items-center justify-center">H</span> Hadir</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-yellow-100 text-yellow-700 font-bold border rounded flex items-center justify-center">B</span> Badal</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-red-100 text-red-700 font-bold border rounded flex items-center justify-center">A</span> Kosong</span>
-        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-slate-200 text-slate-500 font-bold border rounded flex items-center justify-center">L</span> Libur</span>
-        <span className="ml-auto italic">* Navigasi panah kanan/kiri terkunci per baris</span>
+        <span className="ml-auto italic">* Mode HP: tap H → A → B</span>
       </div>
 
+      {hasLoaded && inputMode === 'mobile' && dataList.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={mobileSearch}
+              onChange={e => setMobileSearch(e.target.value)}
+              placeholder="Cari kelas atau nama guru..."
+              className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+            <span className="font-bold text-slate-700">{filteredMobileKelas.length}</span>
+            <span>dari {dataList.length} kelas</span>
+          </div>
+        </div>
+      )}
+
+      {hasLoaded && inputMode === 'mobile' && !loading ? (
+        <MobileAbsensiGuruCards
+          kelasList={filteredMobileKelas}
+          days={days}
+          gridData={gridData}
+          isLibur={isLibur}
+          onCycleCell={cycleCellValue}
+        />
+      ) : (
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
         {!hasLoaded ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
@@ -436,8 +517,141 @@ export default function AbsensiGuruPage() {
              </div>
            )}
       </div>
+      )}
+
+      {hasLoaded && inputMode === 'mobile' && dataList.length > 0 && hasUnsavedChanges && (
+        <div className="fixed left-0 right-0 bottom-0 z-50 bg-white/95 border-t border-slate-200 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
+          <button
+            onClick={handleSimpan}
+            disabled={saving}
+            className="w-full bg-indigo-700 text-white py-3 rounded-2xl flex items-center justify-center gap-2 font-black shadow-lg shadow-indigo-200 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            Simpan {dirtyKeys.size} perubahan
+          </button>
+        </div>
+      )}
     </div>
   )
+}
+
+function getGuruGroups(kelas: any) {
+  const map = new Map<string, { id: string; name: string; sessions: SessionType[] }>()
+  const add = (id: any, name: any, session: SessionType) => {
+    if (!id || !name) return
+    const key = String(id)
+    if (!map.has(key)) map.set(key, { id: key, name: String(name), sessions: [] })
+    map.get(key)!.sessions.push(session)
+  }
+
+  add(kelas.guru_shubuh_id, kelas.guru_shubuh_nama, 'shubuh')
+  add(kelas.guru_ashar_id, kelas.guru_ashar_nama, 'ashar')
+  add(kelas.guru_maghrib_id, kelas.guru_maghrib_nama, 'maghrib')
+
+  return Array.from(map.values()).sort((a, b) => {
+    const score = (item: { sessions: SessionType[] }) =>
+      item.sessions.includes('shubuh') ? 1 : item.sessions.includes('ashar') ? 2 : 3
+    return score(a) - score(b)
+  })
+}
+
+function MobileAbsensiGuruCards({
+  kelasList,
+  days,
+  gridData,
+  isLibur,
+  onCycleCell,
+}: {
+  kelasList: any[]
+  days: { dateStr: string; label: string; abbrev: string; shortDate: string; dayName: string }[]
+  gridData: Record<string, any>
+  isLibur: (dayName: string, session: SessionType) => boolean
+  onCycleCell: (kelasId: string, dateStr: string, session: SessionType) => void
+}) {
+  if (kelasList.length === 0) {
+    return (
+      <div className="text-center py-14 bg-white rounded-2xl border border-dashed border-slate-200">
+        <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-500">Kelas atau guru tidak ditemukan</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 pb-24">
+      {kelasList.map(kelas => {
+        const groups = getGuruGroups(kelas)
+        return (
+          <div key={kelas.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-3 border-b border-slate-100 bg-slate-50/70">
+              <p className="font-black text-slate-900 text-base leading-tight">{kelas.nama_kelas}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{kelas.marhalah_nama || 'Tanpa tingkat'}</p>
+            </div>
+
+            {groups.length === 0 ? (
+              <div className="p-4 text-sm text-slate-400">Belum ada guru pengajar di kelas ini.</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {groups.map(group => (
+                  <div key={group.id} className="p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                        <User className="w-3.5 h-3.5 text-indigo-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-slate-800 truncate">{group.name}</p>
+                        <p className="text-[10px] text-slate-400">{group.sessions.map(s => SESSION_NAME[s]).join(', ')}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] gap-1">
+                      <div />
+                      {days.map(day => (
+                        <div key={day.dateStr} className="text-center">
+                          <div className="text-[9px] font-black text-slate-500 uppercase leading-tight">{day.abbrev}</div>
+                          <div className="text-[9px] text-slate-400 leading-tight">{day.shortDate}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {group.sessions.map(session => (
+                      <div key={session} className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] gap-1">
+                        <div className="h-8 flex items-center justify-center text-[10px] font-black text-slate-500 bg-slate-50 rounded-lg border border-slate-100">
+                          {SESSION_LABEL[session]}
+                        </div>
+                        {days.map(day => {
+                          const off = isLibur(day.dayName, session)
+                          const value = gridData[`${kelas.id}-${day.dateStr}`]?.[session] || 'H'
+                          return (
+                            <button
+                              key={`${kelas.id}-${day.dateStr}-${session}`}
+                              disabled={off}
+                              onClick={() => onCycleCell(kelas.id, day.dateStr, session)}
+                              className={`h-8 rounded-lg text-xs font-black border transition-colors active:scale-95 ${
+                                off ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : guruStatusButtonClass(value)
+                              }`}
+                            >
+                              {off ? '-' : value}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function guruStatusButtonClass(value: string) {
+  if (value === 'A') return 'bg-red-100 text-red-800 border-red-200'
+  if (value === 'B') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  return 'bg-green-50 text-green-700 border-green-200'
 }
 
 // --- OPTIMASI KOMPONEN (React.memo) ---
