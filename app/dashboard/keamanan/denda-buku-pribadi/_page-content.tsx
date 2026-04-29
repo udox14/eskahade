@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Book, CheckCircle2, Eye, Loader2, Plus, Search, X } from 'lucide-react'
+import { CheckCircle2, Eye, Loader2, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   cariSantriDenda,
@@ -40,11 +40,13 @@ export default function DendaBukuPribadiPageContent() {
   const [stats, setStats] = useState<DendaStats>({ totalSantri: 0, totalKasus: 0, totalNominal: 0, totalBelumLunas: 0 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [santriSearch, setSantriSearch] = useState('')
   const [hasilCari, setHasilCari] = useState<SantriOption[]>([])
   const [selectedSantri, setSelectedSantri] = useState<SantriOption | null>(null)
   const [tanggal, setTanggal] = useState(todayKey())
   const [keterangan, setKeterangan] = useState('')
   const [nextDenda, setNextDenda] = useState<{ kehilanganKe: number; nominal: number } | null>(null)
+  const [showCatatModal, setShowCatatModal] = useState(false)
   const [modalSantri, setModalSantri] = useState<DendaSantriSummary | null>(null)
   const [details, setDetails] = useState<DendaBukuDetail[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
@@ -73,12 +75,31 @@ export default function DendaBukuPribadiPageContent() {
     )
   }, [rows, search])
 
+  const resetCatatForm = () => {
+    setSantriSearch('')
+    setHasilCari([])
+    setSelectedSantri(null)
+    setTanggal(todayKey())
+    setKeterangan('')
+    setNextDenda(null)
+  }
+
+  const openCatatModal = () => {
+    resetCatatForm()
+    setShowCatatModal(true)
+  }
+
+  const closeCatatModal = () => {
+    setShowCatatModal(false)
+    resetCatatForm()
+  }
+
   const handleCariSantri = async () => {
-    if (search.trim().length < 2) {
+    if (santriSearch.trim().length < 2) {
       toast.warning('Ketik minimal 2 huruf nama atau NIS')
       return
     }
-    const res = await cariSantriDenda(search)
+    const res = await cariSantriDenda(santriSearch)
     setHasilCari(res)
     if (res.length === 0) toast.info('Santri tidak ditemukan')
   }
@@ -109,9 +130,7 @@ export default function DendaBukuPribadiPageContent() {
       }
 
       toast.success(`Denda ke-${res.kehilanganKe} dicatat: ${rupiah(res.nominal)}`)
-      setSelectedSantri(null)
-      setNextDenda(null)
-      setKeterangan('')
+      closeCatatModal()
       await loadData()
     })
   }
@@ -141,12 +160,15 @@ export default function DendaBukuPribadiPageContent() {
     <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full mb-3">
-            <Book className="w-3.5 h-3.5" /> Perizinan & Disiplin
-          </div>
           <h1 className="text-2xl font-bold text-slate-800">Denda Buku Pribadi</h1>
           <p className="text-sm text-slate-500 mt-1">Catat kehilangan buku pribadi. Nominal otomatis naik Rp25.000 setiap kejadian.</p>
         </div>
+        <button
+          onClick={openCatatModal}
+          className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow-sm"
+        >
+          <Plus className="w-4 h-4" /> Catat Kehilangan
+        </button>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -156,101 +178,7 @@ export default function DendaBukuPribadiPageContent() {
         <StatCard label="Belum Lunas" value={rupiah(stats.totalBelumLunas)} dark />
       </div>
 
-      <div className="grid lg:grid-cols-[390px_1fr] gap-5 items-start">
-        <section className="bg-white border rounded-2xl p-5 space-y-4">
-          <div>
-            <h2 className="font-bold text-slate-800">Catat Kehilangan</h2>
-            <p className="text-sm text-slate-500">Pilih santri, sistem akan menentukan urutan dan nominal denda.</p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase">Cari Santri</label>
-            <div className="flex gap-2">
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCariSantri()}
-                placeholder="Nama atau NIS"
-                className="flex-1 border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
-              />
-              <button onClick={handleCariSantri} className="bg-rose-600 hover:bg-rose-700 text-white px-3 rounded-xl">
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
-
-            {hasilCari.length > 0 && (
-              <div className="border rounded-xl overflow-hidden bg-white">
-                {hasilCari.map(santri => (
-                  <button
-                    key={santri.id}
-                    onClick={() => pilihSantri(santri)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-rose-50 border-b last:border-b-0"
-                  >
-                    <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
-                    <p className="text-xs text-slate-500">{santri.asrama || '-'} / Kamar {santri.kamar || '-'}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {selectedSantri ? (
-            <div className="border rounded-2xl p-4 bg-rose-50 border-rose-100">
-              <div className="flex justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-rose-500 uppercase">Santri Dipilih</p>
-                  <p className="font-bold text-slate-900 mt-0.5">{selectedSantri.nama_lengkap}</p>
-                  <p className="text-xs text-slate-500">{selectedSantri.asrama || '-'} / Kamar {selectedSantri.kamar || '-'}</p>
-                </div>
-                <button onClick={() => { setSelectedSantri(null); setNextDenda(null) }} className="text-slate-400 hover:text-slate-700">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <div className="bg-white rounded-xl border p-3">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase">Hilang Ke</p>
-                  <p className="text-xl font-bold text-slate-800">{nextDenda?.kehilanganKe || '-'}</p>
-                </div>
-                <div className="bg-white rounded-xl border p-3">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase">Nominal</p>
-                  <p className="text-xl font-bold text-rose-700">{rupiah(nextDenda?.nominal || 0)}</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Tanggal</label>
-              <input
-                type="date"
-                value={tanggal}
-                onChange={e => setTanggal(e.target.value)}
-                className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Keterangan</label>
-              <textarea
-                value={keterangan}
-                onChange={e => setKeterangan(e.target.value)}
-                rows={3}
-                placeholder="Opsional"
-                className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={submitDenda}
-            disabled={pending || !selectedSantri}
-            className="w-full bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
-          >
-            {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Catat Denda
-          </button>
-        </section>
-
+      <div>
         <section className="bg-white border rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
@@ -311,6 +239,113 @@ export default function DendaBukuPribadiPageContent() {
           </div>
         </section>
       </div>
+
+      {showCatatModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3 bg-slate-50">
+              <div>
+                <h2 className="font-bold text-slate-800">Catat Kehilangan</h2>
+                <p className="text-sm text-slate-500">Pilih santri, sistem akan menghitung nominal otomatis.</p>
+              </div>
+              <button onClick={closeCatatModal} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase">Cari Santri</label>
+                <div className="flex gap-2">
+                  <input
+                    value={santriSearch}
+                    onChange={e => setSantriSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCariSantri()}
+                    placeholder="Nama atau NIS"
+                    className="flex-1 border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                  />
+                  <button onClick={handleCariSantri} className="bg-rose-600 hover:bg-rose-700 text-white px-3 rounded-xl">
+                    <Search className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {hasilCari.length > 0 && (
+                  <div className="border rounded-xl overflow-hidden bg-white">
+                    {hasilCari.map(santri => (
+                      <button
+                        key={santri.id}
+                        onClick={() => pilihSantri(santri)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-rose-50 border-b last:border-b-0"
+                      >
+                        <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
+                        <p className="text-xs text-slate-500">{santri.asrama || '-'} / Kamar {santri.kamar || '-'}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedSantri ? (
+                <div className="border rounded-2xl p-4 bg-rose-50 border-rose-100">
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold text-rose-500 uppercase">Santri Dipilih</p>
+                      <p className="font-bold text-slate-900 mt-0.5">{selectedSantri.nama_lengkap}</p>
+                      <p className="text-xs text-slate-500">{selectedSantri.asrama || '-'} / Kamar {selectedSantri.kamar || '-'}</p>
+                    </div>
+                    <button onClick={() => { setSelectedSantri(null); setNextDenda(null) }} className="text-slate-400 hover:text-slate-700">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <div className="bg-white rounded-xl border p-3">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Hilang Ke</p>
+                      <p className="text-xl font-bold text-slate-800">{nextDenda?.kehilanganKe || '-'}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border p-3">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Nominal</p>
+                      <p className="text-xl font-bold text-rose-700">{rupiah(nextDenda?.nominal || 0)}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tanggal</label>
+                  <input
+                    type="date"
+                    value={tanggal}
+                    onChange={e => setTanggal(e.target.value)}
+                    className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Keterangan</label>
+                  <textarea
+                    value={keterangan}
+                    onChange={e => setKeterangan(e.target.value)}
+                    rows={3}
+                    placeholder="Opsional"
+                    className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t bg-white">
+              <button
+                onClick={submitDenda}
+                disabled={pending || !selectedSantri}
+                className="w-full bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Catat Denda
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalSantri && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">

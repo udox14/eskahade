@@ -22,6 +22,17 @@ function hitungHariEfektif(startDate: string, endDate: string, session: 'shubuh'
   return count
 }
 
+function getDateRange(startDate: string, endDate: string) {
+  const dates: string[] = []
+  const current = new Date(startDate)
+  const end = new Date(endDate)
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0])
+    current.setDate(current.getDate() + 1)
+  }
+  return dates
+}
+
 export async function getMarhalahList() {
   return getCachedMarhalahList()
 }
@@ -95,24 +106,36 @@ export async function getRekapKinerjaGuru(
     mapJadwal.set(k.id, { shubuh: { id: k.gs_id }, ashar: { id: k.ga_id }, maghrib: { id: k.gm_id } })
   })
 
+  const absensiMap = new Map<string, any>()
   absensiList.forEach((absen: any) => {
-    const jadwal = mapJadwal.get(absen.kelas_id)
+    absensiMap.set(`${absen.kelas_id}-${absen.tanggal}`, absen)
+  })
+
+  const dates = getDateRange(startDate, endDate)
+  kelasList.forEach((kelas: any) => {
+    const jadwal = mapJadwal.get(kelas.id)
     if (!jadwal) return
 
-    const processSession = (session: 'shubuh' | 'ashar' | 'maghrib') => {
-      const guruId = jadwal[session]?.id
-      if (!guruId || !statsGuru.has(guruId)) return
-      const stat = statsGuru.get(guruId)
-      const status = absen[session]
-      if (status === 'L') { stat.libur++; stat.total_wajib-- }
-      else if (status === 'H') stat.hadir++
-      else if (status === 'B') stat.badal++
-      else if (status === 'A') stat.kosong++
-    }
+    dates.forEach(tanggal => {
+      const dayOfWeek = new Date(tanggal).getDay()
+      const absen = absensiMap.get(`${kelas.id}-${tanggal}`)
 
-    processSession('shubuh')
-    processSession('ashar')
-    processSession('maghrib')
+      const processSession = (session: 'shubuh' | 'ashar' | 'maghrib') => {
+        if (isLibur(dayOfWeek, session)) return
+        const guruId = jadwal[session]?.id
+        if (!guruId || !statsGuru.has(guruId)) return
+
+        const stat = statsGuru.get(guruId)
+        const status = String(absen?.[session] || 'H').toUpperCase()
+        if (status === 'A') stat.kosong++
+        else if (status === 'B') stat.badal++
+        else stat.hadir++
+      }
+
+      processSession('shubuh')
+      processSession('ashar')
+      processSession('maghrib')
+    })
   })
 
   const result = Array.from(statsGuru.values()).map(g => {

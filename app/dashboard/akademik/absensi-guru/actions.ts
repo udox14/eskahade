@@ -39,7 +39,11 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 
   const absensiMap: Record<string, any> = {}
   absensi.forEach((a: any) => {
-    absensiMap[`${a.kelas_id}-${a.tanggal}`] = { shubuh: a.shubuh, ashar: a.ashar, maghrib: a.maghrib }
+    absensiMap[`${a.kelas_id}-${a.tanggal}`] = {
+      shubuh: a.shubuh || 'H',
+      ashar: a.ashar || 'H',
+      maghrib: a.maghrib || 'H',
+    }
   })
 
   return {
@@ -53,6 +57,11 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 export async function simpanAbsensiGuru(payload: any[]) {
   const session = await getSession()
   if (payload.length === 0) return { error: 'Tidak ada data untuk disimpan' }
+
+  const normalizeStatus = (value: unknown) => {
+    const status = String(value || 'H').toUpperCase()
+    return status === 'A' || status === 'B' ? status : 'H'
+  }
 
   const statements = payload.map(item => ({
     sql: `
@@ -70,9 +79,9 @@ export async function simpanAbsensiGuru(payload: any[]) {
       item.kelas_id,
       item.guru_id_wali ?? null,
       item.tanggal,
-      item.shubuh ?? '',
-      item.ashar ?? '',
-      item.maghrib ?? '',
+      normalizeStatus(item.shubuh),
+      normalizeStatus(item.ashar),
+      normalizeStatus(item.maghrib),
       session?.id ?? null,
     ],
   }))

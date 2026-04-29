@@ -251,9 +251,9 @@ export default function AbsensiGuruPage() {
             kelas_id: k.id,
             guru_id_wali: k.guru_maghrib_id || k.guru_ashar_id || k.guru_shubuh_id || null,
             tanggal: day.dateStr,
-            shubuh: val.shubuh || '',
-            ashar: val.ashar || '',
-            maghrib: val.maghrib || ''
+            shubuh: val.shubuh || 'H',
+            ashar: val.ashar || 'H',
+            maghrib: val.maghrib || 'H'
           })
         }
       })

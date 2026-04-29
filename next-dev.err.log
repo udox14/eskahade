@@ -24,3 +24,23 @@ You must be logged in to use wrangler dev in remote mode. Try logging in, or run
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async query (lib\db\index.ts:15:23)
+    at async getDaftarAsramaSakit (app\dashboard\asrama\absen-sakit\actions.ts:100:16)
+  13 | ): Promise<T[]> {
+  14 |   const db = await getDB()
+> 15 |   const { results } = await db.prepare(sql).bind(...params).all<T>()
+     |                       ^
+  16 |   return results ?? []
+  17 | }
+  18 | {
+  digest: '3627154532',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:366:41)
+}
