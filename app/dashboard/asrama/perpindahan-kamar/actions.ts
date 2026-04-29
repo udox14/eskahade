@@ -1,35 +1,135 @@
 'use server'
 
-import { query, queryOne, execute, batch, getDB } from '@/lib/db'
+import { query, queryOne, execute, getDB } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
 
+type KamarInput = { nomor_kamar: string; kuota: number; blok?: string }
+type AccessOk = { session: NonNullable<Awaited<ReturnType<typeof getSession>>>; asrama: string }
+
+async function assertAsramaAccess(asrama: string): Promise<AccessOk | { error: string }> {
+  const session = await getSession()
+  const targetAsrama = asrama?.trim()
+
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
+    return { error: 'Unauthorized' }
+  }
+  if (!targetAsrama) return { error: 'Asrama wajib dipilih' }
+
+  if (!isAdmin(session)) {
+    if (!hasRole(session, 'pengurus_asrama')) return { error: 'Unauthorized' }
+    if (!session.asrama_binaan) return { error: 'Asrama binaan akun belum diset' }
+    if (session.asrama_binaan !== targetAsrama) {
+      return { error: 'Anda hanya boleh mengelola asrama binaan Anda' }
+    }
+  }
+
+  return { session, asrama: targetAsrama }
+}
+
+function cleanKamarList(kamarList: KamarInput[]): KamarInput[] | { error: string } {
+  if (!kamarList.length) return { error: 'Tambahkan minimal 1 kamar' }
+
+  const seen = new Set<string>()
+  const cleaned = kamarList.map(k => ({
+    nomor_kamar: String(k.nomor_kamar ?? '').trim(),
+    kuota: Number(k.kuota),
+    blok: k.blok ? String(k.blok).trim().toUpperCase() : '',
+  }))
+
+  for (const k of cleaned) {
+    if (!k.nomor_kamar) return { error: 'Nomor kamar tidak boleh kosong' }
+    if (seen.has(k.nomor_kamar)) return { error: `Nomor kamar ${k.nomor_kamar} duplikat` }
+    seen.add(k.nomor_kamar)
+    if (!Number.isInteger(k.kuota) || k.kuota < 1 || k.kuota > 50) {
+      return { error: `Kuota kamar ${k.nomor_kamar} harus 1-50` }
+    }
+  }
+
+  return cleaned
+}
+
+async function ensureKamarExists(asrama: string, nomorKamar: string) {
+  return queryOne<{ nomor_kamar: string }>(
+    'SELECT nomor_kamar FROM kamar_config WHERE asrama = ? AND nomor_kamar = ?',
+    [asrama, nomorKamar]
+  )
+}
+
+async function ensurePerpindahanKamarSchema() {
+  const db = await getDB()
+
+  await db.batch([
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS kamar_config (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        asrama      TEXT NOT NULL,
+        nomor_kamar TEXT NOT NULL,
+        kuota       INTEGER NOT NULL DEFAULT 10,
+        blok        TEXT,
+        created_at  TEXT DEFAULT (datetime('now')),
+        UNIQUE(asrama, nomor_kamar)
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS kamar_draft (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        asrama      TEXT NOT NULL,
+        santri_id   TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
+        kamar_lama  TEXT,
+        kamar_baru  TEXT NOT NULL,
+        applied     INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT DEFAULT (datetime('now')),
+        UNIQUE(asrama, santri_id)
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS kamar_ketua (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        asrama      TEXT NOT NULL,
+        nomor_kamar TEXT NOT NULL,
+        santri_id   TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
+        created_at  TEXT DEFAULT (datetime('now')),
+        UNIQUE(asrama, nomor_kamar)
+      )
+    `),
+  ])
+
+  const kamarConfigColumns = await query<{ name: string }>('PRAGMA table_info(kamar_config)')
+  if (!kamarConfigColumns.some(col => col.name === 'blok')) {
+    await execute('ALTER TABLE kamar_config ADD COLUMN blok TEXT')
+  }
+}
+
 // ─── GET: Load semua data yang dibutuhkan untuk satu asrama ──────────────────
 
 export async function getDataPerpindahan(asrama: string) {
-  try {
-    // Auto-patch untuk mem-fix error "has no column named blok" di DB lokal
-    await execute('ALTER TABLE kamar_config ADD COLUMN blok TEXT');
-  } catch (e) {
-    // Abaikan error jika kolom sudah ada
-  }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return { error: access.error, configs: [], drafts: [], ketuaList: [], santriList: [] }
+  const targetAsrama = access.asrama
 
   const [configs, drafts, ketuaList, santriList] = await Promise.all([
     // Konfigurasi kamar
-    query<any>('SELECT * FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar', [asrama]),
+    query<any>('SELECT * FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar', [targetAsrama]),
 
     // Draft perpindahan
-    query<any>('SELECT * FROM kamar_draft WHERE asrama = ?', [asrama]),
+    query<any>('SELECT * FROM kamar_draft WHERE asrama = ?', [targetAsrama]),
 
     // Ketua kamar
     query<any>(`
       SELECT kk.*, s.nama_lengkap, s.nis
       FROM kamar_ketua kk
       JOIN santri s ON s.id = kk.santri_id
+       AND s.status_global = 'aktif'
+       AND s.asrama = kk.asrama
+      JOIN kamar_config kc
+        ON kc.asrama = kk.asrama
+       AND kc.nomor_kamar = kk.nomor_kamar
       WHERE kk.asrama = ?
-    `, [asrama]),
+    `, [targetAsrama]),
 
     // Santri aktif di asrama ini
     query<any>(`
@@ -42,7 +142,7 @@ export async function getDataPerpindahan(asrama: string) {
       LEFT JOIN marhalah m ON m.id = k.marhalah_id
       WHERE s.status_global = 'aktif' AND s.asrama = ?
       ORDER BY s.kelas_sekolah, s.nama_lengkap
-    `, [asrama]),
+    `, [targetAsrama]),
   ])
 
   return { configs, drafts, ketuaList, santriList }
@@ -52,19 +152,31 @@ export async function getDataPerpindahan(asrama: string) {
 
 export async function simpanKonfigurasiKamar(
   asrama: string,
-  kamarList: { nomor_kamar: string; kuota: number; blok?: string }[]
+  kamarList: KamarInput[]
 ) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
+  const cleaned = cleanKamarList(kamarList)
+  if ('error' in cleaned) return cleaned
 
   const db = await getDB()
   try {
-    // Hapus config lama, insert baru
+    const validKamar = cleaned.map(k => k.nomor_kamar)
+    const placeholders = validKamar.map(() => '?').join(',')
     const stmts = [
-      db.prepare('DELETE FROM kamar_config WHERE asrama = ?').bind(asrama),
-      ...kamarList.map(k =>
-        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota, blok) VALUES (?, ?, ?, ?)').bind(asrama, k.nomor_kamar, k.kuota, k.blok || null)
-      )
+      db.prepare('DELETE FROM kamar_config WHERE asrama = ?').bind(access.asrama),
+      ...cleaned.map(k =>
+        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota, blok) VALUES (?, ?, ?, ?)').bind(access.asrama, k.nomor_kamar, k.kuota, k.blok || null)
+      ),
+      db.prepare(`DELETE FROM kamar_draft WHERE asrama = ? AND kamar_baru NOT IN (${placeholders})`).bind(access.asrama, ...validKamar),
+      db.prepare(`DELETE FROM kamar_draft WHERE asrama = ? AND santri_id NOT IN (
+        SELECT id FROM santri WHERE status_global = 'aktif' AND asrama = ?
+      )`).bind(access.asrama, access.asrama),
+      db.prepare(`DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar NOT IN (${placeholders})`).bind(access.asrama, ...validKamar),
+      db.prepare(`DELETE FROM kamar_ketua WHERE asrama = ? AND santri_id NOT IN (
+        SELECT id FROM santri WHERE status_global = 'aktif' AND asrama = ?
+      )`).bind(access.asrama, access.asrama),
     ]
     await db.batch(stmts)
     revalidatePath(REVALIDATE)
@@ -80,15 +192,30 @@ export async function generateDraft(
   asrama: string,
   persenUntukBaru: number  // 0–100, misal 20 = 20% slot dikosongkan untuk santri baru
 ) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
+  if (!Number.isFinite(persenUntukBaru) || persenUntukBaru < 0 || persenUntukBaru > 50) {
+    return { error: 'Persen slot santri baru harus 0-50' }
+  }
 
-  const { configs, santriList } = await getDataPerpindahan(asrama)
+  const { configs, santriList } = await getDataPerpindahan(access.asrama)
   if (!configs.length) return { error: 'Belum ada konfigurasi kamar' }
   if (!santriList.length) return { error: 'Tidak ada santri di asrama ini' }
 
   const db = await getDB()
-  const kamarKetua = await query<any>('SELECT santri_id, nomor_kamar FROM kamar_ketua WHERE asrama = ?', [asrama])
+  const kamarKetua = await query<any>(`
+    SELECT kk.santri_id, kk.nomor_kamar
+    FROM kamar_ketua kk
+    JOIN santri s
+      ON s.id = kk.santri_id
+     AND s.status_global = 'aktif'
+     AND s.asrama = kk.asrama
+    JOIN kamar_config kc
+      ON kc.asrama = kk.asrama
+     AND kc.nomor_kamar = kk.nomor_kamar
+    WHERE kk.asrama = ?
+  `, [access.asrama])
 
   // Hitung slot efektif per kamar (setelah dikurangi % untuk santri baru)
   const kamarSlots = configs.map((k: any) => {
@@ -180,12 +307,12 @@ export async function generateDraft(
   // Simpan ke kamar_draft (upsert)
   try {
     const stmts = [
-      db.prepare('DELETE FROM kamar_draft WHERE asrama = ?').bind(asrama),
+      db.prepare('DELETE FROM kamar_draft WHERE asrama = ?').bind(access.asrama),
       ...santriList.map(s =>
         db.prepare(`
           INSERT INTO kamar_draft (asrama, santri_id, kamar_lama, kamar_baru, applied)
           VALUES (?, ?, ?, ?, 0)
-        `).bind(asrama, s.id, s.kamar_asli || null, assignment[s.id] || kamarSlots[0].nomor)
+        `).bind(access.asrama, s.id, s.kamar_asli || null, assignment[s.id] || kamarSlots[0].nomor)
       )
     ]
     // Batch max 100
@@ -202,40 +329,111 @@ export async function generateDraft(
 // ─── UPDATE DRAFT: Pindahkan satu santri ke kamar lain ───────────────────────
 
 export async function updateKamarDraft(asrama: string, santriId: string, kamarBaru: string) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
+  const targetKamar = String(kamarBaru ?? '').trim()
+  if (!targetKamar) return { error: 'Kamar tujuan wajib dipilih' }
+  const kamar = await ensureKamarExists(access.asrama, targetKamar)
+  if (!kamar) return { error: 'Kamar tujuan tidak ada di konfigurasi' }
 
-  await execute(
-    `UPDATE kamar_draft SET kamar_baru = ? WHERE asrama = ? AND santri_id = ?`,
-    [kamarBaru, asrama, santriId]
+  const draft = await queryOne<{ santri_id: string; kamar_lama: string | null }>(`
+    SELECT kd.santri_id, kd.kamar_lama
+    FROM kamar_draft kd
+    JOIN santri s
+      ON s.id = kd.santri_id
+     AND s.status_global = 'aktif'
+     AND s.asrama = kd.asrama
+    WHERE kd.asrama = ? AND kd.santri_id = ?
+    LIMIT 1
+  `, [access.asrama, santriId])
+
+  const santri = await queryOne<{ id: string; kamar: string | null }>(
+    `SELECT id, kamar FROM santri WHERE id = ? AND status_global = 'aktif' AND asrama = ?`,
+    [santriId, access.asrama]
   )
+  if (!santri) return { error: 'Santri tidak aktif atau bukan penghuni asrama ini' }
+
+  const ketuaAssignment = await queryOne<{ nomor_kamar: string }>(
+    'SELECT nomor_kamar FROM kamar_ketua WHERE asrama = ? AND santri_id = ?',
+    [access.asrama, santriId]
+  )
+
+  const db = await getDB()
+  await db.batch([
+    draft
+      ? db.prepare(`
+          UPDATE kamar_draft
+          SET kamar_baru = ?, applied = 0
+          WHERE asrama = ? AND santri_id = ?
+        `).bind(targetKamar, access.asrama, santriId)
+      : db.prepare(`
+          INSERT INTO kamar_draft (asrama, santri_id, kamar_lama, kamar_baru, applied)
+          VALUES (?, ?, ?, ?, 0)
+        `).bind(access.asrama, santriId, santri.kamar ?? null, targetKamar),
+    db.prepare(`
+      DELETE FROM kamar_ketua
+      WHERE asrama = ? AND santri_id = ? AND nomor_kamar <> ?
+    `).bind(access.asrama, santriId, targetKamar),
+  ])
   revalidatePath(REVALIDATE)
-  return { success: true }
+  return {
+    success: true,
+    removedKetuaKamar: ketuaAssignment && ketuaAssignment.nomor_kamar !== targetKamar
+      ? ketuaAssignment.nomor_kamar
+      : null,
+  }
 }
 
 // ─── APPLY DRAFT: Update kolom kamar di tabel santri ─────────────────────────
 
 export async function applyDraft(asrama: string) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
 
-  const drafts = await query<any>('SELECT * FROM kamar_draft WHERE asrama = ?', [asrama])
-  if (!drafts.length) return { error: 'Tidak ada draft untuk diapply' }
+  const [allDrafts, validDrafts] = await Promise.all([
+    query<any>('SELECT id, santri_id FROM kamar_draft WHERE asrama = ?', [access.asrama]),
+    query<any>(`
+      SELECT kd.*
+      FROM kamar_draft kd
+      JOIN santri s
+        ON s.id = kd.santri_id
+       AND s.status_global = 'aktif'
+       AND s.asrama = kd.asrama
+      JOIN kamar_config kc
+        ON kc.asrama = kd.asrama
+       AND kc.nomor_kamar = kd.kamar_baru
+      WHERE kd.asrama = ?
+    `, [access.asrama]),
+  ])
+  if (!allDrafts.length) return { error: 'Tidak ada draft untuk diapply' }
+  if (!validDrafts.length) return { error: 'Semua draft sudah tidak valid. Generate ulang draft.' }
 
   const db = await getDB()
   try {
-    const updateStmts = drafts.map((d: any) =>
-      db.prepare(`UPDATE santri SET kamar = ? WHERE id = ?`).bind(d.kamar_baru, d.santri_id)
+    const validIds = validDrafts.map((d: any) => d.id)
+    const validSantriIds = validDrafts.map((d: any) => d.santri_id)
+    const validPlaceholders = validIds.map(() => '?').join(',')
+    const santriPlaceholders = validSantriIds.map(() => '?').join(',')
+    const staleCount = allDrafts.length - validDrafts.length
+
+    const updateStmts = validDrafts.map((d: any) =>
+      db.prepare(`UPDATE santri SET kamar = ?, updated_at = datetime('now') WHERE id = ? AND status_global = 'aktif' AND asrama = ?`)
+        .bind(d.kamar_baru, d.santri_id, access.asrama)
     )
     const markStmts = [
-      db.prepare(`UPDATE kamar_draft SET applied = 1 WHERE asrama = ?`).bind(asrama)
+      db.prepare(`UPDATE kamar_draft SET applied = 1 WHERE asrama = ? AND santri_id IN (${santriPlaceholders})`)
+        .bind(access.asrama, ...validSantriIds),
+      db.prepare(`DELETE FROM kamar_draft WHERE asrama = ? AND id NOT IN (${validPlaceholders})`)
+        .bind(access.asrama, ...validIds),
     ]
     for (let i = 0; i < updateStmts.length; i += 100) {
       await db.batch(updateStmts.slice(i, i + 100))
     }
     await db.batch(markStmts)
     revalidatePath(REVALIDATE)
-    return { success: true, count: drafts.length }
+    return { success: true, count: validDrafts.length, skipped: staleCount }
   } catch (e: any) {
     return { error: e.message }
   }
@@ -244,17 +442,42 @@ export async function applyDraft(asrama: string) {
 // ─── KETUA KAMAR: Set/unset ketua ────────────────────────────────────────────
 
 export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_id: string | null) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
+  const targetKamar = String(nomor_kamar ?? '').trim()
+  if (!targetKamar) return { error: 'Nomor kamar wajib diisi' }
+
+  const kamar = await ensureKamarExists(access.asrama, targetKamar)
+  if (!kamar) return { error: 'Kamar tidak ada di konfigurasi' }
 
   if (!santri_id) {
-    await execute('DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar = ?', [asrama, nomor_kamar])
+    await execute('DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar = ?', [access.asrama, targetKamar])
   } else {
-    await execute(`
-      INSERT INTO kamar_ketua (asrama, nomor_kamar, santri_id)
-      VALUES (?, ?, ?)
-      ON CONFLICT(asrama, nomor_kamar) DO UPDATE SET santri_id = excluded.santri_id
-    `, [asrama, nomor_kamar, santri_id])
+    const santri = await queryOne<{ id: string }>(
+      `SELECT id FROM santri WHERE id = ? AND status_global = 'aktif' AND asrama = ?`,
+      [santri_id, access.asrama]
+    )
+    if (!santri) return { error: 'Santri tidak aktif atau bukan penghuni asrama ini' }
+
+    const draft = await queryOne<{ kamar_baru: string }>(
+      'SELECT kamar_baru FROM kamar_draft WHERE asrama = ? AND santri_id = ?',
+      [access.asrama, santri_id]
+    )
+    if (draft && draft.kamar_baru !== targetKamar) {
+      return { error: 'Santri ini tidak ada di draft kamar tujuan' }
+    }
+
+    const db = await getDB()
+    await db.batch([
+      db.prepare('DELETE FROM kamar_ketua WHERE asrama = ? AND santri_id = ? AND nomor_kamar <> ?')
+        .bind(access.asrama, santri_id, targetKamar),
+      db.prepare(`
+        INSERT INTO kamar_ketua (asrama, nomor_kamar, santri_id)
+        VALUES (?, ?, ?)
+        ON CONFLICT(asrama, nomor_kamar) DO UPDATE SET santri_id = excluded.santri_id
+      `).bind(access.asrama, targetKamar, santri_id),
+    ])
   }
   revalidatePath(REVALIDATE)
   return { success: true }
@@ -263,10 +486,11 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
 // ─── RESET DRAFT ─────────────────────────────────────────────────────────────
 
 export async function resetDraft(asrama: string) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  await ensurePerpindahanKamarSchema()
+  const access = await assertAsramaAccess(asrama)
+  if ('error' in access) return access
 
-  await execute('DELETE FROM kamar_draft WHERE asrama = ?', [asrama])
+  await execute('DELETE FROM kamar_draft WHERE asrama = ?', [access.asrama])
   revalidatePath(REVALIDATE)
   return { success: true }
 }

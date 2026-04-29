@@ -1,10 +1,11 @@
 'use server'
 
-import { query, queryOne, execute, batch } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
+const ARCHIVE_STATUS = 'arsip'
 
 export type FilterSantri = {
   search?: string
@@ -16,6 +17,219 @@ export type FilterSantri = {
   page?: number
 }
 
+type ArchiveGroupFilter = {
+  angkatan: number | null
+  catatan: string | null
+  tanggal_arsip: string
+}
+
+type TableInfo = { name: string }
+type Row = Record<string, any>
+
+function inClause(values: unknown[]) {
+  return values.map(() => '?').join(',')
+}
+
+function archiveBatchKey(angkatan: number | null, catatan: string | null, tanggalArsip: string) {
+  return `${angkatan ?? 'null'}__${catatan ?? ''}__${tanggalArsip}`
+}
+
+function getAngkatan(profil: Row) {
+  const fromNis = profil.nis ? parseInt(String(profil.nis).substring(0, 4), 10) : NaN
+  if (!Number.isNaN(fromNis)) return fromNis
+  const fromTahunMasuk = Number(profil.tahun_masuk)
+  return Number.isFinite(fromTahunMasuk) ? fromTahunMasuk : null
+}
+
+async function getBySantriId<T = Row>(table: string, santriId: string) {
+  return query<T>(`SELECT * FROM ${table} WHERE santri_id = ?`, [santriId])
+}
+
+async function getByIds<T = Row>(table: string, column: string, ids: unknown[]) {
+  if (ids.length === 0) return []
+  return query<T>(`SELECT * FROM ${table} WHERE ${column} IN (${inClause(ids)})`, ids)
+}
+
+async function getTableColumns(table: string) {
+  const rows = await query<TableInfo>(`PRAGMA table_info(${table})`)
+  return rows.map(r => r.name)
+}
+
+async function insertSnapshotRow(table: string, row: Row, overrides: Row = {}) {
+  const columns = await getTableColumns(table)
+  const data = { ...row, ...overrides }
+  const insertColumns = columns.filter(col => Object.prototype.hasOwnProperty.call(data, col) && data[col] !== undefined)
+  if (insertColumns.length === 0) return
+
+  await execute(
+    `INSERT OR IGNORE INTO ${table} (${insertColumns.join(', ')}) VALUES (${inClause(insertColumns)})`,
+    insertColumns.map(col => data[col])
+  )
+}
+
+async function restoreSnapshotRows(table: string, rows: Row[] = [], overrides: Row = {}) {
+  for (const row of rows) {
+    await insertSnapshotRow(table, row, overrides)
+  }
+}
+
+async function buildSantriSnapshot(profil: Row) {
+  const santriId = profil.id
+
+  const riwayatPendidikan = await query<Row>(`
+    SELECT rp.*, k.nama_kelas, k.tahun_ajaran_id, k.marhalah_id
+    FROM riwayat_pendidikan rp
+    LEFT JOIN kelas k ON rp.kelas_id = k.id
+    WHERE rp.santri_id = ?
+  `, [santriId])
+  const riwayatIds = riwayatPendidikan.map(r => r.id)
+
+  const nilaiAkademik = await getByIds('nilai_akademik', 'riwayat_pendidikan_id', riwayatIds)
+  const nilaiAkhlak = await getByIds('nilai_akhlak', 'riwayat_pendidikan_id', riwayatIds)
+  const ranking = await getByIds('ranking', 'riwayat_pendidikan_id', riwayatIds)
+  const absensiHarian = await getByIds('absensi_harian', 'riwayat_pendidikan_id', riwayatIds)
+
+  const upkTransaksi = await getBySantriId<Row>('upk_transaksi', santriId)
+  const upkItems = await getByIds('upk_item', 'transaksi_id', upkTransaksi.map(t => t.id))
+
+  const upkAntrian = await getBySantriId<Row>('upk_antrian', santriId)
+  const upkAntrianIds = upkAntrian.map(a => a.id)
+  const upkAntrianItems = await getByIds('upk_antrian_item', 'antrian_id', upkAntrianIds)
+  const upkStokMutasi = await getByIds('upk_stok_mutasi', 'antrian_id', upkAntrianIds)
+
+  const akademik = {
+    riwayat_pendidikan: riwayatPendidikan,
+    nilai_akademik: nilaiAkademik,
+    nilai_akhlak: nilaiAkhlak,
+    ranking,
+    absensi_harian: absensiHarian,
+    hasil_tes_klasifikasi: await getBySantriId('hasil_tes_klasifikasi', santriId),
+  }
+
+  const asrama = {
+    absen_asrama: await getBySantriId('absen_asrama', santriId),
+    absen_sakit: await getBySantriId('absen_sakit', santriId),
+    absen_malam_v2: await getBySantriId('absen_malam_v2', santriId),
+    absen_berjamaah: await getBySantriId('absen_berjamaah', santriId),
+    kamar_draft: await getBySantriId('kamar_draft', santriId),
+    kamar_ketua: await getBySantriId('kamar_ketua', santriId),
+    mutasi_asrama_log: await getBySantriId('mutasi_asrama_log', santriId),
+    perpulangan_log: await getBySantriId('perpulangan_log', santriId),
+    santri_nonaktif_log: await getBySantriId('santri_nonaktif_log', santriId),
+  }
+
+  const disiplin = {
+    pelanggaran: await getBySantriId('pelanggaran', santriId),
+    surat_pernyataan: await getBySantriId('surat_pernyataan', santriId),
+    surat_perjanjian: await getBySantriId('surat_perjanjian', santriId),
+    perizinan: await getBySantriId('perizinan', santriId),
+    riwayat_surat: await getBySantriId('riwayat_surat', santriId),
+    denda_buku_pribadi: await getBySantriId('denda_buku_pribadi', santriId),
+  }
+
+  const keuangan = {
+    spp_log: await getBySantriId('spp_log', santriId),
+    spp_setoran_detail: await getBySantriId('spp_setoran_detail', santriId),
+    spp_tunggakan_alasan: await getBySantriId('spp_tunggakan_alasan', santriId),
+    pembayaran_tahunan: await getBySantriId('pembayaran_tahunan', santriId),
+    tabungan_log: await getBySantriId('tabungan_log', santriId),
+  }
+
+  const upk = {
+    upk_transaksi: upkTransaksi,
+    upk_item: upkItems,
+    upk_antrian: upkAntrian,
+    upk_antrian_item: upkAntrianItems,
+    upk_stok_mutasi: upkStokMutasi,
+  }
+
+  const ehb = {
+    ehb_plotting_santri: await getBySantriId('ehb_plotting_santri', santriId),
+    ehb_absensi: await getBySantriId('ehb_absensi', santriId),
+  }
+
+  return {
+    schema_version: 2,
+    mode: 'soft_archive',
+    archived_at: now(),
+    profil,
+    akademik,
+    asrama,
+    disiplin,
+    keuangan,
+    upk,
+    ehb,
+
+    // Legacy aliases so older download/restore tooling can still read common keys.
+    riwayat_pendidikan: akademik.riwayat_pendidikan,
+    absensi: akademik.absensi_harian,
+    pelanggaran: disiplin.pelanggaran,
+    spp: keuangan.spp_log,
+    nilai: akademik.nilai_akademik,
+  }
+}
+
+async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
+  const profil = { ...(snap.profil ?? {}) }
+  if (!profil.nis || !profil.nama_lengkap) throw new Error('Snapshot profil tidak lengkap')
+
+  const idAsli = arsip.santri_id_asli || profil.id || generateId()
+  const timestamp = now()
+
+  await insertSnapshotRow('santri', profil, {
+    id: idAsli,
+    status_global: 'aktif',
+    created_at: profil.created_at ?? timestamp,
+    updated_at: timestamp,
+  })
+
+  const akademik = snap.akademik ?? {}
+  const asrama = snap.asrama ?? {}
+  const disiplin = snap.disiplin ?? {}
+  const keuangan = snap.keuangan ?? {}
+  const upk = snap.upk ?? {}
+  const ehb = snap.ehb ?? {}
+
+  await restoreSnapshotRows('riwayat_pendidikan', akademik.riwayat_pendidikan ?? snap.riwayat_pendidikan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('nilai_akademik', akademik.nilai_akademik ?? snap.nilai ?? [])
+  await restoreSnapshotRows('nilai_akhlak', akademik.nilai_akhlak ?? [])
+  await restoreSnapshotRows('ranking', akademik.ranking ?? [])
+  await restoreSnapshotRows('absensi_harian', akademik.absensi_harian ?? snap.absensi ?? [])
+  await restoreSnapshotRows('hasil_tes_klasifikasi', akademik.hasil_tes_klasifikasi ?? [], { santri_id: idAsli })
+
+  await restoreSnapshotRows('absen_asrama', asrama.absen_asrama ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('absen_sakit', asrama.absen_sakit ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('absen_malam_v2', asrama.absen_malam_v2 ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('absen_berjamaah', asrama.absen_berjamaah ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('kamar_draft', asrama.kamar_draft ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('kamar_ketua', asrama.kamar_ketua ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('mutasi_asrama_log', asrama.mutasi_asrama_log ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('perpulangan_log', asrama.perpulangan_log ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('santri_nonaktif_log', asrama.santri_nonaktif_log ?? [], { santri_id: idAsli })
+
+  await restoreSnapshotRows('pelanggaran', disiplin.pelanggaran ?? snap.pelanggaran ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('surat_pernyataan', disiplin.surat_pernyataan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('surat_perjanjian', disiplin.surat_perjanjian ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('perizinan', disiplin.perizinan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('riwayat_surat', disiplin.riwayat_surat ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('denda_buku_pribadi', disiplin.denda_buku_pribadi ?? [], { santri_id: idAsli })
+
+  await restoreSnapshotRows('spp_log', keuangan.spp_log ?? snap.spp ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('spp_setoran_detail', keuangan.spp_setoran_detail ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('spp_tunggakan_alasan', keuangan.spp_tunggakan_alasan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('pembayaran_tahunan', keuangan.pembayaran_tahunan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('tabungan_log', keuangan.tabungan_log ?? [], { santri_id: idAsli })
+
+  await restoreSnapshotRows('upk_transaksi', upk.upk_transaksi ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('upk_item', upk.upk_item ?? [])
+  await restoreSnapshotRows('upk_antrian', upk.upk_antrian ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('upk_antrian_item', upk.upk_antrian_item ?? [])
+  await restoreSnapshotRows('upk_stok_mutasi', upk.upk_stok_mutasi ?? [])
+
+  await restoreSnapshotRows('ehb_plotting_santri', ehb.ehb_plotting_santri ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('ehb_absensi', ehb.ehb_absensi ?? [], { santri_id: idAsli })
+}
+
 export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
   const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk, page = 1 } = filter
   const offset = (page - 1) * PAGE_SIZE
@@ -23,23 +237,15 @@ export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
   const clauses = ["s.status_global = 'aktif'"]
   const params: any[] = []
 
-  if (search)         { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
-  if (asrama)         { clauses.push('s.asrama = ?');                            params.push(asrama) }
-  if (sekolah)        { clauses.push('s.sekolah = ?');                           params.push(sekolah) }
-  if (kelas_sekolah)  { clauses.push('s.kelas_sekolah LIKE ?');                 params.push(`%${kelas_sekolah}%`) }
-  if (kelas_pesantren){ clauses.push('LOWER(k.nama_kelas) = LOWER(?)');         params.push(kelas_pesantren) }
-  if (tahun_masuk)    { clauses.push('s.tahun_masuk = ?');                       params.push(tahun_masuk) }
-
-  const needKelas = !!kelas_pesantren
-  const joinKelas = needKelas
-    ? `LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON rp.kelas_id = k.id`
-    : `LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON rp.kelas_id = k.id`
+  if (search) { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
+  if (asrama) { clauses.push('s.asrama = ?'); params.push(asrama) }
+  if (sekolah) { clauses.push('s.sekolah = ?'); params.push(sekolah) }
+  if (kelas_sekolah) { clauses.push('s.kelas_sekolah LIKE ?'); params.push(`%${kelas_sekolah}%`) }
+  if (kelas_pesantren) { clauses.push('LOWER(k.nama_kelas) = LOWER(?)'); params.push(kelas_pesantren) }
+  if (tahun_masuk) { clauses.push('s.tahun_masuk = ?'); params.push(tahun_masuk) }
 
   const where = clauses.join(' AND ')
 
-  // Count dulu — 1 query ringan
   const countRow = await queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total FROM santri s
      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
@@ -49,7 +255,6 @@ export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
   )
   const total = countRow?.total ?? 0
 
-  // Data dengan LIMIT/OFFSET langsung di SQL — tidak fetch semua lalu slice
   const data = await query<any>(
     `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar,
             s.sekolah, s.kelas_sekolah, s.tahun_masuk,
@@ -75,15 +280,14 @@ export async function getFilterOptionsSantri() {
   ])
 
   return {
-    asramaList:  asramaRows.map(r => r.asrama),
+    asramaList: asramaRows.map(r => r.asrama),
     sekolahList: sekolahRows.map(r => r.sekolah),
-    kelasList:   kelasRows.map(r => r.nama_kelas).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
-    tahunList:   tahunRows.map(r => r.tahun_masuk),
+    kelasList: kelasRows.map(r => r.nama_kelas).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
+    tahunList: tahunRows.map(r => r.tahun_masuk),
   }
 }
 
 export async function getGrupArsip() {
-  // Aggregate langsung di SQL — tidak fetch semua baris lalu group di memory
   const rows = await query<{
     angkatan: number | null
     catatan: string | null
@@ -103,12 +307,12 @@ export async function getGrupArsip() {
   `)
 
   return rows.map(r => ({
-    key:          `${r.angkatan ?? 'null'}__${r.catatan ?? ''}__${r.tanggal_arsip}`,
-    angkatan:     r.angkatan,
-    catatan:      r.catatan,
+    key: archiveBatchKey(r.angkatan, r.catatan, r.tanggal_arsip),
+    angkatan: r.angkatan,
+    catatan: r.catatan,
     tanggal_arsip: r.tanggal_arsip,
-    jumlah:       r.jumlah,
-    asramaList:   r.asrama_list ? r.asrama_list.split(',').filter(Boolean) : [],
+    jumlah: r.jumlah,
+    asramaList: r.asrama_list ? r.asrama_list.split(',').filter(Boolean) : [],
   }))
 }
 
@@ -123,29 +327,34 @@ export async function getSantriDalamGrup(
   const { search, asrama, page = 1 } = filter
   const offset = (page - 1) * PAGE_SIZE
 
-  const clauses = ['DATE(tanggal_arsip) = ?']
+  const clauses = ['DATE(a.tanggal_arsip) = ?']
   const params: any[] = [tanggalArsip]
 
-  if (angkatan !== null) { clauses.push('angkatan = ?');  params.push(angkatan) }
-  else                     clauses.push('angkatan IS NULL')
+  if (angkatan !== null) { clauses.push('a.angkatan = ?'); params.push(angkatan) }
+  else clauses.push('a.angkatan IS NULL')
 
-  if (catatan) { clauses.push('catatan = ?');  params.push(catatan) }
-  else           clauses.push('catatan IS NULL')
+  if (catatan) { clauses.push('a.catatan = ?'); params.push(catatan) }
+  else clauses.push('a.catatan IS NULL')
 
-  if (search) { clauses.push('(nama_lengkap LIKE ? OR nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
-  if (asrama) { clauses.push('asrama = ?'); params.push(asrama) }
+  if (search) { clauses.push('(a.nama_lengkap LIKE ? OR a.nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
+  if (asrama) { clauses.push('a.asrama = ?'); params.push(asrama) }
 
   const where = clauses.join(' AND ')
 
   const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM santri_arsip WHERE ${where}`, params
+    `SELECT COUNT(*) AS total FROM santri_arsip a WHERE ${where}`, params
   )
   const total = countRow?.total ?? 0
 
   const data = await query<any>(
-    `SELECT id, nis, nama_lengkap, asrama, tanggal_arsip, catatan, angkatan
-     FROM santri_arsip WHERE ${where}
-     ORDER BY nama_lengkap LIMIT ? OFFSET ?`,
+    `SELECT a.id, a.santri_id_asli, a.nis, a.nama_lengkap, a.asrama,
+            a.tanggal_arsip, a.catatan, a.angkatan,
+            s.status_global AS status_santri,
+            CASE WHEN s.id IS NULL THEN 0 ELSE 1 END AS santri_masih_ada
+     FROM santri_arsip a
+     LEFT JOIN santri s ON s.id = a.santri_id_asli
+     WHERE ${where}
+     ORDER BY a.nama_lengkap LIMIT ? OFFSET ?`,
     [...params, PAGE_SIZE, offset]
   )
 
@@ -153,63 +362,59 @@ export async function getSantriDalamGrup(
 }
 
 export async function arsipkanSantri(santriIds: string[], catatan: string): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
-  const access = await assertCrud('/dashboard/santri', 'delete')
+  const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
   if (!santriIds || santriIds.length === 0) return { error: 'Pilih minimal 1 santri' }
 
-  let berhasil = 0, gagal = 0
+  let berhasil = 0
+  let gagal = 0
   const errorList: string[] = []
 
   for (const santriId of santriIds) {
     try {
-      const profil = await queryOne<any>('SELECT * FROM santri WHERE id = ?', [santriId])
+      const profil = await queryOne<Row>('SELECT * FROM santri WHERE id = ?', [santriId])
       if (!profil) { gagal++; errorList.push(`ID ${santriId}: Data tidak ditemukan`); continue }
-
-      const riwayatList = await query<any>(`
-        SELECT rp.id, rp.kelas_id, rp.status_riwayat, k.nama_kelas
-        FROM riwayat_pendidikan rp LEFT JOIN kelas k ON rp.kelas_id = k.id
-        WHERE rp.santri_id = ?
-      `, [santriId])
-
-      const riwayatIds = riwayatList.map((r: any) => r.id)
-
-      // Ambil nilai dan absensi
-      const nilaiList = riwayatIds.length > 0
-        ? await query(`SELECT * FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${riwayatIds.map(() => '?').join(',')})`, riwayatIds)
-        : []
-      const absensiList = riwayatIds.length > 0
-        ? await query(`SELECT * FROM absensi_harian WHERE riwayat_pendidikan_id IN (${riwayatIds.map(() => '?').join(',')})`, riwayatIds)
-        : []
-      const pelanggaranList = await query('SELECT * FROM pelanggaran WHERE santri_id = ?', [santriId])
-      const sppList = await query('SELECT * FROM spp_log WHERE santri_id = ?', [santriId])
-
-      const snapshot = JSON.stringify({ profil, riwayat_pendidikan: riwayatList, absensi: absensiList, pelanggaran: pelanggaranList, spp: sppList, nilai: nilaiList })
-      const angkatan = profil.nis ? parseInt(String(profil.nis).substring(0, 4)) || null : null
-      const now = new Date().toISOString()
-
-      await execute(
-        `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [crypto.randomUUID(), santriId, profil.nis, profil.nama_lengkap, isNaN(angkatan as number) ? null : angkatan, profil.asrama, catatan || null, snapshot, now]
-      )
-
-      // Hapus semua data relasi dalam 1 batch
-      const deleteOps: { sql: string; params: any[] }[] = []
-      if (riwayatIds.length > 0) {
-        const ph = riwayatIds.map(() => '?').join(',')
-        deleteOps.push({ sql: `DELETE FROM nilai_akademik WHERE riwayat_pendidikan_id IN (${ph})`, params: riwayatIds })
-        deleteOps.push({ sql: `DELETE FROM absensi_harian WHERE riwayat_pendidikan_id IN (${ph})`, params: riwayatIds })
-        deleteOps.push({ sql: 'DELETE FROM riwayat_pendidikan WHERE santri_id = ?', params: [santriId] })
+      if (profil.status_global !== 'aktif') {
+        gagal++
+        errorList.push(`${profil.nama_lengkap ?? santriId}: status saat ini ${profil.status_global}, bukan aktif`)
+        continue
       }
-      deleteOps.push({ sql: 'DELETE FROM pelanggaran WHERE santri_id = ?', params: [santriId] })
-      deleteOps.push({ sql: 'DELETE FROM spp_log WHERE santri_id = ?', params: [santriId] })
-      deleteOps.push({ sql: 'DELETE FROM tabungan_log WHERE santri_id = ?', params: [santriId] })
-      deleteOps.push({ sql: 'DELETE FROM santri WHERE id = ?', params: [santriId] })
-      await batch(deleteOps)
 
+      const timestamp = now()
+      const snapshot = JSON.stringify(await buildSantriSnapshot(profil))
+      const angkatan = getAngkatan(profil)
+      const existing = await queryOne<{ id: string }>('SELECT id FROM santri_arsip WHERE santri_id_asli = ? LIMIT 1', [santriId])
+
+      const statements = existing
+        ? [
+          {
+            sql: `UPDATE santri_arsip
+                  SET nis = ?, nama_lengkap = ?, angkatan = ?, asrama = ?, catatan = ?, snapshot = ?, tanggal_arsip = ?
+                  WHERE id = ?`,
+            params: [profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp, existing.id],
+          },
+          {
+            sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
+            params: [ARCHIVE_STATUS, timestamp, santriId],
+          },
+        ]
+        : [
+          {
+            sql: `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            params: [generateId(), santriId, profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp],
+          },
+          {
+            sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
+            params: [ARCHIVE_STATUS, timestamp, santriId],
+          },
+        ]
+
+      await batch(statements)
       berhasil++
     } catch (err: any) {
-      gagal++; errorList.push(`ID ${santriId}: ${err.message}`)
+      gagal++
+      errorList.push(`ID ${santriId}: ${err.message}`)
     }
   }
 
@@ -219,65 +424,46 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
 }
 
 export async function restoreSantri(arsipIds: string[]): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
-  const access = await assertCrud('/dashboard/santri', 'create')
+  const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data untuk direstore' }
 
-  let berhasil = 0, gagal = 0
+  let berhasil = 0
+  let gagal = 0
   const errorList: string[] = []
 
   for (const arsipId of arsipIds) {
     try {
-      const arsip = await queryOne<any>('SELECT * FROM santri_arsip WHERE id = ?', [arsipId])
+      const arsip = await queryOne<Row>('SELECT * FROM santri_arsip WHERE id = ?', [arsipId])
       if (!arsip) { gagal++; errorList.push(`Arsip ID ${arsipId}: Tidak ditemukan`); continue }
 
-      const snap = JSON.parse(arsip.snapshot)
-      const profilAsli = { ...snap.profil }
-      delete profilAsli.id
-      profilAsli.status_global = 'aktif'
-
-      const idBaru = crypto.randomUUID()
-      const now = new Date().toISOString()
-
-      await query(
-        `INSERT INTO santri (id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
-          nama_ayah, nama_ibu, alamat, status_global, sekolah, kelas_sekolah, asrama, kamar, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [idBaru, profilAsli.nis, profilAsli.nama_lengkap, profilAsli.nik, profilAsli.jenis_kelamin,
-         profilAsli.tempat_lahir, profilAsli.tanggal_lahir, profilAsli.nama_ayah, profilAsli.nama_ibu,
-         profilAsli.alamat, 'aktif', profilAsli.sekolah, profilAsli.kelas_sekolah, profilAsli.asrama, profilAsli.kamar, now, now]
+      const existingSantri = await queryOne<{ id: string; status_global: string }>(
+        'SELECT id, status_global FROM santri WHERE id = ?',
+        [arsip.santri_id_asli]
       )
+      const timestamp = now()
 
-      // Restore riwayat (kelas dikosongkan)
-      const mapRiwayat = new Map<string, string>()
-      for (const rw of (snap.riwayat_pendidikan || [])) {
-        const rwId = crypto.randomUUID()
-        await query(
-          'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
-          [rwId, idBaru, null, rw.status_riwayat || 'aktif', now]
-        )
-        mapRiwayat.set(rw.id, rwId)
-
-        for (const n of (rw.nilai_akademik || [])) {
-          await query(
-            'INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai) VALUES (?, ?, ?, ?, ?)',
-            [crypto.randomUUID(), rwId, n.mapel_id, n.semester, n.nilai]
-          )
-        }
+      if (existingSantri) {
+        await batch([
+          {
+            sql: `UPDATE santri SET status_global = 'aktif', updated_at = ? WHERE id = ?`,
+            params: [timestamp, existingSantri.id],
+          },
+          {
+            sql: 'DELETE FROM santri_arsip WHERE id = ?',
+            params: [arsipId],
+          },
+        ])
+      } else {
+        const snap = JSON.parse(arsip.snapshot)
+        await restoreHardDeletedArchive(arsip, snap)
+        await execute('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
       }
 
-      for (const p of (snap.pelanggaran || [])) {
-        const { id: _id, santri_id: _old, ...pData } = p
-        await query(
-          'INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin) VALUES (?, ?, ?, ?, ?, ?)',
-          [crypto.randomUUID(), idBaru, pData.tanggal, pData.jenis, pData.deskripsi, pData.poin]
-        )
-      }
-
-      await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
       berhasil++
     } catch (err: any) {
-      gagal++; errorList.push(`Arsip ID ${arsipId}: ${err.message}`)
+      gagal++
+      errorList.push(`Arsip ID ${arsipId}: ${err.message}`)
     }
   }
 
@@ -286,19 +472,48 @@ export async function restoreSantri(arsipIds: string[]): Promise<{ success: bool
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
-export async function getArsipForDownload(arsipIds?: string[]): Promise<{ data: any[] } | { error: string }> {
+export async function getArsipForDownload(
+  arsipIds?: string[],
+  group?: ArchiveGroupFilter
+): Promise<{ data: any[] } | { error: string }> {
+  const select = 'SELECT id, santri_id_asli, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip, snapshot FROM santri_arsip'
+
   if (arsipIds && arsipIds.length > 0) {
-    const ph = arsipIds.map(() => '?').join(',')
-    const data = await query(`SELECT id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip FROM santri_arsip WHERE id IN (${ph}) ORDER BY angkatan DESC, nama_lengkap`, arsipIds)
+    const data = await query(`${select} WHERE id IN (${inClause(arsipIds)}) ORDER BY angkatan DESC, nama_lengkap`, arsipIds)
     return { data }
   }
-  const data = await query('SELECT id, nis, nama_lengkap, asrama, angkatan, catatan, tanggal_arsip FROM santri_arsip ORDER BY angkatan DESC, nama_lengkap')
+
+  if (group) {
+    const clauses = ['DATE(tanggal_arsip) = ?']
+    const params: any[] = [group.tanggal_arsip]
+    if (group.angkatan !== null) { clauses.push('angkatan = ?'); params.push(group.angkatan) }
+    else clauses.push('angkatan IS NULL')
+    if (group.catatan) { clauses.push('catatan = ?'); params.push(group.catatan) }
+    else clauses.push('catatan IS NULL')
+
+    const data = await query(`${select} WHERE ${clauses.join(' AND ')} ORDER BY angkatan DESC, nama_lengkap`, params)
+    return { data }
+  }
+
+  const data = await query(`${select} ORDER BY angkatan DESC, nama_lengkap`)
   return { data }
 }
 
 export async function hapusArsipPermanen(arsipId: string): Promise<{ success: boolean } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'delete')
   if ('error' in access) return access
+
+  const arsip = await queryOne<Row>(`
+    SELECT a.id, s.status_global
+    FROM santri_arsip a
+    LEFT JOIN santri s ON s.id = a.santri_id_asli
+    WHERE a.id = ?
+  `, [arsipId])
+  if (!arsip) return { error: 'Arsip tidak ditemukan' }
+  if (arsip.status_global === ARCHIVE_STATUS) {
+    return { error: 'Arsip ini masih menjadi penanda status alumni. Restore dulu sebelum menghapus catatannya.' }
+  }
+
   await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
   revalidatePath('/dashboard/santri/arsip')
   return { success: true }
@@ -308,8 +523,19 @@ export async function hapusArsipMassal(arsipIds: string[]): Promise<{ success: b
   const access = await assertCrud('/dashboard/santri', 'delete')
   if ('error' in access) return access
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data' }
-  const ph = arsipIds.map(() => '?').join(',')
-  await query(`DELETE FROM santri_arsip WHERE id IN (${ph})`, arsipIds)
+
+  const rows = await query<{ id: string; status_global: string | null }>(`
+    SELECT a.id, s.status_global
+    FROM santri_arsip a
+    LEFT JOIN santri s ON s.id = a.santri_id_asli
+    WHERE a.id IN (${inClause(arsipIds)})
+  `, arsipIds)
+  const blocked = rows.filter(r => r.status_global === ARCHIVE_STATUS)
+  if (blocked.length > 0) {
+    return { error: `${blocked.length} arsip masih menjadi penanda status alumni. Restore dulu sebelum menghapus catatannya.` }
+  }
+
+  await query(`DELETE FROM santri_arsip WHERE id IN (${inClause(arsipIds)})`, arsipIds)
   revalidatePath('/dashboard/santri/arsip')
   return { success: true, count: arsipIds.length }
 }

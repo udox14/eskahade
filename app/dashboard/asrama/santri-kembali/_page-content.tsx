@@ -12,6 +12,8 @@ import {
   type SessionInfo,
 } from './actions'
 
+const PAGE_SIZE = 30
+
 function localInputNow() {
   const date = new Date()
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
@@ -41,6 +43,10 @@ export default function SantriKembaliPageContent() {
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<SantriKembaliRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [totalRows, setTotalRows] = useState(0)
+  const [overdueTotal, setOverdueTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [selectedRow, setSelectedRow] = useState<SantriKembaliRow | null>(null)
   const [waktuDatang, setWaktuDatang] = useState(localInputNow())
   const [pending, startTransition] = useTransition()
@@ -57,19 +63,31 @@ export default function SantriKembaliPageContent() {
     loadBootstrap()
   }, [])
 
-  const loadRows = useCallback(async () => {
-    setLoading(true)
-    const data = await getSantriBelumKembali({ asrama: selectedAsrama, search })
-    setRows(data)
+  const loadRows = useCallback(async (append = false, offset = 0) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
+
+    const data = await getSantriBelumKembali({
+      asrama: selectedAsrama,
+      search,
+      limit: PAGE_SIZE,
+      offset,
+    })
+
+    setRows(prev => append ? [...prev, ...data.rows] : data.rows)
+    setTotalRows(data.total)
+    setOverdueTotal(data.overdueTotal)
+    setHasMore(data.hasMore)
     setLoading(false)
+    setLoadingMore(false)
   }, [search, selectedAsrama])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadRows()
+    loadRows(false)
   }, [loadRows])
 
-  const overdueCount = useMemo(() => rows.filter(isOverdue).length, [rows])
+  const loadedOverdueCount = useMemo(() => rows.filter(isOverdue).length, [rows])
 
   const openConfirm = (row: SantriKembaliRow) => {
     setSelectedRow(row)
@@ -87,7 +105,7 @@ export default function SantriKembaliPageContent() {
       }
       toast.success(res.message)
       setSelectedRow(null)
-      await loadRows()
+      await loadRows(false)
     })
   }
 
@@ -101,11 +119,11 @@ export default function SantriKembaliPageContent() {
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <div className="bg-white border rounded-2xl px-4 py-3">
             <p className="text-[11px] font-bold text-slate-400 uppercase">Belum Kembali</p>
-            <p className="text-xl font-bold text-slate-800">{rows.length}</p>
+            <p className="text-xl font-bold text-slate-800">{totalRows}</p>
           </div>
           <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3">
             <p className="text-[11px] font-bold text-rose-500 uppercase">Lewat Batas</p>
-            <p className="text-xl font-bold text-rose-700">{overdueCount}</p>
+            <p className="text-xl font-bold text-rose-700">{overdueTotal}</p>
           </div>
         </div>
       </div>
@@ -114,7 +132,10 @@ export default function SantriKembaliPageContent() {
         <div className="px-5 py-4 border-b bg-slate-50 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
           <div>
             <h2 className="font-bold text-slate-800">Izin Pulang Belum Kembali</h2>
-            <p className="text-sm text-slate-500">Yang tampil hanya perizinan dengan jenis izin pulang.</p>
+            <p className="text-sm text-slate-500">
+              Yang tampil hanya perizinan dengan jenis izin pulang. Memuat {rows.length} dari {totalRows} data.
+              {loadedOverdueCount > 0 ? ` ${loadedOverdueCount} yang terlihat sudah lewat batas.` : ''}
+            </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <div className={`border rounded-xl px-3 py-2 bg-white flex items-center gap-2 ${sessionInfo?.asrama_binaan ? 'border-emerald-200 bg-emerald-50' : ''}`}>
@@ -192,6 +213,19 @@ export default function SantriKembaliPageContent() {
             </tbody>
           </table>
         </div>
+
+        {!loading && hasMore ? (
+          <div className="border-t bg-slate-50 px-5 py-4 flex justify-center">
+            <button
+              onClick={() => loadRows(true, rows.length)}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Muat Lagi
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {selectedRow && (

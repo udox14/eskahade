@@ -24,6 +24,9 @@ type SantriData = {
 }
 type DraftItem = { santri_id: string; kamar_lama: string | null; kamar_baru: string; applied: number }
 type KetuaItem = { nomor_kamar: string; santri_id: string; nama_lengkap: string }
+type GetDataResult =
+  | { error: string; configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[] }
+  | { configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[] }
 
 // ── Badge status kamar ────────────────────────────────────────────────────────
 function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
@@ -141,28 +144,40 @@ export default function PerpindahanClient({
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await getDataPerpindahan(asrama)
+    const res = await getDataPerpindahan(asrama) as GetDataResult
+    if ('error' in res && res.error) {
+      toast.error(res.error)
+      setConfigs([])
+      setSantriList([])
+      setDraftMap({})
+      setKetuaMap({})
+      setIsApplied(false)
+      setLoading(false)
+      return
+    }
     setConfigs(res.configs)
     setSantriList(res.santriList)
     // Build draft map
     const dm: Record<string, DraftItem> = {}
-    res.drafts.forEach((d: any) => { dm[d.santri_id] = d })
+    res.drafts.forEach(d => { dm[d.santri_id] = d })
     setDraftMap(dm)
     // Build ketua map
     const km: Record<string, KetuaItem> = {}
-    res.ketuaList.forEach((k: any) => { km[k.nomor_kamar] = k })
+    res.ketuaList.forEach(k => { km[k.nomor_kamar] = k })
     setKetuaMap(km)
     // Determine step
     if (res.configs.length === 0) {
       setStep('config')
       setLocalKamar([])
+      setIsApplied(false)
     } else {
-      setLocalKamar(res.configs.map((c: any) => ({ nomor_kamar: c.nomor_kamar, kuota: c.kuota, blok: c.blok || '' })))
+      setLocalKamar(res.configs.map(c => ({ nomor_kamar: c.nomor_kamar, kuota: c.kuota, blok: c.blok || '' })))
       setConfigOpen(false)
       if (res.drafts.length > 0) {
-        setIsApplied(res.drafts.every((d: any) => d.applied === 1))
+        setIsApplied(res.drafts.every(d => d.applied === 1))
         setStep('plotting')
       } else {
+        setIsApplied(false)
         setStep('generate')
       }
     }
@@ -172,8 +187,9 @@ export default function PerpindahanClient({
   useEffect(() => { load() }, [load])
 
   // ── Derived: santri per kamar ──────────────────────────────────────────────
+  const hasDrafts = Object.keys(draftMap).length > 0
   const getSantriDiKamar = (nomor: string) =>
-    santriList.filter(s => draftMap[s.id]?.kamar_baru === nomor)
+    santriList.filter(s => (draftMap[s.id]?.kamar_baru ?? s.kamar_asli) === nomor)
 
   const santriTanpaDraft = santriList.filter(s => !draftMap[s.id])
 
@@ -196,18 +212,37 @@ export default function PerpindahanClient({
     toast.dismiss(toastId)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
-    toast.success(`Draft dibuat untuk ${(res as any).total} santri`)
+    toast.success(`Draft dibuat untuk ${res.total} santri`)
     await load()
   }
 
   const handlePindah = async (santriId: string, kamarBaru: string) => {
+    const santri = santriList.find(item => item.id === santriId)
     // Optimistic update
     setDraftMap(prev => ({
       ...prev,
-      [santriId]: { ...prev[santriId], santri_id: santriId, kamar_baru: kamarBaru, applied: 0, kamar_lama: prev[santriId]?.kamar_lama ?? null }
+      [santriId]: {
+        ...prev[santriId],
+        santri_id: santriId,
+        kamar_baru: kamarBaru,
+        applied: 0,
+        kamar_lama: prev[santriId]?.kamar_lama ?? santri?.kamar_asli ?? null,
+      }
     }))
+    setIsApplied(false)
     const res = await updateKamarDraft(asrama, santriId, kamarBaru)
-    if ('error' in res) { toast.error(res.error); await load() }
+    if ('error' in res) { toast.error(res.error); await load(); return }
+    const removedKetuaKamar = res.removedKetuaKamar
+    if (removedKetuaKamar) {
+      setKetuaMap(prev => {
+        const next = { ...prev }
+        delete next[removedKetuaKamar]
+        return next
+      })
+      toast.warning('Ketua kamar dilepas otomatis', {
+        description: `Santri dipindah dari kamar ${removedKetuaKamar}, jadi status ketuanya dibersihkan.`,
+      })
+    }
   }
 
   const handleApply = async () => {
@@ -216,13 +251,17 @@ export default function PerpindahanClient({
     const res = await applyDraft(asrama)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
-    toast.success(`Berhasil apply ${(res as any).count} santri!`)
+    const skipped = res.skipped ?? 0
+    toast.success(`Berhasil apply ${res.count} santri!`, skipped > 0 ? {
+      description: `${skipped} draft stale dilewati dan dibersihkan.`
+    } : undefined)
     await load()
   }
 
   const handleReset = async () => {
     if (!await confirm('Reset semua draft perpindahan? Data kamar santri di database TIDAK berubah.')) return
-    await resetDraft(asrama)
+    const res = await resetDraft(asrama)
+    if ('error' in res) return toast.error(res.error)
     toast.success('Draft direset')
     await load()
   }
@@ -237,7 +276,7 @@ export default function PerpindahanClient({
       if (s) next[nomor_kamar] = { nomor_kamar, santri_id, nama_lengkap: s.nama_lengkap }
       return next
     })
-    toast.success('Ketua kamar diperbarui')
+    toast.success('Ketua kamar diganti')
   }
 
   // ── Drag and drop ──────────────────────────────────────────────────────────
@@ -295,7 +334,7 @@ export default function PerpindahanClient({
               <td>${s.nama_lengkap} ${d.ketua?.santri_id === s.id ? '<span class="badge">KETUA</span>' : ''}</td>
               <td>${s.nama_kelas || '-'}</td>
               <td>${s.sekolah || '-'} ${s.kelas_sekolah ? 'Kls ' + s.kelas_sekolah : ''}</td>
-              <td>${draftMap[s.id]?.kamar_lama === d.nomor_kamar ? 'LAMA' : 'BARU'}</td>
+              <td>${(draftMap[s.id]?.kamar_lama ?? s.kamar_asli) === d.nomor_kamar ? 'LAMA' : 'BARU'}</td>
             </tr>
           `).join('')}
           </tbody>
@@ -455,24 +494,24 @@ export default function PerpindahanClient({
                         Sebagian slot dikosongkan untuk santri baru.
                       </p>
                       {(() => {
-                        const bloks = [...new Set(configs.map((k:any) => k.blok).filter(Boolean))]
+                        const bloks = [...new Set(configs.map(k => k.blok).filter(Boolean))]
                         return bloks.length > 0 ? (
                           <div className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
                             <div className="w-4 h-4 mt-0.5 shrink-0 text-indigo-500">🔒</div>
                             <div>
                               <p className="text-xs font-semibold text-indigo-700 mb-1">Blok aktif — santri hanya dipindah dalam blok yang sama</p>
                               <div className="flex flex-wrap gap-1.5">
-                                {bloks.map((blok:any) => {
-                                  const kamarBlok = configs.filter((k:any) => k.blok === blok)
+                                {bloks.map(blok => {
+                                  const kamarBlok = configs.filter(k => k.blok === blok)
                                   return (
                                     <span key={blok} className="text-[10px] bg-white border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded-lg">
-                                      Blok {blok}: Kamar {kamarBlok.map((k:any) => k.nomor_kamar).join(', ')}
+                                      Blok {blok}: Kamar {kamarBlok.map(k => k.nomor_kamar).join(', ')}
                                     </span>
                                   )
                                 })}
-                                {configs.filter((k:any) => !k.blok).length > 0 && (
+                                {configs.filter(k => !k.blok).length > 0 && (
                                   <span className="text-[10px] bg-white border border-slate-200 text-slate-500 font-medium px-2 py-0.5 rounded-lg">
-                                    Tanpa blok: Kamar {configs.filter((k:any) => !k.blok).map((k:any) => k.nomor_kamar).join(', ')}
+                                    Tanpa blok: Kamar {configs.filter(k => !k.blok).map(k => k.nomor_kamar).join(', ')}
                                   </span>
                                 )}
                               </div>
@@ -552,7 +591,7 @@ export default function PerpindahanClient({
                           {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4"/>}
                           Generate Draft
                         </button>
-                        {Object.keys(draftMap).length > 0 && (
+                        {hasDrafts && (
                           <button onClick={() => setStep('plotting')}
                             className="border border-indigo-300 text-indigo-600 hover:bg-indigo-50 px-5 py-2 rounded-lg text-sm font-semibold">
                             Lihat Draft Existing →
@@ -565,7 +604,7 @@ export default function PerpindahanClient({
               )}
 
               {/* ─ STEP 3: PLOTTING ─ */}
-              {Object.keys(draftMap).length > 0 && (
+              {hasDrafts && (
                 <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-3 border-b bg-slate-50 gap-2">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
@@ -592,11 +631,46 @@ export default function PerpindahanClient({
 
                   {/* Santri tanpa draft */}
                   {santriTanpaDraft.length > 0 && (
-                    <div className="mx-5 mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5"/>
-                      <p className="text-xs text-yellow-700">
-                        <b>{santriTanpaDraft.length} santri</b> belum ada di draft. Generate ulang atau assign manual.
-                      </p>
+                    <div className="mx-5 mt-4 space-y-3">
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5"/>
+                        <p className="text-xs text-yellow-700">
+                          <b>{santriTanpaDraft.length} santri</b> belum ada di draft. Generate ulang atau assign manual.
+                        </p>
+                      </div>
+                      <div className="border border-yellow-200 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2.5 bg-yellow-50/70 border-b border-yellow-200">
+                          <p className="text-xs font-semibold text-yellow-800">Assign manual santri yang belum masuk draft</p>
+                        </div>
+                        <div className="divide-y bg-white">
+                          {santriTanpaDraft.map(s => (
+                            <div key={s.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{s.nama_lengkap}</p>
+                                <p className="text-xs text-slate-400">
+                                  {s.nama_kelas || s.kelas_sekolah || 'Belum masuk kelas'}
+                                  {s.kamar_asli ? ` · Kamar asal ${s.kamar_asli}` : ' · Belum punya kamar asal'}
+                                </p>
+                              </div>
+                              <select
+                                onChange={e => {
+                                  if (e.target.value) handlePindah(s.id, e.target.value)
+                                  e.target.value = ''
+                                }}
+                                className="sm:w-44 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>Pilih kamar tujuan</option>
+                                {configs.map(c => (
+                                  <option key={c.nomor_kamar} value={c.nomor_kamar}>
+                                    Kamar {c.nomor_kamar}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -616,9 +690,9 @@ export default function PerpindahanClient({
                           <div className="flex items-center justify-between px-3 py-2 border-b border-inherit bg-white rounded-t-xl">
                             <div className="flex items-center gap-2">
                               <span className="font-black text-slate-800">Kamar {cfg.nomor_kamar}</span>
-                              {(cfg as any).blok && (
+                              {cfg.blok && (
                                 <span className="text-[9px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded">
-                                  Blok {(cfg as any).blok}
+                                  Blok {cfg.blok}
                                 </span>
                               )}
                               <KamarStatusBadge isi={santriKamar.length} kuota={cfg.kuota}/>
@@ -637,6 +711,9 @@ export default function PerpindahanClient({
                             <div className="flex items-center gap-1.5">
                               <Crown className="w-3 h-3 text-amber-500 shrink-0"/>
                               <div className="flex-1 min-w-0 pr-1">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                                  Ganti Ketua Kamar
+                                </p>
                                 <ComboboxKetuaKamar
                                   candidates={santriKamar}
                                   value={ketua?.santri_id || ''}
@@ -652,7 +729,7 @@ export default function PerpindahanClient({
                               <p className="text-center text-xs text-slate-400 py-4">Drag santri ke sini</p>
                             ) : (
                               santriKamar.map(s => {
-                                const isLama = draftMap[s.id]?.kamar_lama === cfg.nomor_kamar
+                                const isLama = (draftMap[s.id]?.kamar_lama ?? s.kamar_asli) === cfg.nomor_kamar
                                 const isKetua = ketua?.santri_id === s.id
                                 return (
                                   <div key={s.id}
@@ -754,7 +831,7 @@ export default function PerpindahanClient({
                           return (
                             <tr key={cfg.nomor_kamar} className="hover:bg-slate-50">
                               <td className="px-4 py-3 font-bold text-slate-800">Kamar {cfg.nomor_kamar}</td>
-                              <td className="px-4 py-3 text-center text-xs">{(cfg as any).blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{(cfg as any).blok}</span> : <span className="text-slate-300">—</span>}</td>
+                              <td className="px-4 py-3 text-center text-xs">{cfg.blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{cfg.blok}</span> : <span className="text-slate-300">—</span>}</td>
                               <td className="px-4 py-3 text-center text-slate-600">{cfg.kuota}</td>
                               <td className="px-4 py-3 text-center font-bold">{isi}</td>
                               <td className={`px-4 py-3 text-center font-bold ${cfg.kuota - isi < 0 ? 'text-red-500' : 'text-green-600'}`}>
@@ -834,7 +911,7 @@ export default function PerpindahanClient({
                       return a.nama_lengkap.localeCompare(b.nama_lengkap)
                     })
                     .map((s, i) => {
-                      const isLama = draftMap[s.id]?.kamar_lama === modalKamar
+                      const isLama = (draftMap[s.id]?.kamar_lama ?? s.kamar_asli) === modalKamar
                       const isKetua = ketua?.santri_id === s.id
                       return (
                         <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${isKetua ? 'bg-amber-50' : ''}`}>

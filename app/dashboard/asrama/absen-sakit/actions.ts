@@ -24,11 +24,15 @@ export type SantriSakitOption = {
 
 export type DataSakitRow = {
   id: string
+  episode_id: string
   santri_id: string
   tanggal: string
   sesi: SesiSakit
   sakit_apa: string
   beli_surat: number
+  status_sakit: 'SAKIT' | 'SEMBUH'
+  mulai_at: string | null
+  sembuh_at: string | null
   created_at: string
   updated_at: string | null
   nama_lengkap: string
@@ -47,6 +51,10 @@ async function ensureSchema() {
     `ALTER TABLE absen_sakit ADD COLUMN sakit_apa TEXT`,
     `ALTER TABLE absen_sakit ADD COLUMN beli_surat INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE absen_sakit ADD COLUMN updated_at TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN episode_id TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN status_sakit TEXT NOT NULL DEFAULT 'SAKIT'`,
+    `ALTER TABLE absen_sakit ADD COLUMN mulai_at TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN sembuh_at TEXT`,
   ]
 
   for (const sql of statements) {
@@ -56,6 +64,9 @@ async function ensureSchema() {
       // Kolom sudah ada pada database yang sudah termigrasi.
     }
   }
+
+  await execute(`UPDATE absen_sakit SET episode_id = id WHERE episode_id IS NULL OR episode_id = ''`)
+  await execute(`UPDATE absen_sakit SET mulai_at = COALESCE(mulai_at, tanggal || 'T00:00:00.000Z') WHERE mulai_at IS NULL OR mulai_at = ''`)
 }
 
 async function getRestrictedAsrama(): Promise<string | null> {
@@ -80,6 +91,12 @@ function normalizeSesi(value: string): SesiSakit {
 
 function normalizeDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().split('T')[0]
+}
+
+function normalizeDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return new Date()
+  return date
 }
 
 export async function getSessionInfo(): Promise<SessionInfo | null> {
@@ -128,7 +145,7 @@ export async function cariSantriSakit(keyword: string, asramaRequest: string): P
   `, [targetAsrama, `%${clean}%`, `%${clean}%`])
 }
 
-export async function getDataSakit(params: { asrama: string; tanggal: string; sesi: SesiSakit }) {
+export async function getDataSakit(params: { asrama: string }) {
   await ensureSchema()
 
   const session = await requireAllowedSession()
@@ -136,12 +153,21 @@ export async function getDataSakit(params: { asrama: string; tanggal: string; se
 
   const restrictedAsrama = await getRestrictedAsrama()
   const targetAsrama = restrictedAsrama || params.asrama
-  const tanggal = normalizeDate(params.tanggal)
-  const sesi = normalizeSesi(params.sesi)
 
   return query<DataSakitRow>(`
+    WITH latest AS (
+      SELECT COALESCE(episode_id, id) AS episode_key, MAX(created_at) AS max_created_at
+      FROM absen_sakit
+      GROUP BY COALESCE(episode_id, id)
+    ),
+    closed AS (
+      SELECT DISTINCT COALESCE(episode_id, id) AS episode_key
+      FROM absen_sakit
+      WHERE status_sakit = 'SEMBUH' OR sembuh_at IS NOT NULL
+    )
     SELECT
       ab.id,
+      COALESCE(ab.episode_id, ab.id) AS episode_id,
       ab.santri_id,
       ab.tanggal,
       COALESCE(ab.sesi, 'PAGI') AS sesi,
@@ -154,6 +180,9 @@ export async function getDataSakit(params: { asrama: string; tanggal: string; se
         WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN 1
         ELSE 0
       END AS beli_surat,
+      COALESCE(ab.status_sakit, 'SAKIT') AS status_sakit,
+      ab.mulai_at,
+      ab.sembuh_at,
       ab.created_at,
       ab.updated_at,
       s.nama_lengkap,
@@ -161,18 +190,20 @@ export async function getDataSakit(params: { asrama: string; tanggal: string; se
       s.kamar,
       s.asrama
     FROM absen_sakit ab
+    JOIN latest l ON l.episode_key = COALESCE(ab.episode_id, ab.id) AND l.max_created_at = ab.created_at
     JOIN santri s ON s.id = ab.santri_id
+    LEFT JOIN closed c ON c.episode_key = COALESCE(ab.episode_id, ab.id)
     WHERE s.asrama = ?
-      AND ab.tanggal = ?
-      AND COALESCE(ab.sesi, 'PAGI') = ?
-    ORDER BY s.kamar, s.nama_lengkap
-  `, [targetAsrama, tanggal, sesi])
+      AND c.episode_key IS NULL
+    ORDER BY COALESCE(ab.mulai_at, ab.created_at) DESC, s.kamar, s.nama_lengkap
+  `, [targetAsrama])
 }
 
 export async function simpanDataSakit(payload: {
   santriId: string
   tanggal: string
   sesi: SesiSakit
+  mulaiAt: string
   sakitApa: string
   beliSurat: boolean
 }) {
@@ -198,27 +229,101 @@ export async function simpanDataSakit(payload: {
 
   const tanggal = normalizeDate(payload.tanggal)
   const sesi = normalizeSesi(payload.sesi)
+  const mulaiAt = normalizeDateTime(payload.mulaiAt).toISOString()
   const beliSurat = payload.beliSurat ? 1 : 0
-  const existing = await queryOne<{ id: string }>(`
-    SELECT id FROM absen_sakit
-    WHERE santri_id = ? AND tanggal = ? AND COALESCE(sesi, 'PAGI') = ?
-  `, [payload.santriId, tanggal, sesi])
+  const active = await queryOne<{ episode_id: string; mulai_at: string | null }>(`
+    WITH closed AS (
+      SELECT DISTINCT COALESCE(episode_id, id) AS episode_key
+      FROM absen_sakit
+      WHERE status_sakit = 'SEMBUH' OR sembuh_at IS NOT NULL
+    )
+    SELECT COALESCE(ab.episode_id, ab.id) AS episode_id, ab.mulai_at
+    FROM absen_sakit ab
+    LEFT JOIN closed c ON c.episode_key = COALESCE(ab.episode_id, ab.id)
+    WHERE ab.santri_id = ? AND c.episode_key IS NULL
+    ORDER BY COALESCE(ab.mulai_at, ab.created_at) DESC
+    LIMIT 1
+  `, [payload.santriId])
 
-  if (existing) {
+  const rowId = generateId()
+  const episodeId = active?.episode_id || rowId
+  const episodeStart = active?.mulai_at || mulaiAt
+
+  if (active) {
     await execute(`
-      UPDATE absen_sakit
-      SET sakit_apa = ?, beli_surat = ?, keterangan = ?, updated_at = datetime('now'), created_by = ?
-      WHERE id = ?
-    `, [sakitApa, beliSurat, sakitApa, session.id ?? null, existing.id])
+      INSERT INTO absen_sakit
+        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
+    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, episodeStart, session.id ?? null])
   } else {
     await execute(`
-      INSERT INTO absen_sakit (id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [generateId(), payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, session.id ?? null])
+      INSERT INTO absen_sakit
+        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
+    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, mulaiAt, session.id ?? null])
   }
 
   revalidatePath(FEATURE_PATH)
-  return { success: true, updated: Boolean(existing), nama: santri.nama_lengkap }
+  return { success: true, updated: Boolean(active), nama: santri.nama_lengkap }
+}
+
+export async function tandaiSembuh(payload: { episodeId: string; tanggal: string; sesi: SesiSakit; sembuhAt: string }) {
+  await ensureSchema()
+
+  const session = await requireAllowedSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const restrictedAsrama = await getRestrictedAsrama()
+  const active = await queryOne<{
+    episode_id: string
+    santri_id: string
+    asrama: string | null
+    sakit_apa: string | null
+    beli_surat: number | null
+    mulai_at: string | null
+  }>(`
+    SELECT
+      COALESCE(ab.episode_id, ab.id) AS episode_id,
+      ab.santri_id,
+      s.asrama,
+      ab.sakit_apa,
+      ab.beli_surat,
+      ab.mulai_at
+    FROM absen_sakit ab
+    JOIN santri s ON s.id = ab.santri_id
+    WHERE COALESCE(ab.episode_id, ab.id) = ?
+    ORDER BY ab.created_at DESC
+    LIMIT 1
+  `, [payload.episodeId])
+
+  if (!active) return { error: 'Data sakit tidak ditemukan.' }
+  if (restrictedAsrama && active.asrama !== restrictedAsrama) {
+    return { error: 'Pengurus asrama hanya bisa mengubah data santri asramanya.' }
+  }
+
+  const tanggal = normalizeDate(payload.tanggal)
+  const sesi = normalizeSesi(payload.sesi)
+  const sembuhAt = normalizeDateTime(payload.sembuhAt).toISOString()
+
+  await execute(`
+    INSERT INTO absen_sakit
+      (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, sembuh_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Sembuh', 'SEMBUH', ?, ?, ?)
+  `, [
+    generateId(),
+    active.episode_id,
+    active.santri_id,
+    tanggal,
+    sesi,
+    active.sakit_apa || 'Sembuh',
+    active.beli_surat || 0,
+    active.mulai_at,
+    sembuhAt,
+    session.id ?? null,
+  ])
+
+  revalidatePath(FEATURE_PATH)
+  return { success: true }
 }
 
 export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitItem[]> {
@@ -235,6 +340,7 @@ export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitIte
   return query<RiwayatSakitItem>(`
     SELECT
       ab.id,
+      COALESCE(ab.episode_id, ab.id) AS episode_id,
       ab.santri_id,
       ab.tanggal,
       COALESCE(ab.sesi, 'PAGI') AS sesi,
@@ -247,6 +353,9 @@ export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitIte
         WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN 1
         ELSE 0
       END AS beli_surat,
+      COALESCE(ab.status_sakit, 'SAKIT') AS status_sakit,
+      ab.mulai_at,
+      ab.sembuh_at,
       ab.created_at,
       ab.updated_at,
       s.nama_lengkap,

@@ -21,6 +21,7 @@ import {
   getRiwayatSakit,
   getSessionInfo,
   simpanDataSakit,
+  tandaiSembuh,
   type DataSakitRow,
   type RiwayatSakitItem,
   type SantriSakitOption,
@@ -28,14 +29,48 @@ import {
   type SessionInfo,
 } from './actions'
 
-const SESI_OPTIONS: Array<{ value: SesiSakit; label: string; description: string }> = [
-  { value: 'PAGI', label: 'Pagi', description: 'Sebelum sekolah' },
-  { value: 'SORE', label: 'Sore', description: 'Sebelum Ashar' },
-  { value: 'MALAM', label: 'Malam', description: 'Sebelum Maghrib' },
+const SESI_OPTIONS: Array<{
+  value: SesiSakit
+  label: string
+  description: string
+  active: string
+  inactive: string
+  text: string
+}> = [
+  {
+    value: 'PAGI',
+    label: 'Pagi',
+    description: 'Sebelum sekolah',
+    active: 'bg-sky-600 border-sky-600 shadow-sky-100',
+    inactive: 'bg-sky-50 border-sky-100 hover:border-sky-300',
+    text: 'text-sky-700',
+  },
+  {
+    value: 'SORE',
+    label: 'Sore',
+    description: 'Sebelum Ashar',
+    active: 'bg-amber-500 border-amber-500 shadow-amber-100',
+    inactive: 'bg-amber-50 border-amber-100 hover:border-amber-300',
+    text: 'text-amber-700',
+  },
+  {
+    value: 'MALAM',
+    label: 'Malam',
+    description: 'Sebelum Maghrib',
+    active: 'bg-indigo-600 border-indigo-600 shadow-indigo-100',
+    inactive: 'bg-indigo-50 border-indigo-100 hover:border-indigo-300',
+    text: 'text-indigo-700',
+  },
 ]
 
 function todayKey() {
   return new Date().toISOString().split('T')[0]
+}
+
+function localDateTimeNow() {
+  const date = new Date()
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0, 16)
 }
 
 function getDefaultSesi(): SesiSakit {
@@ -49,6 +84,19 @@ function formatDate(value: string) {
   const date = new Date(`${value}T00:00:00`)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function sesiLabel(value: SesiSakit) {
@@ -71,6 +119,7 @@ export default function DataSakitPage() {
   const [selectedSantri, setSelectedSantri] = useState<SantriSakitOption | null>(null)
   const [sakitApa, setSakitApa] = useState('')
   const [beliSurat, setBeliSurat] = useState(false)
+  const [mulaiAt, setMulaiAt] = useState(localDateTimeNow())
 
   const [detailSantri, setDetailSantri] = useState<DataSakitRow | null>(null)
   const [riwayat, setRiwayat] = useState<RiwayatSakitItem[]>([])
@@ -92,17 +141,17 @@ export default function DataSakitPage() {
   const loadData = useCallback(async () => {
     if (!selectedAsrama) return
     setLoading(true)
-    const data = await getDataSakit({ asrama: selectedAsrama, tanggal, sesi })
+    const data = await getDataSakit({ asrama: selectedAsrama })
     setRows(data)
     setLoading(false)
-  }, [selectedAsrama, sesi, tanggal])
+  }, [selectedAsrama])
 
   useEffect(() => {
     if (selectedAsrama) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadData()
     }
-  }, [selectedAsrama, tanggal, sesi, loadData])
+  }, [selectedAsrama, loadData])
 
   const filteredRows = useMemo(() => {
     const needle = tableSearch.trim().toLowerCase()
@@ -124,6 +173,9 @@ export default function DataSakitPage() {
     setSelectedSantri(null)
     setSakitApa('')
     setBeliSurat(false)
+    setMulaiAt(localDateTimeNow())
+    setSesi(getDefaultSesi())
+    setTanggal(todayKey())
   }
 
   const openCatatModal = () => {
@@ -156,9 +208,17 @@ export default function DataSakitPage() {
     if (current) {
       setSakitApa(current.sakit_apa === '-' ? '' : current.sakit_apa)
       setBeliSurat(current.beli_surat === 1)
+      if (current.mulai_at) {
+        const date = new Date(current.mulai_at)
+        if (!Number.isNaN(date.getTime())) {
+          date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+          setMulaiAt(date.toISOString().slice(0, 16))
+        }
+      }
     } else {
       setSakitApa('')
       setBeliSurat(false)
+      setMulaiAt(localDateTimeNow())
     }
   }
 
@@ -184,6 +244,7 @@ export default function DataSakitPage() {
         santriId: selectedSantri.id,
         tanggal,
         sesi,
+        mulaiAt,
         sakitApa,
         beliSurat,
       })
@@ -209,12 +270,33 @@ export default function DataSakitPage() {
     setLoadingRiwayat(false)
   }
 
+  const handleSembuh = (row: DataSakitRow) => {
+    startTransition(async () => {
+      const res = await tandaiSembuh({
+        episodeId: row.episode_id,
+        tanggal: todayKey(),
+        sesi,
+        sembuhAt: localDateTimeNow(),
+      })
+
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+
+      toast.success('Santri ditandai sembuh', { description: row.nama_lengkap })
+      await loadData()
+    })
+  }
+
+  const selectedActiveRow = selectedSantri ? rows.find(row => row.santri_id === selectedSantri.id) : null
+
   return (
     <div className="max-w-6xl mx-auto pb-24 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Data Sakit</h1>
-          <p className="text-sm text-slate-500 mt-1">Pendataan santri sakit dilakukan pagi, sore, dan malam.</p>
+          <p className="text-sm text-slate-500 mt-1">Input sekali, update bila ada perubahan, lalu tandai sembuh ketika sudah pulih.</p>
         </div>
         <button
           onClick={openCatatModal}
@@ -225,29 +307,12 @@ export default function DataSakitPage() {
         </button>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-3">
-        {SESI_OPTIONS.map(item => (
-          <button
-            key={item.value}
-            onClick={() => setSesi(item.value)}
-            className={`text-left border rounded-2xl p-4 transition-all ${
-              sesi === item.value
-                ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
-                : 'bg-white hover:border-emerald-200 text-slate-700'
-            }`}
-          >
-            <p className="font-bold">{item.label}</p>
-            <p className={`text-xs mt-1 ${sesi === item.value ? 'text-emerald-50' : 'text-slate-500'}`}>{item.description}</p>
-          </button>
-        ))}
-      </div>
-
       <section className="bg-white border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-slate-50 space-y-3">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
             <div>
-              <h2 className="font-bold text-slate-800">Data Santri Sakit</h2>
-              <p className="text-sm text-slate-500">{formatDate(tanggal)} - {sesiLabel(sesi)}</p>
+              <h2 className="font-bold text-slate-800">Santri Sakit Aktif</h2>
+              <p className="text-sm text-slate-500">Daftar santri yang belum ditandai sembuh.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className={`border rounded-xl px-3 py-2 bg-white flex items-center gap-2 ${sessionInfo?.asrama_binaan ? 'border-emerald-200 bg-emerald-50' : ''}`}>
@@ -261,12 +326,6 @@ export default function DataSakitPage() {
                   {asramaList.map(asrama => <option key={asrama} value={asrama}>{asrama}</option>)}
                 </select>
               </div>
-              <input
-                type="date"
-                value={tanggal}
-                onChange={e => setTanggal(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
-              />
             </div>
           </div>
 
@@ -287,18 +346,19 @@ export default function DataSakitPage() {
               <tr>
                 <th className="px-4 py-3 text-left font-bold min-w-[240px]">Santri</th>
                 <th className="px-4 py-3 text-left font-bold w-40">Asrama</th>
+                <th className="px-4 py-3 text-left font-bold min-w-[180px]">Mulai</th>
                 <th className="px-4 py-3 text-left font-bold min-w-[220px]">Sakit</th>
                 <th className="px-4 py-3 text-left font-bold w-32">Surat</th>
-                <th className="px-4 py-3 text-right font-bold w-28">Aksi</th>
+                <th className="px-4 py-3 text-right font-bold w-44">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={6} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
-                    Tidak ada santri sakit pada sesi ini.
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    Tidak ada santri sakit aktif.
                   </td>
                 </tr>
               ) : filteredRows.map(row => (
@@ -310,6 +370,7 @@ export default function DataSakitPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatDateTime(row.mulai_at)}</td>
                   <td className="px-4 py-3 text-slate-700">{row.sakit_apa}</td>
                   <td className="px-4 py-3">
                     {row.beli_surat ? (
@@ -323,8 +384,11 @@ export default function DataSakitPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => openUpdateModal(row)} className="text-xs font-bold text-emerald-700 hover:text-emerald-900">
+                    <button onClick={() => openUpdateModal(row)} className="text-xs font-bold text-emerald-700 hover:text-emerald-900 mr-3">
                       Update
+                    </button>
+                    <button onClick={() => handleSembuh(row)} disabled={pending} className="text-xs font-bold text-sky-700 hover:text-sky-900 disabled:text-slate-400">
+                      Sembuh
                     </button>
                   </td>
                 </tr>
@@ -340,7 +404,7 @@ export default function DataSakitPage() {
             <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-800">Catat Sakit</h2>
-                <p className="text-sm text-slate-500">{formatDate(tanggal)} - {sesiLabel(sesi)}</p>
+                <p className="text-sm text-slate-500">Catatan {formatDate(tanggal)} - {sesiLabel(sesi)}</p>
               </div>
               <button onClick={closeCatatModal} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                 <X className="w-5 h-5" />
@@ -348,6 +412,37 @@ export default function DataSakitPage() {
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
+              <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tanggal Catatan</label>
+                  <input
+                    type="date"
+                    value={tanggal}
+                    onChange={e => setTanggal(e.target.value)}
+                    className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Sesi Catatan</label>
+                  <div className="mt-1 grid grid-cols-3 gap-2">
+                    {SESI_OPTIONS.map(item => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setSesi(item.value)}
+                        className={`rounded-xl border px-3 py-2 text-left transition-all ${
+                          sesi === item.value
+                            ? `${item.active} text-white shadow-sm`
+                            : `${item.inactive} ${item.text}`
+                        }`}
+                      >
+                        <span className="block text-xs font-bold">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase">Cari Santri</label>
                 <div className="flex gap-2">
@@ -391,6 +486,20 @@ export default function DataSakitPage() {
                   </div>
                 </div>
               ) : null}
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Mulai Sakit</label>
+                <input
+                  type="datetime-local"
+                  value={mulaiAt}
+                  onChange={e => setMulaiAt(e.target.value)}
+                  disabled={Boolean(selectedActiveRow)}
+                  className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
+                />
+                {selectedActiveRow ? (
+                  <p className="text-xs text-slate-500 mt-1">Mulai sakit dikunci karena santri ini masih dalam episode sakit aktif.</p>
+                ) : null}
+              </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Sakit Apa</label>
@@ -454,9 +563,18 @@ export default function DataSakitPage() {
                     <div key={item.id} className="border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
+                          <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
+                            item.status_sakit === 'SEMBUH'
+                              ? 'text-sky-700 bg-sky-50'
+                              : 'text-emerald-700 bg-emerald-50'
+                          }`}>
                             <Clock className="w-3 h-3" /> {sesiLabel(item.sesi)}
                           </span>
+                          {item.status_sakit === 'SEMBUH' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 px-2 py-1 rounded-full">
+                              <CheckCircle2 className="w-3 h-3" /> Sembuh
+                            </span>
+                          ) : null}
                           {item.beli_surat ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
                               <FileText className="w-3 h-3" /> Beli Surat
@@ -467,6 +585,9 @@ export default function DataSakitPage() {
                         <p className="text-xs text-slate-500 mt-1">
                           {formatDate(item.tanggal)} - dicatat oleh {item.pencatat_nama || '-'}
                         </p>
+                        {item.sembuh_at ? (
+                          <p className="text-xs text-sky-600 mt-1">Sembuh: {formatDateTime(item.sembuh_at)}</p>
+                        ) : null}
                       </div>
                       <BookOpen className="w-5 h-5 text-slate-300 hidden md:block" />
                     </div>

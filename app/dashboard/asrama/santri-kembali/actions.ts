@@ -26,6 +26,13 @@ export type SantriKembaliRow = {
   created_at: string
 }
 
+export type SantriBelumKembaliResult = {
+  rows: SantriKembaliRow[]
+  total: number
+  overdueTotal: number
+  hasMore: boolean
+}
+
 async function getAllowedSession() {
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'dewan_santri'])) {
@@ -67,13 +74,15 @@ export async function getAsramaListSantriKembali() {
   return rows.map(row => row.asrama)
 }
 
-export async function getSantriBelumKembali(params: { asrama?: string; search?: string }) {
+export async function getSantriBelumKembali(params: { asrama?: string; search?: string; limit?: number; offset?: number }): Promise<SantriBelumKembaliResult> {
   const session = await getAllowedSession()
-  if (!session) return []
+  if (!session) return { rows: [], total: 0, overdueTotal: 0, hasMore: false }
 
   const restrictedAsrama = await getRestrictedAsrama()
   const clauses = ["p.jenis = 'PULANG'", "p.status = 'AKTIF'", "p.tgl_kembali_aktual IS NULL"]
   const bind: unknown[] = []
+  const limit = Math.min(Math.max(params.limit ?? 30, 1), 100)
+  const offset = Math.max(params.offset ?? 0, 0)
 
   const targetAsrama = restrictedAsrama || params.asrama
   if (targetAsrama && targetAsrama !== 'SEMUA') {
@@ -87,7 +96,17 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
     bind.push(`%${clean}%`, `%${clean}%`, `%${clean}%`)
   }
 
-  return query<SantriKembaliRow>(`
+  const where = clauses.join(' AND ')
+  const [stats, rows] = await Promise.all([
+    queryOne<{ total: number; overdueTotal: number }>(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN p.tgl_selesai_rencana < ? THEN 1 ELSE 0 END) AS overdueTotal
+      FROM perizinan p
+      JOIN santri s ON s.id = p.santri_id
+      WHERE ${where}
+    `, [new Date().toISOString(), ...bind]),
+    query<SantriKembaliRow>(`
     SELECT
       p.id,
       p.santri_id,
@@ -102,10 +121,18 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
       s.kamar
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
-    WHERE ${clauses.join(' AND ')}
+    WHERE ${where}
     ORDER BY p.tgl_selesai_rencana ASC, s.asrama, s.kamar, s.nama_lengkap
-    LIMIT 200
-  `, bind)
+    LIMIT ? OFFSET ?
+    `, [...bind, limit + 1, offset]),
+  ])
+
+  return {
+    rows: rows.slice(0, limit),
+    total: stats?.total ?? 0,
+    overdueTotal: stats?.overdueTotal ?? 0,
+    hasMore: rows.length > limit,
+  }
 }
 
 export async function tandaiSantriKembali(id: string, waktuDatang: string) {

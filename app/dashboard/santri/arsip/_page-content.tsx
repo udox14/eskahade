@@ -155,7 +155,7 @@ export default function ArsipSantriPage() {
   // ── ACTIONS ──
   const handleArsipkan = async () => {
     if (selectedArsip.size === 0) return toast.warning("Pilih santri yang akan dijadikan alumni")
-    if (!await confirm(`⚠️ Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData mereka akan dipindah ke arsip dan dihapus dari daftar aktif.`)) return
+    if (!await confirm(`Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData historis tetap disimpan di D1. Santri hanya disembunyikan dari daftar aktif.`)) return
     setIsArsipkan(true)
     const toastId = toast.loading(`Memproses ${selectedArsip.size} santri...`)
     const res = await arsipkanSantri(Array.from(selectedArsip), catatanArsip)
@@ -169,7 +169,7 @@ export default function ArsipSantriPage() {
 
   const handleRestore = async () => {
     if (selectedRestore.size === 0) return toast.warning("Pilih data yang akan direstore")
-    if (!await confirm(`Restore ${selectedRestore.size} santri ke daftar aktif?\n\nSantri dikembalikan tanpa kelas — atur manual setelahnya.`)) return
+    if (!await confirm(`Restore ${selectedRestore.size} santri ke daftar aktif?\n\nData historis dan riwayat yang masih ada akan tetap dipertahankan.`)) return
     setIsRestore(true)
     const toastId = toast.loading(`Merestore ${selectedRestore.size} santri...`)
     const res = await restoreSantri(Array.from(selectedRestore))
@@ -184,13 +184,13 @@ export default function ArsipSantriPage() {
 
   const handleHapusMassal = async () => {
     if (selectedRestore.size === 0) return toast.warning("Pilih data yang akan dihapus")
-    if (!await confirm(`⚠️ HAPUS PERMANEN ${selectedRestore.size} data arsip dari Supabase?\n\nPastikan sudah didownload dulu. Tindakan ini TIDAK BISA dibatalkan!`)) return
+    if (!await confirm(`Hapus ${selectedRestore.size} catatan arsip?\n\nCatatan alumni soft-archive tidak bisa dihapus sebelum santri direstore.`)) return
     setIsHapusMassal(true)
     const toastId = toast.loading(`Menghapus ${selectedRestore.size} arsip...`)
     const res = await hapusArsipMassal(Array.from(selectedRestore))
     toast.dismiss(toastId); setIsHapusMassal(false)
     if ('error' in res) { toast.error("Gagal hapus", { description: res.error }); return }
-    toast.success(`${res?.count} arsip dihapus`, { description: "Storage Supabase kini lebih lega." })
+    toast.success(`${res?.count} catatan arsip dihapus`)
     loadSantriGrup(1, filterSantriArsip, false)
     loadGrup()
     // Kalau grup sudah kosong, kembali ke level 1
@@ -198,10 +198,10 @@ export default function ArsipSantriPage() {
   }
 
   const handleHapusSatu = async (id: string, nama: string) => {
-    if (!await confirm(`Hapus permanen arsip "${nama}"?\n\nData ini TIDAK BISA dikembalikan lagi!`)) return
+    if (!await confirm(`Hapus catatan arsip "${nama}"?\n\nUntuk alumni soft-archive, restore dulu sebelum menghapus catatannya.`)) return
     const res = await hapusArsipPermanen(id)
-    if ('error' in res) { toast.error("Gagal hapus"); return }
-    toast.success("Arsip dihapus")
+    if ('error' in res) { toast.error("Gagal hapus", { description: res.error }); return }
+    toast.success("Catatan arsip dihapus")
     loadSantriGrup(santriArsipPage, filterSantriArsip, false)
     loadGrup()
   }
@@ -211,20 +211,31 @@ export default function ArsipSantriPage() {
     setIsDownloading(true)
     const toastId = toast.loading("Menyiapkan data...")
     // Kalau tidak ada yang dipilih, download semua dalam grup ini
-    const res = await getArsipForDownload(ids)
+    const res = await getArsipForDownload(ids, ids || !activeGrup ? undefined : {
+      angkatan: activeGrup?.angkatan ?? null,
+      catatan: activeGrup?.catatan ?? null,
+      tanggal_arsip: activeGrup?.tanggal_arsip ?? ''
+    })
     toast.dismiss(toastId); setIsDownloading(false)
     if ('error' in res || !('data' in res)) { toast.error("Gagal", { description: (res as any).error }); return }
+    const exportData = res.data.map((item: any) => {
+      try {
+        return { ...item, snapshot: item.snapshot ? JSON.parse(item.snapshot) : null }
+      } catch {
+        return item
+      }
+    })
     const blob = new Blob([JSON.stringify({
       keterangan: "Backup Arsip Alumni - SKHDAPP",
       tanggal_export: new Date().toISOString(),
-      total: res.data.length,
-      data: res.data
+      total: exportData.length,
+      data: exportData
     }, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url
     a.download = `arsip_alumni_${activeGrup?.angkatan ?? 'backup'}_${new Date().toISOString().split('T')[0]}.json`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
-    toast.success(`${res.data.length} data berhasil didownload`)
+    toast.success(`${exportData.length} data berhasil didownload`)
   }
 
   // ── LABEL GRUP ──
@@ -247,7 +258,7 @@ export default function ArsipSantriPage() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Archive className="w-6 h-6 text-purple-600" /> Arsip Alumni
           </h1>
-          <p className="text-slate-500 text-sm">Jadikan santri alumni, restore, atau hapus arsip untuk hemat storage.</p>
+          <p className="text-slate-500 text-sm">Jadikan santri alumni tanpa menghapus data historis.</p>
         </div>
         <div className="flex gap-3 text-sm">
           <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-center">
@@ -277,7 +288,7 @@ export default function ArsipSantriPage() {
         <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-800">Pilih santri yang sudah lulus → sistem menyalin semua data (nilai, absensi, pelanggaran, SPP) ke arsip → lalu menghapusnya dari daftar aktif untuk menghemat storage.</p>
+            <p className="text-sm text-amber-800">Pilih santri yang sudah lulus → sistem membuat snapshot arsip → lalu mengubah statusnya menjadi alumni agar tidak muncul di daftar aktif.</p>
           </div>
 
           {/* Kontrol filter */}
@@ -386,7 +397,7 @@ export default function ArsipSantriPage() {
                     <tbody className="divide-y divide-gray-50">
                       {santriList.map(s => {
                         const isSelected = selectedArsip.has(s.id)
-                        const kelasPesantren = s.riwayat_pendidikan?.[0]?.kelas?.nama_kelas
+                        const kelasPesantren = s.kelas_pesantren_nama
                         return (
                           <tr key={s.id} onClick={() => toggleSelectArsip(s.id)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-purple-50' : 'hover:bg-slate-50'}`}>
                             <td className="px-4 py-3">{isSelected ? <CheckSquare className="w-5 h-5 text-purple-600" /> : <Square className="w-5 h-5 text-slate-300" />}</td>
@@ -429,7 +440,7 @@ export default function ArsipSantriPage() {
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800">Pilih batch arsip untuk melihat daftar santri di dalamnya dan melakukan restore atau hapus.</p>
+                <p className="text-sm text-blue-800">Pilih batch arsip untuk melihat daftar alumni, download snapshot, atau restore ke daftar aktif.</p>
               </div>
 
               {!hasLoadedGrup ? (
@@ -508,7 +519,7 @@ export default function ArsipSantriPage() {
                 )}
                 <button onClick={handleDownload} disabled={isDownloading} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 flex items-center gap-2 shadow-sm">
                   {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  {selectedRestore.size > 0 ? `Download Terpilih (${selectedRestore.size})` : 'Download Semua'}
+                  {selectedRestore.size > 0 ? `Download Terpilih (${selectedRestore.size})` : 'Download Grup'}
                 </button>
               </div>
 
@@ -557,7 +568,7 @@ export default function ArsipSantriPage() {
                                 </td>
                                 <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{a.asrama || '-'}</td>
                                 <td className="px-4 py-3">
-                                  <button onClick={() => handleHapusSatu(a.id, a.nama_lengkap)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Hapus permanen">
+                                  <button onClick={() => handleHapusSatu(a.id, a.nama_lengkap)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Hapus catatan arsip">
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 </td>
@@ -591,7 +602,7 @@ export default function ArsipSantriPage() {
               <div className="bg-purple-500 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm">{selectedArsip.size}</div>
               <div className="leading-tight">
                 <p className="font-bold text-sm">Siap dijadikan alumni</p>
-                <p className="text-xs text-slate-400">Data akan dipindah ke arsip</p>
+                <p className="text-xs text-slate-400">Status akan diubah menjadi alumni</p>
               </div>
             </div>
             <button onClick={handleArsipkan} disabled={isArsipkan} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
@@ -609,13 +620,13 @@ export default function ArsipSantriPage() {
               <div className="bg-green-500 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">{selectedRestore.size}</div>
               <div className="leading-tight">
                 <p className="font-bold text-sm">Terpilih</p>
-                <p className="text-xs text-slate-400">Restore atau hapus permanen</p>
+                <p className="text-xs text-slate-400">Restore atau hapus catatan</p>
               </div>
             </div>
             <div className="flex gap-2">
               <button onClick={handleHapusMassal} disabled={isHapusMassal || isRestore} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
                 {isHapusMassal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Hapus Permanen
+                Hapus Catatan
               </button>
               <button onClick={handleRestore} disabled={isRestore || isHapusMassal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
                 {isRestore ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
