@@ -49,6 +49,24 @@ export type DendaStats = {
   totalBelumLunas: number
 }
 
+export type DendaListParams = {
+  page?: number
+  pageSize?: number
+  search?: string
+  asrama?: string
+  tglAwal?: string
+  tglAkhir?: string
+}
+
+export type DendaListResult = {
+  rows: DendaSantriSummary[]
+  stats: DendaStats
+  total: number
+  totalPages: number
+  page: number
+  pageSize: number
+}
+
 let schemaReady: Promise<void> | null = null
 
 export async function ensureDendaBukuPribadiSchema() {
@@ -112,8 +130,68 @@ export async function cariSantriDenda(keyword: string) {
   `, [`%${clean}%`, `%${clean}%`])
 }
 
-export async function getDendaBukuPribadiData() {
+export async function getAsramaDendaList() {
   await ensureDendaBukuPribadiSchema()
+  const rows = await query<{ asrama: string }>(`
+    SELECT DISTINCT asrama
+    FROM santri
+    WHERE asrama IS NOT NULL AND asrama != ''
+    ORDER BY asrama
+  `)
+  return rows.map(row => row.asrama)
+}
+
+function buildFilterClause(params: DendaListParams) {
+  const clauses: string[] = []
+  const values: unknown[] = []
+  const search = params.search?.trim()
+  const asrama = params.asrama?.trim()
+  const tglAwal = params.tglAwal?.trim()
+  const tglAkhir = params.tglAkhir?.trim()
+
+  if (search) {
+    clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ? OR s.asrama LIKE ?)')
+    values.push(`%${search}%`, `%${search}%`, `%${search}%`)
+  }
+  if (asrama && asrama !== 'SEMUA') {
+    clauses.push('s.asrama = ?')
+    values.push(asrama)
+  }
+  if (tglAwal) {
+    clauses.push('d.tanggal >= ?')
+    values.push(tglAwal)
+  }
+  if (tglAkhir) {
+    clauses.push('d.tanggal <= ?')
+    values.push(tglAkhir)
+  }
+
+  return {
+    whereSql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
+    values,
+  }
+}
+
+export async function getDendaBukuPribadiData(params: DendaListParams = {}): Promise<DendaListResult> {
+  await ensureDendaBukuPribadiSchema()
+  const requestedPage = Math.max(1, Number(params.page || 1))
+  const pageSize = Math.max(0, Number(params.pageSize ?? 10))
+  const { whereSql, values } = buildFilterClause(params)
+
+  const totalRow = await queryOne<{ total: number }>(`
+    SELECT COUNT(*) as total
+    FROM (
+      SELECT s.id
+      FROM denda_buku_pribadi d
+      JOIN santri s ON s.id = d.santri_id
+      ${whereSql}
+      GROUP BY s.id
+    ) t
+  `, values)
+  const total = Number(totalRow?.total || 0)
+  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(requestedPage, totalPages)
+  const offset = pageSize === 0 ? 0 : (page - 1) * pageSize
 
   const rows = await query<DendaSantriSummary>(`
     SELECT
@@ -128,9 +206,11 @@ export async function getDendaBukuPribadiData() {
       MAX(d.tanggal) as terakhir_hilang
     FROM denda_buku_pribadi d
     JOIN santri s ON s.id = d.santri_id
+    ${whereSql}
     GROUP BY s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar
     ORDER BY total_belum_lunas DESC, terakhir_hilang DESC, s.nama_lengkap
-  `)
+    ${pageSize === 0 ? '' : 'LIMIT ? OFFSET ?'}
+  `, pageSize === 0 ? values : [...values, pageSize, offset])
 
   const statRow = await queryOne<{
     total_santri: number
@@ -143,8 +223,10 @@ export async function getDendaBukuPribadiData() {
       COUNT(*) as total_kasus,
       COALESCE(SUM(nominal), 0) as total_nominal,
       COALESCE(SUM(CASE WHEN status = 'BELUM_BAYAR' THEN nominal ELSE 0 END), 0) as total_belum_lunas
-    FROM denda_buku_pribadi
-  `)
+    FROM denda_buku_pribadi d
+    JOIN santri s ON s.id = d.santri_id
+    ${whereSql}
+  `, values)
 
   const stats: DendaStats = {
     totalSantri: Number(statRow?.total_santri || 0),
@@ -161,6 +243,10 @@ export async function getDendaBukuPribadiData() {
       total_belum_lunas: Number(row.total_belum_lunas || 0),
     })),
     stats,
+    total,
+    totalPages,
+    page,
+    pageSize,
   }
 }
 
@@ -208,25 +294,31 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
   const santriId = String(formData.get('santri_id') || '')
   const tanggal = String(formData.get('tanggal') || '').trim()
   const keterangan = String(formData.get('keterangan') || '').trim()
+  const langsungLunas = String(formData.get('langsung_lunas') || '') === '1'
 
   if (!santriId) return { error: 'Pilih santri dulu.' }
   if (!tanggal) return { error: 'Tanggal wajib diisi.' }
 
   const next = await getNextDendaBukuPribadi(santriId)
+  const paidAt = langsungLunas ? `${tanggal}T00:00:00.000Z` : null
+  const paidBy = langsungLunas ? session.id : null
 
   await execute(`
     INSERT INTO denda_buku_pribadi
-      (id, santri_id, tanggal, kehilangan_ke, nominal, status, keterangan, created_by, created_at)
-    VALUES (?, ?, ?, ?, ?, 'BELUM_BAYAR', ?, ?, ?)
+      (id, santri_id, tanggal, kehilangan_ke, nominal, status, keterangan, created_by, created_at, paid_at, paid_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     generateId(),
     santriId,
     tanggal,
     next.kehilanganKe,
     next.nominal,
+    langsungLunas ? 'LUNAS' : 'BELUM_BAYAR',
     keterangan || null,
     session.id,
     now(),
+    paidAt,
+    paidBy,
   ])
 
   revalidatePath(FEATURE_PATH)

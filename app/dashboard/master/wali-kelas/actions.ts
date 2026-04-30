@@ -8,7 +8,7 @@ import { syncWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
-  return `${cleanName}@sukahideng.com`
+  return `${cleanName}@sukahideng.or.id`
 }
 
 type KelasMasterRow = {

@@ -3,7 +3,7 @@ import { hashPassword } from '@/lib/auth/password'
 
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
-  return `${cleanName}@sukahideng.com`
+  return `${cleanName}@sukahideng.or.id`
 }
 
 async function getOrCreateWaliUserForGuru(guruId: number) {
@@ -60,4 +60,3 @@ export async function syncWaliKelasFromGuruMaghrib(kelasIds?: string[]) {
   if (updates.length > 0) await batch(updates)
   return { synced: updates.length }
 }
-

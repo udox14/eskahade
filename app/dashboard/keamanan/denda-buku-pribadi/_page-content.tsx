@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CheckCircle2, Eye, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { CheckCircle2, Eye, Filter, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import Pagination from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   cariSantriDenda,
   catatDendaBukuPribadi,
+  getAsramaDendaList,
   getDendaBukuPribadiData,
   getDendaBukuPribadiDetail,
   getNextDendaBukuPribadi,
@@ -37,17 +39,37 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const emptyStats: DendaStats = {
+  totalSantri: 0,
+  totalKasus: 0,
+  totalNominal: 0,
+  totalBelumLunas: 0,
+}
+
 export default function DendaBukuPribadiPageContent() {
   const confirm = useConfirm()
+  const pendingPageSizeRef = useRef<number | null>(null)
   const [rows, setRows] = useState<DendaSantriSummary[]>([])
-  const [stats, setStats] = useState<DendaStats>({ totalSantri: 0, totalKasus: 0, totalNominal: 0, totalBelumLunas: 0 })
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<DendaStats>(emptyStats)
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const [asramaOptions, setAsramaOptions] = useState<string[]>([])
+  const [asrama, setAsrama] = useState('SEMUA')
+  const [tglAwal, setTglAwal] = useState('')
+  const [tglAkhir, setTglAkhir] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
   const [santriSearch, setSantriSearch] = useState('')
   const [hasilCari, setHasilCari] = useState<SantriOption[]>([])
   const [selectedSantri, setSelectedSantri] = useState<SantriOption | null>(null)
   const [tanggal, setTanggal] = useState(todayKey())
   const [keterangan, setKeterangan] = useState('')
+  const [langsungLunas, setLangsungLunas] = useState(false)
   const [nextDenda, setNextDenda] = useState<{ kehilanganKe: number; nominal: number } | null>(null)
   const [showCatatModal, setShowCatatModal] = useState(false)
   const [modalSantri, setModalSantri] = useState<DendaSantriSummary | null>(null)
@@ -55,28 +77,75 @@ export default function DendaBukuPribadiPageContent() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [pending, startTransition] = useTransition()
 
-  const loadData = async () => {
-    setLoading(true)
-    const data = await getDendaBukuPribadiData()
-    setRows(data.rows)
-    setStats(data.stats)
-    setLoading(false)
-  }
-
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData()
+    getAsramaDendaList().then(setAsramaOptions)
   }, [])
 
-  const filteredRows = useMemo(() => {
-    const clean = search.trim().toLowerCase()
-    if (!clean) return rows
-    return rows.filter(row =>
-      row.nama_lengkap.toLowerCase().includes(clean) ||
-      (row.nis || '').toLowerCase().includes(clean) ||
-      (row.asrama || '').toLowerCase().includes(clean)
-    )
-  }, [rows, search])
+  const loadData = async (nextPage = page, nextPageSize = pageSize, nextSearch = search, nextAsrama = asrama, nextTglAwal = tglAwal, nextTglAkhir = tglAkhir) => {
+    setLoading(true)
+    try {
+      const data = await getDendaBukuPribadiData({
+        page: nextPage,
+        pageSize: nextPageSize,
+        search: nextSearch,
+        asrama: nextAsrama,
+        tglAwal: nextTglAwal,
+        tglAkhir: nextTglAkhir,
+      })
+      setRows(data.rows)
+      setStats(data.stats)
+      setTotal(data.total)
+      setTotalPages(data.totalPages)
+      setPage(data.page)
+      setPageSize(data.pageSize)
+      setHasLoaded(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApplyFilter = async () => {
+    if (tglAwal && tglAkhir && tglAkhir < tglAwal) {
+      toast.error('Tanggal akhir tidak boleh lebih kecil dari tanggal awal')
+      return
+    }
+    pendingPageSizeRef.current = null
+    const trimmedSearch = searchInput.trim()
+    setSearch(trimmedSearch)
+    setPage(1)
+    await loadData(1, pageSize, trimmedSearch, asrama, tglAwal, tglAkhir)
+  }
+
+  const handleResetFilter = () => {
+    pendingPageSizeRef.current = null
+    setSearchInput('')
+    setSearch('')
+    setAsrama('SEMUA')
+    setTglAwal('')
+    setTglAkhir('')
+    setPage(1)
+    setPageSize(10)
+    setRows([])
+    setStats(emptyStats)
+    setTotal(0)
+    setTotalPages(1)
+    setHasLoaded(false)
+  }
+
+  const handlePageChange = async (nextPage: number) => {
+    const effectivePageSize = pendingPageSizeRef.current ?? pageSize
+    pendingPageSizeRef.current = null
+    if (!hasLoaded) return
+    setPage(nextPage)
+    setPageSize(effectivePageSize)
+    await loadData(nextPage, effectivePageSize, search, asrama, tglAwal, tglAkhir)
+  }
+
+  const handlePageSizeChange = (nextSize: number) => {
+    pendingPageSizeRef.current = nextSize
+    setPageSize(nextSize)
+    setPage(1)
+  }
 
   const resetCatatForm = () => {
     setSantriSearch('')
@@ -84,6 +153,7 @@ export default function DendaBukuPribadiPageContent() {
     setSelectedSantri(null)
     setTanggal(todayKey())
     setKeterangan('')
+    setLangsungLunas(false)
     setNextDenda(null)
   }
 
@@ -124,6 +194,7 @@ export default function DendaBukuPribadiPageContent() {
     payload.set('santri_id', selectedSantri.id)
     payload.set('tanggal', tanggal)
     payload.set('keterangan', keterangan)
+    payload.set('langsung_lunas', langsungLunas ? '1' : '0')
 
     startTransition(async () => {
       const res = await catatDendaBukuPribadi(payload)
@@ -132,9 +203,13 @@ export default function DendaBukuPribadiPageContent() {
         return
       }
 
-      toast.success(`Denda ke-${res.kehilanganKe} dicatat: ${rupiah(res.nominal)}`)
+      toast.success(
+        langsungLunas
+          ? `Denda ke-${res.kehilanganKe} dicatat dan langsung lunas: ${rupiah(res.nominal)}`
+          : `Denda ke-${res.kehilanganKe} dicatat: ${rupiah(res.nominal)}`
+      )
       closeCatatModal()
-      await loadData()
+      if (hasLoaded) await loadData(page, pageSize, search, asrama, tglAwal, tglAkhir)
     })
   }
 
@@ -155,7 +230,7 @@ export default function DendaBukuPribadiPageContent() {
       }
       toast.success(`Denda ke-${item.kehilangan_ke} ditandai lunas`)
       if (modalSantri) await openDetail(modalSantri)
-      await loadData()
+      if (hasLoaded) await loadData(page, pageSize, search, asrama, tglAwal, tglAkhir)
     })
   }
 
@@ -173,7 +248,7 @@ export default function DendaBukuPribadiPageContent() {
       }
       toast.success(`Record denda ${res.nama} berhasil dihapus`)
       if (modalSantri) await openDetail(modalSantri)
-      await loadData()
+      if (hasLoaded) await loadData(page, pageSize, search, asrama, tglAwal, tglAkhir)
     })
   }
 
@@ -192,74 +267,152 @@ export default function DendaBukuPribadiPageContent() {
         </button>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Santri Tercatat" value={stats.totalSantri.toLocaleString('id-ID')} />
-        <StatCard label="Total Kejadian" value={stats.totalKasus.toLocaleString('id-ID')} />
-        <StatCard label="Total Denda" value={rupiah(stats.totalNominal)} />
-        <StatCard label="Belum Lunas" value={rupiah(stats.totalBelumLunas)} dark />
-      </div>
+      <section className="bg-white border rounded-2xl p-5 space-y-4">
+        <div className="flex items-center gap-2 text-slate-800 font-bold">
+          <Filter className="w-4 h-4 text-rose-600" /> Filter Data
+        </div>
 
-      <div>
-        <section className="bg-white border rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-800">Riwayat Denda</h2>
-              <p className="text-sm text-slate-500">Satu santri tampil satu baris. Detail kehilangan dibuka dari tombol lihat.</p>
-            </div>
-            <div className="relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase">Cari</label>
+            <div className="relative mt-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Filter tabel"
-                className="pl-9 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleApplyFilter()}
+                placeholder="Nama, NIS, atau asrama"
+                className="w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
               />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-white text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left font-bold min-w-[220px]">Santri</th>
-                  <th className="px-4 py-3 text-left font-bold w-40">Asrama</th>
-                  <th className="px-4 py-3 text-center font-bold w-28">Kejadian</th>
-                  <th className="px-4 py-3 text-right font-bold w-36">Total</th>
-                  <th className="px-4 py-3 text-right font-bold w-36">Belum Lunas</th>
-                  <th className="px-4 py-3 text-left font-bold w-36">Terakhir</th>
-                  <th className="px-4 py-3 text-right font-bold w-24">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {loading ? (
-                  <tr><td colSpan={7} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
-                ) : filteredRows.length === 0 ? (
-                  <tr><td colSpan={7} className="py-12 text-center text-slate-400">Belum ada denda buku pribadi.</td></tr>
-                ) : filteredRows.map(row => (
-                  <tr key={row.santri_id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-slate-800">{row.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{row.nis || '-'}</p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{row.asrama || '-'} / {row.kamar || '-'}</td>
-                    <td className="px-4 py-3 text-center font-bold text-slate-800">{row.total_kasus}x</td>
-                    <td className="px-4 py-3 text-right font-semibold">{rupiah(row.total_nominal)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${row.total_belum_lunas > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      {rupiah(row.total_belum_lunas)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{formatDate(row.terakhir_hilang)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => openDetail(row)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
-                        <Eye className="w-3.5 h-3.5" /> Detail
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase">Asrama</label>
+            <select
+              value={asrama}
+              onChange={e => setAsrama(e.target.value)}
+              className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400 bg-white"
+            >
+              <option value="SEMUA">Semua Asrama</option>
+              {asramaOptions.map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
           </div>
-        </section>
+
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase">Tanggal Awal</label>
+            <input
+              type="date"
+              value={tglAwal}
+              onChange={e => setTglAwal(e.target.value)}
+              className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase">Tanggal Akhir</label>
+            <input
+              type="date"
+              value={tglAkhir}
+              onChange={e => setTglAkhir(e.target.value)}
+              className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={handleApplyFilter}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white font-bold px-4 py-2.5 rounded-xl text-sm"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Tampilkan
+          </button>
+          <button
+            onClick={handleResetFilter}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-sm"
+          >
+            <RefreshCw className="w-4 h-4" /> Reset
+          </button>
+        </div>
+      </section>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Santri Tercatat" value={hasLoaded ? stats.totalSantri.toLocaleString('id-ID') : '-'} />
+        <StatCard label="Total Kejadian" value={hasLoaded ? stats.totalKasus.toLocaleString('id-ID') : '-'} />
+        <StatCard label="Total Denda" value={hasLoaded ? rupiah(stats.totalNominal) : '-'} />
+        <StatCard label="Belum Lunas" value={hasLoaded ? rupiah(stats.totalBelumLunas) : '-'} dark />
       </div>
+
+      <section className="bg-white border rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-slate-50">
+          <h2 className="font-bold text-slate-800">Riwayat Denda</h2>
+          <p className="text-sm text-slate-500">
+            {!hasLoaded
+              ? 'Pilih filter lalu klik tampilkan untuk memuat data.'
+              : 'Satu santri tampil satu baris. Detail kehilangan dibuka dari tombol lihat.'}
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white text-slate-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-bold min-w-[220px]">Santri</th>
+                <th className="px-4 py-3 text-left font-bold w-40">Asrama</th>
+                <th className="px-4 py-3 text-center font-bold w-28">Kejadian</th>
+                <th className="px-4 py-3 text-right font-bold w-36">Total</th>
+                <th className="px-4 py-3 text-right font-bold w-36">Belum Lunas</th>
+                <th className="px-4 py-3 text-left font-bold w-36">Terakhir</th>
+                <th className="px-4 py-3 text-right font-bold w-24">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {!hasLoaded ? (
+                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Belum ada data ditampilkan.</td></tr>
+              ) : loading ? (
+                <tr><td colSpan={7} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Tidak ada data denda sesuai filter.</td></tr>
+              ) : rows.map(row => (
+                <tr key={row.santri_id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <p className="font-bold text-slate-800">{row.nama_lengkap}</p>
+                    <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{row.asrama || '-'} / {row.kamar || '-'}</td>
+                  <td className="px-4 py-3 text-center font-bold text-slate-800">{row.total_kasus}x</td>
+                  <td className="px-4 py-3 text-right font-semibold">{rupiah(row.total_nominal)}</td>
+                  <td className={`px-4 py-3 text-right font-bold ${row.total_belum_lunas > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {rupiah(row.total_belum_lunas)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{formatDate(row.terakhir_hilang)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => openDetail(row)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">
+                      <Eye className="w-3.5 h-3.5" /> Detail
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {hasLoaded && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
+      </section>
 
       {showCatatModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -351,6 +504,18 @@ export default function DendaBukuPribadiPageContent() {
                     className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
                   />
                 </div>
+                <label className="flex items-start gap-3 border rounded-2xl p-3 bg-slate-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={langsungLunas}
+                    onChange={e => setLangsungLunas(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <p className="font-bold text-sm text-slate-800">Langsung tandai lunas</p>
+                    <p className="text-xs text-slate-500">Centang ini kalau denda langsung dibayar saat dicatat.</p>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -361,7 +526,7 @@ export default function DendaBukuPribadiPageContent() {
                 className="w-full bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
               >
                 {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Catat Denda
+                {langsungLunas ? 'Catat & Lunas' : 'Catat Denda'}
               </button>
             </div>
           </div>

@@ -156,7 +156,7 @@ export default function LoginForm() {
                     name="email"
                     type="email"
                     required
-                    placeholder="email@pesantren.com"
+                    placeholder="email@sukahideng.or.id"
                     disabled={isSubmitting}
                     className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm text-slate-800 placeholder:text-slate-300 disabled:opacity-60"
                     style={{ fontFamily: "sans-serif" }}

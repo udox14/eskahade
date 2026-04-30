@@ -299,9 +299,9 @@ export default function ManajemenUserPage() {
     const XLSX = await import('xlsx')
 
     const rows = [
-      { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@pesantren.com", "PASSWORD": "password123", "ROLE": "wali_kelas", "ASRAMA": "" },
-      { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@pesantren.com", "PASSWORD": "password123", "ROLE": "keamanan", "ASRAMA": "" },
-      { "NAMA LENGKAP": "Siti Bendahara", "EMAIL": "siti@pesantren.com", "PASSWORD": "password123", "ROLE": "bendahara", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "wali_kelas", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "keamanan", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Siti Bendahara", "EMAIL": "siti@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "bendahara", "ASRAMA": "" },
     ]
     const worksheet = XLSX.utils.json_to_sheet(rows)
     worksheet['!cols'] = [{wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:15}]
@@ -407,234 +407,283 @@ export default function ManajemenUserPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div className="flex items-center gap-4">
-          <div className="bg-blue-100 p-3 rounded-full text-blue-700">
-            <UserCog className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Manajemen Pengguna</h1>
-            <p className="text-slate-500 text-sm">Kelola akun, reset password, dan hak akses.</p>
-          </div>
-        </div>
-        
-        <div className="flex gap-2 flex-wrap md:flex-nowrap">
-            {/* Search Bar */}
-            <div className="relative flex-grow md:flex-grow-0">
-                <input 
-                    type="text"
-                    placeholder="Cari nama, email, nip..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white border border-slate-300 text-slate-700 py-2 pl-9 pr-3 rounded-lg font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+      <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/60 shadow-sm overflow-hidden">
+        <div className="p-5 md:p-7 space-y-5">
+          <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="shrink-0 w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
+                <UserCog className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">
+                  <Shield className="w-3.5 h-3.5" /> Administrasi Akses
+                </div>
+                <h1 className="mt-3 text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-none">Manajemen Pengguna</h1>
+                <p className="mt-2 max-w-2xl text-sm md:text-base text-slate-600">
+                  Kelola akun, reset password, atur peran, dan kontrol fitur per pengguna dari satu panel yang lebih rapi.
+                </p>
+              </div>
             </div>
 
-            {/* Filter Dropdown */}
-            <div className="relative">
-                <select 
-                    value={filterRole}
-                    onChange={(e) => setFilterRole(e.target.value)}
-                    className="appearance-none bg-white border border-slate-300 text-slate-700 py-2 pl-3 pr-8 rounded-lg font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+            <div className="grid grid-cols-3 gap-2.5 w-full xl:w-auto xl:min-w-[320px]">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Total</p>
+                <p className="mt-1 text-xl font-black text-slate-900">{users.length}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tampil</p>
+                <p className="mt-1 text-xl font-black text-slate-900">{filteredUsers.length}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">Dipilih</p>
+                <p className="mt-1 text-xl font-black text-emerald-700">{selectedIds.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 md:p-5 shadow-sm">
+            <div className="flex flex-col 2xl:flex-row gap-4 2xl:items-end 2xl:justify-between">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_220px] gap-3 flex-1">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 mb-2">Cari Pengguna</label>
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Cari nama, email, atau NIP..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-700 py-3 pl-10 pr-4 rounded-2xl font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 mb-2">Filter Role</label>
+                  <div className="relative">
+                    <select
+                      value={filterRole}
+                      onChange={(e) => setFilterRole(e.target.value)}
+                      className="appearance-none w-full bg-slate-50 border border-slate-200 text-slate-700 py-3 pl-4 pr-10 rounded-2xl font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none cursor-pointer transition-colors"
+                    >
+                      <option value="SEMUA">Semua Role</option>
+                      {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                    <Filter className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full 2xl:w-auto 2xl:min-w-[520px]">
+                <button
+                  onClick={handleExportSelected}
+                  disabled={selectedIds.length === 0}
+                  className="h-[54px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-200 disabled:text-white/80 text-white px-4 shadow-sm font-bold transition-colors flex items-center justify-center gap-2"
                 >
-                    <option value="SEMUA">Semua Role</option>
-                    {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-                <Filter className="w-4 h-4 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                  <Download className="w-4 h-4" />
+                  <span>Export {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}</span>
+                </button>
+
+                <button
+                  onClick={() => setIsOpenImport(true)}
+                  className="h-[54px] rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-4 shadow-sm font-bold transition-colors flex items-center justify-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Import Excel</span>
+                </button>
+
+                <button
+                  onClick={() => setIsOpenAdd(true)}
+                  className="h-[54px] rounded-2xl bg-green-700 hover:bg-green-800 text-white px-4 shadow-sm font-bold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah User</span>
+                </button>
+              </div>
             </div>
-
-            <button 
-                onClick={handleExportSelected}
-                disabled={selectedIds.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium transition-colors cursor-pointer"
-            >
-                <Download className="w-5 h-5" /> Export ({selectedIds.length})
-            </button>
-
-            <button 
-                onClick={() => setIsOpenImport(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium transition-colors"
-            >
-                <FileSpreadsheet className="w-5 h-5" /> Import Excel
-            </button>
-            
-            <button 
-                onClick={() => setIsOpenAdd(true)}
-                className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-medium transition-colors"
-            >
-                <Plus className="w-5 h-5" /> Tambah User
-            </button>
+          </div>
         </div>
       </div>
 
       {/* TABEL LIST */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-[28px] shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/90 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Daftar Pengguna</h2>
+            <p className="text-sm text-slate-500">Kelola akun aktif, role, akses fitur, dan tindakan administrasi user.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            {filteredUsers.length} user terfilter
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <>
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-              <tr>
-                <th className="px-4 py-4 w-12 text-center">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        const newSelection = Array.from(new Set([...selectedIds, ...pagedUsers.map(u => u.id)]));
-                        setSelectedIds(newSelection);
-                      } else {
-                        const visibleIds = new Set(pagedUsers.map(u => u.id));
-                        setSelectedIds(prev => prev.filter(id => !visibleIds.has(id)));
-                      }
-                    }}
-                    checked={pagedUsers.length > 0 && pagedUsers.every(u => selectedIds.includes(u.id))}
-                  />
-                </th>
-                <th className="px-6 py-4">Nama Lengkap & Email</th>
-                <th className="px-6 py-4">Role / Hak Akses</th>
-                <th className="px-6 py-4">Asrama Binaan</th>
-                <th className="px-6 py-4">Kelas Binaan</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan={6} className="text-center py-10">Memuat data...</td></tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-10">Data user tidak ditemukan.</td></tr>
-              ) : (
-                pagedUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-4 text-center">
-                      <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                        checked={selectedIds.includes(u.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedIds(prev => [...prev, u.id])
-                          else setSelectedIds(prev => prev.filter(id => id !== u.id))
-                        }}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-800">{u.full_name || "Tanpa Nama"}</p>
-                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                        <Mail className="w-3 h-3"/> {u.email}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex flex-wrap gap-1">
-                          {parseRoles(u).map(r => {
-                            const rl = ROLES.find(x => x.value === r)
-                            return (
-                              <span key={r} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                r === 'admin' ? 'bg-purple-100 text-purple-700' :
-                                r === 'pengurus_asrama' ? 'bg-orange-100 text-orange-700' :
-                                r === 'bendahara' ? 'bg-emerald-100 text-emerald-700' :
-                                r === 'keamanan' ? 'bg-red-100 text-red-700' :
-                                r === 'dewan_santri' ? 'bg-violet-100 text-violet-700' :
-                                r === 'sekpen' ? 'bg-cyan-100 text-cyan-700' :
-                                'bg-slate-100 text-slate-700'
-                              }`}>
-                                {rl?.label || r}
-                              </span>
-                            )
-                          })}
+            <table className="w-full min-w-[1120px] text-sm text-left">
+              <thead className="bg-slate-50/80 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-4 w-12 text-center text-[11px] font-bold uppercase tracking-[0.16em]">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const newSelection = Array.from(new Set([...selectedIds, ...pagedUsers.map(u => u.id)]));
+                          setSelectedIds(newSelection);
+                        } else {
+                          const visibleIds = new Set(pagedUsers.map(u => u.id));
+                          setSelectedIds(prev => prev.filter(id => !visibleIds.has(id)));
+                        }
+                      }}
+                      checked={pagedUsers.length > 0 && pagedUsers.every(u => selectedIds.includes(u.id))}
+                    />
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em]">Nama Lengkap & Email</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em]">Role / Hak Akses</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em]">Asrama Binaan</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em]">Kelas Binaan</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-[0.16em]">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr><td colSpan={6} className="text-center py-14 text-slate-400">Memuat data...</td></tr>
+                ) : filteredUsers.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-14 text-slate-400">Data user tidak ditemukan.</td></tr>
+                ) : (
+                  pagedUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="px-4 py-5 text-center align-top">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 mt-1 rounded border-slate-300 text-blue-600 cursor-pointer"
+                          checked={selectedIds.includes(u.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds(prev => [...prev, u.id])
+                            else setSelectedIds(prev => prev.filter(id => id !== u.id))
+                          }}
+                        />
+                      </td>
+                      <td className="px-6 py-5 align-top">
+                        <div className="space-y-2">
+                          <p className="font-bold text-[17px] leading-tight text-slate-900">{u.full_name || "Tanpa Nama"}</p>
+                          <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                            <Mail className="w-3.5 h-3.5" /> {u.email}
+                          </div>
                         </div>
-                        <button
-                          onClick={() => openRoleModal(u)}
-                          className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                          title="Edit Role"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        {processingId === u.id && <Loader2 className="w-4 h-4 animate-spin text-blue-600"/>}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {parseRoles(u).includes('pengurus_asrama') ? (
-                        <button 
-                          onClick={() => {
-                            setPendingRoleUpdate({ userId: u.id, roles: parseRoles(u) })
-                            setIsAsramaModalOpen(true)
-                          }}
-                          className="inline-flex items-center gap-1 bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1 rounded-full text-xs font-bold transition-colors"
-                        >
-                          <Home className="w-3 h-3"/> {u.asrama_binaan || "Pilih Asrama"}
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {parseRoles(u).includes('wali_kelas') ? (
-                        <span className="inline-flex items-center bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs font-bold">
-                          {u.kelas_binaan || "Belum ditugaskan"}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        
-                        <button 
-                          onClick={() => openOverrideModal(u)}
-                          className="text-slate-500 hover:text-emerald-600 p-2 rounded-lg hover:bg-emerald-50 transition-colors"
-                          title="Grant / Revoke Fitur"
-                        >
-                          <ShieldCheck className="w-4 h-4"/>
-                        </button>
+                      </td>
+                      <td className="px-6 py-5 align-top">
+                        <div className="flex items-start gap-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {parseRoles(u).map(r => {
+                              const rl = ROLES.find(x => x.value === r)
+                              return (
+                                <span key={r} className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                  r === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                  r === 'pengurus_asrama' ? 'bg-orange-100 text-orange-700' :
+                                  r === 'bendahara' ? 'bg-emerald-100 text-emerald-700' :
+                                  r === 'keamanan' ? 'bg-red-100 text-red-700' :
+                                  r === 'dewan_santri' ? 'bg-violet-100 text-violet-700' :
+                                  r === 'sekpen' ? 'bg-cyan-100 text-cyan-700' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {rl?.label || r}
+                                </span>
+                              )
+                            })}
+                          </div>
+                          <button
+                            onClick={() => openRoleModal(u)}
+                            className="shrink-0 mt-0.5 p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Edit Role"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          {processingId === u.id && <Loader2 className="w-4 h-4 mt-1 animate-spin text-blue-600" />}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 align-top">
+                        {parseRoles(u).includes('pengurus_asrama') ? (
+                          <button
+                            onClick={() => {
+                              setPendingRoleUpdate({ userId: u.id, roles: parseRoles(u) })
+                              setIsAsramaModalOpen(true)
+                            }}
+                            className="inline-flex items-center gap-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
+                          >
+                            <Home className="w-3 h-3" /> {u.asrama_binaan || "Pilih Asrama"}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-5 align-top">
+                        {parseRoles(u).includes('wali_kelas') ? (
+                          <span className="inline-flex items-center bg-teal-100 text-teal-800 px-3 py-1.5 rounded-full text-xs font-bold">
+                            {u.kelas_binaan || "Belum ditugaskan"}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-5 text-right align-top">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openOverrideModal(u)}
+                            className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors border border-transparent hover:border-emerald-100"
+                            title="Grant / Revoke Fitur"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </button>
 
-                        <button 
-                          onClick={() => {
-                            setUserToEdit({ id: u.id, name: u.full_name, email: u.email })
-                            setIsOpenEdit(true)
-                          }}
-                          className="text-slate-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                          title="Edit Detail"
-                        >
-                          <Edit className="w-4 h-4"/>
-                        </button>
+                          <button
+                            onClick={() => {
+                              setUserToEdit({ id: u.id, name: u.full_name, email: u.email })
+                              setIsOpenEdit(true)
+                            }}
+                            className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"
+                            title="Edit Detail"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
 
-                        <button 
-                          onClick={() => {
-                            setUserToReset({ id: u.id, name: u.full_name })
-                            setIsOpenReset(true)
-                          }}
-                          className="text-slate-500 hover:text-orange-600 p-2 rounded-lg hover:bg-orange-50 transition-colors"
-                          title="Reset Password"
-                        >
-                          <Key className="w-4 h-4"/>
-                        </button>
+                          <button
+                            onClick={() => {
+                              setUserToReset({ id: u.id, name: u.full_name })
+                              setIsOpenReset(true)
+                            }}
+                            className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-orange-600 rounded-xl hover:bg-orange-50 transition-colors border border-transparent hover:border-orange-100"
+                            title="Reset Password"
+                          >
+                            <Key className="w-4 h-4" />
+                          </button>
 
-                        <button 
-                          onClick={() => {
-                            setUserToDelete({ id: u.id, name: u.full_name })
-                            setIsOpenDelete(true)
-                          }}
-                          className="text-slate-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Hapus Akun"
-                        >
-                          <Trash2 className="w-4 h-4"/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          <Pagination
-            currentPage={safePageUsers}
-            totalPages={totalPagesUsers}
-            pageSize={pageSize}
-            total={filteredUsers.length}
-            onPageChange={setPage}
-            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-          />
+                          <button
+                            onClick={() => {
+                              setUserToDelete({ id: u.id, name: u.full_name })
+                              setIsOpenDelete(true)
+                            }}
+                            className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
+                            title="Hapus Akun"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            <Pagination
+              currentPage={safePageUsers}
+              totalPages={totalPagesUsers}
+              pageSize={pageSize}
+              total={filteredUsers.length}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+            />
           </>
         </div>
       </div>
@@ -662,7 +711,7 @@ export default function ManajemenUserPage() {
               
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
-                <input name="email" type="email" required placeholder="email@pesantren.com" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
+                <input name="email" type="email" required placeholder="email@sukahideng.or.id" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
               </div>
 
               <div>
