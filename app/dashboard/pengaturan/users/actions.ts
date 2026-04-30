@@ -7,7 +7,19 @@ import { getCachedFiturAkses } from '@/lib/cache/fitur-akses'
 
 export async function getUsersList() {
   return await query<any>(
-    'SELECT id, email, full_name, role, roles, asrama_binaan, created_at FROM users ORDER BY created_at DESC'
+    `SELECT
+      u.id,
+      u.email,
+      u.full_name,
+      u.role,
+      u.roles,
+      u.asrama_binaan,
+      u.created_at,
+      GROUP_CONCAT(k.nama_kelas, ', ') AS kelas_binaan
+    FROM users u
+    LEFT JOIN kelas k ON k.wali_kelas_id = u.id
+    GROUP BY u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan, u.created_at
+    ORDER BY u.created_at DESC`
   )
 }
 

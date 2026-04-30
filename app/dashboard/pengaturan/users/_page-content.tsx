@@ -383,11 +383,12 @@ export default function ManajemenUserPage() {
         "NAMA LENGKAP": u.full_name || "-",
         "EMAIL": u.email,
         "ROLE": ROLES.find(r => r.value === u.role)?.label || u.role,
-        "ASRAMA BINAAN": u.asrama_binaan || "-"
+        "ASRAMA BINAAN": u.asrama_binaan || "-",
+        "KELAS BINAAN": u.kelas_binaan || "-"
       }))
       
       const ws = XLSX.utils.json_to_sheet(rows)
-      ws['!cols'] = [{wch: 30}, {wch: 35}, {wch: 25}, {wch: 20}]
+      ws['!cols'] = [{wch: 30}, {wch: 35}, {wch: 25}, {wch: 20}, {wch: 24}]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Data User Terpilih")
       XLSX.writeFile(wb, `Export_Akun_User_${new Date().getTime()}.xlsx`)
@@ -493,14 +494,15 @@ export default function ManajemenUserPage() {
                 <th className="px-6 py-4">Nama Lengkap & Email</th>
                 <th className="px-6 py-4">Role / Hak Akses</th>
                 <th className="px-6 py-4">Asrama Binaan</th>
+                <th className="px-6 py-4">Kelas Binaan</th>
                 <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={5} className="text-center py-10">Memuat data...</td></tr>
+                <tr><td colSpan={6} className="text-center py-10">Memuat data...</td></tr>
               ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-10">Data user tidak ditemukan.</td></tr>
+                <tr><td colSpan={6} className="text-center py-10">Data user tidak ditemukan.</td></tr>
               ) : (
                 pagedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50 transition-colors">
@@ -562,6 +564,15 @@ export default function ManajemenUserPage() {
                         >
                           <Home className="w-3 h-3"/> {u.asrama_binaan || "Pilih Asrama"}
                         </button>
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {parseRoles(u).includes('wali_kelas') ? (
+                        <span className="inline-flex items-center bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs font-bold">
+                          {u.kelas_binaan || "Belum ditugaskan"}
+                        </span>
                       ) : (
                         <span className="text-slate-400 text-xs">-</span>
                       )}
