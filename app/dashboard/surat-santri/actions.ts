@@ -1,7 +1,8 @@
 'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -54,8 +55,9 @@ export async function simpanSuratPernyataan(
   pelanggaranIds: string[],
   tanggal: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  const access = await assertFeature('/dashboard/surat-santri')
+  if ('error' in access) return access
+  const session = access
   if (pelanggaranIds.length === 0) return { error: 'Pilih minimal 1 pelanggaran' }
   const id = generateId()
   await execute(
@@ -74,8 +76,9 @@ export async function simpanSuratPerjanjian(
   tanggal: string,
   catatan?: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  const access = await assertFeature('/dashboard/surat-santri')
+  if ('error' in access) return access
+  const session = access
   const id = generateId()
   await execute(
     `INSERT INTO surat_perjanjian (id, santri_id, level, tanggal, catatan, dibuat_oleh, created_at)
@@ -203,9 +206,8 @@ export async function hapusSurat(
   suratId: string,
   tipe: 'pernyataan' | 'perjanjian'
 ): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
-    return { error: 'Akses ditolak' }
+  const access = await assertFeature('/dashboard/surat-santri')
+  if ('error' in access) return access
   const tabel = tipe === 'pernyataan' ? 'surat_pernyataan' : 'surat_perjanjian'
   await execute(`DELETE FROM ${tabel} WHERE id = ?`, [suratId])
   revalidatePath('/dashboard/surat-santri')

@@ -1,21 +1,21 @@
 'use server'
 
 import { query, queryOne, execute, getDB } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { hasRole, isAdmin } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
 
 type KamarInput = { nomor_kamar: string; kuota: number; blok?: string }
-type AccessOk = { session: NonNullable<Awaited<ReturnType<typeof getSession>>>; asrama: string }
+type AccessOk = { session: { id: string; email: string; full_name: string; role: string; roles: string[]; asrama_binaan: string | null }; asrama: string }
 
 async function assertAsramaAccess(asrama: string): Promise<AccessOk | { error: string }> {
-  const session = await getSession()
+  const access = await assertFeature('/dashboard/asrama/perpindahan-kamar')
   const targetAsrama = asrama?.trim()
 
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
-    return { error: 'Unauthorized' }
-  }
+  if ('error' in access) return access
+  const session = access
   if (!targetAsrama) return { error: 'Asrama wajib dipilih' }
 
   if (!isAdmin(session)) {

@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, getDB } from '@/lib/db'
-import { getSession, hasAnyRole } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/mutasi-asrama'
@@ -109,10 +109,9 @@ export async function mutasiSantri(payload: {
   kamarBaru: string | null
   alasan?: string
 }) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
-    return { error: 'Unauthorized' }
-  }
+  const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
+  if ('error' in access) return access
+  const session = access
 
   await ensureTableExists()
 
@@ -165,10 +164,9 @@ export async function mutasiBatch(payload: {
   kamarBaru: string | null
   alasan?: string
 }) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
-    return { error: 'Unauthorized' }
-  }
+  const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
+  if ('error' in access) return access
+  const session = access
 
   await ensureTableExists()
 

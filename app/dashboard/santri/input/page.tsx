@@ -6,7 +6,7 @@ import PageContent from './_page-content'
 export const dynamic = 'force-dynamic'
 
 export default async function GuardedPage() {
-  await guardPage('/dashboard/santri/input')
+  await guardPage('/dashboard/santri')
   if (!(await canCrud('/dashboard/santri', 'create'))) redirect('/dashboard/santri')
   return <PageContent />
 }

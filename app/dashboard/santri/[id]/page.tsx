@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
-import { guardRole } from '@/lib/auth/guard'
+import { guardPage } from '@/lib/auth/guard'
 import { canCrud } from '@/lib/auth/crud'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { hasRole } from '@/lib/auth/session'
 import { getSantriDetail } from './actions'
 import { SantriDetailContent } from './detail-content'
 import { notFound, redirect } from 'next/navigation'
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function SantriDetailPage({ params }: Props) {
-  const session = await guardRole()
+  const session = await guardPage('/dashboard/santri')
   const { id } = await params
 
   // Fetch santri dulu (ringan, 1 query) — untuk validasi akses

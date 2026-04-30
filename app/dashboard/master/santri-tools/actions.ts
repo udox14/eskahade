@@ -1,7 +1,8 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 // ── Helper: ekstrak angka kelas dari string bebas ─────────────────────────
@@ -20,8 +21,8 @@ export async function previewNaikKelas(filter: {
   sekolah?: string
   kelasSekolah?: string
 }) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen', 'bendahara'])) return { error: 'Unauthorized' }
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return { error: access.error }
 
   let where = "s.status_global = 'aktif' AND s.kelas_sekolah IS NOT NULL AND s.kelas_sekolah != ''"
   const params: any[] = []
@@ -62,8 +63,8 @@ export async function previewNaikKelas(filter: {
 
 // ── Eksekusi naik kelas massal ────────────────────────────────────────────
 export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success: boolean; updated: number } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Unauthorized' }
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return { error: access.error }
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   // Ambil data kelas_sekolah santri yang dipilih
@@ -102,8 +103,8 @@ export async function getSantriPembebasan(filter: {
   search?: string
   hanyaBebasSpp?: boolean
 }) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen', 'bendahara'])) return []
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return []
 
   let where = "s.status_global = 'aktif'"
   const params: any[] = []
@@ -151,8 +152,8 @@ export async function setBebas(
   santriIds: string[],
   bebas: boolean
 ): Promise<{ success: boolean; updated: number } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen', 'bendahara'])) return { error: 'Unauthorized' }
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return { error: access.error }
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   const now = new Date().toISOString()
@@ -173,8 +174,9 @@ export async function catatBebasPembayaran(
   tahun: number,
   keterangan: string
 ): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen', 'bendahara'])) return { error: 'Unauthorized' }
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return { error: access.error }
+  const session = access
 
   // Cek apakah sudah ada record
   const existing = await queryOne<{ id: string }>(
@@ -199,8 +201,8 @@ export async function hapusBebasPembayaran(
   jenisBiaya: string,
   tahun: number
 ): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'sekpen', 'bendahara'])) return { error: 'Unauthorized' }
+  const access = await assertFeature('/dashboard/master/santri-tools')
+  if ('error' in access) return { error: access.error }
 
   await execute(
     `DELETE FROM pembayaran_tahunan WHERE santri_id = ? AND jenis_biaya = ? AND tahun_tagihan = ? AND nominal_bayar = 0`,

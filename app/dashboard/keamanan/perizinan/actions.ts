@@ -1,7 +1,8 @@
 'use server'
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -50,10 +51,8 @@ export async function getAlasanIzinList() {
 }
 
 export async function simpanAlasanIzinList(items: string[]) {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
-    return { error: 'Akses ditolak' }
-  }
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
 
   const normalized = normalizeAlasanList(items)
   if (normalized.length === 0) return { error: 'Minimal harus ada 1 alasan izin.' }
@@ -240,10 +239,8 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 
 // ─── Update Izin ─────────────────────────────────────────────────────────────
 export async function updateIzin(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
-    return { error: 'Akses ditolak' }
-  }
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
 
   const jenis = formData.get('jenis') as string
   const alasan_dropdown = formData.get('alasan_dropdown') as string
@@ -279,7 +276,9 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
 
 // ─── Simpan Izin ─────────────────────────────────────────────────────────────
 export async function simpanIzin(formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = access
 
   const santri_id = formData.get('santri_id') as string
   const jenis = formData.get('jenis') as string
@@ -314,6 +313,9 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
 }
 
 export async function setSudahDatang(id: string, waktuDatang: string): Promise<{ success: boolean; message: string } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+
   const izin = await queryOne<{ tgl_selesai_rencana: string }>(
     'SELECT tgl_selesai_rencana FROM perizinan WHERE id = ?', [id]
   )
@@ -345,10 +347,8 @@ export async function cariSantri(keyword: string) {
 }
 
 export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri'])) {
-    return { error: 'Akses ditolak' }
-  }
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
   await execute('DELETE FROM perizinan WHERE id = ?', [id])
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }

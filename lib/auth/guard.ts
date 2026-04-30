@@ -9,7 +9,7 @@
 // - Support per-user grant/revoke overrides
 
 import { getSession, type SessionUser, getEffectiveRoles } from '@/lib/auth/session'
-import { canAccessHref } from '@/lib/cache/fitur-akses'
+import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import { redirect } from 'next/navigation'
 
 export async function guardPage(href: string): Promise<SessionUser> {
@@ -29,7 +29,7 @@ export async function guardPage(href: string): Promise<SessionUser> {
   // Cek akses dari DB (multi-role + per-user overrides)
   let allowed = false
   try {
-    allowed = await canAccessHref(href, roles, session.id)
+    allowed = await canAccessFeatureForSession(session, href)
   } catch (err: any) {
     // Kalau DB error (mis. tabel belum ada), log dan izinkan masuk
     // supaya non-admin tidak ter-redirect loop secara diam-diam

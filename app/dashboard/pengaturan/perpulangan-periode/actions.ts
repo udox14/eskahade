@@ -1,17 +1,15 @@
 'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/pengaturan/perpulangan-periode'
-const ALLOWED_ROLES = ['admin', 'keamanan', 'dewan_santri']
 
 async function assertAllowed() {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ALLOWED_ROLES))
-    throw new Error('Akses ditolak')
-  return session
+  const access = await assertFeature('/dashboard/pengaturan/perpulangan-periode')
+  if ('error' in access) throw new Error(access.error)
+  return access
 }
 
 // ─── List semua periode ───────────────────────────────────────────────────────

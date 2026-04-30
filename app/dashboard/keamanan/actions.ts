@@ -1,7 +1,8 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 
@@ -20,9 +21,8 @@ export async function getMasterPelanggaran() {
 export async function tambahMasterPelanggaran(data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
-    return { error: 'Akses ditolak' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
   await execute(
     'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi) VALUES (?, ?, ?, ?)',
     [data.kategori, data.nama, data.poin, data.deskripsi || null]
@@ -35,9 +35,8 @@ export async function tambahMasterPelanggaran(data: {
 export async function editMasterPelanggaran(id: number, data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
-    return { error: 'Akses ditolak' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
   await execute(
     'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=? WHERE id=?',
     [data.kategori, data.nama, data.poin, data.deskripsi || null, id]
@@ -48,8 +47,8 @@ export async function editMasterPelanggaran(id: number, data: {
 }
 
 export async function hapusMasterPelanggaran(id: number): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin'])) return { error: 'Akses ditolak' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
   const used = await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM pelanggaran WHERE master_id=?', [id])
   if (used && used.n > 0) return { error: 'Tidak bisa dihapus — sudah dipakai di data pelanggaran' }
   await execute('DELETE FROM master_pelanggaran WHERE id=?', [id])
@@ -77,8 +76,9 @@ export async function simpanPelanggaran(data: {
   tanggal: string
   fotoUrl?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+  const session = access
 
   const master = await queryOne<any>(
     'SELECT id, nama_pelanggaran, kategori, poin FROM master_pelanggaran WHERE id=?',
@@ -102,9 +102,8 @@ export async function simpanPelanggaran(data: {
 }
 
 export async function hapusPelanggaran(id: string): Promise<{ success: boolean } | { error: string }> {
-  const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keamanan', 'dewan_santri']))
-    return { error: 'Akses ditolak' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
 
   // Cascade: hapus surat_pernyataan yang mencantumkan pelanggaran ini
   // pelanggaran_ids disimpan sebagai JSON array — cari yang mengandung ID ini
@@ -230,8 +229,9 @@ export async function simpanSuratPernyataan(
   pelanggaranIds: string[],
   tanggal: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+  const session = access
   const id = generateId()
   await execute(
     `INSERT INTO surat_pernyataan (id, santri_id, pelanggaran_ids, tanggal, dibuat_oleh, created_at)
@@ -249,8 +249,9 @@ export async function simpanSuratPerjanjian(
   tanggal: string,
   catatan?: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+  const session = access
   const id = generateId()
   await execute(
     `INSERT INTO surat_perjanjian (id, santri_id, level, tanggal, catatan, dibuat_oleh, created_at)
