@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CheckCircle2, Eye, Loader2, Plus, Search, X } from 'lucide-react'
+import { CheckCircle2, Eye, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   cariSantriDenda,
   catatDendaBukuPribadi,
   getDendaBukuPribadiData,
   getDendaBukuPribadiDetail,
   getNextDendaBukuPribadi,
+  hapusDendaBukuPribadi,
   tandaiDendaBukuPribadiLunas,
   type DendaBukuDetail,
   type DendaSantriSummary,
@@ -36,6 +38,7 @@ function formatDate(value: string | null) {
 }
 
 export default function DendaBukuPribadiPageContent() {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<DendaSantriSummary[]>([])
   const [stats, setStats] = useState<DendaStats>({ totalSantri: 0, totalKasus: 0, totalNominal: 0, totalBelumLunas: 0 })
   const [loading, setLoading] = useState(true)
@@ -151,6 +154,24 @@ export default function DendaBukuPribadiPageContent() {
         return
       }
       toast.success(`Denda ke-${item.kehilangan_ke} ditandai lunas`)
+      if (modalSantri) await openDetail(modalSantri)
+      await loadData()
+    })
+  }
+
+  const handleDelete = async (item: DendaBukuDetail) => {
+    if (!await confirm(
+      `Hapus denda kehilangan ke-${item.kehilangan_ke} untuk ${modalSantri?.nama_lengkap || 'santri ini'}?\n\nUrutan denda santri ini akan disesuaikan ulang agar nominal berikutnya tetap konsisten.`,
+      { confirmLabel: 'Ya, Hapus' }
+    )) return
+
+    startTransition(async () => {
+      const res = await hapusDendaBukuPribadi(item.id)
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(`Record denda ${res.nama} berhasil dihapus`)
       if (modalSantri) await openDetail(modalSantri)
       await loadData()
     })
@@ -363,6 +384,8 @@ export default function DendaBukuPribadiPageContent() {
             <div className="p-5 overflow-y-auto">
               {loadingDetails ? (
                 <div className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+              ) : details.length === 0 ? (
+                <div className="py-12 text-center text-slate-400">Belum ada record denda untuk santri ini.</div>
               ) : (
                 <div className="space-y-3">
                   {details.map(item => (
@@ -380,15 +403,24 @@ export default function DendaBukuPribadiPageContent() {
                       </div>
                       <div className="flex items-center justify-between md:justify-end gap-3">
                         <p className="font-bold text-lg text-slate-900">{rupiah(item.nominal)}</p>
-                        {item.status === 'BELUM_BAYAR' ? (
+                        <div className="flex items-center gap-2">
+                          {item.status === 'BELUM_BAYAR' ? (
+                            <button
+                              onClick={() => tandaiLunas(item)}
+                              disabled={pending}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-4 h-4" /> Lunas
+                            </button>
+                          ) : null}
                           <button
-                            onClick={() => tandaiLunas(item)}
+                            onClick={() => handleDelete(item)}
                             disabled={pending}
-                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5"
+                            className="bg-red-50 hover:bg-red-100 disabled:bg-slate-100 disabled:text-slate-300 text-red-700 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 border border-red-200"
                           >
-                            <CheckCircle2 className="w-4 h-4" /> Lunas
+                            <Trash2 className="w-4 h-4" /> Hapus
                           </button>
-                        ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -1,7 +1,8 @@
 'use server'
 
-import { execute, generateId, query, queryOne, now } from '@/lib/db'
+import { batch, execute, generateId, query, queryOne, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { revalidatePath } from 'next/cache'
 
 const DENDA_STEP = 25000
@@ -86,6 +87,14 @@ async function ensureDendaBukuPribadiSchemaOnce() {
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
     VALUES ('Perizinan & Disiplin', 'Denda Buku Pribadi', '${FEATURE_PATH}', 'Book', '["admin","dewan_santri"]', 1, 5)
   `)
+  await execute(`
+    INSERT INTO role_fitur_crud_permission
+      (fitur_href, role, can_create, can_update, can_delete, created_at, updated_at)
+    VALUES (?, ?, 0, 0, 1, datetime('now'), datetime('now'))
+    ON CONFLICT(fitur_href, role) DO UPDATE SET
+      can_delete = 1,
+      updated_at = datetime('now')
+  `, [FEATURE_PATH, 'dewan_santri'])
 }
 
 export async function cariSantriDenda(keyword: string) {
@@ -237,4 +246,54 @@ export async function tandaiDendaBukuPribadiLunas(id: string): Promise<{ success
 
   revalidatePath(FEATURE_PATH)
   return { success: true }
+}
+
+export async function hapusDendaBukuPribadi(id: string): Promise<{ success: boolean; nama: string } | { error: string }> {
+  const access = await assertCrud(FEATURE_PATH, 'delete')
+  if ('error' in access) return access
+  await ensureDendaBukuPribadiSchema()
+
+  const target = await queryOne<{
+    id: string
+    santri_id: string
+    nama_lengkap: string
+  }>(`
+    SELECT d.id, d.santri_id, s.nama_lengkap
+    FROM denda_buku_pribadi d
+    JOIN santri s ON s.id = d.santri_id
+    WHERE d.id = ?
+    LIMIT 1
+  `, [id])
+
+  if (!target) return { error: 'Record denda tidak ditemukan.' }
+
+  await execute('DELETE FROM denda_buku_pribadi WHERE id = ?', [id])
+
+  const remaining = await query<{
+    id: string
+  }>(`
+    SELECT id
+    FROM denda_buku_pribadi
+    WHERE santri_id = ?
+    ORDER BY tanggal ASC, created_at ASC, id ASC
+  `, [target.santri_id])
+
+  if (remaining.length > 0) {
+    await batch(
+      remaining.map((row, index) => {
+        const kehilanganKe = index + 1
+        return {
+          sql: `
+            UPDATE denda_buku_pribadi
+            SET kehilangan_ke = ?, nominal = ?
+            WHERE id = ?
+          `,
+          params: [kehilanganKe, kehilanganKe * DENDA_STEP, row.id],
+        }
+      })
+    )
+  }
+
+  revalidatePath(FEATURE_PATH)
+  return { success: true, nama: target.nama_lengkap }
 }

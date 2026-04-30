@@ -16,7 +16,7 @@ import {
   LayoutGrid,
   FileText
 } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { 
   getReferensiData, 
   getDataSantriPerKelas, 
@@ -35,6 +35,7 @@ type TabType = 'akademik' | 'kepribadian' | 'catatan'
 type AkademikMode = 'direct' | 'excel'
 
 export default function InputNilaiPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('akademik')
   const [akademikMode, setAkademikMode] = useState<AkademikMode>('direct')
   
@@ -208,14 +209,27 @@ export default function InputNilaiPage() {
     else toast.error(res.error || "Gagal simpan")
   }
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push('/dashboard')
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4">
       {/* HEADER & TABS */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-4 rounded-2xl border shadow-sm">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/akademik" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            aria-label="Kembali"
+          >
             <ArrowLeft className="w-6 h-6 text-slate-600" />
-          </Link>
+          </button>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-800">Manajemen Nilai Terpadu</h1>
             <p className="text-slate-500 text-xs md:text-sm">Akademik, Kepribadian, & Catatan Wali Kelas dalam satu pintu.</p>
