@@ -407,7 +407,7 @@ export default function ManajemenUserPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+      <div className="border-b pb-4 space-y-4">
         <div className="flex items-center gap-4">
           <div className="bg-blue-100 p-3 rounded-full text-blue-700">
             <UserCog className="w-6 h-6" />
@@ -418,9 +418,9 @@ export default function ManajemenUserPage() {
           </div>
         </div>
         
-        <div className="w-full md:w-auto flex flex-col xl:flex-row gap-3 xl:items-center">
+        <div className="flex flex-col xl:flex-row gap-3 xl:items-end">
           <div className="flex flex-col sm:flex-row gap-2 flex-1">
-            <div className="relative flex-1 min-w-0 xl:min-w-[270px]">
+            <div className="relative flex-1 min-w-0">
               <input 
                 type="text"
                 placeholder="Cari nama, email, nip..."
@@ -431,7 +431,7 @@ export default function ManajemenUserPage() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
             </div>
 
-            <div className="relative sm:w-[190px] xl:w-[200px]">
+            <div className="relative sm:w-[210px] xl:w-[220px]">
               <select 
                 value={filterRole}
                 onChange={(e) => setFilterRole(e.target.value)}
@@ -444,25 +444,25 @@ export default function ManajemenUserPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 xl:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 xl:min-w-[420px]">
             <button 
               onClick={handleExportSelected}
               disabled={selectedIds.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
             >
               <Download className="w-4 h-4" /> Export ({selectedIds.length})
             </button>
 
             <button 
               onClick={() => setIsOpenImport(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
             >
               <FileSpreadsheet className="w-4 h-4" /> Import Excel
             </button>
             
             <button 
               onClick={() => setIsOpenAdd(true)}
-              className="bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
+              className="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
             >
               <Plus className="w-4 h-4" /> Tambah User
             </button>

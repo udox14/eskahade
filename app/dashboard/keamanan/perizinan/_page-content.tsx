@@ -197,28 +197,32 @@ export default function PerizinanPage() {
     e.preventDefault()
     if (!selectedSantri && !isOpenEdit) { toast.error("Mohon pilih santri terlebih dahulu!"); return }
     const loadingToast = toast.loading("Menyimpan data izin...")
-    
-    const formData = new FormData(e.currentTarget)
-    if (!isOpenEdit) formData.append('santri_id', selectedSantri.id)
-    formData.append('jenis', jenisIzin)
-    formData.append('alasan_dropdown', alasanDropdown) 
-    
-    let res;
-    if (isOpenEdit) {
-      res = await updateIzin(editData.id, formData)
-    } else {
-      res = await simpanIzin(formData)
-    }
 
-    toast.dismiss(loadingToast)
+    try {
+      const formData = new FormData(e.currentTarget)
+      if (!isOpenEdit && selectedSantri) formData.append('santri_id', selectedSantri.id)
+      formData.append('jenis', jenisIzin)
+      formData.append('alasan_dropdown', alasanDropdown)
 
-    if ('error' in res) {
-      toast.error("Gagal menyimpan: " + (res as any).error)
-    } else {
-      toast.success(isOpenEdit ? "Perubahan izin berhasil disimpat!" : "Data perizinan berhasil disimpan!")
-      setIsOpenInput(false)
-      setIsOpenEdit(false)
-      loadData(1) // Return to page 1
+      const res = isOpenEdit
+        ? await updateIzin(editData.id, formData)
+        : await simpanIzin(formData)
+
+      if ('error' in res) {
+        toast.error("Gagal menyimpan: " + (res as any).error)
+      } else {
+        toast.success(isOpenEdit ? "Perubahan izin berhasil disimpan!" : "Data perizinan berhasil disimpan!")
+        setIsOpenInput(false)
+        setIsOpenEdit(false)
+        loadData(1) // Return to page 1
+      }
+    } catch (error: any) {
+      console.error('Gagal menyimpan data izin:', error)
+      toast.error('Gagal menyimpan data izin.', {
+        description: error?.message || 'Terjadi kesalahan saat memproses permintaan.',
+      })
+    } finally {
+      toast.dismiss(loadingToast)
     }
   }
 

@@ -1,7 +1,6 @@
 'use server'
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
 
@@ -12,6 +11,69 @@ const DEFAULT_ALASAN_IZIN = [
   "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH",
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
+
+function isValidDateValue(value: Date) {
+  return !Number.isNaN(value.getTime())
+}
+
+function buildIzinPayload(formData: FormData): {
+  jenis: string
+  alasan_final: string
+  pemberi_izin: string
+  tgl_mulai: string
+  tgl_selesai_rencana: string
+} | { error: string } {
+  const jenis = String(formData.get('jenis') ?? '').trim()
+  const alasan_dropdown = String(formData.get('alasan_dropdown') ?? '').trim()
+  const deskripsi = String(formData.get('deskripsi') ?? '').trim()
+  const pemberi_izin = String(formData.get('pemberi_izin') ?? '').trim()
+
+  if (!jenis) return { error: 'Jenis izin wajib dipilih.' }
+  if (!alasan_dropdown) return { error: 'Keperluan dasar wajib dipilih.' }
+  if (!pemberi_izin) return { error: 'Pemberi izin wajib dipilih.' }
+
+  const alasan_final = deskripsi ? `${alasan_dropdown} - ${deskripsi}` : alasan_dropdown
+
+  let mulai: Date
+  let selesai: Date
+
+  if (jenis === 'PULANG') {
+    const dStart = String(formData.get('date_start') ?? '').trim()
+    const dEnd = String(formData.get('date_end') ?? '').trim()
+
+    if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
+
+    mulai = new Date(`${dStart}T08:00:00+07:00`)
+    selesai = new Date(`${dEnd}T17:00:00+07:00`)
+  } else if (jenis === 'KELUAR_KOMPLEK') {
+    const date = String(formData.get('date_single') ?? '').trim()
+    const tStart = String(formData.get('time_start') ?? '').trim()
+    const tEnd = String(formData.get('time_end') ?? '').trim()
+
+    if (!date || !tStart || !tEnd) return { error: 'Tanggal dan jam izin wajib diisi lengkap.' }
+
+    mulai = new Date(`${date}T${tStart}:00+07:00`)
+    selesai = new Date(`${date}T${tEnd}:00+07:00`)
+  } else {
+    return { error: 'Jenis izin tidak dikenali.' }
+  }
+
+  if (!isValidDateValue(mulai) || !isValidDateValue(selesai)) {
+    return { error: 'Format tanggal atau jam izin tidak valid.' }
+  }
+
+  if (selesai < mulai) {
+    return { error: 'Batas kembali tidak boleh lebih awal dari waktu mulai izin.' }
+  }
+
+  return {
+    jenis,
+    alasan_final,
+    pemberi_izin,
+    tgl_mulai: mulai.toISOString(),
+    tgl_selesai_rencana: selesai.toISOString(),
+  }
+}
 
 async function ensureAppSettingsTable() {
   await execute(`
@@ -242,27 +304,10 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
 
-  const jenis = formData.get('jenis') as string
-  const alasan_dropdown = formData.get('alasan_dropdown') as string
-  const deskripsi = formData.get('deskripsi') as string
-  const pemberi_izin = formData.get('pemberi_izin') as string
+  const payload = buildIzinPayload(formData)
+  if ('error' in payload) return payload
 
-  const alasan_final = deskripsi.trim() ? `${alasan_dropdown} - ${deskripsi.trim()}` : alasan_dropdown
-
-  let tgl_mulai: string, tgl_selesai_rencana: string
-
-  if (jenis === 'PULANG') {
-    const dStart = formData.get('date_start') as string
-    const dEnd = formData.get('date_end') as string
-    tgl_mulai = new Date(`${dStart}T08:00:00+07:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${dEnd}T17:00:00+07:00`).toISOString()
-  } else {
-    const date = formData.get('date_single') as string
-    const tStart = formData.get('time_start') as string
-    const tEnd = formData.get('time_end') as string
-    tgl_mulai = new Date(`${date}T${tStart}:00+07:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${date}T${tEnd}:00+07:00`).toISOString()
-  }
+  const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
 
   await execute(`
     UPDATE perizinan 
@@ -280,28 +325,13 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   if ('error' in access) return access
   const session = access
 
-  const santri_id = formData.get('santri_id') as string
-  const jenis = formData.get('jenis') as string
-  const alasan_dropdown = formData.get('alasan_dropdown') as string
-  const deskripsi = formData.get('deskripsi') as string
-  const pemberi_izin = formData.get('pemberi_izin') as string
+  const santri_id = String(formData.get('santri_id') ?? '').trim()
+  if (!santri_id) return { error: 'Santri wajib dipilih terlebih dahulu.' }
 
-  const alasan_final = deskripsi.trim() ? `${alasan_dropdown} - ${deskripsi.trim()}` : alasan_dropdown
+  const payload = buildIzinPayload(formData)
+  if ('error' in payload) return payload
 
-  let tgl_mulai: string, tgl_selesai_rencana: string
-
-  if (jenis === 'PULANG') {
-    const dStart = formData.get('date_start') as string
-    const dEnd = formData.get('date_end') as string
-    tgl_mulai = new Date(`${dStart}T08:00:00+07:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${dEnd}T17:00:00+07:00`).toISOString()
-  } else {
-    const date = formData.get('date_single') as string
-    const tStart = formData.get('time_start') as string
-    const tEnd = formData.get('time_end') as string
-    tgl_mulai = new Date(`${date}T${tStart}:00+07:00`).toISOString()
-    tgl_selesai_rencana = new Date(`${date}T${tEnd}:00+07:00`).toISOString()
-  }
+  const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
 
   await execute(`
     INSERT INTO perizinan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, created_by)
