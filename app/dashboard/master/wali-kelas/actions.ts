@@ -169,7 +169,17 @@ export async function setGuruKelas(
 }
 
 export async function getUsersForWaliKelas() {
-  return query<{ id: string; full_name: string | null }>("SELECT id, full_name FROM users WHERE role IN ('wali_kelas', 'sekpen') ORDER BY full_name")
+  return query<{ id: string; full_name: string | null }>(`
+    SELECT id, full_name
+    FROM users
+    WHERE role IN ('wali_kelas', 'sekpen')
+       OR EXISTS (
+         SELECT 1
+         FROM json_each(COALESCE(users.roles, '[]'))
+         WHERE value IN ('wali_kelas', 'sekpen')
+       )
+    ORDER BY full_name
+  `)
 }
 
 export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: boolean; email?: string } | { error: string }> {
