@@ -17,7 +17,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
 // ── Tipe ──────────────────────────────────────────────────────────────────────
-type KamarConfig = { nomor_kamar: string; kuota: number; blok?: string }
+type KamarConfig = { nomor_kamar: string; kuota: number; reserved_baru: number; blok?: string }
 type SantriData = {
   id: string; nama_lengkap: string; nis: string; jenis_kelamin: string
   kamar_asli: string | null; sekolah: string | null; kelas_sekolah: string | null
@@ -26,8 +26,8 @@ type SantriData = {
 type DraftItem = { santri_id: string; kamar_lama: string | null; kamar_baru: string; applied: number }
 type KetuaItem = { nomor_kamar: string; santri_id: string; nama_lengkap: string }
 type GetDataResult =
-  | { error: string; configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[] }
-  | { configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[] }
+  | { error: string; configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[]; defaultConfigs: KamarConfig[] }
+  | { configs: KamarConfig[]; drafts: DraftItem[]; ketuaList: KetuaItem[]; santriList: SantriData[]; defaultConfigs: KamarConfig[] }
 
 // ── Badge status kamar ────────────────────────────────────────────────────────
 function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
@@ -136,7 +136,6 @@ export default function PerpindahanClient({
 
   // UI states
   const [step, setStep] = useState<'config' | 'generate' | 'plotting'>('config')
-  const [persenBaru, setPersenBaru] = useState(20)
   const [localKamar, setLocalKamar] = useState<KamarConfig[]>([])
   const [modalKamar, setModalKamar] = useState<string | null>(null)
   const [dragSantriId, setDragSantriId] = useState<string | null>(null)
@@ -152,6 +151,7 @@ export default function PerpindahanClient({
       setSantriList([])
       setDraftMap({})
       setKetuaMap({})
+      setLocalKamar([])
       setIsApplied(false)
       setLoading(false)
       return
@@ -169,10 +169,21 @@ export default function PerpindahanClient({
     // Determine step
     if (res.configs.length === 0) {
       setStep('config')
-      setLocalKamar([])
+      setLocalKamar(res.defaultConfigs.map(c => ({
+        nomor_kamar: c.nomor_kamar,
+        kuota: c.kuota,
+        reserved_baru: c.reserved_baru ?? 0,
+        blok: c.blok || '',
+      })))
+      setConfigOpen(true)
       setIsApplied(false)
     } else {
-      setLocalKamar(res.configs.map(c => ({ nomor_kamar: c.nomor_kamar, kuota: c.kuota, blok: c.blok || '' })))
+      setLocalKamar(res.configs.map(c => ({
+        nomor_kamar: c.nomor_kamar,
+        kuota: c.kuota,
+        reserved_baru: c.reserved_baru ?? 0,
+        blok: c.blok || '',
+      })))
       setConfigOpen(false)
       if (res.drafts.length > 0) {
         setIsApplied(res.drafts.every(d => d.applied === 1))
@@ -191,13 +202,20 @@ export default function PerpindahanClient({
   const hasDrafts = Object.keys(draftMap).length > 0
   const getSantriDiKamar = (nomor: string) =>
     santriList.filter(s => (draftMap[s.id]?.kamar_baru ?? s.kamar_asli) === nomor)
+  const getEfektifKamar = (cfg: KamarConfig) => Math.max(0, cfg.kuota - (cfg.reserved_baru ?? 0))
 
   const santriTanpaDraft = santriList.filter(s => !draftMap[s.id])
+  const totalReserved = configs.reduce((sum, k) => sum + (k.reserved_baru ?? 0), 0)
+  const totalEffective = configs.reduce((sum, k) => sum + Math.max(0, k.kuota - (k.reserved_baru ?? 0)), 0)
+  const overflowCount = Math.max(0, santriList.length - totalEffective)
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleSimpanConfig = async () => {
     if (localKamar.length === 0) return toast.error('Tambahkan minimal 1 kamar')
     if (localKamar.some(k => !k.nomor_kamar.trim())) return toast.error('Nomor kamar tidak boleh kosong')
+    if (localKamar.some(k => (k.reserved_baru ?? 0) > k.kuota)) {
+      return toast.error('Slot santri baru tidak boleh melebihi kuota kamar')
+    }
     setSaving(true)
     const res = await simpanKonfigurasiKamar(asrama, localKamar)
     setSaving(false)
@@ -209,11 +227,16 @@ export default function PerpindahanClient({
   const handleGenerate = async () => {
     setSaving(true)
     const toastId = toast.loading('Mendistribusikan santri...')
-    const res = await generateDraft(asrama, persenBaru)
+    const res = await generateDraft(asrama)
     toast.dismiss(toastId)
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success(`Draft dibuat untuk ${res.total} santri`)
+    if ((res.overflowCount ?? 0) > 0) {
+      toast.warning('Kapasitas efektif belum cukup', {
+        description: `${res.overflowCount} santri tetap dipaksa masuk karena total kuota efektif setelah reserve hanya ${res.total - res.overflowCount}.`,
+      })
+    }
     await load()
   }
 
@@ -319,7 +342,7 @@ export default function PerpindahanClient({
       <div class="page">
         <h2>ASRAMA ${asrama} — KAMAR ${d.nomor_kamar}</h2>
         <div class="meta">
-          Kuota: ${d.kuota} orang | Terisi: ${d.santri.length} orang |
+          Kuota: ${d.kuota} orang | Reserve baru: ${d.reserved_baru || 0} | Terisi: ${d.santri.length} orang |
           Ketua: ${d.ketua?.nama_lengkap || '(Belum ditentukan)'}
         </div>
         <table>
@@ -430,8 +453,15 @@ export default function PerpindahanClient({
                 {configOpen && (
                   <div className="p-5 space-y-4">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-slate-500">Tentukan daftar kamar dan kuota masing-masing.</p>
-                      <button onClick={() => setLocalKamar(prev => [...prev, { nomor_kamar: String(prev.length + 1), kuota: 10, blok: '' }])}
+                      <div>
+                        <p className="text-sm text-slate-500">Tentukan daftar kamar, kuota, dan slot santri baru tiap kamar.</p>
+                        {configs.length === 0 && localKamar.length > 0 && (
+                          <p className="text-xs text-emerald-600 mt-1">
+                            Kuota awal sudah diprefill dari jumlah penghuni riil tiap kamar saat ini.
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => setLocalKamar(prev => [...prev, { nomor_kamar: String(prev.length + 1), kuota: 10, reserved_baru: 0, blok: '' }])}
                         className="flex items-center gap-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                         <Plus className="w-3.5 h-3.5"/> Tambah Kamar
                       </button>
@@ -455,12 +485,23 @@ export default function PerpindahanClient({
                               className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
                           </div>
                           <div className="flex items-center gap-1">
+                            <label className="text-[10px] text-slate-400 shrink-0">Baru:</label>
+                            <input type="number" min={0} max={50} value={k.reserved_baru ?? 0}
+                              onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, reserved_baru: Number(e.target.value)} : x))}
+                              className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none"/>
+                          </div>
+                          <div className="flex items-center gap-1">
                             <label className="text-[10px] text-slate-400 shrink-0">Blok:</label>
                             <input value={k.blok || ''} placeholder="A/B/C (opt)"
                               onChange={e => setLocalKamar(prev => prev.map((x, j) => j === i ? {...x, blok: e.target.value.toUpperCase()} : x))}
                               className="w-full border rounded px-2 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
                               maxLength={3}/>
                           </div>
+                          {(k.reserved_baru ?? 0) > k.kuota && (
+                            <p className="text-[10px] font-semibold text-red-500">
+                              Slot baru melebihi kuota kamar.
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -491,7 +532,7 @@ export default function PerpindahanClient({
                     <div className="p-5 space-y-4">
                       <p className="text-sm text-slate-500">
                         Sistem akan mendistribusikan santri secara proporsional berdasarkan kelas sekolah.
-                        Sebagian slot dikosongkan untuk santri baru.
+                        Slot santri baru mengikuti reserve yang diatur per kamar.
                       </p>
                       {(() => {
                         const bloks = [...new Set(configs.map(k => k.blok).filter(Boolean))]
@@ -524,27 +565,22 @@ export default function PerpindahanClient({
                           </div>
                         )
                       })()}
-                      <div className="flex items-center gap-4 bg-indigo-50 rounded-xl p-4">
-                        <div className="flex-1">
-                          <label className="text-sm font-semibold text-indigo-800 block mb-1">
-                            % Slot untuk Santri Baru: <span className="text-indigo-600">{persenBaru}%</span>
-                          </label>
-                          <input type="range" min={0} max={50} step={5} value={persenBaru}
-                            onChange={e => setPersenBaru(Number(e.target.value))}
-                            className="w-full accent-indigo-600"/>
-                          <div className="flex justify-between text-xs text-indigo-400 mt-1">
-                            <span>0% (Tidak ada reserved)</span><span>50%</span>
+                      <div className="bg-indigo-50 rounded-xl p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-indigo-800">Reserve santri baru per kamar aktif</p>
+                            <p className="text-xs text-indigo-500 mt-1">
+                              Total reserve diambil dari Step 1. Ubah konfigurasi kamar jika ingin menyesuaikan slot baru.
+                            </p>
                           </div>
-                        </div>
-                        <div className="text-center shrink-0">
-                          <p className="text-2xl font-black text-indigo-700">
-                            {Math.floor(configs.reduce((s, k) => s + k.kuota, 0) * persenBaru / 100)}
-                          </p>
-                          <p className="text-xs text-indigo-400">slot reserved</p>
+                          <div className="text-center shrink-0">
+                            <p className="text-2xl font-black text-indigo-700">{totalReserved}</p>
+                            <p className="text-xs text-indigo-400">slot reserved</p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
                         <div className="bg-slate-50 rounded-xl p-3 border">
                           <p className="text-lg font-black text-slate-800">{santriList.length}</p>
                           <p className="text-xs text-slate-400">Santri akan dipindah</p>
@@ -554,12 +590,24 @@ export default function PerpindahanClient({
                           <p className="text-xs text-slate-400">Kamar tersedia</p>
                         </div>
                         <div className="bg-slate-50 rounded-xl p-3 border">
-                          <p className="text-lg font-black text-slate-800">
-                            {Math.floor(configs.reduce((s, k) => s + k.kuota, 0) * (1 - persenBaru / 100))}
-                          </p>
+                          <p className="text-lg font-black text-slate-800">{totalReserved}</p>
+                          <p className="text-xs text-slate-400">Reserve santri baru</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-3 border">
+                          <p className="text-lg font-black text-slate-800">{totalEffective}</p>
                           <p className="text-xs text-slate-400">Slot efektif</p>
                         </div>
                       </div>
+
+                      {overflowCount > 0 && (
+                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0"/>
+                          <div>
+                            Total slot efektif saat ini hanya {totalEffective}, sedangkan santri yang akan diplot ada {santriList.length}.
+                            Sistem tetap bisa generate draft, tapi sekitar {overflowCount} santri akan terdorong masuk melebihi kapasitas efektif reserve.
+                          </div>
+                        </div>
+                      )}
 
                       {/* SETUP KETUA KAMAR SEBELUM GENERATE */}
                       <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
@@ -678,7 +726,8 @@ export default function PerpindahanClient({
                     {configs.map(cfg => {
                       const santriKamar = getSantriDiKamar(cfg.nomor_kamar)
                       const ketua = ketuaMap[cfg.nomor_kamar]
-                      const isOver = santriKamar.length > cfg.kuota
+                      const kuotaEfektif = getEfektifKamar(cfg)
+                      const isOver = santriKamar.length > kuotaEfektif
                       return (
                         <div key={cfg.nomor_kamar}
                           onDragOver={e => { e.preventDefault(); setDragOverKamar(cfg.nomor_kamar) }}
@@ -695,15 +744,20 @@ export default function PerpindahanClient({
                                   Blok {cfg.blok}
                                 </span>
                               )}
-                              <KamarStatusBadge isi={santriKamar.length} kuota={cfg.kuota}/>
+                              <KamarStatusBadge isi={santriKamar.length} kuota={kuotaEfektif}/>
                             </div>
                             <div className="flex items-center gap-2 text-xs">
                               <span className={`font-bold tabular-nums ${isOver ? 'text-red-500' : 'text-slate-600'}`}>
-                                {santriKamar.length}/{cfg.kuota}
+                                {santriKamar.length}/{kuotaEfektif}
                               </span>
                               <button onClick={() => handlePrint(cfg.nomor_kamar)}
                                 className="text-slate-400 hover:text-slate-600"><Printer className="w-3.5 h-3.5"/></button>
                             </div>
+                          </div>
+                          <div className="px-3 py-1.5 border-b border-inherit bg-slate-50/80 text-[10px] text-slate-500 flex items-center justify-between">
+                            <span>Kuota fisik {cfg.kuota}</span>
+                            <span>Reserve baru {cfg.reserved_baru ?? 0}</span>
+                            <span>Efektif {kuotaEfektif}</span>
                           </div>
 
                           {/* Ketua picker */}
@@ -797,14 +851,14 @@ export default function PerpindahanClient({
                       <p className="text-xs text-slate-400 mt-1">Total Santri</p>
                     </div>
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                      <p className="text-2xl font-black text-green-600">
-                        {configs.reduce((s, k) => s + k.kuota, 0) - santriList.length}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">Slot Kosong</p>
+                      <p className="text-2xl font-black text-green-600">{totalReserved}</p>
+                      <p className="text-xs text-slate-400 mt-1">Reserve Baru</p>
                     </div>
                     <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                      <p className="text-2xl font-black text-amber-600">{Object.keys(ketuaMap).length}</p>
-                      <p className="text-xs text-slate-400 mt-1">Ketua Ditentukan</p>
+                      <p className={`text-2xl font-black ${overflowCount > 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                        {overflowCount > 0 ? overflowCount : Object.keys(ketuaMap).length}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">{overflowCount > 0 ? 'Overflow Efektif' : 'Ketua Ditentukan'}</p>
                     </div>
                   </div>
 
@@ -816,8 +870,10 @@ export default function PerpindahanClient({
                           <th className="px-4 py-3 text-left">Kamar</th>
                           <th className="px-4 py-3 text-center">Blok</th>
                           <th className="px-4 py-3 text-center">Kuota</th>
+                          <th className="px-4 py-3 text-center">Reserve</th>
+                          <th className="px-4 py-3 text-center">Efektif</th>
                           <th className="px-4 py-3 text-center">Terisi</th>
-                          <th className="px-4 py-3 text-center">Sisa</th>
+                          <th className="px-4 py-3 text-center">Sisa Efektif</th>
                           <th className="px-4 py-3 text-center">Ketua</th>
                           <th className="px-4 py-3 text-center">Status</th>
                           <th className="px-4 py-3 text-center">Aksi</th>
@@ -827,21 +883,24 @@ export default function PerpindahanClient({
                         {configs.map(cfg => {
                           const santriKamar = getSantriDiKamar(cfg.nomor_kamar)
                           const isi = santriKamar.length
+                          const efektif = getEfektifKamar(cfg)
                           const ketua = ketuaMap[cfg.nomor_kamar]
                           return (
                             <tr key={cfg.nomor_kamar} className="hover:bg-slate-50">
                               <td className="px-4 py-3 font-bold text-slate-800">Kamar {cfg.nomor_kamar}</td>
                               <td className="px-4 py-3 text-center text-xs">{cfg.blok ? <span className="bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded">{cfg.blok}</span> : <span className="text-slate-300">—</span>}</td>
                               <td className="px-4 py-3 text-center text-slate-600">{cfg.kuota}</td>
+                              <td className="px-4 py-3 text-center text-slate-600">{cfg.reserved_baru ?? 0}</td>
+                              <td className="px-4 py-3 text-center text-slate-600">{efektif}</td>
                               <td className="px-4 py-3 text-center font-bold">{isi}</td>
-                              <td className={`px-4 py-3 text-center font-bold ${cfg.kuota - isi < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                {cfg.kuota - isi}
+                              <td className={`px-4 py-3 text-center font-bold ${efektif - isi < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                {efektif - isi}
                               </td>
                               <td className="px-4 py-3 text-center text-xs text-slate-500">
                                 {ketua ? <span className="flex items-center justify-center gap-1"><Crown className="w-3 h-3 text-amber-400"/>{ketua.nama_lengkap}</span> : <span className="text-slate-300">—</span>}
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <KamarStatusBadge isi={isi} kuota={cfg.kuota}/>
+                                <KamarStatusBadge isi={isi} kuota={efektif}/>
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex items-center justify-center gap-2">
@@ -873,6 +932,7 @@ export default function PerpindahanClient({
         const cfg = configs.find(c => c.nomor_kamar === modalKamar)!
         const santriKamar = getSantriDiKamar(modalKamar)
         const ketua = ketuaMap[modalKamar]
+        const efektif = getEfektifKamar(cfg)
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
             onClick={() => setModalKamar(null)}>
@@ -883,8 +943,8 @@ export default function PerpindahanClient({
                   <h3 className="font-bold text-slate-800 text-lg">Kamar {modalKamar}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-500">Asrama {asrama}</span>
-                    <KamarStatusBadge isi={santriKamar.length} kuota={cfg?.kuota || 0}/>
-                    <span className="text-xs text-slate-400">{santriKamar.length}/{cfg?.kuota} jiwa</span>
+                    <KamarStatusBadge isi={santriKamar.length} kuota={efektif}/>
+                    <span className="text-xs text-slate-400">{santriKamar.length}/{efektif} jiwa efektif</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -900,6 +960,11 @@ export default function PerpindahanClient({
                   <span className="text-sm font-semibold text-amber-700">Ketua: {ketua.nama_lengkap}</span>
                 </div>
               )}
+              <div className="px-5 py-2.5 bg-slate-50 border-b text-xs text-slate-500 flex items-center gap-4">
+                <span>Kuota fisik {cfg.kuota}</span>
+                <span>Reserve baru {cfg.reserved_baru ?? 0}</span>
+                <span>Kuota efektif {efektif}</span>
+              </div>
               <div className="overflow-y-auto flex-1 divide-y">
                 {santriKamar.length === 0 ? (
                   <div className="py-12 text-center text-slate-400 text-sm">Belum ada santri di kamar ini.</div>

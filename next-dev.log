@@ -470,3 +470,74 @@
  POST /dashboard/akademik/absensi 200 in 15ms (compile: 5ms, render: 10ms)
  GET /api/version 200 in 22ms
 ✓ Compiled in 148ms
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 8ms
+ GET /api/version 200 in 12ms
+ GET /api/version 200 in 31ms
+ GET /api/version 200 in 25ms
+ GET /api/version 200 in 12ms
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 9ms
+ GET /api/version 200 in 13ms
+ GET /api/version 200 in 10ms
+ GET /api/version 200 in 10ms
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 13ms
+✓ Compiled in 317ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 801ms (compile: 12ms, render: 788ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 256ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 319ms (compile: 1987µs, render: 317ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 271ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 614ms (compile: 4ms, render: 610ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 269ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 514ms (compile: 4ms, render: 510ms)
+✓ Compiled in 419ms
+ GET /api/version 200 in 11ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+✓ Compiled in 157ms
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 295ms (compile: 2ms, render: 293ms)
+✓ Compiled in 265ms
+✓ Compiled in 204ms
+✓ Compiled in 249ms
+✓ Compiled in 194ms
+✓ Compiled in 233ms
+✓ Compiled in 141ms
+✓ Compiled in 124ms
+✓ Compiled in 130ms
+✓ Compiled in 127ms
+✓ Compiled in 127ms
+✓ Compiled in 139ms
+ GET /api/version 200 in 8ms
+✓ Compiled in 149ms
+✓ Compiled in 156ms
+ GET /api/version 200 in 11ms
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 11ms
+✓ Compiled in 217ms
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/akademik/absensi 200 in 397ms (compile: 8ms, render: 389ms)
+✓ Compiled in 172ms
+✓ Compiled in 498ms
+✓ Compiled in 130ms
+✓ Compiled in 380ms
+✓ Compiled in 441ms
+✓ Compiled in 135ms
+✓ Compiled in 120ms
+✓ Compiled in 127ms
+ GET /api/version 200 in 8ms

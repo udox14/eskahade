@@ -49,6 +49,24 @@ type LogMutasi = {
   created_at: string
 }
 
+type KamarOption = {
+  nomor_kamar: string
+  kuota: number
+  reserved_baru: number
+  blok: string | null
+  terisi: number
+  slot_kosong_fisik: number
+  slot_efektif_lama: number
+  sisa_slot_baru: number
+}
+
+type MutasiResult = {
+  success?: boolean
+  count?: number
+  error?: string
+  needsOverride?: boolean
+}
+
 export default function MutasiAsramaClient({ 
   userRole, 
   asramaBinaan,
@@ -68,10 +86,10 @@ export default function MutasiAsramaClient({
   // Data
   const [santriList, setSantriList] = useState<SantriMutasi[]>([])
   const [logs, setLogs] = useState<LogMutasi[]>([])
-  const [summary, setSummary] = useState<{ perAsrama: any[], tanpaAsrama: number }>({ perAsrama: [], tanpaAsrama: 0 })
+  const [summary, setSummary] = useState<{ perAsrama: any[], tanpaAsrama: number, tanpaKamar: number }>({ perAsrama: [], tanpaAsrama: 0, tanpaKamar: 0 })
   
   // Filters
-  const [filterAsrama, setFilterAsrama] = useState<string | 'ALL' | 'NONE'>('ALL')
+  const [filterAsrama, setFilterAsrama] = useState<string | 'ALL' | 'NONE' | 'NO_ROOM'>('ALL')
   const [search, setSearch] = useState('')
   
   // Selection
@@ -81,17 +99,19 @@ export default function MutasiAsramaClient({
   const [modalOpen, setModalOpen] = useState(false)
   const [targetAsrama, setTargetAsrama] = useState('')
   const [targetKamar, setTargetKamar] = useState('')
-  const [kamarOptions, setKamarOptions] = useState<{ nomor_kamar: string; kuota: number; blok: string | null }[]>([])
+  const [kamarOptions, setKamarOptions] = useState<KamarOption[]>([])
   const [mutasiTarget, setMutasiTarget] = useState<'single' | 'batch'>('single')
   const [singleSantri, setSingleSantri] = useState<SantriMutasi | null>(null)
   const [alasan, setAlasan] = useState('')
+  const [overrideKapasitas, setOverrideKapasitas] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [sList, sum, lData] = await Promise.all([
         getSantriUntukMutasi({ 
-          asrama: filterAsrama === 'ALL' ? undefined : (filterAsrama === 'NONE' ? null : filterAsrama),
+          asrama: filterAsrama === 'ALL' || filterAsrama === 'NO_ROOM' ? undefined : (filterAsrama === 'NONE' ? null : filterAsrama),
+          tanpaKamar: filterAsrama === 'NO_ROOM',
           search: search 
         }),
         getRingkasanAsrama(),
@@ -119,11 +139,17 @@ export default function MutasiAsramaClient({
       setKamarOptions([])
     }
     setTargetKamar('')
+    setOverrideKapasitas(false)
   }, [targetAsrama])
 
   const filteredSantri = useMemo(() => {
     return santriList
   }, [santriList])
+
+  const kamarTerpilih = useMemo(
+    () => kamarOptions.find(k => k.nomor_kamar === targetKamar) || null,
+    [kamarOptions, targetKamar]
+  )
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -146,7 +172,9 @@ export default function MutasiAsramaClient({
       setSingleSantri(null)
       setTargetAsrama('')
     }
+    setTargetKamar('')
     setAlasan('')
+    setOverrideKapasitas(false)
     setModalOpen(true)
   }
 
@@ -157,21 +185,33 @@ export default function MutasiAsramaClient({
     const toastId = toast.loading('Memproses mutasi...')
     
     try {
-      let res
-      if (mutasiTarget === 'single' && singleSantri) {
-        res = await mutasiSantri({
-          santriId: singleSantri.id,
-          asramaBaru: targetAsrama,
-          kamarBaru: targetKamar || null,
-          alasan
-        })
-      } else {
-        res = await mutasiBatch({
+      const runMutasi = async (forceOverride: boolean): Promise<MutasiResult> => {
+        if (mutasiTarget === 'single' && singleSantri) {
+          return mutasiSantri({
+            santriId: singleSantri.id,
+            asramaBaru: targetAsrama,
+            kamarBaru: targetKamar || null,
+            alasan,
+            overrideKapasitas: forceOverride,
+          })
+        }
+        return mutasiBatch({
           santriIds: selectedIds,
           asramaBaru: targetAsrama,
           kamarBaru: targetKamar || null,
-          alasan
+          alasan,
+          overrideKapasitas: forceOverride,
         })
+      }
+
+      let res = await runMutasi(overrideKapasitas)
+
+      if (res.needsOverride && res.error) {
+        toast.dismiss(toastId)
+        const lanjut = await confirm(`${res.error} Lanjutkan dengan override kapasitas kamar?`)
+        if (!lanjut) return
+        setOverrideKapasitas(true)
+        res = await runMutasi(true)
       }
 
       if (res.error) throw new Error(res.error)
@@ -241,6 +281,16 @@ export default function MutasiAsramaClient({
             >
               <p className="text-[10px] font-bold text-slate-400 uppercase">Tanpa Asrama</p>
               <p className="text-xl font-black text-amber-600">{summary?.tanpaAsrama || 0}</p>
+            </button>
+            <button 
+              onClick={() => setFilterAsrama('NO_ROOM')}
+              className={cn(
+                "p-3 rounded-2xl border transition-all text-left",
+                filterAsrama === 'NO_ROOM' ? "bg-sky-50 border-sky-200 shadow-sm" : "bg-white border-slate-200 hover:border-slate-300"
+              )}
+            >
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Belum Punya Kamar</p>
+              <p className="text-xl font-black text-sky-600">{summary?.tanpaKamar || 0}</p>
             </button>
             {summary?.perAsrama?.map(a => (
               <button 
@@ -342,10 +392,15 @@ export default function MutasiAsramaClient({
                         </td>
                         <td className="px-4 py-3">
                           {s.asrama ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">{s.asrama}</span>
                               <span className="text-slate-400">/</span>
                               <span className="font-bold text-slate-600">{s.kamar || '—'}</span>
+                              {!s.kamar && (
+                                <span className="bg-sky-100 text-sky-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                  Belum Kamar
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1 w-fit">
@@ -436,6 +491,11 @@ export default function MutasiAsramaClient({
               <p className="text-emerald-100 text-sm font-medium">
                 {mutasiTarget === 'single' ? `Pindahkan ${singleSantri?.nama_lengkap}` : `Pindahkan ${selectedIds.length} santri terpilih`}
               </p>
+              {mutasiTarget === 'single' && singleSantri && (!singleSantri.asrama || !singleSantri.kamar) && (
+                <p className="text-[11px] font-bold text-emerald-50 mt-2">
+                  Mode cepat santri baru: tentukan asrama dan kamar sekaligus.
+                </p>
+              )}
             </div>
 
             <div className="p-6 space-y-5">
@@ -474,6 +534,69 @@ export default function MutasiAsramaClient({
                 </select>
                 <p className="text-[10px] text-slate-400 italic">* Kosongkan jika kamar akan diatur nanti di Perpindahan Kamar</p>
               </div>
+
+              {kamarTerpilih && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-sky-900">
+                        Kamar {kamarTerpilih.nomor_kamar} {kamarTerpilih.blok ? `(Blok ${kamarTerpilih.blok})` : ''}
+                      </p>
+                      <p className="text-[11px] text-sky-700">
+                        Cek cepat kapasitas kamar untuk santri baru.
+                      </p>
+                    </div>
+                    {kamarTerpilih.sisa_slot_baru > 0 ? (
+                      <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">
+                        Reserve Aman
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">
+                        Perlu Override
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white rounded-xl border border-sky-100 p-3">
+                      <p className="text-slate-400 uppercase text-[10px] font-bold">Kuota</p>
+                      <p className="text-lg font-black text-slate-800">{kamarTerpilih.kuota}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-sky-100 p-3">
+                      <p className="text-slate-400 uppercase text-[10px] font-bold">Terisi</p>
+                      <p className="text-lg font-black text-slate-800">{kamarTerpilih.terisi}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-sky-100 p-3">
+                      <p className="text-slate-400 uppercase text-[10px] font-bold">Reserve Baru</p>
+                      <p className="text-lg font-black text-slate-800">{kamarTerpilih.reserved_baru}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-sky-100 p-3">
+                      <p className="text-slate-400 uppercase text-[10px] font-bold">Sisa Slot Baru</p>
+                      <p className={`text-lg font-black ${kamarTerpilih.sisa_slot_baru > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{kamarTerpilih.sisa_slot_baru}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-white border border-sky-100 px-3 py-2 text-xs">
+                    <span className="text-slate-500">Kosong fisik tersisa</span>
+                    <span className={`font-black ${kamarTerpilih.slot_kosong_fisik > 0 ? 'text-slate-800' : 'text-red-600'}`}>{kamarTerpilih.slot_kosong_fisik}</span>
+                  </div>
+                </div>
+              )}
+
+              {targetKamar && (
+                <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={overrideKapasitas}
+                    onChange={(e) => setOverrideKapasitas(e.target.checked)}
+                    className="mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">Izinkan override kapasitas kamar</p>
+                    <p className="text-[11px] text-amber-700">
+                      Centang jika petugas perlu tetap memasukkan santri meski reserve santri baru habis atau slot fisik sudah mepet.
+                    </p>
+                  </div>
+                </label>
+              )}
 
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Alasan (Opsional)</label>

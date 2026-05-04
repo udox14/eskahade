@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
 
-type KamarInput = { nomor_kamar: string; kuota: number; blok?: string }
+type KamarInput = { nomor_kamar: string; kuota: number; reserved_baru?: number; blok?: string }
 type AccessOk = { session: { id: string; email: string; full_name: string; role: string; roles: string[]; asrama_binaan: string | null }; asrama: string }
 
 async function assertAsramaAccess(asrama: string): Promise<AccessOk | { error: string }> {
@@ -36,6 +36,7 @@ function cleanKamarList(kamarList: KamarInput[]): KamarInput[] | { error: string
   const cleaned = kamarList.map(k => ({
     nomor_kamar: String(k.nomor_kamar ?? '').trim(),
     kuota: Number(k.kuota),
+    reserved_baru: Number(k.reserved_baru ?? 0),
     blok: k.blok ? String(k.blok).trim().toUpperCase() : '',
   }))
 
@@ -45,6 +46,12 @@ function cleanKamarList(kamarList: KamarInput[]): KamarInput[] | { error: string
     seen.add(k.nomor_kamar)
     if (!Number.isInteger(k.kuota) || k.kuota < 1 || k.kuota > 50) {
       return { error: `Kuota kamar ${k.nomor_kamar} harus 1-50` }
+    }
+    if (!Number.isInteger(k.reserved_baru) || k.reserved_baru < 0 || k.reserved_baru > 50) {
+      return { error: `Slot santri baru kamar ${k.nomor_kamar} harus 0-50` }
+    }
+    if (k.reserved_baru > k.kuota) {
+      return { error: `Slot santri baru kamar ${k.nomor_kamar} melebihi kuota. Naikkan kuota dulu.` }
     }
   }
 
@@ -64,12 +71,13 @@ async function ensurePerpindahanKamarSchema() {
   await db.batch([
     db.prepare(`
       CREATE TABLE IF NOT EXISTS kamar_config (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        asrama      TEXT NOT NULL,
-        nomor_kamar TEXT NOT NULL,
-        kuota       INTEGER NOT NULL DEFAULT 10,
-        blok        TEXT,
-        created_at  TEXT DEFAULT (datetime('now')),
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        asrama        TEXT NOT NULL,
+        nomor_kamar   TEXT NOT NULL,
+        kuota         INTEGER NOT NULL DEFAULT 10,
+        reserved_baru INTEGER NOT NULL DEFAULT 0,
+        blok          TEXT,
+        created_at    TEXT DEFAULT (datetime('now')),
         UNIQUE(asrama, nomor_kamar)
       )
     `),
@@ -101,24 +109,22 @@ async function ensurePerpindahanKamarSchema() {
   if (!kamarConfigColumns.some(col => col.name === 'blok')) {
     await execute('ALTER TABLE kamar_config ADD COLUMN blok TEXT')
   }
+  if (!kamarConfigColumns.some(col => col.name === 'reserved_baru')) {
+    await execute('ALTER TABLE kamar_config ADD COLUMN reserved_baru INTEGER NOT NULL DEFAULT 0')
+  }
 }
-
-// ─── GET: Load semua data yang dibutuhkan untuk satu asrama ──────────────────
 
 export async function getDataPerpindahan(asrama: string) {
   await ensurePerpindahanKamarSchema()
   const access = await assertAsramaAccess(asrama)
-  if ('error' in access) return { error: access.error, configs: [], drafts: [], ketuaList: [], santriList: [] }
+  if ('error' in access) {
+    return { error: access.error, configs: [], drafts: [], ketuaList: [], santriList: [], defaultConfigs: [] }
+  }
   const targetAsrama = access.asrama
 
-  const [configs, drafts, ketuaList, santriList] = await Promise.all([
-    // Konfigurasi kamar
+  const [configs, drafts, ketuaList, santriList, existingKamar] = await Promise.all([
     query<any>('SELECT * FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar', [targetAsrama]),
-
-    // Draft perpindahan
     query<any>('SELECT * FROM kamar_draft WHERE asrama = ?', [targetAsrama]),
-
-    // Ketua kamar
     query<any>(`
       SELECT kk.*, s.nama_lengkap, s.nis
       FROM kamar_ketua kk
@@ -130,8 +136,6 @@ export async function getDataPerpindahan(asrama: string) {
        AND kc.nomor_kamar = kk.nomor_kamar
       WHERE kk.asrama = ?
     `, [targetAsrama]),
-
-    // Santri aktif di asrama ini
     query<any>(`
       SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin,
              s.kamar AS kamar_asli, s.sekolah, s.kelas_sekolah,
@@ -143,12 +147,29 @@ export async function getDataPerpindahan(asrama: string) {
       WHERE s.status_global = 'aktif' AND s.asrama = ?
       ORDER BY s.kelas_sekolah, s.nama_lengkap
     `, [targetAsrama]),
+    query<any>(`
+      SELECT TRIM(s.kamar) AS nomor_kamar, COUNT(*) AS kuota
+      FROM santri s
+      WHERE s.status_global = 'aktif'
+        AND s.asrama = ?
+        AND s.kamar IS NOT NULL
+        AND TRIM(s.kamar) <> ''
+      GROUP BY TRIM(s.kamar)
+      ORDER BY CAST(TRIM(s.kamar) AS INTEGER), TRIM(s.kamar)
+    `, [targetAsrama]),
   ])
 
-  return { configs, drafts, ketuaList, santriList }
-}
+  const defaultConfigs = configs.length
+    ? configs
+    : existingKamar.map((k: any) => ({
+        nomor_kamar: k.nomor_kamar,
+        kuota: Number(k.kuota) || 1,
+        reserved_baru: 0,
+        blok: '',
+      }))
 
-// ─── SETUP KAMAR: Simpan konfigurasi kamar ───────────────────────────────────
+  return { configs, drafts, ketuaList, santriList, defaultConfigs }
+}
 
 export async function simpanKonfigurasiKamar(
   asrama: string,
@@ -167,7 +188,8 @@ export async function simpanKonfigurasiKamar(
     const stmts = [
       db.prepare('DELETE FROM kamar_config WHERE asrama = ?').bind(access.asrama),
       ...cleaned.map(k =>
-        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota, blok) VALUES (?, ?, ?, ?)').bind(access.asrama, k.nomor_kamar, k.kuota, k.blok || null)
+        db.prepare('INSERT INTO kamar_config (asrama, nomor_kamar, kuota, reserved_baru, blok) VALUES (?, ?, ?, ?, ?)')
+          .bind(access.asrama, k.nomor_kamar, k.kuota, k.reserved_baru, k.blok || null)
       ),
       db.prepare(`DELETE FROM kamar_draft WHERE asrama = ? AND kamar_baru NOT IN (${placeholders})`).bind(access.asrama, ...validKamar),
       db.prepare(`DELETE FROM kamar_draft WHERE asrama = ? AND santri_id NOT IN (
@@ -186,18 +208,10 @@ export async function simpanKonfigurasiKamar(
   }
 }
 
-// ─── GENERATE DRAFT: Auto-distribusi santri ──────────────────────────────────
-
-export async function generateDraft(
-  asrama: string,
-  persenUntukBaru: number  // 0–100, misal 20 = 20% slot dikosongkan untuk santri baru
-) {
+export async function generateDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()
   const access = await assertAsramaAccess(asrama)
   if ('error' in access) return access
-  if (!Number.isFinite(persenUntukBaru) || persenUntukBaru < 0 || persenUntukBaru > 50) {
-    return { error: 'Persen slot santri baru harus 0-50' }
-  }
 
   const { configs, santriList } = await getDataPerpindahan(access.asrama)
   if (!configs.length) return { error: 'Belum ada konfigurasi kamar' }
@@ -217,18 +231,21 @@ export async function generateDraft(
     WHERE kk.asrama = ?
   `, [access.asrama])
 
-  // Hitung slot efektif per kamar (setelah dikurangi % untuk santri baru)
   const kamarSlots = configs.map((k: any) => {
+    const kuota = Number(k.kuota)
+    const reservedBaru = Number(k.reserved_baru ?? 0)
     const terisiKetua = kamarKetua.filter(x => x.nomor_kamar === k.nomor_kamar).length
     return {
       nomor: k.nomor_kamar,
-      kuota: k.kuota,
+      kuota,
+      reserved_baru: reservedBaru,
       blok: k.blok || null,
-      efektif: Math.max(0, Math.floor(k.kuota * (1 - persenUntukBaru / 100)) - terisiKetua),
+      efektif: Math.max(0, kuota - reservedBaru - terisiKetua),
     }
   })
+  const totalReserved = kamarSlots.reduce((sum, k) => sum + k.reserved_baru, 0)
+  const totalKapasitasSantriLama = kamarSlots.reduce((sum, k) => sum + k.kuota - k.reserved_baru, 0)
 
-  // Pengelompokan blok: { 'A': [kamar1,kamar2,...], null: [...] }
   const blokKamar: Record<string, typeof kamarSlots> = {}
   for (const k of kamarSlots) {
     const blokKey = k.blok || '__TANPA_BLOK__'
@@ -236,7 +253,6 @@ export async function generateDraft(
     blokKamar[blokKey].push(k)
   }
 
-  // Helper: interleave santri per kelas → campuran proporsional
   function interleaveByKelas(list: any[]): any[] {
     const groups: Record<string, any[]> = {}
     for (const s of list) {
@@ -248,13 +264,14 @@ export async function generateDraft(
     const maxLen = Math.max(...keys.map(k => groups[k].length), 0)
     const result: any[] = []
     for (let i = 0; i < maxLen; i++) {
-      for (const key of keys) { if (groups[key][i]) result.push(groups[key][i]) }
+      for (const key of keys) {
+        if (groups[key][i]) result.push(groups[key][i])
+      }
     }
     return result
   }
 
-  // Helper: distribusi santri ke kamar dalam satu blok
-  function distribusiBlok(santriBlok: any[], kamarBlok: typeof kamarSlots, assignment: Record<string,string>) {
+  function distribusiBlok(santriBlok: any[], kamarBlok: typeof kamarSlots, assignment: Record<string, string>) {
     const belumAssign = santriBlok.filter(s => !assignment[s.id])
     const shuffled = interleaveByKelas(belumAssign)
     let idx = 0
@@ -263,34 +280,30 @@ export async function generateDraft(
         assignment[shuffled[idx].id] = kamar.nomor
       }
     }
-    // Overflow: taruh di kamar tersedikit dalam blok ini (over capacity)
     for (let i = idx; i < shuffled.length; i++) {
       const counts: Record<string, number> = {}
-      for (const [sid, nom] of Object.entries(assignment)) {
+      for (const [, nom] of Object.entries(assignment)) {
         if (kamarBlok.some(k => k.nomor === nom)) counts[nom] = (counts[nom] || 0) + 1
       }
-      const min = kamarBlok.reduce((a, b) => (counts[a.nomor]||0) <= (counts[b.nomor]||0) ? a : b)
+      const min = kamarBlok.reduce((a, b) => (counts[a.nomor] || 0) <= (counts[b.nomor] || 0) ? a : b)
       assignment[shuffled[i].id] = min.nomor
     }
   }
 
   const assignment: Record<string, string> = {}
 
-  // Assign ketua ke kamarnya masing-masing
   for (const k of kamarKetua) {
-     assignment[k.santri_id] = k.nomor_kamar;
+    assignment[k.santri_id] = k.nomor_kamar
   }
 
-  // Santri yang kamar lamanya ada di blok tertentu → ikut blok itu
-  // Santri tanpa kamar / kamar tidak dikenali blok → masuk pool __TANPA_BLOK__
   const blokSantri: Record<string, any[]> = {}
-
-  // Bangun map: nomor kamar → blok
   const kamarToBlok: Record<string, string> = {}
-  for (const k of kamarSlots) { kamarToBlok[k.nomor] = k.blok || '__TANPA_BLOK__' }
+  for (const k of kamarSlots) {
+    kamarToBlok[k.nomor] = k.blok || '__TANPA_BLOK__'
+  }
 
   for (const s of santriList) {
-    if (assignment[s.id]) continue; // lewati ketua yang sudah diassign
+    if (assignment[s.id]) continue
     const blokSantriKey = s.kamar_asli && kamarToBlok[s.kamar_asli]
       ? kamarToBlok[s.kamar_asli]
       : '__TANPA_BLOK__'
@@ -298,13 +311,11 @@ export async function generateDraft(
     blokSantri[blokSantriKey].push(s)
   }
 
-  // Distribusikan per blok
   for (const [blokKey, santriBlok] of Object.entries(blokSantri)) {
-    const targetKamar = blokKamar[blokKey] || kamarSlots  // fallback ke semua kamar jika blok tidak dikenali
+    const targetKamar = blokKamar[blokKey] || kamarSlots
     distribusiBlok(santriBlok, targetKamar, assignment)
   }
 
-  // Simpan ke kamar_draft (upsert)
   try {
     const stmts = [
       db.prepare('DELETE FROM kamar_draft WHERE asrama = ?').bind(access.asrama),
@@ -313,20 +324,22 @@ export async function generateDraft(
           INSERT INTO kamar_draft (asrama, santri_id, kamar_lama, kamar_baru, applied)
           VALUES (?, ?, ?, ?, 0)
         `).bind(access.asrama, s.id, s.kamar_asli || null, assignment[s.id] || kamarSlots[0].nomor)
-      )
+      ),
     ]
-    // Batch max 100
     for (let i = 0; i < stmts.length; i += 100) {
       await db.batch(stmts.slice(i, i + 100))
     }
     revalidatePath(REVALIDATE)
-    return { success: true, total: santriList.length }
+    return {
+      success: true,
+      total: santriList.length,
+      overflowCount: Math.max(0, santriList.length - totalKapasitasSantriLama),
+      totalReserved,
+    }
   } catch (e: any) {
     return { error: e.message }
   }
 }
-
-// ─── UPDATE DRAFT: Pindahkan satu santri ke kamar lain ───────────────────────
 
 export async function updateKamarDraft(asrama: string, santriId: string, kamarBaru: string) {
   await ensurePerpindahanKamarSchema()
@@ -385,8 +398,6 @@ export async function updateKamarDraft(asrama: string, santriId: string, kamarBa
   }
 }
 
-// ─── APPLY DRAFT: Update kolom kamar di tabel santri ─────────────────────────
-
 export async function applyDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()
   const access = await assertAsramaAccess(asrama)
@@ -439,8 +450,6 @@ export async function applyDraft(asrama: string) {
   }
 }
 
-// ─── KETUA KAMAR: Set/unset ketua ────────────────────────────────────────────
-
 export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_id: string | null) {
   await ensurePerpindahanKamarSchema()
   const access = await assertAsramaAccess(asrama)
@@ -482,8 +491,6 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
   revalidatePath(REVALIDATE)
   return { success: true }
 }
-
-// ─── RESET DRAFT ─────────────────────────────────────────────────────────────
 
 export async function resetDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()

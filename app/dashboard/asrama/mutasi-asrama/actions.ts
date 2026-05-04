@@ -26,12 +26,42 @@ async function ensureTableExists() {
   } catch (e) {
     // Ignore error if already exists or other issues
   }
+
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS kamar_config (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        asrama        TEXT NOT NULL,
+        nomor_kamar   TEXT NOT NULL,
+        kuota         INTEGER NOT NULL DEFAULT 10,
+        reserved_baru INTEGER NOT NULL DEFAULT 0,
+        blok          TEXT,
+        created_at    TEXT DEFAULT (datetime('now')),
+        UNIQUE(asrama, nomor_kamar)
+      )
+    `).run()
+  } catch (e) {
+    // Ignore error if already exists or other issues
+  }
+
+  try {
+    const kamarConfigColumns = await query<{ name: string }>('PRAGMA table_info(kamar_config)')
+    if (!kamarConfigColumns.some(col => col.name === 'blok')) {
+      await execute('ALTER TABLE kamar_config ADD COLUMN blok TEXT')
+    }
+    if (!kamarConfigColumns.some(col => col.name === 'reserved_baru')) {
+      await execute('ALTER TABLE kamar_config ADD COLUMN reserved_baru INTEGER NOT NULL DEFAULT 0')
+    }
+  } catch (e) {
+    // Ignore schema sync issue and let downstream query surface if needed
+  }
 }
 
 // ── GET: Semua santri aktif + info asrama/kamar ───────────────────────────────
 export async function getSantriUntukMutasi(filter?: {
   asrama?: string | null  // null = santri tanpa asrama, undefined = semua
   search?: string
+  tanpaKamar?: boolean
 }) {
   await ensureTableExists()
   let sql = `
@@ -59,6 +89,10 @@ export async function getSantriUntukMutasi(filter?: {
     params.push(term, term)
   }
 
+  if (filter?.tanpaKamar) {
+    sql += ` AND (s.kamar IS NULL OR s.kamar = '')`
+  }
+
   sql += ` ORDER BY s.asrama NULLS LAST, s.kamar NULLS LAST, s.nama_lengkap`
 
   return query<any>(sql, params)
@@ -66,8 +100,34 @@ export async function getSantriUntukMutasi(filter?: {
 
 // ── GET: Daftar kamar dari kamar_config untuk suatu asrama ───────────────────
 export async function getKamarListByAsrama(asrama: string) {
-  return query<{ nomor_kamar: string; kuota: number; blok: string | null }>(
-    `SELECT nomor_kamar, kuota, blok FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar`,
+  await ensureTableExists()
+  return query<{
+    nomor_kamar: string
+    kuota: number
+    reserved_baru: number
+    blok: string | null
+    terisi: number
+    slot_kosong_fisik: number
+    slot_efektif_lama: number
+    sisa_slot_baru: number
+  }>(
+    `SELECT
+       kc.nomor_kamar,
+       kc.kuota,
+       COALESCE(kc.reserved_baru, 0) AS reserved_baru,
+       kc.blok,
+       COUNT(s.id) AS terisi,
+       MAX(0, kc.kuota - COUNT(s.id)) AS slot_kosong_fisik,
+       MAX(0, kc.kuota - COALESCE(kc.reserved_baru, 0)) AS slot_efektif_lama,
+       MIN(COALESCE(kc.reserved_baru, 0), MAX(0, kc.kuota - COUNT(s.id))) AS sisa_slot_baru
+     FROM kamar_config kc
+     LEFT JOIN santri s
+       ON s.asrama = kc.asrama
+      AND s.kamar = kc.nomor_kamar
+      AND s.status_global = 'aktif'
+     WHERE kc.asrama = ?
+     GROUP BY kc.asrama, kc.nomor_kamar, kc.kuota, kc.reserved_baru, kc.blok
+     ORDER BY CAST(kc.nomor_kamar AS INTEGER), kc.nomor_kamar`,
     [asrama]
   )
 }
@@ -80,13 +140,86 @@ export async function getRingkasanAsrama() {
      WHERE status_global = 'aktif'
      GROUP BY asrama`
   )
+  const tanpaKamarRow = await queryOne<{ jumlah: number }>(
+    `SELECT COUNT(*) AS jumlah
+     FROM santri
+     WHERE status_global = 'aktif'
+       AND (kamar IS NULL OR kamar = '')`
+  )
   // Santri tanpa asrama
   const tanpaAsrama = counts.find(c => !c.asrama)?.jumlah ?? 0
   const perAsrama = ASRAMA_LIST.map(a => ({
     asrama: a,
     jumlah: counts.find(c => c.asrama === a)?.jumlah ?? 0,
   }))
-  return { perAsrama, tanpaAsrama }
+  return { perAsrama, tanpaAsrama, tanpaKamar: tanpaKamarRow?.jumlah ?? 0 }
+}
+
+async function validateTargetKamar(params: {
+  asramaBaru: string
+  kamarBaru: string | null
+  santriSaatIni: Array<{ asrama: string | null; kamar: string | null }>
+  overrideKapasitas?: boolean
+}) {
+  await ensureTableExists()
+  if (!params.kamarBaru) return null
+
+  const kamar = await queryOne<{
+    nomor_kamar: string
+    kuota: number
+    reserved_baru: number
+    terisi: number
+    sisa_slot_baru: number
+  }>(
+    `SELECT
+       kc.nomor_kamar,
+       kc.kuota,
+       COALESCE(kc.reserved_baru, 0) AS reserved_baru,
+       COUNT(s.id) AS terisi,
+       MIN(COALESCE(kc.reserved_baru, 0), MAX(0, kc.kuota - COUNT(s.id))) AS sisa_slot_baru
+     FROM kamar_config kc
+     LEFT JOIN santri s
+       ON s.asrama = kc.asrama
+      AND s.kamar = kc.nomor_kamar
+      AND s.status_global = 'aktif'
+     WHERE kc.asrama = ? AND kc.nomor_kamar = ?
+     GROUP BY kc.asrama, kc.nomor_kamar, kc.kuota, kc.reserved_baru`,
+    [params.asramaBaru, params.kamarBaru]
+  )
+  if (!kamar) return { error: 'Kamar tujuan belum dikonfigurasi di asrama ini' }
+
+  const currentInTarget = params.santriSaatIni.filter(
+    s => s.asrama === params.asramaBaru && s.kamar === params.kamarBaru
+  ).length
+  const incomingTotal = params.santriSaatIni.length - currentInTarget
+  const incomingBaru = params.santriSaatIni.filter(
+    s => (s.kamar == null || s.kamar === '') && !(s.asrama === params.asramaBaru && s.kamar === params.kamarBaru)
+  ).length
+  const slotKosongFisik = Math.max(0, Number(kamar.kuota) - Number(kamar.terisi))
+  const sisaSlotBaru = Math.min(Number(kamar.reserved_baru ?? 0), slotKosongFisik)
+
+  if (incomingTotal > slotKosongFisik && !params.overrideKapasitas) {
+    return {
+      needsOverride: true,
+      error: `Kamar ${params.kamarBaru} hanya tersisa ${slotKosongFisik} slot fisik, tetapi akan menerima ${incomingTotal} santri.`,
+    }
+  }
+
+  if (incomingBaru > sisaSlotBaru && !params.overrideKapasitas) {
+    return {
+      needsOverride: true,
+      error: `Kamar ${params.kamarBaru} hanya punya ${sisaSlotBaru} sisa slot santri baru, tetapi akan menerima ${incomingBaru} santri baru.`,
+    }
+  }
+
+  return {
+    nomor_kamar: kamar.nomor_kamar,
+    kuota: Number(kamar.kuota),
+    reserved_baru: Number(kamar.reserved_baru ?? 0),
+    terisi: Number(kamar.terisi),
+    slot_kosong_fisik: slotKosongFisik,
+    sisa_slot_baru: sisaSlotBaru,
+  }
 }
 
 // ── GET: Log riwayat mutasi terbaru ──────────────────────────────────────────
@@ -108,6 +241,7 @@ export async function mutasiSantri(payload: {
   asramaBaru: string
   kamarBaru: string | null
   alasan?: string
+  overrideKapasitas?: boolean
 }) {
   const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
   if ('error' in access) return access
@@ -128,6 +262,14 @@ export async function mutasiSantri(payload: {
     [payload.santriId]
   )
   if (!santri) return { error: 'Santri tidak ditemukan' }
+
+  const validasiKamar = await validateTargetKamar({
+    asramaBaru: payload.asramaBaru,
+    kamarBaru: payload.kamarBaru,
+    santriSaatIni: [santri],
+    overrideKapasitas: payload.overrideKapasitas,
+  })
+  if (validasiKamar && 'error' in validasiKamar) return validasiKamar
 
   const db = await getDB()
   try {
@@ -163,6 +305,7 @@ export async function mutasiBatch(payload: {
   asramaBaru: string
   kamarBaru: string | null
   alasan?: string
+  overrideKapasitas?: boolean
 }) {
   const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
   if ('error' in access) return access
@@ -190,6 +333,14 @@ export async function mutasiBatch(payload: {
     )
     santriLama.push(...results)
   }
+
+  const validasiKamar = await validateTargetKamar({
+    asramaBaru: payload.asramaBaru,
+    kamarBaru: payload.kamarBaru,
+    santriSaatIni: santriLama,
+    overrideKapasitas: payload.overrideKapasitas,
+  })
+  if (validasiKamar && 'error' in validasiKamar) return validasiKamar
 
   const db = await getDB()
   try {
