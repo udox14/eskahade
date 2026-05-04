@@ -468,3 +468,5 @@
  POST /dashboard/akademik/absensi 500 in 316ms (compile: 2ms, render: 313ms)
  POST /dashboard/akademik/absensi 500 in 341ms (compile: 5ms, render: 337ms)
  POST /dashboard/akademik/absensi 200 in 15ms (compile: 5ms, render: 10ms)
+ GET /api/version 200 in 22ms
+✓ Compiled in 148ms
