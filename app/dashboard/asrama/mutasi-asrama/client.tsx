@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react'
 import { toast } from 'sonner'
 import { 
   ArrowLeftRight, Search, Building2, Users, History, 
@@ -80,17 +80,23 @@ export default function MutasiAsramaClient({
   
   // States
   const [tab, setTab] = useState<'mutasi' | 'riwayat'>('mutasi')
-  const [loading, setLoading] = useState(true)
+  const [loadingTable, setLoadingTable] = useState(false)
+  const [loadingMeta, setLoadingMeta] = useState(true)
+  const [loadingLogs, setLoadingLogs] = useState(false)
   const [processing, setProcessing] = useState(false)
   
   // Data
   const [santriList, setSantriList] = useState<SantriMutasi[]>([])
   const [logs, setLogs] = useState<LogMutasi[]>([])
   const [summary, setSummary] = useState<{ perAsrama: any[], tanpaAsrama: number, tanpaKamar: number }>({ perAsrama: [], tanpaAsrama: 0, tanpaKamar: 0 })
+  const [totalSantri, setTotalSantri] = useState(0)
   
   // Filters
   const [filterAsrama, setFilterAsrama] = useState<string | 'ALL' | 'NONE' | 'NO_ROOM'>('ALL')
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const [page, setPage] = useState(1)
+  const pageSize = 25
   
   // Selection
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -105,31 +111,72 @@ export default function MutasiAsramaClient({
   const [alasan, setAlasan] = useState('')
   const [overrideKapasitas, setOverrideKapasitas] = useState(false)
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const shouldLoadSantri = filterAsrama !== 'ALL' || deferredSearch.trim().length >= 2
+
+  const loadMeta = useCallback(async () => {
+    setLoadingMeta(true)
     try {
-      const [sList, sum, lData] = await Promise.all([
-        getSantriUntukMutasi({ 
-          asrama: filterAsrama === 'ALL' || filterAsrama === 'NO_ROOM' ? undefined : (filterAsrama === 'NONE' ? null : filterAsrama),
-          tanpaKamar: filterAsrama === 'NO_ROOM',
-          search: search 
-        }),
-        getRingkasanAsrama(),
-        getLogMutasi(50)
-      ])
-      setSantriList(sList)
+      const sum = await getRingkasanAsrama()
       setSummary(sum)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setLoadingMeta(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadMeta()
+  }, [loadMeta])
+
+  const loadSantri = useCallback(async () => {
+    if (!shouldLoadSantri) {
+      setSantriList([])
+      setTotalSantri(0)
+      setSelectedIds([])
+      return
+    }
+
+    setLoadingTable(true)
+    try {
+      const result = await getSantriUntukMutasi({ 
+        asrama: filterAsrama === 'ALL' || filterAsrama === 'NO_ROOM' ? undefined : (filterAsrama === 'NONE' ? null : filterAsrama),
+        tanpaKamar: filterAsrama === 'NO_ROOM',
+        search: deferredSearch,
+        page,
+        pageSize,
+      })
+      setSantriList(result.rows)
+      setTotalSantri(result.total)
+      setSelectedIds([])
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setLoadingTable(false)
+    }
+  }, [deferredSearch, filterAsrama, page, shouldLoadSantri])
+
+  useEffect(() => {
+    loadSantri()
+  }, [loadSantri])
+
+  const loadLogs = useCallback(async () => {
+    setLoadingLogs(true)
+    try {
+      const lData = await getLogMutasi(50)
       setLogs(lData)
     } catch (e: any) {
       toast.error(e.message)
     } finally {
-      setLoading(false)
+      setLoadingLogs(false)
     }
-  }, [filterAsrama, search])
+  }, [])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (tab === 'riwayat' && logs.length === 0) {
+      loadLogs()
+    }
+  }, [tab, logs.length, loadLogs])
 
   // Fetch Kamar when Target Asrama changes
   useEffect(() => {
@@ -219,7 +266,7 @@ export default function MutasiAsramaClient({
       toast.success('Berhasil memproses mutasi', { id: toastId })
       setModalOpen(false)
       setSelectedIds([])
-      await loadData()
+      await Promise.all([loadMeta(), loadSantri()])
     } catch (e: any) {
       toast.error(e.message, { id: toastId })
     } finally {
@@ -263,7 +310,7 @@ export default function MutasiAsramaClient({
           {/* SUMMARY CARDS */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <button 
-              onClick={() => setFilterAsrama('ALL')}
+              onClick={() => { setFilterAsrama('ALL'); setPage(1) }}
               className={cn(
                 "p-3 rounded-2xl border transition-all text-left",
                 filterAsrama === 'ALL' ? "bg-emerald-50 border-emerald-200 shadow-sm" : "bg-white border-slate-200 hover:border-slate-300"
@@ -273,7 +320,7 @@ export default function MutasiAsramaClient({
               <p className="text-xl font-black text-slate-800">{(summary?.perAsrama?.reduce((a: any, b: any) => a + (b.jumlah || 0), 0) || 0) + (summary?.tanpaAsrama || 0)}</p>
             </button>
             <button 
-              onClick={() => setFilterAsrama('NONE')}
+              onClick={() => { setFilterAsrama('NONE'); setPage(1) }}
               className={cn(
                 "p-3 rounded-2xl border transition-all text-left",
                 filterAsrama === 'NONE' ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-white border-slate-200 hover:border-slate-300"
@@ -283,7 +330,7 @@ export default function MutasiAsramaClient({
               <p className="text-xl font-black text-amber-600">{summary?.tanpaAsrama || 0}</p>
             </button>
             <button 
-              onClick={() => setFilterAsrama('NO_ROOM')}
+              onClick={() => { setFilterAsrama('NO_ROOM'); setPage(1) }}
               className={cn(
                 "p-3 rounded-2xl border transition-all text-left",
                 filterAsrama === 'NO_ROOM' ? "bg-sky-50 border-sky-200 shadow-sm" : "bg-white border-slate-200 hover:border-slate-300"
@@ -295,7 +342,7 @@ export default function MutasiAsramaClient({
             {summary?.perAsrama?.map(a => (
               <button 
                 key={a.asrama}
-                onClick={() => setFilterAsrama(a.asrama)}
+                onClick={() => { setFilterAsrama(a.asrama); setPage(1) }}
                 className={cn(
                   "p-3 rounded-2xl border transition-all text-left",
                   filterAsrama === a.asrama ? "bg-emerald-50 border-emerald-200 shadow-sm" : "bg-white border-slate-200 hover:border-slate-300"
@@ -306,6 +353,9 @@ export default function MutasiAsramaClient({
               </button>
             ))}
           </div>
+          {loadingMeta && (
+            <div className="text-xs text-slate-400 px-1">Memuat ringkasan asrama...</div>
+          )}
 
           {/* FILTERS & ACTIONS */}
           <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -313,9 +363,9 @@ export default function MutasiAsramaClient({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
               <input 
                 type="text" 
-                placeholder="Cari nama atau NIS..." 
+                placeholder="Cari nama atau NIS... (min. 2 huruf)" 
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                 className="w-full pl-10 pr-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 border-slate-200 transition-all text-sm"
               />
             </div>
@@ -331,6 +381,12 @@ export default function MutasiAsramaClient({
               )}
             </div>
           </div>
+
+          {!shouldLoadSantri && (
+            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-sm text-sky-800">
+              Pilih filter seperti `Tanpa Asrama` atau `Belum Punya Kamar`, atau ketik minimal 2 huruf nama/NIS dulu. Daftar santri tidak dimuat otomatis supaya halaman tetap ringan.
+            </div>
+          )}
 
           {/* TABLE */}
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
@@ -350,11 +406,18 @@ export default function MutasiAsramaClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {loading ? (
+                  {loadingTable ? (
                     <tr>
                       <td colSpan={5} className="py-20 text-center">
                         <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mx-auto mb-2"/>
                         <p className="text-slate-400 font-medium">Memuat data santri...</p>
+                      </td>
+                    </tr>
+                  ) : !shouldLoadSantri ? (
+                    <tr>
+                      <td colSpan={5} className="py-20 text-center text-slate-400">
+                        <Filter className="w-12 h-12 mx-auto mb-3 opacity-20"/>
+                        <p>Pilih filter atau cari santri dulu untuk mulai memuat data.</p>
                       </td>
                     </tr>
                   ) : filteredSantri.length === 0 ? (
@@ -426,6 +489,30 @@ export default function MutasiAsramaClient({
                 </tbody>
               </table>
             </div>
+            {shouldLoadSantri && totalSantri > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t bg-slate-50 text-sm">
+                <p className="text-slate-500">
+                  Menampilkan {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalSantri)} dari {totalSantri} santri
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                    disabled={page === 1 || loadingTable}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold disabled:opacity-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <span className="text-slate-500 font-medium">Hal {page} / {Math.max(1, Math.ceil(totalSantri / pageSize))}</span>
+                  <button
+                    onClick={() => setPage(prev => prev < Math.ceil(totalSantri / pageSize) ? prev + 1 : prev)}
+                    disabled={page >= Math.ceil(totalSantri / pageSize) || loadingTable}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold disabled:opacity-50"
+                  >
+                    Berikutnya
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -445,7 +532,7 @@ export default function MutasiAsramaClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {loading ? (
+                {loadingLogs ? (
                   <tr><td colSpan={6} className="py-20 text-center text-slate-400">Memuat riwayat...</td></tr>
                 ) : !logs || logs.length === 0 ? (
                   <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">Belum ada riwayat mutasi</td></tr>

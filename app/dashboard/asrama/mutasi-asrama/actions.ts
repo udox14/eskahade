@@ -62,8 +62,12 @@ export async function getSantriUntukMutasi(filter?: {
   asrama?: string | null  // null = santri tanpa asrama, undefined = semua
   search?: string
   tanpaKamar?: boolean
+  page?: number
+  pageSize?: number
 }) {
   await ensureTableExists()
+  const page = Math.max(1, Number(filter?.page ?? 1))
+  const pageSize = Math.min(100, Math.max(1, Number(filter?.pageSize ?? 25)))
   let sql = `
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin,
            s.asrama, s.kamar, s.kelas_sekolah, s.sekolah,
@@ -93,9 +97,18 @@ export async function getSantriUntukMutasi(filter?: {
     sql += ` AND (s.kamar IS NULL OR s.kamar = '')`
   }
 
-  sql += ` ORDER BY s.asrama NULLS LAST, s.kamar NULLS LAST, s.nama_lengkap`
+  const countSql = `SELECT COUNT(*) AS total FROM (${sql}) base`
+  const totalRow = await queryOne<{ total: number }>(countSql, params)
 
-  return query<any>(sql, params)
+  sql += ` ORDER BY s.asrama NULLS LAST, s.kamar NULLS LAST, s.nama_lengkap LIMIT ? OFFSET ?`
+  const rows = await query<any>(sql, [...params, pageSize, (page - 1) * pageSize])
+
+  return {
+    rows,
+    total: totalRow?.total ?? 0,
+    page,
+    pageSize,
+  }
 }
 
 // ── GET: Daftar kamar dari kamar_config untuk suatu asrama ───────────────────
