@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList } from '../rekap-asrama/actions'
 import { Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
@@ -112,13 +113,12 @@ export default function RekapAbsenMalamPage() {
     <div className="space-y-5 max-w-7xl mx-auto pb-16">
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Moon className="w-7 h-7 text-indigo-600"/> Rekap Absen Malam
-          </h1>
-          <p className="text-sm text-slate-500">Rekap absensi malam per bulan</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Rekap Absen Malam"
+          description="Rekap absensi malam per bulan."
+          className="flex-1"
+        />
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
             <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-slate-100 rounded-lg">

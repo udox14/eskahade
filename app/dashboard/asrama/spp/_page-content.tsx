@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
@@ -239,13 +240,12 @@ export default function SPPPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-32">
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <CreditCard className="w-6 h-6 text-emerald-600"/> Dashboard SPP
-          </h1>
-          <p className="text-slate-500 text-sm">Monitoring pembayaran santri per kamar.</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Dashboard SPP"
+          description="Monitoring pembayaran santri per kamar."
+          className="flex-1"
+        />
         <div className="flex flex-wrap gap-2 items-center">
           <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1">
             <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">-</button>

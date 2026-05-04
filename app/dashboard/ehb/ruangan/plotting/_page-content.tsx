@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function PlottingEhbPage() {
   const confirm = useConfirm()
@@ -104,17 +105,16 @@ export default function PlottingEhbPage() {
 
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex items-center gap-4">
-        <Link href="/dashboard/ehb/ruangan" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
-          <ArrowLeft className="w-5 h-5"/>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            Auto Plotting Ruangan
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Penempatan otomatis dengan Cross Seating yang tetap berurutan per kelas dan abjad.</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Auto Plotting Ruangan"
+        description="Penempatan otomatis dengan cross seating yang tetap berurutan per kelas dan abjad."
+        className="border-b pb-4"
+        action={(
+          <Link href="/dashboard/ehb/ruangan" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
+            <ArrowLeft className="w-5 h-5"/>
+          </Link>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Status Panel */}

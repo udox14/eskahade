@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { shortDateWib } from '../_date-utils'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function SusulanEhbPage() {
   const confirm = useConfirm()
@@ -76,14 +77,11 @@ export default function SusulanEhbPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <ClipboardList className="w-7 h-7 text-indigo-600" /> Daftar Susulan EHB
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Daftar santri yang tidak hadir ujian (Alpha/Izin/Sakit) dan belum menyelesaikan susulan.</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Daftar Susulan EHB"
+        description="Daftar santri yang tidak hadir ujian dan belum menyelesaikan susulan."
+        className="border-b pb-4"
+      />
 
       <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b bg-slate-50 flex justify-between items-center gap-4">

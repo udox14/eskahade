@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string | null) {
@@ -671,16 +672,10 @@ export default function SantriKeluarPage() {
 
   return (
     <div className="max-w-5xl mx-auto pb-16 space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-          <UserX className="w-6 h-6 text-rose-600" />
-          Santri Keluar
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Kelola santri yang keluar di tengah tahun ajaran — bukan alumni resmi
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Santri Keluar"
+        description="Kelola santri yang keluar di tengah tahun ajaran, bukan alumni resmi."
+      />
 
       {/* Tab */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">

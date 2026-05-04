@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const dashboardModalOverlay = 'fixed inset-y-0 left-[var(--dashboard-sidebar-offset,0px)] right-0 bg-black/50 flex items-center justify-center p-4'
 
@@ -240,25 +241,24 @@ export default function RuanganEhbPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <LayoutList className="w-7 h-7 text-indigo-600" /> Ruangan EHB
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola daftar ruangan ujian dan peserta di dalamnya.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/dashboard/ehb/ruangan/plotting" className="flex items-center gap-2 bg-white border text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">
-            <MapPin className="w-4 h-4" /> Auto Plotting
-          </Link>
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"
-          >
-            <Plus className="w-4 h-4" /> Tambah Ruangan
-          </button>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Ruangan EHB"
+        description="Kelola daftar ruangan ujian dan peserta di dalamnya."
+        className="border-b pb-4"
+        action={(
+          <div className="flex gap-2">
+            <Link href="/dashboard/ehb/ruangan/plotting" className="flex items-center gap-2 bg-white border text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">
+              <MapPin className="w-4 h-4" /> Auto Plotting
+            </Link>
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4" /> Tambah Ruangan
+            </button>
+          </div>
+        )}
+      />
 
       {jamGroups.length > 0 && (
         <div className="flex gap-2 border-b">

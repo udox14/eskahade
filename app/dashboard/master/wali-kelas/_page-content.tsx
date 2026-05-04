@@ -7,6 +7,7 @@ import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Down
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
@@ -192,13 +193,12 @@ export default function ManajemenGuruPage() {
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
       {/* HEADER & TABS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Briefcase className="w-6 h-6 text-indigo-600" /> Manajemen Guru & Jadwal
-          </h1>
-          <p className="text-slate-500 text-sm">Atur pengajar per kelas. Guru Malam otomatis jadi Wali Kelas.</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Manajemen Guru & Jadwal"
+          description="Atur pengajar per kelas. Guru malam otomatis jadi wali kelas."
+          className="flex-1"
+        />
         <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
           <button onClick={() => setTab('JADWAL')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'JADWAL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             <School className="w-4 h-4" /> Jadwal Kelas

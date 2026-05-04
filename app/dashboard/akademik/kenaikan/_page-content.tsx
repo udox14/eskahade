@@ -7,6 +7,7 @@ import { getMarhalahList, getKelasByMarhalah, getSantriForKenaikan, importKenaik
 import { FileSpreadsheet, Upload, Save, Loader2, CheckCircle, AlertTriangle, Download, X, HelpCircle, LayoutList, CheckSquare, Square, Users, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 
 export default function KenaikanKelasPage() {
@@ -253,11 +254,12 @@ export default function KenaikanKelasPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
       
       {/* HEADER & TOGGLE MODE */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Proses Kenaikan Kelas</h1>
-          <p className="text-slate-500 text-sm">Gunakan hasil Grading dari Wali Kelas sebagai acuan penempatan kelas baru.</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Proses Kenaikan Kelas"
+          description="Gunakan hasil grading dari wali kelas sebagai acuan penempatan kelas baru."
+          className="flex-1"
+        />
 
         {/* Custom Toggle Switch */}
         <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner w-full md:w-auto">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Search, Filter, Save, Utensils, Shirt, Settings, X, Plus, Trash2, CheckCircle2, Download, UploadCloud, FileSpreadsheet } from "lucide-react";
+import { Loader2, Search, Filter, Save, Shirt, Settings, X, Plus, Trash2, CheckCircle2, Download, UploadCloud, FileSpreadsheet } from "lucide-react";
 import { 
     getDaftarAsrama, 
     getDaftarKamar, 
@@ -14,6 +14,7 @@ import {
     getClientRestriction
 } from "./actions";
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from "@/components/dashboard/page-header";
 
 export default function LayananAsramaPage() {
   const confirm = useConfirm()
@@ -269,22 +270,19 @@ export default function LayananAsramaPage() {
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 pb-24">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
-                        <Utensils className="w-8 h-8 text-emerald-600" />
-                        Katering & Laundry
-                    </h1>
-                    <p className="text-slate-500 mt-1">Pemetaan tempat makan dan mencuci santri (Batch Mode).</p>
-                </div>
-                <button 
-                    onClick={() => setShowModalJasa(true)}
-                    className="flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-lg hover:bg-slate-700 transition"
-                >
-                    <Settings className="w-4 h-4" />
-                    <span className="font-semibold text-sm">Penyedia Jasa</span>
-                </button>
-            </div>
+            <DashboardPageHeader
+                title="Katering & Laundry"
+                description="Pemetaan tempat makan dan mencuci santri dalam mode batch."
+                action={(
+                    <button 
+                        onClick={() => setShowModalJasa(true)}
+                        className="flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-lg hover:bg-slate-700 transition"
+                    >
+                        <Settings className="w-4 h-4" />
+                        <span className="font-semibold text-sm">Penyedia Jasa</span>
+                    </button>
+                )}
+            />
 
             {/* Filter Section */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -12,6 +12,7 @@ import {
 } from './actions'
 import { ArrowLeft, Check, CheckCircle, Loader2, Minus, Package, Plus, Search, ShoppingCart, Ticket, User, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type UnitUPK = 'PUTRA' | 'PUTRI'
 
@@ -226,10 +227,11 @@ export default function KasirUPKPage() {
   if (!unit) {
     return (
       <div className="max-w-5xl mx-auto pb-20 space-y-6">
-        <div className="border-b pb-4">
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-blue-600" /> Kasir UPK</h1>
-          <p className="text-sm text-slate-500">Pilih unit untuk memulai pencatatan dan pembayaran.</p>
-        </div>
+        <DashboardPageHeader
+          title="Kasir UPK"
+          description="Pilih unit untuk memulai pencatatan dan pembayaran."
+          className="border-b pb-4"
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button onClick={() => pilihUnit('PUTRA')} className="bg-white border rounded-xl p-8 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors">
             <p className="text-3xl font-extrabold text-blue-700">UPK Putra</p>
@@ -246,19 +248,20 @@ export default function KasirUPKPage() {
 
   return (
     <div className="max-w-[1500px] mx-auto pb-28 space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b pb-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => { setUnit(null); resetCatat() }} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200"><ArrowLeft className="w-4 h-4" /></button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Kasir UPK {unit === 'PUTRA' ? 'Putra' : 'Putri'}</h1>
-            <p className="text-sm text-slate-500">Nomor antrian harian, pencatatan pesanan, dan pembayaran.</p>
+      <DashboardPageHeader
+        title={`Kasir UPK ${unit === 'PUTRA' ? 'Putra' : 'Putri'}`}
+        description="Nomor antrian harian, pencatatan pesanan, dan pembayaran."
+        className="border-b pb-4"
+        action={(
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => { setUnit(null); resetCatat() }} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200"><ArrowLeft className="w-4 h-4" /></button>
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => setMode('CATAT')} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'CATAT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Pencatat</button>
+              <button onClick={() => { setMode('KASIR'); loadAntrian() }} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'KASIR' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Kasir</button>
+            </div>
           </div>
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-          <button onClick={() => setMode('CATAT')} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'CATAT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Pencatat</button>
-          <button onClick={() => { setMode('KASIR'); loadAntrian() }} className={`px-4 py-2 rounded-md text-sm font-bold ${mode === 'KASIR' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Kasir</button>
-        </div>
-      </div>
+        )}
+      />
 
       {lastNomor && mode === 'CATAT' && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">

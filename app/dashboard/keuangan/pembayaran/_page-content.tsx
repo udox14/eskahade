@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { cariSantriKeuangan, getInfoTagihan, bayarTagihan, getMonitoringPembayaran, bayarLunasSetahun } from './actions'
-import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Coins, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
+import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
@@ -183,22 +184,17 @@ export default function LoketPembayaranPage() {
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       
       {/* HEADER GLOBAL */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-            <div className="bg-indigo-100 p-3 rounded-full text-indigo-700"><Coins className="w-6 h-6"/></div>
-            <div>
-                <h1 className="text-2xl font-bold text-slate-800">Loket Keuangan Pusat</h1>
-                <p className="text-slate-500 text-sm">Penerimaan Uang Bangunan & Tagihan Tahunan.</p>
-            </div>
-        </div>
-        
-        {/* TAHUN SELECTOR GLOBAL */}
-        <div className="flex items-center gap-2 bg-white border p-1 rounded-lg shadow-sm">
-            <button onClick={() => setTahunTagihan(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">-</button>
-            <span className="font-mono font-bold text-indigo-700 px-2">{tahunTagihan}</span>
-            <button onClick={() => setTahunTagihan(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">+</button>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Loket Keuangan Pusat"
+        description="Penerimaan Uang Bangunan dan tagihan tahunan."
+        action={(
+          <div className="flex items-center gap-2 bg-white border p-1 rounded-lg shadow-sm">
+              <button onClick={() => setTahunTagihan(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">-</button>
+              <span className="font-mono font-bold text-indigo-700 px-2">{tahunTagihan}</span>
+              <button onClick={() => setTahunTagihan(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">+</button>
+          </div>
+        )}
+      />
 
       {/* VIEW 1: TABEL MONITORING & PENCARIAN */}
       {!selectedSantri ? (

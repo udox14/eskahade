@@ -23,6 +23,7 @@ import {
   hapusPemasukanUPK,
   simpanPemasukanUPK,
 } from './actions'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type KategoriPemasukan = 'SETORAN_PENJUALAN' | 'PINJAMAN_MODAL' | 'LAINNYA'
 
@@ -211,31 +212,30 @@ export default function PemasukanUPKPage() {
 
   return (
     <div className="space-y-6 max-w-[1500px] mx-auto pb-24">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-emerald-600" /> Pemasukan
-          </h1>
-          <p className="text-slate-500 text-sm">Catatan uang fisik, setoran harian, dan pinjaman modal UPK.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative">
-            <CalendarDays className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="date"
-              value={tanggal}
-              onChange={e => setTanggal(e.target.value)}
-              className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm font-bold bg-white"
-            />
+      <DashboardPageHeader
+        title="Pemasukan"
+        description="Catatan uang fisik, setoran harian, dan pinjaman modal UPK."
+        className="border-b pb-4"
+        action={(
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative">
+              <CalendarDays className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="date"
+                value={tanggal}
+                onChange={e => setTanggal(e.target.value)}
+                className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm font-bold bg-white"
+              />
+            </div>
+            <button onClick={loadData} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
+              <RefreshCw className="w-4 h-4" /> Muat
+            </button>
+            <button onClick={() => openTambah('SETORAN_PENJUALAN')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold">
+              <Plus className="w-4 h-4" /> Catat Pemasukan
+            </button>
           </div>
-          <button onClick={loadData} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
-            <RefreshCw className="w-4 h-4" /> Muat
-          </button>
-          <button onClick={() => openTambah('SETORAN_PENJUALAN')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold">
-            <Plus className="w-4 h-4" /> Catat Pemasukan
-          </button>
-        </div>
-      </div>
+        )}
+      />
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
         <div className="bg-white border rounded-lg p-4">

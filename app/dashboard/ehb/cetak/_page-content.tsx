@@ -12,6 +12,7 @@ import { TempelanRuanganView } from './_view-tempelan-ruangan'
 import { JadwalMengawasView } from './_view-jadwal-mengawas'
 import { JadwalEhbView } from './_view-jadwal-ehb'
 import { PlaceholderView } from './_shared'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,11 +53,11 @@ export default function CetakEhbPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Printer className="w-7 h-7 text-indigo-600" /> Cetak Administrasi EHB
-        </h1>
-      </div>
+      <DashboardPageHeader
+        title="Cetak Administrasi EHB"
+        description="Pilih dokumen administrasi yang akan dicetak."
+        className="border-b pb-4"
+      />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {MENU_ITEMS.map(item => {
           const Icon = item.icon

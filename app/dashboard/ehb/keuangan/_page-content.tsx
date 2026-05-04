@@ -38,6 +38,7 @@ import {
 } from './actions'
 import { FONT } from '../cetak/_shared'
 import { formatDateKeyWib, shortDateWib } from '../_date-utils'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type DraftRabItem = RabItemInput & {
   draft_id: string
@@ -1646,15 +1647,11 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
 
   return (
     <div className="max-w-7xl mx-auto pb-20 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-3">
-            <Wallet className="w-3.5 h-3.5" /> {event.nama}
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800">Keuangan EHB</h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola rencana anggaran, transaksi, dan honorarium EHB.</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Keuangan EHB"
+        description="Kelola rencana anggaran, transaksi, dan honorarium EHB untuk event aktif."
+        className="border-b pb-5"
+      />
 
       <div className="bg-white border rounded-2xl p-1 flex flex-wrap gap-1 w-fit">
         {[

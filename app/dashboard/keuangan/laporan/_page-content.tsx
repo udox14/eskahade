@@ -6,6 +6,7 @@ import { FileText, Calendar, Download, Loader2, TrendingUp, Building2, HeartPuls
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function LaporanKeuanganPage() {
   const [tahun, setTahun] = useState(new Date().getFullYear())
@@ -62,47 +63,45 @@ export default function LaporanKeuanganPage() {
     <div className="space-y-8 max-w-7xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-emerald-600"/> Laporan Keuangan
-          </h1>
-          <p className="text-slate-500 text-sm">Rekapitulasi Arus Kas & Monitoring Tagihan.</p>
-        </div>
+      <DashboardPageHeader
+        title="Laporan Keuangan"
+        description="Rekapitulasi arus kas dan monitoring tagihan."
+        className="border-b pb-4"
+        action={(
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+              <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">-</button>
+              <span className="px-2 font-mono font-bold text-emerald-700 flex items-center gap-2">
+                <Calendar className="w-4 h-4"/> {tahun}
+              </span>
+              <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">+</button>
+            </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-            <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">-</button>
-            <span className="px-2 font-mono font-bold text-emerald-700 flex items-center gap-2">
-              <Calendar className="w-4 h-4"/> {tahun}
-            </span>
-            <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">+</button>
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
+                isDirty || !data
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+                : <><Search className="w-4 h-4"/> {data ? (isDirty ? 'Perbarui' : 'Muat Ulang') : 'Tampilkan'}</>
+              }
+            </button>
+
+            <button
+              onClick={handleExport}
+              disabled={!data?.list?.length}
+              className="bg-white border text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-slate-50"
+            >
+              <Download className="w-4 h-4"/> Export Excel
+            </button>
           </div>
-
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
-              isDirty || !data
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
-              : <><Search className="w-4 h-4"/> {data ? (isDirty ? 'Perbarui' : 'Muat Ulang') : 'Tampilkan'}</>
-            }
-          </button>
-
-          <button
-            onClick={handleExport}
-            disabled={!data?.list?.length}
-            className="bg-white border text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-slate-50"
-          >
-            <Download className="w-4 h-4"/> Export Excel
-          </button>
-        </div>
-      </div>
+        )}
+      />
 
       {/* EMPTY STATE */}
       {!data && !loading && (

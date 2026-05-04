@@ -26,6 +26,7 @@ import {
   type PembuatSoalRow,
 } from './actions'
 import { FONT } from '../cetak/_shared'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const INTI = [
   { key: 'ketua', label: 'Ketua' },
@@ -544,9 +545,11 @@ export default function KepanitiaanPageContent() {
   if (loading) return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   if (!event) return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><UserCog className="w-7 h-7 text-indigo-600" /> Kepanitiaan EHB</h1>
-      </div>
+      <DashboardPageHeader
+        title="Kepanitiaan EHB"
+        description="Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB."
+        className="border-b pb-4"
+      />
       <div className="bg-amber-50 text-amber-800 p-4 rounded-xl flex items-center gap-3">
         <AlertTriangle className="w-5 h-5 shrink-0" />
         <p className="text-sm font-medium">Belum ada event EHB yang aktif.</p>
@@ -556,14 +559,11 @@ export default function KepanitiaanPageContent() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <UserCog className="w-7 h-7 text-indigo-600" /> Kepanitiaan EHB
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB.</p>
-        </div>
-        {activeTab === 'panitia' ? (
+      <DashboardPageHeader
+        title="Kepanitiaan EHB"
+        description="Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB."
+        className="border-b pb-4"
+        action={activeTab === 'panitia' ? (
           <button onClick={() => handlePrint()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg">
             <Printer className="w-4 h-4" /> Cetak Organigram
           </button>
@@ -572,7 +572,7 @@ export default function KepanitiaanPageContent() {
             {savingSoal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Pembuat Soal
           </button>
         )}
-      </div>
+      />
 
       <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-3 flex items-center gap-3">
         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />

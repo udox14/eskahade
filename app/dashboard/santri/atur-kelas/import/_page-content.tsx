@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { importPenempatanKelas } from './actions'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function ImportKelasPage() {
   const confirm = useConfirm()
@@ -79,15 +80,16 @@ export default function ImportKelasPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         {/* FIX: Ganti Link href ke button router.back() */}
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Import Batch Penempatan Kelas</h1>
-          <p className="text-slate-500 text-sm">Upload hasil rapat pembagian kelas (Excel).</p>
-        </div>
+        <DashboardPageHeader
+          title="Import Batch Penempatan Kelas"
+          description="Upload hasil rapat pembagian kelas dari Excel."
+          className="flex-1"
+        />
       </div>
 
       <div className="bg-white p-6 rounded-xl border shadow-sm">

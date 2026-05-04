@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronLeft, Construction } from 'lucide-react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export const FONT = '"Times New Roman", Times, serif'
 
@@ -19,15 +20,16 @@ export function parseJamGroup(jamGroup: string): string {
 
 export function PageHeader({ title, onBack, subtitle = 'Cetak Administrasi EHB' }: { title: string; onBack: () => void; subtitle?: string }) {
   return (
-    <div className="border-b pb-4 flex items-center gap-3">
-      <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
-        <p className="text-sm text-slate-500">{subtitle}</p>
-      </div>
-    </div>
+    <DashboardPageHeader
+      title={title}
+      description={subtitle}
+      className="border-b pb-4"
+      action={(
+        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+    />
   )
 }
 

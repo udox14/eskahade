@@ -27,6 +27,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type SantriRow = {
   id: string
@@ -508,15 +509,10 @@ export default function SantriNonaktifPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-16 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-          <UserMinus className="w-6 h-6 text-amber-600" />
-          Nonaktif Sementara
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Kelola santri yang pulang sementara setelah pelepasan dan akan aktif kembali saat evaluasi.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Nonaktif Sementara"
+        description="Kelola santri yang pulang sementara setelah pelepasan dan akan aktif kembali saat evaluasi."
+      />
 
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">

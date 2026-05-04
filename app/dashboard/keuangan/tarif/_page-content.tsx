@@ -4,8 +4,9 @@ import React from 'react'
 
 import { useState, useEffect } from 'react'
 import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
-import { Save, Settings, DollarSign, History, Loader2, Edit } from 'lucide-react'
+import { Save, DollarSign, History, Loader2, Edit } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function TarifPage() {
   // State Form
@@ -69,15 +70,10 @@ export default function TarifPage() {
     <div className="space-y-8 max-w-6xl mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex items-center gap-4">
-        <div className="bg-emerald-100 p-3 rounded-full text-emerald-700">
-          <Settings className="w-6 h-6"/>
-        </div>
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800">Pengaturan Tarif Angkatan</h1>
-           <p className="text-slate-500 text-sm">Tentukan besaran biaya masuk & tahunan berdasarkan tahun masuk santri.</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Pengaturan Tarif Angkatan"
+        description="Tentukan besaran biaya masuk dan tahunan berdasarkan tahun masuk santri."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          

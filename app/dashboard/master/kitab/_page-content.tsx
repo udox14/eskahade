@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function MasterKitabPage() {
   const confirm = useConfirm()
@@ -133,13 +134,12 @@ export default function MasterKitabPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Book className="w-6 h-6 text-emerald-600"/> Manajemen Kitab
-           </h1>
-           <p className="text-slate-500 text-sm">Database kitab kuning per marhalah dan mapel. Harga UPK dikelola di Katalog UPK.</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Manajemen Kitab"
+          description="Database kitab kuning per marhalah dan mapel. Harga UPK dikelola di Katalog UPK."
+          className="flex-1"
+        />
         
         <div className="flex bg-slate-100 p-1 rounded-lg">
            <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>

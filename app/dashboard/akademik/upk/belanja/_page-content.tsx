@@ -15,6 +15,7 @@ import {
 } from './actions'
 import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type KatalogItem = {
   id: number
@@ -256,23 +257,24 @@ export default function BelanjaUPKPage() {
 
   return (
     <div className="max-w-[1500px] mx-auto pb-24 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><ShoppingBag className="w-6 h-6 text-emerald-600" /> Belanja</h1>
-          <p className="text-sm text-slate-500">Rencana belanja, pembelian kitab, penambahan stok, dan hutang toko.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-white border rounded-lg px-4 py-2">
-            <p className="text-[11px] font-bold uppercase text-slate-400">Belanja</p>
-            <p className="font-extrabold text-slate-800">{belanjaList.length}</p>
+      <DashboardPageHeader
+        title="Belanja"
+        description="Rencana belanja, pembelian kitab, penambahan stok, dan hutang toko."
+        className="border-b pb-4"
+        action={(
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white border rounded-lg px-4 py-2">
+              <p className="text-[11px] font-bold uppercase text-slate-400">Belanja</p>
+              <p className="font-extrabold text-slate-800">{belanjaList.length}</p>
+            </div>
+            <div className="bg-white border rounded-lg px-4 py-2">
+              <p className="text-[11px] font-bold uppercase text-slate-400">Hutang</p>
+              <p className="font-extrabold text-red-700">{rupiah(totalHutang)}</p>
+            </div>
+            <button onClick={loadData} className="bg-slate-100 rounded-lg px-4 py-2 font-bold text-sm flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4" /> Muat</button>
           </div>
-          <div className="bg-white border rounded-lg px-4 py-2">
-            <p className="text-[11px] font-bold uppercase text-slate-400">Hutang</p>
-            <p className="font-extrabold text-red-700">{rupiah(totalHutang)}</p>
-          </div>
-          <button onClick={loadData} className="bg-slate-100 rounded-lg px-4 py-2 font-bold text-sm flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4" /> Muat</button>
-        </div>
-      </div>
+        )}
+      />
 
       <div className="flex bg-slate-100 p-1 rounded-lg w-full md:w-fit">
         <button onClick={() => setTab('RENCANA')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold ${tab === 'RENCANA' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Rencana</button>

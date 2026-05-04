@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import Pagination from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import * as XLSX from 'xlsx'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const LIST_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
@@ -417,14 +418,15 @@ export default function PerizinanPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       {/* HEADER */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-900">Perizinan Santri</h1>
-          <p className="text-slate-500 text-sm">Monitoring santri keluar/masuk komplek dan pulang.</p>
-        </div>
+        <DashboardPageHeader
+          title="Perizinan Santri"
+          description="Monitoring santri keluar, masuk komplek, dan pulang."
+          className="flex-1"
+        />
         <div className="flex gap-2">
           <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
             <Settings className="w-4 h-4" /> Alasan

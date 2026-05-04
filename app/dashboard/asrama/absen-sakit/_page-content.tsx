@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   cariSantriSakit,
   getDaftarAsramaSakit,
@@ -318,11 +319,12 @@ export default function DataSakitPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-24 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Data Sakit</h1>
-          <p className="text-sm text-slate-500 mt-1">Input sekali, update bila ada perubahan, lalu tandai sembuh ketika sudah pulih.</p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
+        <DashboardPageHeader
+          title="Data Sakit"
+          description="Input sekali, update bila ada perubahan, lalu tandai sembuh ketika sudah pulih."
+          className="flex-1"
+        />
         <button
           onClick={openCatatModal}
           disabled={!selectedAsrama}

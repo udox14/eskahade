@@ -17,6 +17,7 @@ import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 function fmtTgl(s: string) {
   try { return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale }) }
@@ -681,15 +682,10 @@ export default function KeamananPage() {
 
   return (
     <div className="space-y-5 pb-16">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-            <ShieldAlert className="w-4 h-4 text-rose-600" />
-          </span>
-          Pelanggaran
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 ml-10">Catatan disiplin santri</p>
-      </div>
+      <DashboardPageHeader
+        title="Pelanggaran"
+        description="Catatan disiplin santri."
+      />
       <div className="flex gap-0.5 bg-slate-100 p-1 rounded-2xl">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}

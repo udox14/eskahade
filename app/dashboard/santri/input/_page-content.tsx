@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './actions'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
@@ -157,14 +158,15 @@ export default function InputSantriPage() {
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <div>
-          <h1 className="text-2xl font-bold">Tambah Data Santri</h1>
-          <p className="text-slate-500 text-sm">Input satu per satu atau sekaligus via Excel.</p>
-        </div>
+        <DashboardPageHeader
+          title="Tambah Data Santri"
+          description="Input data santri satu per satu atau sekaligus via Excel."
+          className="flex-1"
+        />
       </div>
 
       {/* TAB SWITCHER */}

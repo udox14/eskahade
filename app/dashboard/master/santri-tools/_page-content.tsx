@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ['', 'AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const JENIS_BIAYA_LIST = ['KESEHATAN', 'EHB', 'EKSKUL', 'BANGUNAN']
@@ -163,10 +164,10 @@ export default function SantriToolsPage() {
 
       {/* HEADER */}
       <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Users className="w-7 h-7 text-indigo-600"/> Manajemen Santri
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">Operasi massal data santri — naik kelas sekolah & manajemen pembebasan.</p>
+        <DashboardPageHeader
+          title="Manajemen Santri"
+          description="Operasi massal data santri, naik kelas sekolah, dan manajemen pembebasan."
+        />
       </div>
 
       {/* TABS */}

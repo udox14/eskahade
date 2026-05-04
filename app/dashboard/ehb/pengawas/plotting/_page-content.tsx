@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function PlottingPengawasPage() {
   const confirm = useConfirm()
@@ -93,17 +94,16 @@ export default function PlottingPengawasPage() {
 
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex items-center gap-4">
-        <Link href="/dashboard/ehb/pengawas" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
-          <ArrowLeft className="w-5 h-5"/>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            Auto Plotting Jadwal Pengawas
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Penjadwalan otomatis pengawas EHB dengan mempertimbangkan status senioritas dan keadilan (fairness).</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Auto Plotting Jadwal Pengawas"
+        description="Penjadwalan otomatis pengawas EHB dengan mempertimbangkan status senioritas dan keadilan."
+        className="border-b pb-4"
+        action={(
+          <Link href="/dashboard/ehb/pengawas" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-800">
+            <ArrowLeft className="w-5 h-5"/>
+          </Link>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Status Panel */}

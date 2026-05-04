@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getKelasList, getDataGrading, simpanGradingBatch } from './actions'
 import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet } from 'lucide-react'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // Memastikan interface TypeScript untuk Library XLSX via window
 
@@ -210,15 +211,10 @@ export default function GradingKelasPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
-            <TrendingUp className="w-7 h-7 text-indigo-600" />
-            Grading
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">Sistem Rekomendasi Penentuan Grade Nahwu & Sharaf (A/B/C)</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Grading"
+        description="Sistem rekomendasi penentuan grade Nahwu dan Sharaf (A/B/C)."
+      />
 
       {/* FILTER KELAS */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">

@@ -6,6 +6,7 @@ import { Printer, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useReactToPrint } from 'react-to-print'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const ROOM_NUMBERS = Array.from({ length: 37 }, (_, i) => i + 1)
@@ -88,10 +89,11 @@ export default function CetakLaporanSensus() {
       
       {/* KONTROL PANEL */}
       <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div>
-              <h1 className="text-xl font-bold text-slate-800">Cetak Laporan Bulanan</h1>
-              <p className="text-sm text-slate-500">Laporan Sensus Penduduk (F4 Landscape)</p>
-          </div>
+          <DashboardPageHeader
+              title="Cetak Laporan Bulanan"
+              description="Laporan sensus penduduk format F4 landscape."
+              className="flex-1"
+          />
           <div className="flex gap-2">
               <select value={bulan} onChange={e=>setBulan(Number(e.target.value))} className="p-2 border rounded font-bold text-slate-700">
                 {Array.from({length:12},(_,i)=>i+1).map(b => (

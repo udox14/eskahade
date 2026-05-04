@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { formatDateRangeWib, fullDateWib, getDatesBetweenWib, parseDateKeyWib } from '../_date-utils'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function JadwalEhbPage() {
   const confirm = useConfirm()
@@ -356,12 +357,11 @@ export default function JadwalEhbPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <CalendarDays className="w-7 h-7 text-indigo-600"/> Pengaturan Jadwal EHB
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">Kelola event EHB, sesi, dan jadwal pelajaran yang diujikan.</p>
-      </div>
+      <DashboardPageHeader
+        title="Pengaturan Jadwal EHB"
+        description="Kelola event EHB, sesi, dan jadwal pelajaran yang diujikan."
+        className="border-b pb-4"
+      />
 
       <div className="flex flex-wrap gap-2">
         {renderTabBtn('event', <BookOpen className="w-4 h-4"/>, '1. Event EHB')}

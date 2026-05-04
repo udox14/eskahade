@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const JAJAN_OPTS = [5000, 10000, 15000, 20000]
@@ -198,43 +199,48 @@ export default function UangJajanPage() {
   return (
     <div className="space-y-6 max-w-lg mx-auto pb-32">
 
-      {/* HEADER & STATS */}
-      <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-yellow-300"/> Uang Jajan
-              </h1>
-              <div className={`mt-2 p-1 rounded-lg inline-flex items-center gap-2 ${userAsrama ? 'bg-emerald-800/50 border border-emerald-700' : 'bg-white/10'}`}>
-                {userAsrama ? <Lock className="w-3 h-3 text-emerald-400"/> : <Home className="w-3 h-3 text-emerald-200"/>}
-                <select
-                  value={asrama}
-                  onChange={e => setAsrama(e.target.value)}
-                  disabled={!!userAsrama}
-                  className="bg-transparent text-xs font-bold outline-none cursor-pointer [&>option]:text-black"
-                >
-                  {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <DashboardPageHeader
+            title="Uang Jajan"
+            description="Kelola saldo, topup, dan pengeluaran uang jajan santri per kamar."
+            className="flex-1"
+          />
+          <div className={`p-2 rounded-lg border flex items-center gap-2 w-fit ${userAsrama ? 'bg-emerald-50 border-emerald-200' : 'bg-white'}`}>
+            {userAsrama ? <Lock className="w-4 h-4 text-emerald-700"/> : <Home className="w-4 h-4 text-slate-400"/>}
+            <select
+              value={asrama}
+              onChange={e => setAsrama(e.target.value)}
+              disabled={!!userAsrama}
+              className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed"
+            >
+              {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* HEADER & STATS */}
+        <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div className="text-right sm:ml-auto">
+                <p className="text-xs text-emerald-300 uppercase font-bold">Uang Fisik (Saldo)</p>
+                {loadingStats
+                  ? <Loader2 className="w-5 h-5 animate-spin ml-auto mt-1"/>
+                  : <p className="text-2xl font-mono font-bold">Rp {(stats?.uang_fisik || 0).toLocaleString('id-ID')}</p>
+                }
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-emerald-300 uppercase font-bold">Uang Fisik (Saldo)</p>
-              {loadingStats
-                ? <Loader2 className="w-5 h-5 animate-spin ml-auto mt-1"/>
-                : <p className="text-2xl font-mono font-bold">Rp {(stats?.uang_fisik || 0).toLocaleString('id-ID')}</p>
-              }
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
-            <div className="bg-white/10 p-2 rounded flex items-center justify-between">
-              <span className="flex gap-1 items-center opacity-80"><TrendingUp className="w-3 h-3"/> Masuk</span>
-              <span className="font-bold text-green-300">+{(stats?.masuk_bulan_ini || 0).toLocaleString()}</span>
-            </div>
-            <div className="bg-white/10 p-2 rounded flex items-center justify-between">
-              <span className="flex gap-1 items-center opacity-80"><TrendingDown className="w-3 h-3"/> Keluar</span>
-              <span className="font-bold text-yellow-300">-{(stats?.keluar_bulan_ini || 0).toLocaleString()}</span>
+            <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
+              <div className="bg-white/10 p-2 rounded flex items-center justify-between">
+                <span className="flex gap-1 items-center opacity-80"><TrendingUp className="w-3 h-3"/> Masuk</span>
+                <span className="font-bold text-green-300">+{(stats?.masuk_bulan_ini || 0).toLocaleString()}</span>
+              </div>
+              <div className="bg-white/10 p-2 rounded flex items-center justify-between">
+                <span className="flex gap-1 items-center opacity-80"><TrendingDown className="w-3 h-3"/> Keluar</span>
+                <span className="font-bold text-yellow-300">-{(stats?.keluar_bulan_ini || 0).toLocaleString()}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -18,6 +18,7 @@ import {
 } from './actions'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
@@ -189,14 +190,12 @@ export default function MutasiAsramaClient({
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <ArrowLeftRight className="w-7 h-7 text-emerald-600"/> Mutasi Asrama
-          </h1>
-          <p className="text-sm text-slate-500">Pindahkan santri antar asrama atau assign santri baru ke asrama</p>
-        </div>
-        
+      <div className="flex flex-col sm:flex-row gap-4 border-b pb-4 sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Mutasi Asrama"
+          description="Pindahkan santri antar asrama atau assign santri baru ke asrama."
+          className="flex-1"
+        />
         <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
           <button 
             onClick={() => setTab('mutasi')}

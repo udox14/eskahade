@@ -9,6 +9,7 @@ import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit,
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
@@ -408,15 +409,10 @@ export default function ManajemenUserPage() {
       
       {/* HEADER */}
       <div className="border-b pb-4 space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="bg-blue-100 p-3 rounded-full text-blue-700">
-            <UserCog className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Manajemen Pengguna</h1>
-            <p className="text-slate-500 text-sm">Kelola akun, reset password, dan hak akses.</p>
-          </div>
-        </div>
+        <DashboardPageHeader
+          title="Manajemen Pengguna"
+          description="Kelola akun, reset password, dan hak akses."
+        />
         
         <div className="flex flex-col xl:flex-row gap-3 xl:items-end">
           <div className="flex flex-col sm:flex-row gap-2 flex-1">

@@ -5,6 +5,7 @@ import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger, getTahunAjara
 import { FileSpreadsheet, Loader2, Search, Trophy, Calculator, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 
 export default function LegerNilaiPage() {
@@ -99,11 +100,12 @@ export default function LegerNilaiPage() {
   return (
     <div className="space-y-6 max-w-[95vw] mx-auto pb-20">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800">Leger Nilai</h1>
-           <p className="text-slate-500 text-sm">Rekapitulasi nilai per kelas (Matrix View).</p>
-        </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Leger Nilai"
+          description="Rekapitulasi nilai per kelas dengan tampilan matrix."
+          className="flex-1"
+        />
         
         <div className="flex gap-2">
             <button 

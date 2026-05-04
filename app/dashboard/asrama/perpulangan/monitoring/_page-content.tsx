@@ -9,10 +9,11 @@ import {
   getMonitoringPerKamar, getMonitoringSantriKamar,
 } from './actions'
 import {
-  LayoutList, ChevronDown, ChevronRight, Loader2, CalendarRange,
+  ChevronDown, ChevronRight, Loader2, CalendarRange,
   Bus, Car, RefreshCw, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 function PctBar({ val, total, color }: { val: number; total: number; color: string }) {
   const pct = total > 0 ? Math.round((val / total) * 100) : 0
@@ -279,36 +280,32 @@ export default function MonitoringPerpulanganPage() {
     <div className="max-w-2xl mx-auto pb-16 space-y-4">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <LayoutList className="w-5 h-5 text-blue-600" /> Monitoring Perpulangan
-          </h1>
-          {periode && (
-            <p className="text-sm text-slate-500 mt-0.5">{periode.nama_periode}</p>
-          )}
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {canTandaiTelat && periode && (
+      <DashboardPageHeader
+        title="Monitoring Perpulangan"
+        description={periode?.nama_periode ?? 'Pantau status perpulangan dan kedatangan santri.'}
+        action={(
+          <div className="flex gap-2 flex-wrap">
+            {canTandaiTelat && periode && (
+              <button
+                onClick={handleTandaiTelat}
+                disabled={tandaiLoading}
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {tandaiLoading ? 'Memproses...' : 'Tandai Telat'}
+              </button>
+            )}
             <button
-              onClick={handleTandaiTelat}
-              disabled={tandaiLoading}
-              className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors"
+              onClick={load}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
             >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              {tandaiLoading ? 'Memproses...' : 'Tandai Telat'}
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Perbarui
             </button>
-          )}
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-60 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Perbarui
-          </button>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
       {loading ? (
         <div className="flex justify-center py-16 gap-2 text-slate-400">

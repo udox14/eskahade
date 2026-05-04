@@ -5,6 +5,7 @@ import { getSessionRekap, getRekapBerjamaahAlfaRange, getKamarList, getSantriByA
 import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
 import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -198,13 +199,12 @@ export default function RekapAbsenBerjamaahPage() {
 
       {/* HEADER */}
       <div className="flex flex-col gap-3 border-b pb-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <Flame className="w-6 h-6 text-teal-600"/> Rekap Absen Berjamaah
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">Verifikasi alfa shalat berjamaah per minggu</p>
-          </div>
+        <div className="flex justify-between items-start gap-4">
+          <DashboardPageHeader
+            title="Rekap Absen Berjamaah"
+            description="Verifikasi alfa shalat berjamaah per minggu."
+            className="flex-1"
+          />
           {hasLoaded && !loading && !isPutri && (
             <button
               onClick={() => setShowImportModal(true)}

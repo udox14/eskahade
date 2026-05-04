@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import { fullDateWib } from '../_date-utils'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function PengawasEhbPage() {
   const confirm = useConfirm()
@@ -262,17 +263,16 @@ export default function PengawasEhbPage() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
-      <div className="border-b pb-4 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <UserCheck className="w-7 h-7 text-indigo-600"/> Pengaturan Pengawas
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola daftar pengawas ujian dan jadwal tugas mereka.</p>
-        </div>
-        <Link href="/dashboard/ehb/pengawas/plotting" className="flex items-center gap-2 bg-white border text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">
-          <Users className="w-4 h-4"/> Auto Plotting Pengawas
-        </Link>
-      </div>
+      <DashboardPageHeader
+        title="Pengaturan Pengawas"
+        description="Kelola daftar pengawas ujian dan jadwal tugas mereka."
+        className="border-b pb-4"
+        action={(
+          <Link href="/dashboard/ehb/pengawas/plotting" className="flex items-center gap-2 bg-white border text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">
+            <Users className="w-4 h-4"/> Auto Plotting Pengawas
+          </Link>
+        )}
+      />
 
       <div className="flex gap-2">
           <button 

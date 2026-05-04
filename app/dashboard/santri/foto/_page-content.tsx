@@ -4,8 +4,9 @@ import React from 'react'
 
 import { useState, useRef } from 'react'
 import { getSantriForFoto, uploadFotoSantri } from './actions'
-import { Search, Upload, Image as ImageIcon, RefreshCw, Loader2, Home, Filter } from 'lucide-react'
+import { Search, Upload, RefreshCw, Loader2, Home, Filter } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
@@ -125,13 +126,11 @@ export default function ManajemenFotoPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       
       {/* HEADER & FILTER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <ImageIcon className="w-6 h-6 text-pink-600"/> Manajemen Foto Santri
-           </h1>
-           <p className="text-slate-500 text-sm">Mode cepat upload foto (Kompresi Otomatis).</p>
-        </div>
+      <div className="border-b pb-4">
+        <DashboardPageHeader
+          title="Manajemen Foto Santri"
+          description="Mode cepat upload foto dengan kompresi otomatis."
+        />
       </div>
 
       {/* FILTER BAR */}

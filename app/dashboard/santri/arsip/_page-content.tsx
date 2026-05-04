@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type Grup = {
   key: string
@@ -250,16 +251,15 @@ export default function ArsipSantriPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-28">
 
       {/* HEADER */}
-      <div className="flex items-center gap-4 border-b pb-4">
+      <div className="flex items-start gap-4 border-b pb-4">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
           <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Archive className="w-6 h-6 text-purple-600" /> Arsip Alumni
-          </h1>
-          <p className="text-slate-500 text-sm">Jadikan santri alumni tanpa menghapus data historis.</p>
-        </div>
+        <DashboardPageHeader
+          title="Arsip Alumni"
+          description="Jadikan santri alumni tanpa menghapus data historis."
+          className="flex-1"
+        />
         <div className="flex gap-3 text-sm">
           <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-center">
             <p className="font-bold text-blue-700">{santriTotal}</p>

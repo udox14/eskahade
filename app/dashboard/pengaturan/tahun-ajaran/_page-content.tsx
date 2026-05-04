@@ -10,6 +10,7 @@ import {
   hapusTahunAjaran,
 } from './actions'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function TahunAjaranPage() {
   const confirm = useConfirm()
@@ -72,15 +73,10 @@ export default function TahunAjaranPage() {
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
 
       {/* HEADER */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <CalendarDays className="w-7 h-7 text-green-700" />
-          Tahun Ajaran
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Kelola tahun ajaran. Hanya satu yang bisa aktif dalam satu waktu. Kelas baru otomatis terhubung ke tahun ajaran yang sedang aktif.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Tahun Ajaran"
+        description="Kelola tahun ajaran. Hanya satu yang bisa aktif dalam satu waktu, dan kelas baru otomatis terhubung ke tahun ajaran aktif."
+      />
 
       {/* INFO AKTIF */}
       {aktif && (

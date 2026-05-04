@@ -32,6 +32,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Pagination, { usePagination } from '@/components/ui/pagination'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type KatalogForm = {
   id: string
@@ -369,28 +370,27 @@ export default function KatalogUPKPage() {
 
   return (
     <div className="space-y-6 max-w-[1500px] mx-auto pb-24">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-amber-600" /> Katalog UPK
-          </h1>
-          <p className="text-slate-500 text-sm">Master barang, stok, harga beli, harga jual, dan estimasi laba UPK.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 w-full xl:w-auto">
-          <div className="bg-white border rounded-lg px-4 py-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">Total Stok</p>
-            <p className="text-lg font-extrabold text-slate-800">{summary.stok.toLocaleString('id-ID')}</p>
+      <DashboardPageHeader
+        title="Katalog UPK"
+        description="Master barang, stok, harga beli, harga jual, dan estimasi laba UPK."
+        className="border-b pb-4"
+        action={(
+          <div className="grid grid-cols-3 gap-2 w-full xl:w-auto">
+            <div className="bg-white border rounded-lg px-4 py-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Total Stok</p>
+              <p className="text-lg font-extrabold text-slate-800">{summary.stok.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="bg-white border rounded-lg px-4 py-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Modal</p>
+              <p className="text-lg font-extrabold text-blue-700">{rupiah(summary.modal)}</p>
+            </div>
+            <div className="bg-white border rounded-lg px-4 py-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Laba Bersih</p>
+              <p className="text-lg font-extrabold text-emerald-700">{rupiah(summary.labaBersih)}</p>
+            </div>
           </div>
-          <div className="bg-white border rounded-lg px-4 py-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">Modal</p>
-            <p className="text-lg font-extrabold text-blue-700">{rupiah(summary.modal)}</p>
-          </div>
-          <div className="bg-white border rounded-lg px-4 py-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">Laba Bersih</p>
-            <p className="text-lg font-extrabold text-emerald-700">{rupiah(summary.labaBersih)}</p>
-          </div>
-        </div>
-      </div>
+        )}
+      />
 
       <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">

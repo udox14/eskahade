@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, Filter, AlertCircle, Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type FilterStatus = 'SEMUA' | 'SUDAH' | 'BELUM'
 
@@ -110,11 +111,12 @@ export default function TesKlasifikasiPage() {
     <div className="max-w-6xl mx-auto pb-16 space-y-5">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Tes Klasifikasi</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Penentuan marhalah awal santri baru</p>
-        </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Tes Klasifikasi"
+          description="Penentuan marhalah awal santri baru."
+          className="flex-1"
+        />
         {hasLoaded && (
           <div className="flex items-center gap-2 text-sm">
             <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl font-semibold">

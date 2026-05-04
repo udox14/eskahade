@@ -7,10 +7,11 @@ import {
   type ExportFilter, type SortBy, type KolomExport
 } from './constants'
 import {
-  FileSpreadsheet, Filter, Download, RefreshCw,
+  Filter, Download, RefreshCw,
   ChevronDown, ChevronUp, Check, Loader2, Users, Settings2
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const KOLOM_GROUPS = [...new Set(KOLOM_TERSEDIA.map(k => k.group))]
@@ -243,16 +244,10 @@ export default function ExportSantriPage() {
   return (
     <div className="max-w-4xl mx-auto pb-16 space-y-4">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-          <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
-          Export Data Santri
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Pilih filter, kolom, dan urutan — lalu export ke Excel
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Export Data Santri"
+        description="Pilih filter, kolom, dan urutan lalu export ke Excel."
+      />
 
       {/* 1. Filter kriteria */}
       <Section title="Filter Kriteria" icon={Filter} badge={filterBadge} defaultOpen={true}>

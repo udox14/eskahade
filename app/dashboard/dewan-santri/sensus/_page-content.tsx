@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { getSensusData } from './actions'
 import { BarChart3, Users, Home, ArrowRightLeft, Loader2, BookOpen, Bed, X, User, Search } from 'lucide-react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 type SantriKamar = { id: string; nama_lengkap: string; nis: string; kelas_pesantren: string | null; sekolah: string | null; kelas_sekolah: string | null }
@@ -113,15 +114,12 @@ export default function SensusPage() {
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <BarChart3 className="w-7 h-7 text-blue-600"/> Sensus Penduduk
-          </h1>
-          <p className="text-sm text-slate-500">
-            Statistik demografi santri {asrama !== 'SEMUA' ? `Asrama ${asrama}` : 'Se-Pesantren'}
-          </p>
-        </div>
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Sensus Penduduk"
+          description={`Statistik demografi santri ${asrama !== 'SEMUA' ? `Asrama ${asrama}` : 'se-Pesantren'}.`}
+          className="flex-1"
+        />
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
             <Home className="w-4 h-4 text-slate-400"/>

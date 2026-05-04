@@ -8,6 +8,7 @@ import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Dat
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function MasterKelasPage() {
   const confirm = useConfirm()
@@ -105,11 +106,12 @@ export default function MasterKelasPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800">Manajemen Kelas & Ruangan</h1>
-           <p className="text-slate-500 text-sm">Atur struktur kelas per tahun ajaran.</p>
-        </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Manajemen Kelas & Ruangan"
+          description="Atur struktur kelas per tahun ajaran."
+          className="flex-1"
+        />
         <div className="flex bg-slate-100 p-1 rounded-lg">
            <button onClick={() => setMode('manual')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${mode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
              <List className="w-4 h-4"/> Daftar & Manual
