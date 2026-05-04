@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { getAntrianVerifikasi, simpanVerifikasiMassal, getKelasList, getAsramaList, getMarhalahList } from './actions'
 import {
   Gavel, CheckCircle, Loader2, AlertTriangle,
-  Save, ChevronLeft, ChevronRight, RefreshCw, Users, Search, Filter, ChevronDown, Calendar
+  Save, ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Calendar
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -298,10 +298,6 @@ export default function VerifikasiAbsenPage() {
           </form>
 
           <div className="flex items-center gap-1.5 flex-wrap">
-            <div className="flex items-center gap-2 mr-2 px-3 py-2 bg-slate-100 rounded-lg border border-slate-200">
-               <Users className="w-4 h-4 text-slate-500" />
-               <span className="text-xs font-bold text-slate-600">Pilih Semua:</span>
-            </div>
             {([
               { v: 'ALFA_MURNI' as VonisType, label: 'ALFA',   cls: 'bg-rose-600 text-white hover:bg-rose-700' },
               { v: 'SAKIT'      as VonisType, label: 'SAKIT',  cls: 'bg-amber-500 text-white hover:bg-amber-600' },

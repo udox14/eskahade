@@ -159,35 +159,40 @@ export default function MonitoringSetoranPage() {
         </div>
         
         {/* Filtering & Actions - Compact Flex */}
-        <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 shadow-sm rounded-lg p-1.5">
-          <div className="flex items-center">
+        <div className="grid gap-3 bg-white border border-slate-200 shadow-sm rounded-xl p-3 md:grid-cols-[auto_auto_1fr] md:items-center">
+          <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5 md:min-w-[10.5rem]">
             <button onClick={prevBulan} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
-            <div className="w-24 text-center text-sm font-semibold text-slate-700">{BULAN_NAMA[bulan].substring(0,3)} {tahun}</div>
+            <div className="px-2 text-center text-base font-semibold text-slate-700">{BULAN_NAMA[bulan]} {tahun}</div>
             <button onClick={nextBulan} disabled={tahun === now.getFullYear() && bulan === now.getMonth() + 1} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-30"><ChevronRight className="w-4 h-4"/></button>
           </div>
-          <div className="w-px h-5 bg-slate-200"></div>
-          <div className="flex items-center gap-2 px-2 text-sm text-slate-600">
-            <Banknote className="w-4 h-4 text-emerald-600" />
+
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-slate-700">
+            <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
           </div>
-          <div className="w-px h-5 bg-slate-200"></div>
-          <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 px-2">
-            <CalendarCheck className="w-4 h-4 text-blue-600" />
-            <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</label>
-            <input
-              type="month"
-              value={billingStartInput}
-              onChange={e => setBillingStartInput(e.target.value)}
-              className="h-8 rounded-md border border-slate-200 px-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button type="submit" disabled={savingBillingStart} className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
-              {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <form onSubmit={handleSimpanBillingStart} className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+              <div className="flex items-center gap-2 text-blue-700">
+                <CalendarCheck className="w-4 h-4 shrink-0" />
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</label>
+              </div>
+              <input
+                type="month"
+                value={billingStartInput}
+                onChange={e => setBillingStartInput(e.target.value)}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button type="submit" disabled={savingBillingStart} className="h-10 w-full sm:w-10 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
+                {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              </button>
+            </form>
+
+            <button onClick={load} disabled={loading} className={`w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Memuat...' : 'Tarik Data'}
             </button>
-          </form>
-          <button onClick={load} disabled={loading} className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Memuat...' : 'Tarik Data'}
-          </button>
+          </div>
         </div>
       </div>
 

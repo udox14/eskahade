@@ -427,7 +427,10 @@ export default function PerizinanPage() {
           description="Monitoring santri keluar, masuk komplek, dan pulang."
           className="flex-1"
         />
-        <div className="flex gap-2">
+      </div>
+
+      <div className="flex justify-end">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:p-2 sm:shadow-sm">
           <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
             <Settings className="w-4 h-4" /> Alasan
           </button>

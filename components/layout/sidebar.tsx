@@ -47,6 +47,52 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'Master Data': Database,
 };
 
+const MENU_TITLE_MAP: Record<string, string> = {
+  'Manajemen User': 'User',
+  'Manajemen Santri': 'Tools Santri',
+  'Manajemen Guru & Jadwal': 'Guru & Jadwal',
+  'Manajemen Kelas': 'Kelas',
+  'Manajemen Kitab': 'Kitab',
+  'Manajemen Fitur': 'Fitur Akses',
+};
+
+function getMenuTitle(title: string) {
+  return MENU_TITLE_MAP[title] ?? title;
+}
+
+const GROUP_ITEM_ORDER: Record<string, string[]> = {
+  'Master Data': [
+    'Tahun Ajaran',
+    'Kelas',
+    'Kitab',
+    'Guru & Jadwal',
+    'Tools Santri',
+    'Arsip Alumni',
+    'Periode Perpulangan',
+    'Master Pelanggaran',
+    'User',
+    'Fitur Akses',
+  ],
+};
+
+function sortGroupItems(group: string, items: FiturAkses[]) {
+  const preferredOrder = GROUP_ITEM_ORDER[group];
+  if (!preferredOrder) return items;
+
+  const rankMap = new Map(preferredOrder.map((title, index) => [title, index]));
+  return [...items].sort((a, b) => {
+    const aTitle = getMenuTitle(a.title);
+    const bTitle = getMenuTitle(b.title);
+    const aRank = rankMap.get(aTitle);
+    const bRank = rankMap.get(bTitle);
+
+    if (aRank != null && bRank != null) return aRank - bRank;
+    if (aRank != null) return -1;
+    if (bRank != null) return 1;
+    return a.urutan - b.urutan;
+  });
+}
+
 type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
 type ThemeColor = {
@@ -207,7 +253,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
   }
   const groupedMenu = GROUP_ORDER
     .filter(g => groupMap.has(g))
-    .map(g => ({ group: g, items: groupMap.get(g)! }));
+    .map(g => ({ group: g, items: sortGroupItems(g, groupMap.get(g)!) }));
 
   useEffect(() => {
     const activeGroup = groupedMenu.find(g =>
@@ -300,7 +346,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                           "text-xs tracking-normal transition-colors duration-300",
                           isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
                         )}>
-                          {fitur.title}
+                          {getMenuTitle(fitur.title)}
                         </span>
                       )}
                     </div>
@@ -380,7 +426,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                             "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-300",
                             isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
                           )} />
-                          <span className="truncate">{fitur.title}</span>
+                          <span className="truncate">{getMenuTitle(fitur.title)}</span>
                         </Link>
                       );
                     })}

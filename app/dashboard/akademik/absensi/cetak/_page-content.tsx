@@ -4,11 +4,9 @@ import { useState, useRef } from 'react'
 import { getRekapAlfaMingguan } from './actions'
 import { PemanggilanView } from './pemanggilan-view'
 import { useReactToPrint } from 'react-to-print'
-import { Printer, Search, Loader2, ArrowLeft } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Printer, Search, Loader2 } from 'lucide-react'
 
 export default function CetakPemanggilanPage() {
-  const router = useRouter()
   const [tglRef, setTglRef] = useState(new Date().toISOString().split('T')[0])
   const [tglPanggil, setTglPanggil] = useState(new Date().toISOString().split('T')[0])
   
@@ -55,14 +53,9 @@ export default function CetakPemanggilanPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6 text-slate-600" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cetak Pemanggilan</h1>
-            <p className="text-slate-500 text-sm">Rekap santri untuk sidang pemanggilan alfa</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cetak Pemanggilan</h1>
+          <p className="text-slate-500 text-sm">Rekap santri untuk sidang pemanggilan alfa</p>
         </div>
 
         {data.length > 0 && (

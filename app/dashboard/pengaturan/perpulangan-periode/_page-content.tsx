@@ -6,12 +6,13 @@ import {
   nonaktifkanPeriode, perpanjangTglDatang, hapusPeriode,
 } from './actions'
 import {
-  CalendarRange, Plus, CheckCircle, XCircle, Trash2,
+  Plus, CheckCircle, XCircle, Trash2,
   CalendarClock, Loader2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 function fmtTgl(s: string) {
   try { return format(new Date(s), 'dd MMM yyyy', { locale: localeId }) }
@@ -237,12 +238,10 @@ export default function PeriodePerpulanganPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-16 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <CalendarRange className="w-5 h-5 text-blue-600" /> Periode Perpulangan
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">Kelola jadwal perpulangan dan kedatangan santri</p>
-      </div>
+      <DashboardPageHeader
+        title="Periode Perpulangan"
+        description="Kelola jadwal perpulangan dan kedatangan santri"
+      />
 
       <FormTambah onSuccess={load} />
 

@@ -11,6 +11,7 @@ import {
   ArrowDownToLine, ArrowUpFromLine, AlertCircle, ChevronDown,
   ChevronUp, TrendingDown, TrendingUp, Minus
 } from 'lucide-react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const BULAN_NAMA = ['','Januari','Februari','Maret','April','Mei','Juni',
@@ -253,36 +254,36 @@ export default function MonitoringUangJajanPage() {
     <div className="max-w-6xl mx-auto pb-16 space-y-5">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-            <Wallet className="w-6 h-6 text-emerald-600" />
-            Monitoring Uang Jajan
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Pantau saldo & mutasi uang jajan santri</p>
-        </div>
+      <div className="space-y-4">
+        <DashboardPageHeader
+          title="Monitoring Uang Jajan"
+          description="Pantau saldo & mutasi uang jajan santri"
+        />
 
-        {/* Navigator bulan */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
-            <button onClick={prevBulan} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-              <ChevronLeft className="w-4 h-4 text-slate-600" />
-            </button>
-            <div className="min-w-[120px] text-center font-bold text-slate-800 text-sm px-1">
-              {BULAN_NAMA[bulan]} {tahun}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_104px]">
+            <div className="flex items-center justify-between gap-1 bg-white border border-slate-200 rounded-xl p-1">
+              <button onClick={prevBulan} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <ChevronLeft className="w-4 h-4 text-slate-600" />
+              </button>
+              <div className="min-w-0 flex-1 text-center font-bold text-slate-800 text-base px-1">
+                {BULAN_NAMA[bulan]} {tahun}
+              </div>
+              <button onClick={nextBulan}
+                disabled={tahun===now.getFullYear()&&bulan===now.getMonth()+1}
+                className="p-2 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30">
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
             </div>
-            <button onClick={nextBulan}
-              disabled={tahun===now.getFullYear()&&bulan===now.getMonth()+1}
-              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30">
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
+
+            <select value={tahun} onChange={e=>setTahun(Number(e.target.value))}
+              className="w-full border border-slate-200 rounded-xl px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              {tahunList.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
-          <select value={tahun} onChange={e=>setTahun(Number(e.target.value))}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            {tahunList.map(t=><option key={t} value={t}>{t}</option>)}
-          </select>
+
           <button onClick={handleTampilkan} disabled={loadingSummary||loadingTable}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2">
+            className="w-full sm:w-auto bg-emerald-600 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2">
             <RefreshCw className={`w-4 h-4 ${(loadingSummary||loadingTable)?'animate-spin':''}`} />
             Tampilkan
           </button>
@@ -343,9 +344,9 @@ export default function MonitoringUangJajanPage() {
 
       {/* ── Filter bar ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,220px)_minmax(0,180px)_auto_minmax(0,1fr)_auto] xl:items-end">
 
-          <div className="min-w-[150px]">
+          <div className="min-w-0">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
             <select value={filterAsrama}
               onChange={e=>{setFilterAsrama(e.target.value);setActiveCard(null)}}
@@ -356,7 +357,7 @@ export default function MonitoringUangJajanPage() {
           </div>
 
           {kamarList.length > 0 && (
-            <div className="min-w-[110px]">
+            <div className="min-w-0">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Kamar</label>
               <select value={filterKamar} onChange={e=>setFilterKamar(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -366,12 +367,12 @@ export default function MonitoringUangJajanPage() {
             </div>
           )}
 
-          <div>
+          <div className="min-w-0">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Saldo</label>
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+            <div className="flex w-full gap-1 bg-slate-100 p-1 rounded-xl">
               {(['SEMUA','PUNYA','KOSONG'] as FilterSaldo[]).map(f=>(
                 <button key={f} onClick={()=>setFilterSaldo(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     filterSaldo===f
                       ? f==='KOSONG' ? 'bg-white text-rose-600 shadow-sm'
                       : f==='PUNYA' ? 'bg-white text-emerald-600 shadow-sm'
@@ -384,7 +385,7 @@ export default function MonitoringUangJajanPage() {
             </div>
           </div>
 
-          <form onSubmit={e=>{e.preventDefault();setSearch(searchInput)}} className="flex-1 min-w-[180px]">
+          <form onSubmit={e=>{e.preventDefault();setSearch(searchInput)}} className="min-w-0">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400"/>
@@ -394,9 +395,9 @@ export default function MonitoringUangJajanPage() {
             </div>
           </form>
 
-          <div className="flex gap-2 items-end">
+          <div className="flex items-end gap-2">
             <button onClick={()=>loadTable(1)} disabled={loadingTable}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2">
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2 min-w-[160px]">
               <Filter className="w-4 h-4"/>
               {loadingTable?'Memuat...':'Tampilkan'}
             </button>

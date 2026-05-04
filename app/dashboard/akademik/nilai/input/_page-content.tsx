@@ -366,13 +366,18 @@ export default function InputNilaiPage() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-x-auto min-h-[260px]">
+                <div className="min-h-[260px]">
                   {!selectedKelas || !selectedMapel ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
-                      <AlertCircle className="w-10 h-10 opacity-10" />
-                      <p className="font-medium italic">Pilih Kelas dan Mata Pelajaran untuk mengisi nilai</p>
+                    <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 px-6 py-10 text-center text-slate-400">
+                      <div className="rounded-full border border-slate-100 bg-slate-50 p-3">
+                        <AlertCircle className="h-8 w-8 opacity-30" />
+                      </div>
+                      <p className="max-w-[240px] text-sm font-medium italic leading-6 sm:max-w-sm">
+                        Pilih kelas dan mata pelajaran untuk mulai mengisi nilai.
+                      </p>
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50 border-b">
                         <tr>
@@ -401,6 +406,7 @@ export default function InputNilaiPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </div>
               </div>

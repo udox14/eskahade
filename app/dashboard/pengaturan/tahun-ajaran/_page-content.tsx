@@ -94,18 +94,18 @@ export default function TahunAjaranPage() {
       {/* FORM TAMBAH */}
       <div className="bg-white border rounded-xl shadow-sm p-6">
         <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">Tambah Tahun Ajaran Baru</h2>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             value={nama}
             onChange={e => setNama(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleTambah()}
             placeholder="Contoh: 2025/2026"
-            className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500"
+            className="flex-1 min-w-0 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500"
           />
           <button
             onClick={handleTambah}
             disabled={isSaving || !nama.trim()}
-            className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
+            className="w-full sm:w-auto bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Tambah

@@ -260,16 +260,6 @@ export default function ArsipSantriPage() {
           description="Jadikan santri alumni tanpa menghapus data historis."
           className="flex-1"
         />
-        <div className="flex gap-3 text-sm">
-          <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-center">
-            <p className="font-bold text-blue-700">{santriTotal}</p>
-            <p className="text-[10px] text-blue-500">Santri Aktif</p>
-          </div>
-          <div className="bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-lg text-center">
-            <p className="font-bold text-purple-700">{grupTotal}</p>
-            <p className="text-[10px] text-purple-500">Total Alumni</p>
-          </div>
-        </div>
       </div>
 
       {/* TABS */}
@@ -281,6 +271,17 @@ export default function ArsipSantriPage() {
           <RotateCcw className="w-4 h-4" /> Daftar Arsip & Restore
           {grupList.length > 0 && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{grupList.length}</span>}
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-xl">
+          <p className="text-lg font-bold text-blue-700 leading-none">{santriTotal}</p>
+          <p className="text-[11px] text-blue-500 mt-1">Santri Aktif</p>
+        </div>
+        <div className="bg-purple-50 border border-purple-100 px-3 py-2 rounded-xl">
+          <p className="text-lg font-bold text-purple-700 leading-none">{grupTotal}</p>
+          <p className="text-[11px] text-purple-500 mt-1">Total Alumni</p>
+        </div>
       </div>
 
       {/* ══ TAB 1: JADIKAN ALUMNI ══ */}

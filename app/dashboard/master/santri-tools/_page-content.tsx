@@ -204,33 +204,35 @@ export default function SantriToolsPage() {
           </div>
 
           {/* Filter */}
-          <div className="bg-white border rounded-xl p-4 flex flex-wrap gap-3 items-end">
-            <div>
+          <div className="bg-white border rounded-xl p-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,160px)_auto] xl:items-end">
+            <div className="min-w-0">
               <label className="text-xs font-bold text-slate-500 block mb-1">Asrama</label>
               <select value={filterAsrama} onChange={e => setFilterAsrama(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
                 {ASRAMA_LIST.map(a => <option key={a} value={a}>{a || '— Semua Asrama —'}</option>)}
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
               <select value={filterSekolah} onChange={e => setFilterSekolah(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">— Semua Sekolah —</option>
                 {sekolahList.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs font-bold text-slate-500 block mb-1">Filter Kelas (opsional)</label>
               <input value={filterKelas} onChange={e => setFilterKelas(e.target.value)}
                 placeholder="mis: 7, 8A"
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-32"/>
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"/>
             </div>
-            <button onClick={handlePreview} disabled={loadingPreview}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60">
-              {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>}
-              Preview
-            </button>
+            <div className="flex items-end">
+              <button onClick={handlePreview} disabled={loadingPreview}
+                className="w-full xl:w-auto flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60">
+                {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>}
+                Preview
+              </button>
+            </div>
           </div>
 
           {/* Preview hasil */}

@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { getJuaraUmum } from './actions'
 import { Trophy, Loader2, Printer, Search, Medal } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function JuaraUmumPage() {
   const [selectedSemester, setSelectedSemester] = useState('1')
@@ -63,15 +64,11 @@ export default function JuaraUmumPage() {
     <div className="space-y-6 max-w-7xl mx-auto pb-24">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
-            <Medal className="w-8 h-8 text-yellow-500" />
-            Kejuaraan & Prestasi
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">Rekapitulasi dan Cetak Lampiran Juara Umum 1, 2, dan 3 Seluruh Kelas.</p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Kejuaraan & Prestasi"
+        description="Rekapitulasi dan cetak lampiran Juara Umum 1, 2, dan 3 seluruh kelas."
+        className="border-b pb-4"
+      />
 
       {/* FILTER BAR */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-end gap-4">

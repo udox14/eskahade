@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { getJurnalGuru, simpanAbsensiGuru, getMarhalahList } from './actions'
-import { Save, Loader2, Briefcase, User, Filter, Search, Smartphone, Table2 } from 'lucide-react'
+import { Save, Loader2, User, Filter, Search, Smartphone, Table2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
@@ -320,74 +321,73 @@ export default function AbsensiGuruPage() {
     <div className="space-y-6 max-w-[95vw] mx-auto pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Briefcase className="w-6 h-6 text-indigo-600"/> Absensi Guru
-           </h1>
-           <p className="text-slate-500 text-sm">Input kehadiran mengajar mingguan.</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                <button
-                    onClick={() => changeInputMode('table')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
-                        inputMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                >
-                    <Table2 className="w-4 h-4" />
-                    Tabel
-                </button>
-                <button
-                    onClick={() => changeInputMode('mobile')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
-                        inputMode === 'mobile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                >
-                    <Smartphone className="w-4 h-4" />
-                    HP
-                </button>
-            </div>
-             <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex items-center gap-2 shadow-sm">
-                <Filter className="w-4 h-4 text-slate-400 ml-2"/>
-                <select 
-                    value={selectedMarhalah} 
-                    onChange={e => setSelectedMarhalah(e.target.value)}
-                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer pr-2"
-                >
-                    <option value="">Semua Tingkat</option>
-                    {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                </select>
-            </div>
+      <div className="space-y-4 border-b pb-4">
+        <DashboardPageHeader
+          title="Absensi Guru"
+          description="Input kehadiran mengajar mingguan."
+        />
 
-            <div className="bg-white p-1 border border-slate-200 rounded-xl shadow-sm">
-                <input 
-                    type="date" 
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="p-2 text-sm font-bold text-slate-700 outline-none"
-                />
-            </div>
-
-            <button 
-                onClick={loadData}
-                disabled={loading}
-                className="bg-white text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-indigo-50 flex items-center gap-2"
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[auto_minmax(0,1fr)_220px_auto_auto] xl:items-center">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full sm:w-fit">
+            <button
+              onClick={() => changeInputMode('table')}
+              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all sm:flex-none ${
+                inputMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
             >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>} 
-                Tampilkan
+              <Table2 className="w-4 h-4" />
+              Tabel
             </button>
-            
-            {hasLoaded && (
-                <button 
-                    onClick={handleSimpan}
-                    disabled={saving}
-                    className="bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-800 disabled:opacity-50 flex items-center gap-2"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Simpan
-                </button>
-            )}
+            <button
+              onClick={() => changeInputMode('mobile')}
+              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all sm:flex-none ${
+                inputMode === 'mobile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              HP
+            </button>
+          </div>
+
+          <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex items-center gap-2 shadow-sm min-w-0">
+            <Filter className="w-4 h-4 text-slate-400 ml-2" />
+            <select
+              value={selectedMarhalah}
+              onChange={e => setSelectedMarhalah(e.target.value)}
+              className="w-full min-w-0 bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer pr-2"
+            >
+              <option value="">Semua Tingkat</option>
+              {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+            </select>
+          </div>
+
+          <div className="bg-white p-1 border border-slate-200 rounded-xl shadow-sm">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full p-2 text-sm font-bold text-slate-700 outline-none"
+            />
+          </div>
+
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="bg-white text-indigo-700 border border-indigo-200 px-4 py-3 rounded-xl font-bold shadow-sm hover:bg-indigo-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Tampilkan
+          </button>
+
+          {hasLoaded && (
+            <button
+              onClick={handleSimpan}
+              disabled={saving}
+              className="bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-indigo-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan
+            </button>
+          )}
         </div>
       </div>
 
@@ -425,11 +425,17 @@ export default function AbsensiGuruPage() {
           onCycleCell={cycleCellValue}
         />
       ) : (
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col h-[75vh]">
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[26rem] md:h-[75vh]">
         {!hasLoaded ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                <Search className="w-16 h-16 mb-4 text-slate-200"/>
-                <p>Silakan pilih tingkat dan tanggal, lalu klik <b>Tampilkan</b>.</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-12 text-center text-slate-400">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-50">
+                  <Search className="w-12 h-12 text-slate-200" />
+                </div>
+                <div className="max-w-[18rem] space-y-1">
+                  <p className="text-base font-medium leading-relaxed text-slate-500">
+                    Silakan pilih tingkat dan tanggal, lalu klik <b>Tampilkan</b>.
+                  </p>
+                </div>
             </div>
         ) : loading ? (
              <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500"/></div>

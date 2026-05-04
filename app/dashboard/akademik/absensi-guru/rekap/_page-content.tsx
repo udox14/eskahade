@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { getMarhalahList, getRekapKinerjaGuru } from './actions'
 import { useReactToPrint } from 'react-to-print'
-import { Filter, Search, Loader2, Briefcase, ArrowLeft, Printer, Palette, Circle } from 'lucide-react'
+import { Filter, Search, Loader2, Printer, Palette, Circle } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import Link from 'next/link'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const SESI_OPTIONS = [
   { value: 'semua',          label: 'Semua Sesi' },
@@ -152,21 +152,14 @@ export default function RekapAbsensiGuruPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/akademik/absensi-guru" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6 text-slate-600"/>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Briefcase className="w-6 h-6 text-indigo-600"/> Rekap Kinerja Guru
-            </h1>
-            <p className="text-slate-500 text-sm">Evaluasi kehadiran pengajar berdasarkan jadwal kelas.</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setRange('THIS_WEEK')} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded hover:bg-indigo-100">7 Hari Terakhir</button>
-          <button onClick={() => setRange('THIS_MONTH')} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded hover:bg-indigo-100">Bulan Ini</button>
+      <div className="space-y-4 border-b pb-4">
+        <DashboardPageHeader
+          title="Rekap Kinerja Guru"
+          description="Evaluasi kehadiran pengajar berdasarkan jadwal kelas."
+        />
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setRange('THIS_WEEK')} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100">7 Hari Terakhir</button>
+          <button onClick={() => setRange('THIS_MONTH')} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100">Bulan Ini</button>
         </div>
       </div>
 

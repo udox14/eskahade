@@ -37,13 +37,11 @@ export async function SantriTable({
   let whereClauses: string[] = []
   const params: any[] = []
 
-  let joinClause = ''
+  let joinClause = "LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif' LEFT JOIN kelas k ON k.id = rp.kelas_id"
   if (kelasPesantren) {
-    joinClause = "JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'"
     whereClauses.push('rp.kelas_id = ?')
     params.push(kelasPesantren)
   } else if (marhalah) {
-    joinClause = "JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif' JOIN kelas k ON k.id = rp.kelas_id"
     whereClauses.push('k.marhalah_id = ?')
     params.push(marhalah)
   }
@@ -73,7 +71,8 @@ export async function SantriTable({
       `SELECT COUNT(*) AS total FROM santri s ${joinClause} ${whereStr}`, params
     ),
     query<any>(
-      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.status_global
+      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.status_global,
+              k.nama_kelas AS kelas_pesantren
        FROM santri s ${joinClause} ${whereStr}
        ORDER BY s.nama_lengkap ASC
        LIMIT ? OFFSET ?`,
@@ -105,7 +104,7 @@ export async function SantriTable({
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
-                <p className="text-xs text-gray-400 font-mono mt-0.5">{santri.nis}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{santri.kelas_pesantren || '-'}</p>
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'

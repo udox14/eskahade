@@ -68,34 +68,36 @@ export default function LaporanKeuanganPage() {
         description="Rekapitulasi arus kas dan monitoring tagihan."
         className="border-b pb-4"
         action={(
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-              <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">-</button>
-              <span className="px-2 font-mono font-bold text-emerald-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4"/> {tahun}
-              </span>
-              <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold text-slate-600">+</button>
-            </div>
+          <div className="w-full space-y-2 sm:w-auto">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto] sm:items-center">
+              <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-1 shadow-sm sm:justify-normal">
+                <button onClick={() => setTahun(t => t - 1)} className="px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-bold text-slate-600">-</button>
+                <span className="px-2 font-mono font-bold text-emerald-700 flex items-center justify-center gap-2">
+                  <Calendar className="w-4 h-4"/> {tahun}
+                </span>
+                <button onClick={() => setTahun(t => t + 1)} className="px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-bold text-slate-600">+</button>
+              </div>
 
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
-                isDirty || !data
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {loading
-                ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
-                : <><Search className="w-4 h-4"/> {data ? (isDirty ? 'Perbarui' : 'Muat Ulang') : 'Tampilkan'}</>
-              }
-            </button>
+              <button
+                onClick={loadData}
+                disabled={loading}
+                className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 ${
+                  isDirty || !data
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {loading
+                  ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+                  : <><Search className="w-4 h-4"/> {data ? (isDirty ? 'Perbarui' : 'Muat Ulang') : 'Tampilkan'}</>
+                }
+              </button>
+            </div>
 
             <button
               onClick={handleExport}
               disabled={!data?.list?.length}
-              className="bg-white border text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-slate-50"
+              className="w-full bg-white border text-slate-600 px-4 py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm font-bold text-sm transition-colors disabled:opacity-40 hover:bg-slate-50"
             >
               <Download className="w-4 h-4"/> Export Excel
             </button>

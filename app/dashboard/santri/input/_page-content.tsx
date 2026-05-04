@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { Upload, Download, Save, CheckCircle, ArrowLeft, Loader2, UserPlus, FileSpreadsheet } from 'lucide-react'
+import { Upload, Download, Save, CheckCircle, Loader2, UserPlus, FileSpreadsheet } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './actions'
 import { toast } from 'sonner'
@@ -158,24 +158,18 @@ export default function InputSantriPage() {
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
 
       {/* HEADER */}
-      <div className="flex items-start gap-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <DashboardPageHeader
-          title="Tambah Data Santri"
-          description="Input data santri satu per satu atau sekaligus via Excel."
-          className="flex-1"
-        />
-      </div>
+      <DashboardPageHeader
+        title="Tambah Data Santri"
+        description="Input data santri satu per satu atau sekaligus via Excel."
+      />
 
       {/* TAB SWITCHER */}
       <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
         <button onClick={() => setTab('FORM')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'FORM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <UserPlus className="w-4 h-4" /> Form Satu-Satu
+          <UserPlus className="w-4 h-4" /> Form
         </button>
         <button onClick={() => setTab('EXCEL')} className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'EXCEL' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <FileSpreadsheet className="w-4 h-4" /> Import Excel (Massal)
+          <FileSpreadsheet className="w-4 h-4" /> Import Massal
         </button>
       </div>
 
@@ -210,7 +204,7 @@ export default function InputSantriPage() {
                 {(['L', 'P'] as const).map(jk => (
                   <button type="button" key={jk} onClick={() => set('jenis_kelamin', jk)}
                     className={`flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-colors ${form.jenis_kelamin === jk ? (jk === 'L' ? 'bg-blue-600 text-white border-blue-600' : 'bg-pink-500 text-white border-pink-500') : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>
-                    {jk === 'L' ? '👦 Laki-laki' : '👧 Perempuan'}
+                    {jk === 'L' ? 'Laki-laki' : 'Perempuan'}
                   </button>
                 ))}
               </div>
@@ -337,13 +331,13 @@ export default function InputSantriPage() {
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">
-                🍽️ Tempat Makan <span className="text-slate-400 font-normal normal-case">(auto-sync ke Katering)</span>
+                Tempat Makan <span className="text-slate-400 font-normal normal-case">(auto-sync ke Katering)</span>
               </label>
               <input value={form.nama_tempat_makan} onChange={e => set('nama_tempat_makan', e.target.value)} placeholder="Contoh: Bi Ade" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">
-                👕 Tempat Cuci <span className="text-slate-400 font-normal normal-case">(auto-sync ke Laundry)</span>
+                Tempat Cuci <span className="text-slate-400 font-normal normal-case">(auto-sync ke Laundry)</span>
               </label>
               <input value={form.nama_tempat_cuci} onChange={e => set('nama_tempat_cuci', e.target.value)} placeholder="Contoh: Bi Hani" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
@@ -434,3 +428,4 @@ export default function InputSantriPage() {
     </div>
   )
 }
+

@@ -107,11 +107,11 @@ export default function LegerNilaiPage() {
           className="flex-1"
         />
         
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <button 
                 onClick={handleHitung}
                 disabled={isCalculating || !dataLeger}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold shadow-sm hover:bg-indigo-700 disabled:opacity-50"
             >
                 {isCalculating ? <Loader2 className="w-4 h-4 animate-spin"/> : <Calculator className="w-4 h-4"/>}
                 Hitung & Urutkan
@@ -119,7 +119,7 @@ export default function LegerNilaiPage() {
             <button 
                 onClick={handleExport}
                 disabled={isExporting || !dataLeger}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-green-800 disabled:opacity-50 transition-colors"
+                className="bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold shadow-sm hover:bg-green-800 disabled:opacity-50 transition-colors"
             >
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileSpreadsheet className="w-4 h-4"/>}
                 Excel
@@ -127,14 +127,15 @@ export default function LegerNilaiPage() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border flex flex-col md:flex-row gap-4 items-end shadow-sm">
+      <div className="bg-white p-4 rounded-2xl border shadow-sm">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)_180px_56px] xl:items-end">
         {/* Dropdown Tahun Ajaran */}
-        <div className="w-full md:w-auto">
+        <div className="w-full">
           <label className="text-xs font-bold text-slate-500 uppercase block mb-1 flex items-center gap-1">
             <CalendarDays className="w-3 h-3"/> Tahun Ajaran
           </label>
           <select
-            className="p-2 border border-slate-200 rounded-xl w-48 bg-slate-50 outline-none"
+            className="h-12 w-full px-3 border border-slate-200 rounded-xl bg-slate-50 outline-none"
             value={selectedTA ?? ''}
             onChange={(e) => setSelectedTA(Number(e.target.value))}
           >
@@ -145,20 +146,20 @@ export default function LegerNilaiPage() {
             ))}
           </select>
         </div>
-        <div className="w-full md:w-auto">
+        <div className="w-full">
           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas</label>
           <select 
-            className="p-2 border border-slate-200 rounded-xl w-64 bg-slate-50 outline-none"
+            className="h-12 w-full px-3 border border-slate-200 rounded-xl bg-slate-50 outline-none"
             value={selectedKelas}
             onChange={(e) => setSelectedKelas(e.target.value)}
           >
             {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
           </select>
         </div>
-        <div>
+        <div className="w-full">
           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Semester</label>
           <select 
-            className="p-2 border border-slate-200 rounded-xl w-32 bg-slate-50 outline-none"
+            className="h-12 w-full px-3 border border-slate-200 rounded-xl bg-slate-50 outline-none"
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
           >
@@ -166,7 +167,15 @@ export default function LegerNilaiPage() {
             <option value="2">Genap</option>
           </select>
         </div>
-        <button onClick={loadData} disabled={loading} className="bg-blue-600 text-white p-2 rounded-lg"><Search className="w-5 h-5"/></button>
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="h-12 w-full bg-blue-600 text-white rounded-xl flex items-center justify-center gap-2 font-bold sm:col-span-2 xl:col-span-1"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-5 h-5"/>}
+          <span className="xl:hidden">Tampilkan</span>
+        </button>
+        </div>
       </div>
 
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
@@ -179,9 +188,9 @@ export default function LegerNilaiPage() {
                 <table className="w-full text-sm text-left border-collapse">
                     <thead className="bg-slate-800 text-white font-bold sticky top-0 z-20 shadow-sm">
                         <tr>
-                            <th className="p-2 border border-slate-600 w-10 text-center sticky left-0 bg-slate-800 z-30">No</th>
-                            <th className="p-2 border border-slate-600 w-24 sticky left-10 bg-slate-800 z-30">NIS</th>
-                            <th className="p-2 border border-slate-600 w-64 sticky left-[8.5rem] bg-slate-800 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Nama Santri</th>
+                            <th className="p-2 border border-slate-600 w-10 text-center md:sticky md:left-0 md:bg-slate-800 md:z-30">No</th>
+                            <th className="p-2 border border-slate-600 w-24 md:sticky md:left-10 md:bg-slate-800 md:z-30">NIS</th>
+                            <th className="p-2 border border-slate-600 min-w-[220px] md:w-64 md:sticky md:left-[8.5rem] md:bg-slate-800 md:z-30 md:shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Nama Santri</th>
                             
                             {/* Header Mapel Vertikal */}
                             {dataLeger.mapel.map((m: any) => (
@@ -203,9 +212,9 @@ export default function LegerNilaiPage() {
                     <tbody className="divide-y divide-gray-200">
                         {dataLeger.siswa.map((s: any, idx: number) => (
                             <tr key={s.id} className="hover:bg-yellow-50 transition-colors group">
-                                <td className="p-2 border text-center sticky left-0 bg-white group-hover:bg-yellow-50 z-10">{idx + 1}</td>
-                                <td className="p-2 border font-mono text-xs sticky left-10 bg-white group-hover:bg-yellow-50 z-10">{s.nis}</td>
-                                <td className="p-2 border font-bold text-slate-800 sticky left-[8.5rem] bg-white group-hover:bg-yellow-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] truncate max-w-xs">{s.nama}</td>
+                                <td className="p-2 border text-center md:sticky md:left-0 md:bg-white md:group-hover:bg-yellow-50 md:z-10">{idx + 1}</td>
+                                <td className="p-2 border font-mono text-xs md:sticky md:left-10 md:bg-white md:group-hover:bg-yellow-50 md:z-10">{s.nis}</td>
+                                <td className="p-2 border font-bold text-slate-800 whitespace-nowrap md:sticky md:left-[8.5rem] md:bg-white md:group-hover:bg-yellow-50 md:z-10 md:shadow-[2px_0_5px_rgba(0,0,0,0.1)]">{s.nama}</td>
 
                                 {/* Loop Nilai */}
                                 {dataLeger.mapel.map((m: any) => {

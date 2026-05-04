@@ -89,15 +89,15 @@ export default function TarifPage() {
                     {/* Tahun Selector */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
-                        <div className="flex gap-2">
-                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">-</button>
+                        <div className="grid grid-cols-[48px_minmax(0,1fr)_48px] gap-2 items-center">
+                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">-</button>
                             <input 
                                 type="number" 
-                                className="flex-1 text-center font-bold text-lg border rounded bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full min-w-0 h-12 text-center font-bold text-lg border rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={tahunInput}
                                 onChange={(e) => setTahunInput(Number(e.target.value))}
                             />
-                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200 font-bold">+</button>
+                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">+</button>
                         </div>
                     </div>
 

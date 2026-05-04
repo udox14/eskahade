@@ -17,6 +17,7 @@ import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string) {
@@ -817,15 +818,10 @@ export function PageContent() {
   return (
     <div className="space-y-5 pb-16">
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-            <ScrollText className="w-4 h-4 text-slate-600" />
-          </span>
-          Surat Santri
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 ml-10">Surat pernyataan, SP, dan SK Pengeluaran</p>
-      </div>
+      <DashboardPageHeader
+        title="SP & SK"
+        description="Surat pernyataan, SP, dan SK Pengeluaran"
+      />
 
       {/* Form area — muncul saat klik card */}
       {view === 'pernyataan' && (
