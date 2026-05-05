@@ -162,6 +162,17 @@ export default function AbsensiPage() {
     return false
   }
 
+  const getApplicableSantriIds = (dateStr: string, session: SessionType) => {
+    const day = days.find(item => item.dateStr === dateStr)
+    if (!day || isHoliday(day.label, session)) return []
+    return dataSantri.map(s => String(s.id))
+  }
+
+  const isColumnLibur = (dateStr: string, session: SessionType) => {
+    const ids = getApplicableSantriIds(dateStr, session)
+    return ids.length > 0 && ids.every(id => gridData[id]?.[dateStr]?.[session] === 'L')
+  }
+
   // Handler: Ubah Nilai Sel
   const handleCellChange = (santriId: string, dateStr: string, session: SessionType, value: string) => {
     const upperVal = value.toUpperCase()
@@ -184,6 +195,32 @@ export default function AbsensiPage() {
         }
       }
     }))
+  }
+
+  const toggleColumnLibur = (dateStr: string, session: SessionType) => {
+    const ids = getApplicableSantriIds(dateStr, session)
+    if (ids.length === 0) return
+
+    const nextLibur = !ids.every(id => gridData[id]?.[dateStr]?.[session] === 'L')
+    setHasUnsavedChanges(true)
+    setDirtyKeys(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(`${id}-${dateStr}`))
+      return next
+    })
+    setGridData(prev => {
+      const next = { ...prev }
+      ids.forEach(id => {
+        next[id] = {
+          ...next[id],
+          [dateStr]: {
+            ...(next[id]?.[dateStr] || { shubuh: 'H', ashar: 'H', maghrib: 'H' }),
+            [session]: nextLibur ? 'L' : 'H',
+          },
+        }
+      })
+      return next
+    })
   }
 
   const cycleCellValue = (santriId: string, dateStr: string, session: SessionType) => {
@@ -695,12 +732,52 @@ export default function AbsensiPage() {
             Tidak ditemukan santri yang sesuai dengan kriteria filter yang Anda pilih.
           </p>
         </div>
-      ) : inputMode === 'mobile' ? (
+      ) : (
+        <>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
+            <div>
+              <p className="text-sm font-bold text-slate-800">Kontrol Libur Sesi</p>
+              <p className="text-[11px] text-slate-500">Atur libur sekali per sesi-hari, lalu semua santri otomatis ikut `L`.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-[640px] space-y-2">
+                {SESSIONS.map(session => {
+                  const sessionDays = days.filter(day => !isHoliday(day.label, session))
+                  return (
+                    <div key={session} className="grid grid-cols-[96px_repeat(7,minmax(0,1fr))] gap-2 items-center">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-600">{session}</div>
+                      {sessionDays.map(day => {
+                        const active = isColumnLibur(day.dateStr, session)
+                        return (
+                          <button
+                            key={`${session}-${day.dateStr}`}
+                            type="button"
+                            onClick={() => toggleColumnLibur(day.dateStr, session)}
+                            className={`rounded-xl border px-2 py-2 text-center transition-colors ${
+                              active
+                                ? 'border-slate-300 bg-slate-100 text-slate-700'
+                                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="text-[10px] font-black uppercase">{day.label.slice(0, 3)}</div>
+                            <div className="text-[10px]">{day.shortDate}</div>
+                            <div className="mt-1 text-[11px] font-bold">{active ? 'L' : 'Aktif'}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        {inputMode === 'mobile' ? (
         <MobileAbsensiCards
           santriList={filteredMobileSantri}
           days={days}
           gridData={gridData}
           isHoliday={isHoliday}
+          isColumnLibur={isColumnLibur}
           onCycleCell={cycleCellValue}
           onFillRow={handleFillRow}
         />
@@ -786,6 +863,7 @@ export default function AbsensiPage() {
                           <React.Fragment key={day.dateStr + s.id}>
                             {SESSIONS.map(session => {
                               const isOff = isHoliday(day.label, session)
+                              const columnLibur = isColumnLibur(day.dateStr, session)
                               if (isOff) return null;
 
                               const cellId = `cell-${rowIdx}-${currentCellIndex}`
@@ -796,8 +874,9 @@ export default function AbsensiPage() {
                                 <CellInput 
                                   key={session as string}
                                   id={cellId}
-                                  value={(val[session] as string) ?? 'H'} 
+                                  value={columnLibur ? 'L' : ((val[session] as string) ?? 'H')} 
                                   isHoliday={isOff}
+                                  readOnly={columnLibur}
                                   onChange={(v) => handleCellChange(s.id, day.dateStr, session, v)} 
                                   onKeyDown={(e) => handleKeyDown(e, rowIdx, cellColIndex)}
                                 />
@@ -813,6 +892,8 @@ export default function AbsensiPage() {
             </table>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {hasLoaded && inputMode === 'mobile' && dataSantri.length > 0 && hasUnsavedChanges && (
@@ -886,6 +967,7 @@ function MobileAbsensiCards({
   days,
   gridData,
   isHoliday,
+  isColumnLibur,
   onCycleCell,
   onFillRow,
 }: {
@@ -893,6 +975,7 @@ function MobileAbsensiCards({
   days: { dateStr: string; label: string; shortDate: string }[]
   gridData: Record<string, any>
   isHoliday: (dayName: string, session: SessionType) => boolean
+  isColumnLibur: (dateStr: string, session: SessionType) => boolean
   onCycleCell: (santriId: string, dateStr: string, session: SessionType) => void
   onFillRow: (santriId: string, value: string) => void
 }) {
@@ -952,11 +1035,12 @@ function MobileAbsensiCards({
                   </div>
                   {days.map(day => {
                     const off = isHoliday(day.label, session)
-                    const value = santriGrid[day.dateStr]?.[session] || 'H'
+                    const columnLibur = isColumnLibur(day.dateStr, session)
+                    const value = columnLibur ? 'L' : (santriGrid[day.dateStr]?.[session] || 'H')
                     return (
                       <button
                         key={`${day.dateStr}-${session}`}
-                        disabled={off}
+                        disabled={off || columnLibur}
                         onClick={() => onCycleCell(s.id, day.dateStr, session)}
                         className={`h-8 rounded-lg text-xs font-black border transition-colors active:scale-95 ${
                           off ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : statusButtonClass(value)
@@ -980,6 +1064,7 @@ function statusButtonClass(value: string) {
   if (value === 'A') return 'bg-red-100 text-red-800 border-red-200'
   if (value === 'I') return 'bg-blue-100 text-blue-800 border-blue-200'
   if (value === 'S') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  if (value === 'L') return 'bg-slate-100 text-slate-500 border-slate-200'
   return 'bg-slate-50 text-slate-500 border-slate-200'
 }
 
@@ -987,6 +1072,7 @@ function CellInput({
   id,
   value, 
   isHoliday,
+  readOnly,
   onChange,
   onKeyDown
 }: { 
@@ -994,11 +1080,13 @@ function CellInput({
   id: string,
   value: string, 
   isHoliday: boolean,
+  readOnly?: boolean,
   onChange: (v: string) => void,
   onKeyDown: (e: React.KeyboardEvent) => void
 }) {
   let bgColor = ''
   if (isHoliday) bgColor = 'bg-slate-200 text-slate-400 cursor-not-allowed'
+  else if (value === 'L') bgColor = 'bg-slate-100 text-slate-500 font-bold cursor-not-allowed'
   else if (value === 'S') bgColor = 'bg-yellow-100 text-yellow-800'
   else if (value === 'I') bgColor = 'bg-blue-100 text-blue-800'
   else if (value === 'A') bgColor = 'bg-red-100 text-red-800 font-bold'
@@ -1010,6 +1098,7 @@ function CellInput({
         type="text" 
         maxLength={1}
         disabled={isHoliday}
+        readOnly={readOnly}
         className={`w-full h-full text-center focus:outline-none focus:bg-green-100 focus:ring-2 focus:ring-inset focus:ring-green-500 uppercase cursor-pointer transition-colors ${bgColor}`}
         value={isHoliday ? '-' : (value === 'H' ? '' : value)}
         onChange={(e) => onChange(e.target.value)}

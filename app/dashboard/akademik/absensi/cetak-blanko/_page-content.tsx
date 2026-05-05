@@ -224,11 +224,28 @@ export default function CetakBlankoPage() {
               @page { size: 21.59cm 33.02cm; margin: 0.5cm; }
               body { background: white; }
               .no-print { display: none !important; }
-              .print-area { box-shadow: none !important; border: none !important; width: 100% !important; padding: 0.5cm 0.5cm 0.5cm 2.2cm !important; margin: 0 !important; page-break-after: always; box-sizing: border-box !important; }
-              .print-area:last-child { page-break-after: auto; }
-              table { page-break-inside: auto; border-collapse: collapse; width: 100%; }
-              tr { page-break-inside: avoid; }
-              .agenda-section { page-break-inside: avoid; }
+              .print-sheet {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                break-after: page;
+                page-break-after: always;
+              }
+              .print-sheet:last-child {
+                break-after: auto;
+                page-break-after: auto;
+              }
+              .print-area {
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                padding: 0.5cm 0.5cm 0.5cm 2.2cm !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+              table { border-collapse: collapse; width: 100%; }
+              tr, .agenda-section, .print-header { break-inside: avoid; page-break-inside: avoid; }
           }
           .print-table th, .print-table td { border: 1px solid black; padding: 1px 2px; }
           .print-header { font-size: 11px; }
@@ -312,7 +329,11 @@ export default function CetakBlankoPage() {
 
       {/* RENDER AREA */}
       <div ref={printRef}>
-          {mode === 'SATUAN' && singleData && transformToSheets(singleData).map((d: any, idx: number) => <BlankoSheet key={'s'+idx} data={d} />)}
+          {mode === 'SATUAN' && singleData && transformToSheets(singleData).map((d: any, idx: number) => (
+            <div key={'s' + idx} className="print-sheet">
+              <BlankoSheet data={d} />
+            </div>
+          ))}
           
           {mode === 'MASSAL' && massalData && (
               <div>
@@ -320,7 +341,7 @@ export default function CetakBlankoPage() {
                       Berhasil memuat <b>{massalData.length} kelas</b>. Klik tombol <b>Cetak</b> di atas untuk mencetak semua sekaligus.
                   </div>
                   {massalData.flatMap((item: any) => transformToSheets(item)).map((item: any, idx: number) => (
-                      <div key={idx}>
+                      <div key={idx} className="print-sheet">
                           <BlankoSheet data={item} />
                       </div>
                   ))}

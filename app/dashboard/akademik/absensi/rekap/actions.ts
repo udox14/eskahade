@@ -69,7 +69,11 @@ export async function getRekapAbsensi(
     SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
     FROM absensi_harian
     WHERE riwayat_pendidikan_id IN (${ph})
-      AND (shubuh != 'H' OR ashar != 'H' OR maghrib != 'H')
+      AND (
+        shubuh IN ('A','S','I')
+        OR ashar IN ('A','S','I')
+        OR maghrib IN ('A','S','I')
+      )
   `, riwayatIds)
 
   const result = santriList.map((s: any) => {
@@ -109,7 +113,11 @@ export async function getDetailAbsensiSantri(santriId: string) {
     SELECT tanggal, shubuh, ashar, maghrib
     FROM absensi_harian
     WHERE riwayat_pendidikan_id = ?
-      AND (shubuh != 'H' OR ashar != 'H' OR maghrib != 'H')
+      AND (
+        shubuh IN ('A','S','I')
+        OR ashar IN ('A','S','I')
+        OR maghrib IN ('A','S','I')
+      )
     ORDER BY tanggal DESC
   `, [riwayat.id])
 }
