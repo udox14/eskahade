@@ -1,15 +1,36 @@
 'use server'
 
-import { query, batch, generateId } from '@/lib/db'
+import { query, batch, generateId, execute, now } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
+
+const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
+type SessionType = typeof VALID_SESI[number]
+
+async function ensureLiburPengajianTable() {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS pengajian_libur_sesi (
+        tanggal    TEXT NOT NULL,
+        sesi       TEXT NOT NULL,
+        created_by TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (tanggal, sesi)
+      )
+    `)
+  } catch {
+    // noop
+  }
+}
 
 export async function getMarhalahList() {
   return getCachedMarhalahList()
 }
 
 export async function getJurnalGuru(startDate: string, endDate: string, marhalahId?: string) {
+  await ensureLiburPengajianTable()
   let sql = `
     SELECT k.id, k.nama_kelas,
            m.id AS marhalah_id, m.nama AS marhalah_nama,
@@ -45,6 +66,12 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
     [startDate, endDate]
   )
 
+  const libur = await query<{ tanggal: string; sesi: SessionType }>(`
+    SELECT tanggal, sesi
+    FROM pengajian_libur_sesi
+    WHERE tanggal >= ? AND tanggal <= ?
+  `, [startDate, endDate])
+
   const absensiMap: Record<string, any> = {}
   absensi.forEach((a: any) => {
     absensiMap[`${a.kelas_id}-${a.tanggal}`] = {
@@ -59,16 +86,21 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
       a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
     ),
     absensi: absensiMap,
+    libur,
   }
 }
 
-export async function simpanAbsensiGuru(payload: any[]) {
+export async function simpanAbsensiGuru(
+  payload: any[],
+  liburInput: { tanggal: string; sesi: SessionType; is_libur: boolean }[] = []
+) {
+  await ensureLiburPengajianTable()
   const session = await getSession()
-  if (payload.length === 0) return { error: 'Tidak ada data untuk disimpan' }
+  if (payload.length === 0 && liburInput.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
   const normalizeStatus = (value: unknown) => {
     const status = String(value || 'H').toUpperCase()
-    return status === 'A' || status === 'B' || status === 'L' ? status : 'H'
+    return status === 'A' || status === 'B' ? status : 'H'
   }
 
   const statements = payload.map(item => ({
@@ -100,6 +132,29 @@ export async function simpanAbsensiGuru(payload: any[]) {
     await batch(statements.slice(i, i + chunkSize))
   }
 
+  const uniqueLiburMap = new Map<string, { tanggal: string; sesi: SessionType; is_libur: boolean }>()
+  liburInput.forEach(item => {
+    if (!item?.tanggal || !VALID_SESI.includes(item.sesi)) return
+    uniqueLiburMap.set(`${item.tanggal}-${item.sesi}`, item)
+  })
+  const liburStatements = Array.from(uniqueLiburMap.values()).map(item => (
+    item.is_libur
+      ? {
+          sql: `INSERT INTO pengajian_libur_sesi (tanggal, sesi, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(tanggal, sesi) DO UPDATE SET updated_at = excluded.updated_at`,
+          params: [item.tanggal, item.sesi, session?.id ?? null, now(), now()],
+        }
+      : {
+          sql: `DELETE FROM pengajian_libur_sesi WHERE tanggal = ? AND sesi = ?`,
+          params: [item.tanggal, item.sesi],
+        }
+  ))
+  for (let i = 0; i < liburStatements.length; i += chunkSize) {
+    await batch(liburStatements.slice(i, i + chunkSize))
+  }
+
   revalidatePath('/dashboard/akademik/absensi-guru')
+  revalidatePath('/dashboard/akademik/absensi-guru/rekap')
   return { success: true, saved: payload.length }
 }

@@ -1,9 +1,29 @@
 'use server'
 
-import { query, generateId, batch } from '@/lib/db'
+import { query, generateId, batch, execute, queryOne, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
+
+const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
+type SessionType = typeof VALID_SESI[number]
+
+async function ensureLiburPengajianTable() {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS pengajian_libur_sesi (
+        tanggal    TEXT NOT NULL,
+        sesi       TEXT NOT NULL,
+        created_by TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (tanggal, sesi)
+      )
+    `)
+  } catch {
+    // noop
+  }
+}
 
 function getWeekRange(date: Date) {
   const d = new Date(date)
@@ -18,6 +38,7 @@ function getWeekRange(date: Date) {
 }
 
 export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string }) {
+  await ensureLiburPengajianTable()
   const { start, end } = getWeekRange(new Date(tanggalRef))
   const startStr = start.toISOString().split('T')[0]
   const endStr = end.toISOString().split('T')[0]
@@ -70,20 +91,34 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
       AND ah.tanggal >= ? AND ah.tanggal <= ?
   `, [...params, startStr, endStr])
 
-  return { santri, absensi }
+  const libur = await query<{ tanggal: string; sesi: SessionType }>(`
+    SELECT tanggal, sesi
+    FROM pengajian_libur_sesi
+    WHERE tanggal >= ? AND tanggal <= ?
+  `, [startStr, endStr])
+
+  return { santri, absensi, libur }
 }
 
-export async function simpanAbsensi(dataInput: any[]) {
+export async function simpanAbsensi(
+  dataInput: any[],
+  liburInput: { tanggal: string; sesi: SessionType; is_libur: boolean }[] = []
+) {
+  await ensureLiburPengajianTable()
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
-  if (!dataInput.length) return { success: true }
+  if (!dataInput.length && !liburInput.length) return { success: true }
 
   const statements: { sql: string; params: any[] }[] = []
 
   for (const item of dataInput) {
-    const s = item.shubuh || 'H'
-    const a = item.ashar || 'H'
-    const m = item.maghrib || 'H'
+    const normalizeStatus = (value: unknown) => {
+      const status = String(value || 'H').toUpperCase()
+      return status === 'A' || status === 'S' || status === 'I' ? status : 'H'
+    }
+    const s = normalizeStatus(item.shubuh)
+    const a = normalizeStatus(item.ashar)
+    const m = normalizeStatus(item.maghrib)
 
     if (s === 'H' && a === 'H' && m === 'H') {
       statements.push({
@@ -104,12 +139,37 @@ export async function simpanAbsensi(dataInput: any[]) {
     }
   }
 
+  const uniqueLiburMap = new Map<string, { tanggal: string; sesi: SessionType; is_libur: boolean }>()
+  liburInput.forEach(item => {
+    if (!item?.tanggal || !VALID_SESI.includes(item.sesi)) return
+    uniqueLiburMap.set(`${item.tanggal}-${item.sesi}`, item)
+  })
+  const liburStatements = Array.from(uniqueLiburMap.values()).map(item => (
+    item.is_libur
+      ? {
+          sql: `INSERT INTO pengajian_libur_sesi (tanggal, sesi, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(tanggal, sesi) DO UPDATE SET updated_at = excluded.updated_at`,
+          params: [item.tanggal, item.sesi, session.id, now(), now()],
+        }
+      : {
+          sql: `DELETE FROM pengajian_libur_sesi WHERE tanggal = ? AND sesi = ?`,
+          params: [item.tanggal, item.sesi],
+        }
+  ))
+
   try {
     const chunkSize = 50
     for (let i = 0; i < statements.length; i += chunkSize) {
       await batch(statements.slice(i, i + chunkSize))
     }
+    if (liburStatements.length > 0) {
+      for (let i = 0; i < liburStatements.length; i += chunkSize) {
+        await batch(liburStatements.slice(i, i + chunkSize))
+      }
+    }
     revalidatePath('/dashboard/akademik/absensi')
+    revalidatePath('/dashboard/akademik/absensi/rekap')
     return { success: true, saved: dataInput.length }
   } catch (err: any) {
     console.error("Batch save error:", err)

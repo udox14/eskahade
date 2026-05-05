@@ -27,11 +27,13 @@ export default function AbsensiPage() {
   
   const [dataSantri, setDataSantri] = useState<any[]>([])
   const [gridData, setGridData] = useState<Record<string, any>>({})
+  const [columnLiburMap, setColumnLiburMap] = useState<Record<string, boolean>>({})
   
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
+  const [hasLiburChanges, setHasLiburChanges] = useState(false)
 
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportSortBy, setExportSortBy] = useState<'asrama' | 'kelas'>('asrama')
@@ -73,16 +75,22 @@ export default function AbsensiPage() {
         data.absensi.forEach((row: any) => {
           if (!grid[row.riwayat_pendidikan_id]) grid[row.riwayat_pendidikan_id] = {}
           grid[row.riwayat_pendidikan_id][row.tanggal] = {
-            shubuh: row.shubuh,
-            ashar: row.ashar,
-            maghrib: row.maghrib
+            shubuh: row.shubuh === 'L' ? 'H' : row.shubuh,
+            ashar: row.ashar === 'L' ? 'H' : row.ashar,
+            maghrib: row.maghrib === 'L' ? 'H' : row.maghrib
           }
         })
       }
       setGridData(grid)
+      const nextLiburMap: Record<string, boolean> = {}
+      ;(data.libur || []).forEach((item: { tanggal: string; sesi: SessionType }) => {
+        nextLiburMap[`${item.tanggal}-${item.sesi}`] = true
+      })
+      setColumnLiburMap(nextLiburMap)
       setLoading(false)
       setHasUnsavedChanges(false)
       setDirtyKeys(new Set())
+      setHasLiburChanges(false)
       setHasLoaded(true)
       toast.dismiss(loadToast)
     }).catch((err: any) => {
@@ -169,8 +177,7 @@ export default function AbsensiPage() {
   }
 
   const isColumnLibur = (dateStr: string, session: SessionType) => {
-    const ids = getApplicableSantriIds(dateStr, session)
-    return ids.length > 0 && ids.every(id => gridData[id]?.[dateStr]?.[session] === 'L')
+    return Boolean(columnLiburMap[`${dateStr}-${session}`])
   }
 
   // Handler: Ubah Nilai Sel
@@ -198,29 +205,15 @@ export default function AbsensiPage() {
   }
 
   const toggleColumnLibur = (dateStr: string, session: SessionType) => {
-    const ids = getApplicableSantriIds(dateStr, session)
-    if (ids.length === 0) return
-
-    const nextLibur = !ids.every(id => gridData[id]?.[dateStr]?.[session] === 'L')
+    if (getApplicableSantriIds(dateStr, session).length === 0) return
+    const key = `${dateStr}-${session}`
+    const nextLibur = !columnLiburMap[key]
     setHasUnsavedChanges(true)
-    setDirtyKeys(prev => {
-      const next = new Set(prev)
-      ids.forEach(id => next.add(`${id}-${dateStr}`))
-      return next
-    })
-    setGridData(prev => {
-      const next = { ...prev }
-      ids.forEach(id => {
-        next[id] = {
-          ...next[id],
-          [dateStr]: {
-            ...(next[id]?.[dateStr] || { shubuh: 'H', ashar: 'H', maghrib: 'H' }),
-            [session]: nextLibur ? 'L' : 'H',
-          },
-        }
-      })
-      return next
-    })
+    setHasLiburChanges(true)
+    setColumnLiburMap(prev => ({
+      ...prev,
+      [key]: nextLibur,
+    }))
   }
 
   const cycleCellValue = (santriId: string, dateStr: string, session: SessionType) => {
@@ -320,7 +313,7 @@ export default function AbsensiPage() {
   // Handler: Simpan
   const handleSimpan = async () => {
     if (dataSantri.length === 0) return
-    if (dirtyKeys.size === 0) {
+    if (dirtyKeys.size === 0 && !hasLiburChanges) {
       toast.info('Tidak ada perubahan untuk disimpan')
       return
     }
@@ -353,13 +346,23 @@ export default function AbsensiPage() {
     })
 
     try {
-      const res = await simpanAbsensi(payload)
+      const liburPayload = days.flatMap(day =>
+        SESSIONS
+          .filter(session => !isHoliday(day.label, session))
+          .map(session => ({
+            tanggal: day.dateStr,
+            sesi: session,
+            is_libur: Boolean(columnLiburMap[`${day.dateStr}-${session}`]),
+          }))
+      )
+      const res = await simpanAbsensi(payload, liburPayload)
       if (res?.error) {
         toast.error("Gagal menyimpan absensi", { description: res.error })
         return
       }
       setDirtyKeys(new Set())
       setHasUnsavedChanges(false)
+      setHasLiburChanges(false)
       toast.success("Alhamdulillah!", { description: `Absensi berhasil disimpan (${res.saved ?? payload.length} baris).` })
     } catch (err: any) {
       toast.error("Gagal menyimpan absensi", { description: err?.message ?? 'Terjadi kesalahan saat menyimpan' })

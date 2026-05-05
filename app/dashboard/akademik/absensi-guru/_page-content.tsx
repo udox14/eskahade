@@ -12,7 +12,7 @@ type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
 type InputMode = 'table' | 'mobile'
 
-const STATUS_CYCLE = ['H', 'A', 'B', 'L'] as const
+const STATUS_CYCLE = ['H', 'A', 'B'] as const
 const SESSION_LABEL: Record<SessionType, string> = { shubuh: 'S', ashar: 'A', maghrib: 'M' }
 const SESSION_NAME: Record<SessionType, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib' }
 
@@ -26,10 +26,12 @@ export default function AbsensiGuruPage() {
 
   const [dataList, setDataList] = useState<any[]>([])
   const [gridData, setGridData] = useState<Record<string, any>>({})
+  const [columnLiburMap, setColumnLiburMap] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
+  const [hasLiburChanges, setHasLiburChanges] = useState(false)
   const [inputMode, setInputMode] = useState<InputMode>('table')
   const [mobileSearch, setMobileSearch] = useState('')
 
@@ -90,11 +92,25 @@ export default function AbsensiGuruPage() {
     const res = await getJurnalGuru(days[0].dateStr, days[6].dateStr, selectedMarhalah)
     
     setDataList(res.list)
-    setGridData(res.absensi)
+    const sanitizedGrid: Record<string, any> = {}
+    Object.entries(res.absensi || {}).forEach(([key, value]: [string, any]) => {
+      sanitizedGrid[key] = {
+        shubuh: value?.shubuh === 'L' ? 'H' : (value?.shubuh || 'H'),
+        ashar: value?.ashar === 'L' ? 'H' : (value?.ashar || 'H'),
+        maghrib: value?.maghrib === 'L' ? 'H' : (value?.maghrib || 'H'),
+      }
+    })
+    setGridData(sanitizedGrid)
+    const nextLiburMap: Record<string, boolean> = {}
+    ;(res.libur || []).forEach((item: { tanggal: string; sesi: SessionType }) => {
+      nextLiburMap[`${item.tanggal}-${item.sesi}`] = true
+    })
+    setColumnLiburMap(nextLiburMap)
     setLoading(false)
     setHasLoaded(true)
     setHasUnsavedChanges(false)
     setDirtyKeys(new Set())
+    setHasLiburChanges(false)
   }
 
   // --- LOGIC 1: ARRAY HARI ---
@@ -207,9 +223,8 @@ export default function AbsensiGuruPage() {
   }, [dataList, days, hasAssignedGuru])
 
   const isColumnLibur = useCallback((dateStr: string, session: SessionType) => {
-    const ids = getApplicableKelasIds(dateStr, session)
-    return ids.length > 0 && ids.every(id => gridData[`${id}-${dateStr}`]?.[session] === 'L')
-  }, [getApplicableKelasIds, gridData])
+    return Boolean(columnLiburMap[`${dateStr}-${session}`])
+  }, [columnLiburMap])
 
   // --- HANDLERS (Gunakan useCallback) ---
   const handleCellChange = useCallback((kelasId: string, dateStr: string, session: SessionType, value: string) => {
@@ -233,28 +248,16 @@ export default function AbsensiGuruPage() {
   }, []) // Empty dependency karena state updater (setGridData) stabil
 
   const toggleColumnLibur = useCallback((dateStr: string, session: SessionType) => {
-    const ids = getApplicableKelasIds(dateStr, session)
-    if (ids.length === 0) return
-
-    const nextLibur = !ids.every(id => gridData[`${id}-${dateStr}`]?.[session] === 'L')
+    if (getApplicableKelasIds(dateStr, session).length === 0) return
+    const key = `${dateStr}-${session}`
+    const nextLibur = !columnLiburMap[key]
     setHasUnsavedChanges(true)
-    setDirtyKeys(prev => {
-      const next = new Set(prev)
-      ids.forEach(id => next.add(`${id}-${dateStr}`))
-      return next
-    })
-    setGridData(prev => {
-      const next = { ...prev }
-      ids.forEach(id => {
-        const key = `${id}-${dateStr}`
-        next[key] = {
-          ...(next[key] || { shubuh: 'H', ashar: 'H', maghrib: 'H' }),
-          [session]: nextLibur ? 'L' : 'H',
-        }
-      })
-      return next
-    })
-  }, [getApplicableKelasIds, gridData])
+    setHasLiburChanges(true)
+    setColumnLiburMap(prev => ({
+      ...prev,
+      [key]: nextLibur,
+    }))
+  }, [columnLiburMap, getApplicableKelasIds])
 
   const cycleCellValue = (kelasId: string, dateStr: string, session: SessionType) => {
     const current = gridData[`${kelasId}-${dateStr}`]?.[session] || 'H'
@@ -276,7 +279,7 @@ export default function AbsensiGuruPage() {
   }, [dataList, mobileSearch])
 
   const handleSimpan = async () => {
-    if (dirtyKeys.size === 0) {
+    if (dirtyKeys.size === 0 && !hasLiburChanges) {
       toast.info('Tidak ada perubahan untuk disimpan')
       return
     }
@@ -304,13 +307,23 @@ export default function AbsensiGuruPage() {
     })
 
     try {
-      const res = await simpanAbsensiGuru(payload)
+      const liburPayload = days.flatMap(day =>
+        SESSIONS
+          .filter(session => !isLibur(day.dayName, session))
+          .map(session => ({
+            tanggal: day.dateStr,
+            sesi: session,
+            is_libur: Boolean(columnLiburMap[`${day.dateStr}-${session}`]),
+          }))
+      )
+      const res = await simpanAbsensiGuru(payload, liburPayload)
       if (res?.error) {
         toast.error("Gagal menyimpan", { description: res.error })
         return
       }
       setDirtyKeys(new Set())
       setHasUnsavedChanges(false)
+      setHasLiburChanges(false)
       toast.success(`Jurnal tersimpan (${res.saved ?? payload.length} baris)`)
     } catch (err: any) {
       toast.error("Gagal menyimpan", { description: err?.message ?? 'Terjadi kesalahan saat menyimpan' })
