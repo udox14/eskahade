@@ -26,7 +26,7 @@ export async function getRekapAlfaMingguan(tanggalRef: string, onlyMangkir: bool
            s.nama_lengkap, s.nis, s.asrama, s.kamar
     FROM absensi_harian ah
     JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id
-    JOIN santri s ON s.id = rp.santri_id
+    JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
     WHERE 
   `
   let params = []
@@ -96,4 +96,4 @@ export async function getRekapAlfaMingguan(tanggalRef: string, onlyMangkir: bool
   })
 
   return Array.from(rekapMap.values()).sort((a, b) => a.nama.localeCompare(b.nama))
-}
+}

@@ -61,9 +61,17 @@ export async function getRekapKinerjaGuru(
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+    WHERE EXISTS (
+      SELECT 1
+      FROM riwayat_pendidikan rp
+      JOIN santri s ON s.id = rp.santri_id
+      WHERE rp.kelas_id = k.id
+        AND rp.status_riwayat = 'aktif'
+        AND s.status_global = 'aktif'
+    )
   `
   const params: any[] = []
-  if (marhalahId) { sql += ' WHERE k.marhalah_id = ?'; params.push(marhalahId) }
+  if (marhalahId) { sql += ' AND k.marhalah_id = ?'; params.push(marhalahId) }
 
   const kelasList = await query<any>(sql, params)
   if (!kelasList.length) return []

@@ -204,7 +204,8 @@ export async function getAsramaList() {
   const data = await query<any>(`
     SELECT DISTINCT asrama 
     FROM santri 
-    WHERE asrama IS NOT NULL AND asrama != '' 
+    WHERE status_global = 'aktif'
+      AND asrama IS NOT NULL AND asrama != '' 
     ORDER BY asrama
   `)
   return data.map((d: any) => d.asrama)

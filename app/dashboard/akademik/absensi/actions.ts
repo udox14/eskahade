@@ -22,7 +22,7 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
   const startStr = start.toISOString().split('T')[0]
   const endStr = end.toISOString().split('T')[0]
 
-  let whereClauses = ["rp.status_riwayat = 'aktif'"]
+  let whereClauses = ["rp.status_riwayat = 'aktif'", "s.status_global = 'aktif'"]
   let params: any[] = []
 
   if (filters.kelasId) {
@@ -133,7 +133,8 @@ export async function getAsramaList() {
   const data = await query<any>(`
     SELECT DISTINCT asrama 
     FROM santri 
-    WHERE asrama IS NOT NULL AND asrama != '' 
+    WHERE status_global = 'aktif'
+      AND asrama IS NOT NULL AND asrama != '' 
     ORDER BY asrama
   `)
   return data.map((d: any) => d.asrama)
@@ -169,7 +170,7 @@ export async function getAbsensiGlobalA(tanggalRef: string) {
       ah.maghrib
     FROM ProblemStudents ps
     JOIN riwayat_pendidikan rp ON rp.id = ps.riwayat_pendidikan_id
-    JOIN santri s ON s.id = rp.santri_id
+    JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
     JOIN kelas k ON k.id = rp.kelas_id
     LEFT JOIN absensi_harian ah ON ah.riwayat_pendidikan_id = ps.riwayat_pendidikan_id
       AND ah.tanggal >= ? AND ah.tanggal <= ?

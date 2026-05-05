@@ -41,7 +41,7 @@ export async function getDataBlanko(kelasId: string) {
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
 
@@ -76,7 +76,7 @@ export async function getDataBlankoMassal(marhalahId: string) {
       SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
-      WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+      WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
       ORDER BY s.nama_lengkap
     `, [kelas.id])
     return { kelas, santriList }
