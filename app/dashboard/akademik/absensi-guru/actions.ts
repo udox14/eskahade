@@ -68,7 +68,7 @@ export async function simpanAbsensiGuru(payload: any[]) {
 
   const normalizeStatus = (value: unknown) => {
     const status = String(value || 'H').toUpperCase()
-    return status === 'A' || status === 'B' ? status : 'H'
+    return status === 'A' || status === 'B' || status === 'L' ? status : 'H'
   }
 
   const statements = payload.map(item => ({

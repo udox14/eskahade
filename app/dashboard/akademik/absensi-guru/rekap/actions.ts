@@ -135,7 +135,11 @@ export async function getRekapKinerjaGuru(
 
         const stat = statsGuru.get(guruId)
         const status = String(absen?.[session] || 'H').toUpperCase()
-        if (status === 'A') stat.kosong++
+        if (status === 'L') {
+          stat.libur++
+          stat.total_wajib = Math.max(stat.total_wajib - 1, 0)
+        }
+        else if (status === 'A') stat.kosong++
         else if (status === 'B') stat.badal++
         else stat.hadir++
       }

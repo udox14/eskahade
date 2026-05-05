@@ -12,7 +12,7 @@ type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
 type InputMode = 'table' | 'mobile'
 
-const STATUS_CYCLE = ['H', 'A', 'B'] as const
+const STATUS_CYCLE = ['H', 'A', 'B', 'L'] as const
 const SESSION_LABEL: Record<SessionType, string> = { shubuh: 'S', ashar: 'A', maghrib: 'M' }
 const SESSION_NAME: Record<SessionType, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib' }
 
@@ -192,6 +192,25 @@ export default function AbsensiGuruPage() {
     return rows
   }, [dataList])
 
+  const hasAssignedGuru = useCallback((kelas: any, session: SessionType) => {
+    if (session === 'shubuh') return Boolean(kelas.guru_shubuh_id)
+    if (session === 'ashar') return Boolean(kelas.guru_ashar_id)
+    return Boolean(kelas.guru_maghrib_id)
+  }, [])
+
+  const getApplicableKelasIds = useCallback((dateStr: string, session: SessionType) => {
+    const day = days.find(item => item.dateStr === dateStr)
+    if (!day || isLibur(day.dayName, session)) return []
+    return dataList
+      .filter(kelas => hasAssignedGuru(kelas, session))
+      .map(kelas => String(kelas.id))
+  }, [dataList, days, hasAssignedGuru])
+
+  const isColumnLibur = useCallback((dateStr: string, session: SessionType) => {
+    const ids = getApplicableKelasIds(dateStr, session)
+    return ids.length > 0 && ids.every(id => gridData[`${id}-${dateStr}`]?.[session] === 'L')
+  }, [getApplicableKelasIds, gridData])
+
   // --- HANDLERS (Gunakan useCallback) ---
   const handleCellChange = useCallback((kelasId: string, dateStr: string, session: SessionType, value: string) => {
     const upperVal = value.toUpperCase()
@@ -212,6 +231,30 @@ export default function AbsensiGuruPage() {
       }
     }))
   }, []) // Empty dependency karena state updater (setGridData) stabil
+
+  const toggleColumnLibur = useCallback((dateStr: string, session: SessionType) => {
+    const ids = getApplicableKelasIds(dateStr, session)
+    if (ids.length === 0) return
+
+    const nextLibur = !ids.every(id => gridData[`${id}-${dateStr}`]?.[session] === 'L')
+    setHasUnsavedChanges(true)
+    setDirtyKeys(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(`${id}-${dateStr}`))
+      return next
+    })
+    setGridData(prev => {
+      const next = { ...prev }
+      ids.forEach(id => {
+        const key = `${id}-${dateStr}`
+        next[key] = {
+          ...(next[key] || { shubuh: 'H', ashar: 'H', maghrib: 'H' }),
+          [session]: nextLibur ? 'L' : 'H',
+        }
+      })
+      return next
+    })
+  }, [getApplicableKelasIds, gridData])
 
   const cycleCellValue = (kelasId: string, dateStr: string, session: SessionType) => {
     const current = gridData[`${kelasId}-${dateStr}`]?.[session] || 'H'
@@ -395,8 +438,53 @@ export default function AbsensiGuruPage() {
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-green-100 text-green-700 font-bold border rounded flex items-center justify-center">H</span> Hadir</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-yellow-100 text-yellow-700 font-bold border rounded flex items-center justify-center">B</span> Badal</span>
         <span className="flex items-center gap-1"><span className="w-4 h-4 bg-red-100 text-red-700 font-bold border rounded flex items-center justify-center">A</span> Kosong</span>
-        <span className="ml-auto italic">* Mode HP: tap H → A → B</span>
+        <span className="flex items-center gap-1"><span className="w-4 h-4 bg-slate-100 text-slate-500 font-bold border rounded flex items-center justify-center">L</span> Libur pengajian</span>
+        <span className="ml-auto italic">* Mode HP: tap H → A → B → L</span>
       </div>
+
+      <div className="text-[11px] text-slate-500 -mt-2">
+        Keterangan tambahan: `L` berarti libur pengajian pada sesi itu, jadi tidak dihitung sebagai kewajiban mengajar.
+      </div>
+
+      {hasLoaded && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
+          <div>
+            <p className="text-sm font-bold text-slate-800">Kontrol Libur Sesi</p>
+            <p className="text-[11px] text-slate-500">Atur libur sekali per sesi-hari, lalu semua kelas otomatis ikut.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px] space-y-2">
+              {SESSIONS.map(session => {
+                const sessionDays = days.filter(day => !isLibur(day.dayName, session))
+                return (
+                  <div key={session} className="grid grid-cols-[96px_repeat(7,minmax(0,1fr))] gap-2 items-center">
+                    <div className="text-xs font-black uppercase tracking-wide text-slate-600">{SESSION_NAME[session]}</div>
+                    {sessionDays.map(day => {
+                      const active = isColumnLibur(day.dateStr, session)
+                      return (
+                        <button
+                          key={`${session}-${day.dateStr}`}
+                          type="button"
+                          onClick={() => toggleColumnLibur(day.dateStr, session)}
+                          className={`rounded-xl border px-2 py-2 text-center transition-colors ${
+                            active
+                              ? 'border-slate-300 bg-slate-100 text-slate-700'
+                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-[10px] font-black uppercase">{day.abbrev}</div>
+                          <div className="text-[10px]">{day.shortDate}</div>
+                          <div className="mt-1 text-[11px] font-bold">{active ? 'L' : 'Aktif'}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {hasLoaded && inputMode === 'mobile' && dataList.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 space-y-3">
@@ -422,6 +510,7 @@ export default function AbsensiGuruPage() {
           days={days}
           gridData={gridData}
           isLibur={isLibur}
+          isColumnLibur={isColumnLibur}
           onCycleCell={cycleCellValue}
         />
       ) : (
@@ -498,7 +587,9 @@ export default function AbsensiGuruPage() {
                                     const val = gridData[key] || { shubuh:'', ashar:'', maghrib:'' }
                                     
                                     const isMyJob = row.validSessions.includes(sess)
+                                    const columnLibur = isColumnLibur(day.dateStr, sess)
                                     const disabled = !isMyJob
+                                    const readOnly = columnLibur && isMyJob
                                     
                                     const cellId = `cell-${rowIdx}-${colCounter}`
                                     colCounter++
@@ -507,9 +598,10 @@ export default function AbsensiGuruPage() {
                                         <CellInput 
                                             key={sess + day.dateStr}
                                             id={cellId}
-                                            value={val[sess]} 
+                                            value={columnLibur && isMyJob ? 'L' : val[sess]} 
                                             onChange={(v: string) => handleCellChange(row.kelas.id, day.dateStr, sess, v)} 
                                             disabled={disabled}
+                                            readOnly={readOnly}
                                             onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDown(e, rowIdx, colCounter - 1, rowsToRender.length)}
                                         />
                                     )
@@ -566,12 +658,14 @@ function MobileAbsensiGuruCards({
   days,
   gridData,
   isLibur,
+  isColumnLibur,
   onCycleCell,
 }: {
   kelasList: any[]
   days: { dateStr: string; label: string; abbrev: string; shortDate: string; dayName: string }[]
   gridData: Record<string, any>
   isLibur: (dayName: string, session: SessionType) => boolean
+  isColumnLibur: (dateStr: string, session: SessionType) => boolean
   onCycleCell: (kelasId: string, dateStr: string, session: SessionType) => void
 }) {
   if (kelasList.length === 0) {
@@ -627,11 +721,12 @@ function MobileAbsensiGuruCards({
                         </div>
                         {days.map(day => {
                           const off = isLibur(day.dayName, session)
-                          const value = gridData[`${kelas.id}-${day.dateStr}`]?.[session] || 'H'
+                          const columnLibur = isColumnLibur(day.dateStr, session)
+                          const value = columnLibur ? 'L' : (gridData[`${kelas.id}-${day.dateStr}`]?.[session] || 'H')
                           return (
                             <button
                               key={`${kelas.id}-${day.dateStr}-${session}`}
-                              disabled={off}
+                              disabled={off || columnLibur}
                               onClick={() => onCycleCell(kelas.id, day.dateStr, session)}
                               className={`h-8 rounded-lg text-xs font-black border transition-colors active:scale-95 ${
                                 off ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : guruStatusButtonClass(value)
@@ -657,26 +752,29 @@ function MobileAbsensiGuruCards({
 function guruStatusButtonClass(value: string) {
   if (value === 'A') return 'bg-red-100 text-red-800 border-red-200'
   if (value === 'B') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  if (value === 'L') return 'bg-slate-100 text-slate-500 border-slate-200'
   return 'bg-green-50 text-green-700 border-green-200'
 }
 
 // --- OPTIMASI KOMPONEN (React.memo) ---
 // Ini yang membuat input smooth. Dia tidak akan re-render kecuali value/disabled berubah.
 // Kita gunakan custom comparator untuk mengabaikan perubahan fungsi callback
-const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: { 
+const CellInput = React.memo(({ id, value, onChange, disabled, readOnly, onKeyDown }: { 
     id: string, 
     value: string, 
     onChange: (v: string) => void, 
     disabled?: boolean, 
+    readOnly?: boolean,
     onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void 
 }) => {
     let color = 'bg-white text-slate-800'
     if (value === 'H') color = 'bg-green-100 text-green-700 font-bold'
     if (value === 'A') color = 'bg-red-100 text-red-700 font-bold'
     if (value === 'B') color = 'bg-yellow-100 text-yellow-700 font-bold'
-    if (value === 'L') color = 'bg-slate-100 text-slate-400'
+    if (value === 'L') color = 'bg-slate-100 text-slate-500 font-bold'
 
     if (disabled) color = 'bg-slate-200/50 text-slate-300 cursor-not-allowed'
+    if (readOnly) color = 'bg-slate-100 text-slate-500 font-bold cursor-not-allowed'
 
     return (
         <td className={`border p-0 h-full align-middle ${disabled ? 'bg-slate-100' : ''}`}>
@@ -685,6 +783,7 @@ const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: {
                 type="text" 
                 maxLength={1}
                 disabled={disabled}
+                readOnly={readOnly}
                 className={`w-full h-10 text-center focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 uppercase cursor-pointer transition-colors text-xs ${color}`}
                 value={disabled ? '' : value}
                 onChange={(e) => onChange(e.target.value)}
@@ -695,11 +794,12 @@ const CellInput = React.memo(({ id, value, onChange, disabled, onKeyDown }: {
         </td>
     )
 }, (prev, next) => {
-    // Re-render hanya jika value, disabled, atau ID berubah. 
+    // Re-render hanya jika value, disabled, readOnly, atau ID berubah. 
     // Abaikan perubahan referensi fungsi onChange/onKeyDown
     return (
         prev.value === next.value &&
         prev.disabled === next.disabled &&
+        prev.readOnly === next.readOnly &&
         prev.id === next.id
     )
 })
