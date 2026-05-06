@@ -17,6 +17,7 @@ export type SessionUser = {
   role: string
   roles: string[]
   asrama_binaan: string | null
+  is_demo?: boolean
 }
 
 function base64urlEncode(data: string): string {
@@ -152,4 +153,4 @@ export function isAdmin(session: SessionUser | null): boolean {
 export function getEffectiveRoles(session: SessionUser | null): string[] {
   if (!session) return []
   return getRoles(session)
-}
+}

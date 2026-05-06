@@ -4,9 +4,9 @@ import { useState } from "react"
 import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
-import { login } from "./actions"
+import { login, loginDemo } from "./actions"
 
-export default function LoginForm() {
+export default function LoginForm({ demoEnabled = false }: { demoEnabled?: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -32,6 +32,19 @@ export default function LoginForm() {
       }
       setIsSubmitting(false)
       toast.error("Login Gagal", { description: 'Tidak dapat terhubung ke server.' })
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    setIsSubmitting(true)
+    try {
+      await loginDemo()
+    } catch (err: any) {
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+        return
+      }
+      setIsSubmitting(false)
+      toast.error("Login Demo Gagal", { description: 'Tidak dapat terhubung ke server.' })
     }
   }
 
@@ -206,6 +219,21 @@ export default function LoginForm() {
                   : <><ArrowRight className="w-4 h-4" /> Masuk Dashboard</>
                 }
               </button>
+
+              {demoEnabled && (
+                <button
+                  type="button"
+                  onClick={handleDemoLogin}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold border border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                  style={{ fontFamily: "sans-serif" }}
+                >
+                  {isSubmitting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyiapkan demo...</>
+                    : <><ShieldCheck className="w-4 h-4" /> Masuk Akun Demo</>
+                  }
+                </button>
+              )}
 
             </form>
 

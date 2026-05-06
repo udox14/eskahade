@@ -3,6 +3,7 @@
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setSession } from '@/lib/auth/session'
+import { getDemoSessionUser, validateDemoLogin } from '@/lib/auth/demo'
 import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
@@ -88,5 +89,21 @@ export async function login(formData: FormData) {
   }
 
   console.log('[LOGIN] Step 5: redirecting to /dashboard')
+  redirect('/dashboard')
+}
+
+export async function loginDemo() {
+  const password = process.env.DEMO_USER_PASSWORD ?? ''
+  const validation = validateDemoLogin(password)
+  if (!validation.ok) {
+    return { error: validation.error }
+  }
+
+  try {
+    await setSession(getDemoSessionUser())
+  } catch (err: any) {
+    return { error: 'Gagal menyimpan sesi demo: ' + err?.message }
+  }
+
   redirect('/dashboard')
 }

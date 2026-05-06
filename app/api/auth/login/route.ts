@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { createJWTToken } from '@/lib/auth/session'
+import { getDemoCredentials, getDemoSessionUser, validateDemoLogin } from '@/lib/auth/demo'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
+    const demoCredentials = getDemoCredentials()
+    if (normalizedEmail === demoCredentials.email) {
+      const validation = validateDemoLogin(password)
+      if (!validation.ok) {
+        return NextResponse.json(
+          { error: validation.error },
+          { status: validation.error === 'Email atau Password salah.' ? 401 : 400 }
+        )
+      }
+
+      const demoUser = getDemoSessionUser()
+      const token = await createJWTToken(demoUser)
+
+      const demoResponse = NextResponse.json({ success: true, demo: true })
+      demoResponse.cookies.set({
+        name: 'eskahade_session',
+        value: token,
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      })
+
+      return demoResponse
+    }
+
     const user = await queryOne<{
       id: string
       email: string
@@ -25,7 +54,7 @@ export async function POST(request: NextRequest) {
       asrama_binaan: string | null
     }>(
       'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan FROM users WHERE email = ?',
-      [email.toLowerCase().trim()]
+      [normalizedEmail]
     )
 
     if (!user) {
