@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, batch } from '@/lib/db'
+import { query, queryOne, batch, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCachedDataGuru } from '@/lib/cache/master'
@@ -26,7 +26,42 @@ type KelasMasterRow = {
 
 type ImportGuruRow = Record<string, unknown>
 
+async function ensureKelasCetakColumns() {
+  try {
+    await execute('ALTER TABLE kelas ADD COLUMN tempat TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+
+  try {
+    await execute('ALTER TABLE kelas ADD COLUMN grade TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+}
+
+function getJenjangDominan(row: {
+  jumlah_sltp: number
+  jumlah_slta: number
+  jumlah_kuliah: number
+  jumlah_tidak_sekolah: number
+}) {
+  const options = [
+    { label: 'SLTP', value: Number(row.jumlah_sltp || 0) },
+    { label: 'SLTA', value: Number(row.jumlah_slta || 0) },
+    { label: 'KULIAH', value: Number(row.jumlah_kuliah || 0) },
+    { label: 'TIDAK SEKOLAH', value: Number(row.jumlah_tidak_sekolah || 0) },
+  ].sort((a, b) => b.value - a.value)
+
+  return options[0]?.value ? options[0].label : '-'
+}
+
 export async function getDataMaster() {
+  await ensureKelasCetakColumns()
   await syncWaliKelasFromGuruMaghrib()
 
   const kelas = await query<KelasMasterRow>(`
@@ -53,6 +88,89 @@ export async function getDataMaster() {
   )
 
   return { kelasList: sortedKelas, guruList: guru }
+}
+
+export type PembagianTugasMengajarRow = {
+  id: string
+  nama_kelas: string
+  marhalah_nama: string | null
+  tempat: string | null
+  grade: string | null
+  jenis_kelamin: string
+  guru_shubuh_nama: string | null
+  guru_ashar_nama: string | null
+  guru_maghrib_nama: string | null
+  total_putra: number
+  total_putri: number
+  total_santri: number
+  jumlah_sltp: number
+  jumlah_slta: number
+  jumlah_kuliah: number
+  jumlah_tidak_sekolah: number
+  tingkat_label: string
+  lp_label: string
+  bl_label: string
+}
+
+export async function getPembagianTugasMengajarData() {
+  await ensureKelasCetakColumns()
+  const rows = await query<Omit<PembagianTugasMengajarRow, 'tingkat_label' | 'lp_label' | 'bl_label'>>(`
+    SELECT
+      k.id,
+      k.nama_kelas,
+      m.nama as marhalah_nama,
+      k.tempat,
+      k.grade,
+      k.jenis_kelamin,
+      gs.nama_lengkap as guru_shubuh_nama,
+      ga.nama_lengkap as guru_ashar_nama,
+      gm.nama_lengkap as guru_maghrib_nama,
+      SUM(CASE WHEN s.status_global = 'aktif' AND s.jenis_kelamin = 'L' THEN 1 ELSE 0 END) as total_putra,
+      SUM(CASE WHEN s.status_global = 'aktif' AND s.jenis_kelamin = 'P' THEN 1 ELSE 0 END) as total_putri,
+      SUM(CASE WHEN s.status_global = 'aktif' THEN 1 ELSE 0 END) as total_santri,
+      SUM(CASE
+        WHEN s.status_global = 'aktif'
+         AND (UPPER(COALESCE(s.sekolah, '')) LIKE '%MTS%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SMP%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SADESA%')
+        THEN 1 ELSE 0 END) as jumlah_sltp,
+      SUM(CASE
+        WHEN s.status_global = 'aktif'
+         AND (UPPER(COALESCE(s.sekolah, '')) LIKE '%MA%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SMA%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SMK%')
+        THEN 1 ELSE 0 END) as jumlah_slta,
+      SUM(CASE
+        WHEN s.status_global = 'aktif'
+         AND (UPPER(COALESCE(s.sekolah, '')) LIKE '%KULIAH%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%UNIVERSITAS%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%ST%')
+        THEN 1 ELSE 0 END) as jumlah_kuliah,
+      SUM(CASE
+        WHEN s.status_global = 'aktif'
+         AND COALESCE(TRIM(s.sekolah), '') = ''
+        THEN 1 ELSE 0 END) as jumlah_tidak_sekolah
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    LEFT JOIN data_guru gs ON k.guru_shubuh_id = gs.id
+    LEFT JOIN data_guru ga ON k.guru_ashar_id = ga.id
+    LEFT JOIN data_guru gm ON k.guru_maghrib_id = gm.id
+    LEFT JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN santri s ON s.id = rp.santri_id
+    GROUP BY
+      k.id, k.nama_kelas, m.nama, k.tempat, k.grade, k.jenis_kelamin,
+      gs.nama_lengkap, ga.nama_lengkap, gm.nama_lengkap
+  `)
+
+  return rows
+    .map((row) => ({
+      ...row,
+      tingkat_label: getJenjangDominan(row),
+      lp_label: row.jenis_kelamin === 'L' ? 'Pa' : row.jenis_kelamin === 'P' ? 'Pi' : 'C',
+      bl_label: '-',
+    }))
+    .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {

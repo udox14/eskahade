@@ -1,10 +1,8 @@
 'use client'
 
-import React from 'react'
-
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif } from './actions'
-import { Trash2, Plus, FileSpreadsheet, Upload, Save, CheckCircle, Download, Database, List, Loader2, CalendarDays, AlertTriangle } from 'lucide-react'
+import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -61,12 +59,12 @@ export default function MasterKelasPage() {
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows = [
-      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "JENIS KELAMIN": "L" },
-      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "JENIS KELAMIN": "P" },
-      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "JENIS KELAMIN": "C" },
+      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Barat", "GRADE": "A", "JENIS KELAMIN": "L" },
+      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Timur", "GRADE": "B", "JENIS KELAMIN": "P" },
+      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "TEMPAT": "Aula Lama", "GRADE": "AB", "JENIS KELAMIN": "C" },
     ]
     const worksheet = XLSX.utils.json_to_sheet(rows)
-    worksheet['!cols'] = [{wch:15}, {wch:20}, {wch:10}]
+    worksheet['!cols'] = [{wch:15}, {wch:20}, {wch:20}, {wch:10}, {wch:10}]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template Kelas")
     XLSX.writeFile(workbook, "Template_Master_Kelas.xlsx")
@@ -110,6 +108,15 @@ export default function MasterKelasPage() {
         <DashboardPageHeader
           title="Manajemen Kelas & Ruangan"
           description="Atur struktur kelas per tahun ajaran."
+          action={(
+            <Link
+              href="/dashboard/master/kelas/tempelan"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4" />
+              Cetak Tempelan
+            </Link>
+          )}
           className="flex-1"
         />
         <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -159,6 +166,14 @@ export default function MasterKelasPage() {
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Kelas (Ex: 1-B)</label>
                 <input type="text" name="nama_kelas" required placeholder="Contoh: 1-14" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
               </div>
+              <div className="w-full md:w-1/3">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tempat</label>
+                <input type="text" name="tempat" placeholder="Contoh: Gedung Barat" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+              </div>
+              <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Grade</label>
+                <input type="text" name="grade" placeholder="Contoh: A / AB / C" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm uppercase" />
+              </div>
               <div className="w-full md:w-1/4">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jenis Kelamin</label>
                 <select name="jenis_kelamin" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
@@ -176,13 +191,15 @@ export default function MasterKelasPage() {
             </div>
             <table className="w-full text-sm text-left">
               <thead className="bg-white text-slate-600 font-bold border-b">
-                <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
+                <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {kelasList?.map((k) => (
                   <tr key={k.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
-                    <td className="px-6 py-3 text-slate-500">{k.marhalah?.nama}</td>
+                    <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
+                    <td className="px-6 py-3 text-slate-500">{k.tempat || '-'}</td>
+                    <td className="px-6 py-3 text-slate-500 font-semibold">{k.grade || '-'}</td>
                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
                     <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
@@ -216,7 +233,7 @@ export default function MasterKelasPage() {
                         </button>
                     </div>
                     <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
+                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">Tempat</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['TEMPAT'] || row['tempat'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['GRADE'] || row['grade'] || '-'}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
                     </div>
                 </div>
             )}

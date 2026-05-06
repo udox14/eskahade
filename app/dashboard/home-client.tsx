@@ -13,7 +13,7 @@ import {
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
-  Download, FileWarning, Shuffle, Home, UserX
+  Download, FileWarning, Shuffle, Home, UserX, DoorOpen
 } from 'lucide-react'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
-  FileWarning, Shuffle, Home, UserX,
+  FileWarning, Shuffle, Home, UserX, DoorOpen,
 }
 function getIcon(name: string): React.ElementType {
   return ICON_MAP[name] ?? Settings
@@ -43,6 +43,8 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/dewan-santri/surat':                   'Buat surat izin, keterangan, dan tagihan untuk santri.',
   '/dashboard/asrama/absen-malam':                   'Catat kehadiran santri saat apel malam per kamar.',
   '/dashboard/asrama/absen-berjamaah':               'Rekam kehadiran shalat berjamaah santri per waktu.',
+  '/dashboard/asrama/kamar':                         'Lihat kartu kamar, anggota kamar, ketua kamar, dan mutasi kamar dalam satu asrama.',
+  '/dashboard/asrama/kepengurusan':                 'Atur pembina asrama, rois, sekretaris, bendahara, dan pembina kamar per asrama.',
   '/dashboard/asrama/perpindahan-kamar':             'Proses perpindahan santri antar kamar dalam satu asrama.',
   '/dashboard/asrama/mutasi-asrama':                 'Pindahkan santri antar asrama, assign santri baru, atau mutasi batch.',
   '/dashboard/asrama/absen-sakit':                   'Data santri sakit per sesi pagi, sore, dan malam.',

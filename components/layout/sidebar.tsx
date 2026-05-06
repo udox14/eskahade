@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
   Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
   ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList, ToggleRight,
-  LogOut, CalendarRange, Download, FileWarning, Shuffle, Home, UserX, UserMinus
+  LogOut, CalendarRange, Download, FileWarning, Shuffle, Home, UserX, UserMinus, DoorOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -22,6 +22,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
   FileWarning, Shuffle, Home, UserX, UserMinus,
+  DoorOpen,
 };
 
 function getIcon(name: string): React.ElementType {

@@ -3,11 +3,12 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
 import { getDataMaster, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square } from 'lucide-react'
+import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import Link from 'next/link'
 
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
@@ -197,6 +198,15 @@ export default function ManajemenGuruPage() {
         <DashboardPageHeader
           title="Manajemen Guru & Jadwal"
           description="Atur pengajar per kelas. Guru malam otomatis jadi wali kelas."
+          action={(
+            <Link
+              href="/dashboard/master/wali-kelas/cetak"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4" />
+              Cetak Tugas Mengajar
+            </Link>
+          )}
           className="flex-1"
         />
         <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">

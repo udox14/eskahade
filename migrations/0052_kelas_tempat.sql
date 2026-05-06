@@ -1,0 +1,1 @@
+ALTER TABLE kelas ADD COLUMN tempat TEXT;
