@@ -1,24 +1,25 @@
 'use server'
 
 import { query } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { getSppScope, SADESA_UNIT } from '@/lib/spp/unit-setor'
 
 export async function getStatusSetoranSaya(tahun: number) {
   const session = await getSession()
+  const scope = getSppScope(session)
 
-  if (!session || !hasRole(session, 'pengurus_asrama') || !session.asrama_binaan) {
-    return { error: 'Anda tidak memiliki akses asrama binaan.' }
+  if (!scope || scope.kind === 'ADMIN') {
+    return { error: 'Halaman ini hanya untuk pengurus asrama atau dewan santri.' }
   }
 
-  const asrama = session.asrama_binaan
-
+  const unitSetor = scope.kind === 'SADESA' ? SADESA_UNIT : scope.defaultUnit
   const data = await query<any>(`
     SELECT ss.bulan, ss.tanggal_terima, u.full_name AS penerima_nama
     FROM spp_setoran ss
     LEFT JOIN users u ON u.id = ss.penerima_id
-    WHERE ss.asrama = ? AND ss.tahun = ?
+    WHERE COALESCE(NULLIF(TRIM(ss.unit_setor), ''), ss.asrama) = ? AND ss.tahun = ?
     ORDER BY ss.bulan
-  `, [asrama, tahun])
+  `, [unitSetor, tahun])
 
   const statusBulan: Record<number, any> = {}
   data.forEach((d: any) => {
@@ -29,5 +30,10 @@ export async function getStatusSetoranSaya(tahun: number) {
     }
   })
 
-  return { asrama, data: statusBulan }
+  return {
+    unitSetor,
+    displayName: scope.kind === 'SADESA' ? 'SADESA' : `Asrama ${unitSetor}`,
+    isSadesa: scope.kind === 'SADESA',
+    data: statusBulan,
+  }
 }

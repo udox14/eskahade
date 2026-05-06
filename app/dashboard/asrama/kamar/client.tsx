@@ -1,10 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Crown, Home, MapPin, School } from 'lucide-react'
+import { ArrowLeft, Crown, MapPin, School, Users } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { mutasiKamarDalamAsrama, getKamarOverview, updateKetuaKamarLangsung } from './actions'
+import { getKamarDetail, mutasiKamarDalamAsrama, getKamarOverview, updateKetuaKamarLangsung } from './actions'
 
 type KetuaInfo = {
   nomor_kamar: string
@@ -15,9 +16,9 @@ type KetuaInfo = {
 type RoomMember = {
   id: string
   nis: string
-  nama_lengkap: string
   asrama: string | null
   kamar: string | null
+  nama_lengkap: string
   sekolah: string | null
   kelas_sekolah: string | null
   kab_kota: string | null
@@ -33,7 +34,6 @@ type RoomCard = {
   total_anggota: number
   ketua: KetuaInfo
   pembina_nama: string | null
-  members: RoomMember[]
 }
 
 type Demografi = {
@@ -60,26 +60,33 @@ type OverviewResult =
       demografi: Demografi
     }
 
-function StatCard({
+function KamarStatusBadge({ isi, kuota }: { isi: number; kuota: number }) {
+  if (isi === 0) return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Kosong</span>
+  if (isi > kuota) return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">Over</span>
+  if (isi === kuota) return <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-600">Penuh</span>
+  return <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-600">Normal</span>
+}
+
+function SummaryCard({
   label,
   value,
   tone,
 }: {
   label: string
-  value: string | number
-  tone: 'emerald' | 'blue' | 'amber' | 'slate'
+  value: number
+  tone: 'slate' | 'indigo' | 'green' | 'amber'
 }) {
-  const tones = {
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    blue: 'bg-sky-50 border-sky-200 text-sky-700',
-    amber: 'bg-amber-50 border-amber-200 text-amber-700',
-    slate: 'bg-slate-50 border-slate-200 text-slate-700',
+  const toneClass = {
+    slate: 'text-slate-800',
+    indigo: 'text-indigo-700',
+    green: 'text-green-600',
+    amber: 'text-amber-600',
   }
 
   return (
-    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
-      <p className="text-[11px] font-bold uppercase tracking-wider opacity-70">{label}</p>
-      <p className="mt-2 text-2xl font-black">{value}</p>
+    <div className="rounded-xl border bg-white p-4 text-center shadow-sm">
+      <p className={`text-2xl font-black ${toneClass[tone]}`}>{value}</p>
+      <p className="mt-1 text-xs text-slate-400">{label}</p>
     </div>
   )
 }
@@ -107,9 +114,9 @@ function MutasiSelect({
         value={value}
         onChange={(event) => setValue(event.target.value)}
         disabled={disabled}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
       >
-        <option value="">Pindah ke...</option>
+        <option value="">Pilih kamar</option>
         {rooms
           .filter((room) => room !== currentRoom)
           .map((room) => (
@@ -126,7 +133,7 @@ function MutasiSelect({
           onSubmit(value)
           setValue('')
         }}
-        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200"
+        className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-slate-700 disabled:bg-slate-300"
       >
         Mutasi
       </button>
@@ -141,6 +148,9 @@ export default function KamarClient({
   userRole: string
   asramaBinaan: string | null
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [selectedAsrama, setSelectedAsrama] = useState(asramaBinaan ?? '')
   const [asramaOptions, setAsramaOptions] = useState<string[]>([])
   const [rooms, setRooms] = useState<RoomCard[]>([])
@@ -152,9 +162,20 @@ export default function KamarClient({
     topSekolah: [],
     topKota: [],
   })
-  const [selectedKamar, setSelectedKamar] = useState('')
+  const [selectedRoom, setSelectedRoom] = useState<(RoomCard & { members: RoomMember[] }) | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const selectedKamar = searchParams.get('kamar')
+
+  const setKamarQuery = useCallback((kamar: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (kamar) params.set('kamar', kamar)
+    else params.delete('kamar')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [pathname, router, searchParams])
 
   const load = useCallback(
     async (targetAsrama?: string) => {
@@ -170,26 +191,60 @@ export default function KamarClient({
       setSelectedAsrama(result.currentAsrama)
       setRooms(result.rooms)
       setDemografi(result.demografi)
-      setSelectedKamar((prev) => {
-        const stillExists = result.rooms.some((room) => room.nomor_kamar === prev)
-        return stillExists ? prev : result.rooms[0]?.nomor_kamar || ''
-      })
+      if (selectedKamar && !result.rooms.some((room) => room.nomor_kamar === selectedKamar)) {
+        setKamarQuery(null)
+        setSelectedRoom(null)
+      }
       setLoading(false)
     },
-    [asramaBinaan, selectedAsrama]
+    [asramaBinaan, selectedAsrama, selectedKamar, setKamarQuery]
   )
 
   useEffect(() => {
     load(asramaBinaan ?? selectedAsrama)
   }, [asramaBinaan, load])
 
-  const selectedRoom = useMemo(
-    () => rooms.find((room) => room.nomor_kamar === selectedKamar) ?? null,
-    [rooms, selectedKamar]
-  )
-
   const roomNames = useMemo(() => rooms.map((room) => room.nomor_kamar), [rooms])
+  const ringkasanKamar = useMemo(() => {
+    const kamarTerisi = rooms.filter((room) => room.total_anggota > 0).length
+    const kamarTanpaKetua = rooms.filter((room) => room.total_anggota > 0 && !room.ketua).length
+    const kamarTanpaPembina = rooms.filter((room) => room.total_anggota > 0 && !room.pembina_nama).length
+    return { kamarTerisi, kamarTanpaKetua, kamarTanpaPembina }
+  }, [rooms])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadDetail = async () => {
+      if (!selectedKamar || !selectedAsrama) {
+        setSelectedRoom(null)
+        return
+      }
+
+      setLoadingDetail(true)
+      const result = await getKamarDetail(selectedAsrama, selectedKamar)
+      if (cancelled) return
+
+      if ('error' in result) {
+        toast.error(result.error)
+        setSelectedRoom(null)
+        setSelectedMemberId(null)
+        setKamarQuery(null)
+        setLoadingDetail(false)
+        return
+      }
+
+      setSelectedRoom(result.room)
+      setSelectedMemberId((prev) => result.room.members.some((member: RoomMember) => member.id === prev) ? prev : result.room.members[0]?.id ?? null)
+      setLoadingDetail(false)
+    }
+
+    loadDetail()
+    return () => { cancelled = true }
+  }, [selectedAsrama, selectedKamar, setKamarQuery])
+
   const isAdmin = userRole === 'admin'
+  const selectedMember = selectedRoom?.members.find((member) => member.id === selectedMemberId) ?? null
 
   const handleSetKetua = (nomorKamar: string, santriId: string | null) => {
     startTransition(async () => {
@@ -198,7 +253,6 @@ export default function KamarClient({
         nomorKamar,
         santriId,
       })
-
       if ('error' in result) {
         toast.error(result.error)
         return
@@ -216,7 +270,6 @@ export default function KamarClient({
         santriId,
         kamarTujuan,
       })
-
       if ('error' in result) {
         toast.error(result.error)
         return
@@ -227,256 +280,304 @@ export default function KamarClient({
     })
   }
 
-  return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-20">
-      <DashboardPageHeader
-        title="Kamar Asrama"
-        description="Pantau semua kamar, lihat anggota kamar, tentukan ketua kamar, dan lakukan mutasi kamar dalam satu asrama."
-        action={
-          isAdmin ? (
-            <select
-              value={selectedAsrama}
-              onChange={(event) => {
-                const next = event.target.value
-                setSelectedAsrama(next)
-                setSelectedKamar('')
-                load(next)
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 sm:min-w-64"
-            >
-              {asramaOptions.map((asrama) => (
-                <option key={asrama} value={asrama}>
-                  {asrama}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-              Asrama binaan: {selectedAsrama || asramaBinaan || '-'}
-            </div>
-          )
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total Santri" value={demografi.totalSantri} tone="emerald" />
-        <StatCard label="Total Kamar" value={demografi.totalKamar} tone="blue" />
-        <StatCard label="Ketua Terisi" value={demografi.ketuaTerisi} tone="amber" />
-        <StatCard label="Belum Berkamar" value={demografi.belumBerkamar} tone="slate" />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-slate-700">
-            <School className="h-4 w-4 text-emerald-600" />
-            <h2 className="text-sm font-black uppercase tracking-wider">Demografi Singkat</h2>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Sebaran Sekolah</p>
-              <div className="flex flex-wrap gap-2">
-                {demografi.topSekolah.length > 0 ? (
-                  demografi.topSekolah.map((item) => (
-                    <span
-                      key={item.label}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-                    >
-                      {item.label} ({item.total})
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-slate-400">Belum ada data sekolah.</span>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Sebaran Kab/Kota</p>
-              <div className="flex flex-wrap gap-2">
-                {demografi.topKota.length > 0 ? (
-                  demografi.topKota.map((item) => (
-                    <span
-                      key={item.label}
-                      className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700"
-                    >
-                      {item.label} ({item.total})
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-slate-400">Belum ada data domisili.</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-slate-700">
-            <Home className="h-4 w-4 text-slate-700" />
-            <h2 className="text-sm font-black uppercase tracking-wider">Info Pengelolaan</h2>
-          </div>
-          <div className="space-y-3 text-sm text-slate-600">
-            <p>Ketua kamar di halaman ini memakai tabel yang sama dengan fitur perpindahan kamar, jadi perubahan di sini langsung terbaca di sana.</p>
-            <p>Mutasi kamar di halaman ini hanya berlaku dalam satu asrama. Draft perpindahan kamar untuk santri yang dipindah akan dibersihkan agar datanya tetap sinkron.</p>
-            <p>Pembina kamar diambil dari fitur Kepengurusan Asrama, jadi perubahan pengurus di sana langsung tampil juga di sini.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
+  if (selectedKamar) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-5 pb-20">
+        <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-900">Daftar Kamar</h2>
-            <p className="text-sm text-slate-500">Klik salah satu card untuk membuka detail anggota kamar.</p>
+            <button
+              type="button"
+              onClick={() => setKamarQuery(null)}
+              className="mb-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+            >
+              <ArrowLeft className="h-4 w-4" /> Kembali ke daftar kamar
+            </button>
+            <DashboardPageHeader
+              title={`Kamar ${selectedRoom?.nomor_kamar || selectedKamar}`}
+              description={`Asrama ${selectedAsrama}${selectedRoom?.blok ? ` - Blok ${selectedRoom.blok}` : ''}`}
+            />
           </div>
-          {pending || loading ? <span className="text-xs font-semibold text-slate-400">Memuat data...</span> : null}
+          <div className="grid grid-cols-3 gap-3">
+            <SummaryCard label="Anggota" value={selectedRoom?.total_anggota || 0} tone="slate" />
+            <SummaryCard label="Ketua" value={selectedRoom?.ketua ? 1 : 0} tone="amber" />
+            <SummaryCard label="Pembina" value={selectedRoom?.pembina_nama ? 1 : 0} tone="green" />
+          </div>
         </div>
 
-        {rooms.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-16 text-center text-slate-400">
-            Belum ada kamar yang bisa ditampilkan untuk asrama ini.
+        {loadingDetail || !selectedRoom ? (
+          <div className="flex justify-center py-20">
+            <Users className="h-8 w-8 animate-pulse text-slate-300" />
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ketua Kamar</p>
+            <div className="mt-2 space-y-3">
+              <p className="text-lg font-black text-slate-800">{selectedRoom.ketua?.nama_lengkap || 'Belum ditentukan'}</p>
+              <select
+                value={selectedRoom.ketua?.santri_id || ''}
+                onChange={(event) => handleSetKetua(selectedRoom.nomor_kamar, event.target.value || null)}
+                disabled={pending}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+              >
+                <option value="">-- Pilih Ketua Kamar --</option>
+                {selectedRoom.members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.nama_lengkap}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pembina Kamar</p>
+            <p className="mt-2 text-lg font-black text-slate-800">{selectedRoom.pembina_nama || 'Belum diatur'}</p>
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</p>
+            <div className="mt-2 flex items-center gap-2">
+              <KamarStatusBadge
+                isi={selectedRoom.total_anggota}
+                kuota={Math.max(0, selectedRoom.kuota - (selectedRoom.reserved_baru ?? 0))}
+              />
+              <span className="text-sm font-semibold text-slate-600">
+                {selectedRoom.total_anggota}/{Math.max(0, selectedRoom.kuota - (selectedRoom.reserved_baru ?? 0))} efektif
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Aksi Santri</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Klik salah satu baris santri di tabel untuk memilih siapa yang akan dimutasi.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 lg:min-w-[360px]">
+              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Santri terpilih</p>
+                <p className="mt-1 text-sm font-bold text-slate-800">{selectedMember?.nama_lengkap || 'Belum memilih santri'}</p>
+                <p className="text-xs text-slate-500">{selectedMember ? `${selectedMember.nama_kelas || '-'} • ${selectedMember.sekolah || '-'}` : 'Pilih santri dari tabel di bawah.'}</p>
+              </div>
+              <MutasiSelect
+                currentRoom={selectedRoom.nomor_kamar}
+                rooms={roomNames}
+                disabled={pending || !selectedMember}
+                onSubmit={(targetRoom) => {
+                  if (!selectedMember) return
+                  handleMutasi(selectedMember.id, targetRoom)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-4 py-3 text-left">Nama</th>
+                <th className="px-4 py-3 text-left">Kelas</th>
+                <th className="px-4 py-3 text-left">Sekolah</th>
+                <th className="px-4 py-3 text-left">Kelas Sekolah</th>
+                <th className="px-4 py-3 text-left">Kab/Kota</th>
+                <th className="px-4 py-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {selectedRoom.members.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-16 text-center text-slate-400">Belum ada anggota di kamar ini.</td>
+                </tr>
+              ) : (
+                selectedRoom.members.map((member) => {
+                  const isKetua = selectedRoom.ketua?.santri_id === member.id
+                  const isSelected = selectedMemberId === member.id
+                  return (
+                    <tr
+                      key={member.id}
+                      onClick={() => setSelectedMemberId(member.id)}
+                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-start gap-2">
+                          {isKetua ? <Crown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> : null}
+                          <div>
+                            <p className="font-semibold text-slate-800">{member.nama_lengkap}</p>
+                            <p className="text-xs text-slate-400">{member.nis}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{member.nama_kelas || '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{member.sekolah || '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{member.kelas_sekolah || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {member.alamat_ringkas}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {isKetua ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">Ketua</span>
+                          ) : null}
+                          {isSelected ? (
+                            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold text-indigo-700">Dipilih</span>
+                          ) : (
+                            <span className="text-xs text-slate-400">Klik untuk aksi</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Kamar Asrama"
+          description="Pantau kamar, lihat penghuni, ubah ketua kamar, dan mutasi santri dalam satu asrama."
+          className="flex-1"
+        />
+        {isAdmin ? (
+          <select
+            value={selectedAsrama}
+            onChange={(event) => {
+              const next = event.target.value
+              setSelectedAsrama(next)
+              load(next)
+            }}
+            className="sm:w-56 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+          >
+            {asramaOptions.map((asrama) => (
+              <option key={asrama} value={asrama}>
+                {asrama}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+            Asrama binaan: {selectedAsrama || asramaBinaan || '-'}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard label="Total Kamar" value={demografi.totalKamar} tone="slate" />
+        <SummaryCard label="Total Santri" value={demografi.totalSantri} tone="indigo" />
+        <SummaryCard label="Kamar Terisi" value={ringkasanKamar.kamarTerisi} tone="green" />
+        <SummaryCard label="Belum Berkamar" value={demografi.belumBerkamar} tone="amber" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <School className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide">Sebaran Sekolah</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {demografi.topSekolah.length > 0 ? demografi.topSekolah.map((item) => (
+              <span key={item.label} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                {item.label} ({item.total})
+              </span>
+            )) : <span className="text-sm text-slate-400">Belum ada data sekolah.</span>}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-amber-600" />
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide">Ringkasan Kamar</h2>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+              <span className="text-slate-500">Kamar tanpa ketua</span>
+              <span className="font-black text-slate-800">{ringkasanKamar.kamarTanpaKetua}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+              <span className="text-slate-500">Kamar tanpa pembina</span>
+              <span className="font-black text-slate-800">{ringkasanKamar.kamarTanpaPembina}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+              <span className="text-slate-500">Sebaran kelas sekolah</span>
+              <span className="font-black text-slate-800">{demografi.topKota[0]?.label || '-'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Users className="h-8 w-8 animate-pulse text-slate-300" />
+        </div>
+      ) : rooms.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-16 text-center text-slate-400">
+          Belum ada kamar yang bisa ditampilkan untuk asrama ini.
+        </div>
+      ) : (
+        <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-4 border-b bg-slate-50">
+            <h2 className="font-bold text-slate-800">Daftar Kamar</h2>
+            <p className="text-sm text-slate-500">Klik card untuk membuka detail kamar.</p>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rooms.map((room) => {
-              const active = room.nomor_kamar === selectedKamar
+              const kuotaEfektif = Math.max(0, room.kuota - (room.reserved_baru ?? 0))
               return (
                 <button
                   key={room.nomor_kamar}
                   type="button"
-                  onClick={() => setSelectedKamar(room.nomor_kamar)}
-                  className={`rounded-3xl border p-5 text-left transition ${
-                    active
-                      ? 'border-emerald-300 bg-emerald-50 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                  }`}
+                  onClick={() => setKamarQuery(room.nomor_kamar)}
+                  className="border rounded-xl bg-slate-50/50 hover:border-slate-300 hover:shadow-sm transition-all text-left"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kamar</p>
-                      <h3 className="mt-1 text-2xl font-black text-slate-900">{room.nomor_kamar}</h3>
+                  <div className="flex items-center justify-between px-3 py-2 border-b bg-white rounded-t-xl">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-black text-slate-800">Kamar {room.nomor_kamar}</span>
                       {room.blok ? (
-                        <p className="mt-1 text-xs font-semibold text-indigo-600">Blok {room.blok}</p>
+                        <span className="text-[9px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded">
+                          Blok {room.blok}
+                        </span>
                       ) : null}
+                      <KamarStatusBadge isi={room.total_anggota} kuota={kuotaEfektif} />
                     </div>
-                    <div className="rounded-2xl bg-slate-900 px-3 py-2 text-center text-white">
-                      <p className="text-[10px] uppercase tracking-wider text-slate-300">Anggota</p>
-                      <p className="text-xl font-black">{room.total_anggota}</p>
-                    </div>
+                    <span className="text-xs font-bold text-slate-600">{room.total_anggota}/{kuotaEfektif}</span>
                   </div>
-
-                  <div className="mt-4 grid gap-3">
-                    <div className="rounded-2xl bg-white/80 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ketua Kamar</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-700">
-                        {room.ketua?.nama_lengkap || 'Belum ditentukan'}
-                      </p>
+                  <div className="px-3 py-2 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ketua</p>
+                        <p className="text-xs font-semibold text-slate-700 truncate">{room.ketua?.nama_lengkap || 'Belum ditentukan'}</p>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pembina</p>
+                        <p className="text-xs font-semibold text-slate-700 truncate">{room.pembina_nama || 'Belum diatur'}</p>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-white/80 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pembina</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-700">
-                        {room.pembina_nama || 'Belum diatur'}
-                      </p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>{room.total_anggota} penghuni aktif</span>
+                      <span>{room.reserved_baru ? `Reserve ${room.reserved_baru}` : 'Tanpa reserve'}</span>
                     </div>
                   </div>
                 </button>
               )
             })}
           </div>
-        )}
-      </div>
-
-      {selectedRoom ? (
-        <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Detail Kamar</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-900">
-                Kamar {selectedRoom.nomor_kamar}
-                {selectedRoom.blok ? ` - Blok ${selectedRoom.blok}` : ''}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {selectedRoom.total_anggota} anggota, ketua saat ini: {selectedRoom.ketua?.nama_lengkap || 'belum ditentukan'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Pembina kamar: <span className="font-bold text-slate-800">{selectedRoom.pembina_nama || 'Belum diatur'}</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Nama</th>
-                  <th className="px-4 py-3">Kelas</th>
-                  <th className="px-4 py-3">Sekolah</th>
-                  <th className="px-4 py-3">Kelas Sekolah</th>
-                  <th className="px-4 py-3">Kab/Kota</th>
-                  <th className="px-4 py-3">Ketua</th>
-                  <th className="px-4 py-3">Mutasi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {selectedRoom.members.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-slate-400">
-                      Belum ada anggota di kamar ini.
-                    </td>
-                  </tr>
-                ) : (
-                  selectedRoom.members.map((member) => {
-                    const isKetua = selectedRoom.ketua?.santri_id === member.id
-                    return (
-                      <tr key={member.id} className={isKetua ? 'bg-amber-50/60' : 'bg-white'}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-start gap-2">
-                            {isKetua ? <Crown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> : null}
-                            <div>
-                              <p className="font-semibold text-slate-800">{member.nama_lengkap}</p>
-                              <p className="text-xs text-slate-400">{member.nis}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{member.nama_kelas || '-'}</td>
-                        <td className="px-4 py-3 text-slate-600">{member.sekolah || '-'}</td>
-                        <td className="px-4 py-3 text-slate-600">{member.kelas_sekolah || '-'}</td>
-                        <td className="px-4 py-3">
-                          <div className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {member.alamat_ringkas}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => handleSetKetua(selectedRoom.nomor_kamar, isKetua ? null : member.id)}
-                            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
-                              isKetua
-                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            {isKetua ? 'Lepas Ketua' : 'Jadikan Ketua'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <MutasiSelect
-                            currentRoom={selectedRoom.nomor_kamar}
-                            rooms={roomNames}
-                            disabled={pending}
-                            onSubmit={(targetRoom) => handleMutasi(member.id, targetRoom)}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
-      ) : null}
+      )}
     </div>
   )
 }

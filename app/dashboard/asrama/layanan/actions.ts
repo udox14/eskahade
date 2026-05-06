@@ -62,10 +62,12 @@ export async function getDaftarKamar(asrama: string) {
   const targetAsrama = restrictedAsrama ?? asrama
 
   const data = await query<{ kamar: string }>(
-    'SELECT DISTINCT kamar FROM santri WHERE asrama = ? AND kamar IS NOT NULL ORDER BY kamar',
+    'SELECT DISTINCT kamar FROM santri WHERE asrama = ? AND kamar IS NOT NULL',
     [targetAsrama]
   )
-  return data.map((item) => item.kamar)
+  return data
+    .map((item) => item.kamar)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 export async function getMasterJasa() {

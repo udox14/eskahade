@@ -2,10 +2,11 @@
 
 import { query, queryOne } from '@/lib/db'
 
-function getJenjang(sekolah: string | null) {
+function getJenjang(sekolah: string | null, kategoriSantri?: string | null) {
+  if (kategoriSantri === 'SADESA') return 'SADESA'
   if (!sekolah) return 'TIDAK_SEKOLAH'
   const s = sekolah.toUpperCase()
-  if (s.includes('MTS') || s.includes('SMP') || s.includes('SADESA')) return 'SLTP'
+  if (s.includes('MTS') || s.includes('SMP')) return 'SLTP'
   if (s.includes('MA') || s.includes('SMA') || s.includes('SMK')) return 'SLTA'
   if (s.includes('KULIAH') || s.includes('UNIVERSITAS') || s.includes('ST')) return 'KULIAH'
   return 'LAINNYA'
@@ -16,7 +17,7 @@ const emptyStats = () => ({
   keluar_bulan_ini: 0,
   masuk_bulan_ini: 0,
   jenis_kelamin: { L: 0, P: 0 },
-  jenjang: { SLTP: 0, SLTA: 0, KULIAH: 0, TIDAK_SEKOLAH: 0, LAINNYA: 0, detail: {} as Record<string, number> },
+  jenjang: { SLTP: 0, SLTA: 0, KULIAH: 0, SADESA: 0, TIDAK_SEKOLAH: 0, LAINNYA: 0, detail: {} as Record<string, number> },
   kelas_sekolah: {} as Record<string, number>,
   marhalah: {} as Record<string, number>,
   distribusi_kamar: {} as Record<string, Record<string, number>>,
@@ -33,7 +34,7 @@ export async function getSensusData(asramaFilter: string) {
   const [santriList, statsRow, keluarRow] = await Promise.all([
     // Detail per santri untuk distribusi kamar (tetap diperlukan karena strukturnya kompleks)
     query<any>(`
-      SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
+      SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, s.kategori_santri, s.sekolah, s.kelas_sekolah,
              s.asrama, s.kamar, s.created_at,
              m.nama AS marhalah_nama, k.nama_kelas
       FROM santri s
@@ -74,11 +75,11 @@ export async function getSensusData(asramaFilter: string) {
 
   // Hitung distribusi jenjang, marhalah, kamar dari list (sudah lebih kecil karena filter asrama)
   santriList.forEach((s: any) => {
-    const jenjang = getJenjang(s.sekolah)
+    const jenjang = getJenjang(s.sekolah, s.kategori_santri)
     // @ts-ignore
     if (stats.jenjang[jenjang] !== undefined) stats.jenjang[jenjang]++
 
-    const namaSekolah = s.sekolah ? s.sekolah.toUpperCase() : 'TIDAK SEKOLAH'
+    const namaSekolah = s.kategori_santri === 'SADESA' ? 'SADESA' : (s.sekolah ? s.sekolah.toUpperCase() : 'TIDAK SEKOLAH')
     stats.jenjang.detail[namaSekolah] = (stats.jenjang.detail[namaSekolah] || 0) + 1
 
     const kls = s.kelas_sekolah ? s.kelas_sekolah.toUpperCase() : 'BELUM SET'

@@ -12,7 +12,8 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
-const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "SADESA", "LAINNYA"]
+const KATEGORI_SANTRI_LIST = ["REGULER", "SADESA"] as const
+const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 
 const FORM_INIT = {
   nis: '', nama_lengkap: '', nik: '',
@@ -23,6 +24,7 @@ const FORM_INIT = {
   alamat_lengkap: '', kecamatan: '', kab_kota: '', provinsi: '',
   jemaah: '', no_wa_ortu: '',
   tanggal_masuk: '', tanggal_keluar: '',
+  kategori_santri: 'REGULER',
   sekolah: '', kelas_sekolah: '',
   asrama: '', kamar: '',
   kelas_pesantren: '',
@@ -48,7 +50,13 @@ export default function InputSantriPage() {
     getKelasList().then(setKelasList)
   }, [])
 
-  const set = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
+  const set = (key: string, val: string) => setForm(prev => {
+    if (key === 'kategori_santri' && val === 'SADESA') {
+      return { ...prev, kategori_santri: val, sekolah: '', kelas_sekolah: '' }
+    }
+    return { ...prev, [key]: val }
+  })
+  const isSadesa = form.kategori_santri === 'SADESA'
 
   // ── HANDLER FORM ──
   const handleSimpanForm = async (e: React.FormEvent) => {
@@ -77,7 +85,7 @@ export default function InputSantriPage() {
       jemaah: "Jemaah Taraju",
       no_wa_ortu: "08123456789",
       tanggal_masuk: "2024-07-01", tanggal_keluar: "",
-      sekolah: "MTSN", kelas_sekolah: "7",
+      kategori_santri: "REGULER", sekolah: "MTSN", kelas_sekolah: "7",
       asrama: "BAHAGIA", kamar: "1", kelas_pesantren: "1-A",
       nama_tempat_makan: "Bi Ade",
       nama_tempat_cuci: "Bi Hani"
@@ -109,6 +117,7 @@ export default function InputSantriPage() {
       const raw = XLSX.utils.sheet_to_json(ws)
       const clean = JSON.parse(JSON.stringify(raw)).map((row: any) => ({
         ...row,
+        kategori_santri: row.kategori_santri || row['KATEGORI SANTRI'] || row['kategori santri'] || '',
         kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren'],
         no_wa_ortu: row.no_wa_ortu ? String(row.no_wa_ortu) : (row['no_wa_ortu'] || ''),
       }))
@@ -286,15 +295,22 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kategori Santri</label>
+              <select value={form.kategori_santri} onChange={e => set('kategori_santri', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
+                {KATEGORI_SANTRI_LIST.map(kategori => <option key={kategori} value={kategori}>{kategori}</option>)}
+              </select>
+              <p className="mt-1 text-[11px] text-slate-500">Pilih `SADESA` untuk santri khusus yang tidak memiliki status sekolah formal.</p>
+            </div>
+            <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sekolah</label>
-              <select value={form.sekolah} onChange={e => set('sekolah', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
+              <select value={form.sekolah} onChange={e => set('sekolah', e.target.value)} disabled={isSadesa} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400 disabled:bg-slate-100 disabled:text-slate-400">
                 <option value="">-- Pilih Sekolah --</option>
                 {SEKOLAH_LIST.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kelas Sekolah</label>
-              <input value={form.kelas_sekolah} onChange={e => set('kelas_sekolah', e.target.value)} placeholder="Contoh: 7A, 8B" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <input value={form.kelas_sekolah} onChange={e => set('kelas_sekolah', e.target.value)} disabled={isSadesa} placeholder={isSadesa ? "Tidak dipakai untuk SADESA" : "Contoh: 7A, 8B"} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400 disabled:bg-slate-100 disabled:text-slate-400" />
             </div>
           </div>
 

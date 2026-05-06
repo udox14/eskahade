@@ -11,6 +11,5 @@ export default async function KamarPage() {
   if (!session) {
     redirect('/dashboard')
   }
-
   return <KamarClient userRole={session.role} asramaBinaan={session.asrama_binaan ?? null} />
 }

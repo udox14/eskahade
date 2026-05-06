@@ -11,6 +11,7 @@ interface Props {
   kamar: string
   sekolah: string
   kelasSekolah: string
+  kategoriSantri: string
   marhalah: string
   kelasPesantren: string
   status: string
@@ -27,7 +28,7 @@ interface Props {
 }
 
 export async function SantriTable({
-  page, limit, q, asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren,
+  page, limit, q, asrama, kamar, sekolah, kelasSekolah, kategoriSantri, marhalah, kelasPesantren,
   status, jenisKelamin, golDarah, tahunMasuk, provinsi, kabKota, kecamatan, jemaah, alamat,
   userAsrama,
   canUpdate
@@ -50,6 +51,7 @@ export async function SantriTable({
   if (q)             { whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${q}%`, `%${q}%`) }
   if (asrama)        { whereClauses.push('s.asrama = ?');           params.push(asrama) }
   if (kamar)         { whereClauses.push('s.kamar = ?');            params.push(kamar) }
+  if (kategoriSantri){ whereClauses.push('s.kategori_santri = ?');  params.push(kategoriSantri) }
   if (sekolah)       { whereClauses.push('s.sekolah = ?');          params.push(sekolah) }
   if (kelasSekolah)  { whereClauses.push('s.kelas_sekolah = ?');    params.push(kelasSekolah) }
   if (jenisKelamin)  { whereClauses.push('s.jenis_kelamin = ?');    params.push(jenisKelamin) }
@@ -71,7 +73,7 @@ export async function SantriTable({
       `SELECT COUNT(*) AS total FROM santri s ${joinClause} ${whereStr}`, params
     ),
     query<any>(
-      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.status_global,
+      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kategori_santri, s.status_global,
               k.nama_kelas AS kelas_pesantren
        FROM santri s ${joinClause} ${whereStr}
        ORDER BY s.nama_lengkap ASC
@@ -105,6 +107,7 @@ export async function SantriTable({
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{santri.kelas_pesantren || '-'}</p>
+                <p className="text-[11px] text-indigo-600 mt-1 font-semibold">{santri.kategori_santri || 'REGULER'}</p>
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
@@ -122,7 +125,7 @@ export async function SantriTable({
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 <BookOpen className="w-3 h-3" />
-                {santri.sekolah || '-'} {santri.kelas_sekolah ? `Kls ${santri.kelas_sekolah}` : ''}
+                {santri.kategori_santri === 'SADESA' ? 'Tanpa sekolah formal' : `${santri.sekolah || '-'} ${santri.kelas_sekolah ? `Kls ${santri.kelas_sekolah}` : ''}`}
               </span>
             </div>
             <div className="mt-3 flex gap-2">
@@ -169,8 +172,8 @@ export async function SantriTable({
                     <p className="text-gray-400 text-xs">Kamar {santri.kamar || '-'}</p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="text-blue-700 font-medium text-xs">{santri.sekolah || '-'}</p>
-                    <p className="text-gray-400 text-xs">{santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}</p>
+                    <p className="text-blue-700 font-medium text-xs">{santri.kategori_santri === 'SADESA' ? 'SADESA' : (santri.sekolah || '-')}</p>
+                    <p className="text-gray-400 text-xs">{santri.kategori_santri === 'SADESA' ? 'Tanpa sekolah formal' : (santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-')}</p>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${

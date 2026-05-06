@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { Loader2, Plus, Save, Trash2, UserCog, Users } from 'lucide-react'
+import { Loader2, Plus, Save, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getKepengurusanAsramaData, saveKepengurusanAsrama } from './actions'
@@ -28,67 +28,74 @@ function makePembinaKamarDraft(kamar: string, row?: { guru_id: number | null; na
   return { ...makePersonDraft(row), kamar }
 }
 
-function PersonEditor({
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string | number
+  tone: 'slate' | 'indigo' | 'green' | 'amber'
+}) {
+  const toneClass = {
+    slate: 'text-slate-800',
+    indigo: 'text-indigo-700',
+    green: 'text-green-600',
+    amber: 'text-amber-600',
+  }
+
+  return (
+    <div className="rounded-xl border bg-white p-4 text-center shadow-sm">
+      <p className={`text-2xl font-black ${toneClass[tone]}`}>{value}</p>
+      <p className="mt-1 text-xs text-slate-400">{label}</p>
+    </div>
+  )
+}
+
+function PersonInput({
   value,
   guruOptions,
   onChange,
-  removable,
-  onRemove,
 }: {
   value: PersonDraft
   guruOptions: GuruOption[]
   onChange: (next: PersonDraft) => void
-  removable?: boolean
-  onRemove?: () => void
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="grid grid-cols-2 gap-2">
-        {(['guru', 'manual'] as const).map((source) => (
-          <button
-            key={source}
-            type="button"
-            onClick={() => onChange({ ...value, source, guru_id: '', nama: '' })}
-            className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-              value.source === source ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-          >
-            {source === 'guru' ? 'Pilih Guru' : 'Input Manual'}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3">
-        {value.source === 'guru' ? (
-          <select
-            value={value.guru_id}
-            onChange={(event) => {
-              const guruId = event.target.value ? Number(event.target.value) : ''
-              const selected = guruOptions.find((guru) => guru.id === guruId)
-              onChange({ ...value, guru_id: guruId, nama: selected?.nama ?? '' })
-            }}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">-- Pilih Guru --</option>
-            {guruOptions.map((guru) => (
-              <option key={guru.id} value={guru.id}>
-                {guru.nama}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            value={value.nama}
-            onChange={(event) => onChange({ ...value, nama: event.target.value })}
-            placeholder="Nama pengurus"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        )}
-      </div>
-      {removable && onRemove ? (
-        <button type="button" onClick={onRemove} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-red-600">
-          <Trash2 className="h-3 w-3" /> Hapus
-        </button>
-      ) : null}
+    <div className="flex items-center gap-2">
+      <select
+        value={value.source}
+        onChange={(event) => onChange({ ...value, source: event.target.value as 'guru' | 'manual', guru_id: '', nama: '' })}
+        className="w-28 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        <option value="guru">Guru</option>
+        <option value="manual">Manual</option>
+      </select>
+      {value.source === 'guru' ? (
+        <select
+          value={value.guru_id}
+          onChange={(event) => {
+            const guruId = event.target.value ? Number(event.target.value) : ''
+            const selected = guruOptions.find((guru) => guru.id === guruId)
+            onChange({ ...value, guru_id: guruId, nama: selected?.nama ?? '' })
+          }}
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">-- Pilih Guru --</option>
+          {guruOptions.map((guru) => (
+            <option key={guru.id} value={guru.id}>
+              {guru.nama}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          value={value.nama}
+          onChange={(event) => onChange({ ...value, nama: event.target.value })}
+          placeholder="Nama pengurus"
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      )}
     </div>
   )
 }
@@ -178,177 +185,238 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
     })
   }
 
-  return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-20">
-      <DashboardPageHeader
-        title="Kepengurusan Asrama"
-        description="Atur struktur pengurus inti, sekretaris, bendahara, dan pembina kamar untuk tiap asrama."
-        action={
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            {isAdmin ? (
-              <select
-                value={selectedAsrama}
-                onChange={(event) => {
-                  const next = event.target.value
-                  setSelectedAsrama(next)
-                  load(next)
-                }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 sm:min-w-64"
-              >
-                {asramaOptions.map((asrama) => (
-                  <option key={asrama} value={asrama}>
-                    {asrama}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
-                Asrama binaan: {selectedAsrama || asramaBinaan || '-'}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={submit}
-              disabled={pending || loading || !selectedAsrama}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
-            >
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Simpan
-            </button>
-          </div>
-        }
-      />
+  const intiRows = [
+    { key: 'pembina_asrama', label: 'Pembina Asrama', value: inti.pembina_asrama },
+    { key: 'rois', label: 'Rois / Roisah', value: inti.rois },
+    { key: 'wakil_rois', label: 'Wakil Rois / Roisah', value: inti.wakil_rois },
+  ] as const
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wider text-indigo-500">Pembina Kamar</p>
-          <p className="mt-2 text-3xl font-black text-indigo-800">{filledSummary.pembinaKamar}/{roomOptions.length}</p>
+  return (
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          title="Kepengurusan Asrama"
+          description="Atur pengurus inti, sekretaris, bendahara, dan pembina kamar per asrama."
+          className="flex-1"
+        />
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          {isAdmin ? (
+            <select
+              value={selectedAsrama}
+              onChange={(event) => {
+                const next = event.target.value
+                setSelectedAsrama(next)
+                load(next)
+              }}
+              className="sm:w-56 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              {asramaOptions.map((asrama) => (
+                <option key={asrama} value={asrama}>
+                  {asrama}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              Asrama binaan: {selectedAsrama || asramaBinaan || '-'}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pending || loading || !selectedAsrama}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:bg-slate-300"
+          >
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Simpan
+          </button>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wider text-emerald-500">Sekretaris</p>
-          <p className="mt-2 text-3xl font-black text-emerald-800">{filledSummary.sekretaris}</p>
-        </div>
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wider text-amber-500">Bendahara</p>
-          <p className="mt-2 text-3xl font-black text-amber-800">{filledSummary.bendahara}</p>
-        </div>
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Kamar Terdeteksi</p>
-          <p className="mt-2 text-3xl font-black text-slate-800">{roomOptions.length}</p>
-        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard label="Pembina Kamar" value={`${filledSummary.pembinaKamar}/${roomOptions.length}`} tone="indigo" />
+        <SummaryCard label="Sekretaris" value={filledSummary.sekretaris} tone="green" />
+        <SummaryCard label="Bendahara" value={filledSummary.bendahara} tone="amber" />
+        <SummaryCard label="Kamar Terdeteksi" value={roomOptions.length} tone="slate" />
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+          <Users className="h-8 w-8 animate-pulse text-slate-300" />
         </div>
       ) : (
         <>
-          <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <UserCog className="h-4 w-4 text-slate-600" />
-                <h2 className="text-lg font-black text-slate-900">Pengurus Inti</h2>
-              </div>
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-4 border-b bg-slate-50">
+              <h2 className="font-bold text-slate-800">Pengurus Inti</h2>
+              <p className="text-sm text-slate-500">Struktur utama kepengurusan asrama.</p>
             </div>
-            <div className="grid gap-4 p-5 md:grid-cols-3">
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Pembina Asrama</p>
-                <PersonEditor value={inti.pembina_asrama} guruOptions={guruOptions} onChange={(next) => setInti((prev) => ({ ...prev, pembina_asrama: next }))} />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Rois / Roisah</p>
-                <PersonEditor value={inti.rois} guruOptions={guruOptions} onChange={(next) => setInti((prev) => ({ ...prev, rois: next }))} />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Wakil Rois / Roisah</p>
-                <PersonEditor value={inti.wakil_rois} guruOptions={guruOptions} onChange={(next) => setInti((prev) => ({ ...prev, wakil_rois: next }))} />
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white border-b text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Jabatan</th>
+                    <th className="px-4 py-3 text-left">Pengurus</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {intiRows.map((row) => (
+                    <tr key={row.key} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-700">{row.label}</td>
+                      <td className="px-4 py-3">
+                        <PersonInput
+                          value={row.value}
+                          guruOptions={guruOptions}
+                          onChange={(next) => setInti((prev) => ({ ...prev, [row.key]: next }))}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
+          </div>
 
-          <section className="grid gap-6 xl:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-emerald-600" />
-                  <h2 className="text-lg font-black text-slate-900">Sekretaris</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSekretaris((prev) => [...prev, makePersonDraft()])}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"
-                >
-                  <Plus className="h-3 w-3" /> Tambah
-                </button>
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-4 border-b bg-slate-50 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-slate-800">Sekretaris</h2>
+                <p className="text-sm text-slate-500">Bisa diisi lebih dari satu orang.</p>
               </div>
-              <div className="space-y-3 p-5">
-                {sekretaris.map((item) => (
-                  <PersonEditor
-                    key={item.localId}
-                    value={item}
-                    guruOptions={guruOptions}
-                    onChange={(next) => setSekretaris((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
-                    removable={sekretaris.length > 1}
-                    onRemove={() => setSekretaris((prev) => prev.filter((row) => row.localId !== item.localId))}
-                  />
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setSekretaris((prev) => [...prev, makePersonDraft()])}
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"
+              >
+                <Plus className="h-3 w-3" /> Tambah
+              </button>
             </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white border-b text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left w-16">No</th>
+                    <th className="px-4 py-3 text-left">Pengurus</th>
+                    <th className="px-4 py-3 text-left w-20">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {sekretaris.map((item, index) => (
+                    <tr key={item.localId} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <PersonInput
+                          value={item}
+                          guruOptions={guruOptions}
+                          onChange={(next) => setSekretaris((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setSekretaris((prev) => prev.length > 1 ? prev.filter((row) => row.localId !== item.localId) : prev)}
+                          disabled={sekretaris.length <= 1}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-red-600 disabled:text-slate-300"
+                        >
+                          <Trash2 className="h-3 w-3" /> Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-amber-600" />
-                  <h2 className="text-lg font-black text-slate-900">Bendahara</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setBendahara((prev) => [...prev, makePersonDraft()])}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"
-                >
-                  <Plus className="h-3 w-3" /> Tambah
-                </button>
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-4 border-b bg-slate-50 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-slate-800">Bendahara</h2>
+                <p className="text-sm text-slate-500">Bisa diisi lebih dari satu orang.</p>
               </div>
-              <div className="space-y-3 p-5">
-                {bendahara.map((item) => (
-                  <PersonEditor
-                    key={item.localId}
-                    value={item}
-                    guruOptions={guruOptions}
-                    onChange={(next) => setBendahara((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
-                    removable={bendahara.length > 1}
-                    onRemove={() => setBendahara((prev) => prev.filter((row) => row.localId !== item.localId))}
-                  />
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setBendahara((prev) => [...prev, makePersonDraft()])}
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"
+              >
+                <Plus className="h-3 w-3" /> Tambah
+              </button>
             </div>
-          </section>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white border-b text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left w-16">No</th>
+                    <th className="px-4 py-3 text-left">Pengurus</th>
+                    <th className="px-4 py-3 text-left w-20">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {bendahara.map((item, index) => (
+                    <tr key={item.localId} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <PersonInput
+                          value={item}
+                          guruOptions={guruOptions}
+                          onChange={(next) => setBendahara((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setBendahara((prev) => prev.length > 1 ? prev.filter((row) => row.localId !== item.localId) : prev)}
+                          disabled={bendahara.length <= 1}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-red-600 disabled:text-slate-300"
+                        >
+                          <Trash2 className="h-3 w-3" /> Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-          <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-lg font-black text-slate-900">Pembina Kamar</h2>
-              <p className="mt-1 text-sm text-slate-500">Jumlah baris mengikuti kamar yang sudah terdeteksi di asrama ini.</p>
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-4 border-b bg-slate-50">
+              <h2 className="font-bold text-slate-800">Pembina Kamar</h2>
+              <p className="text-sm text-slate-500">Daftar mengikuti kamar yang sudah terdeteksi di asrama ini.</p>
             </div>
-            <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
-              {pembinaKamar.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
-                  Belum ada kamar terdeteksi. Atur kamar dulu di fitur Kamar atau Perpindahan Kamar.
-                </div>
-              ) : (
-                pembinaKamar.map((item) => (
-                  <div key={item.kamar}>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Kamar {item.kamar}</p>
-                    <PersonEditor
-                      value={item}
-                      guruOptions={guruOptions}
-                      onChange={(next) => setPembinaKamar((prev) => prev.map((row) => row.kamar === item.kamar ? { ...next, kamar: row.kamar } : row))}
-                    />
-                  </div>
-                ))
-              )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white border-b text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left w-28">Kamar</th>
+                    <th className="px-4 py-3 text-left">Pembina</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pembinaKamar.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="px-4 py-16 text-center text-slate-400">
+                        Belum ada kamar terdeteksi. Atur kamar dulu di fitur Kamar atau Perpindahan Kamar.
+                      </td>
+                    </tr>
+                  ) : (
+                    pembinaKamar.map((item) => (
+                      <tr key={item.kamar} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold text-slate-700">Kamar {item.kamar}</td>
+                        <td className="px-4 py-3">
+                          <PersonInput
+                            value={item}
+                            guruOptions={guruOptions}
+                            onChange={(next) => setPembinaKamar((prev) => prev.map((row) => row.kamar === item.kamar ? { ...next, kamar: row.kamar } : row))}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          </section>
+          </div>
         </>
       )}
     </div>

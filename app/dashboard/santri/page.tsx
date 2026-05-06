@@ -40,6 +40,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     asramaKamarRows,
     sekolahRows,
     kelasSekolahRows,
+    kategoriSantriRows,
     statusRows,
     golDarahRows,
     tahunRows,
@@ -64,6 +65,10 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     ),
     query<{ v: string }>(
       `SELECT DISTINCT kelas_sekolah AS v FROM santri ${appendScopedWhere("kelas_sekolah IS NOT NULL AND kelas_sekolah <> ''")} ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`,
+      scopedParams
+    ),
+    query<{ v: string }>(
+      `SELECT DISTINCT kategori_santri AS v FROM santri ${appendScopedWhere("kategori_santri IS NOT NULL AND kategori_santri <> ''")} ORDER BY kategori_santri`,
       scopedParams
     ),
     query<{ v: string }>(
@@ -104,6 +109,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const filterOptions = {
     asramaKamar: asramaKamarRows,
     asramaList: [...new Set(asramaKamarRows.map(row => row.asrama).filter((value): value is string => Boolean(value)))],
+    kategoriSantriList: kategoriSantriRows.map(row => row.v),
     sekolahList: sekolahRows.map(row => row.v),
     kelasSekolahList: kelasSekolahRows.map(row => row.v),
     statusList: statusRows.map(row => row.v),
@@ -123,6 +129,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const kamar         = (searchParams.kamar         as string) || ''
   const sekolah       = (searchParams.sekolah       as string) || ''
   const kelasSekolah  = (searchParams.kelas_sekolah as string) || ''
+  const kategoriSantri = (searchParams.kategori_santri as string) || ''
   const marhalah      = (searchParams.marhalah      as string) || ''
   const kelasPesantren = (searchParams.kelas        as string) || ''
   const status        = (searchParams.status        as string) || 'aktif'
@@ -137,7 +144,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
 
   // Key untuk Suspense — kalau searchParams berubah, skeleton tampil lagi
   const dataKey = JSON.stringify({
-    page, limit, q, asrama, kamar, sekolah, kelasSekolah, marhalah, kelasPesantren,
+    page, limit, q, asrama, kamar, sekolah, kelasSekolah, kategoriSantri, marhalah, kelasPesantren,
     status, jenisKelamin, golDarah, tahunMasuk, provinsi, kabKota, kecamatan, jemaah, alamat,
   })
 
@@ -194,6 +201,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           kamar={kamar}
           sekolah={sekolah}
           kelasSekolah={kelasSekolah}
+          kategoriSantri={kategoriSantri}
           marhalah={marhalah}
           kelasPesantren={kelasPesantren}
           status={status}

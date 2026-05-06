@@ -15,6 +15,9 @@ export async function updateSantri(id: string, formData: FormData) {
   if ('error' in access) return access
 
   const now = new Date().toISOString()
+  const kategoriSantri = String(formData.get('kategori_santri') ?? '').trim().toUpperCase() === 'SADESA' ? 'SADESA' : 'REGULER'
+  const sekolah = kategoriSantri === 'SADESA' ? null : formData.get('sekolah') || null
+  const kelasSekolah = kategoriSantri === 'SADESA' ? null : formData.get('kelas_sekolah') || null
 
   await query(
     `UPDATE santri SET
@@ -22,7 +25,7 @@ export async function updateSantri(id: string, formData: FormData) {
       jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?,
       gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
       jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
-      sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
+      kategori_santri = ?, sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
     WHERE id = ?`,
     [
       formData.get('nis'), formData.get('nama_lengkap'), formData.get('nik') || null,
@@ -39,7 +42,7 @@ export async function updateSantri(id: string, formData: FormData) {
       formData.get('no_wa_ortu') || null,
       formData.get('tanggal_masuk') || null,
       formData.get('tanggal_keluar') || null,
-      formData.get('sekolah') || null, formData.get('kelas_sekolah') || null,
+      kategoriSantri, sekolah, kelasSekolah,
       formData.get('asrama') || null, formData.get('kamar') || null,
       now, id
     ]

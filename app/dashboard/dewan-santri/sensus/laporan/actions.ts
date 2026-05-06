@@ -4,7 +4,8 @@ import { query } from '@/lib/db'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
-function getNamaSekolahLengkap(kode: string | null) {
+function getNamaSekolahLengkap(kode: string | null, kategoriSantri?: string | null) {
+  if (kategoriSantri === 'SADESA') return 'SADESA'
   if (!kode) return 'LAINNYA'
   const k = kode.toUpperCase()
   if (k.includes('MTSN')) return 'MTsN 1 Tasikmalaya'
@@ -14,7 +15,7 @@ function getNamaSekolahLengkap(kode: string | null) {
   if (k.includes('SMA')) return 'SMA KHZ. Mushthafa'
   if (k.includes('SMK')) return 'SMK KH. A. Wahab Muhsin'
   if (k.includes('MI')) return 'MI'
-  if (k.includes('KULIAH') || k.includes('SADESA')) return 'SADESA'
+  if (k.includes('KULIAH')) return 'SADESA'
   return 'LAINNYA'
 }
 
@@ -23,7 +24,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
   const endDate = new Date(tahun, bulan, 0, 23, 59, 59).toISOString()
 
   const santriList = await query<any>(
-    `SELECT id, nama_lengkap, asrama, kamar, sekolah, kelas_sekolah, alamat, created_at
+    `SELECT id, nama_lengkap, asrama, kamar, kategori_santri, sekolah, kelas_sekolah, alamat, created_at
      FROM santri WHERE status_global = 'aktif'`, []
   )
 
@@ -36,7 +37,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
     query<any>(`
       SELECT s.tanggal_keluar   AS created_at,
              s.alasan_keluar    AS detail_info,
-             s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.alamat
+             s.nama_lengkap, s.asrama, s.kamar, s.kategori_santri, s.sekolah, s.kelas_sekolah, s.alamat
       FROM santri s
       WHERE s.status_global = 'keluar'
         AND s.tanggal_keluar >= ? AND s.tanggal_keluar <= ?
@@ -44,7 +45,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
 
     query<any>(`
       SELECT rs.created_at, rs.detail_info,
-             s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.alamat
+             s.nama_lengkap, s.asrama, s.kamar, s.kategori_santri, s.sekolah, s.kelas_sekolah, s.alamat
       FROM riwayat_surat rs
       JOIN santri s ON s.id = rs.santri_id
       WHERE rs.jenis_surat = 'BERHENTI'
@@ -54,7 +55,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
 
     // Mutasi masuk: filter langsung di SQL — tidak JS filter dari santriList lengkap
     query<any>(
-      `SELECT id, nama_lengkap, asrama, kamar, sekolah, kelas_sekolah, alamat, created_at
+      `SELECT id, nama_lengkap, asrama, kamar, kategori_santri, sekolah, kelas_sekolah, alamat, created_at
        FROM santri
        WHERE status_global = 'aktif' AND created_at >= ? AND created_at <= ?`,
       [startDate, endDate]
@@ -105,7 +106,7 @@ export async function getLaporanSensus(bulan: number, tahun: number) {
     const asrama = s.asrama || 'LAINNYA'
     if (!statsSekolah[asrama]) return
 
-    const namaSekolah = getNamaSekolahLengkap(s.sekolah)
+    const namaSekolah = getNamaSekolahLengkap(s.sekolah, s.kategori_santri)
     const kelasRaw = s.kelas_sekolah ? s.kelas_sekolah.replace(/\D/g, '') : '0'
     let kelas = parseInt(kelasRaw)
 

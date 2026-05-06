@@ -98,6 +98,7 @@ export function SantriProfileView({
                     } 
                     isCustom 
                 />
+                <InfoRow label="Kategori Santri" value={santri.kategori_santri || 'REGULER'} />
                 <InfoRow label="Tanggal Masuk" value={safeFormat(santri.tanggal_masuk, 'dd MMMM yyyy')} />
                 {santri.tanggal_keluar && (
                   <InfoRow label="Tanggal Keluar" value={safeFormat(santri.tanggal_keluar, 'dd MMMM yyyy')} />
@@ -152,8 +153,14 @@ export function SantriProfileView({
 
                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-3">
                     <p className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2"><School className="w-4 h-4"/> Pendidikan Formal</p>
-                    <InfoRow label="Sekolah" value={santri.sekolah} />
-                    <InfoRow label="Kelas Sekolah" value={santri.kelas_sekolah} />
+                    {santri.kategori_santri === 'SADESA' ? (
+                      <p className="text-sm text-blue-800 font-medium">Santri kategori SADESA tidak memiliki status sekolah formal.</p>
+                    ) : (
+                      <>
+                        <InfoRow label="Sekolah" value={santri.sekolah} />
+                        <InfoRow label="Kelas Sekolah" value={santri.kelas_sekolah} />
+                      </>
+                    )}
                  </div>
 
                  <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 space-y-3">

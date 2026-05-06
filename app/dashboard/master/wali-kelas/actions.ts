@@ -142,9 +142,9 @@ export async function getPembagianTugasMengajarData() {
       SUM(CASE WHEN s.status_global = 'aktif' THEN 1 ELSE 0 END) as total_santri,
       SUM(CASE
         WHEN s.status_global = 'aktif'
-         AND (UPPER(COALESCE(s.sekolah, '')) LIKE '%MTS%'
-           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SMP%'
-           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SADESA%')
+         AND (s.kategori_santri = 'SADESA'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%MTS%'
+           OR UPPER(COALESCE(s.sekolah, '')) LIKE '%SMP%')
         THEN 1 ELSE 0 END) as jumlah_sltp,
       SUM(CASE
         WHEN s.status_global = 'aktif'

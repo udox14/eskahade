@@ -116,7 +116,7 @@ function PrintDocument({
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: '8mm' }} />
-          <col style={{ width: '22mm' }} />
+          <col />
           <col style={{ width: '16mm' }} />
           <col style={{ width: '9mm' }} />
           <col style={{ width: '9mm' }} />

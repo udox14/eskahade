@@ -13,7 +13,8 @@ type Props = {
 
 const GOL_DARAH = ['A', 'B', 'AB', 'O']
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
-const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "SADESA", "LAINNYA"]
+const KATEGORI_SANTRI_LIST = ["REGULER", "SADESA"] as const
+const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 
 const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
 const labelCls = "block text-xs font-bold text-gray-500 uppercase mb-1"
@@ -162,6 +163,12 @@ export default async function EditSantriPage({ params }: Props) {
             <div>
               <label className={labelCls}>Kamar</label>
               <input name="kamar" defaultValue={s.kamar || ''} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Kategori Santri</label>
+              <select name="kategori_santri" defaultValue={s.kategori_santri || 'REGULER'} className={inputCls + " bg-white"}>
+                {KATEGORI_SANTRI_LIST.map(kategori => <option key={kategori} value={kategori}>{kategori}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelCls}>Sekolah Formal</label>

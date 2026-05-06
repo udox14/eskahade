@@ -128,6 +128,7 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
 type SantriFilterOptions = {
   asramaKamar: { asrama: string | null; kamar: string | null }[]
   asramaList: string[]
+  kategoriSantriList: string[]
   sekolahList: string[]
   kelasSekolahList: string[]
   statusList: string[]
@@ -192,6 +193,7 @@ export function SantriFilter({
   const [isOpen, setIsOpen] = useState(false)
 
   const [status, setStatus] = useState(searchParams.get('status') || '')
+  const [kategoriSantri, setKategoriSantri] = useState(searchParams.get('kategori_santri') || '')
   const [jenisKelamin, setJenisKelamin] = useState(searchParams.get('jenis_kelamin') || '')
   const [golDarah, setGolDarah] = useState(searchParams.get('gol_darah') || '')
   const [tahunMasuk, setTahunMasuk] = useState(searchParams.get('tahun_masuk') || '')
@@ -222,6 +224,7 @@ export function SantriFilter({
       else params.delete(key)
     }
     setParam('status', status)
+    setParam('kategori_santri', kategoriSantri)
     setParam('jenis_kelamin', jenisKelamin)
     setParam('gol_darah', golDarah)
     setParam('tahun_masuk', tahunMasuk)
@@ -243,12 +246,12 @@ export function SantriFilter({
   }
 
   const handleReset = () => {
-    setStatus(''); setJenisKelamin(''); setGolDarah(''); setTahunMasuk('')
+    setStatus(''); setKategoriSantri(''); setJenisKelamin(''); setGolDarah(''); setTahunMasuk('')
     setAsrama(userAsrama || ''); setKamar(''); setSekolah(''); setKelasSekolah(''); setMarhalah(''); setKelasPesantren('')
     setProvinsi(''); setKabKota(''); setKecamatan(''); setJemaah(''); setAlamat('')
     const params = new URLSearchParams(searchParams.toString())
     ;[
-      'status','jenis_kelamin','gol_darah','tahun_masuk','asrama','kamar','sekolah','kelas_sekolah',
+      'status','kategori_santri','jenis_kelamin','gol_darah','tahun_masuk','asrama','kamar','sekolah','kelas_sekolah',
       'marhalah','kelas','provinsi','kab_kota','kecamatan','jemaah','alamat'
     ].forEach(k => params.delete(k))
     params.set('page', '1')
@@ -258,6 +261,7 @@ export function SantriFilter({
 
   const activeCount = [
     status,
+    kategoriSantri,
     jenisKelamin, golDarah, tahunMasuk, userAsrama ? '' : asrama, kamar, sekolah, kelasSekolah,
     marhalah, kelasPesantren, provinsi, kabKota, kecamatan, jemaah, alamat.trim(),
   ].filter(Boolean).length
@@ -323,6 +327,13 @@ export function SantriFilter({
                         .filter(v => v !== 'aktif')
                         .map(v => ({ value: v, label: statusLabel(v) })),
                     ]}
+                  />
+                  <SelectField
+                    label="Kategori"
+                    value={kategoriSantri}
+                    onChange={setKategoriSantri}
+                    allLabel="Semua Kategori"
+                    options={filterOptions.kategoriSantriList.map(v => ({ value: v, label: v }))}
                   />
                   <SelectField
                     label="Jenis Kelamin"

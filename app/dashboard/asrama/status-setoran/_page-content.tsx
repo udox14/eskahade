@@ -32,10 +32,10 @@ export default function StatusSetoranPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Home className="w-6 h-6 text-indigo-600"/> Status Setoran Asrama
+             <Home className="w-6 h-6 text-indigo-600"/> {statusData?.isSadesa ? 'Status Setoran SADESA' : 'Status Setoran Asrama'}
            </h1>
            <p className="text-slate-500 text-sm">
-             Rekapitulasi setoran SPP {statusData?.asrama ? `Asrama ${statusData.asrama}` : ''} ke Pusat.
+             Rekapitulasi setoran SPP {statusData?.displayName || ''} ke Pusat.
            </p>
         </div>
 

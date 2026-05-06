@@ -20,6 +20,17 @@ type SantriKamarRow = {
   nama_kelas: string | null
 }
 
+type RoomOverviewRow = {
+  nomor_kamar: string
+  blok: string | null
+  kuota: number
+  reserved_baru: number
+  total_anggota: number
+  ketua_santri_id: string | null
+  ketua_nama: string | null
+  pembina_nama: string | null
+}
+
 async function ensureKamarSchema() {
   const db = await getDB()
 
@@ -202,18 +213,47 @@ export async function getKamarOverview(asrama?: string | null) {
     }
   }
 
-  const [configs, santriRows, ketuaRows, pembinaRows] = await Promise.all([
-    query<{
-      nomor_kamar: string
-      kuota: number
-      reserved_baru: number
-      blok: string | null
-    }>(
-      `SELECT nomor_kamar, kuota, COALESCE(reserved_baru, 0) AS reserved_baru, blok
-       FROM kamar_config
-       WHERE asrama = ?
-       ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar`,
-      [currentAsrama]
+  const [roomRows, santriRows] = await Promise.all([
+    query<RoomOverviewRow>(
+      `SELECT kamar.nomor_kamar,
+              kc.blok,
+              COALESCE(kc.kuota, COUNT(s.id)) AS kuota,
+              COALESCE(kc.reserved_baru, 0) AS reserved_baru,
+              COUNT(s.id) AS total_anggota,
+              kk.santri_id AS ketua_santri_id,
+              ks.nama_lengkap AS ketua_nama,
+              ak.nama AS pembina_nama
+       FROM (
+         SELECT nomor_kamar FROM kamar_config WHERE asrama = ?
+         UNION
+         SELECT TRIM(kamar) AS nomor_kamar
+         FROM santri
+         WHERE status_global = 'aktif'
+           AND asrama = ?
+           AND kamar IS NOT NULL
+           AND TRIM(kamar) <> ''
+       ) kamar
+       LEFT JOIN kamar_config kc
+         ON kc.asrama = ?
+        AND kc.nomor_kamar = kamar.nomor_kamar
+       LEFT JOIN santri s
+         ON s.asrama = ?
+        AND s.status_global = 'aktif'
+        AND TRIM(COALESCE(s.kamar, '')) = kamar.nomor_kamar
+       LEFT JOIN kamar_ketua kk
+         ON kk.asrama = ?
+        AND kk.nomor_kamar = kamar.nomor_kamar
+       LEFT JOIN santri ks
+         ON ks.id = kk.santri_id
+        AND ks.status_global = 'aktif'
+        AND ks.asrama = ?
+       LEFT JOIN asrama_kepengurusan ak
+         ON ak.asrama = ?
+        AND ak.jabatan_key = 'pembina_kamar'
+        AND ak.kamar = kamar.nomor_kamar
+       GROUP BY kamar.nomor_kamar, kc.blok, kc.kuota, kc.reserved_baru, kk.santri_id, ks.nama_lengkap, ak.nama
+       ORDER BY CAST(kamar.nomor_kamar AS INTEGER), kamar.nomor_kamar`,
+      [currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama]
     ),
     query<SantriKamarRow>(
       `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
@@ -221,66 +261,25 @@ export async function getKamarOverview(asrama?: string | null) {
        FROM santri s
        LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
        LEFT JOIN kelas k ON k.id = rp.kelas_id
-       WHERE s.status_global = 'aktif' AND s.asrama = ?
-       ORDER BY TRIM(COALESCE(s.kamar, '')), s.nama_lengkap`,
-      [currentAsrama]
-    ),
-    query<{
-      nomor_kamar: string
-      santri_id: string
-      nama_lengkap: string
-    }>(
-      `SELECT kk.nomor_kamar, kk.santri_id, s.nama_lengkap
-       FROM kamar_ketua kk
-       JOIN santri s
-         ON s.id = kk.santri_id
-        AND s.status_global = 'aktif'
-        AND s.asrama = kk.asrama
-      WHERE kk.asrama = ?`,
-      [currentAsrama]
-    ),
-    query<{ kamar: string; nama: string }>(
-      `SELECT kamar, nama
-       FROM asrama_kepengurusan
-       WHERE asrama = ?
-         AND jabatan_key = 'pembina_kamar'
-         AND kamar IS NOT NULL`,
+       WHERE s.status_global = 'aktif' AND s.asrama = ?`,
       [currentAsrama]
     ),
   ])
 
-  const configMap = new Map(configs.map((cfg) => [cfg.nomor_kamar, cfg]))
-  const ketuaMap = new Map(ketuaRows.map((row) => [row.nomor_kamar, row]))
-  const pembinaMap = new Map(pembinaRows.map((row) => [row.kamar, row.nama]))
-  const kamarNames = sortKamar(
-    Array.from(
-      new Set([
-        ...configs.map((cfg) => cfg.nomor_kamar),
-        ...santriRows.map((row) => String(row.kamar ?? '').trim()).filter(Boolean),
-      ])
-    )
-  )
-
-  const rooms = kamarNames.map((nomor_kamar) => {
-    const members = santriRows
-      .filter((row) => String(row.kamar ?? '').trim() === nomor_kamar)
-      .map((row) => ({
-        ...row,
-        alamat_ringkas: row.kab_kota?.trim() || '-',
-      }))
-
-    const config = configMap.get(nomor_kamar)
-    const ketua = ketuaMap.get(nomor_kamar) ?? null
-
+  const rooms = sortKamar(roomRows.map((row) => row.nomor_kamar)).map((nomor_kamar) => {
+    const row = roomRows.find((item) => item.nomor_kamar === nomor_kamar)!
     return {
       nomor_kamar,
-      blok: config?.blok ?? null,
-      kuota: Number(config?.kuota ?? members.length ?? 0),
-      reserved_baru: Number(config?.reserved_baru ?? 0),
-      total_anggota: members.length,
-      ketua,
-      pembina_nama: pembinaMap.get(nomor_kamar) ?? null,
-      members,
+      blok: row.blok ?? null,
+      kuota: Number(row.kuota ?? 0),
+      reserved_baru: Number(row.reserved_baru ?? 0),
+      total_anggota: Number(row.total_anggota ?? 0),
+      ketua: row.ketua_santri_id ? {
+        nomor_kamar,
+        santri_id: row.ketua_santri_id,
+        nama_lengkap: row.ketua_nama || '-',
+      } : null,
+      pembina_nama: row.pembina_nama ?? null,
     }
   })
 
@@ -288,7 +287,96 @@ export async function getKamarOverview(asrama?: string | null) {
     asramaOptions,
     currentAsrama,
     rooms,
-    demografi: buildDemografi(santriRows, rooms.length, ketuaRows.length),
+    demografi: buildDemografi(
+      santriRows,
+      rooms.length,
+      rooms.filter((room) => room.ketua).length
+    ),
+  }
+}
+
+export async function getKamarDetail(asrama: string, nomorKamar: string) {
+  const access = await getAccess(asrama)
+  if ('error' in access) {
+    return {
+      error: access.error,
+      room: null as any,
+    }
+  }
+
+  const targetAsrama = access.requestedAsrama
+  const targetKamar = String(nomorKamar ?? '').trim()
+  if (!targetKamar) return { error: 'Kamar wajib dipilih', room: null as any }
+
+  const [roomRow, members] = await Promise.all([
+    queryOne<RoomOverviewRow>(
+      `SELECT kamar.nomor_kamar,
+              kc.blok,
+              COALESCE(kc.kuota, kamar.total_anggota) AS kuota,
+              COALESCE(kc.reserved_baru, 0) AS reserved_baru,
+              kamar.total_anggota,
+              kk.santri_id AS ketua_santri_id,
+              ks.nama_lengkap AS ketua_nama,
+              ak.nama AS pembina_nama
+       FROM (
+         SELECT ? AS nomor_kamar,
+                COUNT(*) AS total_anggota
+         FROM santri
+         WHERE status_global = 'aktif'
+           AND asrama = ?
+           AND TRIM(COALESCE(kamar, '')) = ?
+       ) kamar
+       LEFT JOIN kamar_config kc
+         ON kc.asrama = ?
+        AND kc.nomor_kamar = kamar.nomor_kamar
+       LEFT JOIN kamar_ketua kk
+         ON kk.asrama = ?
+        AND kk.nomor_kamar = kamar.nomor_kamar
+       LEFT JOIN santri ks
+         ON ks.id = kk.santri_id
+        AND ks.status_global = 'aktif'
+        AND ks.asrama = ?
+       LEFT JOIN asrama_kepengurusan ak
+         ON ak.asrama = ?
+        AND ak.jabatan_key = 'pembina_kamar'
+        AND ak.kamar = kamar.nomor_kamar`,
+      [targetKamar, targetAsrama, targetKamar, targetAsrama, targetAsrama, targetAsrama, targetAsrama]
+    ),
+    query<SantriKamarRow>(
+      `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+              k.nama_kelas
+       FROM santri s
+       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+       LEFT JOIN kelas k ON k.id = rp.kelas_id
+       WHERE s.status_global = 'aktif'
+         AND s.asrama = ?
+         AND TRIM(COALESCE(s.kamar, '')) = ?
+       ORDER BY s.nama_lengkap`,
+      [targetAsrama, targetKamar]
+    ),
+  ])
+
+  const kamarExists = roomRow && (Number(roomRow.total_anggota) > 0 || roomRow.kuota || roomRow.pembina_nama || roomRow.ketua_santri_id)
+  if (!kamarExists) return { error: 'Kamar tidak ditemukan', room: null as any }
+
+  return {
+    room: {
+      nomor_kamar: targetKamar,
+      blok: roomRow?.blok ?? null,
+      kuota: Number(roomRow?.kuota ?? 0),
+      reserved_baru: Number(roomRow?.reserved_baru ?? 0),
+      total_anggota: Number(roomRow?.total_anggota ?? 0),
+      ketua: roomRow?.ketua_santri_id ? {
+        nomor_kamar: targetKamar,
+        santri_id: roomRow.ketua_santri_id,
+        nama_lengkap: roomRow.ketua_nama || '-',
+      } : null,
+      pembina_nama: roomRow?.pembina_nama ?? null,
+      members: members.map((row) => ({
+        ...row,
+        alamat_ringkas: row.kab_kota?.trim() || '-',
+      })),
+    },
   }
 }
 

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP } from './actions'
+import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP } from './actions'
 import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -12,6 +12,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const SADESA_UNIT = 'SADESA'
 
 type FilterStatus = 'SEMUA' | 'SUDAH_BAYAR_INI' | 'NUNGGAK' | 'AMAN'
 
@@ -20,8 +21,8 @@ export default function SPPPage() {
   const [view, setView] = useState<'LIST' | 'PAYMENT'>('LIST')
   const [nominal, setNominal] = useState(70000)
   const [tahun, setTahun] = useState(new Date().getFullYear())
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
-  const [userAsrama, setUserAsrama] = useState<string | null>(null)
+  const [unitSetor, setUnitSetor] = useState(ASRAMA_LIST[0])
+  const [scope, setScope] = useState<{ kind: 'ASRAMA' | 'SADESA' | 'ADMIN'; lockedUnit: string | null; defaultUnit: string; allowedUnits: string[] } | null>(null)
 
   // Daftar kamar (ringan, hanya nama kamar)
   const [kamars, setKamars] = useState<string[]>([])
@@ -50,33 +51,50 @@ export default function SPPPage() {
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
+  const isSadesaMode = unitSetor === SADESA_UNIT
+  const currentUnitLabel = isSadesaMode ? 'SADESA' : unitSetor
 
   // Init
   useEffect(() => {
     getNominalSPP().then(setNominal)
     getSppBillingStart().then(setBillingStart)
     getClientRestriction().then(res => {
-      if (res) { setUserAsrama(res); setAsrama(res) }
+      if (res) {
+        setScope(res)
+        setUnitSetor(res.defaultUnit)
+      }
     })
   }, [])
 
   // Load daftar kamar saat asrama/tahun berubah — ringan, hanya distinct kamar
   useEffect(() => {
-    if (!asrama) return
+    if (!scope || !unitSetor) return
     setLoadingKamars(true)
     setKamars([])
     setSantriKamar([])
     setKamarCache({})
     setKamarIdx(0)
     setDrafts({})
-    getKamarsSPP(tahun, asrama).then(res => {
+    getKamarsSPP(tahun, unitSetor).then(res => {
       setKamars(res)
       setLoadingKamars(false)
     })
-  }, [asrama, tahun])
+  }, [scope, unitSetor, tahun])
 
   // Load santri kamar aktif — lazy, dengan cache
   useEffect(() => {
+    if (!scope) return
+
+    if (isSadesaMode) {
+      setLoadingKamar(true)
+      setSantriKamar([])
+      getDashboardSPPSadesa(tahun).then(res => {
+        setSantriKamar(res)
+        setLoadingKamar(false)
+      })
+      return
+    }
+
     if (!kamars.length) return
     const kamar = kamars[kamarIdx]
     if (!kamar) return
@@ -89,15 +107,16 @@ export default function SPPPage() {
 
     setLoadingKamar(true)
     setSantriKamar([])
-    getDashboardSPPKamar(tahun, asrama, kamar).then(res => {
+    getDashboardSPPKamar(tahun, unitSetor, kamar).then(res => {
       setSantriKamar(res)
       setKamarCache(prev => ({ ...prev, [kamar]: res }))
       setLoadingKamar(false)
     })
-  }, [kamarIdx, kamars])
+  }, [scope, kamarIdx, kamars, isSadesaMode, tahun, unitSetor])
 
   useEffect(() => {
     const q = searchQuery.trim()
+    if (!scope) return
     if (q.length < 2) {
       setSearchResults([])
       setLoadingSearch(false)
@@ -106,17 +125,29 @@ export default function SPPPage() {
 
     setLoadingSearch(true)
     const timer = window.setTimeout(() => {
-      searchDashboardSPP(tahun, asrama, q)
+      searchDashboardSPP(tahun, unitSetor, q)
         .then(setSearchResults)
         .finally(() => setLoadingSearch(false))
     }, 250)
 
     return () => window.clearTimeout(timer)
-  }, [searchQuery, tahun, asrama])
+  }, [scope, searchQuery, tahun, unitSetor])
 
   // Invalidate cache kamar tertentu setelah simpan batch
   const invalidateKamar = (kamar: string) => {
     setKamarCache(prev => { const n = { ...prev }; delete n[kamar]; return n })
+  }
+
+  const refreshActiveList = async () => {
+    if (isSadesaMode) {
+      const data = await getDashboardSPPSadesa(tahun)
+      setSantriKamar(data)
+      return
+    }
+    if (!activeKamar) return
+    const data = await getDashboardSPPKamar(tahun, unitSetor, activeKamar)
+    setSantriKamar(data)
+    setKamarCache(prev => ({ ...prev, [activeKamar]: data }))
   }
 
   // Back button
@@ -159,6 +190,7 @@ export default function SPPPage() {
       toast.success('Pembayaran Berhasil!')
       // Invalidate cache kamar santri ini supaya refresh saat kembali
       invalidateKamar(selectedSantri.kamar)
+      await refreshActiveList()
       getStatusSPP(selectedSantri.id, tahun).then(data => {
         setRiwayatBayar(data)
         setSelectedMonths([])
@@ -189,6 +221,7 @@ export default function SPPPage() {
       toast.success(`Sukses menyimpan ${(res as any).count} pembayaran!`)
       // Invalidate cache kamar aktif
       invalidateKamar(kamars[kamarIdx])
+      await refreshActiveList()
       setDrafts({})
     }
   }
@@ -213,6 +246,7 @@ export default function SPPPage() {
     }
     toast.success('Status lunas dibatalkan')
     invalidateKamar(selectedSantri.kamar)
+    await refreshActiveList()
     getStatusSPP(selectedSantri.id, tahun).then(data => {
       setRiwayatBayar(data)
       setSelectedMonths([])
@@ -243,7 +277,7 @@ export default function SPPPage() {
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Dashboard SPP"
-          description="Monitoring pembayaran santri per kamar."
+          description={isSadesaMode ? 'Monitoring pembayaran seluruh santri kategori SADESA.' : 'Monitoring pembayaran santri per kamar.'}
           className="flex-1"
         />
         <div className="flex flex-wrap gap-2 items-center">
@@ -252,15 +286,15 @@ export default function SPPPage() {
             <span className="px-2 font-mono font-bold text-slate-700">{tahun}</span>
             <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">+</button>
           </div>
-          <div className={`p-2 rounded-lg border flex items-center gap-2 ${userAsrama ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
-            {userAsrama ? <Lock className="w-3 h-3 text-orange-600"/> : <Home className="w-4 h-4 text-slate-400"/>}
+          <div className={`p-2 rounded-lg border flex items-center gap-2 ${scope?.lockedUnit ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
+            {scope?.lockedUnit ? <Lock className="w-3 h-3 text-orange-600"/> : <Home className="w-4 h-4 text-slate-400"/>}
             <select
-              value={asrama}
-              onChange={e => setAsrama(e.target.value)}
-              disabled={!!userAsrama}
+              value={unitSetor}
+              onChange={e => setUnitSetor(e.target.value)}
+              disabled={!!scope?.lockedUnit}
               className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed"
             >
-              {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              {(scope?.allowedUnits || [...ASRAMA_LIST]).map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
@@ -298,7 +332,7 @@ export default function SPPPage() {
       {/* KAMAR NAVIGATOR */}
       {loadingKamars ? (
         <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-slate-400"/></div>
-      ) : kamars.length > 0 && (
+      ) : !isSadesaMode && kamars.length > 0 && (
         <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
           <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
             className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
@@ -321,14 +355,14 @@ export default function SPPPage() {
       {/* SANTRI LIST */}
       {loadingKamar || loadingSearch ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-      ) : !activeKamar && !isSearching ? null : filteredSantri.length === 0 ? (
+      ) : !isSadesaMode && !activeKamar && !isSearching ? null : filteredSantri.length === 0 ? (
         <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
-          {isSearching ? 'Tidak ada santri yang cocok dengan pencarian.' : santriKamar.length === 0 ? 'Tidak ada santri di kamar ini.' : 'Tidak ada santri yang cocok dengan filter.'}
+          {isSearching ? 'Tidak ada santri yang cocok dengan pencarian.' : santriKamar.length === 0 ? (isSadesaMode ? 'Belum ada santri kategori SADESA.' : 'Tidak ada santri di kamar ini.') : 'Tidak ada santri yang cocok dengan filter.'}
         </div>
       ) : (
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
           <div className="bg-slate-50 px-4 py-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
-            <span className="text-lg">{isSearching ? 'HASIL PENCARIAN' : `KAMAR ${activeKamar}`}</span>
+            <span className="text-lg">{isSearching ? 'HASIL PENCARIAN' : (isSadesaMode ? 'UNIT SADESA' : `KAMAR ${activeKamar}`)}</span>
             <span className="text-xs bg-white border px-2 py-1 rounded font-normal text-slate-500">{filteredSantri.length} Santri</span>
           </div>
           <div className="divide-y">
@@ -353,7 +387,7 @@ export default function SPPPage() {
                     <div className="min-w-0">
                       <p className="font-bold text-slate-800 leading-snug line-clamp-2">{s.nama_lengkap}</p>
                       <div className="flex gap-2 text-xs text-slate-400 items-center">
-                        <span>Kamar {s.kamar || '-'}</span>
+                        <span>{isSadesaMode ? 'Unit SADESA' : `Kamar ${s.kamar || '-'}`}</span>
                         {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
                       </div>
                     </div>
@@ -408,6 +442,7 @@ export default function SPPPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-800">Input Pembayaran</h1>
           <p className="text-sm text-slate-500">Membayar untuk: <span className="font-bold text-emerald-600">{selectedSantri.nama_lengkap}</span></p>
+          {isSadesaMode && <p className="text-xs text-slate-400">Unit setor: SADESA</p>}
         </div>
       </div>
 
