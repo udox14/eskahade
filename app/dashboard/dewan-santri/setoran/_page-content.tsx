@@ -79,6 +79,8 @@ export default function MonitoringSetoranPage() {
         const updatedRow = rows.find((r: AsramaRow) => r.unit_setor === activeRow.unit_setor)
         if (updatedRow) setActiveRow(updatedRow)
       }
+    } catch (error: any) {
+      toast.error(error?.message || 'Gagal memuat monitoring SPP.')
     } finally {
       setLoading(false)
     }
@@ -92,6 +94,10 @@ export default function MonitoringSetoranPage() {
     })
     getMonitoringPrintMeta().then(res => setTahunAjaranNama(res.tahunAjaranNama))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [tahun, bulan, userAsrama])
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,

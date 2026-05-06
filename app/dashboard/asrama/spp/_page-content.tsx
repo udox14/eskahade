@@ -58,40 +58,57 @@ export default function SPPPage() {
   useEffect(() => {
     getNominalSPP().then(setNominal)
     getSppBillingStart().then(setBillingStart)
-    getClientRestriction().then(res => {
-      if (res) {
+    getClientRestriction()
+      .then(res => {
+        if (!res) return
         setScope(res)
         setUnitSetor(res.defaultUnit)
-      }
-    })
+      })
+      .catch((error: any) => {
+        toast.error(error?.message || 'Gagal memuat batas akses SPP.')
+      })
   }, [])
 
   // Load daftar kamar saat asrama/tahun berubah — ringan, hanya distinct kamar
   useEffect(() => {
     if (!scope || !unitSetor) return
+    if (!scope.allowedUnits.includes(unitSetor)) return
     setLoadingKamars(true)
     setKamars([])
     setSantriKamar([])
     setKamarCache({})
     setKamarIdx(0)
     setDrafts({})
-    getKamarsSPP(tahun, unitSetor).then(res => {
-      setKamars(res)
-      setLoadingKamars(false)
-    })
+    getKamarsSPP(tahun, unitSetor)
+      .then(res => {
+        setKamars(res)
+      })
+      .catch((error: any) => {
+        toast.error(error?.message || 'Gagal memuat daftar kamar.')
+      })
+      .finally(() => {
+        setLoadingKamars(false)
+      })
   }, [scope, unitSetor, tahun])
 
   // Load santri kamar aktif — lazy, dengan cache
   useEffect(() => {
     if (!scope) return
+    if (!scope.allowedUnits.includes(unitSetor)) return
 
     if (isSadesaMode) {
       setLoadingKamar(true)
       setSantriKamar([])
-      getDashboardSPPSadesa(tahun).then(res => {
-        setSantriKamar(res)
-        setLoadingKamar(false)
-      })
+      getDashboardSPPSadesa(tahun)
+        .then(res => {
+          setSantriKamar(res)
+        })
+        .catch((error: any) => {
+          toast.error(error?.message || 'Gagal memuat daftar santri SADESA.')
+        })
+        .finally(() => {
+          setLoadingKamar(false)
+        })
       return
     }
 
@@ -107,16 +124,23 @@ export default function SPPPage() {
 
     setLoadingKamar(true)
     setSantriKamar([])
-    getDashboardSPPKamar(tahun, unitSetor, kamar).then(res => {
-      setSantriKamar(res)
-      setKamarCache(prev => ({ ...prev, [kamar]: res }))
-      setLoadingKamar(false)
-    })
+    getDashboardSPPKamar(tahun, unitSetor, kamar)
+      .then(res => {
+        setSantriKamar(res)
+        setKamarCache(prev => ({ ...prev, [kamar]: res }))
+      })
+      .catch((error: any) => {
+        toast.error(error?.message || 'Gagal memuat daftar santri kamar.')
+      })
+      .finally(() => {
+        setLoadingKamar(false)
+      })
   }, [scope, kamarIdx, kamars, isSadesaMode, tahun, unitSetor])
 
   useEffect(() => {
     const q = searchQuery.trim()
     if (!scope) return
+    if (!scope.allowedUnits.includes(unitSetor)) return
     if (q.length < 2) {
       setSearchResults([])
       setLoadingSearch(false)
@@ -127,6 +151,9 @@ export default function SPPPage() {
     const timer = window.setTimeout(() => {
       searchDashboardSPP(tahun, unitSetor, q)
         .then(setSearchResults)
+        .catch((error: any) => {
+          toast.error(error?.message || 'Gagal mencari data santri.')
+        })
         .finally(() => setLoadingSearch(false))
     }, 250)
 
