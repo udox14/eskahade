@@ -2,6 +2,7 @@
 
 import { query, getDB } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
 export async function getSessionInfo() {
@@ -12,6 +13,7 @@ export async function getSessionInfo() {
 
 // Hanya ambil daftar kamar — ringan, dipanggil saat halaman pertama dibuka
 export async function getKamarsMalam(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   const rows = await query<{ kamar: string }>(
     `SELECT DISTINCT kamar
      FROM santri
@@ -26,6 +28,7 @@ export async function getKamarsMalam(asrama: string) {
 export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tanggal: string) {
   const session = await getSession()
   if (!session) return []
+  if (isAsramaTanpaKamar(asrama)) return []
 
   const santriList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar

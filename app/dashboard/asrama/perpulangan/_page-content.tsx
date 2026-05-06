@@ -13,8 +13,9 @@ import {
   RefreshCw, PenLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4', 'AL-BAGHORY']
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 type Tab = 'pulang' | 'datang'
 
 // ─── Badge status pulang ──────────────────────────────────────────────────────
@@ -211,7 +212,7 @@ function RowDatang({
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function PerpulanganPage() {
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [asramaBinaan, setAsramaBinaan] = useState<string | null>(null)
   const [role, setRole] = useState<string>('')
 
@@ -282,6 +283,7 @@ export default function PerpulanganPage() {
   }, [kamarIdx, kamars, asrama, periode])
 
   const activeKamar = kamars[kamarIdx] ?? ''
+  const roomFeatureBlocked = isAsramaTanpaKamar(asramaBinaan ?? asrama)
 
   // ── Helper: update santri di state + cache ──
   const updateSantriState = useCallback((logId: string, patch: Partial<any>) => {
@@ -450,6 +452,8 @@ export default function PerpulanganPage() {
         <div className="flex justify-center py-4 gap-2 text-slate-400 text-sm">
           <Loader2 className="w-4 h-4 animate-spin" /> Memuat daftar kamar...
         </div>
+      ) : roomFeatureBlocked ? (
+        <p className="text-center text-slate-400 text-sm py-4">Asrama ini tidak memakai kamar, jadi tidak ikut fitur perpulangan berbasis kamar.</p>
       ) : kamars.length === 0 ? (
         <p className="text-center text-slate-400 text-sm py-4">Tidak ada kamar ditemukan.</p>
       ) : (

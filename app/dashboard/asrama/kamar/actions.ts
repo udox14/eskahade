@@ -3,6 +3,7 @@
 import { execute, getDB, query, queryOne } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
 const KAMAR_PATH = '/dashboard/asrama/kamar'
@@ -118,7 +119,7 @@ async function getAccess(asrama?: string | null) {
 
 async function getAllowedAsrama(session: SessionUser) {
   if (!isAdmin(session)) {
-    return session.asrama_binaan ? [session.asrama_binaan] : []
+    return session.asrama_binaan && !isAsramaTanpaKamar(session.asrama_binaan) ? [session.asrama_binaan] : []
   }
 
   const rows = await query<{ asrama: string }>(
@@ -129,7 +130,7 @@ async function getAllowedAsrama(session: SessionUser) {
        AND TRIM(asrama) <> ''
      ORDER BY asrama`
   )
-  return rows.map((row) => row.asrama)
+  return rows.map((row) => row.asrama).filter((asrama) => !isAsramaTanpaKamar(asrama))
 }
 
 function sortKamar(items: string[]) {
@@ -201,6 +202,22 @@ export async function getKamarOverview(asrama?: string | null) {
     return {
       asramaOptions,
       currentAsrama: '',
+      rooms: [],
+      demografi: {
+        totalSantri: 0,
+        totalKamar: 0,
+        ketuaTerisi: 0,
+        belumBerkamar: 0,
+        topSekolah: [],
+        topKota: [],
+      },
+    }
+  }
+
+  if (isAsramaTanpaKamar(currentAsrama)) {
+    return {
+      asramaOptions,
+      currentAsrama,
       rooms: [],
       demografi: {
         totalSantri: 0,
@@ -307,6 +324,7 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
   const targetAsrama = access.requestedAsrama
   const targetKamar = String(nomorKamar ?? '').trim()
   if (!targetKamar) return { error: 'Kamar wajib dipilih', room: null as any }
+  if (isAsramaTanpaKamar(targetAsrama)) return { error: 'Asrama ini tidak memakai kamar', room: null as any }
 
   const [roomRow, members] = await Promise.all([
     queryOne<RoomOverviewRow>(
@@ -389,6 +407,7 @@ export async function updateKetuaKamarLangsung(params: {
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama
+  if (isAsramaTanpaKamar(asrama)) return { error: 'Asrama ini tidak memakai fitur kamar' }
   const nomorKamar = String(params.nomorKamar ?? '').trim()
   if (!nomorKamar) return { error: 'Nomor kamar wajib diisi' }
 
@@ -444,6 +463,7 @@ export async function mutasiKamarDalamAsrama(params: {
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama
+  if (isAsramaTanpaKamar(asrama)) return { error: 'Asrama ini tidak memakai fitur kamar' }
   const kamarTujuan = String(params.kamarTujuan ?? '').trim()
   if (!kamarTujuan) return { error: 'Kamar tujuan wajib dipilih' }
 

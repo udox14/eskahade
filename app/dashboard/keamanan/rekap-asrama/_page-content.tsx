@@ -5,8 +5,9 @@ import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah, getKamarLi
 import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
@@ -41,7 +42,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function RekapAsramaPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [bulan, setBulan] = useState(bulanIni())
   const [tab, setTab] = useState<'malam' | 'berjamaah'>('malam')
   const [loading, setLoading] = useState(false)
@@ -138,6 +139,7 @@ export default function RekapAsramaPage() {
     Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
+  const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   const filteredMalamSantri = malamSantri.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
@@ -269,6 +271,10 @@ export default function RekapAsramaPage() {
           <Loader2 className="w-10 h-10 animate-spin text-indigo-400"/>
         </div>
 
+      ) : roomFeatureBlocked ? (
+        <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
+          Asrama ini tidak memakai kamar, jadi tidak ikut rekap asrama berbasis kamar.
+        </div>
       ) : (
         <>
           {/* ABSEN MALAM */}

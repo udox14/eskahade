@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
 // ─── Helper: cek jenis pulang dari alamat ────────────────────────────────────
@@ -42,6 +43,7 @@ export async function getPeriodeAktif() {
 
 // ─── Daftar kamar per asrama (ringan) ────────────────────────────────────────
 export async function getKamarsPerpulangan(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   const rows = await query<{ kamar: string }>(
     `SELECT DISTINCT kamar
      FROM santri
@@ -62,6 +64,7 @@ export async function getDataKamarPerpulangan(
 ) {
   const session = await getSession()
   if (!session) return []
+  if (isAsramaTanpaKamar(asrama)) return []
 
   // Ambil santri + log perpulangan (LEFT JOIN — santri bisa belum punya log)
   const rows = await query<any>(`

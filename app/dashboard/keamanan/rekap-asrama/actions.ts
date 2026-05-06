@@ -2,6 +2,7 @@
 
 import { query, batch } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 
@@ -16,6 +17,7 @@ export async function getSessionRekap() {
 }
 
 export async function getKamarList(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   const rows = await query<any>(`
     SELECT DISTINCT kamar FROM santri 
     WHERE asrama = ? AND status_global = 'aktif'
@@ -25,6 +27,7 @@ export async function getKamarList(asrama: string) {
 
 // Rekap Absen Malam: per santri, jumlah alfa per bulan
 export async function getRekapAbsenMalam(asrama: string, bulan: string) {
+  if (isAsramaTanpaKamar(asrama)) return { santriList: [], alfaPerSantri: {}, detailPerSantri: {} }
   // bulan format: YYYY-MM
   const [tahun, bln] = bulan.split('-')
   const startDate = `${tahun}-${bln}-01`
@@ -61,6 +64,7 @@ export async function getRekapAbsenMalam(asrama: string, bulan: string) {
 // Rekap Absen Berjamaah: per santri, per waktu, per bulan
 // hideHaid: true untuk non-pengurus-asrama-putri
 export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hideHaid: boolean) {
+  if (isAsramaTanpaKamar(asrama)) return { santriList: [], detail: {} }
   const [tahun, bln] = bulan.split('-')
   const startDate = `${tahun}-${bln}-01`
   const endDate = `${tahun}-${bln}-31`
@@ -97,6 +101,7 @@ export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hide
 }
 
 export async function getSantriByAsrama(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   return query<any>(`
     SELECT id, nama_lengkap, nis, kamar FROM santri
     WHERE asrama = ? AND status_global = 'aktif'
@@ -106,6 +111,7 @@ export async function getSantriByAsrama(asrama: string) {
 
 // Rekap berjamaah per rentang tanggal, hanya santri yang punya alfa
 export async function getRekapBerjamaahAlfaRange(asrama: string, startDate: string, endDate: string) {
+  if (isAsramaTanpaKamar(asrama)) return { santriList: [], detail: {} }
   const rows = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar,
            a.tanggal, a.shubuh, a.ashar, a.maghrib, a.isya
@@ -206,4 +212,3 @@ export async function importAbsenBerjamaahFingerprint(alfaRows: { santri_id: str
     return { error: error.message }
   }
 }
-

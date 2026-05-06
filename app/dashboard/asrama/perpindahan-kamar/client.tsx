@@ -13,8 +13,9 @@ import {
 } from './actions'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { ROOM_REQUIRED_ASRAMA_LIST } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 
 // ── Tipe ──────────────────────────────────────────────────────────────────────
 type KamarConfig = { nomor_kamar: string; kuota: number; reserved_baru: number; blok?: string }

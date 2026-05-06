@@ -6,8 +6,9 @@ import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
 import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
@@ -59,7 +60,7 @@ function formatDayLabel(dateStr: string): string {
 
 export default function RekapAbsenBerjamaahPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [weekWednesday, setWeekWednesday] = useState(thisWeekWednesday())
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -160,6 +161,7 @@ export default function RekapAbsenBerjamaahPage() {
   }
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
+  const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   const daysArr = Array.from({ length: 7 }, (_, i) => addDays(weekWednesday, i))
 
@@ -291,7 +293,7 @@ export default function RekapAbsenBerjamaahPage() {
         </div>
       )}
 
-      {hasLoaded && !loading && (
+      {hasLoaded && !loading && !roomFeatureBlocked && (
         <>
           {/* SUMMARY + SEARCH */}
           <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -457,6 +459,12 @@ export default function RekapAbsenBerjamaahPage() {
             </div>
           )}
         </>
+      )}
+
+      {hasLoaded && !loading && roomFeatureBlocked && (
+        <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
+          Asrama ini tidak memakai kamar, jadi tidak ikut rekap absen berjamaah.
+        </div>
       )}
 
       {showImportModal && (

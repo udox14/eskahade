@@ -1,6 +1,7 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 const PAGE_SIZE = 30
 
@@ -34,7 +35,7 @@ export async function getSummaryPerAsrama(tahun: number, bulan: number) {
       SUM(CASE WHEN COALESCE(saldo_tabungan,0) > 0 THEN 1 ELSE 0 END)     AS punya_saldo,
       SUM(CASE WHEN COALESCE(saldo_tabungan,0) = 0 THEN 1 ELSE 0 END)     AS tidak_punya_saldo
     FROM santri
-    WHERE status_global = 'aktif' AND asrama IS NOT NULL
+    WHERE status_global = 'aktif' AND asrama IS NOT NULL AND asrama != 'AL-BAGHORY'
     GROUP BY asrama ORDER BY asrama
   `, [])
 
@@ -72,13 +73,14 @@ export async function getSummaryPerAsrama(tahun: number, bulan: number) {
 export async function getAsramaList() {
   const rows = await query<{ asrama: string }>(
     `SELECT DISTINCT asrama FROM santri
-     WHERE status_global='aktif' AND asrama IS NOT NULL ORDER BY asrama`
+     WHERE status_global='aktif' AND asrama IS NOT NULL AND asrama != 'AL-BAGHORY' ORDER BY asrama`
   )
   return rows.map(r => r.asrama)
 }
 
 // ─── Daftar kamar per asrama ──────────────────────────────────────────────
 export async function getKamarList(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   const rows = await query<{ kamar: string }>(
     `SELECT DISTINCT kamar FROM santri WHERE asrama=? AND status_global='aktif'
      ORDER BY CAST(kamar AS INTEGER), kamar`,
@@ -108,6 +110,7 @@ export async function getSantriUangJajan(params: {
   const clauses: string[] = ["s.status_global='aktif'"]
   const baseParams: any[] = []
 
+  clauses.push("s.asrama != 'AL-BAGHORY'")
   if (asrama) { clauses.push('s.asrama=?'); baseParams.push(asrama) }
   if (kamar)  { clauses.push('s.kamar=?');  baseParams.push(kamar) }
   if (search) {

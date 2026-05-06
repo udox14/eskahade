@@ -1,21 +1,32 @@
 'use client'
 
-import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent, type SetStateAction } from 'react'
 import { getStatsTabungan, getSantriKamarTabungan, simpanTopup, simpanJajanMassal, getClientRestriction, getRiwayatTabunganSantri, hapusTransaksi, getKamarsTabungan } from './actions'
-import { Wallet, TrendingUp, TrendingDown, Plus, Save, Loader2, ChevronLeft, ChevronRight, Home, Lock, History, Trash2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, Save, Loader2, ChevronLeft, ChevronRight, Home, Lock, History, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const JAJAN_OPTS = [5000, 10000, 15000, 20000]
+
+type StatsTabungan = Awaited<ReturnType<typeof getStatsTabungan>>
+type SantriKamarRow = Awaited<ReturnType<typeof getSantriKamarTabungan>>[number]
+type RiwayatTabunganRow = Awaited<ReturnType<typeof getRiwayatTabunganSantri>>[number]
+type ActionResult =
+  | Awaited<ReturnType<typeof simpanTopup>>
+  | Awaited<ReturnType<typeof simpanJajanMassal>>
+
+function getActionError(res: ActionResult) {
+  return 'error' in res ? res.error : null
+}
 
 export default function UangJajanPage() {
   const confirm = useConfirm()
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
 
   // Daftar kamar (ringan)
@@ -24,13 +35,13 @@ export default function UangJajanPage() {
   const [loadingKamars, setLoadingKamars] = useState(false)
 
   // Stats header
-  const [stats, setStats] = useState<{ uang_fisik: number; masuk_bulan_ini: number; keluar_bulan_ini: number } | null>(null)
+  const [stats, setStats] = useState<StatsTabungan | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
 
   // Data santri kamar aktif (lazy, dengan cache)
-  const [santriKamar, setSantriKamar] = useState<any[]>([])
+  const [santriKamar, setSantriKamar] = useState<SantriKamarRow[]>([])
   const [loadingKamar, setLoadingKamar] = useState(false)
-  const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
+  const [kamarCache, setKamarCache] = useState<Record<string, SantriKamarRow[]>>({})
 
   const [draftJajan, setDraftJajan] = useState<Record<string, number>>({})
   const [manualMode, setManualMode] = useState<Record<string, boolean>>({})
@@ -38,10 +49,12 @@ export default function UangJajanPage() {
 
   // Modal detail/topup
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedSantri, setSelectedSantri] = useState<any>(null)
+  const [selectedSantri, setSelectedSantri] = useState<SantriKamarRow | null>(null)
   const [topupNominal, setTopupNominal] = useState('')
-  const [history, setHistory] = useState<any[]>([])
+  const [history, setHistory] = useState<RiwayatTabunganRow[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+
+  const setDrafts = (val: SetStateAction<Record<string, number>>) => setDraftJajan(val)
 
   // Init
   useEffect(() => {
@@ -53,13 +66,15 @@ export default function UangJajanPage() {
   // Load daftar kamar + stats saat asrama berubah
   useEffect(() => {
     if (!asrama) return
-    setLoadingKamars(true)
-    setLoadingStats(true)
-    setKamars([])
-    setSantriKamar([])
-    setKamarCache({})
-    setKamarIdx(0)
-    setDrafts({})
+    Promise.resolve().then(() => {
+      setLoadingKamars(true)
+      setLoadingStats(true)
+      setKamars([])
+      setSantriKamar([])
+      setKamarCache({})
+      setKamarIdx(0)
+      setDrafts({})
+    })
 
     getKamarsTabungan(asrama).then(res => {
       setKamars(res.kamars)
@@ -76,17 +91,23 @@ export default function UangJajanPage() {
     if (!kamars.length) return
     const kamar = kamars[kamarIdx]
     if (!kamar) return
-    if (kamarCache[kamar]) { setSantriKamar(kamarCache[kamar]); return }
-    setLoadingKamar(true)
-    setSantriKamar([])
+    if (kamarCache[kamar]) {
+      Promise.resolve().then(() => setSantriKamar(kamarCache[kamar]))
+      return
+    }
+    Promise.resolve().then(() => {
+      setLoadingKamar(true)
+      setSantriKamar([])
+    })
     getSantriKamarTabungan(asrama, kamar).then(res => {
       setSantriKamar(res)
       setKamarCache(prev => ({ ...prev, [kamar]: res }))
       setLoadingKamar(false)
     })
-  }, [kamarIdx, kamars])
+  }, [asrama, kamarCache, kamarIdx, kamars])
 
   const activeKamar = kamars[kamarIdx] ?? ''
+  const roomFeatureBlocked = isAsramaTanpaKamar(userAsrama ?? asrama)
 
   // Invalidate cache + reload stats + reload santri kamar aktif setelah mutasi
   const refreshAfterMutasi = (kamar?: string) => {
@@ -107,8 +128,6 @@ export default function UangJajanPage() {
   }
 
   // ── Jajan logic ────────────────────────────────────────────────────────────
-  const setDrafts = (val: Record<string, number> | ((p: Record<string, number>) => Record<string, number>)) => setDraftJajan(val)
-
   const handleSelectJajan = (santriId: string, nominal: number, saldo: number) => {
     if (nominal > saldo) { toast.warning('Saldo tidak cukup!'); return }
     setDraftJajan(prev => {
@@ -142,7 +161,8 @@ export default function UangJajanPage() {
     setIsSaving(false)
     toast.dismiss(toastId)
 
-    if ('error' in res) { toast.error('Gagal', { description: (res as any).error }) }
+    const error = getActionError(res)
+    if (error) { toast.error('Gagal', { description: error }) }
     else {
       toast.success('Berhasil!', { description: 'Saldo santri telah terpotong.' })
       setDraftJajan({})
@@ -151,7 +171,7 @@ export default function UangJajanPage() {
   }
 
   // ── Modal logic ─────────────────────────────────────────────────────────────
-  const openModal = async (santri: any) => {
+  const openModal = async (santri: SantriKamarRow) => {
     setSelectedSantri(santri)
     setIsModalOpen(true)
     setLoadingHistory(true)
@@ -159,8 +179,9 @@ export default function UangJajanPage() {
     setLoadingHistory(false)
   }
 
-  const handleTopup = async (e: React.FormEvent) => {
+  const handleTopup = async (e: FormEvent) => {
     e.preventDefault()
+    if (!selectedSantri) return
     const nominal = parseInt(topupNominal.replace(/\./g, ''))
     if (!nominal || nominal <= 0) return toast.warning('Nominal tidak valid')
     setIsSaving(true)
@@ -168,13 +189,14 @@ export default function UangJajanPage() {
     const res = await simpanTopup(selectedSantri.id, nominal, 'Topup Manual')
     setIsSaving(false)
     toast.dismiss(toastId)
-    if ('error' in res) { toast.error('Gagal', { description: (res as any).error }) }
+    const error = getActionError(res)
+    if (error) { toast.error('Gagal', { description: error }) }
     else {
       toast.success('Topup Berhasil')
       setTopupNominal('')
       // Update saldo selectedSantri langsung di state supaya modal tampilkan angka baru
       const newSaldo = selectedSantri.saldo + nominal
-      setSelectedSantri((prev: any) => ({ ...prev, saldo: newSaldo }))
+      setSelectedSantri(prev => (prev ? { ...prev, saldo: newSaldo } : prev))
       // Reload riwayat di modal
       setLoadingHistory(true)
       getRiwayatTabunganSantri(selectedSantri.id).then(h => { setHistory(h); setLoadingHistory(false) })
@@ -183,6 +205,7 @@ export default function UangJajanPage() {
   }
 
   const handleDeleteHistory = async (id: string) => {
+    if (!selectedSantri) return
     if (!await confirm('Hapus transaksi ini? Saldo akan dikembalikan.')) return
     const toastId = toast.loading('Menghapus...')
     const res = await hapusTransaksi(id)
@@ -269,12 +292,16 @@ export default function UangJajanPage() {
       {/* SANTRI LIST */}
       {loadingKamar ? (
         <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600"/></div>
+      ) : roomFeatureBlocked ? (
+        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
+          Asrama ini tidak memakai kamar, jadi tidak ikut fitur uang jajan asrama.
+        </div>
       ) : santriKamar.length === 0 && !loadingKamar && activeKamar ? (
         <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">Kamar Kosong.</div>
       ) : santriKamar.length > 0 && (
         <div className="bg-white rounded-xl border shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4">
           <div className="divide-y">
-            {santriKamar.map((s: any) => {
+            {santriKamar.map(s => {
               const draftVal = draftJajan[s.id]
               const finalSaldo = s.saldo - (draftVal || 0)
               const isLow = finalSaldo <= 5000

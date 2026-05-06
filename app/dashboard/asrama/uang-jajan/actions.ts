@@ -4,6 +4,7 @@ import { query, queryOne, batch, generateId } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { WIB_TIME_ZONE } from '@/app/dashboard/ehb/_date-utils'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 const UANG_JAJAN_PATH = '/dashboard/asrama/uang-jajan'
 
@@ -111,6 +112,7 @@ async function getAllowedTransaksiRow(id: string) {
 export async function getKamarsTabungan(asramaRequest: string) {
   const restrictedAsrama = await getUserRestriction()
   const targetAsrama = restrictedAsrama || asramaRequest
+  if (isAsramaTanpaKamar(targetAsrama)) return { kamars: [], asrama: targetAsrama }
   const rows = await query<{ kamar: string }>(
     `SELECT DISTINCT kamar FROM santri
      WHERE asrama = ? AND status_global = 'aktif'
@@ -123,6 +125,13 @@ export async function getKamarsTabungan(asramaRequest: string) {
 export async function getStatsTabungan(asramaRequest: string) {
   const restrictedAsrama = await getUserRestriction()
   const targetAsrama = restrictedAsrama || asramaRequest
+  if (isAsramaTanpaKamar(targetAsrama)) {
+    return {
+      uang_fisik: 0,
+      masuk_bulan_ini: 0,
+      keluar_bulan_ini: 0,
+    }
+  }
   const startMonth = getStartOfCurrentMonthWibIso()
 
   const row = await queryOne<{ uang_fisik: number; masuk: number; keluar: number }>(
@@ -150,6 +159,7 @@ export async function getStatsTabungan(asramaRequest: string) {
 export async function getSantriKamarTabungan(asramaRequest: string, kamar: string) {
   const restrictedAsrama = await getUserRestriction()
   const targetAsrama = restrictedAsrama || asramaRequest
+  if (isAsramaTanpaKamar(targetAsrama)) return []
   return query<SantriKamarRow>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama,
             COALESCE(s.saldo_tabungan, 0) AS saldo

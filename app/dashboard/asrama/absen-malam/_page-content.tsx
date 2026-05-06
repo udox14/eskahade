@@ -4,15 +4,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam } from './actions'
 import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
 export default function AbsenMalamPage() {
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [asramaBinaan, setAsramaBinaan] = useState<string | null>(null)
   const [tanggal, setTanggal] = useState(todayStr())
 
@@ -81,6 +82,7 @@ export default function AbsenMalamPage() {
   }, [kamarIdx, kamars, tanggal])
 
   const activeKamar = kamars[kamarIdx] ?? ''
+  const roomFeatureBlocked = isAsramaTanpaKamar(asramaBinaan ?? asrama)
 
   const hadir = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'HADIR').length
   const alfa  = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'ALFA').length
@@ -184,6 +186,10 @@ export default function AbsenMalamPage() {
       {/* CONTENT */}
       {loadingKamar ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-slate-400"/></div>
+      ) : roomFeatureBlocked ? (
+        <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
+          Asrama ini tidak memakai kamar, jadi tidak ikut fitur absen malam.
+        </div>
       ) : kamars.length === 0 && !loadingKamars ? (
         <div className="mx-4 py-16 text-center bg-white rounded-2xl border border-dashed text-slate-400">
           Tidak ada santri di asrama ini.

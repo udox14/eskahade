@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList } from '../rekap-asrama/actions'
 import { Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
-const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 
 function bulanIni() { return new Date().toISOString().slice(0, 7) }
 function getDaysInMonth(bulan: string) {
@@ -27,7 +28,7 @@ function nextBulan(b: string) {
 
 export default function RekapAbsenMalamPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
-  const [asrama, setAsrama] = useState(ASRAMA_LIST[0])
+  const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [bulan, setBulan] = useState(bulanIni())
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -108,6 +109,7 @@ export default function RekapAbsenMalamPage() {
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
     return matchKamar && matchSearch
   })
+  const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16">
@@ -203,6 +205,10 @@ export default function RekapAbsenMalamPage() {
           <Loader2 className="w-10 h-10 animate-spin text-indigo-400"/>
         </div>
 
+      ) : roomFeatureBlocked ? (
+        <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
+          Asrama ini tidak memakai kamar, jadi tidak ikut rekap absen malam.
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">

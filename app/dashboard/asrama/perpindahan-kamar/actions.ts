@@ -3,6 +3,7 @@
 import { query, queryOne, execute, getDB } from '@/lib/db'
 import { hasRole, isAdmin } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
@@ -17,6 +18,7 @@ async function assertAsramaAccess(asrama: string): Promise<AccessOk | { error: s
   if ('error' in access) return access
   const session = access
   if (!targetAsrama) return { error: 'Asrama wajib dipilih' }
+  if (isAsramaTanpaKamar(targetAsrama)) return { error: 'Asrama ini tidak memakai fitur kamar' }
 
   if (!isAdmin(session)) {
     if (!hasRole(session, 'pengurus_asrama')) return { error: 'Unauthorized' }

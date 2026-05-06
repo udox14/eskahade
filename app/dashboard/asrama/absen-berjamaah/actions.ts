@@ -2,6 +2,7 @@
 
 import { query, getDB } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -18,6 +19,7 @@ export async function getSessionBerjamaah() {
 
 // Hanya ambil daftar kamar — ringan
 export async function getKamarsBerjamaah(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
   const rows = await query<{ kamar: string }>(
     `SELECT DISTINCT kamar
      FROM santri
@@ -32,6 +34,7 @@ export async function getKamarsBerjamaah(asrama: string) {
 export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, tanggal: string) {
   const session = await getSession()
   if (!session) return []
+  if (isAsramaTanpaKamar(asrama)) return []
 
   const santriList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar
