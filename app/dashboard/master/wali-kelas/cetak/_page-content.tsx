@@ -13,7 +13,7 @@ function headerCellStyle(extra?: React.CSSProperties): React.CSSProperties {
     border: '1px solid #111827',
     padding: '1.4mm 1mm',
     textAlign: 'center',
-    fontSize: '7.4pt',
+    fontSize: '10pt',
     fontWeight: 700,
     lineHeight: 1.15,
     verticalAlign: 'middle',
@@ -27,11 +27,22 @@ function bodyCellStyle(extra?: React.CSSProperties): React.CSSProperties {
   return {
     border: '1px solid #111827',
     padding: '1.05mm 0.95mm',
-    fontSize: '7.5pt',
+    fontSize: '10pt',
     lineHeight: 1.15,
     verticalAlign: 'middle',
     whiteSpace: 'normal',
     wordBreak: 'break-word',
+    ...extra,
+  }
+}
+
+function bodyCellSingleLine(extra?: React.CSSProperties): React.CSSProperties {
+  return {
+    ...bodyCellStyle(),
+    whiteSpace: 'nowrap',
+    wordBreak: 'normal',
+    overflow: 'hidden',
+    textOverflow: 'clip',
     ...extra,
   }
 }
@@ -89,13 +100,13 @@ function PrintDocument({
             style={{ width: '22mm', height: '22mm', objectFit: 'contain', flexShrink: 0 }}
           />
           <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: '16pt', fontWeight: 700, letterSpacing: '0.4pt', lineHeight: 1.1 }}>
+            <div style={{ fontSize: '14pt', fontWeight: 700, letterSpacing: '0.4pt', lineHeight: 1.1 }}>
               PEMBAGIAN TUGAS MENGAJAR
             </div>
-            <div style={{ fontSize: '11pt', fontWeight: 700, marginTop: '0.8mm', lineHeight: 1.1 }}>
+            <div style={{ fontSize: '14pt', fontWeight: 700, marginTop: '0.8mm', lineHeight: 1.1 }}>
               LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
             </div>
-            <div style={{ fontSize: '10pt', marginTop: '0.8mm', lineHeight: 1.1 }}>
+            <div style={{ fontSize: '14pt', marginTop: '0.8mm', lineHeight: 1.1 }}>
               TAHUN AJARAN {tahunAjaran}
             </div>
           </div>
@@ -103,44 +114,59 @@ function PrintDocument({
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '8mm' }} />
+          <col style={{ width: '22mm' }} />
+          <col style={{ width: '16mm' }} />
+          <col style={{ width: '9mm' }} />
+          <col style={{ width: '9mm' }} />
+          <col style={{ width: '7mm' }} />
+          <col style={{ width: '7mm' }} />
+          <col style={{ width: '8mm' }} />
+          <col style={{ width: '12mm' }} />
+          <col style={{ width: '26mm' }} />
+          <col style={{ width: '58mm' }} />
+          <col style={{ width: '58mm' }} />
+          <col style={{ width: '58mm' }} />
+        </colgroup>
         <thead>
           <tr>
-            <th rowSpan={2} style={headerCellStyle({ width: '8mm' })}>NO</th>
-            <th rowSpan={2} style={headerCellStyle({ width: '26mm' })}>KELAS</th>
-            <th colSpan={3} style={headerCellStyle({ width: '26mm' })}>KELOMPOK</th>
-            <th colSpan={3} style={headerCellStyle({ width: '21mm', letterSpacing: '1pt' })}>JUMLAH</th>
-            <th rowSpan={2} style={headerCellStyle({ width: '12mm' })}>GRADE</th>
-            <th rowSpan={2} style={headerCellStyle({ width: '28mm' })}>TEMPAT</th>
+            <th rowSpan={2} style={headerCellStyle()}>NO</th>
+            <th rowSpan={2} style={headerCellStyle()}>KELAS</th>
+            <th colSpan={3} style={headerCellStyle()}>KELOMPOK</th>
+            <th colSpan={3} style={headerCellStyle({ letterSpacing: '1pt' })}>JUMLAH</th>
+            <th rowSpan={2} style={headerCellStyle()}>GRADE</th>
+            <th rowSpan={2} style={headerCellStyle()}>TEMPAT</th>
             <th colSpan={3} style={headerCellStyle()}>PENGAJAR</th>
           </tr>
           <tr>
-            <th style={headerCellStyle({ width: '10mm' })}>TINGKAT</th>
-            <th style={headerCellStyle({ width: '8mm' })}>L/P</th>
-            <th style={headerCellStyle({ width: '8mm' })}>B/L</th>
-            <th style={headerCellStyle({ width: '7mm' })}>L</th>
-            <th style={headerCellStyle({ width: '7mm' })}>P</th>
-            <th style={headerCellStyle({ width: '7mm' })}>J</th>
-            <th style={headerCellStyle({ width: '48mm' })}>Malam (19.00-20.30)</th>
-            <th style={headerCellStyle({ width: '48mm' })}>Subuh (05.15-06.10)</th>
-            <th style={headerCellStyle({ width: '48mm' })}>Ashar (16.00-17.00)</th>
+            <th style={headerCellStyle({ whiteSpace: 'nowrap', wordBreak: 'normal' })}>TINGKAT</th>
+            <th style={headerCellStyle()}>L/P</th>
+            <th style={headerCellStyle()}>B/L</th>
+            <th style={headerCellStyle()}>L</th>
+            <th style={headerCellStyle()}>P</th>
+            <th style={headerCellStyle()}>J</th>
+            <th style={headerCellStyle()}>Malam (19.00-20.30)</th>
+            <th style={headerCellStyle()}>Subuh (05.15-06.10)</th>
+            <th style={headerCellStyle()}>Ashar (16.00-17.00)</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, index) => (
             <tr key={row.id}>
               <td style={bodyCellStyle({ textAlign: 'center', fontWeight: 700 })}>{index + 1}</td>
-              <td style={bodyCellStyle({ fontWeight: 700, textAlign: 'center' })}>{row.nama_kelas}</td>
-              <td style={bodyCellStyle({ textAlign: 'center' })}>{row.tingkat_label}</td>
-              <td style={bodyCellStyle({ textAlign: 'center' })}>{row.lp_label}</td>
-              <td style={bodyCellStyle({ textAlign: 'center' })}>{row.bl_label}</td>
+              <td style={bodyCellSingleLine({ fontWeight: 700, textAlign: 'center' })}>{row.nama_kelas}</td>
+              <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.tingkat_label}</td>
+              <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.lp_label}</td>
+              <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.bl_label}</td>
               <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_putra || ''}</td>
               <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_putri || ''}</td>
               <td style={bodyCellStyle({ textAlign: 'center', fontWeight: 700 })}>{row.total_santri || ''}</td>
-              <td style={bodyCellStyle({ textAlign: 'center', fontWeight: 700 })}>{row.grade || '-'}</td>
-              <td style={bodyCellStyle()}>{row.tempat || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_maghrib_nama || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_shubuh_nama || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_ashar_nama || '-'}</td>
+              <td style={bodyCellSingleLine({ textAlign: 'center', fontWeight: 700 })}>{row.grade || '-'}</td>
+              <td style={bodyCellSingleLine()}>{row.tempat || '-'}</td>
+              <td style={bodyCellSingleLine()}>{row.guru_maghrib_nama || '-'}</td>
+              <td style={bodyCellSingleLine()}>{row.guru_shubuh_nama || '-'}</td>
+              <td style={bodyCellSingleLine()}>{row.guru_ashar_nama || '-'}</td>
             </tr>
           ))}
         </tbody>
