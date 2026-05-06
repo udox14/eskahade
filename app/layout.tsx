@@ -61,14 +61,30 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="mask-icon" href="/logo.png" color="#15803d" />
         <link rel="shortcut icon" href="/favicon.ico" />
-        {/* Register service worker */}
+        {/* Unregister legacy service worker to prevent stale Server Action bundles */}
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {
-              window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
-                  .then(function(reg) { console.log('SW registered:', reg.scope); })
-                  .catch(function(err) { console.log('SW registration failed:', err); });
+              window.addEventListener('load', async function() {
+                try {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(
+                    regs
+                      .filter(function(reg) { return reg.active?.scriptURL?.includes('/sw.js') || reg.waiting?.scriptURL?.includes('/sw.js') || reg.installing?.scriptURL?.includes('/sw.js'); })
+                      .map(function(reg) { return reg.unregister(); })
+                  );
+                  if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(
+                      keys
+                        .filter(function(key) { return key.indexOf('sukahideng-') === 0; })
+                        .map(function(key) { return caches.delete(key); })
+                    );
+                  }
+                  console.log('Legacy SW cache cleared');
+                } catch (err) {
+                  console.log('SW cleanup failed:', err);
+                }
               });
             }
           `

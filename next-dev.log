@@ -40,3 +40,6 @@
  POST /api/auth/login 500 in 3.4s (compile: 2.7s, render: 752ms)
  POST /api/auth/login 500 in 204ms (compile: 6ms, render: 198ms)
 ✓ Compiled in 260ms
+✓ Compiled in 1289ms
+✓ Compiled in 361ms
+✓ Compiled in 442ms

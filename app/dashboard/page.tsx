@@ -12,10 +12,19 @@ export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await queryOne<{ full_name: string; roles: string | null }>(
-    'SELECT full_name, roles FROM users WHERE id = ?',
-    [session.id]
-  )
+  let user: { full_name: string; roles: string | null } | null = null
+  try {
+    user = await queryOne<{ full_name: string; roles: string | null }>(
+      'SELECT full_name, roles FROM users WHERE id = ?',
+      [session.id]
+    )
+  } catch {
+    const fallback = await queryOne<{ full_name: string; role: string }>(
+      'SELECT full_name, role FROM users WHERE id = ?',
+      [session.id]
+    )
+    user = fallback ? { full_name: fallback.full_name, roles: fallback.role ? JSON.stringify([fallback.role]) : null } : null
+  }
 
   const userName = user?.full_name || 'Pengguna'
   
