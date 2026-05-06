@@ -19,3 +19,24 @@
 [layout] session null → redirect /login
  GET /dashboard/asrama/spp 307 in 234ms (compile: 9ms, render: 225ms)
  GET /dashboard/dewan-santri/setoran 307 in 241ms (compile: 112ms, render: 129ms)
+[layout] session null → redirect /login
+[layout] session null → redirect /login
+ GET /dashboard/dewan-santri/setoran 307 in 1522ms (compile: 860ms, render: 661ms)
+ GET /dashboard/asrama/spp 307 in 1619ms (compile: 1415ms, render: 203ms)
+ GET /login 200 in 842ms (compile: 639ms, render: 203ms)
+ GET /login 200 in 853ms (compile: 680ms, render: 173ms)
+[layout] session null → redirect /login
+[layout] session null → redirect /login
+ GET /dashboard/asrama/spp 307 in 190ms (compile: 12ms, render: 179ms)
+ GET /dashboard/dewan-santri/setoran 307 in 200ms (compile: 73ms, render: 126ms)
+ GET /login 200 in 139ms (compile: 8ms, render: 131ms)
+ GET /login 200 in 143ms (compile: 41ms, render: 101ms)
+[layout] session null → redirect /login
+[layout] session null → redirect /login
+ GET /dashboard/asrama/spp 307 in 158ms (compile: 3ms, render: 155ms)
+ GET /dashboard/dewan-santri/setoran 307 in 145ms (compile: 7ms, render: 137ms)
+ GET /login 200 in 170ms (compile: 20ms, render: 149ms)
+ GET /login 200 in 99ms (compile: 9ms, render: 90ms)
+ POST /api/auth/login 500 in 3.4s (compile: 2.7s, render: 752ms)
+ POST /api/auth/login 500 in 204ms (compile: 6ms, render: 198ms)
+✓ Compiled in 260ms
