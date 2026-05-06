@@ -17,7 +17,6 @@ export type SessionUser = {
   role: string
   roles: string[]
   asrama_binaan: string | null
-  is_demo?: boolean
 }
 
 function base64urlEncode(data: string): string {

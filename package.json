@@ -8,8 +8,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "demo:build-sql": "node scripts/build-demo-bootstrap.mjs",
-    "demo:apply": "node scripts/build-demo-bootstrap.mjs && wrangler d1 execute eskahade-demo --remote --file scripts/demo-bootstrap.sql",
     "build:cf": "opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",

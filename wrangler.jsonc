@@ -30,12 +30,6 @@
 			"database_name": "eskahade-db",
 			"database_id": "a2010f08-f314-46af-88fd-dbb9b4ef1bb1",
 			"remote": true
-		},
-		{
-			"binding": "DEMO_DB",
-			"database_name": "eskahade-demo",
-			"database_id": "baad7149-8cc3-4971-8e0a-a8406645a0b4",
-			"remote": true
 		}
 	],
 	"r2_buckets": [

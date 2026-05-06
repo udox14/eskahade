@@ -1,19 +1,8 @@
 // lib/db/index.ts
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getSession } from '@/lib/auth/session'
 
 export async function getDB() {
   const { env } = await getCloudflareContext({ async: true })
-  const session = await getSession()
-
-  if (session?.is_demo) {
-    const demoDb = (env as CloudflareEnv).DEMO_DB
-    if (!demoDb) {
-      throw new Error('DEMO_DB belum dikonfigurasi. Akun demo tidak boleh memakai database utama.')
-    }
-    return demoDb
-  }
-
   return env.DB
 }
 
