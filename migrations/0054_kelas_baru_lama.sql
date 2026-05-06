@@ -1,0 +1,1 @@
+ALTER TABLE kelas ADD COLUMN baru_lama TEXT;

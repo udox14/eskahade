@@ -16,11 +16,11 @@ import {
 
 function getClassFontSize(name: string) {
   const len = name.trim().length
-  if (len <= 6) return '64pt'
-  if (len <= 10) return '56pt'
-  if (len <= 14) return '48pt'
-  if (len <= 18) return '40pt'
-  return '34pt'
+  if (len <= 6) return '82pt'
+  if (len <= 10) return '72pt'
+  if (len <= 14) return '62pt'
+  if (len <= 18) return '54pt'
+  return '46pt'
 }
 
 function getPlaceFontSize(place: string) {
@@ -41,29 +41,16 @@ function TempelanKelasPrint({ item }: { item: TempelanKelasItem }) {
         height: '203mm',
         boxSizing: 'border-box',
         padding: '8mm 10mm',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 55%, #eef2ff 100%)',
+        background: '#ffffff',
         color: '#0f172a',
         fontFamily: '"Times New Roman", Times, serif',
         display: 'flex',
         flexDirection: 'column',
         border: '1.5pt solid #0f172a',
         breakAfter: 'page',
-        position: 'relative',
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          top: '10mm',
-          right: '12mm',
-          width: '42mm',
-          height: '42mm',
-          borderRadius: '999px',
-          background: 'radial-gradient(circle, rgba(30,64,175,0.10) 0%, rgba(30,64,175,0) 72%)',
-        }}
-      />
-
       <div
         style={{
           display: 'flex',
@@ -81,13 +68,13 @@ function TempelanKelasPrint({ item }: { item: TempelanKelasItem }) {
           style={{ width: '25mm', height: '25mm', objectFit: 'contain', flexShrink: 0 }}
         />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: '17pt', fontWeight: 800, letterSpacing: '0.3pt', lineHeight: 1.05 }}>
+          <div style={{ fontSize: '17pt', fontWeight: 400, letterSpacing: '0.3pt', lineHeight: 1.05 }}>
             SEKSI PENGAJARAN DEWAN SANTRI
           </div>
           <div style={{ fontSize: '14pt', fontWeight: 700, letterSpacing: '0.2pt', lineHeight: 1.1, marginTop: '0.8mm' }}>
             LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
           </div>
-          <div style={{ fontSize: '13pt', fontWeight: 600, letterSpacing: '0.8pt', marginTop: '1.4mm' }}>
+          <div style={{ fontSize: '13pt', fontWeight: 400, letterSpacing: '0.8pt', lineHeight: 1.1, marginTop: '0.8mm' }}>
             TAHUN AJARAN {item.tahun_ajaran_nama}
           </div>
         </div>
@@ -105,8 +92,7 @@ function TempelanKelasPrint({ item }: { item: TempelanKelasItem }) {
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.94) 100%)',
-          boxShadow: 'inset 0 0 0 1pt rgba(30,58,138,0.08)',
+          background: '#ffffff',
         }}
       >
         <div
@@ -144,7 +130,7 @@ function TempelanKelasPrint({ item }: { item: TempelanKelasItem }) {
         style={{
           marginTop: '4mm',
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           alignItems: 'center',
           fontSize: '10pt',
           color: '#334155',
@@ -152,7 +138,6 @@ function TempelanKelasPrint({ item }: { item: TempelanKelasItem }) {
         }}
       >
         <span>{item.marhalah_nama || 'Tanpa marhalah'}</span>
-        <span>Tempelan Kelas</span>
       </div>
     </div>
   )

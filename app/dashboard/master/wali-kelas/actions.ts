@@ -42,6 +42,14 @@ async function ensureKelasCetakColumns() {
       throw error
     }
   }
+
+  try {
+    await execute('ALTER TABLE kelas ADD COLUMN baru_lama TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
 }
 
 function getJenjangDominan(row: {
@@ -94,8 +102,10 @@ export type PembagianTugasMengajarRow = {
   id: string
   nama_kelas: string
   marhalah_nama: string | null
+  tahun_ajaran_nama: string
   tempat: string | null
   grade: string | null
+  baru_lama: string | null
   jenis_kelamin: string
   guru_shubuh_nama: string | null
   guru_ashar_nama: string | null
@@ -119,8 +129,10 @@ export async function getPembagianTugasMengajarData() {
       k.id,
       k.nama_kelas,
       m.nama as marhalah_nama,
+      ta.nama as tahun_ajaran_nama,
       k.tempat,
       k.grade,
+      k.baru_lama,
       k.jenis_kelamin,
       gs.nama_lengkap as guru_shubuh_nama,
       ga.nama_lengkap as guru_ashar_nama,
@@ -159,7 +171,7 @@ export async function getPembagianTugasMengajarData() {
     LEFT JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN santri s ON s.id = rp.santri_id
     GROUP BY
-      k.id, k.nama_kelas, m.nama, k.tempat, k.grade, k.jenis_kelamin,
+      k.id, k.nama_kelas, m.nama, ta.nama, k.tempat, k.grade, k.baru_lama, k.jenis_kelamin,
       gs.nama_lengkap, ga.nama_lengkap, gm.nama_lengkap
   `)
 
@@ -168,7 +180,7 @@ export async function getPembagianTugasMengajarData() {
       ...row,
       tingkat_label: getJenjangDominan(row),
       lp_label: row.jenis_kelamin === 'L' ? 'Pa' : row.jenis_kelamin === 'P' ? 'Pi' : 'C',
-      bl_label: '-',
+      bl_label: row.baru_lama || '-',
     }))
     .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }

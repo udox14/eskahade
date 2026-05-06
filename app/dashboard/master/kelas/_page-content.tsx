@@ -59,12 +59,12 @@ export default function MasterKelasPage() {
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows = [
-      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Barat", "GRADE": "A", "JENIS KELAMIN": "L" },
-      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Timur", "GRADE": "B", "JENIS KELAMIN": "P" },
-      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "TEMPAT": "Aula Lama", "GRADE": "AB", "JENIS KELAMIN": "C" },
+      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Barat", "GRADE": "A", "B/L": "B", "JENIS KELAMIN": "L" },
+      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Timur", "GRADE": "B", "B/L": "L", "JENIS KELAMIN": "P" },
+      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "TEMPAT": "Aula Lama", "GRADE": "AB", "B/L": "B", "JENIS KELAMIN": "C" },
     ]
     const worksheet = XLSX.utils.json_to_sheet(rows)
-    worksheet['!cols'] = [{wch:15}, {wch:20}, {wch:20}, {wch:10}, {wch:10}]
+    worksheet['!cols'] = [{wch:15}, {wch:20}, {wch:20}, {wch:10}, {wch:10}, {wch:10}]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template Kelas")
     XLSX.writeFile(workbook, "Template_Master_Kelas.xlsx")
@@ -175,6 +175,10 @@ export default function MasterKelasPage() {
                 <input type="text" name="grade" placeholder="Contoh: A / AB / C" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm uppercase" />
               </div>
               <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">B/L (Baru/Lama)</label>
+                <input type="text" name="baru_lama" placeholder="Contoh: B / L" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm uppercase" />
+              </div>
+              <div className="w-full md:w-1/4">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jenis Kelamin</label>
                 <select name="jenis_kelamin" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                   <option value="L">Putra (L)</option><option value="P">Putri (P)</option><option value="C">Campuran (L & P)</option>
@@ -191,7 +195,7 @@ export default function MasterKelasPage() {
             </div>
             <table className="w-full text-sm text-left">
               <thead className="bg-white text-slate-600 font-bold border-b">
-                <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
+                <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">B/L</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {kelasList?.map((k) => (
@@ -200,6 +204,7 @@ export default function MasterKelasPage() {
                     <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
                     <td className="px-6 py-3 text-slate-500">{k.tempat || '-'}</td>
                     <td className="px-6 py-3 text-slate-500 font-semibold">{k.grade || '-'}</td>
+                    <td className="px-6 py-3 text-slate-500 font-semibold">{k.baru_lama || '-'}</td>
                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
                     <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
@@ -233,7 +238,7 @@ export default function MasterKelasPage() {
                         </button>
                     </div>
                     <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">Tempat</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['TEMPAT'] || row['tempat'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['GRADE'] || row['grade'] || '-'}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
+                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">Tempat</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">B/L</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['TEMPAT'] || row['tempat'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['GRADE'] || row['grade'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '-'}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
                     </div>
                 </div>
             )}

@@ -24,6 +24,14 @@ async function ensureKelasExtraColumns() {
       throw error
     }
   }
+
+  try {
+    await execute('ALTER TABLE kelas ADD COLUMN baru_lama TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
 }
 
 export async function getKelasList() {
@@ -44,6 +52,7 @@ export type TempelanKelasItem = {
   nama_kelas: string
   tempat: string | null
   grade: string | null
+  baru_lama: string | null
   marhalah_nama: string | null
   tahun_ajaran_nama: string
 }
@@ -56,6 +65,7 @@ export async function getKelasTempelanList() {
       k.nama_kelas,
       k.tempat,
       k.grade,
+      k.baru_lama,
       m.nama as marhalah_nama,
       ta.nama as tahun_ajaran_nama
     FROM kelas k
@@ -77,6 +87,7 @@ export async function getTempelanKelasData(kelasId: string) {
       k.nama_kelas,
       k.tempat,
       k.grade,
+      k.baru_lama,
       m.nama as marhalah_nama,
       ta.nama as tahun_ajaran_nama
     FROM kelas k
@@ -97,6 +108,7 @@ export async function tambahKelas(formData: FormData) {
   const jenisKelamin = formData.get('jenis_kelamin') as string
   const tempat = ((formData.get('tempat') as string) || '').trim()
   const grade = ((formData.get('grade') as string) || '').trim().toUpperCase()
+  const baruLama = ((formData.get('baru_lama') as string) || '').trim().toUpperCase()
 
   await ensureKelasExtraColumns()
 
@@ -112,8 +124,8 @@ export async function tambahKelas(formData: FormData) {
   if (exist) return { error: 'Kelas dengan nama ini sudah ada di marhalah tersebut.' }
 
   await query(
-    'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [crypto.randomUUID(), namaKelas, marhalahId, jenisKelamin, tempat || null, grade || null, tahunAktif.id]
+    'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, baru_lama, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [crypto.randomUUID(), namaKelas, marhalahId, jenisKelamin, tempat || null, grade || null, baruLama || null, tahunAktif.id]
   )
 
   revalidatePath('/dashboard/master/kelas')
@@ -163,6 +175,7 @@ export async function importKelasMassal(dataExcel: any[]) {
     const jkRaw = String(row['JENIS KELAMIN'] || row['jenis kelamin'] || 'L').toUpperCase().trim()
     const tempat = String(row['TEMPAT'] || row['tempat'] || '').trim()
     const grade = String(row['GRADE'] || row['grade'] || '').trim().toUpperCase()
+    const baruLama = String(row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '').trim().toUpperCase()
 
     if (!namaKelas || !namaMarhalah) continue
 
@@ -179,7 +192,7 @@ export async function importKelasMassal(dataExcel: any[]) {
     if (jkRaw === 'P' || jkRaw === 'PUTRI' || jkRaw === 'PEREMPUAN') jk = 'P'
     else if (jkRaw === 'C' || jkRaw === 'CAMPURAN') jk = 'C'
 
-    inserts.push([crypto.randomUUID(), namaKelas, marhalahId, jk, tempat || null, grade || null, tahunAktif.id])
+    inserts.push([crypto.randomUUID(), namaKelas, marhalahId, jk, tempat || null, grade || null, baruLama || null, tahunAktif.id])
     existingSet.add(keyCheck)
   }
 
@@ -190,7 +203,7 @@ export async function importKelasMassal(dataExcel: any[]) {
   }
 
   await batch(inserts.map(row => ({
-    sql: 'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    sql: 'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, baru_lama, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     params: row,
   })))
 
