@@ -3,7 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur } from './actions'
+import { getUsersList, updateUserRoles, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates } from './actions'
+import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
@@ -23,6 +24,7 @@ const ROLES = [
 ]
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const DEFAULT_USER_PASSWORD = 'eskahade2026'
 
 export default function ManajemenUserPage() {
   const confirm = useConfirm()
@@ -43,6 +45,11 @@ export default function ManajemenUserPage() {
   const [isOpenAdd, setIsOpenAdd] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [newRole, setNewRole] = useState('wali_kelas')
+  const [candidateSource, setCandidateSource] = useState<'guru' | 'sadesa'>('guru')
+  const [userCandidates, setUserCandidates] = useState<UserCreationCandidate[]>([])
+  const [candidateSearch, setCandidateSearch] = useState('')
+  const [selectedCandidateKey, setSelectedCandidateKey] = useState('')
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
 
   const [isAsramaModalOpen, setIsAsramaModalOpen] = useState(false)
   const [pendingRoleUpdate, setPendingRoleUpdate] = useState<{userId: string, roles: string[]} | null>(null)
@@ -77,11 +84,27 @@ export default function ManajemenUserPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    loadCandidates()
+  }, [])
+
   const loadData = async () => {
     setLoading(true)
     const data = await getUsersList()
     setUsers(data)
     setLoading(false)
+  }
+
+  const loadCandidates = async () => {
+    setLoadingCandidates(true)
+    try {
+      const data = await getUserCreationCandidates()
+      setUserCandidates(data)
+    } catch {
+      toast.error('Gagal memuat data kandidat akun')
+    } finally {
+      setLoadingCandidates(false)
+    }
   }
 
   // --- FILTERING ---
@@ -112,6 +135,30 @@ export default function ManajemenUserPage() {
 
     return matchRole && matchSearch
   })
+
+  const filteredCandidates = userCandidates.filter(candidate => {
+    if (candidate.source_type !== candidateSource) return false
+    if (!candidateSearch.trim()) return true
+    const q = candidateSearch.toLowerCase()
+    return [
+      candidate.label,
+      candidate.full_name,
+      candidate.email,
+      candidate.meta || '',
+    ].some(value => value.toLowerCase().includes(q))
+  })
+
+  const selectedCandidate = userCandidates.find(candidate =>
+    `${candidate.source_type}:${candidate.source_ref_id}` === selectedCandidateKey
+  ) || null
+
+  const closeAddModal = () => {
+    setIsOpenAdd(false)
+    setCandidateSource('guru')
+    setCandidateSearch('')
+    setSelectedCandidateKey('')
+    setNewRole('wali_kelas')
+  }
 
   // --- HANDLERS MULTI-ROLE ---
   const openRoleModal = (user: any) => {
@@ -217,6 +264,11 @@ export default function ManajemenUserPage() {
   // --- HANDLER CREATE ---
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!selectedCandidate) {
+      toast.error('Pilih dulu orang yang akan dibuatkan akun')
+      return
+    }
+
     setIsCreating(true)
     const toastId = toast.loading("Membuat akun baru...")
     
@@ -230,7 +282,8 @@ export default function ManajemenUserPage() {
       toast.error("Gagal membuat user", { description: (res as any).error })
     } else {
       toast.success("Akun Berhasil Dibuat!", { description: "User bisa langsung login sekarang." })
-      setIsOpenAdd(false)
+      closeAddModal()
+      await loadCandidates()
       loadData()
     }
   }
@@ -272,7 +325,23 @@ export default function ManajemenUserPage() {
     if ('error' in res) {
       toast.error("Gagal Reset", { description: (res as any).error })
     } else {
-      toast.success("Password Berhasil Direset")
+      toast.success("Password Berhasil Direset", { description: `Password baru: ${newPass}` })
+      setIsOpenReset(false)
+      setUserToReset(null)
+    }
+  }
+
+  const handleResetToDefaultPassword = async () => {
+    if (!userToReset) return
+
+    const toastId = toast.loading("Mereset ke password default...")
+    const res = await resetUserPassword(userToReset.id, DEFAULT_USER_PASSWORD)
+    toast.dismiss(toastId)
+
+    if ('error' in res) {
+      toast.error("Gagal Reset", { description: (res as any).error })
+    } else {
+      toast.success("Password Default Diterapkan", { description: `Password baru: ${DEFAULT_USER_PASSWORD}` })
       setIsOpenReset(false)
       setUserToReset(null)
     }
@@ -646,26 +715,123 @@ export default function ManajemenUserPage() {
       {/* --- MODAL TAMBAH USER --- */}
       {isOpenAdd && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">Tambah Pengguna Baru</h3>
-              <button onClick={() => setIsOpenAdd(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
+              <button onClick={closeAddModal} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
             </div>
             
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
+                  <select
+                    value={candidateSource}
+                    onChange={(e) => {
+                      setCandidateSource(e.target.value as 'guru' | 'sadesa')
+                      setSelectedCandidateKey('')
+                      setCandidateSearch('')
+                    }}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                  >
+                    <option value="guru">Guru</option>
+                    <option value="sadesa">SADESA</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Orang</label>
+                  <input
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    placeholder={candidateSource === 'guru' ? 'Cari nama guru...' : 'Cari santri SADESA...'}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pilih Orang</label>
+                <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
+                  {loadingCandidates ? (
+                    <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
+                    </div>
+                  ) : filteredCandidates.length === 0 ? (
+                    <div className="px-4 py-8 text-sm text-slate-500 text-center">
+                      Tidak ada data yang cocok.
+                    </div>
+                  ) : (
+                    filteredCandidates.map(candidate => {
+                      const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
+                      const selected = selectedCandidateKey === candidateKey
+                      return (
+                        <button
+                          key={candidateKey}
+                          type="button"
+                          disabled={candidate.has_account}
+                          onClick={() => setSelectedCandidateKey(candidateKey)}
+                          className={`w-full text-left px-4 py-3 transition-colors ${
+                            candidate.has_account
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : selected
+                                ? 'bg-emerald-50 border-l-4 border-emerald-500'
+                                : 'hover:bg-white text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className={`font-semibold truncate ${selected ? 'text-emerald-800' : ''}`}>{candidate.label}</p>
+                              <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
+                              <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
+                            </div>
+                            {candidate.has_account ? (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Sudah ada akun</span>
+                            ) : selected ? (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Terpilih</span>
+                            ) : null}
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
-                <input name="full_name" required placeholder="Contoh: Ustadz Ahmad" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
+                <input
+                  name="full_name"
+                  required
+                  readOnly
+                  value={selectedCandidate?.full_name || ''}
+                  placeholder="Pilih orang dari daftar"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-green-500 outline-none"
+                />
               </div>
               
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
-                <input name="email" type="email" required placeholder="email@sukahideng.or.id" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  readOnly
+                  value={selectedCandidate?.email || ''}
+                  placeholder="Email akan dibuat otomatis"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-green-500 outline-none"
+                />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                <input name="password" type="password" required minLength={6} placeholder="Minimal 6 karakter" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" />
+              <input type="hidden" name="source_type" value={selectedCandidate?.source_type || ''} />
+              <input type="hidden" name="source_ref_id" value={selectedCandidate?.source_ref_id || ''} />
+
+              <input type="hidden" name="password" value="eskahade2026" />
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
+                <p className="mt-1 text-[11px] text-emerald-700">Akun baru akan dibuat otomatis dengan password ini.</p>
               </div>
 
               <div>
@@ -697,7 +863,7 @@ export default function ManajemenUserPage() {
               <div className="pt-4">
                 <button 
                   type="submit" 
-                  disabled={isCreating}
+                  disabled={isCreating || !selectedCandidate || selectedCandidate.has_account}
                   className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-sm flex justify-center items-center gap-2 disabled:opacity-70"
                 >
                   {isCreating ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
@@ -751,6 +917,24 @@ export default function ManajemenUserPage() {
               <p className="text-xs text-red-600 mt-1">Mengganti password untuk <b>{userToReset.name}</b></p>
             </div>
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-xs font-bold uppercase text-amber-800">Reset Cepat</p>
+                <p className="mt-1 text-sm text-amber-900">Klik tombol di bawah untuk langsung set password default.</p>
+                <button
+                  type="button"
+                  onClick={handleResetToDefaultPassword}
+                  className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-600 shadow-sm"
+                >
+                  Set Password Default: {DEFAULT_USER_PASSWORD}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Atau isi manual</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password Baru</label>
                 <input name="new_password" type="text" required minLength={6} placeholder="Min 6 karakter" className="w-full p-3 border-2 border-slate-200 rounded-lg focus:border-red-500 outline-none text-center font-bold text-lg" />

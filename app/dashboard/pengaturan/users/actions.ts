@@ -5,7 +5,97 @@ import { hashPassword } from '@/lib/auth/password'
 import { revalidatePath } from 'next/cache'
 import { getCachedFiturAkses } from '@/lib/cache/fitur-akses'
 
+const DEFAULT_USER_PASSWORD = 'eskahade2026'
+
+type UserSourceType = 'guru' | 'sadesa'
+
+export type UserCreationCandidate = {
+  source_type: UserSourceType
+  source_ref_id: string
+  label: string
+  full_name: string
+  email: string
+  meta: string | null
+  has_account: boolean
+}
+
+function generateEmail(name: string) {
+  const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return `${cleanName}@sukahideng.or.id`
+}
+
+async function ensureUserSourceColumns() {
+  try {
+    await execute('ALTER TABLE users ADD COLUMN source_type TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+
+  try {
+    await execute('ALTER TABLE users ADD COLUMN source_ref_id TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+
+  try {
+    await execute(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_source_unique
+      ON users(source_type, source_ref_id)
+      WHERE source_type IS NOT NULL AND source_ref_id IS NOT NULL
+    `)
+  } catch {
+    // Abaikan jika engine belum mendukung partial index.
+  }
+}
+
+async function getSourceProfile(sourceType: UserSourceType, sourceRefId: string) {
+  await ensureUserSourceColumns()
+
+  if (sourceType === 'guru') {
+    const guru = await queryOne<{ id: number; nama_lengkap: string }>(
+      'SELECT id, nama_lengkap FROM data_guru WHERE id = ?',
+      [Number(sourceRefId)]
+    )
+    if (!guru) return null
+
+    return {
+      source_type: 'guru' as const,
+      source_ref_id: String(guru.id),
+      full_name: guru.nama_lengkap,
+      email: generateEmail(guru.nama_lengkap),
+    }
+  }
+
+  const santri = await queryOne<{
+    id: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+  }>(
+    `SELECT id, nama_lengkap, asrama, kamar
+     FROM santri
+     WHERE id = ?
+       AND status_global = 'aktif'
+       AND kategori_santri = 'SADESA'`,
+    [sourceRefId]
+  )
+  if (!santri) return null
+
+  return {
+    source_type: 'sadesa' as const,
+    source_ref_id: santri.id,
+    full_name: santri.nama_lengkap,
+    email: generateEmail(santri.nama_lengkap),
+  }
+}
+
 export async function getUsersList() {
+  await ensureUserSourceColumns()
+
   return await query<any>(
     `SELECT
       u.id,
@@ -14,16 +104,90 @@ export async function getUsersList() {
       u.role,
       u.roles,
       u.asrama_binaan,
+      u.source_type,
+      u.source_ref_id,
       u.created_at,
       GROUP_CONCAT(k.nama_kelas, ', ') AS kelas_binaan
     FROM users u
     LEFT JOIN kelas k ON k.wali_kelas_id = u.id
-    GROUP BY u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan, u.created_at
+    GROUP BY
+      u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
+      u.source_type, u.source_ref_id, u.created_at
     ORDER BY u.created_at DESC`
   )
 }
 
-// ── Multi-role: update roles (JSON array) + role (primary) ──────────────────
+export async function getUserCreationCandidates(): Promise<UserCreationCandidate[]> {
+  await ensureUserSourceColumns()
+
+  const guruRows = await query<{ id: number; nama_lengkap: string }>(
+    'SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'
+  )
+
+  const sadesaRows = await query<{
+    id: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+  }>(
+    `SELECT id, nama_lengkap, asrama, kamar
+     FROM santri
+     WHERE status_global = 'aktif'
+       AND kategori_santri = 'SADESA'
+     ORDER BY nama_lengkap ASC`
+  )
+
+  const guruCandidates = await Promise.all(
+    guruRows.map(async (row) => {
+      const email = generateEmail(row.nama_lengkap)
+      const existing = await queryOne<{ id: string }>(
+        `SELECT id
+         FROM users
+         WHERE (source_type = 'guru' AND source_ref_id = ?)
+            OR lower(trim(email)) = lower(trim(?))
+         LIMIT 1`,
+        [String(row.id), email]
+      )
+
+      return {
+        source_type: 'guru' as const,
+        source_ref_id: String(row.id),
+        label: row.nama_lengkap,
+        full_name: row.nama_lengkap,
+        email,
+        meta: 'Data Guru',
+        has_account: Boolean(existing),
+      }
+    })
+  )
+
+  const sadesaCandidates = await Promise.all(
+    sadesaRows.map(async (row) => {
+      const email = generateEmail(row.nama_lengkap)
+      const existing = await queryOne<{ id: string }>(
+        `SELECT id
+         FROM users
+         WHERE (source_type = 'sadesa' AND source_ref_id = ?)
+            OR lower(trim(email)) = lower(trim(?))
+         LIMIT 1`,
+        [row.id, email]
+      )
+
+      return {
+        source_type: 'sadesa' as const,
+        source_ref_id: row.id,
+        label: row.nama_lengkap,
+        full_name: row.nama_lengkap,
+        email,
+        meta: [row.asrama, row.kamar].filter(Boolean).join(' • ') || 'Santri SADESA',
+        has_account: Boolean(existing),
+      }
+    })
+  )
+
+  return [...guruCandidates, ...sadesaCandidates]
+}
+
 export async function updateUserRoles(
   id: string,
   newRoles: string[],
@@ -44,28 +208,58 @@ export async function updateUserRoles(
   return { success: true }
 }
 
-// Backward compat wrapper
 export async function updateUserRole(id: string, newRole: string, asrama?: string): Promise<{ success: boolean } | { error: string }> {
   return updateUserRoles(id, [newRole], asrama)
 }
 
 export async function createUser(formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const email = (formData.get('email') as string).toLowerCase().trim()
-  const password = formData.get('password') as string
-  const fullName = formData.get('full_name') as string
-  const role = formData.get('role') as string
-  const asrama = formData.get('asrama_binaan') as string
+  await ensureUserSourceColumns()
 
-  // Cek email duplikat
+  const emailInput = String(formData.get('email') || '').toLowerCase().trim()
+  const passwordInput = String(formData.get('password') || '')
+  const fullNameInput = String(formData.get('full_name') || '').trim()
+  const role = String(formData.get('role') || '')
+  const asrama = String(formData.get('asrama_binaan') || '')
+  const sourceTypeRaw = String(formData.get('source_type') || '').trim().toLowerCase()
+  const sourceRefId = String(formData.get('source_ref_id') || '').trim()
+  const sourceType = sourceTypeRaw === 'guru' || sourceTypeRaw === 'sadesa' ? sourceTypeRaw : null
+
+  let fullName = fullNameInput
+  let email = emailInput
+
+  if (sourceType && sourceRefId) {
+    const sourceProfile = await getSourceProfile(sourceType, sourceRefId)
+    if (!sourceProfile) return { error: 'Data sumber akun tidak ditemukan atau sudah tidak aktif.' }
+
+    const existingSourceUser = await queryOne<{ id: string }>(
+      'SELECT id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
+      [sourceType, sourceRefId]
+    )
+    if (existingSourceUser) return { error: 'Orang yang dipilih sudah memiliki akun.' }
+
+    fullName = sourceProfile.full_name
+    email = email || sourceProfile.email
+  }
+
+  if (!fullName) return { error: 'Nama lengkap wajib diisi.' }
+  if (!email) return { error: 'Email login wajib diisi.' }
+  if (!role) return { error: 'Role wajib dipilih.' }
+
   const exist = await queryOne('SELECT id FROM users WHERE email = ?', [email])
   if (exist) return { error: 'Email sudah digunakan.' }
+
+  const password = passwordInput.trim() || DEFAULT_USER_PASSWORD
+  if (password.length < 6) return { error: 'Password minimal 6 karakter.' }
 
   const passwordHash = await hashPassword(password)
   const now = new Date().toISOString()
   const rolesJson = JSON.stringify([role])
 
   await execute(
-    'INSERT INTO users (id, email, password_hash, full_name, role, roles, asrama_binaan, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    `INSERT INTO users (
+      id, email, password_hash, full_name, role, roles, asrama_binaan,
+      source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       crypto.randomUUID(),
       email,
@@ -74,8 +268,10 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       role,
       rolesJson,
       role === 'pengurus_asrama' ? asrama : null,
+      sourceType,
+      sourceRefId || null,
       now,
-      now
+      now,
     ]
   )
 
@@ -94,8 +290,6 @@ export async function createUsersBatch(usersData: any[]) {
     }
 
     const email = String(u.email).toLowerCase().trim()
-
-    // Cek duplikat
     const exist = await queryOne('SELECT id FROM users WHERE email = ?', [email])
     if (exist) {
       errors.push(`Email ${email} sudah digunakan.`)
@@ -109,7 +303,10 @@ export async function createUsersBatch(usersData: any[]) {
       const rolesJson = JSON.stringify([userRole])
 
       await execute(
-        'INSERT INTO users (id, email, password_hash, full_name, role, roles, asrama_binaan, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO users (
+          id, email, password_hash, full_name, role, roles, asrama_binaan,
+          source_type, source_ref_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(),
           email,
@@ -118,8 +315,10 @@ export async function createUsersBatch(usersData: any[]) {
           userRole,
           rolesJson,
           userRole === 'pengurus_asrama' ? (u.asrama_binaan || null) : null,
+          null,
+          null,
           now,
-          now
+          now,
         ]
       )
       successCount++
@@ -134,8 +333,6 @@ export async function createUsersBatch(usersData: any[]) {
 
 export async function updateUserDetails(userId: string, fullName: string, email: string): Promise<{ success: boolean } | { error: string }> {
   const emailClean = email.toLowerCase().trim()
-
-  // Cek email duplikat (kecuali user itu sendiri)
   const exist = await queryOne('SELECT id FROM users WHERE email = ? AND id != ?', [emailClean, userId])
   if (exist) return { error: 'Email sudah digunakan user lain.' }
 
@@ -164,8 +361,6 @@ export async function deleteUser(userId: string): Promise<{ success: boolean } |
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
 }
-
-// ── Per-user feature overrides (Grant/Revoke) ──────────────────────────────
 
 export async function getUserOverrides(userId: string) {
   try {
@@ -205,7 +400,6 @@ export async function removeUserFiturOverride(
   return { success: true }
 }
 
-// Expose fitur list as a server action for the client
 export async function getAllActiveFitur() {
   const all = await getCachedFiturAkses()
   return all.filter(f => f.is_active)
