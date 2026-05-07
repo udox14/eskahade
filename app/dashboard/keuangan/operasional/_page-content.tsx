@@ -295,14 +295,14 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
         title="Operasional Unit"
         description="Buat alokasi bulanan, pantau realisasi pengeluaran, dan cetak laporan operasional per unit."
         action={(
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-auto">
               <Calendar className="h-4 w-4 text-slate-400" />
-              <select value={bulan} onChange={e => setBulan(Number(e.target.value) || 1)} className="bg-transparent text-sm font-semibold outline-none">
+              <select value={bulan} onChange={e => setBulan(Number(e.target.value) || 1)} className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none sm:flex-none">
                 {BULAN_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
               <span className="text-slate-300">/</span>
-              <input type="number" value={tahun} onChange={e => setTahun(Number(e.target.value) || now.getFullYear())} className="w-20 bg-transparent text-sm font-semibold outline-none" />
+              <input type="number" value={tahun} onChange={e => setTahun(Number(e.target.value) || now.getFullYear())} className="w-24 min-w-0 bg-transparent text-sm font-semibold outline-none" />
             </div>
             <button onClick={() => load(activeUnitId)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -312,7 +312,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
         )}
       />
 
-      <div className="flex gap-2 rounded-2xl bg-slate-100 p-1">
+      <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1">
         {([
           { key: 'monitoring', label: 'Monitoring' },
           { key: 'alokasi', label: 'Alokasi' },
@@ -348,7 +348,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
 
           {activeTab === 'monitoring' ? (
             <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-              <div className="space-y-6">
+              <div className="min-w-0 space-y-6">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <SummaryCard label="Unit Aktif" value={selectedUnitName} tone="slate" />
                   <SummaryCard label="Saldo Awal" value={formatCurrency(ledger?.saldoAwal || 0)} tone="slate" />
@@ -361,7 +361,31 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                     <Eye className="h-4 w-4 text-slate-500" />
                     <p className="font-semibold text-slate-800">Rekap Lintas Unit</p>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="space-y-3 lg:hidden">
+                    {dashboard.map(row => (
+                      <button
+                        key={row.unit_id}
+                        onClick={() => load(row.unit_id)}
+                        className={`w-full rounded-2xl border p-4 text-left shadow-sm ${row.unit_id === activeUnitId ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-slate-900">{row.unit_name}</p>
+                            <p className="mt-1 text-xs text-slate-500">{row.tanpa_bukti > 0 ? `${row.tanpa_bukti} transaksi tanpa bukti` : 'Semua transaksi sudah terbaca'}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">Buka</span>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          <InfoRow label="Saldo Awal" value={formatCurrency(row.saldo_awal)} valueClassName="font-mono" />
+                          <InfoRow label="Alokasi" value={formatCurrency(row.alokasi_bendahara)} valueClassName="font-mono text-emerald-700" />
+                          <InfoRow label="Pemasukan Lain" value={formatCurrency(row.pemasukan_lain)} valueClassName="font-mono" />
+                          <InfoRow label="Pengeluaran" value={formatCurrency(row.pengeluaran)} valueClassName="font-mono text-rose-700" />
+                          <InfoRow label="Saldo Akhir" value={formatCurrency(row.saldo_akhir)} valueClassName="font-mono" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto lg:block">
                     <table className="w-full min-w-[860px] text-sm">
                       <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr className="border-b border-slate-200">
@@ -406,7 +430,55 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                       Penyesuaian
                     </button>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="space-y-3 md:hidden">
+                    {!ledger || ledger.transactions.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+                        Belum ada transaksi pada unit ini.
+                      </div>
+                    ) : ledger.transactions.map(row => (
+                      <div key={row.id} className="rounded-2xl border border-slate-200 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800">{row.uraian}</p>
+                            <p className="mt-1 text-xs text-slate-500">{row.tanggal}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            row.tipe === 'PENGELUARAN' ? 'bg-rose-100 text-rose-700' : row.tipe === 'PEMASUKAN' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {row.tipe}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          <InfoRow label="Kategori" value={row.kategori || '-'} />
+                          <InfoRow label="Pihak Terkait" value={row.partner_name || '-'} />
+                          <InfoRow label="Nominal" value={formatCurrency(row.nominal)} valueClassName="font-mono text-slate-800" />
+                          <InfoRow label="Bukti" value={row.receipt_url ? 'Tersedia' : 'Tanpa bukti'} valueClassName={row.receipt_url ? 'text-blue-700' : 'text-amber-700'} />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {row.receipt_url ? (
+                            <a href={row.receipt_url} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-xl border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                              Lihat Bukti
+                            </a>
+                          ) : null}
+                          {!row.is_system && row.tipe === 'PENYESUAIAN' ? (
+                            <>
+                              <button onClick={() => { setCorrectionForm({ id: row.id, tanggal: row.tanggal, kategori: row.kategori || 'Penyesuaian', uraian: row.uraian, nominal: String(row.nominal), partnerName: row.partner_name || '', catatan: row.catatan || '' }); setCorrectionModalOpen(true) }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                              <button onClick={() => handleDeleteCorrection(row.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Hapus
+                              </button>
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">{row.is_system ? 'Transaksi sistem' : 'Hanya baca'}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[760px] text-sm">
                       <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr className="border-b border-slate-200">
@@ -465,7 +537,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="min-w-0 space-y-6">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -528,12 +600,12 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
             </div>
           ) : activeTab === 'alokasi' ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="font-medium text-slate-800">Alokasi dikerjakan lewat modal</p>
                   <p className="mt-1 text-sm text-slate-500">Halaman alokasi sengaja dibuat lebih lega. Daftar alokasi tetap tampil di tab monitoring.</p>
                 </div>
-                <button onClick={() => setAllocationModalOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black">
+                <button onClick={() => setAllocationModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black lg:shrink-0">
                   <Plus className="h-4 w-4" />
                   Buat Alokasi
                 </button>
@@ -541,12 +613,12 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="font-semibold text-slate-800">Preview Laporan Bendahara</p>
                   <p className="text-sm text-slate-500">Cetak per unit dengan format laporan yang formal dan rapi.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button onClick={() => setSignatureModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     <Pencil className="h-4 w-4" />
                     Tanda Tangan
@@ -563,8 +635,10 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                   <div className="absolute left-[-99999px] top-0">
                     <OperasionalPrintSheet ref={printRef} ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="Laporan Bulanan" />
                   </div>
-                  <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-                    <OperasionalPrintSheet ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="Laporan Bulanan" />
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <div className="max-h-[70vh] overflow-y-auto">
+                      <OperasionalPrintSheet ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="Laporan Bulanan" preview />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -663,11 +737,11 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, valueClassName = '' }: { label: string; value: string; valueClassName?: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
       <span className="text-slate-500">{label}</span>
-      <span className="font-semibold text-slate-800">{value}</span>
+      <span className={`text-right font-semibold text-slate-800 ${valueClassName}`}>{value}</span>
     </div>
   )
 }
@@ -694,15 +768,15 @@ function AppModal({
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
+          <h2 className="pr-3 text-base font-semibold text-slate-900 sm:text-lg">{title}</h2>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[80vh] overflow-y-auto p-5">{children}</div>
+        <div className="max-h-[calc(92vh-72px)] overflow-y-auto p-4 sm:p-5">{children}</div>
       </div>
     </div>
   )
