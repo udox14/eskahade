@@ -43,3 +43,45 @@
 ✓ Compiled in 1289ms
 ✓ Compiled in 361ms
 ✓ Compiled in 442ms
+ GET / 200 in 2.7s (compile: 1640ms, render: 1060ms)
+ GET /api/version 200 in 1858ms
+○ Compiling /dashboard/asrama/kamar ...
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/kamar 200 in 12.2s (compile: 10.9s, render: 1322ms)
+ GET /api/version 200 in 12ms
+ POST /dashboard/asrama/kamar 500 in 768ms (compile: 6ms, render: 761ms)
+ GET / 200 in 121ms (compile: 9ms, render: 112ms)
+ GET /api/version 200 in 10ms
+ GET /login 200 in 291ms (compile: 217ms, render: 74ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 725ms (compile: 47ms, render: 677ms)
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 632ms (compile: 8ms, render: 624ms)
+ GET / 200 in 92ms (compile: 5ms, render: 87ms)
+ GET /api/version 200 in 9ms
+ GET /login 200 in 42ms (compile: 7ms, render: 35ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 610ms (compile: 6ms, render: 604ms)
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 544ms (compile: 6ms, render: 538ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/kamar 200 in 690ms (compile: 5ms, render: 685ms)
+ GET /api/version 200 in 10ms
+ POST /dashboard/asrama/kamar 500 in 509ms (compile: 7ms, render: 502ms)
+✓ Compiled in 313ms
+ POST /dashboard/asrama/kamar 500 in 666ms (compile: 161ms, render: 505ms)
+ GET /api/version 200 in 48ms
+ GET /api/version 200 in 12ms
+✓ Compiled in 425ms
