@@ -95,6 +95,21 @@ export default function ManajemenUserPage() {
     loadCandidates()
   }, [])
 
+  useEffect(() => {
+    if (!isOpenAdd) return
+
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.overflow = previousBodyOverflow
+    }
+  }, [isOpenAdd])
+
   const loadData = async () => {
     setLoading(true)
     const data = await getUsersList()
@@ -778,7 +793,7 @@ export default function ManajemenUserPage() {
       
       {/* --- MODAL TAMBAH USER --- */}
       {isOpenAdd && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-[min(1200px,96vw)] h-[min(780px,92vh)] overflow-hidden flex flex-col">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">Tambah Pengguna Baru</h3>
@@ -787,7 +802,7 @@ export default function ManajemenUserPage() {
             
             <form onSubmit={handleCreateUser} className="p-4 md:p-5 flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
               <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 xl:items-stretch flex-1 min-h-0 overflow-hidden">
-                <div className="space-y-4 xl:order-1 min-h-0 flex flex-col">
+                <div className="xl:order-1 min-h-0 h-full flex flex-col gap-4 overflow-hidden">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                     <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
                     <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
@@ -807,7 +822,7 @@ export default function ManajemenUserPage() {
                     </select>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-1 min-h-0 flex flex-col">
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-1 min-h-0 h-0 flex flex-col">
                     <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
@@ -823,7 +838,7 @@ export default function ManajemenUserPage() {
                         Pilih orang dari kolom kanan dulu.
                       </div>
                     ) : (
-                      <div className="overflow-y-auto divide-y min-h-0 flex-1">
+                      <div className="overflow-y-auto overscroll-contain divide-y min-h-0 flex-1">
                         {selectedBatchCandidates.map(candidate => {
                           const key = `${candidate.source_type}:${candidate.source_ref_id}`
                           const config = selectedBatchConfigs[key]
@@ -884,7 +899,7 @@ export default function ManajemenUserPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 xl:order-2 min-h-0 flex flex-col">
+                <div className="xl:order-2 min-h-0 h-full flex flex-col gap-4 overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
@@ -912,7 +927,7 @@ export default function ManajemenUserPage() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="min-h-0 h-0 flex-1 flex flex-col">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kandidat Akun</label>
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
@@ -934,7 +949,7 @@ export default function ManajemenUserPage() {
                       </div>
                     </div>
 
-                    <div className="overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50 min-h-0 h-full">
+                    <div className="overflow-y-auto overscroll-contain border border-slate-200 rounded-xl divide-y bg-slate-50 min-h-0 flex-1">
                       {loadingCandidates ? (
                         <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
