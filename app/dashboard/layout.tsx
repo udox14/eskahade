@@ -4,6 +4,7 @@ import { getSession, getEffectiveRoles } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { getFiturForRoles, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
+import { ensureOperasionalSchema } from '@/lib/operasional'
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,12 @@ export default async function DashboardLayout({
   }
 
   console.log('[layout] userRoles:', userRoles)
+
+  try {
+    await ensureOperasionalSchema()
+  } catch (err: any) {
+    console.error('[layout] ensureOperasionalSchema ERROR:', err?.message)
+  }
 
   // Ambil fitur dan setting bottomnav secara paralel
   let fiturAkses: FiturAkses[] = []

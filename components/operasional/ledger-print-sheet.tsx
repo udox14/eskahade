@@ -37,12 +37,12 @@ export const OperasionalPrintSheet = React.forwardRef<HTMLDivElement, {
             .operasional-print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .operasional-print-sheet th,
             .operasional-print-sheet td { border: 1px solid #0f172a; padding: 5px 6px; vertical-align: top; }
-            .operasional-print-sheet th { background: #e2e8f0; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+            .operasional-print-sheet th { background: #e2e8f0; font-size: 10px; font-weight: 700; text-transform: uppercase; }
             .operasional-print-sheet td { font-size: 10px; }
             .operasional-print-sheet .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 14px; }
             .operasional-print-sheet .summary-card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px; background: #f8fafc; }
             .operasional-print-sheet .summary-card-label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #475569; }
-            .operasional-print-sheet .summary-card-value { margin-top: 4px; font-size: 17px; font-weight: 800; }
+            .operasional-print-sheet .summary-card-value { margin-top: 4px; font-size: 17px; font-weight: 700; }
             .operasional-print-sheet .signature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
             .operasional-print-sheet .signature-box { text-align: center; font-size: 11px; }
             .operasional-print-sheet .signature-space { height: 64px; }
@@ -57,9 +57,9 @@ export const OperasionalPrintSheet = React.forwardRef<HTMLDivElement, {
       />
       <div className="operasional-print-sheet">
         <div className="text-center">
-          <div className="text-[24px] font-black uppercase tracking-wide">Laporan Kas Operasional</div>
-          <div className="mt-1 text-[12px] font-bold uppercase tracking-[0.2em] text-slate-600">{subtitle}</div>
-          <div className="mt-2 text-[14px] font-bold uppercase">{ledger.unit.name}</div>
+          <div className="text-[22px] font-bold uppercase tracking-wide">Laporan Kas Operasional</div>
+          <div className="mt-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-600">{subtitle}</div>
+          <div className="mt-2 text-[14px] font-semibold uppercase">{ledger.unit.name}</div>
         </div>
 
         <div className="mt-4 flex items-start justify-between gap-6">
@@ -104,7 +104,7 @@ export const OperasionalPrintSheet = React.forwardRef<HTMLDivElement, {
                 <td>{row.tipe}</td>
                 <td>{row.kategori || (row.sumber_pemasukan === 'ALOKASI_BENDAHARA' ? 'Alokasi Bendahara' : '-')}</td>
                 <td>
-                  <div className="font-semibold">{row.uraian}</div>
+                  <div className="font-medium">{row.uraian}</div>
                   {row.partner_name ? <div className="muted">{row.partner_name}</div> : null}
                   {row.catatan ? <div className="muted">{row.catatan}</div> : null}
                 </td>
@@ -162,7 +162,7 @@ function SignatureBox({ label, nama, jabatan }: { label: string; nama: string; j
     <div className="signature-box">
       <div>{label || '....................'}</div>
       <div className="signature-space" />
-      <div className="font-semibold">{nama || '........................................'}</div>
+      <div className="font-medium">{nama || '........................................'}</div>
       <div className="muted">{jabatan || '........................................'}</div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { deleteFromR2 } from '@/lib/r2/upload'
+import { revalidateTag } from 'next/cache'
 
 export const OPERASIONAL_RECIPIENT_FEATURE = '/dashboard/operasional'
 export const OPERASIONAL_BENDAHARA_FEATURE = '/dashboard/keuangan/operasional'
@@ -276,6 +277,9 @@ async function ensureOperasionalSchemaOnce() {
       ('Keuangan Pusat', 'Operasional Unit', '/dashboard/keuangan/operasional', 'Wallet', '["admin","bendahara"]', 1, 3)
   `)
   await execute(`DELETE FROM fitur_akses WHERE href IN ('/dashboard/operasional/cetak', '/dashboard/keuangan/operasional/cetak')`)
+  try {
+    revalidateTag('fitur-akses', 'everything')
+  } catch {}
   await syncOperasionalUnits()
 }
 
@@ -286,6 +290,7 @@ async function syncOperasionalUnits() {
     WHERE status_global = 'aktif'
       AND asrama IS NOT NULL
       AND TRIM(asrama) <> ''
+      AND UPPER(TRIM(asrama)) <> 'AL-BAGHORY'
     ORDER BY TRIM(asrama)
   `)
 
@@ -298,7 +303,7 @@ async function syncOperasionalUnits() {
         id: sanitizeAsramaUnitId(asrama),
         kind: 'ASRAMA' as const,
         code: sanitizeAsramaUnitId(asrama),
-        name: `Asrama ${asrama}`,
+        name: asrama,
         asrama_name: asrama,
       }
     }),

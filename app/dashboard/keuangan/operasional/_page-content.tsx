@@ -8,17 +8,20 @@ import {
   Eye,
   Loader2,
   Pencil,
+  Plus,
   Printer,
   RefreshCw,
   Save,
   ShieldCheck,
   Trash2,
   Wallet,
+  X,
   XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { OperasionalPrintSheet } from '@/components/operasional/ledger-print-sheet'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import type {
   OperasionalLedgerData,
   OperasionalPrintPreference,
@@ -87,6 +90,13 @@ const DEFAULT_PREFS: OperasionalPrintPreference = {
   slot3_jabatan: '',
 }
 
+const BULAN_OPTIONS = [
+  { value: 1, label: 'JANUARI' }, { value: 2, label: 'FEBRUARI' }, { value: 3, label: 'MARET' },
+  { value: 4, label: 'APRIL' }, { value: 5, label: 'MEI' }, { value: 6, label: 'JUNI' },
+  { value: 7, label: 'JULI' }, { value: 8, label: 'AGUSTUS' }, { value: 9, label: 'SEPTEMBER' },
+  { value: 10, label: 'OKTOBER' }, { value: 11, label: 'NOVEMBER' }, { value: 12, label: 'DESEMBER' },
+]
+
 function getTodayValue() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -119,7 +129,11 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
   const [allocationForm, setAllocationForm] = useState<AllocationForm>(makeAllocationForm())
   const [correctionForm, setCorrectionForm] = useState<CorrectionForm>(makeCorrectionForm())
   const [prefs, setPrefs] = useState<OperasionalPrintPreference>(DEFAULT_PREFS)
+  const [allocationModalOpen, setAllocationModalOpen] = useState(false)
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false)
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
+  const confirm = useConfirm()
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -182,6 +196,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
         toast.success('Alokasi berhasil disimpan sebagai draft.')
       }
       setAllocationForm(makeAllocationForm(allocationForm.unitId))
+      setAllocationModalOpen(false)
       await load(allocationForm.unitId)
     } finally {
       setSavingAllocation(false)
@@ -199,7 +214,9 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
   }
 
   async function handleCancelAllocation(id: string) {
-    if (!window.confirm('Batalkan alokasi ini? Transaksi sistem terkait akan disembunyikan dari ledger aktif.')) return
+    const ok = await confirm('Batalkan alokasi ini?\nTransaksi sistem terkait akan disembunyikan dari ledger aktif.', { variant: 'warning', confirmLabel: 'Ya, Batalkan' })
+    if (!ok) return
+
     const result = await cancelBendaharaAlokasi(id)
     if ('error' in result) {
       toast.error(result.error)
@@ -231,6 +248,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
       }
       toast.success(correctionForm.id ? 'Penyesuaian diperbarui.' : 'Penyesuaian berhasil ditambahkan.')
       setCorrectionForm(makeCorrectionForm())
+      setCorrectionModalOpen(false)
       await load(activeUnitId)
     } finally {
       setSavingCorrection(false)
@@ -238,6 +256,9 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
   }
 
   async function handleDeleteCorrection(id: string) {
+    const ok = await confirm('Hapus transaksi penyesuaian ini?', { variant: 'warning', confirmLabel: 'Ya, Hapus' })
+    if (!ok) return
+
     const result = await deleteBendaharaTransaksi(id)
     if ('error' in result) {
       toast.error(result.error)
@@ -259,6 +280,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
         scope_key: `bendahara:${activeUnitId}`,
       })
       toast.success('Preferensi cetak bendahara tersimpan.')
+      setSignatureModalOpen(false)
       await load(activeUnitId)
     } catch (error: any) {
       toast.error(error?.message || 'Gagal menyimpan preferensi cetak.')
@@ -271,12 +293,14 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
     <div className="space-y-6 pb-16">
       <DashboardPageHeader
         title="Operasional Unit"
-        description="Buat alokasi bulanan, pantau realisasi pengeluaran, dan cetak laporan dari POV bendahara."
+        description="Buat alokasi bulanan, pantau realisasi pengeluaran, dan cetak laporan operasional per unit."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
               <Calendar className="h-4 w-4 text-slate-400" />
-              <input type="number" min={1} max={12} value={bulan} onChange={e => setBulan(Math.min(12, Math.max(1, Number(e.target.value) || 1)))} className="w-12 bg-transparent text-sm font-semibold outline-none" />
+              <select value={bulan} onChange={e => setBulan(Number(e.target.value) || 1)} className="bg-transparent text-sm font-semibold outline-none">
+                {BULAN_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
               <span className="text-slate-300">/</span>
               <input type="number" value={tahun} onChange={e => setTahun(Number(e.target.value) || now.getFullYear())} className="w-20 bg-transparent text-sm font-semibold outline-none" />
             </div>
@@ -318,9 +342,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
               }}
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900"
             >
-              {data.scope.unitOptions.map(unit => (
-                <option key={unit.id} value={unit.id}>{unit.name}</option>
-              ))}
+              {data.scope.unitOptions.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
             </select>
           </div>
 
@@ -374,9 +396,15 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-4 flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-slate-500" />
-                    <p className="font-semibold text-slate-800">Detail Ledger {selectedUnitName}</p>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-slate-500" />
+                      <p className="font-semibold text-slate-800">Detail Ledger {selectedUnitName}</p>
+                    </div>
+                    <button onClick={() => setCorrectionModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      <Plus className="h-4 w-4" />
+                      Penyesuaian
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[760px] text-sm">
@@ -400,17 +428,13 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                             <td className="px-2 py-3 text-slate-500">{row.tanggal}</td>
                             <td className="px-2 py-3">
                               <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-                                row.tipe === 'PENGELUARAN'
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : row.tipe === 'PEMASUKAN'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-amber-100 text-amber-700'
+                                row.tipe === 'PENGELUARAN' ? 'bg-rose-100 text-rose-700' : row.tipe === 'PEMASUKAN' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                               }`}>
                                 {row.tipe}
                               </span>
                             </td>
                             <td className="px-2 py-3">
-                              <p className="font-semibold text-slate-800">{row.uraian}</p>
+                              <p className="font-medium text-slate-800">{row.uraian}</p>
                               <p className="text-xs text-slate-500">{row.kategori || '-'}{row.partner_name ? ` • ${row.partner_name}` : ''}</p>
                             </td>
                             <td className="px-2 py-3 text-right font-mono font-semibold">{formatCurrency(row.nominal)}</td>
@@ -421,15 +445,7 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
                               <div className="flex justify-end gap-2">
                                 {!row.is_system && row.tipe === 'PENYESUAIAN' ? (
                                   <>
-                                    <button onClick={() => setCorrectionForm({
-                                      id: row.id,
-                                      tanggal: row.tanggal,
-                                      kategori: row.kategori || 'Penyesuaian',
-                                      uraian: row.uraian,
-                                      nominal: String(row.nominal),
-                                      partnerName: row.partner_name || '',
-                                      catatan: row.catatan || '',
-                                    })} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
+                                    <button onClick={() => { setCorrectionForm({ id: row.id, tanggal: row.tanggal, kategori: row.kategori || 'Penyesuaian', uraian: row.uraian, nominal: String(row.nominal), partnerName: row.partner_name || '', catatan: row.catatan || '' }); setCorrectionModalOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
                                     <button onClick={() => handleDeleteCorrection(row.id)} className="rounded-lg border border-rose-200 p-2 text-rose-600 hover:bg-rose-50">
@@ -451,32 +467,57 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
 
               <div className="space-y-6">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-4 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-slate-500" />
-                    <p className="font-semibold text-slate-800">Penyesuaian Saldo</p>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-slate-500" />
+                      <p className="font-semibold text-slate-800">Alokasi Bulan Aktif</p>
+                    </div>
+                    <button onClick={() => setAllocationModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black">
+                      <Plus className="h-4 w-4" />
+                      Alokasi
+                    </button>
                   </div>
                   <div className="space-y-3">
-                    <Field label="Tanggal"><input type="date" value={correctionForm.tanggal} onChange={e => setCorrectionForm(prev => ({ ...prev, tanggal: e.target.value }))} className={inputClass} /></Field>
-                    <Field label="Kategori"><input value={correctionForm.kategori} onChange={e => setCorrectionForm(prev => ({ ...prev, kategori: e.target.value }))} className={inputClass} /></Field>
-                    <Field label="Uraian"><input value={correctionForm.uraian} onChange={e => setCorrectionForm(prev => ({ ...prev, uraian: e.target.value }))} className={inputClass} /></Field>
-                    <Field label="Nominal"><input type="number" value={correctionForm.nominal} onChange={e => setCorrectionForm(prev => ({ ...prev, nominal: e.target.value }))} className={inputClass} placeholder="Gunakan negatif untuk pengurang saldo" /></Field>
-                    <Field label="Pihak Terkait"><input value={correctionForm.partnerName} onChange={e => setCorrectionForm(prev => ({ ...prev, partnerName: e.target.value }))} className={inputClass} /></Field>
-                    <Field label="Catatan"><textarea value={correctionForm.catatan} onChange={e => setCorrectionForm(prev => ({ ...prev, catatan: e.target.value }))} className={`${inputClass} min-h-24`} /></Field>
-                    <div className="flex gap-2">
-                      <button onClick={handleSaveCorrection} disabled={savingCorrection || !activeUnitId || !correctionForm.uraian.trim() || !correctionForm.nominal.trim()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
-                        {savingCorrection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        {correctionForm.id ? 'Simpan Koreksi' : 'Tambah Koreksi'}
-                      </button>
-                      <button onClick={() => setCorrectionForm(makeCorrectionForm())} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                        Reset
-                      </button>
-                    </div>
+                    {!ledger || ledger.allocations.length === 0 ? (
+                      <p className="text-sm text-slate-400">Belum ada alokasi untuk unit ini pada periode aktif.</p>
+                    ) : ledger.allocations.map(item => (
+                      <div key={item.id} className="rounded-xl border border-slate-200 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-lg font-semibold text-slate-900">{formatCurrency(item.nominal)}</p>
+                            <p className="text-sm text-slate-500">{item.catatan || 'Tanpa catatan.'}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                              item.status === 'posted' ? 'bg-emerald-100 text-emerald-700' : item.status === 'cancelled' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {item.status.toUpperCase()}
+                            </span>
+                            {item.status === 'draft' ? (
+                              <button onClick={() => handlePostAllocation(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Posting
+                              </button>
+                            ) : null}
+                            {item.status !== 'cancelled' ? (
+                              <button onClick={() => handleCancelAllocation(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                                <XCircle className="h-3.5 w-3.5" />
+                                Batalkan
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="font-semibold text-slate-800">Catatan Monitoring</p>
-                  <div className="mt-4 grid gap-3">
+                  <div className="mb-4 flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-slate-500" />
+                    <p className="font-semibold text-slate-800">Catatan Monitoring</p>
+                  </div>
+                  <div className="grid gap-3">
                     <InfoRow label="Transaksi dengan bukti" value={`${dashboard.find(row => row.unit_id === activeUnitId)?.ada_bukti ?? 0} item`} />
                     <InfoRow label="Transaksi tanpa bukti" value={`${dashboard.find(row => row.unit_id === activeUnitId)?.tanpa_bukti ?? 0} item`} />
                     <InfoRow label="Total pemasukan lain" value={formatCurrency(ledger?.totals.pemasukan_lain || 0)} />
@@ -486,133 +527,124 @@ export default function PageContent({ initialTab = 'monitoring' }: { initialTab?
               </div>
             </div>
           ) : activeTab === 'alokasi' ? (
-            <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-4 font-semibold text-slate-800">Form Alokasi Bulanan</p>
-                <div className="space-y-3">
-                  <Field label="Unit Tujuan">
-                    <select value={allocationForm.unitId} onChange={e => setAllocationForm(prev => ({ ...prev, unitId: e.target.value }))} className={inputClass}>
-                      <option value="">Pilih unit</option>
-                      {data.scope.unitOptions.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Nominal">
-                    <input type="number" value={allocationForm.nominal} onChange={e => setAllocationForm(prev => ({ ...prev, nominal: e.target.value }))} className={inputClass} />
-                  </Field>
-                  <Field label="Catatan">
-                    <textarea value={allocationForm.catatan} onChange={e => setAllocationForm(prev => ({ ...prev, catatan: e.target.value }))} className={`${inputClass} min-h-24`} />
-                  </Field>
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => handleSaveAllocation(false)} disabled={savingAllocation || !allocationForm.unitId || !allocationForm.nominal.trim()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      {savingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Simpan Draft
-                    </button>
-                    <button onClick={() => handleSaveAllocation(true)} disabled={savingAllocation || !allocationForm.unitId || !allocationForm.nominal.trim()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
-                      {savingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      Simpan & Posting
-                    </button>
-                  </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="font-medium text-slate-800">Alokasi dikerjakan lewat modal</p>
+                  <p className="mt-1 text-sm text-slate-500">Halaman alokasi sengaja dibuat lebih lega. Daftar alokasi tetap tampil di tab monitoring.</p>
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-4 font-semibold text-slate-800">Daftar Alokasi Unit Aktif</p>
-                <div className="space-y-3">
-                  {!ledger || ledger.allocations.length === 0 ? (
-                    <p className="text-sm text-slate-400">Belum ada alokasi untuk unit ini pada periode aktif.</p>
-                  ) : ledger.allocations.map(item => (
-                    <div key={item.id} className="rounded-xl border border-slate-200 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-bold text-slate-900">{formatCurrency(item.nominal)}</p>
-                          <p className="text-sm text-slate-500">{item.catatan || 'Tanpa catatan.'}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                            item.status === 'posted'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : item.status === 'cancelled'
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {item.status.toUpperCase()}
-                          </span>
-                          {item.status === 'draft' ? (
-                            <button onClick={() => handlePostAllocation(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Posting
-                            </button>
-                          ) : null}
-                          {item.status !== 'cancelled' ? (
-                            <button onClick={() => handleCancelAllocation(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">
-                              <XCircle className="h-3.5 w-3.5" />
-                              Batalkan
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <button onClick={() => setAllocationModalOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black">
+                  <Plus className="h-4 w-4" />
+                  Buat Alokasi
+                </button>
               </div>
             </div>
           ) : (
-            <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-800">Preview Laporan Bendahara</p>
-                    <p className="text-sm text-slate-500">Cetak per unit dari sudut pandang bendahara.</p>
-                  </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-800">Preview Laporan Bendahara</p>
+                  <p className="text-sm text-slate-500">Cetak per unit dengan format laporan yang formal dan rapi.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setSignatureModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <Pencil className="h-4 w-4" />
+                    Tanda Tangan
+                  </button>
                   <button onClick={() => handlePrint()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black">
                     <Printer className="h-4 w-4" />
                     Cetak
                   </button>
                 </div>
-
-                {ledger ? (
-                  <>
-                    <div className="absolute left-[-99999px] top-0">
-                      <OperasionalPrintSheet ref={printRef} ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="POV Bendahara" />
-                    </div>
-                    <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-                      <OperasionalPrintSheet ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="POV Bendahara" />
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-slate-400">Pilih unit terlebih dahulu.</p>
-                )}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-4 font-semibold text-slate-800">Tanda Tangan Cetak</p>
-                <div className="space-y-4">
-                  {[1, 2, 3].map(index => (
-                    <div key={index} className="rounded-xl border border-slate-200 p-3">
-                      <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Kolom {index}</p>
-                      <div className="space-y-3">
-                        <Field label="Label">
-                          <input value={prefs[`slot${index}_label` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_label`]: e.target.value }))} className={inputClass} />
-                        </Field>
-                        <Field label="Nama">
-                          <input value={prefs[`slot${index}_nama` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_nama`]: e.target.value }))} className={inputClass} />
-                        </Field>
-                        <Field label="Jabatan">
-                          <input value={prefs[`slot${index}_jabatan` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_jabatan`]: e.target.value }))} className={inputClass} />
-                        </Field>
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={handleSavePrefs} disabled={savingPrefs || !activeUnitId} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
-                    {savingPrefs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Simpan Preferensi
-                  </button>
+              {ledger ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <div className="absolute left-[-99999px] top-0">
+                    <OperasionalPrintSheet ref={printRef} ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="Laporan Bulanan" />
+                  </div>
+                  <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
+                    <OperasionalPrintSheet ledger={ledger} preferences={prefs} bulan={bulan} tahun={tahun} subtitle="Laporan Bulanan" />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-sm text-slate-400">Pilih unit terlebih dahulu.</p>
+              )}
             </div>
           )}
         </>
       )}
+
+      <AppModal open={allocationModalOpen} onClose={() => setAllocationModalOpen(false)} title="Buat Alokasi Operasional">
+        <div className="space-y-3">
+          <Field label="Unit Tujuan">
+            <select value={allocationForm.unitId} onChange={e => setAllocationForm(prev => ({ ...prev, unitId: e.target.value }))} className={inputClass}>
+              <option value="">Pilih unit</option>
+              {data?.scope.unitOptions.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Nominal">
+            <input type="number" value={allocationForm.nominal} onChange={e => setAllocationForm(prev => ({ ...prev, nominal: e.target.value }))} className={inputClass} />
+          </Field>
+          <Field label="Catatan">
+            <textarea value={allocationForm.catatan} onChange={e => setAllocationForm(prev => ({ ...prev, catatan: e.target.value }))} className={`${inputClass} min-h-24`} />
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => handleSaveAllocation(false)} disabled={savingAllocation || !allocationForm.unitId || !allocationForm.nominal.trim()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              {savingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Simpan Draft
+            </button>
+            <button onClick={() => handleSaveAllocation(true)} disabled={savingAllocation || !allocationForm.unitId || !allocationForm.nominal.trim()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
+              {savingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Simpan & Posting
+            </button>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal open={correctionModalOpen} onClose={() => setCorrectionModalOpen(false)} title={correctionForm.id ? 'Edit Penyesuaian Saldo' : 'Tambah Penyesuaian Saldo'}>
+        <div className="space-y-3">
+          <Field label="Tanggal"><input type="date" value={correctionForm.tanggal} onChange={e => setCorrectionForm(prev => ({ ...prev, tanggal: e.target.value }))} className={inputClass} /></Field>
+          <Field label="Kategori"><input value={correctionForm.kategori} onChange={e => setCorrectionForm(prev => ({ ...prev, kategori: e.target.value }))} className={inputClass} /></Field>
+          <Field label="Uraian"><input value={correctionForm.uraian} onChange={e => setCorrectionForm(prev => ({ ...prev, uraian: e.target.value }))} className={inputClass} /></Field>
+          <Field label="Nominal"><input type="number" value={correctionForm.nominal} onChange={e => setCorrectionForm(prev => ({ ...prev, nominal: e.target.value }))} className={inputClass} placeholder="Gunakan negatif untuk pengurang saldo" /></Field>
+          <Field label="Pihak Terkait"><input value={correctionForm.partnerName} onChange={e => setCorrectionForm(prev => ({ ...prev, partnerName: e.target.value }))} className={inputClass} /></Field>
+          <Field label="Catatan"><textarea value={correctionForm.catatan} onChange={e => setCorrectionForm(prev => ({ ...prev, catatan: e.target.value }))} className={`${inputClass} min-h-24`} /></Field>
+          <div className="flex gap-2">
+            <button onClick={handleSaveCorrection} disabled={savingCorrection || !activeUnitId || !correctionForm.uraian.trim() || !correctionForm.nominal.trim()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
+              {savingCorrection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {correctionForm.id ? 'Simpan Koreksi' : 'Tambah Koreksi'}
+            </button>
+            <button onClick={() => { setCorrectionForm(makeCorrectionForm()); setCorrectionModalOpen(false) }} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+              Batal
+            </button>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal open={signatureModalOpen} onClose={() => setSignatureModalOpen(false)} title="Atur Tanda Tangan Laporan">
+        <div className="space-y-4">
+          {[1, 2, 3].map(index => (
+            <div key={index} className="rounded-xl border border-slate-200 p-3">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Kolom {index}</p>
+              <div className="space-y-3">
+                <Field label="Label"><input value={prefs[`slot${index}_label` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_label`]: e.target.value }))} className={inputClass} /></Field>
+                <Field label="Nama"><input value={prefs[`slot${index}_nama` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_nama`]: e.target.value }))} className={inputClass} /></Field>
+                <Field label="Jabatan"><input value={prefs[`slot${index}_jabatan` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_jabatan`]: e.target.value }))} className={inputClass} /></Field>
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <button onClick={handleSavePrefs} disabled={savingPrefs || !activeUnitId} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
+              {savingPrefs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Simpan Preferensi
+            </button>
+            <button onClick={() => setSignatureModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+              Tutup
+            </button>
+          </div>
+        </div>
+      </AppModal>
     </div>
   )
 }
@@ -626,7 +658,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
   return (
     <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
       <p className="text-xs font-bold uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-2xl font-black">{value}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   )
 }
@@ -645,6 +677,33 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function AppModal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[80vh] overflow-y-auto p-5">{children}</div>
+      </div>
     </div>
   )
 }

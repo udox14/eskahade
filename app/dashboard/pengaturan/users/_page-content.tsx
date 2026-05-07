@@ -779,200 +779,207 @@ export default function ManajemenUserPage() {
       {/* --- MODAL TAMBAH USER --- */}
       {isOpenAdd && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">Tambah Pengguna Baru</h3>
               <button onClick={closeAddModal} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
             </div>
             
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
-                  <select
-                    value={candidateSource}
-                    onChange={(e) => {
-                      setCandidateSource(e.target.value as 'guru' | 'sadesa')
-                      setCandidateSearch('')
-                    }}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
-                  >
-                    <option value="guru">Guru</option>
-                    <option value="sadesa">SADESA</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Orang</label>
-                  <input
-                    value={candidateSearch}
-                    onChange={(e) => setCandidateSearch(e.target.value)}
-                    placeholder={candidateSource === 'guru' ? 'Cari nama guru...' : 'Cari santri SADESA...'}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </div>
-              </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pilih Orang</label>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSelectAllVisibleCandidates}
-                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
-                      >
-                        Pilih semua hasil
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedBatchConfigs({})}
-                        className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
-                      >
-                        Kosongkan
-                      </button>
-                    </div>
+              <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 items-start">
+                <div className="space-y-4 xl:order-1">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
+                    <p className="mt-1 text-[11px] text-emerald-700">Akun baru akan dibuat otomatis dengan password ini.</p>
                   </div>
-                  <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
-                    {loadingCandidates ? (
-                      <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
-                      </div>
-                  ) : filteredCandidates.length === 0 ? (
-                    <div className="px-4 py-8 text-sm text-slate-500 text-center">
-                      Tidak ada data yang cocok.
-                    </div>
-                  ) : (
-                    filteredCandidates.map(candidate => {
-                      const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
-                      const selected = Boolean(selectedBatchConfigs[candidateKey])
-                      return (
-                        <button
-                          key={candidateKey}
-                          type="button"
-                          disabled={candidate.has_account}
-                          onClick={() => toggleCandidateSelection(candidate)}
-                          className={`w-full text-left px-4 py-3 transition-colors ${
-                            candidate.has_account
-                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                              : selected
-                                ? 'bg-emerald-50 border-l-4 border-emerald-500'
-                                : 'hover:bg-white text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className={`font-semibold truncate ${selected ? 'text-emerald-800' : ''}`}>{candidate.label}</p>
-                              <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
-                              <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
-                            </div>
-                            {candidate.has_account ? (
-                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Sudah ada akun</span>
-                            ) : selected ? (
-                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Terpilih</span>
-                            ) : null}
-                          </div>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
 
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
-                <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
-                <p className="mt-1 text-[11px] text-emerald-700">Akun baru akan dibuat otomatis dengan password ini.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role Default Saat Memilih</label>
-                <select 
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                >
-                  {ROLES.map(r => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
-                    <p className="text-[11px] text-slate-500">Atur role dan asrama binaan masing-masing di sini.</p>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role Default Saat Memilih</label>
+                    <select 
+                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                    >
+                      {ROLES.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
                   </div>
-                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">
-                    {selectedBatchCandidates.length} orang
-                  </span>
+
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
+                        <p className="text-[11px] text-slate-500">Atur role dan asrama binaan masing-masing di sini.</p>
+                      </div>
+                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">
+                        {selectedBatchCandidates.length} orang
+                      </span>
+                    </div>
+
+                    {selectedBatchCandidates.length === 0 ? (
+                      <div className="px-4 py-10 text-center text-sm text-slate-500">
+                        Pilih orang dari kolom kanan dulu.
+                      </div>
+                    ) : (
+                      <div className="max-h-[34rem] overflow-y-auto divide-y">
+                        {selectedBatchCandidates.map(candidate => {
+                          const key = `${candidate.source_type}:${candidate.source_ref_id}`
+                          const config = selectedBatchConfigs[key]
+                          return (
+                            <div key={key} className="p-4 space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-slate-800">{candidate.full_name}</p>
+                                  <p className="text-xs text-slate-500">{candidate.email}</p>
+                                  <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCandidateSelection(candidate)}
+                                  className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-50"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Role</label>
+                                  <select
+                                    value={config?.role || 'wali_kelas'}
+                                    onChange={(e) => updateSelectedBatchConfig(key, {
+                                      role: e.target.value,
+                                      asrama_binaan: e.target.value === 'pengurus_asrama' ? config?.asrama_binaan || '' : '',
+                                    })}
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                                  >
+                                    {ROLES.map(r => (
+                                      <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Asrama Binaan</label>
+                                  <select
+                                    value={config?.asrama_binaan || ''}
+                                    disabled={config?.role !== 'pengurus_asrama'}
+                                    onChange={(e) => updateSelectedBatchConfig(key, { asrama_binaan: e.target.value })}
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    <option value="">-- Pilih Asrama --</option>
+                                    {ASRAMA_LIST.map(a => (
+                                      <option key={a} value={a}>{a}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {selectedBatchCandidates.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-slate-500">
-                    Belum ada orang yang dipilih.
+                <div className="space-y-4 xl:order-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
+                      <select
+                        value={candidateSource}
+                        onChange={(e) => {
+                          setCandidateSource(e.target.value as 'guru' | 'sadesa')
+                          setCandidateSearch('')
+                        }}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                      >
+                        <option value="guru">Guru</option>
+                        <option value="sadesa">SADESA</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Orang</label>
+                      <input
+                        value={candidateSearch}
+                        onChange={(e) => setCandidateSearch(e.target.value)}
+                        placeholder={candidateSource === 'guru' ? 'Cari nama guru...' : 'Cari santri SADESA...'}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <div className="max-h-72 overflow-y-auto divide-y">
-                    {selectedBatchCandidates.map(candidate => {
-                      const key = `${candidate.source_type}:${candidate.source_ref_id}`
-                      const config = selectedBatchConfigs[key]
-                      return (
-                        <div key={key} className="p-4 space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800">{candidate.full_name}</p>
-                              <p className="text-xs text-slate-500">{candidate.email}</p>
-                              <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleCandidateSelection(candidate)}
-                              className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-50"
-                            >
-                              Hapus
-                            </button>
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Role</label>
-                              <select
-                                value={config?.role || 'wali_kelas'}
-                                onChange={(e) => updateSelectedBatchConfig(key, {
-                                  role: e.target.value,
-                                  asrama_binaan: e.target.value === 'pengurus_asrama' ? config?.asrama_binaan || '' : '',
-                                })}
-                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
-                              >
-                                {ROLES.map(r => (
-                                  <option key={r.value} value={r.value}>{r.label}</option>
-                                ))}
-                              </select>
-                            </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kandidat Akun</label>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSelectAllVisibleCandidates}
+                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
+                        >
+                          Pilih semua hasil
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBatchConfigs({})}
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                        >
+                          Kosongkan
+                        </button>
+                      </div>
+                    </div>
 
-                            <div>
-                              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Asrama Binaan</label>
-                              <select
-                                value={config?.asrama_binaan || ''}
-                                disabled={config?.role !== 'pengurus_asrama'}
-                                onChange={(e) => updateSelectedBatchConfig(key, { asrama_binaan: e.target.value })}
-                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-400"
-                              >
-                                <option value="">-- Pilih Asrama --</option>
-                                {ASRAMA_LIST.map(a => (
-                                  <option key={a} value={a}>{a}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
+                    <div className="max-h-[44rem] overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
+                      {loadingCandidates ? (
+                        <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
                         </div>
-                      )
-                    })}
+                      ) : filteredCandidates.length === 0 ? (
+                        <div className="px-4 py-8 text-sm text-slate-500 text-center">
+                          Tidak ada data yang cocok.
+                        </div>
+                      ) : (
+                        filteredCandidates.map(candidate => {
+                          const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
+                          const selected = Boolean(selectedBatchConfigs[candidateKey])
+                          return (
+                            <button
+                              key={candidateKey}
+                              type="button"
+                              disabled={candidate.has_account}
+                              onClick={() => toggleCandidateSelection(candidate)}
+                              className={`w-full text-left px-4 py-3 transition-colors ${
+                                candidate.has_account
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  : selected
+                                    ? 'bg-emerald-50 border-l-4 border-emerald-500'
+                                    : 'hover:bg-white text-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className={`font-semibold truncate ${selected ? 'text-emerald-800' : ''}`}>{candidate.label}</p>
+                                  <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
+                                  <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
+                                </div>
+                                {candidate.has_account ? (
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Sudah ada akun</span>
+                                ) : selected ? (
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Terpilih</span>
+                                ) : null}
+                              </div>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="pt-4">
