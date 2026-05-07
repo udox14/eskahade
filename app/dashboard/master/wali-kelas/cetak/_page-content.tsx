@@ -154,19 +154,19 @@ function PrintDocument({
         <tbody>
           {rows.map((row, index) => (
             <tr key={row.id}>
-              <td style={bodyCellStyle({ textAlign: 'center', fontWeight: 700 })}>{index + 1}</td>
-              <td style={bodyCellSingleLine({ fontWeight: 700, textAlign: 'center' })}>{row.nama_kelas}</td>
+              <td style={bodyCellStyle({ textAlign: 'center' })}>{index + 1}</td>
+              <td style={bodyCellStyle({ textAlign: 'left' })}>{row.nama_kelas}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.tingkat_label}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.lp_label}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.bl_label}</td>
               <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_putra || ''}</td>
               <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_putri || ''}</td>
-              <td style={bodyCellStyle({ textAlign: 'center', fontWeight: 700 })}>{row.total_santri || ''}</td>
-              <td style={bodyCellSingleLine({ textAlign: 'center', fontWeight: 700 })}>{row.grade || '-'}</td>
+              <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_santri || ''}</td>
+              <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.grade || '-'}</td>
               <td style={bodyCellSingleLine()}>{row.tempat || '-'}</td>
-              <td style={bodyCellSingleLine()}>{row.guru_maghrib_nama || '-'}</td>
-              <td style={bodyCellSingleLine()}>{row.guru_shubuh_nama || '-'}</td>
-              <td style={bodyCellSingleLine()}>{row.guru_ashar_nama || '-'}</td>
+              <td style={bodyCellStyle()}>{row.guru_maghrib_nama || '-'}</td>
+              <td style={bodyCellStyle()}>{row.guru_shubuh_nama || '-'}</td>
+              <td style={bodyCellStyle()}>{row.guru_ashar_nama || '-'}</td>
             </tr>
           ))}
         </tbody>

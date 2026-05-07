@@ -3,7 +3,7 @@
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
-import { syncWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
+import { backfillManualWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 
 export type ActiveEvent = {
   id: number
@@ -751,7 +751,7 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
 
 export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
   await ensureHonorMapelDefaults(eventId)
-  await syncWaliKelasFromGuruMaghrib()
+  await backfillManualWaliKelasFromGuruMaghrib()
   const tarif = await getHonorTarif(eventId)
 
   const pembuatSoalRows = await query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`

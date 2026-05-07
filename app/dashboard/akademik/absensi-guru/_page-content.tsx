@@ -162,25 +162,27 @@ export default function AbsensiGuruPage() {
     const rows: any[] = []
     
     dataList.forEach(k => {
-      const mapGuru = new Map<string, { id: string, name: string, sessions: SessionType[] }>()
-      
-      const addSesi = (g: any, s: SessionType) => {
-        if (!g || !g.id) return 
-        if (!mapGuru.has(g.id)) {
-            mapGuru.set(g.id, { id: g.id, name: g.nama_lengkap, sessions: [] })
-        }
-        mapGuru.get(g.id)?.sessions.push(s)
-      }
+      const mapGuru = new Map<string, { id: string, name: string, sessions: Set<SessionType>, assignmentKeys: Set<string> }>()
 
-      addSesi({ id: k.guru_shubuh_id, nama_lengkap: k.guru_shubuh_nama }, 'shubuh')
-      addSesi({ id: k.guru_ashar_id, nama_lengkap: k.guru_ashar_nama }, 'ashar')
-      addSesi({ id: k.guru_maghrib_id, nama_lengkap: k.guru_maghrib_nama }, 'maghrib')
+      ;(k.week_schedule || []).forEach((entry: any) => {
+        SESSIONS.forEach(session => {
+          const guru = entry?.guru?.[session]
+          if (!guru?.id || !guru?.nama) return
+
+          const key = String(guru.id)
+          if (!mapGuru.has(key)) {
+            mapGuru.set(key, { id: key, name: guru.nama, sessions: new Set(), assignmentKeys: new Set() })
+          }
+          mapGuru.get(key)?.sessions.add(session)
+          mapGuru.get(key)?.assignmentKeys.add(`${entry.tanggal}|${session}`)
+        })
+      })
 
       if (mapGuru.size === 0) {
         rows.push({
             uniqueId: `${k.id}-empty`,
             kelas: k,
-            guru: { name: 'Belum Ada Guru' },
+            guru: { name: 'Belum Ada Guru', assignmentKeys: new Set<string>() },
             validSessions: [],
             isFirst: true,
             rowSpan: 1
@@ -188,7 +190,7 @@ export default function AbsensiGuruPage() {
       } else {
         let isFirst = true
         const teachers = Array.from(mapGuru.values()).sort((a, b) => {
-             const score = (t: any) => (t.sessions.includes('shubuh') ? 1 : t.sessions.includes('ashar') ? 2 : 3)
+             const score = (t: any) => (t.sessions.has('shubuh') ? 1 : t.sessions.has('ashar') ? 2 : 3)
              return score(a) - score(b)
         })
 
@@ -196,8 +198,8 @@ export default function AbsensiGuruPage() {
             rows.push({
                 uniqueId: `${k.id}-${t.id}`,
                 kelas: k,
-                guru: t,
-                validSessions: t.sessions,
+                guru: { id: t.id, name: t.name, assignmentKeys: t.assignmentKeys },
+                validSessions: Array.from(t.sessions),
                 isFirst: isFirst,
                 rowSpan: teachers.length
             })
@@ -208,17 +210,16 @@ export default function AbsensiGuruPage() {
     return rows
   }, [dataList])
 
-  const hasAssignedGuru = useCallback((kelas: any, session: SessionType) => {
-    if (session === 'shubuh') return Boolean(kelas.guru_shubuh_id)
-    if (session === 'ashar') return Boolean(kelas.guru_ashar_id)
-    return Boolean(kelas.guru_maghrib_id)
+  const hasAssignedGuru = useCallback((kelas: any, session: SessionType, dateStr: string) => {
+    const schedule = (kelas.week_schedule || []).find((item: any) => item.tanggal === dateStr)
+    return Boolean(schedule?.guru?.[session]?.id)
   }, [])
 
   const getApplicableKelasIds = useCallback((dateStr: string, session: SessionType) => {
     const day = days.find(item => item.dateStr === dateStr)
     if (!day || isLibur(day.dayName, session)) return []
     return dataList
-      .filter(kelas => hasAssignedGuru(kelas, session))
+      .filter(kelas => hasAssignedGuru(kelas, session, dateStr))
       .map(kelas => String(kelas.id))
   }, [dataList, days, hasAssignedGuru])
 
@@ -272,9 +273,7 @@ export default function AbsensiGuruPage() {
     return dataList.filter(k =>
       String(k.nama_kelas || '').toLowerCase().includes(q) ||
       String(k.marhalah_nama || '').toLowerCase().includes(q) ||
-      String(k.guru_shubuh_nama || '').toLowerCase().includes(q) ||
-      String(k.guru_ashar_nama || '').toLowerCase().includes(q) ||
-      String(k.guru_maghrib_nama || '').toLowerCase().includes(q)
+      getGuruGroups(k).some(group => group.name.toLowerCase().includes(q))
     )
   }, [dataList, mobileSearch])
 
@@ -580,7 +579,7 @@ export default function AbsensiGuruPage() {
                                     rowSpan={row.rowSpan}
                                 >
                                     <div className="whitespace-nowrap">{row.kelas.nama_kelas}</div>
-                                    <div className="text-[10px] font-normal text-slate-400 mt-1 whitespace-nowrap">{row.kelas.marhalah?.nama}</div>
+                                    <div className="text-[10px] font-normal text-slate-400 mt-1 whitespace-nowrap">{row.kelas.marhalah_nama}</div>
                                 </td>
                             )}
 
@@ -599,7 +598,7 @@ export default function AbsensiGuruPage() {
                                     const key = `${row.kelas.id}-${day.dateStr}`
                                     const val = gridData[key] || { shubuh:'', ashar:'', maghrib:'' }
                                     
-                                    const isMyJob = row.validSessions.includes(sess)
+                                    const isMyJob = row.guru.assignmentKeys.has(`${day.dateStr}|${sess}`)
                                     const columnLibur = isColumnLibur(day.dateStr, sess)
                                     const disabled = !isMyJob
                                     const readOnly = columnLibur && isMyJob
@@ -647,19 +646,26 @@ export default function AbsensiGuruPage() {
 }
 
 function getGuruGroups(kelas: any) {
-  const map = new Map<string, { id: string; name: string; sessions: SessionType[] }>()
-  const add = (id: any, name: any, session: SessionType) => {
-    if (!id || !name) return
-    const key = String(id)
-    if (!map.has(key)) map.set(key, { id: key, name: String(name), sessions: [] })
-    map.get(key)!.sessions.push(session)
-  }
+  const map = new Map<string, { id: string; name: string; sessions: Set<SessionType>; assignmentKeys: Set<string> }>()
 
-  add(kelas.guru_shubuh_id, kelas.guru_shubuh_nama, 'shubuh')
-  add(kelas.guru_ashar_id, kelas.guru_ashar_nama, 'ashar')
-  add(kelas.guru_maghrib_id, kelas.guru_maghrib_nama, 'maghrib')
+  ;(kelas.week_schedule || []).forEach((entry: any) => {
+    SESSIONS.forEach(session => {
+      const guru = entry?.guru?.[session]
+      if (!guru?.id || !guru?.nama) return
 
-  return Array.from(map.values()).sort((a, b) => {
+      const key = String(guru.id)
+      if (!map.has(key)) map.set(key, { id: key, name: String(guru.nama), sessions: new Set(), assignmentKeys: new Set() })
+      map.get(key)!.sessions.add(session)
+      map.get(key)!.assignmentKeys.add(`${entry.tanggal}|${session}`)
+    })
+  })
+
+  return Array.from(map.values()).map(item => ({
+    id: item.id,
+    name: item.name,
+    sessions: Array.from(item.sessions),
+    assignmentKeys: item.assignmentKeys,
+  })).sort((a, b) => {
     const score = (item: { sessions: SessionType[] }) =>
       item.sessions.includes('shubuh') ? 1 : item.sessions.includes('ashar') ? 2 : 3
     return score(a) - score(b)
@@ -734,18 +740,19 @@ function MobileAbsensiGuruCards({
                         </div>
                         {days.map(day => {
                           const off = isLibur(day.dayName, session)
+                          const assigned = group.assignmentKeys.has(`${day.dateStr}|${session}`)
                           const columnLibur = isColumnLibur(day.dateStr, session)
-                          const value = columnLibur ? 'L' : (gridData[`${kelas.id}-${day.dateStr}`]?.[session] || 'H')
+                          const value = columnLibur && assigned ? 'L' : (gridData[`${kelas.id}-${day.dateStr}`]?.[session] || 'H')
                           return (
                             <button
                               key={`${kelas.id}-${day.dateStr}-${session}`}
-                              disabled={off || columnLibur}
+                              disabled={off || columnLibur || !assigned}
                               onClick={() => onCycleCell(kelas.id, day.dateStr, session)}
                               className={`h-8 rounded-lg text-xs font-black border transition-colors active:scale-95 ${
-                                off ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : guruStatusButtonClass(value)
+                                off || !assigned ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed' : guruStatusButtonClass(value)
                               }`}
                             >
-                              {off ? '-' : value}
+                              {off || !assigned ? '-' : value}
                             </button>
                           )
                         })}

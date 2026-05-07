@@ -1,14 +1,59 @@
 'use client'
 
-import React from 'react'
-import { useState, useEffect } from 'react'
-import { getDataMaster, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import { UserCheck, Save, Loader2, School, Search, FileSpreadsheet, Upload, Download, List, Briefcase, Plus, Trash2, AlertCircle, CheckSquare, Square, Printer } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
+import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import Link from 'next/link'
+
+type SessionKey = 's' | 'a' | 'm'
+type WeeklySessionKey = 'shubuh' | 'ashar' | 'maghrib'
+type WeeklyMap = Record<WeeklySessionKey, Record<number, string>>
+
+const HARI_LIST = [
+  { index: 1, label: 'Senin' },
+  { index: 2, label: 'Selasa' },
+  { index: 3, label: 'Rabu' },
+  { index: 4, label: 'Kamis' },
+  { index: 5, label: 'Jumat' },
+  { index: 6, label: 'Sabtu' },
+  { index: 0, label: 'Ahad' },
+] as const
+
+const SESSION_META: { key: SessionKey; serverKey: WeeklySessionKey; label: string }[] = [
+  { key: 's', serverKey: 'shubuh', label: 'Shubuh' },
+  { key: 'a', serverKey: 'ashar', label: 'Ashar' },
+  { key: 'm', serverKey: 'maghrib', label: 'Maghrib' },
+]
+
+function isStructuralLibur(hariIndex: number, session: WeeklySessionKey) {
+  if (hariIndex === 2 && session === 'maghrib') return true
+  if (hariIndex === 4 && session === 'maghrib') return true
+  if (hariIndex === 5 && (session === 'shubuh' || session === 'ashar')) return true
+  return false
+}
+
+function makeEmptyWeeklyMap(): WeeklyMap {
+  return {
+    shubuh: { 0: '', 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' },
+    ashar: { 0: '', 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' },
+    maghrib: { 0: '', 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' },
+  }
+}
+
+function buildRuleSignature(weekly: WeeklyMap) {
+  return SESSION_META.flatMap(session =>
+    HARI_LIST
+      .map(day => {
+        const value = weekly[session.serverKey]?.[day.index] || ''
+        return value ? `${session.serverKey}|${day.index}|${value}` : ''
+      })
+      .filter(Boolean)
+  ).join('||')
+}
 
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
@@ -16,12 +61,16 @@ export default function ManajemenGuruPage() {
 
   const [kelasList, setKelasList] = useState<any[]>([])
   const [localKelasList, setLocalKelasList] = useState<any[]>([])
+  const [marhalahList, setMarhalahList] = useState<any[]>([])
+  const [waliUserList, setWaliUserList] = useState<any[]>([])
+  const [selectedMarhalah, setSelectedMarhalah] = useState('')
+  const [jadwalLoaded, setJadwalLoaded] = useState(false)
 
   const [guruList, setGuruList] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([])
-  const [guruSearch, setGuruSearch] = useState("")
+  const [guruSearch, setGuruSearch] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [isSavingBatch, setIsSavingBatch] = useState(false)
@@ -33,89 +82,143 @@ export default function ManajemenGuruPage() {
   const [newGuru, setNewGuru] = useState({ nama: '', gelar: '', kode: '' })
   const [search, setSearch] = useState('')
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadInitialData() }, [])
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     setLoading(true)
-    const res = await getDataMaster()
-    setKelasList(res.kelasList)
-    const mappedLocal = res.kelasList.map((k: any) => ({
-      id: k.id,
-      nama_kelas: k.nama_kelas,
-      s: k.guru_shubuh_id?.toString() || "",
-      a: k.guru_ashar_id?.toString() || "",
-      m: k.guru_maghrib_id?.toString() || ""
-    }))
-    setLocalKelasList(mappedLocal)
+    const res = await getJadwalFilterOptions()
     setGuruList(res.guruList)
+    setMarhalahList(res.marhalahList)
+    setWaliUserList(res.waliUserList || [])
     setSelectedGuruIds([])
     setLoading(false)
   }
 
-  const { busyMapS, busyMapA, busyMapM } = React.useMemo(() => {
-    const s = new Map<string, string>()
-    const a = new Map<string, string>()
-    const m = new Map<string, string>()
-    localKelasList.forEach(k => {
-      if (k.s) s.set(String(k.s), k.id)
-      if (k.a) a.set(String(k.a), k.id)
-      if (k.m) m.set(String(k.m), k.id)
+  const loadKelasByFilter = async (marhalahId: string) => {
+    setLoading(true)
+    const kelas = await getKelasJadwalByMarhalah(marhalahId)
+    setKelasList(kelas)
+    const mappedLocal = kelas.map((k: any) => {
+      const weekly = makeEmptyWeeklyMap()
+      ;(k.weekly_rules || []).forEach((rule: any) => {
+        if (weekly[rule.sesi as WeeklySessionKey]) {
+          weekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
+        }
+      })
+
+      return {
+        id: k.id,
+        nama_kelas: k.nama_kelas,
+        marhalah_nama: k.marhalah_nama,
+        wali_kelas_id: k.wali_kelas_id || '',
+        s: k.guru_shubuh_id?.toString() || '',
+        a: k.guru_ashar_id?.toString() || '',
+        m: k.guru_maghrib_id?.toString() || '',
+        weekly,
+      }
     })
-    return { busyMapS: s, busyMapA: a, busyMapM: m }
-  }, [localKelasList])
+    setLocalKelasList(mappedLocal)
+    setJadwalLoaded(true)
+    setLoading(false)
+  }
 
-  const isGuruBusy = React.useCallback((guruId: string, session: 's' | 'a' | 'm', currentKelasId: string) => {
-    if (!guruId) return false
-    const map = session === 's' ? busyMapS : session === 'a' ? busyMapA : busyMapM
-    const assignedKelas = map.get(String(guruId))
-    return assignedKelas !== undefined && assignedKelas !== currentKelasId
-  }, [busyMapS, busyMapA, busyMapM])
+  const handleChangeLocal = (kelasId: string, field: SessionKey | 'wali_kelas_id', value: string) => {
+    setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [field]: value } : k))
+  }
 
-  const handleChangeLocal = (kelasId: string, session: 's' | 'a' | 'm', guruId: string) => {
-    setLocalKelasList(prev => prev.map(k => k.id === kelasId ? { ...k, [session]: guruId } : k))
+  const handleChangeWeekly = (kelasId: string, session: WeeklySessionKey, hariIndex: number, guruId: string) => {
+    setLocalKelasList(prev => prev.map(k => {
+      if (k.id !== kelasId) return k
+      return {
+        ...k,
+        weekly: {
+          ...k.weekly,
+          [session]: {
+            ...k.weekly[session],
+            [hariIndex]: guruId,
+          },
+        },
+      }
+    }))
   }
 
   const handleSimpanSemua = async () => {
     const changedClasses = localKelasList.filter(local => {
-      const asli = kelasList.find(k => k.id === local.id)
+      const asli = kelasList.find((k: any) => k.id === local.id)
       if (!asli) return false
-      const asliS = asli.guru_shubuh_id?.toString() || ""
-      const asliA = asli.guru_ashar_id?.toString() || ""
-      const asliM = asli.guru_maghrib_id?.toString() || ""
-      return local.s?.toString() !== asliS || local.a?.toString() !== asliA || local.m?.toString() !== asliM
+
+      const asliWeekly = makeEmptyWeeklyMap()
+      ;(asli.weekly_rules || []).forEach((rule: any) => {
+        if (asliWeekly[rule.sesi as WeeklySessionKey]) {
+          asliWeekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
+        }
+      })
+
+      return (
+        (asli.guru_shubuh_id?.toString() || '') !== local.s ||
+        (asli.guru_ashar_id?.toString() || '') !== local.a ||
+        (asli.guru_maghrib_id?.toString() || '') !== local.m ||
+        (asli.wali_kelas_id || '') !== local.wali_kelas_id ||
+        buildRuleSignature(asliWeekly) !== buildRuleSignature(local.weekly)
+      )
     })
-    if (changedClasses.length === 0) return toast.info("Tidak ada perubahan", { description: "Jadwal kelas belum ada yang diubah." })
+
+    if (changedClasses.length === 0) {
+      toast.info('Tidak ada perubahan', { description: 'Jadwal, wali kelas, dan pembagian harian belum ada yang diubah.' })
+      return
+    }
+
     if (!await confirm(`Terdapat ${changedClasses.length} perubahan jadwal. Simpan sekarang?`)) return
     setIsSavingBatch(true)
     const toastId = toast.loading(`Menyimpan ${changedClasses.length} jadwal...`)
+
     const payload = changedClasses.map(k => ({
       kelasId: k.id,
-      shubuhId: Number(k.s) || 0,
-      asharId: Number(k.a) || 0,
-      maghribId: Number(k.m) || 0
+      waliKelasId: k.wali_kelas_id || null,
+      shubuhId: Number(k.s) || null,
+      asharId: Number(k.a) || null,
+      maghribId: Number(k.m) || null,
+      weeklyRules: SESSION_META.flatMap(session =>
+        HARI_LIST.map(day => ({
+          sesi: session.serverKey,
+          hariIndex: day.index,
+          guruId: Number(k.weekly[session.serverKey]?.[day.index] || 0) || null,
+        }))
+      ),
     }))
-    const res = await simpanJadwalBatch(payload)
+
+    const res = await simpanJadwalBatch(payload as any)
     setIsSavingBatch(false)
     toast.dismiss(toastId)
-    if ('error' in res) toast.error("Gagal", { description: (res as any).error })
-    else { toast.success("Berhasil!", { description: `${(res as any).count} kelas telah diperbarui.` }); loadData() }
+    if ('error' in res) toast.error('Gagal', { description: (res as any).error })
+    else {
+      toast.success('Berhasil!', { description: `${(res as any).count} kelas telah diperbarui.` })
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+    }
   }
 
   const handleTambahGuru = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newGuru.nama) return toast.warning("Nama wajib diisi")
-    const toastId = toast.loading("Menambahkan...")
+    if (!newGuru.nama) return toast.warning('Nama wajib diisi')
+    const toastId = toast.loading('Menambahkan...')
     const res = await tambahGuruManual(newGuru.nama, newGuru.gelar, newGuru.kode)
     toast.dismiss(toastId)
-    if ((res as any).success) { toast.success("Guru ditambahkan"); setNewGuru({ nama: '', gelar: '', kode: '' }); loadData() }
-    else toast.error((res as any).error)
+    if ((res as any).success) {
+      toast.success('Guru ditambahkan')
+      setNewGuru({ nama: '', gelar: '', kode: '' })
+      await loadInitialData()
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+    } else toast.error((res as any).error)
   }
 
   const handleHapusGuru = async (id: string, nama: string) => {
     if (!await confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
     const res = await hapusGuru(id as any)
-    if ((res as any).success) { toast.success("Guru dihapus"); loadData() }
-    else toast.error((res as any).error)
+    if ((res as any).success) {
+      toast.success('Guru dihapus')
+      await loadInitialData()
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+    } else toast.error((res as any).error)
   }
 
   const toggleSelectGuru = (id: string) => {
@@ -131,24 +234,27 @@ export default function ManajemenGuruPage() {
     if (selectedGuruIds.length === 0) return
     if (!await confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
-    const toastId = toast.loading("Menghapus data...")
+    const toastId = toast.loading('Menghapus data...')
     const res = await hapusGuruMassal(selectedGuruIds as any)
     setIsDeletingBatch(false)
     toast.dismiss(toastId)
-    if ((res as any).success) { toast.success("Berhasil", { description: `${(res as any).count} guru dihapus.` }); loadData() }
-    else toast.error("Gagal Menghapus", { description: (res as any).error })
+    if ((res as any).success) {
+      toast.success('Berhasil', { description: `${(res as any).count} guru dihapus.` })
+      await loadInitialData()
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+    } else toast.error('Gagal Menghapus', { description: (res as any).error })
   }
 
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows = [
-      { "NAMA LENGKAP": "Ahmad Fulan", "GELAR": "S.Pd.I", "KODE": "AHM" },
-      { "NAMA LENGKAP": "Budi Santoso", "GELAR": "M.Ag", "KODE": "BUD" }
+      { 'NAMA LENGKAP': 'Ahmad Fulan', 'GELAR': 'S.Pd.I', 'KODE': 'AHM' },
+      { 'NAMA LENGKAP': 'Budi Santoso', 'GELAR': 'M.Ag', 'KODE': 'BUD' },
     ]
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Data Guru")
-    XLSX.writeFile(wb, "Template_Guru.xlsx")
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Guru')
+    XLSX.writeFile(wb, 'Template_Guru.xlsx')
   }
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,29 +268,39 @@ export default function ManajemenGuruPage() {
       const data = XLSX.utils.sheet_to_json(ws)
       setExcelData(JSON.parse(JSON.stringify(data)))
       toast.success(`${data.length} baris terbaca`)
-    } catch { toast.error("Gagal baca file") }
+    } catch {
+      toast.error('Gagal baca file')
+    }
   }
 
   const handleSimpanGuru = async () => {
     if (excelData.length === 0) return
     setIsProcessing(true)
-    const toastId = toast.loading("Mengimport data guru...")
+    const toastId = toast.loading('Mengimport data guru...')
     const res = await importGuruMassal(excelData)
     setIsProcessing(false)
     toast.dismiss(toastId)
-    if ('error' in res) toast.error("Gagal import", { description: (res as any).error })
+    if ('error' in res) toast.error('Gagal import', { description: (res as any).error })
     else {
       const skippedMsg = ((res as any).skipped ?? 0) > 0 ? ` (${(res as any).skipped} duplikat dilewati)` : ''
       toast.success(`Berhasil import ${(res as any).count} guru${skippedMsg}`)
-      setExcelData([]); loadData(); setTab('JADWAL')
+      setExcelData([])
+      await loadInitialData()
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+      setTab('JADWAL')
     }
   }
 
-  const filteredLocalKelas = React.useMemo(() => localKelasList.filter(k =>
-    k.nama_kelas.toLowerCase().includes(search.toLowerCase())
-  ), [localKelasList, search])
+  const filteredLocalKelas = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q) return localKelasList
+    return localKelasList.filter(k =>
+      String(k.nama_kelas || '').toLowerCase().includes(q) ||
+      String(k.marhalah_nama || '').toLowerCase().includes(q)
+    )
+  }, [localKelasList, search])
 
-  const filteredForDropdown = React.useMemo(() => guruSearch
+  const filteredForDropdown = useMemo(() => guruSearch
     ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
     : guruList, [guruList, guruSearch])
 
@@ -192,12 +308,10 @@ export default function ManajemenGuruPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
-
-      {/* HEADER & TABS */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Manajemen Guru & Jadwal"
-          description="Atur pengajar per kelas. Guru malam otomatis jadi wali kelas."
+          description="Atur guru default, pembagian harian mingguan, dan wali kelas manual."
           action={(
             <Link
               href="/dashboard/master/wali-kelas/cetak"
@@ -219,78 +333,163 @@ export default function ManajemenGuruPage() {
         </div>
       </div>
 
-      {/* TAB 1: JADWAL KELAS */}
       {tab === 'JADWAL' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
-            <div className="flex gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-56">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-60">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <select
+                  value={selectedMarhalah}
+                  onChange={async (e) => {
+                    const value = e.target.value
+                    setSelectedMarhalah(value)
+                    setSearch('')
+                    setJadwalLoaded(false)
+                    setKelasList([])
+                    setLocalKelasList([])
+                    if (!value) return
+                    await loadKelasByFilter(value)
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+                >
+                  <option value="">Pilih tingkat / marhalah...</option>
+                  <option value="SEMUA">Tampilkan semua</option>
+                  {marhalahList.map((m: any) => <option key={m.id} value={String(m.id)}>{m.nama}</option>)}
+                </select>
               </div>
               <div className="relative flex-1 sm:w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
+                <input disabled={!jadwalLoaded} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm disabled:bg-slate-50 disabled:text-slate-400" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input disabled={!jadwalLoaded} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm disabled:bg-slate-50 disabled:text-slate-400" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
               </div>
             </div>
-            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading || !jadwalLoaded} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
               {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               SIMPAN JADWAL
             </button>
           </div>
 
-          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto min-h-[400px]">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-indigo-50 text-indigo-900 font-bold uppercase text-xs sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-3 min-w-[150px]">Kelas</th>
-                    <th className="px-4 py-3 min-w-[200px]">Shubuh</th>
-                    <th className="px-4 py-3 min-w-[200px]">Ashar</th>
-                    <th className="px-4 py-3 min-w-[200px] bg-yellow-100 text-yellow-900 border-l border-yellow-200">Maghrib (Wali Kelas)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></td></tr>
-                  ) : filteredLocalKelas.map(k => (
-                    <tr key={k.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{k.nama_kelas}</p>
-                      </td>
-                      <td className="px-4 py-2">
-                        <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
-                          <option value="">- Kosong -</option>
-                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 's', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500">
-                          <option value="">- Kosong -</option>
-                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'a', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2 bg-yellow-50/30 border-l border-yellow-100">
-                        <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full p-1.5 border border-yellow-300 bg-white text-xs font-bold text-indigo-900 focus:ring-2 focus:ring-yellow-500">
-                          <option value="">- Kosong -</option>
-                          {filteredForDropdown.map((g: any) => isGuruBusy(g.id, 'm', k.id) ? null : <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
-                        </select>
-                        {k.m && <p className="text-[9px] text-green-600 mt-1 text-center font-bold">Auto Akun</p>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2 font-bold text-indigo-900">
+              <CalendarDays className="w-4 h-4" />
+              Pembagian Harian Mingguan
             </div>
+            <p className="mt-1 text-xs text-slate-600">Kolom default tetap menjadi fallback. Jika sel harian dikosongkan, kelas akan otomatis memakai guru default sesi tersebut.</p>
+          </div>
+
+          <div className="space-y-4">
+            {loading ? (
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
+            ) : !jadwalLoaded ? (
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center text-slate-400">
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-500">Pilih tingkat / marhalah dulu</p>
+                  <p className="text-sm">Konten jadwal kelas akan dimuat setelah filter dipilih.</p>
+                </div>
+              </div>
+            ) : filteredLocalKelas.length === 0 ? (
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center text-slate-400">
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-500">Tidak ada kelas</p>
+                  <p className="text-sm">Coba pilih filter lain atau gunakan opsi tampilkan semua.</p>
+                </div>
+              </div>
+            ) : filteredLocalKelas.map(k => (
+              <div key={k.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="font-bold text-slate-800">{k.nama_kelas}</p>
+                  <p className="text-xs text-slate-500">{k.marhalah_nama || 'Tanpa tingkat'}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Wali Kelas</label>
+                    <select value={k.wali_kelas_id} onChange={e => handleChangeLocal(k.id, 'wali_kelas_id', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Belum diatur -</option>
+                      {waliUserList.map((user: any) => <option key={user.id} value={user.id}>{user.full_name || '(Tanpa nama)'}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Shubuh</label>
+                    <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Ashar</label>
+                    <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Maghrib</label>
+                    <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full rounded-xl border border-yellow-300 bg-yellow-50/40 px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-yellow-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 px-4 py-4">
+                  <div className="mb-3">
+                    <p className="text-sm font-bold text-slate-700">Override Harian</p>
+                    <p className="text-xs text-slate-500">Kosongkan sel untuk memakai guru default sesi. Sel abu-abu berarti sesi itu memang libur pengajian.</p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[920px] w-full border-separate border-spacing-0">
+                      <thead>
+                        <tr>
+                          <th className="sticky left-0 z-10 bg-white border-b border-slate-200 px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Sesi</th>
+                          {HARI_LIST.map(day => (
+                            <th key={day.index} className="border-b border-slate-200 px-2 py-2 text-center text-xs font-bold uppercase text-slate-500">{day.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {SESSION_META.map(session => (
+                          <tr key={session.serverKey}>
+                            <td className="sticky left-0 z-10 bg-white border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-700">{session.label}</td>
+                            {HARI_LIST.map(day => {
+                              const disabled = isStructuralLibur(day.index, session.serverKey)
+                              return (
+                                <td key={`${session.serverKey}-${day.index}`} className="border-b border-slate-100 px-2 py-2">
+                                  <select
+                                    disabled={disabled}
+                                    value={k.weekly[session.serverKey]?.[day.index] || ''}
+                                    onChange={e => handleChangeWeekly(k.id, session.serverKey, day.index, e.target.value)}
+                                    className={`w-full rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 ${
+                                      disabled
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                        : 'border-slate-200 bg-white focus:ring-indigo-500'
+                                    }`}
+                                  >
+                                    <option value="">{disabled ? 'Libur' : 'Gunakan default'}</option>
+                                    {!disabled && filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                                  </select>
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* TAB 2: MASTER GURU */}
       {tab === 'MASTER' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
-
-          {/* FORM INPUT MANUAL */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-2">
               <Plus className="w-5 h-5 text-green-600" /> Tambah Guru Baru (Manual)
@@ -330,7 +529,6 @@ export default function ManajemenGuruPage() {
             </div>
           </div>
 
-          {/* Preview Import */}
           {excelData.length > 0 && (() => {
             const previewRows = excelData.map(d => {
               const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
@@ -350,7 +548,7 @@ export default function ManajemenGuruPage() {
                     </p>
                   </div>
                   <button onClick={handleSimpanGuru} disabled={isProcessing || newCount === 0} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
-                    {isProcessing ? "Menyimpan..." : `Simpan ${newCount} Guru Baru`}
+                    {isProcessing ? 'Menyimpan...' : `Simpan ${newCount} Guru Baru`}
                   </button>
                 </div>
                 <div className="max-h-64 overflow-auto border rounded">
@@ -377,7 +575,6 @@ export default function ManajemenGuruPage() {
             )
           })()}
 
-          {/* Daftar Guru + Hapus Massal */}
           <div className="bg-white border rounded-xl p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-3">
               <div>
@@ -414,7 +611,7 @@ export default function ManajemenGuruPage() {
                 </div>
               ))}
             </div>
-            
+
             <Pagination
               currentPage={safePageGuruList}
               totalPages={totalPagesGuruList}
@@ -426,7 +623,6 @@ export default function ManajemenGuruPage() {
           </div>
         </div>
       )}
-
     </div>
   )
 }

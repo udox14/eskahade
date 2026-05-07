@@ -2,6 +2,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { buildWeeklyGuruRuleMap, getWeeklyGuruRules, summarizeWeeklyGuruAssignments } from '@/lib/akademik/guru-jadwal'
 
 export async function getKelasForCetak() {
   const aktif = await getCachedTahunAjaranAktif()
@@ -20,13 +21,33 @@ export async function getMarhalahForCetak() {
   return getCachedMarhalahList()
 }
 
+async function decorateGuruSummary(kelasRows: any[]) {
+  const rules = await getWeeklyGuruRules(kelasRows.map(row => row.id))
+  const ruleMap = buildWeeklyGuruRuleMap(rules)
+
+  return kelasRows.map(kelas => {
+    const summary = summarizeWeeklyGuruAssignments(kelas, ruleMap)
+    return {
+      ...kelas,
+      guru_shubuh: summary.shubuh,
+      guru_ashar: summary.ashar,
+      guru_maghrib: summary.maghrib,
+    }
+  })
+}
+
 export async function getDataBlanko(kelasId: string) {
-  const kelas = await queryOne<any>(`
-    SELECT k.nama_kelas,
-           m.nama AS marhalah_nama,
-           gs.nama_lengkap AS guru_shubuh,
-           ga.nama_lengkap AS guru_ashar,
-           gm.nama_lengkap AS guru_maghrib
+  const kelasRow = await queryOne<any>(`
+    SELECT
+      k.id,
+      k.nama_kelas,
+      m.nama AS marhalah_nama,
+      k.guru_shubuh_id,
+      gs.nama_lengkap AS guru_shubuh_nama,
+      k.guru_ashar_id,
+      ga.nama_lengkap AS guru_ashar_nama,
+      k.guru_maghrib_id,
+      gm.nama_lengkap AS guru_maghrib_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
@@ -35,7 +56,8 @@ export async function getDataBlanko(kelasId: string) {
     WHERE k.id = ?
   `, [kelasId])
 
-  if (!kelas) return { error: 'Kelas tidak ditemukan' }
+  if (!kelasRow) return { error: 'Kelas tidak ditemukan' }
+  const [kelas] = await decorateGuruSummary([kelasRow])
 
   const santriList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
@@ -51,11 +73,16 @@ export async function getDataBlanko(kelasId: string) {
 export async function getDataBlankoMassal(marhalahId: string) {
   const aktif = await getCachedTahunAjaranAktif()
   const kelasList = await query<any>(`
-    SELECT k.id, k.nama_kelas,
-           m.nama AS marhalah_nama,
-           gs.nama_lengkap AS guru_shubuh,
-           ga.nama_lengkap AS guru_ashar,
-           gm.nama_lengkap AS guru_maghrib
+    SELECT
+      k.id,
+      k.nama_kelas,
+      m.nama AS marhalah_nama,
+      k.guru_shubuh_id,
+      gs.nama_lengkap AS guru_shubuh_nama,
+      k.guru_ashar_id,
+      ga.nama_lengkap AS guru_ashar_nama,
+      k.guru_maghrib_id,
+      gm.nama_lengkap AS guru_maghrib_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
@@ -71,7 +98,8 @@ export async function getDataBlankoMassal(marhalahId: string) {
 
   if (!sorted.length) return { error: 'Tidak ada kelas di tingkat ini.' }
 
-  const result = await Promise.all(sorted.map(async (kelas: any) => {
+  const kelasWithSummary = await decorateGuruSummary(sorted)
+  const result = await Promise.all(kelasWithSummary.map(async (kelas: any) => {
     const santriList = await query<any>(`
       SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.jenis_kelamin
       FROM riwayat_pendidikan rp

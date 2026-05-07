@@ -35,11 +35,11 @@ async function getOrCreateWaliUserForGuru(guruId: number) {
   return userId
 }
 
-export async function syncWaliKelasFromGuruMaghrib(kelasIds?: string[]) {
+export async function backfillManualWaliKelasFromGuruMaghrib(kelasIds?: string[]) {
   const params = kelasIds?.filter(Boolean) ?? []
   const where = params.length > 0
-    ? `WHERE k.id IN (${params.map(() => '?').join(',')}) AND k.guru_maghrib_id IS NOT NULL`
-    : 'WHERE k.guru_maghrib_id IS NOT NULL'
+    ? `WHERE k.id IN (${params.map(() => '?').join(',')}) AND k.guru_maghrib_id IS NOT NULL AND k.wali_kelas_id IS NULL`
+    : 'WHERE k.guru_maghrib_id IS NOT NULL AND k.wali_kelas_id IS NULL'
 
   const rows = await query<{ kelas_id: string; guru_maghrib_id: number }>(`
     SELECT k.id as kelas_id, k.guru_maghrib_id
@@ -59,4 +59,8 @@ export async function syncWaliKelasFromGuruMaghrib(kelasIds?: string[]) {
 
   if (updates.length > 0) await batch(updates)
   return { synced: updates.length }
+}
+
+export async function syncWaliKelasFromGuruMaghrib(kelasIds?: string[]) {
+  return backfillManualWaliKelasFromGuruMaghrib(kelasIds)
 }
