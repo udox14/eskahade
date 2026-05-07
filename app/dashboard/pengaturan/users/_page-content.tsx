@@ -779,15 +779,15 @@ export default function ManajemenUserPage() {
       {/* --- MODAL TAMBAH USER --- */}
       {isOpenAdd && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-[min(1200px,96vw)] h-[min(780px,92vh)] overflow-hidden flex flex-col">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
               <h3 className="font-bold text-slate-800">Tambah Pengguna Baru</h3>
               <button onClick={closeAddModal} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
             </div>
             
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 items-start">
-                <div className="space-y-4 xl:order-1">
+            <form onSubmit={handleCreateUser} className="p-4 md:p-5 flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
+              <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 items-start flex-1 min-h-0 overflow-hidden">
+                <div className="space-y-4 xl:order-1 min-h-0 flex flex-col">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                     <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
                     <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
@@ -807,7 +807,7 @@ export default function ManajemenUserPage() {
                     </select>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-1 min-h-0">
                     <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
@@ -823,7 +823,7 @@ export default function ManajemenUserPage() {
                         Pilih orang dari kolom kanan dulu.
                       </div>
                     ) : (
-                      <div className="max-h-[34rem] overflow-y-auto divide-y">
+                      <div className="overflow-y-auto divide-y min-h-0 h-full">
                         {selectedBatchCandidates.map(candidate => {
                           const key = `${candidate.source_type}:${candidate.source_ref_id}`
                           const config = selectedBatchConfigs[key]
@@ -884,7 +884,7 @@ export default function ManajemenUserPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 xl:order-2">
+                <div className="space-y-4 xl:order-2 min-h-0 flex flex-col">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
@@ -934,7 +934,7 @@ export default function ManajemenUserPage() {
                       </div>
                     </div>
 
-                    <div className="max-h-[44rem] overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
+                    <div className="overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50 min-h-0 h-full">
                       {loadingCandidates ? (
                         <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
@@ -982,7 +982,7 @@ export default function ManajemenUserPage() {
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="pt-2 md:pt-4 border-t bg-white">
                 <button 
                   type="submit" 
                   disabled={isCreating || selectedBatchCandidates.length === 0}

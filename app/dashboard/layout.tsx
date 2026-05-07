@@ -77,6 +77,25 @@ export default async function DashboardLayout({
     try { fiturAkses = await getFiturForRoles(userRoles, session.id) } catch {}
   }
 
+  const hasOperasionalRecipientMenu = fiturAkses.some(f => f.href === '/dashboard/operasional')
+  if (userRoles.includes('admin') && !hasOperasionalRecipientMenu) {
+    fiturAkses = [
+      ...fiturAkses,
+      {
+        id: -9901,
+        group_name: 'Keuangan Santri',
+        title: 'Kas Operasional Unit',
+        href: '/dashboard/operasional',
+        icon: 'WalletCards',
+        roles: ['admin', 'pengurus_asrama', 'sekpen', 'keamanan'],
+        is_active: true,
+        urutan: 0,
+        is_bottomnav: false,
+        bottomnav_urutan: 0,
+      },
+    ]
+  }
+
   console.log('[layout] fiturAkses count:', fiturAkses.length)
 
   return (
