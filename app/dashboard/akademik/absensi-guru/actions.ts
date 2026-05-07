@@ -20,6 +20,18 @@ async function ensureLiburPengajianTable() {
         PRIMARY KEY (tanggal, sesi)
       )
     `)
+    await execute(`
+      CREATE INDEX IF NOT EXISTS idx_pengajian_libur_sesi_tanggal
+      ON pengajian_libur_sesi(tanggal, sesi)
+    `)
+    await execute(`
+      CREATE INDEX IF NOT EXISTS idx_absensi_guru_tanggal_kelas
+      ON absensi_guru(tanggal, kelas_id)
+    `)
+    await execute(`
+      CREATE INDEX IF NOT EXISTS idx_riwayat_kelas_status_santri
+      ON riwayat_pendidikan(kelas_id, status_riwayat, santri_id)
+    `)
   } catch {
     // noop
   }
@@ -43,12 +55,11 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
-    WHERE EXISTS (
-      SELECT 1
+    WHERE k.id IN (
+      SELECT DISTINCT rp.kelas_id
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
-      WHERE rp.kelas_id = k.id
-        AND rp.status_riwayat = 'aktif'
+      WHERE rp.status_riwayat = 'aktif'
         AND s.status_global = 'aktif'
     )
   `

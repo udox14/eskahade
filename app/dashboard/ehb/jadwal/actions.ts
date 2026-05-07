@@ -276,6 +276,24 @@ export async function hapusJadwalCell(eventId: number, tanggal: string, sesiId: 
   return { success: true }
 }
 
+export async function hapusJadwalCells(
+  eventId: number,
+  items: { tanggal: string; sesi_id: number; kelas_id: string }[]
+) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  if (!items.length) return { success: true }
+
+  const stmts = items.map(item => ({
+    sql: `DELETE FROM ehb_jadwal WHERE ehb_event_id = ? AND tanggal = ? AND sesi_id = ? AND kelas_id = ?`,
+    params: [eventId, item.tanggal, item.sesi_id, item.kelas_id],
+  }))
+
+  await batch(stmts)
+  revalidatePath('/dashboard/ehb/jadwal')
+  return { success: true }
+}
+
 export async function hapusTanggal(eventId: number, tanggal: string) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }

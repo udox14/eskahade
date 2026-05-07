@@ -6,7 +6,7 @@ import {
   getSesiList, saveSesiConfig,
   getKelasJamMapping, getKelasAktifList, saveKelasJamMapping,
   getJadwalEhb, getTanggalJadwal, getMapelAktifList, saveJadwalEhb,
-  getTahunAjaranList, hapusJadwalCell, hapusTanggal, updateTanggalJadwal, copyJadwalFromEvent, SesiInput, JadwalItem
+  getTahunAjaranList, hapusJadwalCell, hapusJadwalCells, hapusTanggal, updateTanggalJadwal, copyJadwalFromEvent, SesiInput, JadwalItem
 } from './actions'
 import {
   CalendarDays, Settings, Users, BookOpen, Plus, Save, Trash2, 
@@ -70,6 +70,57 @@ export default function JadwalEhbPage() {
     loadInitialData()
   }, [])
 
+  const buildKelasJamMap = (rows: any[]) => {
+    const map: Record<string, string> = {}
+    rows.forEach((row: any) => {
+      map[row.kelas_id] = row.jam_group
+    })
+    return map
+  }
+
+  const syncEventDependentData = async (eventId: number) => {
+    const [kelasRes, mappingRes, mapelRes] = await Promise.all([
+      getKelasAktifList(),
+      getKelasJamMapping(eventId),
+      getMapelAktifList(),
+    ])
+
+    setKelasAktif(kelasRes)
+    setKelasJamMapping(buildKelasJamMap(mappingRes))
+    setMapelAktif(mapelRes)
+  }
+
+  const replaceJadwalEntries = (
+    current: any[],
+    items: { tanggal: string; sesi_id: number; kelas_id: string; mapel_id: number }[],
+    remove = false,
+  ) => {
+    const nextMap = new Map<string, any>()
+    current.forEach(row => {
+      nextMap.set(`${row.tanggal}::${row.sesi_id}::${row.kelas_id}`, row)
+    })
+
+    items.forEach(item => {
+      const key = `${item.tanggal}::${item.sesi_id}::${item.kelas_id}`
+      if (remove) {
+        nextMap.delete(key)
+        return
+      }
+
+      const existing = nextMap.get(key)
+      nextMap.set(key, {
+        ...existing,
+        ehb_event_id: activeEvent?.id,
+        tanggal: item.tanggal,
+        sesi_id: item.sesi_id,
+        kelas_id: item.kelas_id,
+        mapel_id: item.mapel_id,
+      })
+    })
+
+    return Array.from(nextMap.values())
+  }
+
   const loadInitialData = async () => {
     setLoading(true)
     const [evt, evts, tas] = await Promise.all([
@@ -81,7 +132,7 @@ export default function JadwalEhbPage() {
     setAllEvents(evts)
     setTahunAjaranList(tas)
     if (evt) {
-      loadSesi(evt.id)
+      await loadSesi(evt.id)
     }
     setLoading(false)
   }
@@ -170,15 +221,7 @@ export default function JadwalEhbPage() {
   const loadMapping = async () => {
     if (!activeEvent) return
     setLoadingMapping(true)
-    const [kelasRes, mappingRes] = await Promise.all([
-      getKelasAktifList(),
-      getKelasJamMapping(activeEvent.id)
-    ])
-    setKelasAktif(kelasRes)
-    
-    const map: Record<string, string> = {}
-    mappingRes.forEach((m: any) => map[m.kelas_id] = m.jam_group)
-    setKelasJamMapping(map)
+    await syncEventDependentData(activeEvent.id)
     setLoadingMapping(false)
   }
 
@@ -208,24 +251,15 @@ export default function JadwalEhbPage() {
   const loadJadwal = async () => {
     if (!activeEvent) return
     setLoadingJadwal(true)
-    const [jdw, mapel, kelasRes, mappingRes] = await Promise.all([
+    const [jdw] = await Promise.all([
       getJadwalEhb(activeEvent.id),
-      getMapelAktifList(),
-      getKelasAktifList(),
-      getKelasJamMapping(activeEvent.id)
+      syncEventDependentData(activeEvent.id),
     ])
     setJadwal(jdw)
-    setMapelAktif(mapel)
     
     const newDates = getDatesBetweenWib(activeEvent.tanggal_mulai, activeEvent.tanggal_selesai)
     setTanggalList(newDates)
     setExpandedDates(prev => prev.length > 0 ? prev : [])
-
-    // Selalu sinkronkan kelas & mapping
-    setKelasAktif(kelasRes)
-    const map: Record<string, string> = {}
-    mappingRes.forEach((m: any) => map[m.kelas_id] = m.jam_group)
-    setKelasJamMapping(map)
     setLoadingJadwal(false)
   }
 
@@ -262,8 +296,8 @@ export default function JadwalEhbPage() {
       : saveJadwalEhb(activeEvent.id, [item]))
       
     if ('error' in res) return toast.error(res.error)
+    setJadwal(prev => replaceJadwalEntries(prev, [item], mapelId === ''))
     toast.success('Jadwal disimpan')
-    loadJadwal()
   }
 
   // Bulk set mapel untuk semua kelas dalam satu marhalah sekaligus
@@ -277,26 +311,27 @@ export default function JadwalEhbPage() {
     }))
     const res = await saveJadwalEhb(activeEvent.id, items)
     if ('error' in res) return toast.error(res.error)
+    setJadwal(prev => replaceJadwalEntries(prev, items))
     toast.success(`Jadwal ${bulkModal.marhalahNama} (${items.length} kelas) berhasil diset!`)
     setBulkModal(null)
     setBulkMapelId('')
-    loadJadwal()
   }
 
   // Inline: set mapel untuk seluruh kelas dalam marhalah (non-Mutawassithah) tanpa modal
   const handleMarhalahChange = async (tgl: string, sesiId: number, kelasIds: string[], mapelId: number | '') => {
     if (!activeEvent) return
+    const items = kelasIds.map(kId => ({ tanggal: tgl, sesi_id: sesiId, kelas_id: kId }))
     if (mapelId === '') {
-      // Hapus semua kelas marhalah ini untuk sesi+tgl ini
-      for (const kId of kelasIds) {
-        await hapusJadwalCell(activeEvent.id, tgl, sesiId, kId)
-      }
-    } else {
-      const items = kelasIds.map(kId => ({ tanggal: tgl, sesi_id: sesiId, kelas_id: kId, mapel_id: mapelId as number }))
-      const res = await saveJadwalEhb(activeEvent.id, items)
+      const res = await hapusJadwalCells(activeEvent.id, items)
       if ('error' in res) return toast.error(res.error)
+      setJadwal(prev => replaceJadwalEntries(prev, items.map(item => ({ ...item, mapel_id: 0 })), true))
+    } else {
+      const updateItems = items.map(item => ({ ...item, mapel_id: mapelId as number }))
+      const res = await saveJadwalEhb(activeEvent.id, updateItems)
+      if ('error' in res) return toast.error(res.error)
+      setJadwal(prev => replaceJadwalEntries(prev, updateItems))
     }
-    loadJadwal()
+    toast.success('Jadwal marhalah disimpan')
   }
 
   // Set mapel untuk SEMUA kelas di satu sesi sekaligus
@@ -310,10 +345,10 @@ export default function JadwalEhbPage() {
     }))
     const res = await saveJadwalEhb(activeEvent.id, items)
     if ('error' in res) return toast.error(res.error)
+    setJadwal(prev => replaceJadwalEntries(prev, items))
     toast.success(`Sesi ${sesiModal.sesiLabel}: ${items.length} kelas berhasil diset!`)
     setSesiModal(null)
     setSesiMapelId('')
-    loadJadwal()
   }
 
   const handleCopyEvent = async () => {

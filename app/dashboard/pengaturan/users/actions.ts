@@ -450,10 +450,60 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
   return { success: true }
 }
 
+async function findUserDeleteUsage(userId: string): Promise<string | null> {
+  const references = [
+    { table: 'kelas', column: 'wali_kelas_id', label: 'wali kelas pada data kelas' },
+    { table: 'absensi_harian', column: 'created_by', label: 'absensi harian' },
+    { table: 'absensi_guru', column: 'updated_by', label: 'absensi guru' },
+    { table: 'absen_asrama', column: 'created_by', label: 'absen asrama' },
+    { table: 'absen_sakit', column: 'created_by', label: 'absen sakit' },
+    { table: 'nilai_akademik', column: 'created_by', label: 'nilai akademik' },
+    { table: 'pelanggaran', column: 'penindak_id', label: 'data pelanggaran' },
+    { table: 'perizinan', column: 'created_by', label: 'perizinan' },
+    { table: 'hasil_tes_klasifikasi', column: 'tester_id', label: 'hasil tes klasifikasi' },
+    { table: 'spp_log', column: 'penerima_id', label: 'pembayaran SPP' },
+    { table: 'spp_setoran', column: 'penerima_id', label: 'setoran SPP' },
+    { table: 'pembayaran_tahunan', column: 'penerima_id', label: 'pembayaran tahunan' },
+    { table: 'tabungan_log', column: 'created_by', label: 'tabungan / uang jajan' },
+    { table: 'upk_transaksi', column: 'created_by', label: 'transaksi UPK' },
+    { table: 'riwayat_surat', column: 'created_by', label: 'riwayat surat' },
+    { table: 'user_fitur_override', column: 'user_id', label: 'override fitur user' },
+  ]
+
+  for (const ref of references) {
+    try {
+      const row = await queryOne<{ total: number }>(
+        `SELECT COUNT(*) as total FROM ${ref.table} WHERE ${ref.column} = ?`,
+        [userId]
+      )
+      if (Number(row?.total || 0) > 0) {
+        return ref.label
+      }
+    } catch {
+      // Abaikan tabel yang belum ada di environment tertentu.
+    }
+  }
+
+  return null
+}
+
 export async function deleteUser(userId: string): Promise<{ success: boolean } | { error: string }> {
-  await execute('DELETE FROM users WHERE id = ?', [userId])
-  revalidatePath('/dashboard/pengaturan/users')
-  return { success: true }
+  const usage = await findUserDeleteUsage(userId)
+  if (usage) {
+    return { error: `User tidak bisa dihapus karena masih dipakai pada ${usage}.` }
+  }
+
+  try {
+    await execute('DELETE FROM users WHERE id = ?', [userId])
+    revalidatePath('/dashboard/pengaturan/users')
+    return { success: true }
+  } catch (error: any) {
+    const message = String(error?.message || '')
+    if (message.toLowerCase().includes('foreign key')) {
+      return { error: 'User tidak bisa dihapus karena masih terhubung dengan data lain.' }
+    }
+    return { error: message || 'Gagal menghapus user.' }
+  }
 }
 
 export async function getUserOverrides(userId: string) {

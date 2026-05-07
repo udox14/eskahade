@@ -430,16 +430,21 @@ export default function ManajemenUserPage() {
     if (!userToDelete) return
     
     const toastId = toast.loading("Menghapus user...")
-    const res = await deleteUser(userToDelete.id)
-    toast.dismiss(toastId)
+    try {
+      const res = await deleteUser(userToDelete.id)
 
-    if ('error' in res) {
-        toast.error("Gagal Hapus", { description: (res as any).error })
-    } else {
-        toast.success("User Dihapus")
-        setUsers(prev => prev.filter(u => u.id !== userToDelete.id))
-        setIsOpenDelete(false)
-        setUserToDelete(null)
+      if ('error' in res) {
+          toast.error("Gagal Hapus", { description: (res as any).error })
+      } else {
+          toast.success("User Dihapus")
+          setUsers(prev => prev.filter(u => u.id !== userToDelete.id))
+          setIsOpenDelete(false)
+          setUserToDelete(null)
+      }
+    } catch (error: any) {
+      toast.error("Gagal Hapus", { description: String(error?.message || 'Terjadi kesalahan saat menghapus user.') })
+    } finally {
+      toast.dismiss(toastId)
     }
   }
 
