@@ -786,7 +786,7 @@ export default function ManajemenUserPage() {
             </div>
             
             <form onSubmit={handleCreateUser} className="p-4 md:p-5 flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
-              <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 items-start flex-1 min-h-0 overflow-hidden">
+              <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 xl:items-stretch flex-1 min-h-0 overflow-hidden">
                 <div className="space-y-4 xl:order-1 min-h-0 flex flex-col">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                     <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
@@ -807,7 +807,7 @@ export default function ManajemenUserPage() {
                     </select>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-1 min-h-0">
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden flex-1 min-h-0 flex flex-col">
                     <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
@@ -819,11 +819,11 @@ export default function ManajemenUserPage() {
                     </div>
 
                     {selectedBatchCandidates.length === 0 ? (
-                      <div className="px-4 py-10 text-center text-sm text-slate-500">
+                      <div className="px-4 py-10 text-center text-sm text-slate-500 flex-1">
                         Pilih orang dari kolom kanan dulu.
                       </div>
                     ) : (
-                      <div className="overflow-y-auto divide-y min-h-0 h-full">
+                      <div className="overflow-y-auto divide-y min-h-0 flex-1">
                         {selectedBatchCandidates.map(candidate => {
                           const key = `${candidate.source_type}:${candidate.source_ref_id}`
                           const config = selectedBatchConfigs[key]

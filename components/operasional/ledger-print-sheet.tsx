@@ -16,12 +16,13 @@ export const OperasionalPrintSheet = React.forwardRef<HTMLDivElement, {
   bulan: number
   tahun: number
   subtitle: string
-}>(({ ledger, preferences, bulan, tahun, subtitle }, ref) => {
+  preview?: boolean
+}>(({ ledger, preferences, bulan, tahun, subtitle, preview = false }, ref) => {
   const printedAt = format(new Date(), 'dd MMMM yyyy', { locale: idLocale })
   const bulanLabel = `${BULAN_NAMA[bulan]} ${tahun}`
 
   return (
-    <div ref={ref} className="bg-white text-black">
+    <div ref={ref} className={`bg-white text-black ${preview ? 'operasional-print-preview' : ''}`}>
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -47,6 +48,17 @@ export const OperasionalPrintSheet = React.forwardRef<HTMLDivElement, {
             .operasional-print-sheet .signature-box { text-align: center; font-size: 11px; }
             .operasional-print-sheet .signature-space { height: 64px; }
             .operasional-print-sheet .muted { color: #64748b; }
+            .operasional-print-preview {
+              width: 100%;
+              min-width: 760px;
+            }
+            .operasional-print-preview .operasional-print-sheet {
+              width: 100%;
+              min-width: 760px;
+              min-height: auto;
+              padding: 10mm;
+              margin: 0 auto;
+            }
             @page { size: F4 portrait; margin: 10mm; }
             @media print {
               html, body { background: white !important; }
