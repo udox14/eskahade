@@ -12,7 +12,7 @@ const KAMAR_PATH = '/dashboard/asrama/kamar'
 type PengurusInput = {
   guru_id?: number | null
   nama: string
-  source?: 'guru' | 'manual'
+  source?: 'guru' | 'sadesa'
 }
 
 type PembinaKamarInput = PengurusInput & {
@@ -122,6 +122,7 @@ export async function getKepengurusanAsramaData(asrama?: string | null) {
       asramaOptions: [] as string[],
       currentAsrama: '',
       guruOptions: [] as Array<{ id: number; nama: string }>,
+      sadesaOptions: [] as Array<{ id: string; nama: string; asrama: string | null; kamar: string | null }>,
       roomOptions: [] as string[],
       inti: {
         pembina_asrama: null as any,
@@ -138,12 +139,32 @@ export async function getKepengurusanAsramaData(asrama?: string | null) {
   const currentAsrama = access.requestedAsrama || asramaOptions[0] || ''
   const guruRows = await getCachedDataGuru()
   const guruOptions = guruRows.map((guru: any) => ({ id: Number(guru.id), nama: String(guru.nama_lengkap) }))
+  const sadesaRows = currentAsrama ? await query<{
+    id: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+  }>(`
+    SELECT id, nama_lengkap, asrama, kamar
+    FROM santri
+    WHERE status_global = 'aktif'
+      AND kategori_santri = 'SADESA'
+      AND asrama = ?
+    ORDER BY nama_lengkap
+  `, [currentAsrama]) : []
+  const sadesaOptions = sadesaRows.map((row) => ({
+    id: row.id,
+    nama: row.nama_lengkap,
+    asrama: row.asrama,
+    kamar: row.kamar,
+  }))
 
   if (!currentAsrama) {
     return {
       asramaOptions,
       currentAsrama: '',
       guruOptions,
+      sadesaOptions,
       roomOptions: [],
       inti: { pembina_asrama: null, rois: null, wakil_rois: null },
       sekretaris: [],
@@ -194,6 +215,7 @@ export async function getKepengurusanAsramaData(asrama?: string | null) {
     asramaOptions,
     currentAsrama,
     guruOptions,
+    sadesaOptions,
     roomOptions,
     inti: {
       pembina_asrama: intiMap.get('pembina_asrama') ?? null,

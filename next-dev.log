@@ -86,3 +86,7 @@
  GET /api/version 200 in 12ms
 ✓ Compiled in 425ms
  GET /api/version 200 in 27ms
+ GET /api/version 200 in 31ms
+ GET /api/version 200 in 23ms
+✓ Compiled in 434ms
+ GET /api/version 200 in 30ms

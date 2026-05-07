@@ -2,6 +2,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { ensurePeriodeLogs } from '../actions'
 
 // ─── Session info ─────────────────────────────────────────────────────────────
 export async function getSessionMonitoring() {
@@ -17,6 +18,7 @@ export async function getSessionMonitoring() {
 export async function getMonitoringAggregate(periodeId: number, asramaFilter?: string) {
   const session = await getSession()
   if (!session) return []
+  await ensurePeriodeLogs(periodeId, asramaFilter)
 
   const asramaClause = asramaFilter ? 'AND s.asrama = ?' : ''
   const params: any[] = [periodeId]
@@ -42,7 +44,9 @@ export async function getMonitoringAggregate(periodeId: number, asramaFilter?: s
       SUM(CASE WHEN pl.status_datang IN ('TELAT','VONIS') THEN 1 ELSE 0 END) AS telat
     FROM santri s
     INNER JOIN perpulangan_log pl ON pl.santri_id = s.id AND pl.periode_id = ?
-    WHERE s.status_global = 'aktif' ${asramaClause}
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'
+      ${asramaClause}
     GROUP BY s.asrama
     ORDER BY s.asrama
   `, params)
@@ -52,6 +56,7 @@ export async function getMonitoringAggregate(periodeId: number, asramaFilter?: s
 
 // ─── Aggregate per kamar dalam 1 asrama (lazy, dipanggil saat accordion dibuka) ──
 export async function getMonitoringPerKamar(periodeId: number, asrama: string) {
+  await ensurePeriodeLogs(periodeId, asrama)
   const rows = await query<{
     kamar: string
     total: number
@@ -72,7 +77,9 @@ export async function getMonitoringPerKamar(periodeId: number, asrama: string) {
       SUM(CASE WHEN pl.status_datang IN ('TELAT','VONIS') THEN 1 ELSE 0 END) AS telat
     FROM santri s
     INNER JOIN perpulangan_log pl ON pl.santri_id = s.id AND pl.periode_id = ?
-    WHERE s.status_global = 'aktif' AND s.asrama = ?
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'
+      AND s.asrama = ?
     GROUP BY s.kamar
     ORDER BY CAST(s.kamar AS INTEGER), s.kamar
   `, [periodeId, asrama])
@@ -86,6 +93,7 @@ export async function getMonitoringSantriKamar(
   asrama: string,
   kamar: string
 ) {
+  await ensurePeriodeLogs(periodeId, asrama)
   return query<{
     id: string
     nama_lengkap: string
@@ -102,7 +110,9 @@ export async function getMonitoringSantriKamar(
            pl.keterangan, pl.tgl_pulang, pl.tgl_datang
     FROM santri s
     INNER JOIN perpulangan_log pl ON pl.santri_id = s.id AND pl.periode_id = ?
-    WHERE s.status_global = 'aktif' AND s.asrama = ? AND s.kamar = ?
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'
+      AND s.asrama = ? AND s.kamar = ?
     ORDER BY s.nama_lengkap
   `, [periodeId, asrama, kamar])
 }

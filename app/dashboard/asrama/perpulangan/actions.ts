@@ -12,6 +12,49 @@ function autoJenisPulang(kab_kota: string | null, alamat: string | null): 'ROMBO
   return src.includes('tasikmalaya') ? 'DIJEMPUT' : 'ROMBONGAN'
 }
 
+export async function ensurePeriodeLogs(periodeId: number, asrama?: string) {
+  const session = await getSession()
+  const params: Array<number | string> = [periodeId]
+  let asramaClause = ''
+
+  if (asrama && !isAsramaTanpaKamar(asrama)) {
+    asramaClause = 'AND s.asrama = ?'
+    params.push(asrama)
+  }
+
+  const missing = await query<{
+    id: string
+    kab_kota: string | null
+    alamat: string | null
+  }>(`
+    SELECT s.id, s.kab_kota, s.alamat
+    FROM santri s
+    LEFT JOIN perpulangan_log pl
+      ON pl.santri_id = s.id AND pl.periode_id = ?
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'
+      ${asramaClause}
+      AND pl.id IS NULL
+  `, params)
+
+  if (!missing.length) return 0
+
+  await batch(missing.map((row) => ({
+    sql: `INSERT OR IGNORE INTO perpulangan_log
+            (id, santri_id, periode_id, jenis_pulang, status_pulang, status_datang, created_by)
+          VALUES (?, ?, ?, ?, 'BELUM', 'BELUM', ?)`,
+    params: [
+      generateId(),
+      row.id,
+      periodeId,
+      autoJenisPulang(row.kab_kota, row.alamat),
+      session?.id ?? null,
+    ],
+  })))
+
+  return missing.length
+}
+
 // ─── Session info ────────────────────────────────────────────────────────────
 export async function getSessionInfo() {
   const session = await getSession()
@@ -65,6 +108,7 @@ export async function getDataKamarPerpulangan(
   const session = await getSession()
   if (!session) return []
   if (isAsramaTanpaKamar(asrama)) return []
+  await ensurePeriodeLogs(periodeId, asrama)
 
   // Ambil santri + log perpulangan (LEFT JOIN — santri bisa belum punya log)
   const rows = await query<any>(`
@@ -83,41 +127,6 @@ export async function getDataKamarPerpulangan(
     WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [periodeId, asrama, kamar])
-
-  // Auto-insert row untuk santri yang belum punya log di periode ini
-  const belumAda = rows.filter((r: any) => r.log_id === null)
-  if (belumAda.length > 0) {
-    await batch(belumAda.map((r: any) => ({
-      sql: `INSERT OR IGNORE INTO perpulangan_log
-              (id, santri_id, periode_id, jenis_pulang, status_pulang, status_datang, created_by)
-            VALUES (?, ?, ?, ?, 'BELUM', 'BELUM', ?)`,
-      params: [
-        generateId(),
-        r.id,
-        periodeId,
-        autoJenisPulang(r.kab_kota, r.alamat),
-        session.id,
-      ],
-    })))
-
-    // Re-fetch setelah insert agar log_id dan jenis_pulang terisi
-    const refreshed = await query<any>(`
-      SELECT s.id, s.nama_lengkap, s.nis, s.kamar,
-             pl.id         AS log_id,
-             pl.jenis_pulang,
-             pl.status_pulang,
-             pl.keterangan,
-             pl.tgl_pulang,
-             pl.status_datang,
-             pl.tgl_datang
-      FROM santri s
-      LEFT JOIN perpulangan_log pl
-        ON pl.santri_id = s.id AND pl.periode_id = ?
-      WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
-      ORDER BY s.nama_lengkap
-    `, [periodeId, asrama, kamar])
-    return refreshed
-  }
 
   return rows
 }
@@ -319,8 +328,13 @@ export async function tandaiTelatMassal(
     return { error: 'Periode kedatangan belum selesai.' }
 
   const targets = await query<{ id: string }>(
-    `SELECT id FROM perpulangan_log
-     WHERE periode_id = ? AND status_pulang = 'PULANG' AND status_datang = 'BELUM'`,
+    `SELECT pl.id
+     FROM perpulangan_log pl
+     JOIN santri s ON s.id = pl.santri_id
+     WHERE pl.periode_id = ?
+       AND pl.status_pulang = 'PULANG'
+       AND pl.status_datang = 'BELUM'
+       AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'`,
     [periodeId]
   )
   if (!targets.length) return { success: true, count: 0 }

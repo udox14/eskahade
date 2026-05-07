@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
+const NON_KAMAR_ASRAMA = new Set(['AL-BAGHORY'])
 
 type SantriMutasi = {
   id: string
@@ -197,6 +198,8 @@ export default function MutasiAsramaClient({
     () => kamarOptions.find(k => k.nomor_kamar === targetKamar) || null,
     [kamarOptions, targetKamar]
   )
+
+  const isNonKamarAsrama = (asrama: string | null | undefined) => Boolean(asrama && NON_KAMAR_ASRAMA.has(asrama))
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -457,9 +460,15 @@ export default function MutasiAsramaClient({
                           {s.asrama ? (
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">{s.asrama}</span>
-                              <span className="text-slate-400">/</span>
-                              <span className="font-bold text-slate-600">{s.kamar || '—'}</span>
-                              {!s.kamar && (
+                              {!isNonKamarAsrama(s.asrama) ? (
+                                <>
+                                  <span className="text-slate-400">/</span>
+                                  <span className="font-bold text-slate-600">{s.kamar || '—'}</span>
+                                </>
+                              ) : (
+                                <span className="font-bold text-slate-500">Tanpa Kamar</span>
+                              )}
+                              {!s.kamar && !isNonKamarAsrama(s.asrama) && (
                                 <span className="bg-sky-100 text-sky-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
                                   Belum Kamar
                                 </span>

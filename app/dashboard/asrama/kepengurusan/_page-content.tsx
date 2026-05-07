@@ -7,9 +7,10 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getKepengurusanAsramaData, saveKepengurusanAsrama } from './actions'
 
 type GuruOption = { id: number; nama: string }
+type SadesaOption = { id: string; nama: string; asrama: string | null; kamar: string | null }
 type PersonDraft = {
   localId: string
-  source: 'guru' | 'manual'
+  source: 'guru' | 'sadesa'
   guru_id: number | ''
   nama: string
 }
@@ -18,7 +19,7 @@ type PembinaKamarDraft = PersonDraft & { kamar: string }
 function makePersonDraft(row?: { guru_id: number | null; nama: string } | null): PersonDraft {
   return {
     localId: crypto.randomUUID(),
-    source: row?.guru_id ? 'guru' : 'manual',
+    source: row?.guru_id ? 'guru' : 'sadesa',
     guru_id: row?.guru_id ?? '',
     nama: row?.nama ?? '',
   }
@@ -55,21 +56,23 @@ function SummaryCard({
 function PersonInput({
   value,
   guruOptions,
+  sadesaOptions,
   onChange,
 }: {
   value: PersonDraft
   guruOptions: GuruOption[]
+  sadesaOptions: SadesaOption[]
   onChange: (next: PersonDraft) => void
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="grid gap-2 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:items-center">
       <select
         value={value.source}
-        onChange={(event) => onChange({ ...value, source: event.target.value as 'guru' | 'manual', guru_id: '', nama: '' })}
-        className="w-28 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+        onChange={(event) => onChange({ ...value, source: event.target.value as 'guru' | 'sadesa', guru_id: '', nama: '' })}
+        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
       >
         <option value="guru">Guru</option>
-        <option value="manual">Manual</option>
+        <option value="sadesa">SADESA</option>
       </select>
       {value.source === 'guru' ? (
         <select
@@ -80,21 +83,30 @@ function PersonInput({
             onChange({ ...value, guru_id: guruId, nama: selected?.nama ?? '' })
           }}
           className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">-- Pilih Guru --</option>
+            {guruOptions.map((guru) => (
+              <option key={guru.id} value={guru.id}>
+                {guru.nama}
+              </option>
+            ))}
+          </select>
+      ) : (
+        <select
+          value={value.nama}
+          onChange={(event) => {
+            const selected = sadesaOptions.find((item) => item.id === event.target.value)
+            onChange({ ...value, nama: selected?.nama ?? '' })
+          }}
+          className="min-w-0 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="">-- Pilih Guru --</option>
-          {guruOptions.map((guru) => (
-            <option key={guru.id} value={guru.id}>
-              {guru.nama}
+          <option value="">-- Pilih SADESA --</option>
+          {sadesaOptions.map((santri) => (
+            <option key={santri.id} value={santri.id}>
+              {santri.nama}{santri.kamar ? ` · Kamar ${santri.kamar}` : ''}
             </option>
           ))}
         </select>
-      ) : (
-        <input
-          value={value.nama}
-          onChange={(event) => onChange({ ...value, nama: event.target.value })}
-          placeholder="Nama pengurus"
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-        />
       )}
     </div>
   )
@@ -104,6 +116,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
   const [asramaOptions, setAsramaOptions] = useState<string[]>([])
   const [selectedAsrama, setSelectedAsrama] = useState(asramaBinaan ?? '')
   const [guruOptions, setGuruOptions] = useState<GuruOption[]>([])
+  const [sadesaOptions, setSadesaOptions] = useState<SadesaOption[]>([])
   const [roomOptions, setRoomOptions] = useState<string[]>([])
   const [inti, setInti] = useState({
     pembina_asrama: makePersonDraft(),
@@ -130,6 +143,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
     setAsramaOptions(result.asramaOptions)
     setSelectedAsrama(result.currentAsrama)
     setGuruOptions(result.guruOptions)
+    setSadesaOptions(result.sadesaOptions ?? [])
     setRoomOptions(result.roomOptions)
     setInti({
       pembina_asrama: makePersonDraft(result.inti.pembina_asrama),
@@ -218,7 +232,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
             </select>
           ) : (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-              Asrama binaan: {selectedAsrama || asramaBinaan || '-'}
+              Asrama binaan: {selectedAsrama || asramaBinaan || '-'} · Pilihan pengurus dari Guru atau SADESA
             </div>
           )}
           <button
@@ -267,6 +281,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
                         <PersonInput
                           value={row.value}
                           guruOptions={guruOptions}
+                          sadesaOptions={sadesaOptions}
                           onChange={(next) => setInti((prev) => ({ ...prev, [row.key]: next }))}
                         />
                       </td>
@@ -308,6 +323,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
                         <PersonInput
                           value={item}
                           guruOptions={guruOptions}
+                          sadesaOptions={sadesaOptions}
                           onChange={(next) => setSekretaris((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
                         />
                       </td>
@@ -359,6 +375,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
                         <PersonInput
                           value={item}
                           guruOptions={guruOptions}
+                          sadesaOptions={sadesaOptions}
                           onChange={(next) => setBendahara((prev) => prev.map((row) => row.localId === item.localId ? next : row))}
                         />
                       </td>
@@ -407,6 +424,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
                           <PersonInput
                             value={item}
                             guruOptions={guruOptions}
+                            sadesaOptions={sadesaOptions}
                             onChange={(next) => setPembinaKamar((prev) => prev.map((row) => row.kamar === item.kamar ? { ...next, kamar: row.kamar } : row))}
                           />
                         </td>

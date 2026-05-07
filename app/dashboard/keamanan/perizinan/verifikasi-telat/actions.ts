@@ -38,6 +38,7 @@ export async function getAntrianTelat() {
     JOIN perpulangan_periode pp ON pp.id = pl.periode_id
     JOIN santri s ON s.id = pl.santri_id
     WHERE pl.status_datang = 'TELAT'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) != 'AL-BAGHORY'
     ORDER BY pp.tgl_selesai_datang ASC
     LIMIT 200
   `)
