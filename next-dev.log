@@ -90,3 +90,45 @@
  GET /api/version 200 in 23ms
 ✓ Compiled in 434ms
  GET /api/version 200 in 30ms
+ GET / 200 in 824ms (compile: 206ms, render: 618ms)
+ GET / 200 in 464ms (compile: 6ms, render: 457ms)
+ GET /api/version 200 in 19ms
+ GET /login 200 in 134ms (compile: 65ms, render: 69ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 1386ms (compile: 32ms, render: 1354ms)
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 881ms (compile: 11ms, render: 870ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/perpulangan 200 in 2.8s (compile: 1777ms, render: 983ms)
+ GET /api/version 200 in 8ms
+ POST /dashboard/asrama/perpulangan 200 in 22ms (compile: 6ms, render: 16ms)
+ POST /dashboard/asrama/perpulangan 500 in 849ms (compile: 6ms, render: 843ms)
+ POST /dashboard/asrama/perpulangan 500 in 720ms (compile: 7ms, render: 713ms)
+ GET /dashboard 200 in 349ms (compile: 7ms, render: 342ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard/asrama/perpulangan 200 in 793ms (compile: 7ms, render: 786ms)
+ GET /api/version 200 in 14ms
+ POST /dashboard/asrama/perpulangan 200 in 27ms (compile: 8ms, render: 18ms)
+ POST /dashboard/asrama/perpulangan 500 in 769ms (compile: 9ms, render: 760ms)
+ POST /dashboard/asrama/perpulangan 500 in 703ms (compile: 8ms, render: 695ms)
+[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
+ GET /login 307 in 351ms (compile: 8ms, render: 343ms)
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 0
+ GET /dashboard 200 in 843ms (compile: 9ms, render: 834ms)
+ GET /api/version 200 in 11ms
+ GET /dashboard/login 404 in 2.8s (compile: 2.7s, render: 156ms)
+ GET /api/version 200 in 15ms
+ GET / 200 in 131ms (compile: 6ms, render: 124ms)
+✓ Compiled in 771ms
+✓ Finished filesystem cache database compaction in 11.2s
+✓ Compiled in 456ms
+✓ Compiled in 354ms

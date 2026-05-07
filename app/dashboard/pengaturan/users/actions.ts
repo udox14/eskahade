@@ -19,6 +19,17 @@ export type UserCreationCandidate = {
   has_account: boolean
 }
 
+type BatchSourceUserInput = {
+  source_type: UserSourceType
+  source_ref_id: string
+  role: string
+  asrama_binaan?: string | null
+}
+
+type LinkedUserCreateResult =
+  | { success: true; full_name: string; email: string }
+  | { error: string }
+
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.or.id`
@@ -91,6 +102,63 @@ async function getSourceProfile(sourceType: UserSourceType, sourceRefId: string)
     full_name: santri.nama_lengkap,
     email: generateEmail(santri.nama_lengkap),
   }
+}
+
+async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<LinkedUserCreateResult> {
+  const sourceProfile = await getSourceProfile(input.source_type, input.source_ref_id)
+  if (!sourceProfile) {
+    return { error: 'Data sumber akun tidak ditemukan atau sudah tidak aktif.' } as const
+  }
+
+  if (!input.role) {
+    return { error: `Role untuk ${sourceProfile.full_name} belum dipilih.` } as const
+  }
+
+  if (input.role === 'pengurus_asrama' && !String(input.asrama_binaan || '').trim()) {
+    return { error: `Asrama binaan untuk ${sourceProfile.full_name} belum dipilih.` } as const
+  }
+
+  const existingSourceUser = await queryOne<{ id: string }>(
+    'SELECT id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
+    [input.source_type, input.source_ref_id]
+  )
+  if (existingSourceUser) {
+    return { error: `${sourceProfile.full_name} sudah memiliki akun.` } as const
+  }
+
+  const existingEmailUser = await queryOne<{ id: string }>(
+    'SELECT id FROM users WHERE email = ? LIMIT 1',
+    [sourceProfile.email]
+  )
+  if (existingEmailUser) {
+    return { error: `Email ${sourceProfile.email} sudah digunakan.` } as const
+  }
+
+  const passwordHash = await hashPassword(DEFAULT_USER_PASSWORD)
+  const now = new Date().toISOString()
+  const rolesJson = JSON.stringify([input.role])
+
+  await execute(
+    `INSERT INTO users (
+      id, email, password_hash, full_name, role, roles, asrama_binaan,
+      source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      crypto.randomUUID(),
+      sourceProfile.email,
+      passwordHash,
+      sourceProfile.full_name,
+      input.role,
+      rolesJson,
+      input.role === 'pengurus_asrama' ? String(input.asrama_binaan || '').trim() : null,
+      input.source_type,
+      input.source_ref_id,
+      now,
+      now,
+    ]
+  )
+
+  return { success: true, full_name: sourceProfile.full_name, email: sourceProfile.email } as const
 }
 
 export async function getUsersList() {
@@ -224,22 +292,21 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   const sourceRefId = String(formData.get('source_ref_id') || '').trim()
   const sourceType = sourceTypeRaw === 'guru' || sourceTypeRaw === 'sadesa' ? sourceTypeRaw : null
 
-  let fullName = fullNameInput
-  let email = emailInput
-
   if (sourceType && sourceRefId) {
-    const sourceProfile = await getSourceProfile(sourceType, sourceRefId)
-    if (!sourceProfile) return { error: 'Data sumber akun tidak ditemukan atau sudah tidak aktif.' }
+    const result = await createLinkedUserFromSource({
+      source_type: sourceType,
+      source_ref_id: sourceRefId,
+      role,
+      asrama_binaan: asrama || null,
+    })
+    if ('error' in result) return { error: result.error }
 
-    const existingSourceUser = await queryOne<{ id: string }>(
-      'SELECT id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
-      [sourceType, sourceRefId]
-    )
-    if (existingSourceUser) return { error: 'Orang yang dipilih sudah memiliki akun.' }
-
-    fullName = sourceProfile.full_name
-    email = email || sourceProfile.email
+    revalidatePath('/dashboard/pengaturan/users')
+    return { success: true }
   }
+
+  const fullName = fullNameInput
+  const email = emailInput
 
   if (!fullName) return { error: 'Nama lengkap wajib diisi.' }
   if (!email) return { error: 'Email login wajib diisi.' }
@@ -277,6 +344,33 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
 
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
+}
+
+export async function createUsersFromSourcesBatch(items: BatchSourceUserInput[]) {
+  await ensureUserSourceColumns()
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return { success: false, count: 0, errors: ['Tidak ada data yang dipilih.'] }
+  }
+
+  let successCount = 0
+  const errors: string[] = []
+
+  for (const item of items) {
+    const result = await createLinkedUserFromSource(item)
+    if ('error' in result) {
+      errors.push(result.error)
+      continue
+    }
+    successCount++
+  }
+
+  revalidatePath('/dashboard/pengaturan/users')
+  return {
+    success: successCount > 0,
+    count: successCount,
+    errors: errors.length > 0 ? errors : null,
+  }
 }
 
 export async function createUsersBatch(usersData: any[]) {

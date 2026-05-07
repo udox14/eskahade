@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  getSantriAktif, getSantriKeluar, getAsramaList,
-  tetapkanKeluar, aktifkanKembali, getDataSuratBerhenti, catatSuratBerhenti
+  getSantriAktif, getSantriKeluar, getAsramaList, getPengajuanKeluar,
+  tetapkanKeluar, aktifkanKembali, getDataSuratBerhenti, catatSuratBerhenti,
+  setujuiPengajuanKeluar, tolakPengajuanKeluar
 } from './actions'
 import {
   UserX, UserCheck, Search, Filter, ChevronLeft, ChevronRight,
@@ -30,6 +31,18 @@ type SantriAktif = {
 }
 type SantriKeluar = SantriAktif & {
   tanggal_keluar: string | null; alasan_keluar: string | null; ada_surat: number
+}
+type PengajuanKeluar = {
+  id: string
+  santri_id: string
+  nis: string | null
+  nama_lengkap: string | null
+  asrama: string
+  kamar: string | null
+  tanggal_tandai: string
+  catatan: string | null
+  status_global: string | null
+  penanda_nama: string | null
 }
 
 // ── Modal Tetapkan Keluar ─────────────────────────────────────────────────────
@@ -138,6 +151,101 @@ function ModalKeluar({ santri, onClose, onSuccess }: {
 }
 
 // ── Modal Cetak Surat ─────────────────────────────────────────────────────────
+function ModalSetujuiPengajuan({ pengajuan, onClose, onSuccess }: {
+  pengajuan: PengajuanKeluar
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
+  const [alasan, setAlasan] = useState(pengajuan.catatan || '')
+  const [buatSurat, setBuatSurat] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    const res = await setujuiPengajuanKeluar({
+      pengajuanId: pengajuan.id,
+      tanggalKeluar: tanggal,
+      alasanKeluar: alasan,
+      buatSurat,
+    })
+    setSaving(false)
+    if ('error' in res) { toast.error('Gagal', { description: (res as any).error }); return }
+    toast.success(`${pengajuan.nama_lengkap || 'Santri'} dikeluarkan`)
+    onSuccess()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-900">ACC Santri Keluar</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{pengajuan.nama_lengkap || '-'}</p>
+            </div>
+            <button type="button" onClick={onClose}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
+              <p className="text-slate-500 text-xs font-medium mb-1">Penandaan dari Asrama</p>
+              <p className="font-semibold text-slate-800">{pengajuan.penanda_nama || 'Pengurus asrama'}</p>
+              <p className="text-slate-500 text-xs">
+                {pengajuan.asrama} / {pengajuan.kamar || '—'} · {fmtTgl(pengajuan.tanggal_tandai)}
+              </p>
+              {pengajuan.catatan ? <p className="text-xs text-slate-600 mt-2">{pengajuan.catatan}</p> : null}
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Tanggal Keluar
+              </label>
+              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Alasan Keluar
+              </label>
+              <textarea value={alasan} onChange={e => setAlasan(e.target.value)}
+                rows={3}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none" />
+            </div>
+
+            <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
+                className="w-4 h-4 rounded accent-rose-600" />
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
+                <p className="text-xs text-slate-400">Otomatis muncul sebagai surat berhenti</p>
+              </div>
+            </label>
+          </div>
+
+          <div className="p-5 pt-0 flex gap-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Batal
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+              {saving ? 'Menyimpan...' : 'ACC dan Keluarkan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -457,6 +565,196 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
 }
 
 // ── Tab Santri Keluar ─────────────────────────────────────────────────────────
+function TabPengajuan({ asramaList }: { asramaList: string[] }) {
+  const confirm = useConfirm()
+  const [rows, setRows] = useState<PengajuanKeluar[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [asrama, setAsrama] = useState('SEMUA')
+  const [pageSize, setPageSize] = useState(20)
+  const [modalPengajuan, setModalPengajuan] = useState<PengajuanKeluar | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+
+  const load = useCallback(async (pg = 1, s = search, a = asrama, ps = pageSize) => {
+    setLoading(true)
+    try {
+      const res = await getPengajuanKeluar({
+        search: s || undefined,
+        asrama: a !== 'SEMUA' ? a : undefined,
+        page: pg,
+        pageSize: ps,
+      })
+      setRows(res.rows); setTotal(res.total)
+      setTotalPages(res.totalPages); setPage(pg); setHasLoaded(true)
+    } finally { setLoading(false) }
+  }, [search, asrama, pageSize])
+
+  const handleReject = async (row: PengajuanKeluar) => {
+    if (!await confirm(`Tolak penandaan keluar untuk ${row.nama_lengkap || 'santri'}?`)) return
+    setRejectingId(row.id)
+    const res = await tolakPengajuanKeluar({ pengajuanId: row.id })
+    setRejectingId(null)
+    if ('error' in res) { toast.error('Gagal', { description: (res as any).error }); return }
+    toast.success('Pengajuan ditolak')
+    setRows(prev => prev.filter(item => item.id !== row.id))
+    setTotal(prev => prev - 1)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[140px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
+            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="SEMUA">Semua Asrama</option>
+              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
+            className="flex-1 min-w-[180px]">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input type="text" placeholder="Nama atau NIS..."
+                value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            </div>
+          </form>
+          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors self-end">
+            <Filter className="w-4 h-4" />
+            {loading ? 'Memuat...' : 'Tampilkan'}
+          </button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
+            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
+              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {!hasLoaded && !loading && (
+        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
+          <Building2 className="w-10 h-10 text-slate-200" />
+          <p className="text-slate-500 text-sm">Tekan <strong>Tampilkan</strong> untuk melihat penandaan dari asrama</p>
+        </div>
+      )}
+      {loading && (
+        <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
+        </div>
+      )}
+
+      {hasLoaded && !loading && (
+        <>
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span><strong className="text-slate-700">{fmtNum(total)}</strong> penandaan menunggu ACC</span>
+            {totalPages > 1 && <span>Hal {page}/{totalPages}</span>}
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
+              Belum ada penandaan keluar dari asrama.
+            </div>
+          ) : (
+            <>
+              <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      {['No','Santri','Asrama / Kamar','Ditandai','Catatan','Aksi'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {rows.map((r, i) => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-xs text-slate-300">{(page-1)*pageSize + i + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{r.nama_lengkap || '-'}</div>
+                          <div className="text-xs text-slate-400">{r.nis || '-'} · {r.penanda_nama || 'Pengurus asrama'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {r.asrama} / <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg font-bold">{r.kamar || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{fmtTgl(r.tanggal_tandai)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[280px] truncate" title={r.catatan || ''}>{r.catatan || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setModalPengajuan(r)}
+                              className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
+                              ACC
+                            </button>
+                            <button onClick={() => handleReject(r)} disabled={rejectingId === r.id}
+                              className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                              {rejectingId === r.id ? 'Memproses...' : 'Tolak'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden space-y-2">
+                {rows.map(r => (
+                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2">
+                    <div>
+                      <p className="font-semibold text-slate-800">{r.nama_lengkap || '-'}</p>
+                      <p className="text-xs text-slate-400">{r.nis || '-'} · {r.asrama} / {r.kamar || '—'}</p>
+                    </div>
+                    <p className="text-xs text-slate-500">Ditandai {fmtTgl(r.tanggal_tandai)} oleh {r.penanda_nama || 'pengurus asrama'}</p>
+                    <p className="text-xs text-slate-600 bg-slate-50 rounded-xl p-2">{r.catatan || 'Tanpa catatan'}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setModalPengajuan(r)}
+                        className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">ACC</button>
+                      <button onClick={() => handleReject(r)} disabled={rejectingId === r.id}
+                        className="flex-1 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600">Tolak</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <button onClick={() => load(page-1)} disabled={page<=1||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    <ChevronLeft className="w-4 h-4" /> Sebelumnya
+                  </button>
+                  <span className="text-sm text-slate-500">Hal {page}/{totalPages}</span>
+                  <button onClick={() => load(page+1)} disabled={page>=totalPages||loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    Berikutnya <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {modalPengajuan && (
+        <ModalSetujuiPengajuan
+          pengajuan={modalPengajuan}
+          onClose={() => setModalPengajuan(null)}
+          onSuccess={() => { setModalPengajuan(null); load(page) }}
+        />
+      )}
+    </div>
+  )
+}
+
 function TabKeluar({ asramaList }: { asramaList: string[] }) {
   const [rows, setRows]         = useState<SantriKeluar[]>([])
   const [total, setTotal]       = useState(0)
@@ -664,8 +962,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SantriKeluarPage() {
-  const confirm = useConfirm()
-  const [tab, setTab]           = useState<'aktif' | 'keluar'>('aktif')
+  const [tab, setTab]           = useState<'aktif' | 'pengajuan' | 'keluar'>('aktif')
   const [asramaList, setAsramaList] = useState<string[]>([])
 
   useEffect(() => { getAsramaList().then(setAsramaList) }, [])
@@ -674,13 +971,14 @@ export default function SantriKeluarPage() {
     <div className="max-w-5xl mx-auto pb-16 space-y-5">
       <DashboardPageHeader
         title="Santri Keluar"
-        description="Kelola santri yang keluar di tengah tahun ajaran, bukan alumni resmi."
+        description="Dewan santri bisa mengeksekusi keluar langsung, atau memproses penandaan keluar dari pengurus asrama."
       />
 
       {/* Tab */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
         {([
           { key: 'aktif',  label: 'Tetapkan Keluar', icon: LogOut },
+          { key: 'pengajuan', label: 'Pengajuan Asrama', icon: Building2 },
           { key: 'keluar', label: 'Daftar Keluar',   icon: UserX  },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -694,6 +992,7 @@ export default function SantriKeluarPage() {
       </div>
 
       {tab === 'aktif'  && <TabAktif  asramaList={asramaList} />}
+      {tab === 'pengajuan' && <TabPengajuan asramaList={asramaList} />}
       {tab === 'keluar' && <TabKeluar asramaList={asramaList} />}
     </div>
   )

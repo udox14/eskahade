@@ -7,28 +7,74 @@ async function getR2() {
   return env.R2_BUCKET
 }
 
-export async function uploadToR2(
-  file: File,
-  santriId: string
-): Promise<{ url: string } | { error: string }> {
+function sanitizePathSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9/_-]+/g, '-').replace(/\/+/g, '/').replace(/^-+|-+$/g, '')
+}
+
+function extensionFromMime(mimeType: string) {
+  if (mimeType.includes('png')) return 'png'
+  if (mimeType.includes('webp')) return 'webp'
+  if (mimeType.includes('gif')) return 'gif'
+  return 'jpg'
+}
+
+export async function uploadBufferToR2(params: {
+  buffer: ArrayBuffer
+  folder: string
+  filenamePrefix: string
+  contentType: string
+}): Promise<{ url: string } | { error: string }> {
   try {
     const r2 = await getR2()
-    const ext = file.type === 'image/png' ? 'png' : 'jpg'
-    const key = `foto-santri/${santriId}_${Date.now()}.${ext}`
+    const ext = extensionFromMime(params.contentType || 'image/jpeg')
+    const folder = sanitizePathSegment(params.folder || 'uploads') || 'uploads'
+    const prefix = sanitizePathSegment(params.filenamePrefix || 'file') || 'file'
+    const key = `${folder}/${prefix}_${Date.now()}.${ext}`
 
-    const arrayBuffer = await file.arrayBuffer()
-
-    await r2.put(key, arrayBuffer, {
+    await r2.put(key, params.buffer, {
       httpMetadata: {
-        contentType: file.type || 'image/jpeg',
+        contentType: params.contentType || 'image/jpeg',
         cacheControl: 'public, max-age=31536000',
       },
     })
 
     const baseUrl = process.env.R2_PUBLIC_URL!
-    const url = `${baseUrl}/${key}`
+    return { url: `${baseUrl}/${key}` }
+  } catch (err: any) {
+    return { error: `Gagal upload: ${err.message}` }
+  }
+}
 
-    return { url }
+export async function uploadBase64ImageToR2(params: {
+  base64: string
+  folder: string
+  filenamePrefix: string
+}): Promise<{ url: string } | { error: string }> {
+  const match = String(params.base64 || '').match(/^data:(.+?);base64,(.+)$/)
+  if (!match) return { error: 'Format base64 tidak valid.' }
+
+  const [, mimeType, payload] = match
+  const bytes = Uint8Array.from(atob(payload), char => char.charCodeAt(0))
+  return uploadBufferToR2({
+    buffer: bytes.buffer,
+    folder: params.folder,
+    filenamePrefix: params.filenamePrefix,
+    contentType: mimeType,
+  })
+}
+
+export async function uploadToR2(
+  file: File,
+  santriId: string
+): Promise<{ url: string } | { error: string }> {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    return uploadBufferToR2({
+      buffer: arrayBuffer,
+      folder: 'foto-santri',
+      filenamePrefix: santriId,
+      contentType: file.type || 'image/jpeg',
+    })
   } catch (err: any) {
     return { error: `Gagal upload: ${err.message}` }
   }

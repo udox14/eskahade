@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, createUser, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -25,6 +25,13 @@ const ROLES = [
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const DEFAULT_USER_PASSWORD = 'eskahade2026'
+
+type SelectedBatchConfig = {
+  source_type: 'guru' | 'sadesa'
+  source_ref_id: string
+  role: string
+  asrama_binaan: string
+}
 
 export default function ManajemenUserPage() {
   const confirm = useConfirm()
@@ -48,7 +55,7 @@ export default function ManajemenUserPage() {
   const [candidateSource, setCandidateSource] = useState<'guru' | 'sadesa'>('guru')
   const [userCandidates, setUserCandidates] = useState<UserCreationCandidate[]>([])
   const [candidateSearch, setCandidateSearch] = useState('')
-  const [selectedCandidateKey, setSelectedCandidateKey] = useState('')
+  const [selectedBatchConfigs, setSelectedBatchConfigs] = useState<Record<string, SelectedBatchConfig>>({})
   const [loadingCandidates, setLoadingCandidates] = useState(false)
 
   const [isAsramaModalOpen, setIsAsramaModalOpen] = useState(false)
@@ -148,16 +155,70 @@ export default function ManajemenUserPage() {
     ].some(value => value.toLowerCase().includes(q))
   })
 
-  const selectedCandidate = userCandidates.find(candidate =>
-    `${candidate.source_type}:${candidate.source_ref_id}` === selectedCandidateKey
-  ) || null
+  const selectedBatchCandidates = userCandidates
+    .filter(candidate => Boolean(selectedBatchConfigs[`${candidate.source_type}:${candidate.source_ref_id}`]))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
 
   const closeAddModal = () => {
     setIsOpenAdd(false)
     setCandidateSource('guru')
     setCandidateSearch('')
-    setSelectedCandidateKey('')
+    setSelectedBatchConfigs({})
     setNewRole('wali_kelas')
+  }
+
+  const toggleCandidateSelection = (candidate: UserCreationCandidate) => {
+    const key = `${candidate.source_type}:${candidate.source_ref_id}`
+    setSelectedBatchConfigs(prev => {
+      if (prev[key]) {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+
+      return {
+        ...prev,
+        [key]: {
+          source_type: candidate.source_type,
+          source_ref_id: candidate.source_ref_id,
+          role: newRole,
+          asrama_binaan: '',
+        },
+      }
+    })
+  }
+
+  const updateSelectedBatchConfig = (key: string, patch: Partial<SelectedBatchConfig>) => {
+    setSelectedBatchConfigs(prev => {
+      const current = prev[key]
+      if (!current) return prev
+      return {
+        ...prev,
+        [key]: {
+          ...current,
+          ...patch,
+        },
+      }
+    })
+  }
+
+  const handleSelectAllVisibleCandidates = () => {
+    setSelectedBatchConfigs(prev => {
+      const next = { ...prev }
+      filteredCandidates.forEach(candidate => {
+        if (candidate.has_account) return
+        const key = `${candidate.source_type}:${candidate.source_ref_id}`
+        if (!next[key]) {
+          next[key] = {
+            source_type: candidate.source_type,
+            source_ref_id: candidate.source_ref_id,
+            role: newRole,
+            asrama_binaan: '',
+          }
+        }
+      })
+      return next
+    })
   }
 
   // --- HANDLERS MULTI-ROLE ---
@@ -264,24 +325,27 @@ export default function ManajemenUserPage() {
   // --- HANDLER CREATE ---
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!selectedCandidate) {
+    const items = Object.values(selectedBatchConfigs)
+    if (items.length === 0) {
       toast.error('Pilih dulu orang yang akan dibuatkan akun')
       return
     }
 
     setIsCreating(true)
-    const toastId = toast.loading("Membuat akun baru...")
+    const toastId = toast.loading("Membuat akun batch...")
     
-    const formData = new FormData(e.currentTarget)
-    const res = await createUser(formData)
+    const res = await createUsersFromSourcesBatch(items)
     
     setIsCreating(false)
     toast.dismiss(toastId)
 
-    if ('error' in res) {
-      toast.error("Gagal membuat user", { description: (res as any).error })
+    if (!res?.success && (!res?.count || res.count === 0)) {
+      toast.error("Gagal membuat user", { description: res?.errors?.join(', ') || 'Terjadi kesalahan sistem.' })
     } else {
-      toast.success("Akun Berhasil Dibuat!", { description: "User bisa langsung login sekarang." })
+      toast.success("Akun Berhasil Dibuat!", { description: `${res.count} akun berhasil dibuat.` })
+      if (res.errors?.length) {
+        toast.warning("Sebagian akun gagal dibuat", { description: res.errors.join(', ') })
+      }
       closeAddModal()
       await loadCandidates()
       loadData()
@@ -729,7 +793,6 @@ export default function ManajemenUserPage() {
                     value={candidateSource}
                     onChange={(e) => {
                       setCandidateSource(e.target.value as 'guru' | 'sadesa')
-                      setSelectedCandidateKey('')
                       setCandidateSearch('')
                     }}
                     className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
@@ -750,13 +813,32 @@ export default function ManajemenUserPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pilih Orang</label>
-                <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
-                  {loadingCandidates ? (
-                    <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pilih Orang</label>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllVisibleCandidates}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Pilih semua hasil
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBatchConfigs({})}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                      >
+                        Kosongkan
+                      </button>
                     </div>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y bg-slate-50">
+                    {loadingCandidates ? (
+                      <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
+                      </div>
                   ) : filteredCandidates.length === 0 ? (
                     <div className="px-4 py-8 text-sm text-slate-500 text-center">
                       Tidak ada data yang cocok.
@@ -764,13 +846,13 @@ export default function ManajemenUserPage() {
                   ) : (
                     filteredCandidates.map(candidate => {
                       const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
-                      const selected = selectedCandidateKey === candidateKey
+                      const selected = Boolean(selectedBatchConfigs[candidateKey])
                       return (
                         <button
                           key={candidateKey}
                           type="button"
                           disabled={candidate.has_account}
-                          onClick={() => setSelectedCandidateKey(candidateKey)}
+                          onClick={() => toggleCandidateSelection(candidate)}
                           className={`w-full text-left px-4 py-3 transition-colors ${
                             candidate.has_account
                               ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -798,36 +880,6 @@ export default function ManajemenUserPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
-                <input
-                  name="full_name"
-                  required
-                  readOnly
-                  value={selectedCandidate?.full_name || ''}
-                  placeholder="Pilih orang dari daftar"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-green-500 outline-none"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  readOnly
-                  value={selectedCandidate?.email || ''}
-                  placeholder="Email akan dibuat otomatis"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-green-500 outline-none"
-                />
-              </div>
-
-              <input type="hidden" name="source_type" value={selectedCandidate?.source_type || ''} />
-              <input type="hidden" name="source_ref_id" value={selectedCandidate?.source_ref_id || ''} />
-
-              <input type="hidden" name="password" value="eskahade2026" />
-
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <p className="text-xs font-bold uppercase text-emerald-800">Password Default</p>
                 <p className="mt-1 text-sm font-semibold text-emerald-900">eskahade2026</p>
@@ -835,9 +887,8 @@ export default function ManajemenUserPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role / Hak Akses</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role Default Saat Memilih</label>
                 <select 
-                  name="role" 
                   className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
@@ -848,26 +899,90 @@ export default function ManajemenUserPage() {
                 </select>
               </div>
 
-              {newRole === 'pengurus_asrama' && (
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 animate-in slide-in-from-top-2">
-                  <label className="block text-xs font-bold text-orange-800 uppercase mb-1">Pilih Asrama Binaan</label>
-                  <select name="asrama_binaan" required className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500 outline-none">
-                    <option value="">-- Pilih Asrama --</option>
-                    {ASRAMA_LIST.map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Akun Yang Akan Dibuat</p>
+                    <p className="text-[11px] text-slate-500">Atur role dan asrama binaan masing-masing di sini.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">
+                    {selectedBatchCandidates.length} orang
+                  </span>
                 </div>
-              )}
+
+                {selectedBatchCandidates.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-slate-500">
+                    Belum ada orang yang dipilih.
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto divide-y">
+                    {selectedBatchCandidates.map(candidate => {
+                      const key = `${candidate.source_type}:${candidate.source_ref_id}`
+                      const config = selectedBatchConfigs[key]
+                      return (
+                        <div key={key} className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800">{candidate.full_name}</p>
+                              <p className="text-xs text-slate-500">{candidate.email}</p>
+                              <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleCandidateSelection(candidate)}
+                              className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-50"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Role</label>
+                              <select
+                                value={config?.role || 'wali_kelas'}
+                                onChange={(e) => updateSelectedBatchConfig(key, {
+                                  role: e.target.value,
+                                  asrama_binaan: e.target.value === 'pengurus_asrama' ? config?.asrama_binaan || '' : '',
+                                })}
+                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                              >
+                                {ROLES.map(r => (
+                                  <option key={r.value} value={r.value}>{r.label}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Asrama Binaan</label>
+                              <select
+                                value={config?.asrama_binaan || ''}
+                                disabled={config?.role !== 'pengurus_asrama'}
+                                onChange={(e) => updateSelectedBatchConfig(key, { asrama_binaan: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-400"
+                              >
+                                <option value="">-- Pilih Asrama --</option>
+                                {ASRAMA_LIST.map(a => (
+                                  <option key={a} value={a}>{a}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div className="pt-4">
                 <button 
                   type="submit" 
-                  disabled={isCreating || !selectedCandidate || selectedCandidate.has_account}
+                  disabled={isCreating || selectedBatchCandidates.length === 0}
                   className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-sm flex justify-center items-center gap-2 disabled:opacity-70"
                 >
                   {isCreating ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                  {isCreating ? "Membuat Akun..." : "Buat Akun Sekarang"}
+                  {isCreating ? "Membuat Akun..." : `Buat ${selectedBatchCandidates.length || ''} Akun Sekarang`}
                 </button>
               </div>
             </form>

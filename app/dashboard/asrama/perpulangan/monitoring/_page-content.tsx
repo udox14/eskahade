@@ -13,8 +13,8 @@ import {
   Bus,
   CalendarRange,
   Car,
+  ChevronRight,
   Eye,
-  Home,
   Loader2,
   RefreshCw,
   X,
@@ -54,19 +54,34 @@ type SantriRow = {
   tgl_datang: string | null
 }
 
-function PctBar({ value, total, color }: { value: number; total: number; color: string }) {
+function localTime(value: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+}
+
+function PctBar({
+  value,
+  total,
+  color,
+}: {
+  value: number
+  total: number
+  color: string
+}) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-8 text-right text-[11px] font-bold text-slate-400">{pct}%</span>
+      <span className="w-8 text-right text-[10px] font-bold text-slate-400">{pct}%</span>
     </div>
   )
 }
 
-function StatsCard({
+function StatChip({
   label,
   value,
   tone,
@@ -83,51 +98,46 @@ function StatsCard({
   } as const
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${tones[tone]}`}>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
+    <div className={`rounded-xl border px-3 py-2.5 ${tones[tone]}`}>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-bold">{value}</p>
     </div>
   )
-}
-
-function SantriBadge({ row }: { row: SantriRow }) {
-  if (row.status_pulang !== 'PULANG') {
-    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">BELUM PULANG</span>
-  }
-  if (row.status_datang === 'SUDAH') {
-    return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">SUDAH DATANG</span>
-  }
-  if (row.status_datang === 'TELAT' || row.status_datang === 'VONIS') {
-    return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">{row.status_datang}</span>
-  }
-  return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">BELUM DATANG</span>
 }
 
 function JenisBadge({ jenis }: { jenis: SantriRow['jenis_pulang'] }) {
   if (jenis === 'ROMBONGAN') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-1 text-[11px] font-bold text-teal-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-1 text-[10px] font-bold text-teal-700">
         <Bus className="h-3 w-3" />
-        ROMBONGAN
+        Romb.
       </span>
     )
   }
 
   if (jenis === 'DIJEMPUT') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 text-[11px] font-bold text-violet-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700">
         <Car className="h-3 w-3" />
-        DIJEMPUT
+        Jemput
       </span>
     )
   }
 
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500">
-      <Home className="h-3 w-3" />
-      BELUM DIATUR
-    </span>
-  )
+  return null
+}
+
+function SantriBadge({ row }: { row: SantriRow }) {
+  if (row.status_pulang !== 'PULANG') {
+    return <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">Belum Pulang</span>
+  }
+  if (row.status_datang === 'SUDAH') {
+    return <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">Sudah Datang</span>
+  }
+  if (row.status_datang === 'TELAT' || row.status_datang === 'VONIS') {
+    return <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700">{row.status_datang}</span>
+  }
+  return <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">Belum Datang</span>
 }
 
 function ModalShell({
@@ -142,21 +152,21 @@ function ModalShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+            <h2 className="font-bold text-slate-800">{title}</h2>
             <p className="mt-1 text-sm text-slate-500">{description}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-slate-700"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-slate-700"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[calc(90vh-84px)] overflow-y-auto">{children}</div>
+        <div className="max-h-[calc(90vh-76px)] overflow-y-auto">{children}</div>
       </div>
     </div>
   )
@@ -191,42 +201,38 @@ function KamarDetailModal({
 
   return (
     <ModalShell
-      title={`Santri Kamar ${kamar}`}
-      description={`Detail santri ${asrama} kamar ${kamar} pada periode aktif.`}
+      title={`Kamar ${kamar}`}
+      description={`Detail santri ${asrama} pada kamar ${kamar}.`}
       onClose={onClose}
     >
       {loading ? (
-        <div className="flex justify-center gap-2 py-16 text-slate-400">
+        <div className="flex justify-center gap-2 py-14 text-slate-400">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-sm">Memuat santri...</span>
         </div>
       ) : rows.length === 0 ? (
         <div className="py-14 text-center text-sm text-slate-400">Tidak ada data santri pada kamar ini.</div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="space-y-3 p-3 sm:p-4">
           {rows.map((row) => (
-            <div key={row.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate font-bold text-slate-800">{row.nama_lengkap}</p>
-                  <SantriBadge row={row} />
+            <article key={row.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-bold text-slate-800">{row.nama_lengkap}</p>
+                    <SantriBadge row={row} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <JenisBadge jenis={row.jenis_pulang} />
+                    <span>Pulang {localTime(row.tgl_pulang)}</span>
+                    <span>Datang {localTime(row.tgl_datang)}</span>
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">{row.nis || '-'}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <JenisBadge jenis={row.jenis_pulang} />
-                  {row.keterangan ? <span className="text-xs text-slate-500">{row.keterangan}</span> : null}
-                </div>
               </div>
-              <div className="space-y-1 text-sm text-slate-500">
-                <p>Pulang: <span className="font-semibold text-slate-700">{row.tgl_pulang ? new Date(row.tgl_pulang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</span></p>
-                <p>Datang: <span className="font-semibold text-slate-700">{row.tgl_datang ? new Date(row.tgl_datang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</span></p>
-              </div>
-              <div className="flex items-start lg:justify-end">
-                <span className="text-xs font-medium text-slate-400">
-                  {row.status_pulang === 'PULANG' ? row.status_datang : row.status_pulang}
-                </span>
-              </div>
-            </div>
+              {row.keterangan ? (
+                <p className="mt-2 text-xs text-slate-500">{row.keterangan}</p>
+              ) : null}
+            </article>
           ))}
         </div>
       )}
@@ -263,67 +269,66 @@ function AsramaDetailModal({
   return (
     <>
       <ModalShell
-        title={`Detail ${row.asrama}`}
-        description="Ringkasan per kamar. Buka salah satu kamar untuk melihat daftar santrinya tanpa dropdown panjang."
+        title={row.asrama}
+        description="Ringkasan per kamar. Ketuk salah satu kamar untuk melihat daftar santri."
         onClose={onClose}
       >
-        <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-4">
-          <StatsCard label="Total" value={row.total} tone="slate" />
-          <StatsCard label="Sudah Pulang" value={row.sudah_pulang} tone="amber" />
-          <StatsCard label="Sudah Datang" value={row.sudah_datang} tone="emerald" />
-          <StatsCard label="Telat" value={row.telat} tone="rose" />
+        <div className="grid grid-cols-2 gap-2 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-4">
+          <StatChip label="Total" value={row.total} tone="slate" />
+          <StatChip label="Pulang" value={row.sudah_pulang} tone="amber" />
+          <StatChip label="Datang" value={row.sudah_datang} tone="emerald" />
+          <StatChip label="Telat" value={row.telat} tone="rose" />
         </div>
 
         {loading ? (
-          <div className="flex justify-center gap-2 py-16 text-slate-400">
+          <div className="flex justify-center gap-2 py-14 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">Memuat rekap kamar...</span>
           </div>
         ) : rooms.length === 0 ? (
           <div className="py-14 text-center text-sm text-slate-400">Belum ada data kamar untuk asrama ini.</div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-3 p-3 sm:p-4">
             {rooms.map((room) => (
-              <div key={room.kamar} className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+              <button
+                key={room.kamar}
+                onClick={() => setSelectedKamar(room.kamar)}
+                className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-slate-800">Kamar {room.kamar}</p>
-                      <p className="mt-1 text-xs text-slate-400">{room.total} santri • {room.belum_pulang} belum pulang • {room.belum_datang} belum datang</p>
+                      {room.telat > 0 ? (
+                        <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700">
+                          {room.telat} telat
+                        </span>
+                      ) : null}
                     </div>
-                    {room.telat > 0 ? (
-                      <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-bold text-rose-700">{room.telat} telat</span>
-                    ) : null}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {room.total} santri • {room.belum_pulang} belum pulang • {room.belum_datang} belum datang
+                    </p>
                   </div>
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-400" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="mt-3 space-y-2">
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       <span>Keberangkatan</span>
                       <span>{room.sudah_pulang}/{room.total}</span>
                     </div>
                     <PctBar value={room.sudah_pulang} total={room.total} color="bg-amber-400" />
                   </div>
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       <span>Kepulangan</span>
                       <span>{room.sudah_datang}/{room.sudah_pulang || 0}</span>
                     </div>
                     <PctBar value={room.sudah_datang} total={room.sudah_pulang || 1} color="bg-emerald-400" />
                   </div>
                 </div>
-
-                <div className="flex items-center lg:justify-end">
-                  <button
-                    onClick={() => setSelectedKamar(room.kamar)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <Eye className="h-4 w-4" />
-                    Lihat Santri
-                  </button>
-                </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -404,33 +409,34 @@ export default function MonitoringPerpulanganPage() {
   const canTandaiTelat = ['admin', 'keamanan', 'dewan_santri'].includes(session?.role ?? '')
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-24">
-      <DashboardPageHeader
-        title="Monitoring Perpulangan"
-        description={periode?.nama_periode ?? 'Pantau progres perpulangan dan kedatangan santri per asrama.'}
-        action={(
-          <div className="flex flex-wrap gap-2">
-            {canTandaiTelat && periode ? (
-              <button
-                onClick={handleTandaiTelat}
-                disabled={tandaiLoading}
-                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {tandaiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
-                Tandai Telat
-              </button>
-            ) : null}
+    <div className="mx-auto max-w-lg space-y-5 pb-24 lg:max-w-6xl">
+      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <DashboardPageHeader
+          title="Monitoring Perpulangan"
+          description={periode?.nama_periode ?? 'Pantau progres perpulangan dan kedatangan santri per asrama.'}
+          className="flex-1"
+        />
+        <div className="flex flex-wrap gap-2">
+          {canTandaiTelat && periode ? (
             <button
-              onClick={load}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              onClick={handleTandaiTelat}
+              disabled={tandaiLoading}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Perbarui
+              {tandaiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+              Tandai Telat
             </button>
-          </div>
-        )}
-      />
+          ) : null}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Perbarui
+          </button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="flex justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-16 text-slate-400">
@@ -449,47 +455,49 @@ export default function MonitoringPerpulanganPage() {
         </div>
       ) : (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <StatsCard label="Total Santri" value={totals.total} tone="slate" />
-            <StatsCard label="Sudah Pulang" value={totals.sudah_pulang} tone="amber" />
-            <StatsCard label="Sudah Datang" value={totals.sudah_datang} tone="emerald" />
-            <StatsCard label="Belum Datang" value={totals.belum_datang} tone="amber" />
-            <StatsCard label="Telat" value={totals.telat} tone="rose" />
+          <section className="grid grid-cols-2 gap-2 lg:grid-cols-5 lg:gap-3">
+            <StatChip label="Total Santri" value={totals.total} tone="slate" />
+            <StatChip label="Sudah Pulang" value={totals.sudah_pulang} tone="amber" />
+            <StatChip label="Sudah Datang" value={totals.sudah_datang} tone="emerald" />
+            <StatChip label="Belum Datang" value={totals.belum_datang} tone="amber" />
+            <StatChip label="Telat" value={totals.telat} tone="rose" />
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-2">
+          <section className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
             {rows.map((row) => (
-              <article key={row.asrama} className="rounded-2xl border border-slate-200 bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-slate-800">{row.asrama}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{row.total} santri • {row.belum_pulang} belum pulang • {row.belum_datang} belum datang</p>
+              <article key={row.asrama} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate font-bold text-slate-800">{row.asrama}</h2>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {row.total} santri • {row.belum_pulang} belum pulang • {row.belum_datang} belum datang
+                    </p>
                   </div>
                   <button
                     onClick={() => setSelectedAsrama(row)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
+                    title="Lihat detail"
                   >
                     <Eye className="h-4 w-4" />
-                    Lihat Detail
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <StatsCard label="Pulang" value={row.sudah_pulang} tone="amber" />
-                  <StatsCard label="Datang" value={row.sudah_datang} tone="emerald" />
-                  <StatsCard label="Telat" value={row.telat} tone="rose" />
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <StatChip label="Pulang" value={row.sudah_pulang} tone="amber" />
+                  <StatChip label="Datang" value={row.sudah_datang} tone="emerald" />
+                  <StatChip label="Telat" value={row.telat} tone="rose" />
                 </div>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 space-y-2">
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       <span>Keberangkatan</span>
                       <span>{row.sudah_pulang}/{row.total}</span>
                     </div>
                     <PctBar value={row.sudah_pulang} total={row.total} color="bg-amber-400" />
                   </div>
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-400">
                       <span>Kepulangan</span>
                       <span>{row.sudah_datang}/{row.sudah_pulang || 0}</span>
                     </div>

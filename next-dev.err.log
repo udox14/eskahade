@@ -127,3 +127,167 @@
       at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
       at async (cloudflare-internal:d1-api:90:27)
 }
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+    at async DashboardPage (app\dashboard\page.tsx:22:22)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '3577718974',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+    at async DashboardPage (app\dashboard\page.tsx:22:22)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '3577718974',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '2365025627',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async query (lib\db\index.ts:15:23)
+    at async getKamarsPerpulangan (app\dashboard\asrama\perpulangan\actions.ts:90:16)
+  13 | ): Promise<T[]> {
+  14 |   const db = await getDB()
+> 15 |   const { results } = await db.prepare(sql).bind(...params).all<T>()
+     |                       ^
+  16 |   return results ?? []
+  17 | }
+  18 | {
+  digest: '3109512541',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:366:41)
+}
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+    at async DashboardPage (app\dashboard\page.tsx:22:22)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '3577718974',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '2365025627',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async query (lib\db\index.ts:15:23)
+    at async getKamarsPerpulangan (app\dashboard\asrama\perpulangan\actions.ts:90:16)
+  13 | ): Promise<T[]> {
+  14 |   const db = await getDB()
+> 15 |   const { results } = await db.prepare(sql).bind(...params).all<T>()
+     |                       ^
+  16 |   return results ?? []
+  17 | }
+  18 | {
+  digest: '3109512541',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:366:41)
+}
+[layout] queryOne users ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ Error: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+    at async queryOne (lib\db\index.ts:28:18)
+    at async DashboardPage (app\dashboard\page.tsx:22:22)
+  26 | ): Promise<T | null> {
+  27 |   const db = await getDB()
+> 28 |   const result = await db.prepare(sql).bind(...params).first<T>()
+     |                  ^
+  29 |   return result ?? null
+  30 | }
+  31 | {
+  digest: '3577718974',
+  [cause]: Error: Failed to parse body as JSON, got: error code: 1031
+      at D1DatabaseSessionAlwaysPrimary._send (cloudflare-internal:d1-api:182:24)
+      at async D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:135:25)
+      at async (cloudflare-internal:d1-api:323:39)
+}
+[fitur-akses] getCachedFiturAkses ERROR: D1_ERROR: Failed to parse body as JSON, got: error code: 1031
+⨯ ./app/dashboard/asrama/perpulangan/page.tsx:2:1
+Module not found: Can't resolve './_page-content'
+[0m [90m 1 |[39m [36mimport[39m { guardPage } [36mfrom[39m [32m'@/lib/auth/guard'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33mPageContent[39m [36mfrom[39m [32m'./_page-content'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m
+ [90m 4 |[39m [36mexport[39m [36mconst[39m dynamic [33m=[39m [32m'force-dynamic'[39m
+ [90m 5 |[39m[0m
+
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/dashboard/asrama/perpulangan/page.tsx:2:1
+Module not found: Can't resolve './_page-content'
+[0m [90m 1 |[39m [36mimport[39m { guardPage } [36mfrom[39m [32m'@/lib/auth/guard'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33mPageContent[39m [36mfrom[39m [32m'./_page-content'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m
+ [90m 4 |[39m [36mexport[39m [36mconst[39m dynamic [33m=[39m [32m'force-dynamic'[39m
+ [90m 5 |[39m[0m
+
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+

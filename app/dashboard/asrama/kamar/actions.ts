@@ -1,8 +1,8 @@
 'use server'
 
-import { execute, getDB, query, queryOne } from '@/lib/db'
+import { execute, generateId, getDB, now, query, queryOne } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
-import { hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { revalidatePath } from 'next/cache'
 
@@ -19,6 +19,9 @@ type SantriKamarRow = {
   kelas_sekolah: string | null
   kab_kota: string | null
   nama_kelas: string | null
+  pending_keluar_id: string | null
+  pending_keluar_tanggal: string | null
+  pending_keluar_catatan: string | null
 }
 
 type RoomOverviewRow = {
@@ -97,9 +100,30 @@ async function ensureKepengurusanSchema() {
   `)
 }
 
+async function ensureKeluarTandaiSchema() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS santri_keluar_tandai (
+      id                TEXT PRIMARY KEY,
+      santri_id         TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
+      asrama            TEXT NOT NULL,
+      kamar             TEXT,
+      tanggal_tandai    TEXT NOT NULL,
+      catatan           TEXT,
+      status            TEXT NOT NULL DEFAULT 'pending',
+      ditandai_oleh     TEXT REFERENCES users(id),
+      diproses_oleh     TEXT REFERENCES users(id),
+      diproses_at       TEXT,
+      keputusan_catatan TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT
+    )
+  `)
+}
+
 async function getAccess(asrama?: string | null) {
   await ensureKamarSchema()
   await ensureKepengurusanSchema()
+  await ensureKeluarTandaiSchema()
   const access = await assertFeature(KAMAR_PATH)
   if ('error' in access) return access
 
@@ -274,7 +298,28 @@ export async function getKamarOverview(asrama?: string | null) {
     ),
     query<SantriKamarRow>(
       `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
-              k.nama_kelas
+              k.nama_kelas,
+              (
+                SELECT sk.id
+                FROM santri_keluar_tandai sk
+                WHERE sk.santri_id = s.id AND sk.status = 'pending'
+                ORDER BY sk.created_at DESC
+                LIMIT 1
+              ) AS pending_keluar_id,
+              (
+                SELECT sk.tanggal_tandai
+                FROM santri_keluar_tandai sk
+                WHERE sk.santri_id = s.id AND sk.status = 'pending'
+                ORDER BY sk.created_at DESC
+                LIMIT 1
+              ) AS pending_keluar_tanggal,
+              (
+                SELECT sk.catatan
+                FROM santri_keluar_tandai sk
+                WHERE sk.santri_id = s.id AND sk.status = 'pending'
+                ORDER BY sk.created_at DESC
+                LIMIT 1
+              ) AS pending_keluar_catatan
        FROM santri s
        LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
        LEFT JOIN kelas k ON k.id = rp.kelas_id
@@ -393,6 +438,11 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
       members: members.map((row) => ({
         ...row,
         alamat_ringkas: row.kab_kota?.trim() || '-',
+        pending_keluar: row.pending_keluar_id ? {
+          id: row.pending_keluar_id,
+          tanggal_tandai: row.pending_keluar_tanggal,
+          catatan: row.pending_keluar_catatan,
+        } : null,
       })),
     },
   }
@@ -508,4 +558,91 @@ export async function mutasiKamarDalamAsrama(params: {
   revalidatePath(KAMAR_PATH)
   revalidatePath(PERPINDAHAN_PATH)
   return { success: true, kamarAsal: kamarAsal || null }
+}
+
+export async function tandaiSantriKeluarDariKamar(params: {
+  asrama: string
+  santriId: string
+  catatan?: string
+}) {
+  const access = await getAccess(params.asrama)
+  if ('error' in access) return access
+
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const asrama = access.requestedAsrama
+  const santri = await queryOne<{
+    id: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    status_global: string
+  }>(
+    `SELECT id, nama_lengkap, asrama, kamar, status_global
+     FROM santri
+     WHERE id = ? AND asrama = ?`,
+    [params.santriId, asrama]
+  )
+
+  if (!santri) return { error: 'Santri tidak ditemukan di asrama ini' }
+  if (santri.status_global !== 'aktif') return { error: 'Santri sudah tidak aktif' }
+
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id
+     FROM santri_keluar_tandai
+     WHERE santri_id = ? AND status = 'pending'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [params.santriId]
+  )
+
+  const catatan = String(params.catatan ?? '').trim() || null
+  const stampedAt = now()
+
+  if (existing) {
+    await execute(
+      `UPDATE santri_keluar_tandai
+       SET asrama = ?,
+           kamar = ?,
+           tanggal_tandai = ?,
+           catatan = ?,
+           ditandai_oleh = ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt, existing.id]
+    )
+  } else {
+    await execute(
+      `INSERT INTO santri_keluar_tandai (
+        id, santri_id, asrama, kamar, tanggal_tandai, catatan, status, ditandai_oleh, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [generateId(), params.santriId, asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt]
+    )
+  }
+
+  revalidatePath(KAMAR_PATH)
+  revalidatePath('/dashboard/santri/keluar')
+  return { success: true }
+}
+
+export async function batalTandaiSantriKeluarDariKamar(params: {
+  asrama: string
+  santriId: string
+}) {
+  const access = await getAccess(params.asrama)
+  if ('error' in access) return access
+
+  await execute(
+    `UPDATE santri_keluar_tandai
+     SET status = 'dibatalkan',
+         diproses_at = ?,
+         updated_at = ?
+     WHERE santri_id = ? AND asrama = ? AND status = 'pending'`,
+    [now(), now(), params.santriId, access.requestedAsrama]
+  )
+
+  revalidatePath(KAMAR_PATH)
+  revalidatePath('/dashboard/santri/keluar')
+  return { success: true }
 }
