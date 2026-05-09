@@ -59,6 +59,7 @@ export default function PageContent({
   const [selected, setSelected] = useState<ActivityLogItem | null>(null)
   const [formState, setFormState] = useState(filters)
   const [configState, setConfigState] = useState(configs)
+  const [activeTab, setActiveTab] = useState<'log' | 'settings'>('log')
   const [isPending, startTransition] = useTransition()
 
   const activeFilterCount = useMemo(
@@ -127,221 +128,240 @@ export default function PageContent({
         description="Audit trail aksi penting seperti login, perubahan akses, transaksi, dan perubahan data penting."
       />
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-4">
-          <div className="text-sm font-semibold text-slate-900">Pengaturan Log Per Fitur</div>
-          <p className="mt-1 text-sm text-slate-500">
-            Admin bisa mengatur logging `create`, `update`, dan `delete` untuk semua fitur yang terdaftar di aplikasi.
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Grup</th>
-                <th className="px-4 py-3 font-semibold">Fitur</th>
-                <th className="px-4 py-3 font-semibold">Route</th>
-                <th className="px-4 py-3 font-semibold text-center">C</th>
-                <th className="px-4 py-3 font-semibold text-center">U</th>
-                <th className="px-4 py-3 font-semibold text-center">D</th>
-              </tr>
-            </thead>
-            <tbody>
-              {configState.map((item) => (
-                <tr key={item.fitur_href} className="border-t border-slate-100">
-                  <td className="px-4 py-3 text-slate-700">{item.group_name}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{item.title}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{item.fitur_href}</td>
-                  <td className="px-4 py-3 text-center">
-                    <ConfigToggle
-                      checked={item.log_create}
-                      disabled={isPending}
-                      onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'create', nextValue)}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <ConfigToggle
-                      checked={item.log_update}
-                      disabled={isPending}
-                      onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'update', nextValue)}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <ConfigToggle
-                      checked={item.log_delete}
-                      disabled={isPending}
-                      onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'delete', nextValue)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        <TabButton
+          active={activeTab === 'log'}
+          onClick={() => setActiveTab('log')}
+        >
+          Log
+        </TabButton>
+        <TabButton
+          active={activeTab === 'settings'}
+          onClick={() => setActiveTab('settings')}
+        >
+          Pengaturan
+        </TabButton>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Filter className="h-4 w-4" />
-          <span>Filter log</span>
-          {activeFilterCount > 0 ? (
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-              {activeFilterCount} aktif
-            </span>
-          ) : null}
-        </div>
+      {activeTab === 'settings' ? (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-4">
+            <div className="text-sm font-semibold text-slate-900">Pengaturan Log Per Fitur</div>
+            <p className="mt-1 text-sm text-slate-500">
+              Admin bisa mengatur logging `create`, `update`, dan `delete` untuk semua fitur yang terdaftar di aplikasi.
+            </p>
+          </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <input
-            value={formState.q}
-            onChange={(event) => setFormState(current => ({ ...current, q: event.target.value }))}
-            placeholder="Cari objek, ID, atau ringkasan"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          />
-          <input
-            value={formState.actor}
-            onChange={(event) => setFormState(current => ({ ...current, actor: event.target.value }))}
-            placeholder="Cari user pelaku"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          />
-          <select
-            value={formState.module}
-            onChange={(event) => setFormState(current => ({ ...current, module: event.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="">Semua modul</option>
-            {modules.map((module) => (
-              <option key={module} value={module}>
-                {prettifyLabel(module)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={formState.action}
-            onChange={(event) => setFormState(current => ({ ...current, action: event.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="">Semua aksi</option>
-            {actions.map((action) => (
-              <option key={action} value={action}>
-                {prettifyLabel(action)}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={formState.startDate}
-            onChange={(event) => setFormState(current => ({ ...current, startDate: event.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          />
-          <input
-            type="date"
-            value={formState.endDate}
-            onChange={(event) => setFormState(current => ({ ...current, endDate: event.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="submit"
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Terapkan filter
-          </button>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset
-          </button>
-        </div>
-      </form>
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Waktu</th>
-                <th className="px-4 py-3 font-semibold">User</th>
-                <th className="px-4 py-3 font-semibold">Modul</th>
-                <th className="px-4 py-3 font-semibold">Aksi</th>
-                <th className="px-4 py-3 font-semibold">Objek</th>
-                <th className="px-4 py-3 font-semibold">Ringkasan</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold text-right">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-600">
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
-                    Belum ada log yang cocok dengan filter saat ini.
-                  </td>
+                  <th className="px-4 py-3 font-semibold">Grup</th>
+                  <th className="px-4 py-3 font-semibold">Fitur</th>
+                  <th className="px-4 py-3 font-semibold">Route</th>
+                  <th className="px-4 py-3 font-semibold text-center">C</th>
+                  <th className="px-4 py-3 font-semibold text-center">U</th>
+                  <th className="px-4 py-3 font-semibold text-center">D</th>
                 </tr>
-              ) : rows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 align-top">
-                  <td className="px-4 py-3 text-slate-700">{formatDateTime(row.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{row.actor_name || '-'}</div>
-                    {row.actor_roles.length > 0 ? (
-                      <div className="mt-1 text-xs text-slate-500">
-                        {row.actor_roles.join(', ')}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{prettifyLabel(row.module)}</td>
-                  <td className="px-4 py-3 text-slate-700">{prettifyLabel(row.action)}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{row.entity_label || '-'}</div>
-                    {row.entity_id ? (
-                      <div className="mt-1 text-xs text-slate-500">{row.entity_id}</div>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{row.summary}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        row.status === 'success'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-rose-50 text-rose-700'
-                      }`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSelected(row)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Lihat
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {configState.map((item) => (
+                  <tr key={item.fitur_href} className="border-t border-slate-100">
+                    <td className="px-4 py-3 text-slate-700">{item.group_name}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{item.title}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{item.fitur_href}</td>
+                    <td className="px-4 py-3 text-center">
+                      <ConfigToggle
+                        checked={item.log_create}
+                        disabled={isPending}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'create', nextValue)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <ConfigToggle
+                        checked={item.log_update}
+                        disabled={isPending}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'update', nextValue)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <ConfigToggle
+                        checked={item.log_delete}
+                        disabled={isPending}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'delete', nextValue)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      ) : (
+        <>
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <Filter className="h-4 w-4" />
+              <span>Filter log</span>
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                  {activeFilterCount} aktif
+                </span>
+              ) : null}
+            </div>
 
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={(nextPage) => pushWith({ page: nextPage })}
-          onPageSizeChange={(nextPageSize) => pushWith({ page: 1, pageSize: nextPageSize === 0 ? 100 : nextPageSize })}
-        />
-      </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <input
+                value={formState.q}
+                onChange={(event) => setFormState(current => ({ ...current, q: event.target.value }))}
+                placeholder="Cari objek, ID, atau ringkasan"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <input
+                value={formState.actor}
+                onChange={(event) => setFormState(current => ({ ...current, actor: event.target.value }))}
+                placeholder="Cari user pelaku"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <select
+                value={formState.module}
+                onChange={(event) => setFormState(current => ({ ...current, module: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="">Semua modul</option>
+                {modules.map((module) => (
+                  <option key={module} value={module}>
+                    {prettifyLabel(module)}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={formState.action}
+                onChange={(event) => setFormState(current => ({ ...current, action: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="">Semua aksi</option>
+                {actions.map((action) => (
+                  <option key={action} value={action}>
+                    {prettifyLabel(action)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={formState.startDate}
+                onChange={(event) => setFormState(current => ({ ...current, startDate: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+              <input
+                type="date"
+                value={formState.endDate}
+                onChange={(event) => setFormState(current => ({ ...current, endDate: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Terapkan filter
+              </button>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </button>
+            </div>
+          </form>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Waktu</th>
+                    <th className="px-4 py-3 font-semibold">User</th>
+                    <th className="px-4 py-3 font-semibold">Modul</th>
+                    <th className="px-4 py-3 font-semibold">Aksi</th>
+                    <th className="px-4 py-3 font-semibold">Objek</th>
+                    <th className="px-4 py-3 font-semibold">Ringkasan</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold text-right">Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
+                        Belum ada log yang cocok dengan filter saat ini.
+                      </td>
+                    </tr>
+                  ) : rows.map((row) => (
+                    <tr key={row.id} className="border-t border-slate-100 align-top">
+                      <td className="px-4 py-3 text-slate-700">{formatDateTime(row.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900">{row.actor_name || '-'}</div>
+                        {row.actor_roles.length > 0 ? (
+                          <div className="mt-1 text-xs text-slate-500">
+                            {row.actor_roles.join(', ')}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{prettifyLabel(row.module)}</td>
+                      <td className="px-4 py-3 text-slate-700">{prettifyLabel(row.action)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900">{row.entity_label || '-'}</div>
+                        {row.entity_id ? (
+                          <div className="mt-1 text-xs text-slate-500">{row.entity_id}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{row.summary}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            row.status === 'success'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelected(row)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Lihat
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={(nextPage) => pushWith({ page: nextPage })}
+              onPageSizeChange={(nextPageSize) => pushWith({ page: 1, pageSize: nextPageSize === 0 ? 100 : nextPageSize })}
+            />
+          </div>
+        </>
+      )}
 
       {selected ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
@@ -415,6 +435,30 @@ function ConfigToggle({
       } ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:opacity-85'}`}
     >
       {checked ? 'ON' : 'OFF'}
+    </button>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+        active
+          ? 'bg-slate-900 text-white'
+          : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+      }`}
+    >
+      {children}
     </button>
   )
 }
