@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function cariSantriKeuangan(keyword: string) {
@@ -62,6 +63,10 @@ export async function bayarTagihan(
   keterangan: string
 ) {
   const session = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [santriId]
+  )
 
   if (jenis !== 'BANGUNAN' && tahunTagihan) {
     const exist = await queryOne<{ id: string }>(
@@ -75,6 +80,24 @@ export async function bayarTagihan(
     INSERT INTO pembayaran_tahunan (id, santri_id, jenis_biaya, tahun_tagihan, nominal_bayar, penerima_id, keterangan, tanggal_bayar)
     VALUES (?, ?, ?, ?, ?, ?, ?, date('now'))
   `, [generateId(), santriId, jenis, tahunTagihan, nominal, session?.id ?? null, keterangan])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keuangan_pembayaran',
+    action: 'payment',
+    fiturHref: '/dashboard/keuangan/pembayaran',
+    logKind: 'create',
+    entityType: 'santri',
+    entityId: santriId,
+    entityLabel: santri?.nama_lengkap || santri?.nis || santriId,
+    summary: `Mencatat pembayaran ${jenis} untuk ${santri?.nama_lengkap || santri?.nis || santriId}`,
+    details: {
+      jenis_biaya: jenis,
+      nominal,
+      tahun_tagihan: tahunTagihan,
+      keterangan: keterangan || null,
+    },
+  })
 
   revalidatePath('/dashboard/keuangan/pembayaran')
   return { success: true }
@@ -156,6 +179,10 @@ export async function getMonitoringPembayaran(
 
 export async function bayarLunasSetahun(santriId: string, tahunTagihan: number, tahunMasuk: number) {
   const session = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [santriId]
+  )
 
   const tarif = await query<any>(
     `SELECT jenis_biaya, nominal FROM biaya_settings
@@ -181,6 +208,24 @@ export async function bayarLunasSetahun(santriId: string, tahunTagihan: number, 
     `, [generateId(), santriId, t.jenis_biaya, tahunTagihan, t.nominal, session?.id ?? null, `Pelunasan Otomatis ${tahunTagihan}`])
     totalNominal += t.nominal
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keuangan_pembayaran',
+    action: 'payment',
+    fiturHref: '/dashboard/keuangan/pembayaran',
+    logKind: 'create',
+    entityType: 'santri',
+    entityId: santriId,
+    entityLabel: santri?.nama_lengkap || santri?.nis || santriId,
+    summary: `Mencatat pelunasan tahunan untuk ${santri?.nama_lengkap || santri?.nis || santriId}`,
+    details: {
+      tahun_tagihan: tahunTagihan,
+      total_nominal: totalNominal,
+      jenis_biaya: toInsert.map(item => item.jenis_biaya),
+      count: toInsert.length,
+    },
+  })
 
   revalidatePath('/dashboard/keuangan/pembayaran')
   return { success: true, count: toInsert.length, total: totalNominal }

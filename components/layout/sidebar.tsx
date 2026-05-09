@@ -74,6 +74,7 @@ const GROUP_ITEM_ORDER: Record<string, string[]> = {
     'Master Pelanggaran',
     'User',
     'Fitur Akses',
+    'Log Aktivitas',
   ],
 };
 

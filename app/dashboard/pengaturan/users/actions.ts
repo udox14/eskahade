@@ -2,6 +2,8 @@
 
 import { query, queryOne, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedFiturAkses } from '@/lib/cache/fitur-akses'
 
@@ -27,12 +29,36 @@ type BatchSourceUserInput = {
 }
 
 type LinkedUserCreateResult =
-  | { success: true; full_name: string; email: string }
+  | { success: true; user_id: string; full_name: string; email: string }
   | { error: string }
 
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.or.id`
+}
+
+async function getUserById(id: string) {
+  return queryOne<{
+    id: string
+    full_name: string
+    email: string
+    role: string
+    roles: string | null
+    asrama_binaan: string | null
+  }>(
+    'SELECT id, full_name, email, role, roles, asrama_binaan FROM users WHERE id = ?',
+    [id]
+  )
+}
+
+function parseRoles(raw: string | null, fallbackRole: string) {
+  try {
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[]
+    }
+  } catch {}
+  return fallbackRole ? [fallbackRole] : []
 }
 
 async function ensureUserSourceColumns() {
@@ -137,6 +163,7 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
   const passwordHash = await hashPassword(DEFAULT_USER_PASSWORD)
   const now = new Date().toISOString()
   const rolesJson = JSON.stringify([input.role])
+  const userId = crypto.randomUUID()
 
   await execute(
     `INSERT INTO users (
@@ -144,7 +171,7 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
       source_type, source_ref_id, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      crypto.randomUUID(),
+      userId,
       sourceProfile.email,
       passwordHash,
       sourceProfile.full_name,
@@ -158,7 +185,7 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
     ]
   )
 
-  return { success: true, full_name: sourceProfile.full_name, email: sourceProfile.email } as const
+  return { success: true, user_id: userId, full_name: sourceProfile.full_name, email: sourceProfile.email } as const
 }
 
 export async function getUsersList() {
@@ -263,6 +290,10 @@ export async function updateUserRoles(
 ): Promise<{ success: boolean } | { error: string }> {
   if (!newRoles || newRoles.length === 0) return { error: 'Minimal satu role harus dipilih.' }
 
+  const session = await getSession()
+  const beforeUser = await getUserById(id)
+  if (!beforeUser) return { error: 'User tidak ditemukan.' }
+
   const primaryRole = newRoles[0]
   const asramaBinaan = newRoles.includes('pengurus_asrama') ? (asrama || null) : null
   const rolesJson = JSON.stringify(newRoles)
@@ -271,6 +302,33 @@ export async function updateUserRoles(
     'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, updated_at = ? WHERE id = ?',
     [primaryRole, rolesJson, asramaBinaan, new Date().toISOString(), id]
   )
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'access_change',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'update',
+      entityType: 'user',
+    entityId: id,
+    entityLabel: beforeUser.full_name || beforeUser.email,
+    summary: `Mengubah role user ${beforeUser.full_name || beforeUser.email}`,
+    details: {
+      changed_fields: diffWhitelistedFields(
+        {
+          role: beforeUser.role,
+          roles: parseRoles(beforeUser.roles, beforeUser.role),
+          asrama_binaan: beforeUser.asrama_binaan,
+        },
+        {
+          role: primaryRole,
+          roles: newRoles,
+          asrama_binaan: asramaBinaan,
+        },
+        ['role', 'roles', 'asrama_binaan']
+      ),
+    },
+  })
 
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
@@ -282,6 +340,7 @@ export async function updateUserRole(id: string, newRole: string, asrama?: strin
 
 export async function createUser(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   await ensureUserSourceColumns()
+  const session = await getSession()
 
   const emailInput = String(formData.get('email') || '').toLowerCase().trim()
   const passwordInput = String(formData.get('password') || '')
@@ -300,6 +359,25 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       asrama_binaan: asrama || null,
     })
     if ('error' in result) return { error: result.error }
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'create',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'create',
+      entityType: 'user',
+      entityId: result.user_id,
+      entityLabel: result.full_name,
+      summary: `Membuat akun user ${result.full_name}`,
+      details: {
+        email: result.email,
+        role,
+        source_type: sourceType,
+        source_ref_id: sourceRefId,
+        asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
+      },
+    })
 
     revalidatePath('/dashboard/pengaturan/users')
     return { success: true }
@@ -321,6 +399,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   const passwordHash = await hashPassword(password)
   const now = new Date().toISOString()
   const rolesJson = JSON.stringify([role])
+  const userId = crypto.randomUUID()
 
   await execute(
     `INSERT INTO users (
@@ -328,7 +407,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       source_type, source_ref_id, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      crypto.randomUUID(),
+      userId,
       email,
       passwordHash,
       fullName,
@@ -342,12 +421,32 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
     ]
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'create',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'create',
+    entityType: 'user',
+    entityId: userId,
+    entityLabel: fullName,
+    summary: `Membuat akun user ${fullName}`,
+    details: {
+      email,
+      role,
+      asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
+      source_type: sourceType,
+      source_ref_id: sourceRefId || null,
+    },
+  })
+
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
 }
 
 export async function createUsersFromSourcesBatch(items: BatchSourceUserInput[]) {
   await ensureUserSourceColumns()
+  const session = await getSession()
 
   if (!Array.isArray(items) || items.length === 0) {
     return { success: false, count: 0, errors: ['Tidak ada data yang dipilih.'] }
@@ -365,6 +464,24 @@ export async function createUsersFromSourcesBatch(items: BatchSourceUserInput[])
     successCount++
   }
 
+  if (successCount > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'create',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'create',
+      entityType: 'user_batch',
+      entityId: 'linked-batch',
+      entityLabel: 'Pembuatan user tertaut',
+      summary: `Membuat ${successCount} akun tertaut secara batch`,
+      details: {
+        count: successCount,
+        failed_count: errors.length,
+      },
+    })
+  }
+
   revalidatePath('/dashboard/pengaturan/users')
   return {
     success: successCount > 0,
@@ -374,6 +491,7 @@ export async function createUsersFromSourcesBatch(items: BatchSourceUserInput[])
 }
 
 export async function createUsersBatch(usersData: any[]) {
+  const session = await getSession()
   let successCount = 0
   const errors: string[] = []
 
@@ -421,11 +539,33 @@ export async function createUsersBatch(usersData: any[]) {
     }
   }
 
+  if (successCount > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'create',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'create',
+      entityType: 'user_batch',
+      entityId: 'batch',
+      entityLabel: 'Import user batch',
+      summary: `Membuat ${successCount} akun user secara batch`,
+      details: {
+        count: successCount,
+        failed_count: errors.length,
+      },
+    })
+  }
+
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
 
 export async function updateUserDetails(userId: string, fullName: string, email: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const beforeUser = await getUserById(userId)
+  if (!beforeUser) return { error: 'User tidak ditemukan.' }
+
   const emailClean = email.toLowerCase().trim()
   const exist = await queryOne('SELECT id FROM users WHERE email = ? AND id != ?', [emailClean, userId])
   if (exist) return { error: 'Email sudah digunakan user lain.' }
@@ -435,17 +575,54 @@ export async function updateUserDetails(userId: string, fullName: string, email:
     [fullName, emailClean, new Date().toISOString(), userId]
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'update',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: userId,
+    entityLabel: beforeUser.full_name || beforeUser.email,
+    summary: `Memperbarui profil user ${beforeUser.full_name || beforeUser.email}`,
+    details: {
+      changed_fields: diffWhitelistedFields(
+        { full_name: beforeUser.full_name, email: beforeUser.email },
+        { full_name: fullName, email: emailClean },
+        ['full_name', 'email']
+      ),
+    },
+  })
+
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
 }
 
 export async function resetUserPassword(userId: string, newPassword: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const targetUser = await getUserById(userId)
+  if (!targetUser) return { error: 'User tidak ditemukan.' }
   const passwordHash = await hashPassword(newPassword)
 
   await execute(
     'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
     [passwordHash, new Date().toISOString(), userId]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'update',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: userId,
+    entityLabel: targetUser.full_name || targetUser.email,
+    summary: `Mereset password user ${targetUser.full_name || targetUser.email}`,
+    details: {
+      reset_type: newPassword === DEFAULT_USER_PASSWORD ? 'default' : 'manual',
+    },
+  })
 
   return { success: true }
 }
@@ -488,6 +665,10 @@ async function findUserDeleteUsage(userId: string): Promise<string | null> {
 }
 
 export async function deleteUser(userId: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const targetUser = await getUserById(userId)
+  if (!targetUser) return { error: 'User tidak ditemukan.' }
+
   const usage = await findUserDeleteUsage(userId)
   if (usage) {
     return { error: `User tidak bisa dihapus karena masih dipakai pada ${usage}.` }
@@ -495,6 +676,22 @@ export async function deleteUser(userId: string): Promise<{ success: boolean } |
 
   try {
     await execute('DELETE FROM users WHERE id = ?', [userId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'delete',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'delete',
+      entityType: 'user',
+      entityId: userId,
+      entityLabel: targetUser.full_name || targetUser.email,
+      summary: `Menghapus user ${targetUser.full_name || targetUser.email}`,
+      details: {
+        email: targetUser.email,
+        role: targetUser.role,
+        roles: parseRoles(targetUser.roles, targetUser.role),
+      },
+    })
     revalidatePath('/dashboard/pengaturan/users')
     return { success: true }
   } catch (error: any) {
@@ -522,12 +719,35 @@ export async function setUserFiturOverride(
   fiturId: number,
   action: 'grant' | 'revoke'
 ): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const targetUser = await getUserById(userId)
+  const fitur = await queryOne<{ title: string; href: string }>(
+    'SELECT title, href FROM fitur_akses WHERE id = ?',
+    [fiturId]
+  )
+
   await execute(
     `INSERT INTO user_fitur_override (user_id, fitur_id, action, created_at)
      VALUES (?, ?, ?, datetime('now'))
      ON CONFLICT(user_id, fitur_id) DO UPDATE SET action = excluded.action, created_at = excluded.created_at`,
     [userId, fiturId, action]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'access_change',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: userId,
+    entityLabel: targetUser?.full_name || targetUser?.email || userId,
+    summary: `${action === 'grant' ? 'Memberi' : 'Mencabut'} override fitur untuk ${targetUser?.full_name || targetUser?.email || userId}`,
+    details: {
+      fitur_id: fiturId,
+      fitur_title: fitur?.title || fitur?.href || String(fiturId),
+      override_action: action,
+    },
+  })
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
 }
@@ -536,10 +756,32 @@ export async function removeUserFiturOverride(
   userId: string,
   fiturId: number
 ): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const targetUser = await getUserById(userId)
+  const fitur = await queryOne<{ title: string; href: string }>(
+    'SELECT title, href FROM fitur_akses WHERE id = ?',
+    [fiturId]
+  )
+
   await execute(
     'DELETE FROM user_fitur_override WHERE user_id = ? AND fitur_id = ?',
     [userId, fiturId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'access_change',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: userId,
+    entityLabel: targetUser?.full_name || targetUser?.email || userId,
+    summary: `Menghapus override fitur untuk ${targetUser?.full_name || targetUser?.email || userId}`,
+    details: {
+      fitur_id: fiturId,
+      fitur_title: fitur?.title || fitur?.href || String(fiturId),
+    },
+  })
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
 }

@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
 import { getSession, type SessionUser } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 
@@ -37,8 +38,10 @@ async function assertSantriAccess(session: SessionUser | null, santriId: string)
     id: string
     asrama: string | null
     kategori_santri: string | null
+    nama_lengkap: string | null
+    nis: string | null
   }>(
-    `SELECT id, asrama, kategori_santri
+    `SELECT id, asrama, kategori_santri, nama_lengkap, nis
      FROM santri
      WHERE id = ? AND status_global = 'aktif'`,
     [santriId]
@@ -284,7 +287,7 @@ export async function getStatusSPP(santriId: string, tahun: number) {
 export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number): Promise<{ success: boolean } | { error: string }> {
   try {
     const session = await getSession()
-    await assertSantriAccess(session, santriId)
+    const santri = await assertSantriAccess(session, santriId)
 
     const billingStart = await getSppBillingStart()
     const invalidMonth = bulans.some(b => (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
@@ -303,6 +306,25 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
       params: [generateId(), santriId, tahun, b, nominalPerBulan, session?.id ?? null],
     })))
 
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'payment',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'create',
+      entityType: 'santri',
+      entityId: santriId,
+      entityLabel: santri.nama_lengkap || santri.nis || santriId,
+      summary: `Mencatat pembayaran SPP untuk ${santri.nama_lengkap || santri.nis || santriId}`,
+      details: {
+        tahun,
+        bulan: bulans,
+        nominal_per_bulan: nominalPerBulan,
+        total_nominal: nominalPerBulan * bulans.length,
+        unit_setor: santri.unit_setor,
+      },
+    })
+
     revalidatePath('/dashboard/asrama/spp')
     revalidatePath('/dashboard/dewan-santri/setoran')
     return { success: true }
@@ -314,15 +336,44 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
 export async function batalkanPembayaranSPP(logId: string): Promise<{ success: boolean } | { error: string }> {
   if (!logId) return { error: 'Data pembayaran tidak valid.' }
 
-  const current = await queryOne<{ id: string; santri_id: string }>(
-    `SELECT id, santri_id FROM spp_log WHERE id = ?`,
+  const current = await queryOne<{
+    id: string
+    santri_id: string
+    bulan: number
+    tahun: number
+    nominal_bayar: number
+    nama_lengkap: string | null
+    nis: string | null
+  }>(
+    `SELECT sl.id, sl.santri_id, sl.bulan, sl.tahun, sl.nominal_bayar, s.nama_lengkap, s.nis
+     FROM spp_log sl
+     LEFT JOIN santri s ON s.id = sl.santri_id
+     WHERE sl.id = ?`,
     [logId]
   )
   if (!current) return { error: 'Data pembayaran tidak ditemukan.' }
 
   try {
-    await assertSantriAccess(await getSession(), current.santri_id)
+    const session = await getSession()
+    await assertSantriAccess(session, current.santri_id)
     await execute(`DELETE FROM spp_log WHERE id = ?`, [logId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'delete',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'delete',
+      entityType: 'santri',
+      entityId: current.santri_id,
+      entityLabel: current.nama_lengkap || current.nis || current.santri_id,
+      summary: `Membatalkan pembayaran SPP ${current.nama_lengkap || current.nis || current.santri_id}`,
+      details: {
+        bulan: current.bulan,
+        tahun: current.tahun,
+        nominal: current.nominal_bayar,
+        log_id: logId,
+      },
+    })
     revalidatePath('/dashboard/asrama/spp')
     revalidatePath('/dashboard/dewan-santri/setoran')
     return { success: true }
@@ -345,6 +396,22 @@ export async function simpanSppBatch(listTransaksi: Array<{ santriId: string; bu
             VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Cepat', date('now'))`,
       params: [generateId(), item.santriId, item.bulan, item.tahun, item.nominal, session?.id ?? null],
     })))
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'payment',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'create',
+      entityType: 'spp_batch',
+      entityId: 'batch',
+      entityLabel: 'Pembayaran SPP batch',
+      summary: `Mencatat ${listTransaksi.length} pembayaran SPP batch`,
+      details: {
+        count: listTransaksi.length,
+        total_nominal: listTransaksi.reduce((sum, item) => sum + item.nominal, 0),
+      },
+    })
 
     revalidatePath('/dashboard/asrama/spp')
     revalidatePath('/dashboard/dewan-santri/setoran')

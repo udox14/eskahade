@@ -3,11 +3,14 @@
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setSession } from '@/lib/auth/session'
+import { getRequestAuditContext, logActivity } from '@/lib/activity-log'
 import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const normalizedEmail = String(email || '').toLowerCase().trim()
+  const requestInfo = await getRequestAuditContext()
 
   console.log('[LOGIN] Step 1: email=', email ? email.substring(0, 5) + '***' : 'EMPTY')
 
@@ -28,7 +31,7 @@ export async function login(formData: FormData) {
   try {
     user = await queryOne(
       'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan FROM users WHERE email = ?',
-      [email.toLowerCase().trim()]
+      [normalizedEmail]
     )
     console.log('[LOGIN] Step 2: user found=', !!user, 'role=', user?.role)
   } catch (err: any) {
@@ -38,6 +41,17 @@ export async function login(formData: FormData) {
 
   if (!user) {
     console.log('[LOGIN] Step 2: user NOT FOUND')
+    await logActivity({
+      actor: { email: normalizedEmail },
+      module: 'auth',
+      action: 'login',
+      entityType: 'session',
+      entityLabel: normalizedEmail || 'unknown',
+      summary: `Login gagal untuk ${normalizedEmail || 'email kosong'}`,
+      details: { reason: 'user_not_found', email: normalizedEmail },
+      status: 'failed',
+      requestInfo,
+    })
     return { error: 'Email atau Password salah.' }
   }
 
@@ -52,6 +66,18 @@ export async function login(formData: FormData) {
   }
 
   if (!valid) {
+    await logActivity({
+      actor: { id: user.id, name: user.full_name, email: user.email, roles: [user.role] },
+      module: 'auth',
+      action: 'login',
+      entityType: 'session',
+      entityId: user.id,
+      entityLabel: user.full_name || user.email,
+      summary: `Login gagal untuk ${user.full_name || user.email}`,
+      details: { reason: 'invalid_password', email: user.email },
+      status: 'failed',
+      requestInfo,
+    })
     return { error: 'Email atau Password salah.' }
   }
 
@@ -86,6 +112,27 @@ export async function login(formData: FormData) {
     console.error('[LOGIN] Step 4 ERROR:', err?.message)
     return { error: 'Gagal menyimpan sesi: ' + err?.message }
   }
+
+  await logActivity({
+    actor: {
+      id: user.id,
+      name: user.full_name,
+      email: user.email,
+      roles: rolesArray,
+    },
+    module: 'auth',
+    action: 'login',
+    entityType: 'session',
+    entityId: user.id,
+    entityLabel: user.full_name || user.email,
+    summary: 'Login berhasil',
+    details: {
+      email: user.email,
+      primary_role: rolesArray[0],
+    },
+    status: 'success',
+    requestInfo,
+  })
 
   console.log('[LOGIN] Step 5: redirecting to /dashboard')
   redirect('/dashboard')

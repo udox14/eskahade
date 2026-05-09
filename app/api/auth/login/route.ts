@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { createJWTToken } from '@/lib/auth/session'
+import { logActivity } from '@/lib/activity-log'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password } = body
+    const requestInfo = {
+      ipAddress: request.headers.get('cf-connecting-ip')
+        ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        ?? null,
+      userAgent: request.headers.get('user-agent'),
+    }
 
     if (!email || !password) {
       return NextResponse.json(
@@ -30,6 +37,17 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
+      await logActivity({
+        actor: { email: normalizedEmail },
+        module: 'auth',
+        action: 'login',
+        entityType: 'session',
+        entityLabel: normalizedEmail,
+        summary: `Login gagal untuk ${normalizedEmail}`,
+        details: { reason: 'user_not_found', email: normalizedEmail, channel: 'api' },
+        status: 'failed',
+        requestInfo,
+      })
       return NextResponse.json(
         { error: 'Email atau Password salah.' },
         { status: 401 }
@@ -38,6 +56,18 @@ export async function POST(request: NextRequest) {
 
     const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
+      await logActivity({
+        actor: { id: user.id, name: user.full_name, email: user.email },
+        module: 'auth',
+        action: 'login',
+        entityType: 'session',
+        entityId: user.id,
+        entityLabel: user.full_name || user.email,
+        summary: `Login gagal untuk ${user.full_name || user.email}`,
+        details: { reason: 'invalid_password', email: user.email, channel: 'api' },
+        status: 'failed',
+        requestInfo,
+      })
       return NextResponse.json(
         { error: 'Email atau Password salah.' },
         { status: 401 }
@@ -76,6 +106,24 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
+    })
+
+    await logActivity({
+      actor: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        roles: rolesArray,
+      },
+      module: 'auth',
+      action: 'login',
+      entityType: 'session',
+      entityId: user.id,
+      entityLabel: user.full_name || user.email,
+      summary: 'Login berhasil',
+      details: { email: user.email, primary_role: rolesArray[0], channel: 'api' },
+      status: 'success',
+      requestInfo,
     })
 
     return response

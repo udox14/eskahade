@@ -2,6 +2,7 @@
 
 import { query, queryOne, batch, generateId } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { WIB_TIME_ZONE } from '@/app/dashboard/ehb/_date-utils'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
@@ -197,6 +198,25 @@ export async function simpanTopup(
     },
   ])
 
+  const santri = santriMap.get(santriId)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'uang_jajan',
+    action: 'payment',
+    fiturHref: '/dashboard/asrama/uang-jajan',
+    logKind: 'create',
+    entityType: 'santri',
+    entityId: santriId,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Topup saldo uang jajan ${santri?.nama_lengkap || santriId}`,
+    details: {
+      nominal: nominalValid,
+      keterangan: keterangan || 'Topup Saldo',
+      jenis: 'MASUK',
+      asrama: santri?.asrama ?? null,
+    },
+  })
+
   revalidatePath(UANG_JAJAN_PATH)
   return { success: true }
 }
@@ -245,6 +265,22 @@ export async function simpanJajanMassal(
     })),
   ])
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'uang_jajan',
+    action: 'payment',
+    fiturHref: '/dashboard/asrama/uang-jajan',
+    logKind: 'create',
+    entityType: 'tabungan_batch',
+    entityId: 'batch',
+    entityLabel: 'Jajan harian massal',
+    summary: `Mencatat jajan harian massal untuk ${aggregatedList.length} santri`,
+    details: {
+      count: aggregatedList.length,
+      total_nominal: aggregatedList.reduce((sum, item) => sum + item.nominal, 0),
+    },
+  })
+
   revalidatePath(UANG_JAJAN_PATH)
   return { success: true, count: aggregatedList.length }
 }
@@ -271,6 +307,11 @@ export async function hapusTransaksi(id: string) {
   const trx = await getAllowedTransaksiRow(id)
   if (!trx) return { error: 'Transaksi tidak ditemukan atau tidak boleh diakses.' }
 
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [trx.santri_id]
+  )
+
   const santriMap = await getAllowedSantriRows([trx.santri_id])
   const saldoSaatIni = santriMap.get(trx.santri_id)?.saldo
   if (saldoSaatIni == null) {
@@ -289,6 +330,24 @@ export async function hapusTransaksi(id: string) {
       params: [delta, trx.santri_id],
     },
   ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'uang_jajan',
+    action: 'delete',
+    fiturHref: '/dashboard/asrama/uang-jajan',
+    logKind: 'delete',
+    entityType: 'santri',
+    entityId: trx.santri_id,
+    entityLabel: santri?.nama_lengkap || santri?.nis || trx.santri_id,
+    summary: `Menghapus transaksi uang jajan ${santri?.nama_lengkap || santri?.nis || trx.santri_id}`,
+    details: {
+      transaksi_id: id,
+      jenis: trx.jenis,
+      nominal: trx.nominal,
+      asrama: trx.asrama,
+    },
+  })
 
   revalidatePath(UANG_JAJAN_PATH)
   return { success: true }
