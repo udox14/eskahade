@@ -10,14 +10,19 @@ import {
   Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, 
   AlertTriangle, Trash2, Filter, Download, BarChart2, List, Edit2, TrendingUp, Settings, Save
 } from 'lucide-react'
-import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Pagination from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import * as XLSX from 'xlsx'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import {
+  formatWibDate,
+  formatWibDateTime,
+  toWibDateInputValue,
+  toWibDateTimeLocalValue,
+  toWibTimeInputValue,
+} from '@/lib/date/wib'
 
 const LIST_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
@@ -29,6 +34,15 @@ const DEFAULT_LIST_ALASAN = [
   "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH", 
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
+
+function formatIzinWaktu(jenis: string, value: string | null | undefined) {
+  if (!value) return 'Belum Kembali'
+  return jenis === 'PULANG' ? formatWibDate(value) : formatWibDateTime(value)
+}
+
+function getDefaultReturnValue(jenis: 'PULANG' | 'KELUAR_KOMPLEK') {
+  return jenis === 'PULANG' ? toWibDateInputValue() : toWibDateTimeLocalValue()
+}
 
 export default function PerizinanPage() {
   const confirm = useConfirm()
@@ -81,7 +95,8 @@ export default function PerizinanPage() {
   // Modal Kembali
   const [isOpenReturn, setIsOpenReturn] = useState(false)
   const [selectedReturnId, setSelectedReturnId] = useState('')
-  const [waktuKembali, setWaktuKembali] = useState(new Date().toISOString().slice(0, 16))
+  const [selectedReturnJenis, setSelectedReturnJenis] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
+  const [waktuKembali, setWaktuKembali] = useState(getDefaultReturnValue('KELUAR_KOMPLEK'))
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [draftAlasan, setDraftAlasan] = useState<string[]>(DEFAULT_LIST_ALASAN)
   const [newAlasan, setNewAlasan] = useState('')
@@ -137,7 +152,7 @@ export default function PerizinanPage() {
     setAlasanDropdown(alasanOptions[0] || 'SAKIT')
     setDeskripsiIzin('')
     setPemberiIzin('')
-    setFormDateSingle(new Date().toLocaleDateString('en-CA'))
+    setFormDateSingle(toWibDateInputValue())
     setFormTimeStart('')
     setFormTimeEnd('')
     setFormDateStart('')
@@ -179,16 +194,13 @@ export default function PerizinanPage() {
     // Parse Dates (Assuming +07:00 was saved, taking substring to fit input)
     // Tgl Mulai: 2023-12-12T08:00:00.000Z representing UTC, but we want local time.
     // If we create new Date(), it parses into browser local time.
-    const tStart = new Date(item.tgl_mulai)
-    const tEnd = new Date(item.tgl_selesai_rencana)
-
     if (item.jenis === 'PULANG') {
-      setFormDateStart(format(tStart, "yyyy-MM-dd"))
-      setFormDateEnd(format(tEnd, "yyyy-MM-dd"))
+      setFormDateStart(toWibDateInputValue(item.tgl_mulai))
+      setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
     } else {
-      setFormDateSingle(format(tStart, "yyyy-MM-dd"))
-      setFormTimeStart(format(tStart, "HH:mm"))
-      setFormTimeEnd(format(tEnd, "HH:mm"))
+      setFormDateSingle(toWibDateInputValue(item.tgl_mulai))
+      setFormTimeStart(toWibTimeInputValue(item.tgl_mulai))
+      setFormTimeEnd(toWibTimeInputValue(item.tgl_selesai_rencana))
     }
 
     setIsOpenEdit(true)
@@ -239,9 +251,8 @@ export default function PerizinanPage() {
 
   const openReturnModal = (item: any) => {
     setSelectedReturnId(item.id)
-    const now = new Date()
-    const tzOffset = now.getTimezoneOffset() * 60000
-    setWaktuKembali((new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16))
+    setSelectedReturnJenis(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
+    setWaktuKembali(getDefaultReturnValue(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK'))
     setIsOpenReturn(true)
   }
 
@@ -274,9 +285,9 @@ export default function PerizinanPage() {
         "Alasan / Keperluan": d.alasan,
         "Pemberi Izin": d.pemberi_izin,
         "Status Izin": d.status,
-        "Keberangkatan": format(new Date(d.tgl_mulai), 'dd MMM yyyy HH:mm', { locale: id }),
-        "Batas Rencana Kembali": format(new Date(d.tgl_selesai_rencana), 'dd MMM yyyy HH:mm', { locale: id }),
-        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? format(new Date(d.tgl_kembali_aktual), 'dd MMM yyyy HH:mm', { locale: id }) : 'Belum Kembali'
+        "Keberangkatan": formatIzinWaktu(d.jenis, d.tgl_mulai),
+        "Batas Rencana Kembali": formatIzinWaktu(d.jenis, d.tgl_selesai_rencana),
+        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? formatIzinWaktu(d.jenis, d.tgl_kembali_aktual) : 'Belum Kembali'
       }))
 
       const ws = XLSX.utils.json_to_sheet(remappedData)
@@ -291,7 +302,7 @@ export default function PerizinanPage() {
 
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Data Perizinan")
-      XLSX.writeFile(wb, `Laporan_Perizinan_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+      XLSX.writeFile(wb, `Laporan_Perizinan_${toWibDateInputValue()}.xlsx`)
       toast.success("Berhasil export Excel!")
     } catch(e) {
       toast.error("Gagal export data")
@@ -549,6 +560,9 @@ export default function PerizinanPage() {
                       const tglMulai = new Date(item.tgl_mulai)
                       const tglRencana = new Date(item.tgl_selesai_rencana)
                       const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
+                      const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
+                      const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
+                      const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
                       
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
@@ -570,11 +584,11 @@ export default function PerizinanPage() {
                           <td className="px-3 py-2">
                             <table className="text-[11px] text-slate-600">
                               <tbody>
-                                <tr><td className="pr-2 text-slate-400">PGI:</td><td className="font-semibold">{format(tglMulai, 'dd MMM, HH:mm', { locale: id })}</td></tr>
-                                {item.tgl_kembali_aktual ? (
-                                  <tr><td className="pr-2 text-slate-400">TBA:</td><td className={`font-bold ${isTelat ? 'text-orange-600' : 'text-emerald-600'}`}>{format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })}</td></tr>
+                                <tr><td className="pr-2 text-slate-400">PGI:</td><td className="font-semibold">{waktuMulai}</td></tr>
+                                {waktuAktual ? (
+                                  <tr><td className="pr-2 text-slate-400">TBA:</td><td className={`font-bold ${isTelat ? 'text-orange-600' : 'text-emerald-600'}`}>{waktuAktual}</td></tr>
                                 ) : (
-                                  <tr><td className="pr-2 text-slate-400">BTS:</td><td className={`font-semibold ${isTelat ? 'text-red-500 font-bold' : ''}`}>{format(tglRencana, 'dd MMM, HH:mm', { locale: id })}</td></tr>
+                                  <tr><td className="pr-2 text-slate-400">BTS:</td><td className={`font-semibold ${isTelat ? 'text-red-500 font-bold' : ''}`}>{waktuRencana}</td></tr>
                                 )}
                               </tbody>
                             </table>
@@ -615,6 +629,9 @@ export default function PerizinanPage() {
                   const tglMulai = new Date(item.tgl_mulai)
                   const tglRencana = new Date(item.tgl_selesai_rencana)
                   const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
+                  const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
+                  const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
+                  const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
 
                   return (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
@@ -650,10 +667,10 @@ export default function PerizinanPage() {
                         <div className="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-600 mt-0.5 space-y-2 border border-slate-100">
                           <p className="italic text-slate-500 leading-tight">"{item.alasan}"</p>
                           <div className="flex justify-between border-t border-slate-200 pt-2">
-                            <span><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Berangkat</span> <span className="font-semibold">{format(tglMulai, 'dd MMM, HH:mm', { locale: id })}</span></span>
-                            {item.tgl_kembali_aktual 
-                              ? <span className="text-right"><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Tiba Aktual</span> <span className={`font-bold ${isTelat ? 'text-orange-600' : 'text-emerald-600'}`}>{format(new Date(item.tgl_kembali_aktual), 'dd MMM, HH:mm', { locale: id })}</span></span>
-                              : <span className="text-right"><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Batas Kembali</span> <span className={`font-semibold ${isTelat ? 'text-red-500' : ''}`}>{format(tglRencana, 'dd MMM, HH:mm', { locale: id })}</span></span>}
+                            <span><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Berangkat</span> <span className="font-semibold">{waktuMulai}</span></span>
+                            {waktuAktual
+                              ? <span className="text-right"><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Tiba Aktual</span> <span className={`font-bold ${isTelat ? 'text-orange-600' : 'text-emerald-600'}`}>{waktuAktual}</span></span>
+                              : <span className="text-right"><span className="text-[10px] text-slate-400 font-bold block mb-0.5">Batas Kembali</span> <span className={`font-semibold ${isTelat ? 'text-red-500' : ''}`}>{waktuRencana}</span></span>}
                           </div>
                         </div>
 
@@ -944,14 +961,19 @@ export default function PerizinanPage() {
             </div>
             
             <div className="p-6">
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block text-center">Waktu Aktual Tiba</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block text-center">
+                {selectedReturnJenis === 'PULANG' ? 'Tanggal Tiba Aktual' : 'Waktu Aktual Tiba'}
+              </label>
               <input 
-                type="datetime-local" 
+                type={selectedReturnJenis === 'PULANG' ? 'date' : 'datetime-local'}
                 value={waktuKembali}
                 onChange={(e) => setWaktuKembali(e.target.value)}
                 className="w-full p-3 border-2 border-slate-200 focus:border-emerald-500 rounded-xl text-center font-bold text-slate-800 mb-6 outline-none transition-colors"
-                title="Waktu kepulangan bisa Anda sesuaikan jika telat input"
+                title={selectedReturnJenis === 'PULANG'
+                  ? 'Tanggal kedatangan dibaca dengan timezone WIB'
+                  : 'Waktu kepulangan dibaca dengan timezone WIB'}
               />
+              <p className="text-[11px] text-slate-400 text-center -mt-3 mb-6">Semua waktu diproses dalam WIB.</p>
 
               <div className="flex gap-3">
                 <button type="button" onClick={() => setIsOpenReturn(false)} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Batal</button>

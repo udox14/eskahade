@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
+import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -43,8 +44,8 @@ function buildIzinPayload(formData: FormData): {
 
     if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
 
-    mulai = new Date(`${dStart}T08:00:00+07:00`)
-    selesai = new Date(`${dEnd}T17:00:00+07:00`)
+    mulai = parseWibDate(dStart, 'start')
+    selesai = parseWibDate(dEnd, 'end')
   } else if (jenis === 'KELUAR_KOMPLEK') {
     const date = String(formData.get('date_single') ?? '').trim()
     const tStart = String(formData.get('time_start') ?? '').trim()
@@ -346,12 +347,16 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
 
-  const izin = await queryOne<{ tgl_selesai_rencana: string }>(
-    'SELECT tgl_selesai_rencana FROM perizinan WHERE id = ?', [id]
+  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string }>(
+    'SELECT jenis, tgl_selesai_rencana FROM perizinan WHERE id = ?', [id]
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
 
-  const aktual = new Date(waktuDatang)
+  const aktual = izin.jenis === 'PULANG'
+    ? parseWibDate(waktuDatang, 'start')
+    : parseWibDateTime(waktuDatang)
+  if (!isValidDateValue(aktual)) return { error: 'Waktu datang tidak valid.' }
+
   const rencana = new Date(izin.tgl_selesai_rencana)
   const isTelat = aktual > rencana
   const statusFinal = isTelat ? 'AKTIF' : 'KEMBALI'

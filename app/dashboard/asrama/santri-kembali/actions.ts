@@ -2,6 +2,7 @@
 
 import { execute, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, hasRole, isAdmin } from '@/lib/auth/session'
+import { parseWibDate } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 const FEATURE_PATH = '/dashboard/asrama/santri-kembali'
@@ -161,7 +162,7 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
     return { error: 'Pengurus asrama hanya bisa menandai santri asramanya.' }
   }
 
-  const actual = new Date(waktuDatang)
+  const actual = parseWibDate(waktuDatang, 'start')
   if (Number.isNaN(actual.getTime())) return { error: 'Waktu datang tidak valid.' }
 
   const rencana = new Date(izin.tgl_selesai_rencana)

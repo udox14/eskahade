@@ -10,7 +10,7 @@ import {
   getWeeklyGuruRules,
   isPengajianLiburByHariIndex,
   resolveGuruForHariIndex,
-  summarizeWeeklyGuruAssignments,
+  summarizeWeeklyGuruAssignmentNames,
   type GuruJadwalSession,
   type WeeklyGuruRule,
 } from '@/lib/akademik/guru-jadwal'
@@ -380,7 +380,7 @@ export async function getPembagianTugasMengajarData() {
 
   return rows
     .map((row) => {
-      const summary = summarizeWeeklyGuruAssignments(row as any, ruleMap)
+      const summary = summarizeWeeklyGuruAssignmentNames(row as any, ruleMap, { separator: '\n' })
       return {
         ...row,
         guru_shubuh_nama: summary.shubuh,

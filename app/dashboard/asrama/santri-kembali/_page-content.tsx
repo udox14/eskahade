@@ -11,25 +11,12 @@ import {
   type SantriKembaliRow,
   type SessionInfo,
 } from './actions'
+import { formatWibDate, toWibDateInputValue } from '@/lib/date/wib'
 
 const PAGE_SIZE = 30
 
-function localInputNow() {
-  const date = new Date()
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
-  return date.toISOString().slice(0, 16)
-}
-
 function formatDateTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatWibDate(value)
 }
 
 function isOverdue(row: SantriKembaliRow) {
@@ -48,7 +35,7 @@ export default function SantriKembaliPageContent() {
   const [overdueTotal, setOverdueTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [selectedRow, setSelectedRow] = useState<SantriKembaliRow | null>(null)
-  const [waktuDatang, setWaktuDatang] = useState(localInputNow())
+  const [waktuDatang, setWaktuDatang] = useState(toWibDateInputValue())
   const [pending, startTransition] = useTransition()
 
   const loadBootstrap = async () => {
@@ -91,7 +78,7 @@ export default function SantriKembaliPageContent() {
 
   const openConfirm = (row: SantriKembaliRow) => {
     setSelectedRow(row)
-    setWaktuDatang(localInputNow())
+    setWaktuDatang(toWibDateInputValue())
   }
 
   const handleConfirm = () => {
@@ -246,16 +233,17 @@ export default function SantriKembaliPageContent() {
                 <p className="text-xs text-slate-500 mt-1">Batas kembali: {formatDateTime(selectedRow.tgl_selesai_rencana)}</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Waktu Datang Aktual</label>
+                <label className="text-xs font-bold text-slate-500 uppercase">Tanggal Datang Aktual</label>
                 <div className="relative mt-1">
                   <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={waktuDatang}
                     onChange={e => setWaktuDatang(e.target.value)}
                     className="w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
                   />
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1">Tanggal diproses dalam WIB.</p>
               </div>
               <button
                 onClick={handleConfirm}

@@ -164,9 +164,9 @@ function PrintDocument({
               <td style={bodyCellStyle({ textAlign: 'center' })}>{row.total_santri || ''}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.grade || '-'}</td>
               <td style={bodyCellSingleLine()}>{row.tempat || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_maghrib_nama || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_shubuh_nama || '-'}</td>
-              <td style={bodyCellStyle()}>{row.guru_ashar_nama || '-'}</td>
+              <td style={bodyCellStyle({ whiteSpace: 'pre-line', wordBreak: 'normal' })}>{row.guru_maghrib_nama || '-'}</td>
+              <td style={bodyCellStyle({ whiteSpace: 'pre-line', wordBreak: 'normal' })}>{row.guru_shubuh_nama || '-'}</td>
+              <td style={bodyCellStyle({ whiteSpace: 'pre-line', wordBreak: 'normal' })}>{row.guru_ashar_nama || '-'}</td>
             </tr>
           ))}
         </tbody>

@@ -287,3 +287,41 @@ export function summarizeWeeklyGuruAssignments(
     maghrib: summarizeWeeklyGuruSession(kelas, 'maghrib', ruleMap, options),
   }
 }
+
+export function summarizeWeeklyGuruSessionNames(
+  kelas: KelasGuruBase,
+  sesi: GuruJadwalSession,
+  ruleMap: Map<string, WeeklyGuruRule>,
+  options?: { skipStructuralLibur?: boolean; separator?: string }
+) {
+  const skipStructuralLibur = options?.skipStructuralLibur ?? true
+  const separator = options?.separator ?? '\n'
+  const seen = new Set<string>()
+  const names: string[] = []
+
+  for (const hariIndex of HARI_DISPLAY_ORDER) {
+    if (skipStructuralLibur && isPengajianLiburByHariIndex(hariIndex, sesi)) continue
+
+    const resolved = resolveGuruForHariIndex(kelas, hariIndex, ruleMap)[sesi]
+    if (!resolved.id || !resolved.nama) continue
+
+    const key = `${resolved.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    names.push(resolved.nama)
+  }
+
+  return names.length > 0 ? names.join(separator) : '-'
+}
+
+export function summarizeWeeklyGuruAssignmentNames(
+  kelas: KelasGuruBase,
+  ruleMap: Map<string, WeeklyGuruRule>,
+  options?: { skipStructuralLibur?: boolean; separator?: string }
+) {
+  return {
+    shubuh: summarizeWeeklyGuruSessionNames(kelas, 'shubuh', ruleMap, options),
+    ashar: summarizeWeeklyGuruSessionNames(kelas, 'ashar', ruleMap, options),
+    maghrib: summarizeWeeklyGuruSessionNames(kelas, 'maghrib', ruleMap, options),
+  }
+}
