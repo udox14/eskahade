@@ -2,6 +2,7 @@
 
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export type ActiveEvent = {
@@ -264,6 +265,18 @@ export async function savePanitia(eventId: number, input: PanitiaInput, id?: num
 
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: id ? 'update' : 'create',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: id ? 'update' : 'create',
+    entityType: 'ehb_panitia',
+    entityId: id ? String(id) : String(eventId),
+    entityLabel: nama,
+    summary: `${id ? 'Memperbarui' : 'Menambahkan'} panitia ${nama}`,
+    details: { event_id: eventId, tipe: input.tipe, jabatan_key: input.jabatan_key ?? null, seksi_key: input.seksi_key ?? null, peran: input.peran ?? null },
+  })
   return { success: true }
 }
 
@@ -316,6 +329,18 @@ export async function importPanitiaBatch(eventId: number, inputs: PanitiaInput[]
 
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'create',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'create',
+    entityType: 'ehb_panitia_batch',
+    entityId: String(eventId),
+    entityLabel: 'Import panitia EHB',
+    summary: `Import panitia EHB sebanyak ${imported} orang`,
+    details: { event_id: eventId, imported },
+  })
   return { success: true, imported }
 }
 
@@ -367,6 +392,18 @@ export async function replacePanitiaBatch(eventId: number, inputs: PanitiaBatchI
 
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'update',
+    entityType: 'ehb_panitia_batch',
+    entityId: String(eventId),
+    entityLabel: 'Replace panitia EHB',
+    summary: `Mengganti susunan panitia EHB (${cleanInputs.length} baris)`,
+    details: { event_id: eventId, total_rows: cleanInputs.length },
+  })
   return { success: true, saved: cleanInputs.length }
 }
 
@@ -396,15 +433,39 @@ export async function copyPanitiaFromEvent(targetEventId: number, sourceEventId:
 
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'update',
+    entityType: 'ehb_panitia_copy',
+    entityId: String(targetEventId),
+    entityLabel: 'Copy panitia EHB',
+    summary: `Menyalin panitia dari event ${sourceEventId}`,
+    details: { target_event_id: targetEventId, source_event_id: sourceEventId, copied: sourceRows.length },
+  })
   return { success: true, copied: sourceRows.length }
 }
 
 export async function deletePanitia(id: number, eventId: number) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
+  const target = await queryOne<{ nama: string }>('SELECT nama FROM ehb_panitia WHERE id = ? AND ehb_event_id = ?', [id, eventId])
   await execute(`DELETE FROM ehb_panitia WHERE id = ? AND ehb_event_id = ?`, [id, eventId])
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/cetak')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'delete',
+    entityType: 'ehb_panitia',
+    entityId: String(id),
+    entityLabel: target?.nama ?? `Panitia ${id}`,
+    summary: `Menghapus panitia ${target?.nama ?? id}`,
+  })
   return { success: true }
 }
 
@@ -417,6 +478,18 @@ export async function reorderPanitia(eventId: number, ids: number[]) {
     params: [index + 1, id, eventId],
   })))
   revalidatePath('/dashboard/ehb/kepanitiaan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'update',
+    entityType: 'ehb_panitia_order',
+    entityId: String(eventId),
+    entityLabel: 'Urutan panitia EHB',
+    summary: `Mengubah urutan ${ids.length} panitia EHB`,
+    details: { total_ids: ids.length },
+  })
   return { success: true }
 }
 
@@ -518,6 +591,18 @@ export async function savePembuatSoalBatch(eventId: number, inputs: PembuatSoalI
 
   revalidatePath('/dashboard/ehb/kepanitiaan')
   revalidatePath('/dashboard/ehb/keuangan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_kepanitiaan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/kepanitiaan',
+    logKind: 'update',
+    entityType: 'ehb_pembuat_soal_batch',
+    entityId: String(eventId),
+    entityLabel: 'Pembuat soal EHB',
+    summary: `Menyimpan ${cleanInputs.length} pembuat soal EHB`,
+    details: { event_id: eventId, total_rows: cleanInputs.length },
+  })
   return { success: true, saved: cleanInputs.length }
 }
 

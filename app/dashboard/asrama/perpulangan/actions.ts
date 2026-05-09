@@ -1,8 +1,9 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 // ─── Helper: cek jenis pulang dari alamat ────────────────────────────────────
@@ -174,6 +175,21 @@ export async function konfirmasiPulang(
      WHERE id = ? AND status_pulang = 'BELUM'`,
     [keterangan || null, now(), session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: 'Mengonfirmasi kepulangan santri',
+    details: {
+      periode_id: periodeId,
+      keterangan: keterangan || null,
+    },
+  })
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
 }
@@ -195,6 +211,20 @@ export async function batalPulang(
      WHERE id = ? AND status_datang = 'BELUM'`,
     [session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: 'Membatalkan status pulang santri',
+    details: {
+      periode_id: periodeId,
+    },
+  })
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
 }
@@ -232,6 +262,25 @@ export async function konfirmasiRombonganKamar(
     params: [keterangan || 'Rombongan', tglPulang, session.id, l.id],
   })))
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log_batch',
+    entityId: `${asrama}:${kamar}`,
+    entityLabel: `${asrama} kamar ${kamar}`,
+    summary: `Mengonfirmasi pulang rombongan kamar ${kamar}`,
+    details: {
+      periode_id: periodeId,
+      asrama,
+      kamar,
+      count: logs.length,
+      keterangan: keterangan || 'Rombongan',
+    },
+  })
+
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true, count: logs.length }
 }
@@ -248,6 +297,20 @@ export async function updateJenisPulang(
     `UPDATE perpulangan_log SET jenis_pulang = ?, updated_by = ? WHERE id = ?`,
     [jenisBaru, session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: `Mengubah jenis pulang menjadi ${jenisBaru}`,
+    details: {
+      jenis_pulang: jenisBaru,
+    },
+  })
   return { success: true }
 }
 
@@ -263,6 +326,20 @@ export async function updateKeterangan(
     `UPDATE perpulangan_log SET keterangan = ?, updated_by = ? WHERE id = ?`,
     [keterangan || null, session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: 'Memperbarui keterangan perpulangan',
+    details: {
+      keterangan: keterangan || null,
+    },
+  })
   return { success: true }
 }
 
@@ -283,6 +360,20 @@ export async function konfirmasiDatang(
      WHERE id = ? AND status_pulang = 'PULANG' AND status_datang = 'BELUM'`,
     [now(), session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: 'Mengonfirmasi kedatangan santri',
+    details: {
+      periode_id: periodeId,
+    },
+  })
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
 }
@@ -304,6 +395,20 @@ export async function batalDatang(
      WHERE id = ? AND status_datang = 'SUDAH'`,
     [session.id, logId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log',
+    entityId: logId,
+    entityLabel: logId,
+    summary: 'Membatalkan status datang santri',
+    details: {
+      periode_id: periodeId,
+    },
+  })
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
 }
@@ -343,6 +448,22 @@ export async function tandaiTelatMassal(
     sql: `UPDATE perpulangan_log SET status_datang = 'TELAT', updated_by = ? WHERE id = ?`,
     params: [session.id, t.id],
   })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_perpulangan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/perpulangan',
+    logKind: 'update',
+    entityType: 'perpulangan_log_batch',
+    entityId: `telat:${periodeId}`,
+    entityLabel: `Periode ${periodeId}`,
+    summary: `Menandai ${targets.length} santri telat datang`,
+    details: {
+      periode_id: periodeId,
+      count: targets.length,
+    },
+  })
 
   revalidatePath('/dashboard/asrama/perpulangan/monitoring')
   return { success: true, count: targets.length }

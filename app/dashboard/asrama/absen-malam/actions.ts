@@ -1,8 +1,9 @@
 'use server'
 
 import { query, getDB } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getSessionInfo() {
@@ -50,7 +51,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
       `SELECT santri_id, status FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
       [tanggal, ...ids]
     )
-  } catch (_) {}
+  } catch {}
 
   try {
     izinList = await query<any>(
@@ -61,7 +62,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
          AND p.santri_id IN (${ph})`,
       [tanggal, tanggal, ...ids]
     )
-  } catch (_) {}
+  } catch {}
 
   const absenMap: Record<string, string> = {}
   absenList.forEach((a: any) => { absenMap[a.santri_id] = a.status })
@@ -80,6 +81,15 @@ export async function batchSaveAbsenMalam(
 ) {
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  const santriIds = records.map((record) => record.santri_id)
+  const santriScope = santriIds.length
+    ? await query<{ asrama: string | null; kamar: string | null }>(
+        `SELECT DISTINCT asrama, kamar
+         FROM santri
+         WHERE id IN (${santriIds.map(() => '?').join(',')})`,
+        santriIds
+      )
+    : []
 
   const toSave = records.filter(r => r.status === 'ALFA')
   const toDelete = records.filter(r => r.status !== 'ALFA').map(r => r.santri_id)
@@ -105,6 +115,24 @@ export async function batchSaveAbsenMalam(
   for (let i = 0; i < stmts.length; i += 100) {
     await db.batch(stmts.slice(i, i + 100))
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_malam',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/absen-malam',
+    logKind: 'update',
+    entityType: 'absen_malam_batch',
+    entityId: tanggal,
+    entityLabel: tanggal,
+    summary: `Menyimpan absen malam ${records.length} santri`,
+    details: {
+      tanggal,
+      count: records.length,
+      alfa_count: toSave.length,
+      scope: santriScope,
+    },
+  })
 
   revalidatePath('/dashboard/asrama/absen-malam')
   return { success: true, saved: toSave.length }

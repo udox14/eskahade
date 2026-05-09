@@ -1,6 +1,8 @@
 'use server'
 
 import { query, batch } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 type ImportRow = {
@@ -10,6 +12,7 @@ type ImportRow = {
 
 // FIX #8: Ganti for...of await query INSERT -> batch()
 export async function importPenempatanKelas(data: ImportRow[]) {
+  const session = await getSession()
   if (!data || data.length === 0) return { error: 'Data kosong.' }
 
   const semuaKelas = await query<{ id: string; nama_kelas: string }>(`
@@ -50,5 +53,17 @@ export async function importPenempatanKelas(data: ImportRow[]) {
   })))
 
   revalidatePath('/dashboard/santri')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri_atur_kelas_import',
+    action: 'create',
+    fiturHref: '/dashboard/santri/atur-kelas',
+    logKind: 'create',
+    entityType: 'riwayat_pendidikan_batch',
+    entityId: 'import',
+    entityLabel: 'Import penempatan kelas',
+    summary: `Import penempatan kelas: ${toInsert.length} santri diproses`,
+    details: { count: toInsert.length },
+  })
   return { success: true, count: toInsert.length }
 }

@@ -3,6 +3,8 @@
 import { execute, query, queryOne, now } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 
 export { getCachedMarhalahList as getMarhalahList }
 
@@ -169,6 +171,7 @@ export async function getMasterKitabOptions() {
 }
 
 export async function simpanKatalogUPK(formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   const id = toNullableInt(formData.get('id'))
   const kitabId = toNullableInt(formData.get('kitab_id'))
   const namaKitab = String(formData.get('nama_kitab') ?? '').trim()
@@ -210,6 +213,25 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
       WHERE id = ?
     `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, hargaBeli, hargaJual,
         isActive, catatan || null, stockUpdatedAt, timestamp, id])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_katalog',
+      action: 'update',
+      fiturHref: '/dashboard/akademik/upk/katalog',
+      logKind: 'update',
+      entityType: 'upk_katalog',
+      entityId: String(id),
+      entityLabel: namaKitab,
+      summary: `Memperbarui katalog UPK ${namaKitab}`,
+      details: {
+        marhalah_id: marhalahId,
+        toko_id: tokoId,
+        stok_lama: stokLama,
+        harga_beli: hargaBeli,
+        harga_jual: hargaJual,
+        is_active: isActive === 1,
+      },
+    })
   } else {
     await execute(`
       INSERT INTO upk_katalog
@@ -218,6 +240,26 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, 0, hargaBeli, hargaJual,
         isActive, catatan || null, timestamp, timestamp, timestamp])
+    const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog WHERE nama_kitab = ? AND marhalah_id = ? ORDER BY id DESC LIMIT 1', [namaKitab, marhalahId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_katalog',
+      action: 'create',
+      fiturHref: '/dashboard/akademik/upk/katalog',
+      logKind: 'create',
+      entityType: 'upk_katalog',
+      entityId: created ? String(created.id) : null,
+      entityLabel: namaKitab,
+      summary: `Menambahkan katalog UPK ${namaKitab}`,
+      details: {
+        marhalah_id: marhalahId,
+        toko_id: tokoId,
+        stok_lama: stokLama,
+        harga_beli: hargaBeli,
+        harga_jual: hargaJual,
+        is_active: isActive === 1,
+      },
+    })
   }
 
   revalidatePath(KATALOG_PATH)
@@ -225,12 +267,32 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
 }
 
 export async function hapusKatalogUPK(id: number): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const target = await queryOne<{ id: number; nama_kitab: string; marhalah_id: number | null }>(
+    'SELECT id, nama_kitab, marhalah_id FROM upk_katalog WHERE id = ?',
+    [id]
+  )
   await execute('DELETE FROM upk_katalog WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: 'delete',
+    fiturHref: '/dashboard/akademik/upk/katalog',
+    logKind: 'delete',
+    entityType: 'upk_katalog',
+    entityId: String(id),
+    entityLabel: target?.nama_kitab ?? `Katalog ${id}`,
+    summary: `Menghapus katalog UPK ${target?.nama_kitab ?? id}`,
+    details: {
+      marhalah_id: target?.marhalah_id ?? null,
+    },
+  })
   revalidatePath(KATALOG_PATH)
   return { success: true }
 }
 
 export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: boolean; inserted: number; updated: number; failed: number; errors: string[] } | { error: string }> {
+  const session = await getSession()
   if (!rows.length) return { error: 'File Excel belum berisi data.' }
 
   const [marhalahRows, tokoRows, masterRows, katalogRows] = await Promise.all([
@@ -337,11 +399,30 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
     return { error: errors[0] || 'Tidak ada baris valid untuk diimport.' }
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/upk/katalog',
+    logKind: 'update',
+    entityType: 'upk_katalog_batch',
+    entityId: 'import-katalog',
+    entityLabel: 'Import katalog UPK',
+    summary: `Import katalog UPK: ${inserted} tambah, ${updated} update`,
+    details: {
+      inserted,
+      updated,
+      failed,
+      total_rows: rows.length,
+    },
+  })
+
   revalidatePath(KATALOG_PATH)
   return { success: true, inserted, updated, failed, errors: errors.slice(0, 8) }
 }
 
 export async function simpanTokoUPK(formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   const id = toNullableInt(formData.get('id'))
   const nama = String(formData.get('nama') ?? '').trim()
   const isActive = formData.get('is_active') === 'on' ? 1 : 0
@@ -355,8 +436,33 @@ export async function simpanTokoUPK(formData: FormData): Promise<{ success: bool
 
   if (id) {
     await execute('UPDATE upk_toko SET nama = ?, is_active = ?, updated_at = ? WHERE id = ?', [nama, isActive, now(), id])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_katalog',
+      action: 'update',
+      fiturHref: '/dashboard/akademik/upk/katalog',
+      logKind: 'update',
+      entityType: 'upk_toko',
+      entityId: String(id),
+      entityLabel: nama,
+      summary: `Memperbarui toko UPK ${nama}`,
+      details: { is_active: isActive === 1 },
+    })
   } else {
     await execute('INSERT INTO upk_toko (nama, is_active, created_at, updated_at) VALUES (?, ?, ?, ?)', [nama, isActive, now(), now()])
+    const created = await queryOne<{ id: number }>('SELECT id FROM upk_toko WHERE lower(nama) = lower(?) ORDER BY id DESC LIMIT 1', [nama])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_katalog',
+      action: 'create',
+      fiturHref: '/dashboard/akademik/upk/katalog',
+      logKind: 'create',
+      entityType: 'upk_toko',
+      entityId: created ? String(created.id) : null,
+      entityLabel: nama,
+      summary: `Menambahkan toko UPK ${nama}`,
+      details: { is_active: isActive === 1 },
+    })
   }
 
   revalidatePath(KATALOG_PATH)
@@ -364,10 +470,23 @@ export async function simpanTokoUPK(formData: FormData): Promise<{ success: bool
 }
 
 export async function hapusTokoUPK(id: number): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   const used = await queryOne<{ id: number }>('SELECT id FROM upk_katalog WHERE toko_id = ? LIMIT 1', [id])
   if (used) return { error: 'Toko sudah dipakai di katalog. Nonaktifkan saja jika tidak digunakan lagi.' }
 
+  const target = await queryOne<{ id: number; nama: string }>('SELECT id, nama FROM upk_toko WHERE id = ?', [id])
   await execute('DELETE FROM upk_toko WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: 'delete',
+    fiturHref: '/dashboard/akademik/upk/katalog',
+    logKind: 'delete',
+    entityType: 'upk_toko',
+    entityId: String(id),
+    entityLabel: target?.nama ?? `Toko ${id}`,
+    summary: `Menghapus toko UPK ${target?.nama ?? id}`,
+  })
   revalidatePath(KATALOG_PATH)
   return { success: true }
 }

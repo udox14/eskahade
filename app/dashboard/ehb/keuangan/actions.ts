@@ -2,6 +2,7 @@
 
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { backfillManualWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 
@@ -512,6 +513,18 @@ export async function saveRabItems(eventId: number, items: RabItemInput[]) {
   }
 
   revalidatePath('/dashboard/ehb/keuangan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_keuangan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/keuangan',
+    logKind: 'update',
+    entityType: 'ehb_rab_batch',
+    entityId: String(eventId),
+    entityLabel: 'RAB EHB',
+    summary: `Menyimpan ${cleanItems.length} item RAB EHB`,
+    details: { event_id: eventId, total_items: cleanItems.length },
+  })
   return { success: true, saved: cleanItems.length }
 }
 
@@ -580,6 +593,18 @@ export async function saveTransaksiItems(eventId: number, items: TransaksiInput[
   }
 
   revalidatePath('/dashboard/ehb/keuangan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_keuangan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/keuangan',
+    logKind: 'update',
+    entityType: 'ehb_transaksi_batch',
+    entityId: String(eventId),
+    entityLabel: 'Transaksi EHB',
+    summary: `Menyimpan ${cleanItems.length} transaksi EHB`,
+    details: { event_id: eventId, total_items: cleanItems.length },
+  })
   return { success: true, saved: cleanItems.length }
 }
 
@@ -682,6 +707,18 @@ export async function saveHonorMapelConfig(eventId: number, configs: { marhalah_
   }
 
   revalidatePath('/dashboard/ehb/keuangan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_keuangan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/keuangan',
+    logKind: 'update',
+    entityType: 'ehb_honor_mapel_batch',
+    entityId: String(eventId),
+    entityLabel: 'Honor mapel EHB',
+    summary: `Menyimpan konfigurasi honor mapel (${configs.length} baris)`,
+    details: { event_id: eventId, total_rows: configs.length },
+  })
   return { success: true, saved: configs.length }
 }
 
@@ -746,6 +783,18 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
   }
 
   revalidatePath('/dashboard/ehb/keuangan')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_keuangan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/keuangan',
+    logKind: 'update',
+    entityType: 'ehb_honor_manual_batch',
+    entityId: String(eventId),
+    entityLabel: 'Honor pembuatan soal EHB',
+    summary: `Menyimpan honor pembuatan soal untuk ${cleanRows.length} guru`,
+    details: { event_id: eventId, total_rows: cleanRows.length },
+  })
   return { success: true, saved: cleanRows.length }
 }
 
@@ -1031,5 +1080,17 @@ export async function saveHonorPanitiaBatch(eventId: number, rows: HonorPanitiaI
 
   revalidatePath('/dashboard/ehb/keuangan')
   revalidatePath('/dashboard/ehb/keuangan/honor-panitia')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_keuangan',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/keuangan',
+    logKind: 'update',
+    entityType: 'ehb_honor_panitia_batch',
+    entityId: String(eventId),
+    entityLabel: 'Honor panitia EHB',
+    summary: `Menyimpan honor panitia untuk ${cleanRows.length} orang`,
+    details: { event_id: eventId, total_rows: cleanRows.length },
+  })
   return { success: true, saved: cleanRows.length }
 }

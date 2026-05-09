@@ -2,6 +2,7 @@
 
 import { query, execute, batch, generateId } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 /** 
@@ -92,6 +93,7 @@ export async function simpanNilaiPerMapel(
   mapelId: number,
   data: { riwayat_id: string; nilai: number }[]
 ) {
+  const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
 
   await batch(data.map(item => ({
@@ -100,6 +102,23 @@ export async function simpanNilaiPerMapel(
           ON CONFLICT(riwayat_pendidikan_id, mapel_id, semester) DO UPDATE SET nilai = excluded.nilai`,
     params: [generateId(), item.riwayat_id, mapelId, semester, item.nilai],
   })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_nilai_input',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/nilai/input',
+    logKind: 'update',
+    entityType: 'nilai_mapel_batch',
+    entityId: `${mapelId}:${semester}`,
+    entityLabel: `Nilai mapel ${mapelId}`,
+    summary: `Menyimpan nilai mapel untuk ${data.length} santri`,
+    details: {
+      mapel_id: mapelId,
+      semester,
+      total_santri: data.length,
+    },
+  })
 
   revalidatePath('/dashboard/akademik/nilai')
   return { success: true, count: data.length }
@@ -111,6 +130,7 @@ export async function simpanNilaiExcelMenyeluruh(
   dataNilai: any[],
   listMapel: { id: number; nama: string }[]
 ) {
+  const session = await getSession()
   const dataSantri = await getDataSantriPerKelas(kelasId)
   const mapNisToId = new Map<string, string>()
   dataSantri.forEach((s: any) => mapNisToId.set(String(s.nis).trim(), s.riwayat_id))
@@ -197,6 +217,27 @@ export async function simpanNilaiExcelMenyeluruh(
 
   if (batches.length > 0) await batch(batches)
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_nilai_input',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/nilai/input',
+    logKind: 'update',
+    entityType: 'nilai_import_batch',
+    entityId: `${kelasId}:${semester}`,
+    entityLabel: 'Import nilai menyeluruh',
+    summary: `Import nilai menyeluruh untuk ${dataNilai.length} baris`,
+    details: {
+      kelas_id: kelasId,
+      semester,
+      total_rows: dataNilai.length,
+      nilai_akademik: toUpsertAkademik.length,
+      nilai_kepribadian: toUpsertAkhlak.length,
+      catatan_wali: toUpsertRanking.length,
+      mapel_count: listMapel.length,
+    },
+  })
+
   revalidatePath('/dashboard/akademik/nilai')
   revalidatePath('/dashboard/laporan/rapor')
   
@@ -230,6 +271,7 @@ export async function getDataKepribadian(kelasId: string, semester: number) {
 
 
 export async function simpanKepribadian(semester: number, data: any[]) {
+  const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
   await batch(data.map(item => ({
     sql: `INSERT INTO nilai_akhlak (id, riwayat_pendidikan_id, semester, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian)
@@ -239,6 +281,21 @@ export async function simpanKepribadian(semester: number, data: any[]) {
             kesopanan = excluded.kesopanan, ibadah = excluded.ibadah, kemandirian = excluded.kemandirian`,
     params: [generateId(), item.riwayat_id, semester, item.kedisiplinan, item.kebersihan, item.kesopanan, item.ibadah, item.kemandirian],
   })))
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_nilai_input',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/nilai/input',
+    logKind: 'update',
+    entityType: 'nilai_kepribadian_batch',
+    entityId: `kepribadian:${semester}`,
+    entityLabel: 'Nilai kepribadian',
+    summary: `Menyimpan nilai kepribadian untuk ${data.length} santri`,
+    details: {
+      semester,
+      total_santri: data.length,
+    },
+  })
   revalidatePath('/dashboard/laporan/rapor')
   return { success: true }
 }
@@ -264,6 +321,7 @@ export async function getDataCatatanWali(kelasId: string, semester: number) {
 }
 
 export async function simpanCatatanWali(semester: number, data: { riwayat_id: string; catatan: string }[]) {
+  const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
   for (const item of data) {
     await execute(`
@@ -272,6 +330,21 @@ export async function simpanCatatanWali(semester: number, data: { riwayat_id: st
       ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET catatan_wali_kelas = excluded.catatan_wali_kelas
     `, [generateId(), item.riwayat_id, semester, item.catatan])
   }
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_nilai_input',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/nilai/input',
+    logKind: 'update',
+    entityType: 'catatan_wali_batch',
+    entityId: `catatan:${semester}`,
+    entityLabel: 'Catatan wali kelas',
+    summary: `Menyimpan catatan wali kelas untuk ${data.length} santri`,
+    details: {
+      semester,
+      total_santri: data.length,
+    },
+  })
   revalidatePath('/dashboard/laporan/rapor')
   return { success: true }
 }

@@ -1,7 +1,8 @@
 'use server'
 
-import { query, generateId, batch, execute, queryOne, now } from '@/lib/db'
+import { query, generateId, batch, execute, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 
@@ -43,8 +44,8 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
   const startStr = start.toISOString().split('T')[0]
   const endStr = end.toISOString().split('T')[0]
 
-  let whereClauses = ["rp.status_riwayat = 'aktif'", "s.status_global = 'aktif'"]
-  let params: any[] = []
+  const whereClauses = ["rp.status_riwayat = 'aktif'", "s.status_global = 'aktif'"]
+  const params: any[] = []
 
   if (filters.kelasId) {
     whereClauses.push("rp.kelas_id = ?")
@@ -168,6 +169,23 @@ export async function simpanAbsensi(
         await batch(liburStatements.slice(i, i + chunkSize))
       }
     }
+    const liburAktif = liburInput.filter((item) => item?.is_libur).length
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_absensi',
+      action: 'update',
+      fiturHref: '/dashboard/akademik/absensi',
+      logKind: 'update',
+      entityType: 'absensi_batch',
+      entityId: 'simpan-absensi',
+      entityLabel: 'Absensi pengajian',
+      summary: `Menyimpan absensi pengajian (${dataInput.length} baris)`,
+      details: {
+        saved_rows: dataInput.length,
+        libur_rows: liburInput.length,
+        libur_aktif: liburAktif,
+      },
+    })
     revalidatePath('/dashboard/akademik/absensi')
     revalidatePath('/dashboard/akademik/absensi/rekap')
     return { success: true, saved: dataInput.length }

@@ -1,9 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { batch, execute, getDB, query, queryOne } from '@/lib/db'
+import { batch, execute, getDB, query } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { getCachedDataGuru } from '@/lib/cache/master'
 
 const KEPENGURUSAN_PATH = '/dashboard/asrama/kepengurusan'
@@ -293,6 +294,27 @@ export async function saveKepengurusanAsrama(params: {
   })
 
   await batch(statements)
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_kepengurusan',
+    action: 'update',
+    fiturHref: KEPENGURUSAN_PATH,
+    logKind: 'update',
+    entityType: 'asrama_kepengurusan',
+    entityId: asrama,
+    entityLabel: asrama,
+    summary: `Memperbarui kepengurusan asrama ${asrama}`,
+    details: {
+      sekretaris_count: params.sekretaris.length,
+      bendahara_count: params.bendahara.length,
+      pembina_kamar_count: params.pembinaKamar.filter((item) => String(item.nama ?? '').trim() || item.guru_id).length,
+      inti: {
+        pembina_asrama: params.inti.pembina_asrama?.nama || null,
+        rois: params.inti.rois?.nama || null,
+        wakil_rois: params.inti.wakil_rois?.nama || null,
+      },
+    },
+  })
   revalidatePath(KEPENGURUSAN_PATH)
   revalidatePath(KAMAR_PATH)
   return { success: true }

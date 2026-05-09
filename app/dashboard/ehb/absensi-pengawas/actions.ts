@@ -2,6 +2,7 @@
 
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export type ActiveEvent = {
@@ -238,6 +239,24 @@ export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiP
       ],
     })))
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_absensi_pengawas',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/absensi-pengawas',
+    logKind: 'update',
+    entityType: 'ehb_absensi_pengawas_batch',
+    entityId: String(eventId),
+    entityLabel: 'Absensi pengawas EHB',
+    summary: `Menyimpan absensi pengawas untuk ${cleanInputs.length} petugas`,
+    details: {
+      event_id: eventId,
+      total_inputs: cleanInputs.length,
+      badal: cleanInputs.filter(input => input.status === 'BADAL').length,
+      tidak_hadir: cleanInputs.filter(input => input.status === 'TIDAK_HADIR').length,
+    },
+  })
 
   revalidatePath('/dashboard/ehb/absensi-pengawas')
   revalidatePath('/dashboard/ehb/keuangan')

@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'

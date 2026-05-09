@@ -3,6 +3,7 @@
 import { query, getDB } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -54,7 +55,7 @@ export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, 
       `SELECT santri_id, shubuh, ashar, maghrib, isya FROM absen_berjamaah WHERE tanggal = ? AND santri_id IN (${ph})`,
       [tanggal, ...ids]
     )
-  } catch (_) {}
+  } catch {}
 
   const absenMap: Record<string, any> = {}
   absenList.forEach((a: any) => { absenMap[a.santri_id] = a })
@@ -75,6 +76,15 @@ export async function batchSaveAbsenBerjamaah(
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
   if (hasRole(session, 'pengurus_asrama') && !ASRAMA_PUTRI.includes(session.asrama_binaan || '')) return { error: 'Tidak punya akses' }
+  const santriIds = records.map((record) => record.santri_id)
+  const santriScope = santriIds.length
+    ? await query<{ asrama: string | null; kamar: string | null }>(
+        `SELECT DISTINCT asrama, kamar
+         FROM santri
+         WHERE id IN (${santriIds.map(() => '?').join(',')})`,
+        santriIds
+      )
+    : []
 
   const db = await getDB()
   const stmts: any[] = []
@@ -103,6 +113,27 @@ export async function batchSaveAbsenBerjamaah(
   for (let i = 0; i < stmts.length; i += 100) {
     await db.batch(stmts.slice(i, i + 100))
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_berjamaah',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/absen-berjamaah',
+    logKind: 'update',
+    entityType: 'absen_berjamaah_batch',
+    entityId: tanggal,
+    entityLabel: tanggal,
+    summary: `Menyimpan absen berjamaah ${records.length} santri`,
+    details: {
+      tanggal,
+      count: records.length,
+      alfa_shubuh: records.filter((record) => record.shubuh).length,
+      alfa_ashar: records.filter((record) => record.ashar).length,
+      alfa_maghrib: records.filter((record) => record.maghrib).length,
+      alfa_isya: records.filter((record) => record.isya).length,
+      scope: santriScope,
+    },
+  })
 
   revalidatePath('/dashboard/asrama/absen-berjamaah')
   return { success: true }

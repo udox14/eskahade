@@ -2,6 +2,7 @@
 
 import { execute, generateId, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, hasRole, isAdmin } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const FEATURE_PATH = '/dashboard/asrama/absen-sakit'
@@ -263,6 +264,25 @@ export async function simpanDataSakit(payload: {
     `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, mulaiAt, session.id ?? null])
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_sakit',
+    action: active ? 'update' : 'create',
+    fiturHref: FEATURE_PATH,
+    logKind: active ? 'update' : 'create',
+    entityType: 'absen_sakit',
+    entityId: episodeId,
+    entityLabel: santri.nama_lengkap,
+    summary: `${active ? 'Memperbarui' : 'Mencatat'} sakit santri ${santri.nama_lengkap}`,
+    details: {
+      tanggal,
+      sesi,
+      sakit_apa: sakitApa,
+      beli_surat: Boolean(beliSurat),
+      mulai_at: active ? episodeStart : mulaiAt,
+    },
+  })
+
   revalidatePath(FEATURE_PATH)
   return { success: true, updated: Boolean(active), nama: santri.nama_lengkap }
 }
@@ -322,6 +342,27 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
     session.id ?? null,
   ])
 
+  const santri = await queryOne<{ nama_lengkap: string | null }>(
+    'SELECT nama_lengkap FROM santri WHERE id = ?',
+    [active.santri_id]
+  )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_sakit',
+    action: 'update',
+    fiturHref: FEATURE_PATH,
+    logKind: 'update',
+    entityType: 'absen_sakit',
+    entityId: active.episode_id,
+    entityLabel: santri?.nama_lengkap || active.santri_id,
+    summary: `Menandai sembuh santri ${santri?.nama_lengkap || active.santri_id}`,
+    details: {
+      tanggal,
+      sesi,
+      sembuh_at: sembuhAt,
+    },
+  })
+
   revalidatePath(FEATURE_PATH)
   return { success: true }
 }
@@ -361,6 +402,22 @@ export async function hapusDataSakit(payload: { episodeId: string }) {
     DELETE FROM absen_sakit
     WHERE COALESCE(episode_id, id) = ?
   `, [target.episode_id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_sakit',
+    action: 'delete',
+    fiturHref: FEATURE_PATH,
+    logKind: 'delete',
+    entityType: 'absen_sakit',
+    entityId: target.episode_id,
+    entityLabel: target.nama_lengkap,
+    summary: `Menghapus riwayat sakit santri ${target.nama_lengkap}`,
+    details: {
+      santri_id: target.santri_id,
+      asrama: target.asrama,
+    },
+  })
 
   revalidatePath(FEATURE_PATH)
   return { success: true, nama: target.nama_lengkap }

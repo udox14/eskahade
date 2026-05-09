@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, batch } from '@/lib/db'
+import { query, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getPlottingStatus(eventId: number) {
@@ -44,6 +45,17 @@ export async function resetPlotting(eventId: number) {
   if (!session) return { error: 'Unauthorized' }
   
   await execute(`DELETE FROM ehb_plotting_santri WHERE ehb_event_id = ?`, [eventId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_ruangan_plotting',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/ruangan/plotting',
+    logKind: 'delete',
+    entityType: 'ehb_plotting_santri_batch',
+    entityId: String(eventId),
+    entityLabel: 'Plotting ruangan EHB',
+    summary: `Mereset plotting peserta EHB`,
+  })
   revalidatePath('/dashboard/ehb/ruangan/plotting')
   revalidatePath('/dashboard/ehb/ruangan')
   return { success: true }
@@ -141,6 +153,18 @@ export async function autoPlotSantri(eventId: number) {
     if (insertStmts.length > 0) {
       await batch(insertStmts)
     }
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan_plotting',
+      action: 'update',
+      fiturHref: '/dashboard/ehb/ruangan/plotting',
+      logKind: 'update',
+      entityType: 'ehb_plotting_santri_batch',
+      entityId: String(eventId),
+      entityLabel: 'Plotting ruangan EHB',
+      summary: `Melakukan auto plotting peserta EHB`,
+      details: { total_assignment: insertStmts.length, jam_groups: jamGroups.length },
+    })
 
     revalidatePath('/dashboard/ehb/ruangan/plotting')
     revalidatePath('/dashboard/ehb/ruangan')

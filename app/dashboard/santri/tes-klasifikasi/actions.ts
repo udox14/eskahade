@@ -2,6 +2,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -172,6 +173,25 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
        hafalan, nahwu ? 1 : 0, rekomendasi, grade, testerId, now, now]
     )
   }
+
+  const santri = await queryOne<{ nama_lengkap: string | null }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+  await logActivity({
+    actor: actorFromSession(user),
+    module: 'santri_tes_klasifikasi',
+    action: existing ? 'update' : 'create',
+    fiturHref: '/dashboard/santri/tes-klasifikasi',
+    logKind: existing ? 'update' : 'create',
+    entityType: 'hasil_tes_klasifikasi',
+    entityId: santriId,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `${existing ? 'Memperbarui' : 'Mencatat'} tes klasifikasi ${santri?.nama_lengkap || santriId}`,
+    details: {
+      rekomendasi_marhalah: rekomendasi,
+      catatan_grade: grade,
+      hari_tes: hari,
+      sesi_tes: sesi,
+    },
+  })
 
   revalidatePath('/dashboard/santri/tes-klasifikasi')
   return { success: true }

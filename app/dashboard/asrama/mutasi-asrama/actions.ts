@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, getDB } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/mutasi-asrama'
@@ -23,7 +24,7 @@ async function ensureTableExists() {
         created_at     TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `).run()
-  } catch (e) {
+  } catch {
     // Ignore error if already exists or other issues
   }
 
@@ -40,7 +41,7 @@ async function ensureTableExists() {
         UNIQUE(asrama, nomor_kamar)
       )
     `).run()
-  } catch (e) {
+  } catch {
     // Ignore error if already exists or other issues
   }
 
@@ -52,7 +53,7 @@ async function ensureTableExists() {
     if (!kamarConfigColumns.some(col => col.name === 'reserved_baru')) {
       await execute('ALTER TABLE kamar_config ADD COLUMN reserved_baru INTEGER NOT NULL DEFAULT 0')
     }
-  } catch (e) {
+  } catch {
     // Ignore schema sync issue and let downstream query surface if needed
   }
 }
@@ -271,7 +272,7 @@ export async function mutasiSantri(payload: {
 
   // Ambil data lama
   const santri = await queryOne<{ asrama: string | null; kamar: string | null }>(
-    `SELECT asrama, kamar FROM santri WHERE id = ?`,
+    `SELECT asrama, kamar, nama_lengkap FROM santri WHERE id = ?`,
     [payload.santriId]
   )
   if (!santri) return { error: 'Santri tidak ditemukan' }
@@ -304,6 +305,24 @@ export async function mutasiSantri(payload: {
         session.id ?? null
       ),
     ])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'asrama_mutasi',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'mutasi_asrama',
+      entityId: payload.santriId,
+      entityLabel: (santri as any).nama_lengkap || payload.santriId,
+      summary: `Mutasi asrama santri ${(santri as any).nama_lengkap || payload.santriId}`,
+      details: {
+        asrama_lama: santri.asrama ?? null,
+        kamar_lama: santri.kamar ?? null,
+        asrama_baru: payload.asramaBaru,
+        kamar_baru: payload.kamarBaru ?? null,
+        alasan: payload.alasan ?? null,
+      },
+    })
     revalidatePath(REVALIDATE)
     return { success: true }
   } catch (e: any) {
@@ -381,6 +400,24 @@ export async function mutasiBatch(payload: {
     for (let i = 0; i < allStmts.length; i += 100) {
       await db.batch(allStmts.slice(i, i + 100))
     }
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'asrama_mutasi',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'mutasi_asrama_batch',
+      entityId: payload.asramaBaru,
+      entityLabel: payload.asramaBaru,
+      summary: `Mutasi batch ${payload.santriIds.length} santri ke asrama ${payload.asramaBaru}`,
+      details: {
+        count: payload.santriIds.length,
+        asrama_baru: payload.asramaBaru,
+        kamar_baru: payload.kamarBaru ?? null,
+        alasan: payload.alasan ?? null,
+      },
+    })
 
     revalidatePath(REVALIDATE)
     return { success: true, count: payload.santriIds.length }

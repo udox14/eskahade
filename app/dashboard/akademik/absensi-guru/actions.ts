@@ -3,6 +3,7 @@
 import { query, batch, generateId, execute, now } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import {
   buildWeekSchedule,
@@ -10,7 +11,6 @@ import {
   ensureGuruJadwalSchema,
   getWeeklyGuruRules,
   resolveGuruForDate,
-  type GuruJadwalSession,
 } from '@/lib/akademik/guru-jadwal'
 
 const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
@@ -244,6 +244,23 @@ export async function simpanAbsensiGuru(
   for (let i = 0; i < liburStatements.length; i += chunkSize) {
     await batch(liburStatements.slice(i, i + chunkSize))
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_absensi_guru',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/absensi-guru',
+    logKind: 'update',
+    entityType: 'absensi_guru_batch',
+    entityId: 'simpan-absensi-guru',
+    entityLabel: 'Absensi guru pengajian',
+    summary: `Menyimpan absensi guru (${payload.length} baris)`,
+    details: {
+      saved_rows: payload.length,
+      libur_rows: liburInput.length,
+      kelas_terdampak: kelasIds.length,
+    },
+  })
 
   revalidatePath('/dashboard/akademik/absensi-guru')
   revalidatePath('/dashboard/akademik/absensi-guru/rekap')

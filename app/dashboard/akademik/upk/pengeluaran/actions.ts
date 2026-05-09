@@ -2,6 +2,7 @@
 
 import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const PENGELUARAN_PATH = '/dashboard/akademik/upk/pengeluaran'
@@ -243,14 +244,39 @@ export async function simpanPengeluaranUPK(payload: PengeluaranPayload): Promise
       WHERE id = ?
     `, [tanggal, kategori, payload.penerima?.trim() || null, nominal, belanjaId,
         katalogId, namaKitab, payload.catatan?.trim() || null, now(), id])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_pengeluaran',
+      action: 'update',
+      fiturHref: '/dashboard/akademik/upk/pengeluaran',
+      logKind: 'update',
+      entityType: 'upk_pengeluaran',
+      entityId: id,
+      entityLabel: payload.penerima?.trim() || kategori,
+      summary: `Memperbarui pengeluaran UPK ${kategori}`,
+      details: { tanggal, kategori, nominal, penerima: payload.penerima?.trim() || null, belanja_id: belanjaId, nama_kitab: namaKitab },
+    })
   } else {
+    const createdId = generateId()
     await execute(`
       INSERT INTO upk_pengeluaran
         (id, tanggal, waktu_catat, kategori, penerima, nominal, belanja_id,
          katalog_id, nama_kitab, catatan, created_by, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [generateId(), tanggal, now(), kategori, payload.penerima?.trim() || null, nominal, belanjaId,
+    `, [createdId, tanggal, now(), kategori, payload.penerima?.trim() || null, nominal, belanjaId,
         katalogId, namaKitab, payload.catatan?.trim() || null, session?.id ?? null, now(), now()])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_upk_pengeluaran',
+      action: 'create',
+      fiturHref: '/dashboard/akademik/upk/pengeluaran',
+      logKind: 'create',
+      entityType: 'upk_pengeluaran',
+      entityId: createdId,
+      entityLabel: payload.penerima?.trim() || kategori,
+      summary: `Menambahkan pengeluaran UPK ${kategori}`,
+      details: { tanggal, kategori, nominal, penerima: payload.penerima?.trim() || null, belanja_id: belanjaId, nama_kitab: namaKitab },
+    })
   }
 
   revalidatePath(PENGELUARAN_PATH)
@@ -259,6 +285,7 @@ export async function simpanPengeluaranUPK(payload: PengeluaranPayload): Promise
 }
 
 export async function hapusPengeluaranUPK(id: string): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
   if (!id) return { error: 'Data pengeluaran tidak valid.' }
   const old = await queryOne<OldPengeluaranRow>('SELECT id, kategori, nominal, belanja_id FROM upk_pengeluaran WHERE id = ?', [id])
   if (!old) return { error: 'Data pengeluaran tidak ditemukan.' }
@@ -269,6 +296,18 @@ export async function hapusPengeluaranUPK(id: string): Promise<{ success: true }
   }
 
   await execute('DELETE FROM upk_pengeluaran WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_pengeluaran',
+    action: 'delete',
+    fiturHref: '/dashboard/akademik/upk/pengeluaran',
+    logKind: 'delete',
+    entityType: 'upk_pengeluaran',
+    entityId: id,
+    entityLabel: old.kategori,
+    summary: `Menghapus pengeluaran UPK ${old.kategori}`,
+    details: { nominal: old.nominal, belanja_id: old.belanja_id },
+  })
   revalidatePath(PENGELUARAN_PATH)
   revalidatePath(BELANJA_PATH)
   return { success: true }

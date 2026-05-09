@@ -2,6 +2,7 @@
 
 import { query, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { formatDistance } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -134,6 +135,19 @@ export async function simpanVonisTelat(
       [izinId]
     )
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_verifikasi_telat',
+    action: 'approval',
+    fiturHref: '/dashboard/keamanan/perizinan/verifikasi-telat',
+    logKind: 'update',
+    entityType: sumber === 'perpulangan' ? 'perpulangan_log' : 'perizinan',
+    entityId: izinId,
+    entityLabel: santriId,
+    summary: `Memberi vonis telat ${vonis.toLowerCase().replaceAll('_', ' ')}`,
+    details: { santri_id: santriId, vonis, sumber },
+  })
 
   revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
   revalidatePath('/dashboard/keamanan')

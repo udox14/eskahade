@@ -4,6 +4,7 @@ import { query, queryOne, execute, getDB } from '@/lib/db'
 import { hasRole, isAdmin } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
@@ -203,6 +204,20 @@ export async function simpanKonfigurasiKamar(
       )`).bind(access.asrama, access.asrama),
     ]
     await db.batch(stmts)
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_perpindahan_kamar',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'kamar_config_batch',
+      entityId: access.asrama,
+      entityLabel: access.asrama,
+      summary: `Memperbarui konfigurasi kamar asrama ${access.asrama}`,
+      details: {
+        total_kamar: cleaned.length,
+      },
+    })
     revalidatePath(REVALIDATE)
     return { success: true }
   } catch (e: any) {
@@ -331,6 +346,22 @@ export async function generateDraft(asrama: string) {
     for (let i = 0; i < stmts.length; i += 100) {
       await db.batch(stmts.slice(i, i + 100))
     }
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_perpindahan_kamar',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'kamar_draft',
+      entityId: access.asrama,
+      entityLabel: access.asrama,
+      summary: `Generate draft perpindahan kamar untuk asrama ${access.asrama}`,
+      details: {
+        total: santriList.length,
+        overflow_count: Math.max(0, santriList.length - totalKapasitasSantriLama),
+        total_reserved: totalReserved,
+      },
+    })
     revalidatePath(REVALIDATE)
     return {
       success: true,
@@ -391,6 +422,26 @@ export async function updateKamarDraft(asrama: string, santriId: string, kamarBa
       WHERE asrama = ? AND santri_id = ? AND nomor_kamar <> ?
     `).bind(access.asrama, santriId, targetKamar),
   ])
+  const santriDetail = await queryOne<{ nama_lengkap: string | null }>(
+    'SELECT nama_lengkap FROM santri WHERE id = ?',
+    [santriId]
+  )
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_perpindahan_kamar',
+    action: 'update',
+    fiturHref: REVALIDATE,
+    logKind: 'update',
+    entityType: 'kamar_draft',
+    entityId: santriId,
+    entityLabel: santriDetail?.nama_lengkap || santriId,
+    summary: `Memindahkan draft kamar ${santriDetail?.nama_lengkap || santriId}`,
+    details: {
+      asrama: access.asrama,
+      kamar_tujuan: targetKamar,
+      removed_ketua_kamar: ketuaAssignment && ketuaAssignment.nomor_kamar !== targetKamar ? ketuaAssignment.nomor_kamar : null,
+    },
+  })
   revalidatePath(REVALIDATE)
   return {
     success: true,
@@ -445,6 +496,21 @@ export async function applyDraft(asrama: string) {
       await db.batch(updateStmts.slice(i, i + 100))
     }
     await db.batch(markStmts)
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_perpindahan_kamar',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'kamar_draft',
+      entityId: access.asrama,
+      entityLabel: access.asrama,
+      summary: `Menerapkan draft perpindahan kamar asrama ${access.asrama}`,
+      details: {
+        applied_count: validDrafts.length,
+        skipped: staleCount,
+      },
+    })
     revalidatePath(REVALIDATE)
     return { success: true, count: validDrafts.length, skipped: staleCount }
   } catch (e: any) {
@@ -464,6 +530,21 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
 
   if (!santri_id) {
     await execute('DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar = ?', [access.asrama, targetKamar])
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_perpindahan_kamar',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'kamar_ketua',
+      entityId: `${access.asrama}:${targetKamar}`,
+      entityLabel: `${access.asrama} kamar ${targetKamar}`,
+      summary: `Menghapus ketua kamar ${targetKamar} di asrama ${access.asrama}`,
+      details: {
+        asrama: access.asrama,
+        nomor_kamar: targetKamar,
+      },
+    })
   } else {
     const santri = await queryOne<{ id: string }>(
       `SELECT id FROM santri WHERE id = ? AND status_global = 'aktif' AND asrama = ?`,
@@ -489,6 +570,27 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
         ON CONFLICT(asrama, nomor_kamar) DO UPDATE SET santri_id = excluded.santri_id
       `).bind(access.asrama, targetKamar, santri_id),
     ])
+    const santriDetail = await queryOne<{ nama_lengkap: string | null }>(
+      'SELECT nama_lengkap FROM santri WHERE id = ?',
+      [santri_id]
+    )
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_perpindahan_kamar',
+      action: 'update',
+      fiturHref: REVALIDATE,
+      logKind: 'update',
+      entityType: 'kamar_ketua',
+      entityId: `${access.asrama}:${targetKamar}`,
+      entityLabel: `${access.asrama} kamar ${targetKamar}`,
+      summary: `Menetapkan ketua kamar ${targetKamar}`,
+      details: {
+        asrama: access.asrama,
+        nomor_kamar: targetKamar,
+        santri_id,
+        nama_santri: santriDetail?.nama_lengkap || santri_id,
+      },
+    })
   }
   revalidatePath(REVALIDATE)
   return { success: true }
@@ -500,6 +602,20 @@ export async function resetDraft(asrama: string) {
   if ('error' in access) return access
 
   await execute('DELETE FROM kamar_draft WHERE asrama = ?', [access.asrama])
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_perpindahan_kamar',
+    action: 'delete',
+    fiturHref: REVALIDATE,
+    logKind: 'delete',
+    entityType: 'kamar_draft',
+    entityId: access.asrama,
+    entityLabel: access.asrama,
+    summary: `Mereset draft perpindahan kamar asrama ${access.asrama}`,
+    details: {
+      asrama: access.asrama,
+    },
+  })
   revalidatePath(REVALIDATE)
   return { success: true }
 }

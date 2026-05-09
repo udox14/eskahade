@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getPlottingPengawasStatus(eventId: number) {
@@ -50,6 +51,17 @@ export async function resetPlottingPengawas(eventId: number) {
     if (!session) return { error: 'Unauthorized' }
     
     await execute(`DELETE FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId])
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas_plotting',
+        action: 'delete',
+        fiturHref: '/dashboard/ehb/pengawas/plotting',
+        logKind: 'delete',
+        entityType: 'ehb_jadwal_pengawas_batch',
+        entityId: String(eventId),
+        entityLabel: 'Plotting pengawas EHB',
+        summary: `Mereset plotting pengawas EHB`,
+    })
     revalidatePath('/dashboard/ehb/pengawas')
     revalidatePath('/dashboard/ehb/pengawas/plotting')
     return { success: true }
@@ -165,6 +177,18 @@ export async function autoPlotPengawas(eventId: number) {
         if (insertStmts.length > 0) {
             await batch(insertStmts)
         }
+        await logActivity({
+            actor: actorFromSession(session),
+            module: 'ehb_pengawas_plotting',
+            action: 'update',
+            fiturHref: '/dashboard/ehb/pengawas/plotting',
+            logKind: 'update',
+            entityType: 'ehb_jadwal_pengawas_batch',
+            entityId: String(eventId),
+            entityLabel: 'Plotting pengawas EHB',
+            summary: `Melakukan auto plotting pengawas EHB`,
+            details: { total_assignment: insertStmts.length },
+        })
 
         revalidatePath('/dashboard/ehb/pengawas')
         revalidatePath('/dashboard/ehb/pengawas/plotting')

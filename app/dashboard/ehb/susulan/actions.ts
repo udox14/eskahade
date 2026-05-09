@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, batch } from '@/lib/db'
+import { query, queryOne, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getActiveEventLight() {
@@ -39,6 +40,18 @@ export async function markSusulanDone(absensiIds: number[]) {
     try {
         const placeholders = absensiIds.map(() => '?').join(',')
         await execute(`UPDATE ehb_absensi SET is_susulan_done = 1 WHERE id IN (${placeholders})`, absensiIds)
+        await logActivity({
+            actor: actorFromSession(session),
+            module: 'ehb_susulan',
+            action: 'update',
+            fiturHref: '/dashboard/ehb/susulan',
+            logKind: 'update',
+            entityType: 'ehb_susulan_batch',
+            entityId: 'mark-susulan-done',
+            entityLabel: 'Susulan EHB',
+            summary: `Menandai ${absensiIds.length} susulan EHB selesai`,
+            details: { total_absensi: absensiIds.length },
+        })
         revalidatePath('/dashboard/ehb/susulan')
         return { success: true }
     } catch (err: any) {

@@ -1,6 +1,8 @@
 'use server'
 
 import { query } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
 
@@ -27,6 +29,7 @@ export async function getSantriForFoto(search: string, asrama: string, kamar: st
 }
 
 export async function uploadFotoSantri(formData: FormData) {
+  const session = await getSession()
   const file = formData.get('file') as File
   const santriId = formData.get('santriId') as string
 
@@ -51,6 +54,20 @@ export async function uploadFotoSantri(formData: FormData) {
     'UPDATE santri SET foto_url = ?, updated_at = ? WHERE id = ?',
     [result.url, new Date().toISOString(), santriId]
   )
+
+  const santri = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri_foto',
+    action: 'update',
+    fiturHref: '/dashboard/santri/foto',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: santriId,
+    entityLabel: santri[0]?.nama_lengkap || santriId,
+    summary: `Memperbarui foto santri ${santri[0]?.nama_lengkap || santriId}`,
+    details: { foto_url: result.url },
+  })
 
   revalidatePath('/dashboard/santri')
   revalidatePath('/dashboard/santri/foto')

@@ -1,6 +1,6 @@
 'use server'
 
-import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
+import { batch, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'

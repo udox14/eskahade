@@ -2,6 +2,7 @@
 
 import { query, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
 
@@ -26,6 +27,22 @@ export async function updateProfil(data: { full_name: string; phone: string }) {
     'UPDATE users SET full_name = ?, phone = ?, updated_at = ? WHERE id = ?',
     [data.full_name.trim(), data.phone.trim() || null, new Date().toISOString(), session.id]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'profil',
+    action: 'update',
+    fiturHref: '/dashboard/profil',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: session.id,
+    entityLabel: data.full_name.trim(),
+    summary: 'Memperbarui profil sendiri',
+    details: {
+      full_name: data.full_name.trim(),
+      phone: data.phone.trim() || null,
+    },
+  })
 
   revalidatePath('/dashboard/profil')
   revalidatePath('/dashboard')
@@ -62,6 +79,18 @@ export async function updatePassword(data: { current: string; new: string; confi
     [newHash, new Date().toISOString(), session.id]
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'profil',
+    action: 'update',
+    fiturHref: '/dashboard/profil',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: session.id,
+    entityLabel: session.full_name || session.email,
+    summary: 'Mengubah password sendiri',
+  })
+
   return { success: true }
 }
 
@@ -73,6 +102,18 @@ export async function toggleShowBottomNav(show: boolean) {
     'UPDATE users SET show_bottomnav = ? WHERE id = ?',
     [show ? 1 : 0, session.id]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'profil',
+    action: 'update',
+    fiturHref: '/dashboard/profil',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: session.id,
+    entityLabel: session.full_name || session.email,
+    summary: `${show ? 'Menampilkan' : 'Menyembunyikan'} bottom navigation`,
+    details: { show_bottomnav: show },
+  })
   revalidatePath('/dashboard/profil')
   revalidatePath('/dashboard')
   return { success: true }
@@ -90,7 +131,7 @@ export async function uploadAvatar(formData: FormData) {
   const existing = await query<any>('SELECT avatar_url FROM users WHERE id = ?', [session.id])
   const avatarLama = existing[0]?.avatar_url
   if (avatarLama) {
-    try { await deleteFromR2(avatarLama) } catch (_) {}
+    try { await deleteFromR2(avatarLama) } catch {}
   }
 
   // Upload ke R2 — pakai session.id sebagai identifier
@@ -101,6 +142,19 @@ export async function uploadAvatar(formData: FormData) {
     'UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?',
     [result.url, new Date().toISOString(), session.id]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'profil',
+    action: 'update',
+    fiturHref: '/dashboard/profil',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: session.id,
+    entityLabel: session.full_name || session.email,
+    summary: 'Memperbarui avatar profil',
+    details: { avatar_url: result.url },
+  })
 
   revalidatePath('/dashboard/profil')
   revalidatePath('/dashboard')

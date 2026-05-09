@@ -2,6 +2,8 @@
 
 import { query, execute, generateId, now } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getMarhalahList() {
@@ -64,6 +66,7 @@ export async function getSantriForKenaikan(marhalahId: string, kelasId: string) 
 }
 
 export async function importKenaikanKelas(dataExcel: any[]) {
+  const session = await getSession()
   if (!dataExcel || !dataExcel.length) return { error: 'Data kosong.' }
 
   // Kelas tujuan diambil dari tahun ajaran AKTIF (kelas baru tahun depan)
@@ -139,6 +142,23 @@ export async function importKenaikanKelas(dataExcel: any[]) {
       VALUES (?, ?, ?, 'aktif', ?)
     `, [generateId(), rec.santri_id, rec.kelas_id, now()])
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_kenaikan',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/kenaikan',
+    logKind: 'update',
+    entityType: 'kenaikan_kelas_batch',
+    entityId: 'import-kenaikan',
+    entityLabel: 'Import kenaikan kelas',
+    summary: `Import kenaikan kelas untuk ${recordsToInsert.length} santri`,
+    details: {
+      total_rows: dataExcel.length,
+      updated_riwayat: recordsToUpdate.length,
+      inserted_riwayat: recordsToInsert.length,
+    },
+  })
 
   revalidatePath('/dashboard/akademik/kenaikan')
   return { success: true, count: recordsToInsert.length }

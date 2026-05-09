@@ -2,6 +2,7 @@
 
 import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -52,6 +53,18 @@ export async function addPengawas(eventId: number, pengawas: { guru_id?: number,
     }))
 
     await batch(stmts)
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas',
+        action: 'create',
+        fiturHref: '/dashboard/ehb/pengawas',
+        logKind: 'create',
+        entityType: 'ehb_pengawas_batch',
+        entityId: String(eventId),
+        entityLabel: 'Pengawas EHB',
+        summary: `Menambahkan ${pengawas.length} pengawas EHB`,
+        details: { event_id: eventId, total_pengawas: pengawas.length },
+    })
     revalidatePath('/dashboard/ehb/pengawas')
     return { success: true }
 }
@@ -61,6 +74,18 @@ export async function updatePengawas(id: number, data: { nama_pengawas: string, 
     if (!session) return { error: 'Unauthorized' }
 
     await execute(`UPDATE ehb_pengawas SET nama_pengawas = ?, tag = ? WHERE id = ?`, [data.nama_pengawas, data.tag, id])
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas',
+        action: 'update',
+        fiturHref: '/dashboard/ehb/pengawas',
+        logKind: 'update',
+        entityType: 'ehb_pengawas',
+        entityId: String(id),
+        entityLabel: data.nama_pengawas,
+        summary: `Memperbarui pengawas ${data.nama_pengawas}`,
+        details: { tag: data.tag },
+    })
     revalidatePath('/dashboard/ehb/pengawas')
     return { success: true }
 }
@@ -68,10 +93,22 @@ export async function updatePengawas(id: number, data: { nama_pengawas: string, 
 export async function deletePengawas(id: number) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
+    const target = await queryOne<{ nama_pengawas: string }>('SELECT nama_pengawas FROM ehb_pengawas WHERE id = ?', [id])
 
     // Hapus jadwalnya juga
     await execute(`DELETE FROM ehb_jadwal_pengawas WHERE pengawas_id = ?`, [id])
     await execute(`DELETE FROM ehb_pengawas WHERE id = ?`, [id])
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas',
+        action: 'delete',
+        fiturHref: '/dashboard/ehb/pengawas',
+        logKind: 'delete',
+        entityType: 'ehb_pengawas',
+        entityId: String(id),
+        entityLabel: target?.nama_pengawas ?? `Pengawas ${id}`,
+        summary: `Menghapus pengawas ${target?.nama_pengawas ?? id}`,
+    })
     
     revalidatePath('/dashboard/ehb/pengawas')
     return { success: true }
@@ -122,6 +159,18 @@ export async function saveAssignmentManual(eventId: number, jpId: number | null,
                  VALUES (?, ?, ?, ?, ?)
              `, [eventId, pengawasId, ruanganId, tanggal, sesiId])
          }
+         await logActivity({
+             actor: actorFromSession(session),
+             module: 'ehb_pengawas',
+             action: jpId ? 'update' : 'create',
+             fiturHref: '/dashboard/ehb/pengawas',
+             logKind: jpId ? 'update' : 'create',
+             entityType: 'ehb_jadwal_pengawas',
+             entityId: jpId ? String(jpId) : `${eventId}:${pengawasId}:${ruanganId}:${tanggal}:${sesiId}`,
+             entityLabel: 'Jadwal pengawas EHB',
+             summary: `${jpId ? 'Memperbarui' : 'Menambahkan'} jadwal pengawas manual`,
+             details: { event_id: eventId, pengawas_id: pengawasId, ruangan_id: ruanganId, tanggal, sesi_id: sesiId },
+         })
          revalidatePath('/dashboard/ehb/pengawas')
          return { success: true }
      } catch(err: any) {
@@ -134,6 +183,17 @@ export async function deleteAssignment(jpId: number) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     await execute(`DELETE FROM ehb_jadwal_pengawas WHERE id = ?`, [jpId])
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas',
+        action: 'delete',
+        fiturHref: '/dashboard/ehb/pengawas',
+        logKind: 'delete',
+        entityType: 'ehb_jadwal_pengawas',
+        entityId: String(jpId),
+        entityLabel: 'Jadwal pengawas EHB',
+        summary: `Menghapus jadwal pengawas manual`,
+    })
     revalidatePath('/dashboard/ehb/pengawas')
     return { success: true }
 }

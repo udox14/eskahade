@@ -1,8 +1,10 @@
 'use server'
 
 import { query, queryOne, execute } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
+import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
 export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
 
@@ -20,6 +22,7 @@ export async function getTahunAjaranList() {
 }
 
 export async function tambahTahunAjaran(nama: string) {
+  const session = await getSession()
   nama = nama.trim()
   if (!nama) return { error: 'Nama tahun ajaran tidak boleh kosong.' }
 
@@ -27,6 +30,16 @@ export async function tambahTahunAjaran(nama: string) {
   if (existing) return { error: `Tahun ajaran "${nama}" sudah ada.` }
 
   await execute('INSERT INTO tahun_ajaran (nama, is_active) VALUES (?, 0)', [nama])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_tahun_ajaran',
+    action: 'create',
+    fiturHref: '/dashboard/pengaturan/tahun-ajaran',
+    logKind: 'create',
+    entityType: 'tahun_ajaran',
+    entityLabel: nama,
+    summary: `Menambahkan tahun ajaran ${nama}`,
+  })
 
   revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
@@ -35,8 +48,21 @@ export async function tambahTahunAjaran(nama: string) {
 }
 
 export async function aktifkanTahunAjaran(id: number): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   await execute('UPDATE tahun_ajaran SET is_active = 0', [])
   await execute('UPDATE tahun_ajaran SET is_active = 1 WHERE id = ?', [id])
+  const tahunAjaran = await queryOne<{ nama: string | null }>('SELECT nama FROM tahun_ajaran WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_tahun_ajaran',
+    action: 'update',
+    fiturHref: '/dashboard/pengaturan/tahun-ajaran',
+    logKind: 'update',
+    entityType: 'tahun_ajaran',
+    entityId: String(id),
+    entityLabel: tahunAjaran?.nama || String(id),
+    summary: `Mengaktifkan tahun ajaran ${tahunAjaran?.nama || id}`,
+  })
 
   revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
@@ -46,6 +72,7 @@ export async function aktifkanTahunAjaran(id: number): Promise<{ success: boolea
 }
 
 export async function hapusTahunAjaran(id: number): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   const ta = await queryOne<any>('SELECT * FROM tahun_ajaran WHERE id = ?', [id])
   if (!ta) return { error: 'Tahun ajaran tidak ditemukan.' }
   if (ta.is_active) return { error: 'Tidak bisa menghapus tahun ajaran yang sedang aktif.' }
@@ -56,6 +83,17 @@ export async function hapusTahunAjaran(id: number): Promise<{ success: boolean }
   if ((kelasCount?.c ?? 0) > 0) return { error: `Tidak bisa dihapus: masih ada ${kelasCount?.c} kelas terkait tahun ajaran ini.` }
 
   await execute('DELETE FROM tahun_ajaran WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_tahun_ajaran',
+    action: 'delete',
+    fiturHref: '/dashboard/pengaturan/tahun-ajaran',
+    logKind: 'delete',
+    entityType: 'tahun_ajaran',
+    entityId: String(id),
+    entityLabel: ta.nama || String(id),
+    summary: `Menghapus tahun ajaran ${ta.nama || id}`,
+  })
 
   revalidateTag('tahun-ajaran', 'everything')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')

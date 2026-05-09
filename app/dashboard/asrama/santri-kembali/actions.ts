@@ -2,6 +2,7 @@
 
 import { execute, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, hasRole, isAdmin } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { parseWibDate } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
@@ -146,8 +147,9 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
     status: string
     tgl_selesai_rencana: string
     asrama: string | null
+    nama_lengkap: string | null
   }>(`
-    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, s.asrama
+    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, s.asrama, s.nama_lengkap
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE p.id = ?
@@ -174,6 +176,23 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
     SET status = ?, tgl_kembali_aktual = ?
     WHERE id = ?
   `, [statusFinal, actual.toISOString(), id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_santri_kembali',
+    action: 'update',
+    fiturHref: FEATURE_PATH,
+    logKind: 'update',
+    entityType: 'perizinan',
+    entityId: id,
+    entityLabel: izin.nama_lengkap || id,
+    summary: `Menandai santri kembali ${izin.nama_lengkap || id}`,
+    details: {
+      waktu_datang: actual.toISOString(),
+      status_final: statusFinal,
+      telat: isTelat,
+    },
+  })
 
   revalidatePath(FEATURE_PATH)
   revalidatePath('/dashboard/keamanan/perizinan')

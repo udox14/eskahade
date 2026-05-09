@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, batch, generateId } from '@/lib/db'
+import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { formatDateKeyWib, parseDateKeyWib } from '../_date-utils'
 
@@ -46,6 +47,17 @@ export async function createEhbEvent(data: {
     `INSERT INTO ehb_event (tahun_ajaran_id, semester, nama, tanggal_mulai, tanggal_selesai, is_active) VALUES (?, ?, ?, ?, ?, 1)`,
     [data.tahunAjaranId, data.semester, data.nama, data.tanggal_mulai, data.tanggal_selesai]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'create',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'create',
+    entityType: 'ehb_event',
+    entityLabel: data.nama,
+    summary: `Membuat event EHB ${data.nama}`,
+    details: { tahun_ajaran_id: data.tahunAjaranId, semester: data.semester, tanggal_mulai: data.tanggal_mulai, tanggal_selesai: data.tanggal_selesai },
+  })
 
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
@@ -57,6 +69,17 @@ export async function setActiveEvent(eventId: number) {
 
   await execute(`UPDATE ehb_event SET is_active = 0`)
   await execute(`UPDATE ehb_event SET is_active = 1 WHERE id = ?`, [eventId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'update',
+    entityType: 'ehb_event',
+    entityId: String(eventId),
+    entityLabel: `Event ${eventId}`,
+    summary: `Mengaktifkan event EHB ${eventId}`,
+  })
 
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
@@ -75,6 +98,17 @@ export async function deleteEhbEvent(eventId: number) {
   await execute(`DELETE FROM ehb_kelas_jam WHERE ehb_event_id = ?`, [eventId])
   await execute(`DELETE FROM ehb_sesi WHERE ehb_event_id = ?`, [eventId])
   await execute(`DELETE FROM ehb_event WHERE id = ?`, [eventId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'delete',
+    entityType: 'ehb_event',
+    entityId: String(eventId),
+    entityLabel: `Event ${eventId}`,
+    summary: `Menghapus event EHB ${eventId}`,
+  })
 
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
@@ -144,6 +178,18 @@ export async function saveSesiConfig(eventId: number, sesiList: SesiInput[]) {
     })
 
     await batch(stmts)
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_jadwal',
+      action: 'update',
+      fiturHref: '/dashboard/ehb/jadwal',
+      logKind: 'update',
+      entityType: 'ehb_sesi_batch',
+      entityId: String(eventId),
+      entityLabel: 'Konfigurasi sesi EHB',
+      summary: `Menyimpan konfigurasi ${sesiList.length} sesi EHB`,
+      details: { event_id: eventId, total_sesi: sesiList.length, deleted_ids: deletedIds.length },
+    })
     revalidatePath('/dashboard/ehb/jadwal')
     return { success: true }
   } catch (e: any) {
@@ -197,6 +243,18 @@ export async function saveKelasJamMapping(
   }))
 
   await batch(stmts)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'update',
+    entityType: 'ehb_kelas_jam_batch',
+    entityId: String(eventId),
+    entityLabel: 'Mapping kelas jam EHB',
+    summary: `Menyimpan mapping jam untuk ${mappings.length} kelas`,
+    details: { event_id: eventId, total_mapping: mappings.length },
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -260,6 +318,18 @@ export async function saveJadwalEhb(eventId: number, items: JadwalItem[]) {
   }))
 
   await batch(stmts)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'update',
+    entityType: 'ehb_jadwal_batch',
+    entityId: String(eventId),
+    entityLabel: 'Jadwal EHB',
+    summary: `Menyimpan ${items.length} slot jadwal EHB`,
+    details: { event_id: eventId, total_items: items.length },
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -272,6 +342,18 @@ export async function hapusJadwalCell(eventId: number, tanggal: string, sesiId: 
     `DELETE FROM ehb_jadwal WHERE ehb_event_id = ? AND tanggal = ? AND sesi_id = ? AND kelas_id = ?`,
     [eventId, tanggal, sesiId, kelasId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'delete',
+    entityType: 'ehb_jadwal',
+    entityId: `${eventId}:${tanggal}:${sesiId}:${kelasId}`,
+    entityLabel: 'Jadwal EHB',
+    summary: `Menghapus satu slot jadwal EHB`,
+    details: { tanggal, sesi_id: sesiId, kelas_id: kelasId },
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -290,6 +372,18 @@ export async function hapusJadwalCells(
   }))
 
   await batch(stmts)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'delete',
+    entityType: 'ehb_jadwal_batch',
+    entityId: String(eventId),
+    entityLabel: 'Jadwal EHB',
+    summary: `Menghapus ${items.length} slot jadwal EHB`,
+    details: { total_items: items.length },
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -302,6 +396,17 @@ export async function hapusTanggal(eventId: number, tanggal: string) {
     `DELETE FROM ehb_jadwal WHERE ehb_event_id = ? AND tanggal = ?`,
     [eventId, tanggal]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'delete',
+    entityType: 'ehb_tanggal_jadwal',
+    entityId: `${eventId}:${tanggal}`,
+    entityLabel: tanggal,
+    summary: `Menghapus semua jadwal tanggal ${tanggal}`,
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -320,6 +425,18 @@ export async function updateTanggalJadwal(eventId: number, oldTanggal: string, n
     `UPDATE ehb_jadwal SET tanggal = ? WHERE ehb_event_id = ? AND tanggal = ?`,
     [newTanggal, eventId, oldTanggal]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'update',
+    entityType: 'ehb_tanggal_jadwal',
+    entityId: `${eventId}:${oldTanggal}`,
+    entityLabel: `${oldTanggal} -> ${newTanggal}`,
+    summary: `Mengubah tanggal jadwal EHB`,
+    details: { old_tanggal: oldTanggal, new_tanggal: newTanggal },
+  })
   revalidatePath('/dashboard/ehb/jadwal')
   return { success: true }
 }
@@ -340,7 +457,7 @@ export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: 
   const sesiMap = new Map<number, number>() // old_id -> new_id
   
   for (const s of oldSesi) {
-    const res = await execute(
+    await execute(
       `INSERT INTO ehb_sesi (ehb_event_id, nomor_sesi, label, jam_group, waktu_mulai, waktu_selesai) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [targetEventId, s.nomor_sesi, s.label, s.jam_group, s.waktu_mulai, s.waktu_selesai]
     )
@@ -400,5 +517,17 @@ export async function copyJadwalFromEvent(targetEventId: number, sourceEventId: 
   }
 
   revalidatePath('/dashboard/ehb/jadwal')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_jadwal',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/jadwal',
+    logKind: 'update',
+    entityType: 'ehb_event_copy',
+    entityId: String(targetEventId),
+    entityLabel: `Copy event ${sourceEventId}`,
+    summary: `Menyalin jadwal EHB dari event ${sourceEventId}`,
+    details: { target_event_id: targetEventId, source_event_id: sourceEventId, sesi_copied: oldSesi.length, jadwal_copied: oldJadwal.length },
+  })
   return { success: true }
 }

@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, generateId, batch } from '@/lib/db'
+import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -43,6 +44,17 @@ export async function addRuangan(eventId: number, data: { nomor_ruangan: number,
       INSERT INTO ehb_ruangan (ehb_event_id, nomor_ruangan, nama_ruangan, kapasitas, jenis_kelamin)
       VALUES (?, ?, ?, ?, ?)
     `, [eventId, data.nomor_ruangan, data.nama_ruangan, data.kapasitas, data.jenis_kelamin])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'create',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'create',
+      entityType: 'ehb_ruangan',
+      entityLabel: data.nama_ruangan,
+      summary: `Menambahkan ruangan ${data.nama_ruangan}`,
+      details: { event_id: eventId, nomor_ruangan: data.nomor_ruangan, kapasitas: data.kapasitas, jenis_kelamin: data.jenis_kelamin },
+    })
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
   } catch (err: any) {
@@ -65,6 +77,18 @@ export async function addRuanganBulk(eventId: number, count: number, startNo: nu
       })
     }
     await batch(stmts)
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'create',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'create',
+      entityType: 'ehb_ruangan_batch',
+      entityId: String(eventId),
+      entityLabel: 'Generate ruangan EHB',
+      summary: `Menambahkan ${count} ruangan EHB`,
+      details: { start_no: startNo, kapasitas, jenis_kelamin },
+    })
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
   } catch (err: any) {
@@ -91,6 +115,18 @@ export async function addRuanganImport(eventId: number, data: any[]) {
       ]
     }))
     await batch(stmts)
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'update',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'update',
+      entityType: 'ehb_ruangan_batch',
+      entityId: String(eventId),
+      entityLabel: 'Import ruangan EHB',
+      summary: `Import ruangan EHB sebanyak ${data.length} baris`,
+      details: { total_rows: data.length },
+    })
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
   } catch (err: any) {
@@ -108,6 +144,18 @@ export async function updateRuangan(ruanganId: number, data: { nomor_ruangan: nu
       SET nomor_ruangan = ?, nama_ruangan = ?, kapasitas = ?, jenis_kelamin = ?
       WHERE id = ?
     `, [data.nomor_ruangan, data.nama_ruangan, data.kapasitas, data.jenis_kelamin, ruanganId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'update',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'update',
+      entityType: 'ehb_ruangan',
+      entityId: String(ruanganId),
+      entityLabel: data.nama_ruangan,
+      summary: `Memperbarui ruangan ${data.nama_ruangan}`,
+      details: { nomor_ruangan: data.nomor_ruangan, kapasitas: data.kapasitas, jenis_kelamin: data.jenis_kelamin },
+    })
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
   } catch (err: any) {
@@ -124,7 +172,19 @@ export async function deleteRuangan(ruanganId: number) {
   const count = await queryOne<{ total: number }>(`SELECT COUNT(*) as total FROM ehb_plotting_santri WHERE ruangan_id = ?`, [ruanganId])
   if (count && count.total > 0) return { error: 'Ruangan tidak bisa dihapus karena sudah ada peserta. Kosongkan dulu peserta di menu Plotting.' }
 
+  const target = await queryOne<{ nama_ruangan: string; nomor_ruangan: number }>('SELECT nama_ruangan, nomor_ruangan FROM ehb_ruangan WHERE id = ?', [ruanganId])
   await execute(`DELETE FROM ehb_ruangan WHERE id = ?`, [ruanganId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_ruangan',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/ruangan',
+    logKind: 'delete',
+    entityType: 'ehb_ruangan',
+    entityId: String(ruanganId),
+    entityLabel: target?.nama_ruangan ?? `Ruangan ${target?.nomor_ruangan ?? ruanganId}`,
+    summary: `Menghapus ruangan ${target?.nama_ruangan ?? ruanganId}`,
+  })
   revalidatePath('/dashboard/ehb/ruangan')
   return { success: true }
 }
@@ -187,6 +247,18 @@ export async function pindahSantri(santriId: string, eventId: number, targetRuan
         SET ruangan_id = ?, nomor_kursi = ?, jam_group = ?
         WHERE santri_id = ? AND ehb_event_id = ?
     `, [targetRuanganId, nextKursi, newJamGroup, santriId, eventId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'update',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'update',
+      entityType: 'ehb_plotting_santri',
+      entityId: `${eventId}:${santriId}`,
+      entityLabel: 'Pindah peserta EHB',
+      summary: `Memindahkan peserta EHB ke ruangan baru`,
+      details: { santri_id: santriId, target_ruangan_id: targetRuanganId, jam_group: newJamGroup },
+    })
 
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
@@ -196,6 +268,17 @@ export async function hapusPeserta(plottingId: number) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     await execute(`DELETE FROM ehb_plotting_santri WHERE id = ?`, [plottingId])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'delete',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'delete',
+      entityType: 'ehb_plotting_santri',
+      entityId: String(plottingId),
+      entityLabel: 'Peserta ruangan EHB',
+      summary: `Menghapus peserta dari ruangan EHB`,
+    })
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }
 }
@@ -231,6 +314,18 @@ export async function tambahPesertaManual(eventId: number, ruanganId: number, sa
         INSERT INTO ehb_plotting_santri (ehb_event_id, ruangan_id, santri_id, nomor_kursi, jam_group)
         VALUES (?, ?, ?, ?, ?)
     `, [eventId, ruanganId, santriId, nextKursi, jamGroup])
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_ruangan',
+      action: 'create',
+      fiturHref: '/dashboard/ehb/ruangan',
+      logKind: 'create',
+      entityType: 'ehb_plotting_santri',
+      entityId: `${eventId}:${santriId}`,
+      entityLabel: 'Peserta ruangan EHB',
+      summary: `Menambahkan peserta manual ke ruangan EHB`,
+      details: { ruangan_id: ruanganId, santri_id: santriId, jam_group: jamGroup },
+    })
 
     revalidatePath('/dashboard/ehb/ruangan')
     return { success: true }

@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, batch } from '@/lib/db'
+import { query, queryOne, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getActiveEventLight() {
@@ -107,6 +108,18 @@ export async function saveAbsensiBatch(eventId: number, tanggal: string, sesiId:
         if (stmts.length > 0) {
             await batch(stmts)
         }
+        await logActivity({
+            actor: actorFromSession(session),
+            module: 'ehb_absensi',
+            action: 'update',
+            fiturHref: '/dashboard/ehb/absensi',
+            logKind: 'update',
+            entityType: 'ehb_absensi_batch',
+            entityId: `${eventId}:${tanggal}:${sesiId}`,
+            entityLabel: 'Absensi peserta EHB',
+            summary: `Menyimpan absensi EHB untuk ${absensiUpdates.length} peserta`,
+            details: { event_id: eventId, tanggal, sesi_id: sesiId, total_updates: absensiUpdates.length },
+        })
         revalidatePath('/dashboard/ehb/absensi')
         return { success: true }
     } catch (err: any) {

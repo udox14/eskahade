@@ -4,6 +4,7 @@ import { execute, generateId, getDB, now, query, queryOne } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const KAMAR_PATH = '/dashboard/asrama/kamar'
@@ -478,6 +479,21 @@ export async function updateKetuaKamarLangsung(params: {
 
   if (!params.santriId) {
     await execute('DELETE FROM kamar_ketua WHERE asrama = ? AND nomor_kamar = ?', [asrama, nomorKamar])
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_kamar',
+      action: 'update',
+      fiturHref: KAMAR_PATH,
+      logKind: 'update',
+      entityType: 'kamar_ketua',
+      entityId: `${asrama}:${nomorKamar}`,
+      entityLabel: `${asrama} kamar ${nomorKamar}`,
+      summary: `Menghapus ketua kamar ${nomorKamar}`,
+      details: {
+        asrama,
+        nomor_kamar: nomorKamar,
+      },
+    })
   } else {
     const santri = await queryOne<{ id: string }>(
       `SELECT id
@@ -497,6 +513,27 @@ export async function updateKetuaKamarLangsung(params: {
         ON CONFLICT(asrama, nomor_kamar) DO UPDATE SET santri_id = excluded.santri_id
       `).bind(asrama, nomorKamar, params.santriId),
     ])
+    const santriDetail = await queryOne<{ nama_lengkap: string | null }>(
+      'SELECT nama_lengkap FROM santri WHERE id = ?',
+      [params.santriId]
+    )
+    await logActivity({
+      actor: actorFromSession(access.session),
+      module: 'asrama_kamar',
+      action: 'update',
+      fiturHref: KAMAR_PATH,
+      logKind: 'update',
+      entityType: 'kamar_ketua',
+      entityId: `${asrama}:${nomorKamar}`,
+      entityLabel: `${asrama} kamar ${nomorKamar}`,
+      summary: `Menetapkan ketua kamar ${nomorKamar}`,
+      details: {
+        asrama,
+        nomor_kamar: nomorKamar,
+        santri_id: params.santriId,
+        nama_santri: santriDetail?.nama_lengkap || params.santriId,
+      },
+    })
   }
 
   revalidatePath(KAMAR_PATH)
@@ -554,6 +591,23 @@ export async function mutasiKamarDalamAsrama(params: {
     db.prepare(`DELETE FROM kamar_ketua WHERE asrama = ? AND santri_id = ? AND nomor_kamar <> ?`)
       .bind(asrama, params.santriId, kamarTujuan),
   ])
+
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_kamar',
+    action: 'update',
+    fiturHref: KAMAR_PATH,
+    logKind: 'update',
+    entityType: 'mutasi_kamar',
+    entityId: params.santriId,
+    entityLabel: santri.nama_lengkap,
+    summary: `Memindahkan kamar ${santri.nama_lengkap}`,
+    details: {
+      asrama,
+      kamar_asal: kamarAsal || null,
+      kamar_tujuan: kamarTujuan,
+    },
+  })
 
   revalidatePath(KAMAR_PATH)
   revalidatePath(PERPINDAHAN_PATH)
@@ -621,6 +675,24 @@ export async function tandaiSantriKeluarDariKamar(params: {
     )
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_kamar',
+    action: 'update',
+    fiturHref: KAMAR_PATH,
+    logKind: 'update',
+    entityType: 'santri_keluar_pengajuan',
+    entityId: params.santriId,
+    entityLabel: santri.nama_lengkap,
+    summary: `Menandai santri keluar dari kamar: ${santri.nama_lengkap}`,
+    details: {
+      asrama,
+      kamar: santri.kamar,
+      catatan,
+      mode: existing ? 'update' : 'create',
+    },
+  })
+
   revalidatePath(KAMAR_PATH)
   revalidatePath('/dashboard/santri/keluar')
   return { success: true }
@@ -633,6 +705,11 @@ export async function batalTandaiSantriKeluarDariKamar(params: {
   const access = await getAccess(params.asrama)
   if ('error' in access) return access
 
+  const santri = await queryOne<{ nama_lengkap: string | null; kamar: string | null }>(
+    'SELECT nama_lengkap, kamar FROM santri WHERE id = ? AND asrama = ?',
+    [params.santriId, access.requestedAsrama]
+  )
+
   await execute(
     `UPDATE santri_keluar_tandai
      SET status = 'dibatalkan',
@@ -641,6 +718,22 @@ export async function batalTandaiSantriKeluarDariKamar(params: {
      WHERE santri_id = ? AND asrama = ? AND status = 'pending'`,
     [now(), now(), params.santriId, access.requestedAsrama]
   )
+
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_kamar',
+    action: 'update',
+    fiturHref: KAMAR_PATH,
+    logKind: 'update',
+    entityType: 'santri_keluar_pengajuan',
+    entityId: params.santriId,
+    entityLabel: santri?.nama_lengkap || params.santriId,
+    summary: `Membatalkan tanda keluar dari kamar untuk ${santri?.nama_lengkap || params.santriId}`,
+    details: {
+      asrama: access.requestedAsrama,
+      kamar: santri?.kamar || null,
+    },
+  })
 
   revalidatePath(KAMAR_PATH)
   revalidatePath('/dashboard/santri/keluar')

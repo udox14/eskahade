@@ -2,6 +2,7 @@
 
 import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const KASIR_PATH = '/dashboard/akademik/upk/kasir'
@@ -215,6 +216,24 @@ export async function buatAntrianUPK(payload: {
     `, [generateId(), antrianId, item.katalogId, item.namaKitab, item.marhalahId, item.marhalahNama, qty, harga, qty * harga, now(), now()])
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_kasir',
+    action: 'create',
+    fiturHref: '/dashboard/akademik/upk/kasir',
+    logKind: 'create',
+    entityType: 'upk_antrian',
+    entityId: antrianId,
+    entityLabel: payload.santri.nama_lengkap,
+    summary: `Membuat antrian UPK untuk ${payload.santri.nama_lengkap}`,
+    details: {
+      nomor,
+      unit: payload.unit,
+      total_item: payload.items.length,
+      total_tagihan: totalTagihan,
+    },
+  })
+
   revalidatePath(KASIR_PATH)
   return { success: true, id: antrianId, nomor }
 }
@@ -323,6 +342,27 @@ export async function selesaikanAntrianUPK(payload: {
     WHERE id = ?
   `, [totalTagihan, totalBayar, sisaKembalian, payload.kembalianDitahan ? 1 : 0,
       sisaTunggakan, session?.id ?? null, now(), now(), payload.antrianId])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_kasir',
+    action: 'payment',
+    fiturHref: '/dashboard/akademik/upk/kasir',
+    logKind: 'update',
+    entityType: 'upk_antrian',
+    entityId: payload.antrianId,
+    entityLabel: antrian.nama_santri,
+    summary: `Menyelesaikan antrian UPK ${String(antrian.nomor).padStart(3, '0')}`,
+    details: {
+      unit: payload.unit,
+      total_item: itemRows.length,
+      total_tagihan: totalTagihan,
+      total_bayar: totalBayar,
+      sisa_tunggakan: sisaTunggakan,
+      sisa_kembalian: sisaKembalian,
+      kembalian_ditahan: payload.kembalianDitahan,
+    },
+  })
 
   revalidatePath(KASIR_PATH)
   revalidatePath('/dashboard/akademik/upk/pesanan')

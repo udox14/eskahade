@@ -3,6 +3,7 @@
 import { batch, execute, generateId, query, queryOne, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const DENDA_STEP = 25000
@@ -321,6 +322,26 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
     paidBy,
   ])
 
+  const santri = await queryOne<{ nama_lengkap: string | null }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_denda_buku_pribadi',
+    action: 'create',
+    fiturHref: FEATURE_PATH,
+    logKind: 'create',
+    entityType: 'denda_buku_pribadi',
+    entityId: `${santriId}:${next.kehilanganKe}`,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Mencatat denda buku pribadi untuk ${santri?.nama_lengkap || santriId}`,
+    details: {
+      kehilangan_ke: next.kehilanganKe,
+      nominal: next.nominal,
+      tanggal,
+      langsung_lunas: langsungLunas,
+      keterangan: keterangan || null,
+    },
+  })
+
   revalidatePath(FEATURE_PATH)
   return { success: true, kehilanganKe: next.kehilanganKe, nominal: next.nominal }
 }
@@ -330,11 +351,31 @@ export async function tandaiDendaBukuPribadiLunas(id: string): Promise<{ success
   if (!session) return { error: 'Unauthorized' }
   await ensureDendaBukuPribadiSchema()
 
+  const target = await queryOne<{ nama_lengkap: string | null; santri_id: string }>(
+    `SELECT s.nama_lengkap, d.santri_id
+     FROM denda_buku_pribadi d
+     JOIN santri s ON s.id = d.santri_id
+     WHERE d.id = ?`,
+    [id]
+  )
+
   await execute(`
     UPDATE denda_buku_pribadi
     SET status = 'LUNAS', paid_at = ?, paid_by = ?
     WHERE id = ?
   `, [now(), session.id, id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_denda_buku_pribadi',
+    action: 'update',
+    fiturHref: FEATURE_PATH,
+    logKind: 'update',
+    entityType: 'denda_buku_pribadi',
+    entityId: id,
+    entityLabel: target?.nama_lengkap || target?.santri_id || id,
+    summary: `Menandai denda buku pribadi lunas untuk ${target?.nama_lengkap || target?.santri_id || id}`,
+  })
 
   revalidatePath(FEATURE_PATH)
   return { success: true }
@@ -385,6 +426,18 @@ export async function hapusDendaBukuPribadi(id: string): Promise<{ success: bool
       })
     )
   }
+
+  await logActivity({
+    actor: actorFromSession(access),
+    module: 'keamanan_denda_buku_pribadi',
+    action: 'delete',
+    fiturHref: FEATURE_PATH,
+    logKind: 'delete',
+    entityType: 'denda_buku_pribadi',
+    entityId: id,
+    entityLabel: target.nama_lengkap,
+    summary: `Menghapus denda buku pribadi ${target.nama_lengkap}`,
+  })
 
   revalidatePath(FEATURE_PATH)
   return { success: true, nama: target.nama_lengkap }

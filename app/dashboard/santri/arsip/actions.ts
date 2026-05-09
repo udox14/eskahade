@@ -2,6 +2,8 @@
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const PAGE_SIZE = 30
@@ -364,6 +366,7 @@ export async function getSantriDalamGrup(
 export async function arsipkanSantri(santriIds: string[], catatan: string): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
+  const session = await getSession()
   if (!santriIds || santriIds.length === 0) return { error: 'Pilih minimal 1 santri' }
 
   let berhasil = 0
@@ -420,12 +423,27 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
 
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
+  if (berhasil > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'santri_arsip',
+      action: 'update',
+      fiturHref: '/dashboard/santri/arsip',
+      logKind: 'update',
+      entityType: 'santri_batch',
+      entityId: 'arsipkan',
+      entityLabel: 'Arsip santri',
+      summary: `Mengarsipkan ${berhasil} santri`,
+      details: { berhasil, gagal, catatan: catatan || null },
+    })
+  }
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
 export async function restoreSantri(arsipIds: string[]): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
+  const session = await getSession()
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data untuk direstore' }
 
   let berhasil = 0
@@ -469,6 +487,20 @@ export async function restoreSantri(arsipIds: string[]): Promise<{ success: bool
 
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
+  if (berhasil > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'santri_arsip',
+      action: 'update',
+      fiturHref: '/dashboard/santri/arsip',
+      logKind: 'update',
+      entityType: 'santri_batch',
+      entityId: 'restore',
+      entityLabel: 'Restore arsip santri',
+      summary: `Merestore ${berhasil} arsip santri`,
+      details: { berhasil, gagal },
+    })
+  }
   return { success: true, berhasil, gagal, errors: errorList }
 }
 
@@ -502,6 +534,7 @@ export async function getArsipForDownload(
 export async function hapusArsipPermanen(arsipId: string): Promise<{ success: boolean } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'delete')
   if ('error' in access) return access
+  const session = await getSession()
 
   const arsip = await queryOne<Row>(`
     SELECT a.id, s.status_global
@@ -515,6 +548,17 @@ export async function hapusArsipPermanen(arsipId: string): Promise<{ success: bo
   }
 
   await query('DELETE FROM santri_arsip WHERE id = ?', [arsipId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri_arsip',
+    action: 'delete',
+    fiturHref: '/dashboard/santri/arsip',
+    logKind: 'delete',
+    entityType: 'santri_arsip',
+    entityId: arsipId,
+    entityLabel: arsipId,
+    summary: 'Menghapus arsip santri secara permanen',
+  })
   revalidatePath('/dashboard/santri/arsip')
   return { success: true }
 }
@@ -522,6 +566,7 @@ export async function hapusArsipPermanen(arsipId: string): Promise<{ success: bo
 export async function hapusArsipMassal(arsipIds: string[]): Promise<{ success: boolean; count: number } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'delete')
   if ('error' in access) return access
+  const session = await getSession()
   if (!arsipIds || arsipIds.length === 0) return { error: 'Pilih minimal 1 data' }
 
   const rows = await query<{ id: string; status_global: string | null }>(`
@@ -536,6 +581,18 @@ export async function hapusArsipMassal(arsipIds: string[]): Promise<{ success: b
   }
 
   await query(`DELETE FROM santri_arsip WHERE id IN (${inClause(arsipIds)})`, arsipIds)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri_arsip',
+    action: 'delete',
+    fiturHref: '/dashboard/santri/arsip',
+    logKind: 'delete',
+    entityType: 'santri_arsip_batch',
+    entityId: 'hapus-massal',
+    entityLabel: 'Hapus arsip santri',
+    summary: `Menghapus ${arsipIds.length} arsip santri`,
+    details: { count: arsipIds.length },
+  })
   revalidatePath('/dashboard/santri/arsip')
   return { success: true, count: arsipIds.length }
 }

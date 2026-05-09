@@ -3,6 +3,7 @@
 import { query, execute, generateId } from '@/lib/db'
 import { getCachedMapelList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getTahunAjaranList() {
@@ -91,6 +92,7 @@ export async function getLegerData(kelasId: string, semester: number) {
 }
 
 export async function hitungDanSimpanLeger(kelasId: string, semester: number) {
+  const session = await getSession()
   const { mapel, siswa } = await getLegerData(kelasId, semester)
   if (!siswa.length) return { error: 'Tidak ada siswa' }
 
@@ -118,6 +120,24 @@ export async function hitungDanSimpanLeger(kelasId: string, semester: number) {
         predikat = excluded.predikat
     `, [generateId(), item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, idx + 1, predikat])
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_leger',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/leger',
+    logKind: 'update',
+    entityType: 'ranking_batch',
+    entityId: `${kelasId}:${semester}`,
+    entityLabel: `Leger semester ${semester}`,
+    summary: `Menghitung dan menyimpan leger untuk ${kalkulasi.length} santri`,
+    details: {
+      kelas_id: kelasId,
+      semester,
+      total_santri: kalkulasi.length,
+      total_mapel: totalMapel,
+    },
+  })
 
   revalidatePath('/dashboard/akademik/leger')
   return { success: true }

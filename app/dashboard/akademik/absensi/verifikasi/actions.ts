@@ -2,6 +2,7 @@
 
 import { query, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, now } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
@@ -182,6 +183,32 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [v.id, v.santri_id, v.tanggal, v.jenis, v.deskripsi, v.poin, v.penindak_id])
   }
+
+  const alfaCount = daftarVonis.filter((item) => item.vonis === 'ALFA_MURNI').length
+  const sakitCount = daftarVonis.filter((item) => item.vonis === 'SAKIT').length
+  const izinCount = daftarVonis.filter((item) => item.vonis === 'IZIN').length
+  const resetCount = daftarVonis.filter((item) => item.vonis === 'KESALAHAN').length
+  const belumCount = daftarVonis.filter((item) => item.vonis === 'BELUM').length
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_absensi_verifikasi',
+    action: 'approval',
+    fiturHref: '/dashboard/akademik/absensi/verifikasi',
+    logKind: 'update',
+    entityType: 'verifikasi_absensi_batch',
+    entityId: 'verifikasi-massal',
+    entityLabel: 'Verifikasi absensi',
+    summary: `Memverifikasi absensi massal untuk ${daftarVonis.length} santri`,
+    details: {
+      total_santri: daftarVonis.length,
+      total_pelanggaran: violationsToInsert.length,
+      alfa_murni: alfaCount,
+      sakit: sakitCount,
+      izin: izinCount,
+      kesalahan: resetCount,
+      belum: belumCount,
+    },
+  })
 
   revalidatePath('/dashboard/akademik/absensi/verifikasi')
   revalidatePath('/dashboard/keamanan')

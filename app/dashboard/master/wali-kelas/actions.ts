@@ -2,6 +2,8 @@
 
 import { query, queryOne, batch, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCachedDataGuru, getCachedMarhalahList } from '@/lib/cache/master'
 import {
@@ -395,10 +397,22 @@ export async function getPembagianTugasMengajarData() {
 }
 
 export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   await execute(
     'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
     [nama, gelar, kode]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'create',
+    entityType: 'data_guru',
+    entityLabel: nama,
+    summary: `Menambahkan data guru ${nama}`,
+    details: { gelar, kode_guru: kode || null },
+  })
   revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
@@ -406,6 +420,12 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
 
 export async function hapusGuru(id: number): Promise<{ success: boolean } | { error: string }> {
   await ensureKelasCetakColumns()
+  const session = await getSession()
+  const guru = await queryOne<{ nama_lengkap: string | null; gelar: string | null; kode_guru: string | null }>(
+    'SELECT nama_lengkap, gelar, kode_guru FROM data_guru WHERE id = ?',
+    [id]
+  )
+  if (!guru) return { error: 'Guru tidak ditemukan.' }
   const used = await queryOne<{ id: string }>(
     `
       SELECT id
@@ -424,6 +444,18 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
   if (usedInWeeklyRule) return { error: 'Guru ini masih dipakai pada pembagian jadwal mingguan.' }
 
   await execute('DELETE FROM data_guru WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'delete',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'delete',
+    entityType: 'data_guru',
+    entityId: String(id),
+    entityLabel: guru.nama_lengkap || String(id),
+    summary: `Menghapus data guru ${guru.nama_lengkap || id}`,
+    details: { gelar: guru.gelar, kode_guru: guru.kode_guru },
+  })
   revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
@@ -431,6 +463,7 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
 
 export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean; count: number } | { error: string }> {
   await ensureKelasCetakColumns()
+  const session = await getSession()
   if (!ids.length) return { error: 'Tidak ada data.' }
   const placeholders = ids.map(() => '?').join(',')
   const usedCheck = await query<{ id: string }>(
@@ -446,12 +479,25 @@ export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean
   if (usedInWeeklyRule.length > 0) return { error: 'Beberapa guru masih dipakai pada pembagian jadwal mingguan.' }
 
   await execute(`DELETE FROM data_guru WHERE id IN (${placeholders})`, ids)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'delete',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'delete',
+    entityType: 'data_guru_batch',
+    entityId: 'hapus-massal',
+    entityLabel: 'Hapus guru massal',
+    summary: `Menghapus ${ids.length} data guru`,
+    details: { count: ids.length },
+  })
   revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: ids.length }
 }
 
 export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+  const session = await getSession()
   if (!dataExcel.length) return { error: 'Data kosong.' }
 
   const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
@@ -477,6 +523,19 @@ export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ su
     params: row,
   })))
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'create',
+    entityType: 'data_guru_batch',
+    entityId: 'import',
+    entityLabel: 'Import guru massal',
+    summary: `Import guru massal: ${toInsert.length} ditambahkan`,
+    details: { count: toInsert.length, skipped },
+  })
+
   revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: toInsert.length, skipped }
@@ -486,6 +545,7 @@ export async function simpanJadwalBatch(
   payload: SimpanJadwalPayload[]
 ): Promise<{ success: boolean; count: number } | { error: string }> {
   await ensureKelasCetakColumns()
+  const session = await getSession()
   if (!payload.length) return { error: 'Tidak ada data.' }
 
   const validation = await validateWeeklyGuruConflicts(payload)
@@ -526,12 +586,37 @@ export async function simpanJadwalBatch(
   revalidatePath('/dashboard/akademik/absensi-guru')
   revalidatePath('/dashboard/akademik/absensi-guru/rekap')
   revalidatePath('/dashboard/akademik/absensi/cetak-blanko')
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'update',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'update',
+    entityType: 'kelas_batch',
+    entityId: 'jadwal-batch',
+    entityLabel: 'Jadwal wali kelas',
+    summary: `Memperbarui jadwal mengajar ${payload.length} kelas`,
+    details: { count: payload.length },
+  })
   return { success: true, count: payload.length }
 }
 
 export async function setWaliKelas(kelasId: string, userId: string | null) {
   await ensureKelasCetakColumns()
+  const session = await getSession()
   await execute('UPDATE kelas SET wali_kelas_id = ? WHERE id = ?', [userId, kelasId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'update',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'update',
+    entityType: 'kelas',
+    entityId: kelasId,
+    entityLabel: kelasId,
+    summary: 'Memperbarui wali kelas',
+    details: { user_id: userId },
+  })
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -543,10 +628,27 @@ export async function setGuruKelas(
   guruMaghribId: string | null
 ) {
   await ensureKelasCetakColumns()
+  const session = await getSession()
   await execute(
     'UPDATE kelas SET guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
     [guruShubuhId, guruAsharId, guruMaghribId, kelasId]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'update',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'update',
+    entityType: 'kelas',
+    entityId: kelasId,
+    entityLabel: kelasId,
+    summary: 'Memperbarui guru kelas',
+    details: {
+      guru_shubuh_id: guruShubuhId,
+      guru_ashar_id: guruAsharId,
+      guru_maghrib_id: guruMaghribId,
+    },
+  })
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -566,6 +668,7 @@ export async function getUsersForWaliKelas() {
 }
 
 export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: boolean; email?: string } | { error: string }> {
+  const session = await getSession()
   const guru = await queryOne<{ id: number; nama_lengkap: string }>('SELECT id, nama_lengkap FROM data_guru WHERE id = ?', [guruId])
   if (!guru) return { error: 'Data guru tidak ditemukan.' }
 
@@ -578,6 +681,18 @@ export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: b
     "INSERT INTO users (id, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, 'wali_kelas')",
     [crypto.randomUUID(), email, hashed, guru.nama_lengkap]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'create',
+    entityType: 'user',
+    entityLabel: guru.nama_lengkap,
+    summary: `Membuat akun guru otomatis untuk ${guru.nama_lengkap}`,
+    details: { email, guru_id: guruId },
+  })
 
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, email }

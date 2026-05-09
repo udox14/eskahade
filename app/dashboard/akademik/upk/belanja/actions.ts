@@ -2,6 +2,7 @@
 
 import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const BELANJA_PATH = '/dashboard/akademik/upk/belanja'
@@ -193,6 +194,23 @@ export async function simpanRencanaBelanja(payload: {
         toInt(item.saranQty), qty, harga, qty * harga, now(), now()])
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'create',
+    fiturHref: '/dashboard/akademik/upk/belanja',
+    logKind: 'create',
+    entityType: 'upk_rencana_belanja',
+    entityId: id,
+    entityLabel: payload.nama.trim() || `Rencana ${today()}`,
+    summary: `Membuat rencana belanja UPK ${items.length} item`,
+    details: {
+      persen_target: persen,
+      total_item: items.length,
+      total_estimasi: items.reduce((sum, item) => sum + (Math.max(0, toInt(item.qtyRencana)) * Math.max(0, toInt(item.hargaBeli))), 0),
+    },
+  })
+
   revalidatePath(BELANJA_PATH)
   return { success: true }
 }
@@ -254,6 +272,26 @@ export async function simpanBelanja(payload: {
     `, [qty, harga, toko?.id ?? null, now(), now(), item.katalogId])
   }
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'create',
+    fiturHref: '/dashboard/akademik/upk/belanja',
+    logKind: 'create',
+    entityType: 'upk_belanja',
+    entityId: belanjaId,
+    entityLabel: toko?.nama ?? payload.tokoNama ?? `Belanja ${tanggal}`,
+    summary: `Mencatat belanja UPK ${items.length} item`,
+    details: {
+      tanggal,
+      jenis: payload.jenis,
+      toko: toko?.nama ?? payload.tokoNama ?? null,
+      total,
+      dibayar,
+      sisa_hutang: sisaHutang,
+    },
+  })
+
   revalidatePath(BELANJA_PATH)
   revalidatePath('/dashboard/akademik/upk/katalog')
   return { success: true }
@@ -280,6 +318,7 @@ export async function getHutangBelanja() {
 }
 
 export async function bayarHutangBelanja(id: string, nominal: number): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
   const row = await queryOne<{ id: string; total: number; dibayar: number; sisa_hutang: number }>('SELECT * FROM upk_belanja WHERE id = ?', [id])
   if (!row) return { error: 'Data belanja tidak ditemukan.' }
 
@@ -291,6 +330,24 @@ export async function bayarHutangBelanja(id: string, nominal: number): Promise<{
     'UPDATE upk_belanja SET dibayar = ?, sisa_hutang = ?, status_pembayaran = ?, updated_at = ? WHERE id = ?',
     [dibayarBaru, sisaBaru, statusPembayaran(row.total, dibayarBaru), now(), id]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'payment',
+    fiturHref: '/dashboard/akademik/upk/belanja',
+    logKind: 'update',
+    entityType: 'upk_belanja',
+    entityId: id,
+    entityLabel: 'Pembayaran hutang belanja',
+    summary: `Membayar hutang belanja UPK sebesar ${bayar}`,
+    details: {
+      nominal_bayar: bayar,
+      dibayar_sebelumnya: row.dibayar,
+      dibayar_setelah: dibayarBaru,
+      sisa_hutang: sisaBaru,
+    },
+  })
 
   revalidatePath(BELANJA_PATH)
   return { success: true }

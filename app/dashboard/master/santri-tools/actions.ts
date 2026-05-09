@@ -3,6 +3,7 @@
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 // ── Helper: ekstrak angka kelas dari string bebas ─────────────────────────
@@ -65,6 +66,7 @@ export async function previewNaikKelas(filter: {
 export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success: boolean; updated: number } | { error: string }> {
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
+  const session = await getSession()
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   // Ambil data kelas_sekolah santri yang dipilih
@@ -91,6 +93,19 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
     sql: `UPDATE santri SET kelas_sekolah = ?, updated_at = ? WHERE id = ?`,
     params: [u.kelas_baru, now, u.id],
   })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_santri_tools',
+    action: 'update',
+    fiturHref: '/dashboard/master/santri-tools',
+    logKind: 'update',
+    entityType: 'santri_batch',
+    entityId: 'naik-kelas',
+    entityLabel: 'Naik kelas massal',
+    summary: `Menaikkan kelas ${updates.length} santri`,
+    details: { updated: updates.length },
+  })
 
   revalidatePath('/dashboard/santri')
   revalidatePath('/dashboard/master/santri-tools')
@@ -154,6 +169,7 @@ export async function setBebas(
 ): Promise<{ success: boolean; updated: number } | { error: string }> {
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
+  const session = await getSession()
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   const now = new Date().toISOString()
@@ -161,6 +177,19 @@ export async function setBebas(
     sql: `UPDATE santri SET bebas_spp = ?, updated_at = ? WHERE id = ?`,
     params: [bebas ? 1 : 0, now, id],
   })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_santri_tools',
+    action: 'update',
+    fiturHref: '/dashboard/master/santri-tools',
+    logKind: 'update',
+    entityType: 'santri_batch',
+    entityId: bebas ? 'set-bebas' : 'cabut-bebas',
+    entityLabel: 'Bebas SPP massal',
+    summary: `${bebas ? 'Mengaktifkan' : 'Menonaktifkan'} bebas SPP untuk ${santriIds.length} santri`,
+    details: { updated: santriIds.length, bebas },
+  })
 
   revalidatePath('/dashboard/santri')
   revalidatePath('/dashboard/master/santri-tools')
@@ -191,6 +220,24 @@ export async function catatBebasPembayaran(
     [generateId(), santriId, jenisBiaya, tahun, session.id, keterangan || `Dibebaskan oleh ${session.email}`]
   )
 
+  const santri = await queryOne<{ nama_lengkap: string | null }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_santri_tools',
+    action: 'create',
+    fiturHref: '/dashboard/master/santri-tools',
+    logKind: 'create',
+    entityType: 'pembayaran_tahunan',
+    entityId: `${santriId}:${jenisBiaya}:${tahun}`,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Mencatat pembebasan ${jenisBiaya} untuk ${santri?.nama_lengkap || santriId}`,
+    details: {
+      jenis_biaya: jenisBiaya,
+      tahun,
+      keterangan: keterangan || `Dibebaskan oleh ${session.email}`,
+    },
+  })
+
   revalidatePath('/dashboard/master/santri-tools')
   return { success: true }
 }
@@ -203,11 +250,26 @@ export async function hapusBebasPembayaran(
 ): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
+  const session = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string | null }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
 
   await execute(
     `DELETE FROM pembayaran_tahunan WHERE santri_id = ? AND jenis_biaya = ? AND tahun_tagihan = ? AND nominal_bayar = 0`,
     [santriId, jenisBiaya, tahun]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_santri_tools',
+    action: 'delete',
+    fiturHref: '/dashboard/master/santri-tools',
+    logKind: 'delete',
+    entityType: 'pembayaran_tahunan',
+    entityId: `${santriId}:${jenisBiaya}:${tahun}`,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Menghapus pembebasan ${jenisBiaya} untuk ${santri?.nama_lengkap || santriId}`,
+    details: { jenis_biaya: jenisBiaya, tahun },
+  })
 
   revalidatePath('/dashboard/master/santri-tools')
   return { success: true }

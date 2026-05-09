@@ -1,7 +1,8 @@
 'use server'
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/pengaturan/perpulangan-periode'
@@ -50,15 +51,38 @@ export async function tambahPeriode(data: {
       session.id,
     ]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_perpulangan_periode',
+    action: 'create',
+    fiturHref: REVALIDATE,
+    logKind: 'create',
+    entityType: 'perpulangan_periode',
+    entityLabel: data.nama_periode.trim(),
+    summary: `Menambahkan periode perpulangan ${data.nama_periode.trim()}`,
+    details: data,
+  })
   revalidatePath(REVALIDATE)
   return { success: true }
 }
 
 // ─── Aktifkan periode (nonaktifkan semua yang lain dulu) ──────────────────────
 export async function aktifkanPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  await assertAllowed()
+  const session = await assertAllowed()
   await execute('UPDATE perpulangan_periode SET is_active = 0', [])
   await execute('UPDATE perpulangan_periode SET is_active = 1 WHERE id = ?', [id])
+  const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_perpulangan_periode',
+    action: 'update',
+    fiturHref: REVALIDATE,
+    logKind: 'update',
+    entityType: 'perpulangan_periode',
+    entityId: String(id),
+    entityLabel: periode?.nama_periode || String(id),
+    summary: `Mengaktifkan periode perpulangan ${periode?.nama_periode || id}`,
+  })
   revalidatePath(REVALIDATE)
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
@@ -66,8 +90,20 @@ export async function aktifkanPeriode(id: number): Promise<{ success: boolean } 
 
 // ─── Nonaktifkan periode ──────────────────────────────────────────────────────
 export async function nonaktifkanPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  await assertAllowed()
+  const session = await assertAllowed()
   await execute('UPDATE perpulangan_periode SET is_active = 0 WHERE id = ?', [id])
+  const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_perpulangan_periode',
+    action: 'update',
+    fiturHref: REVALIDATE,
+    logKind: 'update',
+    entityType: 'perpulangan_periode',
+    entityId: String(id),
+    entityLabel: periode?.nama_periode || String(id),
+    summary: `Menonaktifkan periode perpulangan ${periode?.nama_periode || id}`,
+  })
   revalidatePath(REVALIDATE)
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
@@ -92,6 +128,22 @@ export async function perpanjangTglDatang(
     'UPDATE perpulangan_periode SET tgl_selesai_datang = ? WHERE id = ?',
     [tglSelesaiBaru, id]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_perpulangan_periode',
+    action: 'update',
+    fiturHref: REVALIDATE,
+    logKind: 'update',
+    entityType: 'perpulangan_periode',
+    entityId: String(id),
+    entityLabel: String(id),
+    summary: 'Memperpanjang tanggal datang periode perpulangan',
+    details: {
+      tgl_mulai_datang: p.tgl_mulai_datang,
+      tgl_selesai_lama: p.tgl_selesai_datang,
+      tgl_selesai_baru: tglSelesaiBaru,
+    },
+  })
   revalidatePath(REVALIDATE)
   revalidatePath('/dashboard/asrama/perpulangan')
   return { success: true }
@@ -99,7 +151,8 @@ export async function perpanjangTglDatang(
 
 // ─── Hapus periode (hanya jika tidak ada log) ─────────────────────────────────
 export async function hapusPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  await assertAllowed()
+  const session = await assertAllowed()
+  const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
 
   const ada = await queryOne<{ n: number }>(
     'SELECT COUNT(*) AS n FROM perpulangan_log WHERE periode_id = ?',
@@ -109,6 +162,17 @@ export async function hapusPeriode(id: number): Promise<{ success: boolean } | {
     return { error: 'Tidak bisa dihapus: sudah ada data perpulangan santri di periode ini.' }
 
   await execute('DELETE FROM perpulangan_periode WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_perpulangan_periode',
+    action: 'delete',
+    fiturHref: REVALIDATE,
+    logKind: 'delete',
+    entityType: 'perpulangan_periode',
+    entityId: String(id),
+    entityLabel: periode?.nama_periode || String(id),
+    summary: `Menghapus periode perpulangan ${periode?.nama_periode || id}`,
+  })
   revalidatePath(REVALIDATE)
   return { success: true }
 }

@@ -3,6 +3,7 @@
 import { query, execute } from '@/lib/db'
 import { getCachedMapelAll } from '@/lib/cache/master'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function getKelasList() {
@@ -64,7 +65,7 @@ export async function getDataGrading(kelasId: string) {
       if (n.nilai !== null && n.nilai !== undefined) { totalNilai += Number(n.nilai); countNilai++ }
     })
     const rata = countNilai > 0 ? totalNilai / countNilai : 0
-    let rekomendasi = rata >= 70 ? 'Grade A' : rata >= 50 ? 'Grade B' : countNilai === 0 ? '-' : 'Grade C'
+    const rekomendasi = rata >= 70 ? 'Grade A' : rata >= 50 ? 'Grade B' : countNilai === 0 ? '-' : 'Grade C'
 
     return {
       riwayat_id: s.id,
@@ -79,6 +80,7 @@ export async function getDataGrading(kelasId: string) {
 }
 
 export async function simpanGradingBatch(payload: { riwayat_id: string; grade: string }[]) {
+  const session = await getSession()
   if (payload.length === 0) return { success: true }
 
   for (const item of payload) {
@@ -87,6 +89,22 @@ export async function simpanGradingBatch(payload: { riwayat_id: string; grade: s
       [item.grade, item.riwayat_id]
     )
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_grading',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/grading',
+    logKind: 'update',
+    entityType: 'grading_batch',
+    entityId: 'grading-batch',
+    entityLabel: 'Grading lanjutan',
+    summary: `Menyimpan grading lanjutan untuk ${payload.length} santri`,
+    details: {
+      total_santri: payload.length,
+      grades: Array.from(new Set(payload.map((item) => item.grade))).slice(0, 10),
+    },
+  })
 
   revalidatePath('/dashboard/akademik/grading')
   return { success: true, count: payload.length }
