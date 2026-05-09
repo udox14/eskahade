@@ -2,6 +2,7 @@
 
 import { batch, execute, generateId, query } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 type LayananFilterArgs = {
@@ -78,10 +79,25 @@ export async function tambahMasterJasa(nama_jasa: string, jenis: string) {
   const session = await getSession()
   if (!session) throw new Error('Unauthorized')
 
+  const jasaId = generateId()
   await execute(
     'INSERT INTO master_jasa (id, nama_jasa, jenis) VALUES (?, ?, ?)',
-    [generateId(), nama_jasa, jenis]
+    [jasaId, nama_jasa, jenis]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_layanan',
+    action: 'create',
+    fiturHref: '/dashboard/asrama/layanan',
+    logKind: 'create',
+    entityType: 'master_jasa',
+    entityId: jasaId,
+    entityLabel: nama_jasa,
+    summary: `Menambahkan master jasa ${nama_jasa}`,
+    details: {
+      jenis,
+    },
+  })
   revalidatePath('/dashboard/asrama/layanan')
   return { success: true }
 }
@@ -98,6 +114,21 @@ export async function tambahMasterJasaBatch(dataBatch: { nama_jasa: string; jeni
     }))
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_layanan',
+    action: 'create',
+    fiturHref: '/dashboard/asrama/layanan',
+    logKind: 'create',
+    entityType: 'master_jasa_batch',
+    entityId: 'batch',
+    entityLabel: 'Tambah master jasa batch',
+    summary: `Menambahkan ${dataBatch.length} master jasa secara batch`,
+    details: {
+      count: dataBatch.length,
+    },
+  })
+
   revalidatePath('/dashboard/asrama/layanan')
   return { success: true, count: dataBatch.length }
 }
@@ -106,7 +137,28 @@ export async function hapusMasterJasa(id: string) {
   const session = await getSession()
   if (!session) throw new Error('Unauthorized')
 
+  const jasa = await query<{ id: string; nama_jasa: string | null; jenis: string | null }>(
+    'SELECT id, nama_jasa, jenis FROM master_jasa WHERE id = ?',
+    [id]
+  )
+  const target = jasa[0]
   await execute('DELETE FROM master_jasa WHERE id = ?', [id])
+  if (target) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'asrama_layanan',
+      action: 'delete',
+      fiturHref: '/dashboard/asrama/layanan',
+      logKind: 'delete',
+      entityType: 'master_jasa',
+      entityId: target.id,
+      entityLabel: target.nama_jasa || target.id,
+      summary: `Menghapus master jasa ${target.nama_jasa || target.id}`,
+      details: {
+        jenis: target.jenis,
+      },
+    })
+  }
   revalidatePath('/dashboard/asrama/layanan')
 }
 
@@ -314,6 +366,21 @@ export async function simpanBatchLayanan(
       await execute(`UPDATE santri SET ${sets.join(', ')} WHERE id = ?`, params)
     }
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_layanan',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/layanan',
+    logKind: 'update',
+    entityType: 'santri_layanan_batch',
+    entityId: 'batch',
+    entityLabel: 'Pengaturan layanan santri',
+    summary: `Memperbarui penempatan layanan untuk ${entries.length} santri`,
+    details: {
+      count: entries.length,
+    },
+  })
 
   revalidatePath('/dashboard/asrama/layanan')
   return { success: true, count: entries.length }

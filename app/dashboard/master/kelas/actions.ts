@@ -1,6 +1,8 @@
 'use server'
 
 import { query, queryOne, batch, execute } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 
@@ -103,6 +105,7 @@ export async function getTempelanKelasSemuaData() {
 }
 
 export async function tambahKelas(formData: FormData) {
+  const session = await getSession()
   const namaKelas = formData.get('nama_kelas') as string
   const marhalahId = formData.get('marhalah_id') as string
   const jenisKelamin = formData.get('jenis_kelamin') as string
@@ -128,11 +131,41 @@ export async function tambahKelas(formData: FormData) {
     [crypto.randomUUID(), namaKelas, marhalahId, jenisKelamin, tempat || null, grade || null, baruLama || null, tahunAktif.id]
   )
 
+  const marhalah = await queryOne<{ nama: string | null }>('SELECT nama FROM marhalah WHERE id = ?', [marhalahId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/kelas',
+    logKind: 'create',
+    entityType: 'kelas',
+    entityLabel: namaKelas,
+    summary: `Menambahkan kelas ${namaKelas}`,
+    details: {
+      marhalah: marhalah?.nama || marhalahId,
+      jenis_kelamin: jenisKelamin,
+      tempat: tempat || null,
+      grade: grade || null,
+      baru_lama: baruLama || null,
+      tahun_ajaran_id: tahunAktif.id,
+    },
+  })
+
   revalidatePath('/dashboard/master/kelas')
   return { success: true }
 }
 
 export async function hapusKelas(kelasId: string) {
+  const session = await getSession()
+  const targetKelas = await queryOne<{
+    id: string
+    nama_kelas: string
+    jenis_kelamin: string | null
+    tempat: string | null
+    grade: string | null
+    baru_lama: string | null
+  }>('SELECT id, nama_kelas, jenis_kelamin, tempat, grade, baru_lama FROM kelas WHERE id = ?', [kelasId])
+  if (!targetKelas) return { error: 'Kelas tidak ditemukan.' }
   const rows = await query<{ count: number }>(
     'SELECT COUNT(*) as count FROM riwayat_pendidikan WHERE kelas_id = ? AND status_riwayat = ?',
     [kelasId, 'aktif']
@@ -141,12 +174,30 @@ export async function hapusKelas(kelasId: string) {
   if (count > 0) return { error: 'Gagal hapus: Masih ada santri aktif di kelas ini. Kosongkan dulu.' }
 
   await query('DELETE FROM kelas WHERE id = ?', [kelasId])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kelas',
+    action: 'delete',
+    fiturHref: '/dashboard/master/kelas',
+    logKind: 'delete',
+    entityType: 'kelas',
+    entityId: targetKelas.id,
+    entityLabel: targetKelas.nama_kelas,
+    summary: `Menghapus kelas ${targetKelas.nama_kelas}`,
+    details: {
+      jenis_kelamin: targetKelas.jenis_kelamin,
+      tempat: targetKelas.tempat,
+      grade: targetKelas.grade,
+      baru_lama: targetKelas.baru_lama,
+    },
+  })
 
   revalidatePath('/dashboard/master/kelas')
   return { success: true }
 }
 
 export async function importKelasMassal(dataExcel: any[]) {
+  const session = await getSession()
   await ensureKelasExtraColumns()
   const tahunAktif = await queryOne<{ id: string }>(
     'SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1'
@@ -206,6 +257,24 @@ export async function importKelasMassal(dataExcel: any[]) {
     sql: 'INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, baru_lama, tahun_ajaran_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     params: row,
   })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/kelas',
+    logKind: 'create',
+    entityType: 'kelas_batch',
+    entityId: 'import',
+    entityLabel: 'Import kelas massal',
+    summary: `Import kelas massal: ${inserts.length} kelas ditambahkan`,
+    details: {
+      inserted: inserts.length,
+      skipped: duplicates,
+      failed: errors.length,
+      tahun_ajaran_id: tahunAktif.id,
+    },
+  })
 
   revalidatePath('/dashboard/master/kelas')
   return { success: true, count: inserts.length, skipped: duplicates }

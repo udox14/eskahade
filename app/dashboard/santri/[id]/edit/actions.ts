@@ -2,6 +2,8 @@
 
 import { query, queryOne } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -13,11 +15,48 @@ export async function getSantriById(id: string) {
 export async function updateSantri(id: string, formData: FormData) {
   const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
+  const session = await getSession()
+
+  const beforeSantri = await queryOne<Record<string, unknown>>(
+    `SELECT id, nis, nama_lengkap, nik, tempat_lahir, tanggal_lahir, jenis_kelamin,
+            nama_ayah, nama_ibu, alamat, gol_darah, alamat_lengkap, kecamatan, kab_kota,
+            provinsi, jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar, kategori_santri,
+            sekolah, kelas_sekolah, asrama, kamar
+     FROM santri
+     WHERE id = ?`,
+    [id]
+  )
+  if (!beforeSantri) return { error: 'Santri tidak ditemukan.' }
 
   const now = new Date().toISOString()
   const kategoriSantri = String(formData.get('kategori_santri') ?? '').trim().toUpperCase() === 'SADESA' ? 'SADESA' : 'REGULER'
   const sekolah = kategoriSantri === 'SADESA' ? null : formData.get('sekolah') || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : formData.get('kelas_sekolah') || null
+  const afterSantri = {
+    nis: formData.get('nis'),
+    nama_lengkap: formData.get('nama_lengkap'),
+    nik: formData.get('nik') || null,
+    tempat_lahir: formData.get('tempat_lahir') || null,
+    tanggal_lahir: formData.get('tanggal_lahir') || null,
+    jenis_kelamin: formData.get('jenis_kelamin'),
+    nama_ayah: formData.get('nama_ayah') || null,
+    nama_ibu: formData.get('nama_ibu') || null,
+    alamat: formData.get('alamat') || null,
+    gol_darah: formData.get('gol_darah') || null,
+    alamat_lengkap: formData.get('alamat_lengkap') || null,
+    kecamatan: formData.get('kecamatan') || null,
+    kab_kota: formData.get('kab_kota') || null,
+    provinsi: formData.get('provinsi') || null,
+    jemaah: formData.get('jemaah') || null,
+    no_wa_ortu: formData.get('no_wa_ortu') || null,
+    tanggal_masuk: formData.get('tanggal_masuk') || null,
+    tanggal_keluar: formData.get('tanggal_keluar') || null,
+    kategori_santri: kategoriSantri,
+    sekolah,
+    kelas_sekolah: kelasSekolah,
+    asrama: formData.get('asrama') || null,
+    kamar: formData.get('kamar') || null,
+  }
 
   await query(
     `UPDATE santri SET
@@ -47,6 +86,45 @@ export async function updateSantri(id: string, formData: FormData) {
       now, id
     ]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'update',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: id,
+    entityLabel: String(beforeSantri.nama_lengkap || afterSantri.nama_lengkap || id),
+    summary: `Memperbarui data santri ${String(beforeSantri.nama_lengkap || afterSantri.nama_lengkap || id)}`,
+    details: {
+      changed_fields: diffWhitelistedFields(beforeSantri, afterSantri, [
+        'nis',
+        'nama_lengkap',
+        'nik',
+        'tempat_lahir',
+        'tanggal_lahir',
+        'jenis_kelamin',
+        'nama_ayah',
+        'nama_ibu',
+        'alamat',
+        'gol_darah',
+        'alamat_lengkap',
+        'kecamatan',
+        'kab_kota',
+        'provinsi',
+        'jemaah',
+        'no_wa_ortu',
+        'tanggal_masuk',
+        'tanggal_keluar',
+        'kategori_santri',
+        'sekolah',
+        'kelas_sekolah',
+        'asrama',
+        'kamar',
+      ]),
+    },
+  })
 
   revalidatePath('/dashboard/santri')
   revalidatePath(`/dashboard/santri/${id}`)

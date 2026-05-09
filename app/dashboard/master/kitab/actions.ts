@@ -1,6 +1,8 @@
 'use server'
 
 import { query, queryOne, batch } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedMapelAll, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 
@@ -39,31 +41,86 @@ export async function getKitabList(marhalahId?: string, tahunAjaranId?: number) 
 }
 
 export async function tambahKitab(formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
   const nama = formData.get('nama_kitab') as string
   const marhalah = formData.get('marhalah_id') as string
   const mapel = formData.get('mapel_id') as string
   const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
+  const marhalahRow = await queryOne<{ nama: string }>('SELECT nama FROM marhalah WHERE id = ?', [marhalah])
+  const mapelRow = await queryOne<{ nama: string }>('SELECT nama FROM mapel WHERE id = ?', [mapel])
+
   await query(
     'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, tahun_ajaran_id) VALUES (?, ?, ?, ?)',
     [nama, marhalah, mapel, aktif.id]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kitab',
+    action: 'create',
+    fiturHref: '/dashboard/master/kitab',
+    logKind: 'create',
+    entityType: 'kitab',
+    entityLabel: nama,
+    summary: `Menambahkan kitab ${nama}`,
+    details: {
+      marhalah: marhalahRow?.nama || marhalah,
+      mapel: mapelRow?.nama || mapel,
+      tahun_ajaran: aktif.nama,
+    },
+  })
 
   revalidatePath('/dashboard/master/kitab')
   return { success: true }
 }
 
 export async function hapusKitab(id: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const targetKitab = await queryOne<{
+    id: number
+    nama_kitab: string
+    marhalah_nama: string | null
+    mapel_nama: string | null
+    tahun_ajaran_nama: string | null
+  }>(
+    `SELECT k.id, k.nama_kitab, m.nama AS marhalah_nama, mp.nama AS mapel_nama, ta.nama AS tahun_ajaran_nama
+     FROM kitab k
+     LEFT JOIN marhalah m ON m.id = k.marhalah_id
+     LEFT JOIN mapel mp ON mp.id = k.mapel_id
+     LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
+     WHERE k.id = ?`,
+    [id]
+  )
+  if (!targetKitab) return { error: 'Kitab tidak ditemukan.' }
+
   const used = await queryOne<any>('SELECT id FROM upk_item WHERE kitab_id = ? LIMIT 1', [id])
   if (used) return { error: 'Kitab ini sudah pernah digunakan di transaksi UPK dan tidak bisa dihapus.' }
 
   await query('DELETE FROM kitab WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kitab',
+    action: 'delete',
+    fiturHref: '/dashboard/master/kitab',
+    logKind: 'delete',
+    entityType: 'kitab',
+    entityId: String(targetKitab.id),
+    entityLabel: targetKitab.nama_kitab,
+    summary: `Menghapus kitab ${targetKitab.nama_kitab}`,
+    details: {
+      marhalah: targetKitab.marhalah_nama,
+      mapel: targetKitab.mapel_nama,
+      tahun_ajaran: targetKitab.tahun_ajaran_nama,
+    },
+  })
   revalidatePath('/dashboard/master/kitab')
   return { success: true }
 }
 
 export async function importKitabMassal(dataExcel: any[]): Promise<{ success: boolean; inserted: number; updated: number; failed: number } | { error: string }> {
+  const session = await getSession()
   const aktif = await getCachedTahunAjaranAktif()
   if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
 
@@ -121,6 +178,24 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
 
   const allStatements = [...toInsert, ...toUpdate]
   await batch(allStatements)
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kitab',
+    action: 'update',
+    fiturHref: '/dashboard/master/kitab',
+    logKind: 'update',
+    entityType: 'kitab_batch',
+    entityId: 'import',
+    entityLabel: 'Import kitab massal',
+    summary: `Import kitab massal: ${toInsert.length} tambah, ${toUpdate.length} update`,
+    details: {
+      inserted: toInsert.length,
+      updated: toUpdate.length,
+      failed: failCount,
+      tahun_ajaran: aktif.nama,
+    },
+  })
 
   revalidatePath('/dashboard/master/kitab')
   return { success: true, inserted: toInsert.length, updated: toUpdate.length, failed: failCount }

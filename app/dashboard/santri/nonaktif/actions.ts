@@ -3,6 +3,7 @@
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 30
@@ -188,6 +189,24 @@ export async function nonaktifkanSantri(params: {
   ]
 
   await batch(statements)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'update',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri_nonaktif_batch',
+    entityId: 'nonaktifkan',
+    entityLabel: 'Nonaktifkan santri',
+    summary: `Menonaktifkan sementara ${activeIds.length} santri`,
+    details: {
+      count: activeIds.length,
+      tanggal_mulai: params.tanggalMulai,
+      tanggal_rencana_aktif: params.tanggalRencanaAktif || null,
+      alasan: params.alasan.trim(),
+      catatan: params.catatan?.trim() || null,
+    },
+  })
   revalidatePath('/dashboard/santri/nonaktif')
   revalidatePath('/dashboard/santri')
   return { success: true, count: activeIds.length }
@@ -229,6 +248,22 @@ export async function aktifkanKembaliSantri(params: {
       params: [params.tanggalAktif, session.id, now(), id],
     })),
   ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'update',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri_nonaktif_batch',
+    entityId: 'aktifkan-kembali',
+    entityLabel: 'Aktifkan kembali santri',
+    summary: `Mengaktifkan kembali ${validIds.length} santri`,
+    details: {
+      count: validIds.length,
+      tanggal_aktif: params.tanggalAktif,
+    },
+  })
 
   revalidatePath('/dashboard/santri/nonaktif')
   revalidatePath('/dashboard/santri')

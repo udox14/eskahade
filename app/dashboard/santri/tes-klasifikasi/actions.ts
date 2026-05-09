@@ -111,24 +111,35 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
   const hafalan     = Number(formData.get('hafalan_juz') || 0)
   const nahwu       = formData.get('nahwu_pengalaman') === 'on'
 
-  // Algoritma penentuan marhalah
+  // Algoritma penentuan marhalah:
+  // prioritas utama adalah kemampuan membaca, lalu tajwid, lalu menulis.
   let rekomendasi = 'Ibtidaiyyah 1'
-  let grade = 'Grade B/C'
+  let grade = 'Grade C'
 
-  if (tulis === 'TIDAK_BISA' && kelancaran === 'TIDAK_BISA') {
-    rekomendasi = 'Tamhidiyyah 1'; grade = '-'
-  } else if (
-    (tulis === 'BAIK' || tulis === 'KURANG') &&
-    kelancaran === 'TIDAK_LANCAR' &&
-    (tajwid === 'KURANG' || tajwid === 'BURUK')
-  ) {
-    rekomendasi = 'Tamhidiyyah 2'; grade = 'Grade A/B'
-  } else if (
-    (tulis === 'BAIK' || tulis === 'KURANG') &&
-    kelancaran === 'LANCAR' &&
-    tajwid === 'BAIK'
-  ) {
-    rekomendasi = 'Ibtidaiyyah 1'; grade = 'Grade A'
+  if (kelancaran === 'TIDAK_BISA') {
+    rekomendasi = 'Tamhidiyyah 1'
+    grade = '-'
+  } else if (kelancaran === 'TIDAK_LANCAR') {
+    if (tajwid === 'BURUK') {
+      rekomendasi = 'Tamhidiyyah 2'
+      grade = 'Grade B'
+    } else if (tajwid === 'KURANG') {
+      rekomendasi = 'Tamhidiyyah 2'
+      grade = 'Grade A'
+    } else if (tajwid === 'BAIK') {
+      rekomendasi = 'Ibtidaiyyah 1'
+      grade = tulis === 'BAIK' ? 'Grade B' : 'Grade C'
+    }
+  } else if (kelancaran === 'LANCAR') {
+    rekomendasi = 'Ibtidaiyyah 1'
+
+    if (tajwid === 'BURUK') {
+      grade = 'Grade C'
+    } else if (tajwid === 'KURANG') {
+      grade = tulis === 'BAIK' ? 'Grade B' : 'Grade C'
+    } else if (tajwid === 'BAIK') {
+      grade = tulis === 'BAIK' ? 'Grade A' : 'Grade B'
+    }
   }
 
   if (nahwu) grade += ' (REKOMENDASI TES NAHWU LANJUTAN)'

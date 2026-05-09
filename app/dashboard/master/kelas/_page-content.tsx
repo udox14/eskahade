@@ -193,24 +193,26 @@ export default function MasterKelasPage() {
             <div className="bg-slate-50 px-6 py-3 border-b text-xs font-bold text-slate-500 uppercase flex justify-between items-center">
                <span>Daftar Kelas Tersedia</span><span className="bg-white border px-2 py-0.5 rounded text-slate-600">{kelasList.length} Rombel</span>
             </div>
-            <table className="w-full text-sm text-left">
-              <thead className="bg-white text-slate-600 font-bold border-b">
-                <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">B/L</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {kelasList?.map((k) => (
-                  <tr key={k.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
-                    <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
-                    <td className="px-6 py-3 text-slate-500">{k.tempat || '-'}</td>
-                    <td className="px-6 py-3 text-slate-500 font-semibold">{k.grade || '-'}</td>
-                    <td className="px-6 py-3 text-slate-500 font-semibold">{k.baru_lama || '-'}</td>
-                    <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
-                    <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="min-w-[760px] w-full text-sm text-left">
+                <thead className="bg-white text-slate-600 font-bold border-b">
+                  <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">B/L</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {kelasList?.map((k) => (
+                    <tr key={k.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
+                      <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
+                      <td className="px-6 py-3 text-slate-500">{k.tempat || '-'}</td>
+                      <td className="px-6 py-3 text-slate-500 font-semibold">{k.grade || '-'}</td>
+                      <td className="px-6 py-3 text-slate-500 font-semibold">{k.baru_lama || '-'}</td>
+                      <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
+                      <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -238,7 +240,7 @@ export default function MasterKelasPage() {
                         </button>
                     </div>
                     <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">Tempat</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">B/L</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['TEMPAT'] || row['tempat'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['GRADE'] || row['grade'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '-'}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
+                        <table className="min-w-[720px] w-full text-sm text-left"><thead className="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th className="px-4 py-2">Nama Kelas</th><th className="px-4 py-2">Marhalah</th><th className="px-4 py-2">Tempat</th><th className="px-4 py-2">Grade</th><th className="px-4 py-2">B/L</th><th className="px-4 py-2">L/P</th></tr></thead><tbody className="divide-y">{excelData.map((row, i) => (<tr key={i}><td className="px-4 py-2">{row['NAMA KELAS'] || row['nama kelas']}</td><td className="px-4 py-2">{row['MARHALAH'] || row['marhalah']}</td><td className="px-4 py-2">{row['TEMPAT'] || row['tempat'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['GRADE'] || row['grade'] || '-'}</td><td className="px-4 py-2 font-semibold">{row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '-'}</td><td className="px-4 py-2">{row['JENIS KELAMIN'] || row['jenis kelamin']}</td></tr>))}</tbody></table>
                     </div>
                 </div>
             )}

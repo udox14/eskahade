@@ -3,6 +3,7 @@
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
+import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 
@@ -23,10 +24,26 @@ export async function tambahMasterPelanggaran(data: {
 }): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan')
   if ('error' in access) return access
+  const session = await getSession()
   await execute(
     'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi) VALUES (?, ?, ?, ?)',
     [data.kategori, data.nama, data.poin, data.deskripsi || null]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'create',
+    entityType: 'master_pelanggaran',
+    entityLabel: data.nama,
+    summary: `Menambahkan master pelanggaran ${data.nama}`,
+    details: {
+      kategori: data.kategori,
+      poin: data.poin,
+      deskripsi: data.deskripsi || null,
+    },
+  })
   revalidateTag('master-pelanggaran', 'everything')
   revalidatePath('/dashboard/keamanan')
   return { success: true }
@@ -37,10 +54,39 @@ export async function editMasterPelanggaran(id: number, data: {
 }): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan')
   if ('error' in access) return access
+  const session = await getSession()
+  const beforeMaster = await queryOne<Record<string, unknown>>(
+    'SELECT id, kategori, nama_pelanggaran, poin, deskripsi FROM master_pelanggaran WHERE id = ?',
+    [id]
+  )
+  if (!beforeMaster) return { error: 'Master pelanggaran tidak ditemukan.' }
   await execute(
     'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=? WHERE id=?',
     [data.kategori, data.nama, data.poin, data.deskripsi || null, id]
   )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'update',
+    entityType: 'master_pelanggaran',
+    entityId: String(id),
+    entityLabel: String(beforeMaster.nama_pelanggaran || data.nama),
+    summary: `Memperbarui master pelanggaran ${String(beforeMaster.nama_pelanggaran || data.nama)}`,
+    details: {
+      changed_fields: diffWhitelistedFields(
+        beforeMaster,
+        {
+          kategori: data.kategori,
+          nama_pelanggaran: data.nama,
+          poin: data.poin,
+          deskripsi: data.deskripsi || null,
+        },
+        ['kategori', 'nama_pelanggaran', 'poin', 'deskripsi']
+      ),
+    },
+  })
   revalidateTag('master-pelanggaran', 'everything')
   revalidatePath('/dashboard/keamanan')
   return { success: true }
@@ -49,9 +95,34 @@ export async function editMasterPelanggaran(id: number, data: {
 export async function hapusMasterPelanggaran(id: number): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan')
   if ('error' in access) return access
+  const session = await getSession()
+  const targetMaster = await queryOne<{
+    id: number
+    kategori: string | null
+    nama_pelanggaran: string | null
+    poin: number | null
+    deskripsi: string | null
+  }>('SELECT id, kategori, nama_pelanggaran, poin, deskripsi FROM master_pelanggaran WHERE id = ?', [id])
+  if (!targetMaster) return { error: 'Master pelanggaran tidak ditemukan.' }
   const used = await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM pelanggaran WHERE master_id=?', [id])
   if (used && used.n > 0) return { error: 'Tidak bisa dihapus — sudah dipakai di data pelanggaran' }
   await execute('DELETE FROM master_pelanggaran WHERE id=?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan',
+    action: 'delete',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'delete',
+    entityType: 'master_pelanggaran',
+    entityId: String(targetMaster.id),
+    entityLabel: targetMaster.nama_pelanggaran || String(targetMaster.id),
+    summary: `Menghapus master pelanggaran ${targetMaster.nama_pelanggaran || targetMaster.id}`,
+    details: {
+      kategori: targetMaster.kategori,
+      poin: targetMaster.poin,
+      deskripsi: targetMaster.deskripsi,
+    },
+  })
   revalidateTag('master-pelanggaran', 'everything')
   return { success: true }
 }
@@ -97,6 +168,28 @@ export async function simpanPelanggaran(data: {
      deskripsi, data.tanggal, master.poin, data.fotoUrl || null, session.id]
   )
 
+  const actorSession = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [data.santriId]
+  )
+  await logActivity({
+    actor: actorFromSession(actorSession),
+    module: 'keamanan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'create',
+    entityType: 'pelanggaran',
+    entityLabel: santri?.nama_lengkap || santri?.nis || data.santriId,
+    summary: `Mencatat pelanggaran untuk ${santri?.nama_lengkap || santri?.nis || data.santriId}`,
+    details: {
+      jenis: master.kategori,
+      nama_pelanggaran: master.nama_pelanggaran,
+      poin: master.poin,
+      tanggal: data.tanggal,
+    },
+  })
+
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
@@ -104,6 +197,21 @@ export async function simpanPelanggaran(data: {
 export async function hapusPelanggaran(id: string): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan')
   if ('error' in access) return access
+  const session = await getSession()
+  const target = await queryOne<{
+    id: string
+    deskripsi: string | null
+    jenis: string | null
+    poin: number | null
+    nama_lengkap: string | null
+  }>(
+    `SELECT p.id, p.deskripsi, p.jenis, p.poin, s.nama_lengkap
+     FROM pelanggaran p
+     LEFT JOIN santri s ON s.id = p.santri_id
+     WHERE p.id = ?`,
+    [id]
+  )
+  if (!target) return { error: 'Data pelanggaran tidak ditemukan.' }
 
   // Cascade: hapus surat_pernyataan yang mencantumkan pelanggaran ini
   // pelanggaran_ids disimpan sebagai JSON array — cari yang mengandung ID ini
@@ -126,6 +234,22 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
   }
 
   await execute('DELETE FROM pelanggaran WHERE id=?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan',
+    action: 'delete',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'delete',
+    entityType: 'pelanggaran',
+    entityId: id,
+    entityLabel: target.nama_lengkap || id,
+    summary: `Menghapus pelanggaran milik ${target.nama_lengkap || id}`,
+    details: {
+      deskripsi: target.deskripsi,
+      jenis: target.jenis,
+      poin: target.poin,
+    },
+  })
   revalidatePath('/dashboard/keamanan')
   revalidatePath('/dashboard/surat-santri')
   return { success: true }
@@ -238,6 +362,26 @@ export async function simpanSuratPernyataan(
      VALUES (?, ?, ?, ?, ?, ?)`,
     [id, santriId, JSON.stringify(pelanggaranIds), tanggal, session.id, now()]
   )
+  const actorSession = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string | null }>(
+    'SELECT nama_lengkap FROM santri WHERE id = ?',
+    [santriId]
+  )
+  await logActivity({
+    actor: actorFromSession(actorSession),
+    module: 'keamanan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'create',
+    entityType: 'surat_pernyataan',
+    entityId: id,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Membuat surat pernyataan untuk ${santri?.nama_lengkap || santriId}`,
+    details: {
+      tanggal,
+      jumlah_pelanggaran: pelanggaranIds.length,
+    },
+  })
   revalidatePath('/dashboard/keamanan')
   return { success: true, id }
 }
@@ -258,6 +402,27 @@ export async function simpanSuratPerjanjian(
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, santriId, level, tanggal, catatan || null, session.id, now()]
   )
+  const actorSession = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string | null }>(
+    'SELECT nama_lengkap FROM santri WHERE id = ?',
+    [santriId]
+  )
+  await logActivity({
+    actor: actorFromSession(actorSession),
+    module: 'keamanan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'create',
+    entityType: 'surat_perjanjian',
+    entityId: id,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Membuat surat perjanjian ${level} untuk ${santri?.nama_lengkap || santriId}`,
+    details: {
+      level,
+      tanggal,
+      catatan: catatan || null,
+    },
+  })
   revalidatePath('/dashboard/keamanan')
   return { success: true, id }
 }

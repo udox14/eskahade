@@ -3,6 +3,7 @@
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 30
@@ -266,10 +267,30 @@ export async function tetapkanKeluar(params: {
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  return tetapkanKeluarInternal({
+  const result = await tetapkanKeluarInternal({
     ...params,
     actorId: session.id,
   })
+  if ('error' in result) return result
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'update',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: params.santriId,
+    entityLabel: result.santriNama || params.santriId,
+    summary: `Menetapkan status keluar untuk ${result.santriNama || params.santriId}`,
+    details: {
+      tanggal_keluar: params.tanggalKeluar,
+      alasan_keluar: params.alasanKeluar,
+      buat_surat: params.buatSurat,
+    },
+  })
+
+  return result
 }
 
 export async function setujuiPengajuanKeluar(params: {
@@ -312,6 +333,24 @@ export async function setujuiPengajuanKeluar(params: {
     [session.id, now(), 'Disetujui dari tab pengajuan asrama', now(), params.pengajuanId]
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'approval',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: pengajuan.santri_id,
+    entityLabel: result.santriNama || pengajuan.santri_id,
+    summary: `Menyetujui pengajuan keluar untuk ${result.santriNama || pengajuan.santri_id}`,
+    details: {
+      pengajuan_id: params.pengajuanId,
+      tanggal_keluar: params.tanggalKeluar,
+      alasan_keluar: params.alasanKeluar,
+      buat_surat: params.buatSurat,
+    },
+  })
+
   revalidatePath('/dashboard/santri/keluar')
   revalidatePath('/dashboard/asrama/kamar')
   return result
@@ -327,8 +366,8 @@ export async function tolakPengajuanKeluar(params: {
   if (!session) return { error: 'Tidak terautentikasi' }
   await ensureKeluarTandaiSchema()
 
-  const pengajuan = await queryOne<{ id: string }>(
-    `SELECT id
+  const pengajuan = await queryOne<{ id: string; santri_id: string }>(
+    `SELECT id, santri_id
      FROM santri_keluar_tandai
      WHERE id = ? AND status = 'pending'`,
     [params.pengajuanId]
@@ -346,6 +385,23 @@ export async function tolakPengajuanKeluar(params: {
     [session.id, now(), String(params.keputusanCatatan ?? '').trim() || null, now(), params.pengajuanId]
   )
 
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'approval',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri_keluar_pengajuan',
+    entityId: params.pengajuanId,
+    entityLabel: params.pengajuanId,
+    summary: 'Menolak pengajuan keluar santri',
+    details: {
+      pengajuan_id: params.pengajuanId,
+      santri_id: pengajuan.santri_id,
+      keputusan_catatan: String(params.keputusanCatatan ?? '').trim() || null,
+    },
+  })
+
   revalidatePath('/dashboard/santri/keluar')
   revalidatePath('/dashboard/asrama/kamar')
   return { success: true }
@@ -359,8 +415,8 @@ export async function aktifkanKembali(
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  const santri = await queryOne<{ status_global: string }>(
-    'SELECT status_global FROM santri WHERE id = ?',
+  const santri = await queryOne<{ status_global: string; nama_lengkap: string | null }>(
+    'SELECT status_global, nama_lengkap FROM santri WHERE id = ?',
     [santriId]
   )
   if (!santri) return { error: 'Santri tidak ditemukan' }
@@ -374,6 +430,22 @@ export async function aktifkanKembali(
      WHERE id = ?`,
     [santriId]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'update',
+    fiturHref: '/dashboard/santri',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: santriId,
+    entityLabel: santri.nama_lengkap || santriId,
+    summary: `Mengaktifkan kembali santri keluar ${santri.nama_lengkap || santriId}`,
+    details: {
+      from_status: 'keluar',
+      to_status: 'aktif',
+    },
+  })
 
   revalidatePath('/dashboard/santri/keluar')
   revalidatePath('/dashboard/santri')
@@ -426,6 +498,25 @@ export async function catatSuratBerhenti(
      VALUES (?, ?, 'BERHENTI', ?, ?, ?)`,
     [generateId(), santriId, keterangan, session.id, now()]
   )
+  const santri = await queryOne<{ nama_lengkap: string | null }>(
+    'SELECT nama_lengkap FROM santri WHERE id = ?',
+    [santriId]
+  )
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'create',
+    fiturHref: '/dashboard/santri',
+    logKind: 'create',
+    entityType: 'riwayat_surat',
+    entityId: santriId,
+    entityLabel: santri?.nama_lengkap || santriId,
+    summary: `Mencatat surat berhenti untuk ${santri?.nama_lengkap || santriId}`,
+    details: {
+      jenis_surat: 'BERHENTI',
+      keterangan,
+    },
+  })
   revalidatePath('/dashboard/dewan-santri/surat')
   return { success: true }
 }

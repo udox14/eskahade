@@ -2,6 +2,8 @@
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
@@ -116,6 +118,7 @@ export async function getAlasanIzinList() {
 export async function simpanAlasanIzinList(items: string[]) {
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
+  const session = await getSession()
 
   const normalized = normalizeAlasanList(items)
   if (normalized.length === 0) return { error: 'Minimal harus ada 1 alasan izin.' }
@@ -127,6 +130,21 @@ export async function simpanAlasanIzinList(items: string[]) {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     [ALASAN_IZIN_KEY, JSON.stringify(normalized)]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'update',
+    entityType: 'app_setting',
+    entityId: ALASAN_IZIN_KEY,
+    entityLabel: 'Alasan izin',
+    summary: 'Memperbarui daftar alasan izin',
+    details: {
+      total_alasan: normalized.length,
+    },
+  })
 
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true, rows: normalized }
@@ -304,6 +322,15 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 export async function updateIzin(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
+  const session = await getSession()
+  const beforeIzin = await queryOne<Record<string, unknown>>(
+    `SELECT p.id, p.jenis, p.tgl_mulai, p.tgl_selesai_rencana, p.alasan, p.pemberi_izin, s.nama_lengkap
+     FROM perizinan p
+     LEFT JOIN santri s ON s.id = p.santri_id
+     WHERE p.id = ?`,
+    [id]
+  )
+  if (!beforeIzin) return { error: 'Data izin tidak ditemukan.' }
 
   const payload = buildIzinPayload(formData)
   if ('error' in payload) return payload
@@ -315,6 +342,25 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
     SET jenis = ?, tgl_mulai = ?, tgl_selesai_rencana = ?, alasan = ?, pemberi_izin = ?
     WHERE id = ? AND status = 'AKTIF'
   `, [jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'update',
+    entityType: 'perizinan',
+    entityId: id,
+    entityLabel: String(beforeIzin.nama_lengkap || id),
+    summary: `Memperbarui izin untuk ${String(beforeIzin.nama_lengkap || id)}`,
+    details: {
+      changed_fields: diffWhitelistedFields(
+        beforeIzin,
+        { jenis, tgl_mulai, tgl_selesai_rencana, alasan: alasan_final, pemberi_izin },
+        ['jenis', 'tgl_mulai', 'tgl_selesai_rencana', 'alasan', 'pemberi_izin']
+      ),
+    },
+  })
 
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
@@ -333,11 +379,36 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   if ('error' in payload) return payload
 
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const izinId = generateId()
+  const actorSession = await getSession()
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [santri_id]
+  )
 
   await execute(`
     INSERT INTO perizinan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'AKTIF', ?)
-  `, [generateId(), santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
+  `, [izinId, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
+
+  await logActivity({
+    actor: actorFromSession(actorSession),
+    module: 'keamanan_perizinan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'create',
+    entityType: 'perizinan',
+    entityId: izinId,
+    entityLabel: santri?.nama_lengkap || santri?.nis || santri_id,
+    summary: `Mencatat izin untuk ${santri?.nama_lengkap || santri?.nis || santri_id}`,
+    details: {
+      jenis,
+      alasan: alasan_final,
+      pemberi_izin,
+      tgl_mulai,
+      tgl_selesai_rencana,
+    },
+  })
 
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
@@ -346,9 +417,14 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
 export async function setSudahDatang(id: string, waktuDatang: string): Promise<{ success: boolean; message: string } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
+  const session = await getSession()
 
-  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string }>(
-    'SELECT jenis, tgl_selesai_rencana FROM perizinan WHERE id = ?', [id]
+  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string; santri_nama: string | null }>(
+    `SELECT p.jenis, p.tgl_selesai_rencana, s.nama_lengkap AS santri_nama
+     FROM perizinan p
+     LEFT JOIN santri s ON s.id = p.santri_id
+     WHERE p.id = ?`,
+    [id]
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
 
@@ -365,6 +441,23 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
     'UPDATE perizinan SET status = ?, tgl_kembali_aktual = ? WHERE id = ?',
     [statusFinal, aktual.toISOString(), id]
   )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'update',
+    entityType: 'perizinan',
+    entityId: id,
+    entityLabel: izin.santri_nama || id,
+    summary: `Mencatat kedatangan santri izin ${izin.santri_nama || id}`,
+    details: {
+      waktu_datang: aktual.toISOString(),
+      status_final: statusFinal,
+      telat: isTelat,
+    },
+  })
 
   revalidatePath('/dashboard/keamanan/perizinan')
 
@@ -384,7 +477,36 @@ export async function cariSantri(keyword: string) {
 export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
+  const session = await getSession()
+  const izin = await queryOne<{
+    id: string
+    jenis: string | null
+    alasan: string | null
+    nama_lengkap: string | null
+  }>(
+    `SELECT p.id, p.jenis, p.alasan, s.nama_lengkap
+     FROM perizinan p
+     LEFT JOIN santri s ON s.id = p.santri_id
+     WHERE p.id = ?`,
+    [id]
+  )
+  if (!izin) return { error: 'Data izin tidak ditemukan.' }
   await execute('DELETE FROM perizinan WHERE id = ?', [id])
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'delete',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'delete',
+    entityType: 'perizinan',
+    entityId: id,
+    entityLabel: izin.nama_lengkap || id,
+    summary: `Menghapus data izin ${izin.nama_lengkap || id}`,
+    details: {
+      jenis: izin.jenis,
+      alasan: izin.alasan,
+    },
+  })
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
 }

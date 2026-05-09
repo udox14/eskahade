@@ -2,6 +2,8 @@
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
+import { getSession } from '@/lib/auth/session'
+import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 type SantriImportData = {
@@ -67,6 +69,7 @@ export async function getKelasList() {
 export async function importSantriMassal(dataSantri: SantriImportData[]): Promise<{ success: boolean; count: number } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'create')
   if ('error' in access) return access
+  const session = await getSession()
   if (!dataSantri || dataSantri.length === 0) return { error: 'Data kosong tidak bisa disimpan.' }
 
   const kelasList = await query<{ id: string; nama_kelas: string }>(`
@@ -160,6 +163,24 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
   }
 
   revalidatePath('/dashboard/santri')
+  if (inserted > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'santri',
+      action: 'create',
+      fiturHref: '/dashboard/santri',
+      logKind: 'create',
+      entityType: 'santri_batch',
+      entityId: 'import',
+      entityLabel: 'Import santri massal',
+      summary: `Import santri massal: ${inserted} data ditambahkan`,
+      details: {
+        inserted,
+        attempted: cleanData.length,
+        skipped: cleanData.length - inserted,
+      },
+    })
+  }
   return { success: true, count: inserted }
 }
 
@@ -193,6 +214,7 @@ export async function tambahSantriSatuSatu(data: {
 }) {
   const access = await assertCrud('/dashboard/santri', 'create')
   if ('error' in access) return access
+  const session = await getSession()
 
   const { nis, nama_lengkap, kelas_pesantren, nama_tempat_makan, nama_tempat_cuci, ...rest } = data
   if (!nis || !nama_lengkap) return { error: 'NIS dan Nama wajib diisi.' }
@@ -263,6 +285,27 @@ export async function tambahSantriSatuSatu(data: {
       )
     }
   }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'santri',
+    action: 'create',
+    fiturHref: '/dashboard/santri',
+    logKind: 'create',
+    entityType: 'santri',
+    entityId: id,
+    entityLabel: nama_lengkap.trim(),
+    summary: `Menambahkan santri ${nama_lengkap.trim()}`,
+    details: {
+      nis: nis.trim(),
+      kategori_santri: kategoriSantri,
+      sekolah,
+      kelas_sekolah: kelasSekolah,
+      asrama: rest.asrama?.toUpperCase().trim() || null,
+      kamar: rest.kamar?.trim() || null,
+      kelas_pesantren: kelas_pesantren?.trim() || null,
+    },
+  })
 
   revalidatePath('/dashboard/santri')
   return { success: true }
