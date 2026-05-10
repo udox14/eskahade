@@ -16,6 +16,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  X,
   XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -67,8 +68,12 @@ function StatsCard({
 }
 
 function FormTambah({
+  open,
+  onClose,
   onSuccess,
 }: {
+  open: boolean
+  onClose: () => void
   onSuccess: () => Promise<void> | void
 }) {
   const today = new Date().toISOString().slice(0, 10)
@@ -102,18 +107,28 @@ function FormTambah({
       tgl_mulai_datang: today,
       tgl_selesai_datang: today,
     })
+    onClose()
     await onSuccess()
   }
 
   const fieldClassName =
     'w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
 
+  if (!open) return null
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white shadow-2xl">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-        <div className="flex items-center gap-2">
-          <Plus className="h-4 w-4 text-emerald-600" />
-          <h2 className="font-bold text-slate-800">Tambah Periode Baru</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Plus className="h-4 w-4 text-emerald-600" />
+            <h2 className="font-bold text-slate-800">Tambah Periode Baru</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X className="h-5 w-5" />
+          </button>
         </div>
         <p className="mt-1 text-sm text-slate-500">Atur jadwal perpulangan dan jendela kedatangan untuk satu periode aktif.</p>
       </div>
@@ -187,6 +202,12 @@ function FormTambah({
 
         <div className="flex justify-end">
           <button
+            onClick={onClose}
+            className="mr-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            Batal
+          </button>
+          <button
             onClick={handleSubmit}
             disabled={loading || !form.nama_periode.trim()}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -196,7 +217,9 @@ function FormTambah({
           </button>
         </div>
       </div>
-    </section>
+        </section>
+      </div>
+    </div>
   )
 }
 
@@ -244,7 +267,7 @@ function PeriodCard({
 
   const handleDelete = async () => {
     const ok = await confirm(
-      `Hapus periode "${periode.nama_periode}"?\nPeriode yang sudah punya log perpulangan memang akan ditolak sistem.`,
+      `Hapus periode "${periode.nama_periode}"?\nData log perpulangan santri pada periode ini juga akan ikut dihapus.`,
       {
         title: 'Hapus Periode',
         variant: 'danger',
@@ -374,6 +397,7 @@ function PeriodCard({
 export default function PeriodePerpulanganPage() {
   const [list, setList] = useState<PeriodeRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [openTambah, setOpenTambah] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -401,7 +425,21 @@ export default function PeriodePerpulanganPage() {
         <StatsCard label="Riwayat Nonaktif" value={Math.max(list.length - activeCount, 0)} tone="amber" />
       </section>
 
-      <FormTambah onSuccess={load} />
+      <div className="flex justify-end">
+        <button
+          onClick={() => setOpenTambah(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+        >
+          <Plus className="h-4 w-4" />
+          Tambah Periode
+        </button>
+      </div>
+
+      <FormTambah
+        open={openTambah}
+        onClose={() => setOpenTambah(false)}
+        onSuccess={load}
+      />
 
       <section className="space-y-4">
         {loading ? (

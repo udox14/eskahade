@@ -149,18 +149,13 @@ export async function perpanjangTglDatang(
   return { success: true }
 }
 
-// ─── Hapus periode (hanya jika tidak ada log) ─────────────────────────────────
+// ─── Hapus periode (ikut hapus log perpulangan di periode tersebut) ───────────
 export async function hapusPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
   const session = await assertAllowed()
   const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
+  if (!periode) return { error: 'Periode tidak ditemukan.' }
 
-  const ada = await queryOne<{ n: number }>(
-    'SELECT COUNT(*) AS n FROM perpulangan_log WHERE periode_id = ?',
-    [id]
-  )
-  if ((ada?.n ?? 0) > 0)
-    return { error: 'Tidak bisa dihapus: sudah ada data perpulangan santri di periode ini.' }
-
+  await execute('DELETE FROM perpulangan_log WHERE periode_id = ?', [id])
   await execute('DELETE FROM perpulangan_periode WHERE id = ?', [id])
   await logActivity({
     actor: actorFromSession(session),
@@ -174,5 +169,7 @@ export async function hapusPeriode(id: number): Promise<{ success: boolean } | {
     summary: `Menghapus periode perpulangan ${periode?.nama_periode || id}`,
   })
   revalidatePath(REVALIDATE)
+  revalidatePath('/dashboard/asrama/perpulangan')
+  revalidatePath('/dashboard/asrama/perpulangan/monitoring')
   return { success: true }
 }
