@@ -46,21 +46,23 @@ export function BottomNav({ fiturAkses, userRole, userRoles, globalEnabled, user
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
 
   const navItems = fiturAkses
-    .filter(f => f.is_active && f.is_bottomnav && f.roles.some(r => effectiveRoles.includes(r)))
+    .filter(f => f.href !== '/dashboard' && f.is_active && f.is_bottomnav && f.roles.some(r => effectiveRoles.includes(r)))
     .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
     .slice(0, 4)
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    return pathname === href || pathname.startsWith(href + '/')
-  }
+  const activeHref = [...navItems]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find(item => pathname === item.href || pathname.startsWith(item.href + '/'))
+    ?.href
+
+  const menuActive = pathname === '/dashboard' && !activeHref
 
   return (
     <nav className="md:hidden no-print shrink-0 w-full bg-white border-t border-slate-200 flex items-stretch h-14">
 
       {navItems.map((item) => {
         const Icon = getIcon(item.icon)
-        const active = isActive(item.href)
+        const active = activeHref === item.href
         return (
           <Link
             key={item.href}
@@ -83,7 +85,7 @@ export function BottomNav({ fiturAkses, userRole, userRoles, globalEnabled, user
         href="/dashboard"
         className={cn(
           'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-          pathname === '/dashboard' && navItems.every(i => i.href !== '/dashboard')
+          menuActive
             ? 'text-emerald-600 bg-emerald-50'
             : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
         )}
