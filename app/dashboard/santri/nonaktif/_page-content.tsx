@@ -6,6 +6,7 @@ import {
   aktifkanKembaliSantri,
   getFilterOptions,
   getSantriAktif,
+  getSantriIdsByStatus,
   getSantriNonaktif,
   nonaktifkanSantri,
 } from './actions'
@@ -187,7 +188,7 @@ function FilterBar({
             onChange={e => setPageSize(Number(e.target.value))}
             className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none"
           >
-            {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+            {[10, 20, 50, 100, 0].map(v => <option key={v} value={v}>{v === 0 ? 'Semua' : v}</option>)}
           </select>
         </div>
       </div>
@@ -312,6 +313,7 @@ export default function SantriNonaktifPage() {
   const [pageSize, setPageSize] = useState(20)
   const [showModal, setShowModal] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [selectingAll, setSelectingAll] = useState(false)
 
   useEffect(() => {
     getFilterOptions().then(options => {
@@ -357,6 +359,7 @@ export default function SantriNonaktifPage() {
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const allVisibleSelected = rows.length > 0 && rows.every(row => selectedSet.has(row.id))
+  const allFilteredSelected = total > 0 && selectedIds.length >= total
 
   const toggleOne = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
@@ -369,6 +372,29 @@ export default function SantriNonaktifPage() {
       setSelectedIds(prev => [...new Set([...prev, ...rows.map(row => row.id)])])
     }
   }
+
+  const selectAllFiltered = async () => {
+    setSelectingAll(true)
+    try {
+      const res = await getSantriIdsByStatus(
+        tab === 'aktif' ? 'aktif' : 'nonaktif_sementara',
+        {
+          search: search || undefined,
+          asrama: asrama !== 'SEMUA' ? asrama : undefined,
+          kelasSekolah: kelasSekolah !== 'SEMUA' ? kelasSekolah : undefined,
+        }
+      )
+      if ('error' in res) {
+        toast.error('Gagal', { description: res.error })
+        return
+      }
+      setSelectedIds(res.ids)
+    } finally {
+      setSelectingAll(false)
+    }
+  }
+
+  const clearSelection = () => setSelectedIds([])
 
   const handleApply = () => {
     const nextSearch = searchInput.trim()
@@ -403,7 +429,7 @@ export default function SantriNonaktifPage() {
       return
     }
     toast.success(`${fmtNum(res.count)} santri aktif kembali`)
-    load(page)
+    load(1)
   }
 
   const renderRows = () => {
@@ -533,12 +559,31 @@ export default function SantriNonaktifPage() {
           ))}
         </div>
 
-        {selectedIds.length > 0 && (
-          <div className="flex items-center gap-2">
+        {(selectedIds.length > 0 || (tab === 'nonaktif' && hasLoaded && total > 0)) && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-xs text-slate-500">{fmtNum(selectedIds.length)} dipilih</span>
+            {tab === 'nonaktif' && total > 0 && !allFilteredSelected && (
+              <button
+                onClick={selectAllFiltered}
+                disabled={selectingAll || loading}
+                className="flex items-center gap-2 px-4 py-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+              >
+                {selectingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Pilih Semua ({fmtNum(total)})
+              </button>
+            )}
+            {selectedIds.length > 0 && (
+              <button
+                onClick={clearSelection}
+                className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
+              >
+                <X className="w-4 h-4" /> Batal Pilih
+              </button>
+            )}
             {tab === 'aktif' ? (
               <button
                 onClick={() => setShowModal(true)}
+                disabled={selectedIds.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-colors"
               >
                 <UserMinus className="w-4 h-4" /> Nonaktifkan
@@ -546,7 +591,7 @@ export default function SantriNonaktifPage() {
             ) : (
               <button
                 onClick={handleRestore}
-                disabled={restoring}
+                disabled={restoring || selectedIds.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 transition-colors"
               >
                 {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}

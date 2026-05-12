@@ -16,6 +16,8 @@ type ListParams = {
   pageSize?: number
 }
 
+type SantriStatus = 'aktif' | 'nonaktif_sementara'
+
 export async function getFilterOptions() {
   const [asramaRows, kelasRows] = await Promise.all([
     query<{ v: string }>(
@@ -38,7 +40,7 @@ export async function getFilterOptions() {
   }
 }
 
-function buildWhere(status: 'aktif' | 'nonaktif_sementara', params: ListParams) {
+function buildWhere(status: SantriStatus, params: ListParams) {
   const clauses = ['s.status_global = ?']
   const values: unknown[] = [status]
 
@@ -61,7 +63,8 @@ function buildWhere(status: 'aktif' | 'nonaktif_sementara', params: ListParams) 
 export async function getSantriAktif(params: ListParams) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE
-  const offset = (page - 1) * pageSize
+  const showAll = pageSize === 0
+  const offset = showAll ? 0 : (page - 1) * pageSize
   const { where, values } = buildWhere('aktif', params)
 
   const countRow = await queryOne<{ total: number }>(
@@ -71,6 +74,8 @@ export async function getSantriAktif(params: ListParams) {
   const total = countRow?.total ?? 0
   if (total === 0) return { rows: [], total: 0, page: 1, totalPages: 0 }
 
+  const limitClause = showAll ? '' : 'LIMIT ? OFFSET ?'
+  const listValues = showAll ? values : [...values, pageSize, offset]
   const rows = await query<{
     id: string
     nis: string
@@ -84,17 +89,18 @@ export async function getSantriAktif(params: ListParams) {
      FROM santri s
      WHERE ${where}
      ORDER BY CAST(s.kelas_sekolah AS INTEGER), s.kelas_sekolah, s.nama_lengkap
-     LIMIT ? OFFSET ?`,
-    [...values, pageSize, offset]
+     ${limitClause}`,
+    listValues
   )
 
-  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
+  return { rows, total, page: showAll ? 1 : page, totalPages: showAll ? 1 : Math.ceil(total / pageSize) }
 }
 
 export async function getSantriNonaktif(params: ListParams) {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE
-  const offset = (page - 1) * pageSize
+  const showAll = pageSize === 0
+  const offset = showAll ? 0 : (page - 1) * pageSize
   const { where, values } = buildWhere('nonaktif_sementara', params)
 
   const countRow = await queryOne<{ total: number }>(
@@ -104,6 +110,8 @@ export async function getSantriNonaktif(params: ListParams) {
   const total = countRow?.total ?? 0
   if (total === 0) return { rows: [], total: 0, page: 1, totalPages: 0 }
 
+  const limitClause = showAll ? '' : 'LIMIT ? OFFSET ?'
+  const listValues = showAll ? values : [...values, pageSize, offset]
   const rows = await query<{
     id: string
     nis: string
@@ -124,11 +132,27 @@ export async function getSantriNonaktif(params: ListParams) {
        ON l.santri_id = s.id AND l.status = 'AKTIF'
      WHERE ${where}
      ORDER BY COALESCE(l.tanggal_mulai, s.created_at) DESC, s.nama_lengkap
-     LIMIT ? OFFSET ?`,
-    [...values, pageSize, offset]
+     ${limitClause}`,
+    listValues
   )
 
-  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
+  return { rows, total, page: showAll ? 1 : page, totalPages: showAll ? 1 : Math.ceil(total / pageSize) }
+}
+
+export async function getSantriIdsByStatus(status: SantriStatus, params: ListParams) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return access
+
+  const { where, values } = buildWhere(status, params)
+  const rows = await query<{ id: string }>(
+    `SELECT s.id
+     FROM santri s
+     WHERE ${where}
+     ORDER BY CAST(s.kelas_sekolah AS INTEGER), s.kelas_sekolah, s.nama_lengkap`,
+    values
+  )
+
+  return { ids: rows.map(row => row.id) }
 }
 
 export async function nonaktifkanSantri(params: {
