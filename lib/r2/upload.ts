@@ -18,6 +18,10 @@ function extensionFromMime(mimeType: string) {
   return 'jpg'
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
 export async function uploadBufferToR2(params: {
   buffer: ArrayBuffer
   folder: string
@@ -40,8 +44,8 @@ export async function uploadBufferToR2(params: {
 
     const baseUrl = process.env.R2_PUBLIC_URL!
     return { url: `${baseUrl}/${key}` }
-  } catch (err: any) {
-    return { error: `Gagal upload: ${err.message}` }
+  } catch (err: unknown) {
+    return { error: `Gagal upload: ${errorMessage(err)}` }
   }
 }
 
@@ -65,18 +69,19 @@ export async function uploadBase64ImageToR2(params: {
 
 export async function uploadToR2(
   file: File,
-  santriId: string
+  filenamePrefix: string,
+  folder = 'foto-santri'
 ): Promise<{ url: string } | { error: string }> {
   try {
     const arrayBuffer = await file.arrayBuffer()
     return uploadBufferToR2({
       buffer: arrayBuffer,
-      folder: 'foto-santri',
-      filenamePrefix: santriId,
+      folder,
+      filenamePrefix,
       contentType: file.type || 'image/jpeg',
     })
-  } catch (err: any) {
-    return { error: `Gagal upload: ${err.message}` }
+  } catch (err: unknown) {
+    return { error: `Gagal upload: ${errorMessage(err)}` }
   }
 }
 

@@ -6,11 +6,22 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
 
+type ProfilData = {
+  id: string
+  email: string
+  full_name: string | null
+  role: string
+  asrama_binaan: string | null
+  avatar_url: string | null
+  phone: string | null
+  show_bottomnav: number | null
+}
+
 export async function getProfilData() {
   const session = await getSession()
   if (!session) return null
 
-  const user = await query<any>(
+  const user = await query<ProfilData>(
     'SELECT id, email, full_name, role, asrama_binaan, avatar_url, phone, show_bottomnav FROM users WHERE id = ?',
     [session.id]
   )
@@ -57,7 +68,7 @@ export async function updatePassword(data: { current: string; new: string; confi
   if (data.new !== data.confirm) return { error: 'Konfirmasi password tidak cocok' }
 
   // Verify current password
-  const user = await query<any>('SELECT password_hash FROM users WHERE id = ?', [session.id])
+  const user = await query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?', [session.id])
   if (!user[0]) return { error: 'User tidak ditemukan' }
 
   const encoder = new TextEncoder()
@@ -126,22 +137,22 @@ export async function uploadAvatar(formData: FormData) {
   const file = formData.get('file') as File
   if (!file || file.size === 0) return { error: 'File tidak valid' }
   if (file.size > 2 * 1024 * 1024) return { error: 'Ukuran file maksimal 2MB' }
+  if (!file.type.startsWith('image/')) return { error: 'File harus berupa gambar' }
 
-  // Hapus avatar lama
-  const existing = await query<any>('SELECT avatar_url FROM users WHERE id = ?', [session.id])
+  const existing = await query<{ avatar_url: string | null }>('SELECT avatar_url FROM users WHERE id = ?', [session.id])
   const avatarLama = existing[0]?.avatar_url
-  if (avatarLama) {
-    try { await deleteFromR2(avatarLama) } catch {}
-  }
 
-  // Upload ke R2 — pakai session.id sebagai identifier
-  const result = await uploadToR2(file, `avatar-${session.id}`)
-  if ('error' in result) return { error: 'Gagal upload: ' + (result as any).error }
+  const result = await uploadToR2(file, `avatar-${session.id}`, 'avatar-profil')
+  if ('error' in result) return { error: 'Gagal upload: ' + result.error }
 
   await execute(
     'UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?',
     [result.url, new Date().toISOString(), session.id]
   )
+
+  if (avatarLama) {
+    try { await deleteFromR2(avatarLama) } catch {}
+  }
 
   await logActivity({
     actor: actorFromSession(session),

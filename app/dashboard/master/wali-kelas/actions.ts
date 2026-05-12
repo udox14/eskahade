@@ -9,9 +9,11 @@ import { getCachedDataGuru, getCachedMarhalahList } from '@/lib/cache/master'
 import {
   buildWeeklyGuruRuleMap,
   ensureGuruJadwalSchema,
+  getKelasGabunganPengajian,
   getWeeklyGuruRules,
   isPengajianLiburByHariIndex,
   resolveGuruForHariIndex,
+  saveKelasGabunganPengajian,
   summarizeWeeklyGuruAssignmentNames,
   type GuruJadwalSession,
   type WeeklyGuruRule,
@@ -25,6 +27,7 @@ function generateEmail(name: string) {
 type KelasMasterRow = {
   id: string
   nama_kelas: string
+  tahun_ajaran_id: number | null
   marhalah_nama: string | null
   guru_shubuh_id: number | null
   guru_shubuh_nama: string | null
@@ -35,6 +38,7 @@ type KelasMasterRow = {
   wali_kelas_id: string | null
   wali_kelas_nama: string | null
   weekly_rules?: WeeklyGuruRule[]
+  gabungan?: Partial<Record<GuruJadwalSession, { group_key: string; tempat: string | null }>>
 }
 
 type ImportGuruRow = Record<string, unknown>
@@ -52,6 +56,7 @@ type SimpanJadwalPayload = {
   asharId: number | null
   maghribId: number | null
   weeklyRules: WeeklyRuleInput[]
+  gabungan?: Partial<Record<GuruJadwalSession, { groupKey?: string | null; tempat?: string | null }>>
 }
 
 async function ensureKelasCetakColumns() {
@@ -129,16 +134,24 @@ function sanitizeWeeklyRules(rules: WeeklyRuleInput[]) {
 
 async function attachWeeklyRules<T extends KelasMasterRow>(kelas: T[]) {
   const rules = await getWeeklyGuruRules(kelas.map(item => item.id))
+  const gabungan = await getKelasGabunganPengajian(kelas.map(item => item.id))
   const rulesByKelas = new Map<string, WeeklyGuruRule[]>()
+  const gabunganByKelas = new Map<string, NonNullable<KelasMasterRow['gabungan']>>()
 
   for (const rule of rules) {
     if (!rulesByKelas.has(rule.kelas_id)) rulesByKelas.set(rule.kelas_id, [])
     rulesByKelas.get(rule.kelas_id)!.push(rule)
   }
+  for (const item of gabungan) {
+    const existing = gabunganByKelas.get(item.kelas_id) || {}
+    existing[item.sesi] = { group_key: item.group_key, tempat: item.tempat }
+    gabunganByKelas.set(item.kelas_id, existing)
+  }
 
   return kelas.map(item => ({
     ...item,
     weekly_rules: rulesByKelas.get(item.id) || [],
+    gabungan: gabunganByKelas.get(item.id) || {},
   }))
 }
 
@@ -147,6 +160,7 @@ async function getActiveKelasRows() {
     SELECT
       k.id,
       k.nama_kelas,
+      k.tahun_ajaran_id,
       m.nama as marhalah_nama,
       gs.id as guru_shubuh_id,
       gs.nama_lengkap as guru_shubuh_nama,
@@ -169,14 +183,19 @@ async function getActiveKelasRows() {
 async function validateWeeklyGuruConflicts(payload: SimpanJadwalPayload[]) {
   const allKelas = await getActiveKelasRows()
   const allRules = await getWeeklyGuruRules(allKelas.map(item => item.id))
+  const existingGabungan = await getKelasGabunganPengajian(allKelas.map(item => item.id))
   const guruList = await getCachedDataGuru()
   const guruNameMap = new Map<number, string>(guruList.map(guru => [Number(guru.id), guru.nama_lengkap]))
   const kelasMap = new Map(allKelas.map(kelas => [kelas.id, { ...kelas }]))
   const rulesByKelas = new Map<string, WeeklyGuruRule[]>()
+  const gabunganByKelas = new Map<string, string>()
 
   for (const rule of allRules) {
     if (!rulesByKelas.has(rule.kelas_id)) rulesByKelas.set(rule.kelas_id, [])
     rulesByKelas.get(rule.kelas_id)!.push(rule)
+  }
+  for (const item of existingGabungan) {
+    gabunganByKelas.set(`${item.kelas_id}|${item.sesi}`, item.group_key)
   }
 
   for (const item of payload) {
@@ -199,6 +218,12 @@ async function validateWeeklyGuruConflicts(payload: SimpanJadwalPayload[]) {
         guru_nama: guruNameMap.get(Number(rule.guruId)) || null,
       }))
     )
+    for (const sesi of ['shubuh', 'ashar', 'maghrib'] as GuruJadwalSession[]) {
+      const groupKey = String(item.gabungan?.[sesi]?.groupKey || '').trim()
+      const key = `${item.kelasId}|${sesi}`
+      if (groupKey) gabunganByKelas.set(key, groupKey)
+      else gabunganByKelas.delete(key)
+    }
   }
 
   const mergedRules = Array.from(rulesByKelas.entries()).flatMap(([kelasId, rules]) =>
@@ -215,17 +240,19 @@ async function validateWeeklyGuruConflicts(payload: SimpanJadwalPayload[]) {
         const resolved = resolveGuruForHariIndex(kelas, hariIndex, ruleMap)[sesi]
         if (!resolved.id || !resolved.nama) continue
 
+        const gabunganKey = gabunganByKelas.get(`${kelas.id}|${sesi}`)
+        const kelasBentrokKey = gabunganKey ? `gabungan:${sesi}:${gabunganKey}` : `kelas:${kelas.id}`
         const key = `${hariIndex}|${sesi}|${resolved.id}`
         const existing = seen.get(key)
-        if (existing && existing.kelasId !== kelas.id) {
+        if (existing && existing.kelasId !== kelasBentrokKey) {
           return {
             error: `Bentrok jadwal ${resolved.nama} pada sesi ${sesi} antara kelas ${existing.kelasNama} dan ${kelas.nama_kelas}.`,
           }
         }
 
         seen.set(key, {
-          kelasId: kelas.id,
-          kelasNama: kelas.nama_kelas,
+          kelasId: kelasBentrokKey,
+          kelasNama: gabunganKey ? `Gabungan ${gabunganKey}` : kelas.nama_kelas,
           guruNama: resolved.nama,
         })
       }
@@ -271,6 +298,7 @@ export async function getKelasJadwalByMarhalah(marhalahId: string) {
     SELECT
       k.id,
       k.nama_kelas,
+      k.tahun_ajaran_id,
       m.nama as marhalah_nama,
       gs.id as guru_shubuh_id,
       gs.nama_lengkap as guru_shubuh_nama,
@@ -570,15 +598,29 @@ export async function simpanJadwalBatch(
   for (const item of payload) {
     await execute('DELETE FROM kelas_jadwal_guru_mingguan WHERE kelas_id = ?', [item.kelasId])
     const weeklyRules = sanitizeWeeklyRules(item.weeklyRules)
-    if (weeklyRules.length === 0) continue
+    if (weeklyRules.length > 0) {
+      await batch(weeklyRules.map(rule => ({
+        sql: `
+          INSERT INTO kelas_jadwal_guru_mingguan (kelas_id, sesi, hari_index, guru_id, updated_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+        `,
+        params: [item.kelasId, rule.sesi, rule.hariIndex, Number(rule.guruId)],
+      })))
+    }
 
-    await batch(weeklyRules.map(rule => ({
-      sql: `
-        INSERT INTO kelas_jadwal_guru_mingguan (kelas_id, sesi, hari_index, guru_id, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-      `,
-      params: [item.kelasId, rule.sesi, rule.hariIndex, Number(rule.guruId)],
-    })))
+    const kelas = await queryOne<{ tahun_ajaran_id: number | null }>(
+      'SELECT tahun_ajaran_id FROM kelas WHERE id = ?',
+      [item.kelasId]
+    )
+    await saveKelasGabunganPengajian(
+      item.kelasId,
+      kelas?.tahun_ajaran_id ?? null,
+      (['shubuh', 'ashar', 'maghrib'] as GuruJadwalSession[]).map(sesi => ({
+        sesi,
+        groupKey: item.gabungan?.[sesi]?.groupKey || null,
+        tempat: item.gabungan?.[sesi]?.tempat || null,
+      }))
+    )
   }
 
   revalidatePath('/dashboard/master/wali-kelas')

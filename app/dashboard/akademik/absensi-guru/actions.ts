@@ -7,14 +7,26 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import {
   buildWeekSchedule,
+  buildGabunganByKelas,
+  buildGabunganMembersByGroup,
   buildWeeklyGuruRuleMap,
   ensureGuruJadwalSchema,
+  getKelasGabunganPengajian,
   getWeeklyGuruRules,
   resolveGuruForDate,
+  type GuruJadwalSession,
 } from '@/lib/akademik/guru-jadwal'
 
 const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
 type SessionType = typeof VALID_SESI[number]
+
+function emptyResolvedGuru() {
+  return {
+    shubuh: { id: null, nama: null, source: 'default' },
+    ashar: { id: null, nama: null, source: 'default' },
+    maghrib: { id: null, nama: null, source: 'default' },
+  }
+}
 
 async function ensureLiburPengajianTable() {
   await ensureGuruJadwalSchema()
@@ -100,6 +112,10 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 
   const rules = await getWeeklyGuruRules(kelasList.map((kelas: any) => kelas.id))
   const ruleMap = buildWeeklyGuruRuleMap(rules)
+  const gabungan = await getKelasGabunganPengajian(kelasList.map((kelas: any) => kelas.id))
+  const gabunganByKelas = buildGabunganByKelas(gabungan)
+  const gabunganMembersByGroup = buildGabunganMembersByGroup(gabungan)
+  const kelasById = new Map(kelasList.map((kelas: any) => [String(kelas.id), kelas]))
 
   const dates: string[] = []
   const current = new Date(startDate)
@@ -118,12 +134,52 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
     }
   })
 
+  const baseRows = kelasList.map((kelas: any) => ({
+    ...kelas,
+    week_schedule: buildWeekSchedule(kelas, dates, ruleMap).map(entry => {
+      const guru = { ...entry.guru }
+      for (const sesi of VALID_SESI) {
+        const group = gabunganByKelas.get(`${kelas.id}|${sesi}`)
+        if (!group) continue
+        const members = gabunganMembersByGroup.get(group.id) || []
+        const representative = members[0]
+        if (representative && representative.kelas_id !== kelas.id) {
+          guru[sesi] = { id: null, nama: null, source: 'default' }
+        }
+      }
+      return { ...entry, guru }
+    }),
+  }))
+
+  const virtualRows: any[] = []
+  for (const [groupId, members] of gabunganMembersByGroup.entries()) {
+    const representative = members[0]
+    if (!representative) continue
+    const baseKelas = kelasById.get(String(representative.kelas_id))
+    if (!baseKelas) continue
+    const sesi = representative.sesi as GuruJadwalSession
+    const namaKelas = members.map(member => member.nama_kelas).join(' + ')
+    virtualRows.push({
+      ...baseKelas,
+      id: representative.kelas_id,
+      nama_kelas: namaKelas,
+      marhalah_nama: `${baseKelas.marhalah_nama || 'Tanpa tingkat'} - Gabungan ${representative.sesi}${representative.tempat ? ` - ${representative.tempat}` : ''}`,
+      is_gabungan: true,
+      gabungan_id: groupId,
+      gabungan_sesi: representative.sesi,
+      gabungan_members: members.map(member => member.kelas_id),
+      week_schedule: buildWeekSchedule(baseKelas, dates, ruleMap).map(entry => ({
+        ...entry,
+        guru: {
+          ...emptyResolvedGuru(),
+          [sesi]: entry.guru[sesi],
+        },
+      })),
+    })
+  }
+
   return {
-    list: kelasList
-      .map((kelas: any) => ({
-        ...kelas,
-        week_schedule: buildWeekSchedule(kelas, dates, ruleMap),
-      }))
+    list: [...baseRows, ...virtualRows]
       .sort((a: any, b: any) =>
         a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
       ),
@@ -167,7 +223,14 @@ export async function simpanAbsensiGuru(
   const kelasMap = new Map(kelasList.map((kelas: any) => [kelas.id, kelas]))
   const ruleMap = buildWeeklyGuruRuleMap(await getWeeklyGuruRules(kelasIds))
 
-  const statements = payload.map(item => {
+  const payloadByKey = new Map<string, any>()
+  for (const item of payload) {
+    if (!item?.kelas_id || !item?.tanggal) continue
+    const key = `${item.kelas_id}|${item.tanggal}`
+    payloadByKey.set(key, { ...(payloadByKey.get(key) || {}), ...item })
+  }
+
+  const statements = Array.from(payloadByKey.values()).map(item => {
     const kelas = kelasMap.get(String(item.kelas_id))
     const resolved = kelas
       ? resolveGuruForDate(kelas, item.tanggal, ruleMap)

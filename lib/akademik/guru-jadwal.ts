@@ -26,6 +26,23 @@ export type WeeklyGuruRule = {
   guru_nama?: string | null
 }
 
+export type KelasGabunganPengajian = {
+  id: number
+  group_key: string
+  nama: string
+  sesi: GuruJadwalSession
+  tempat: string | null
+  tahun_ajaran_id: number | null
+  kelas_id: string
+  nama_kelas: string
+}
+
+export type KelasGabunganInput = {
+  sesi: GuruJadwalSession
+  groupKey: string | null
+  tempat?: string | null
+}
+
 export type KelasGuruBase = {
   id: string
   nama_kelas?: string | null
@@ -77,6 +94,36 @@ async function ensureGuruJadwalSchemaOnce() {
     ON kelas_jadwal_guru_mingguan(guru_id, sesi, hari_index)
   `)
 
+  await execute(`
+    CREATE TABLE IF NOT EXISTS kelas_gabungan_pengajian (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_key        TEXT NOT NULL,
+      nama             TEXT NOT NULL,
+      sesi             TEXT NOT NULL,
+      tempat           TEXT,
+      tahun_ajaran_id  INTEGER REFERENCES tahun_ajaran(id) ON DELETE CASCADE,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(tahun_ajaran_id, sesi, group_key)
+    )
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS kelas_gabungan_pengajian_anggota (
+      group_id    INTEGER NOT NULL REFERENCES kelas_gabungan_pengajian(id) ON DELETE CASCADE,
+      kelas_id    TEXT NOT NULL REFERENCES kelas(id) ON DELETE CASCADE,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (group_id, kelas_id)
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_kelas_gabungan_pengajian_lookup
+    ON kelas_gabungan_pengajian(tahun_ajaran_id, sesi, group_key)
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_kelas_gabungan_pengajian_anggota_kelas
+    ON kelas_gabungan_pengajian_anggota(kelas_id)
+  `)
+
   const snapshotColumns = [
     'ALTER TABLE absensi_guru ADD COLUMN guru_shubuh_id_snapshot INTEGER REFERENCES data_guru(id)',
     'ALTER TABLE absensi_guru ADD COLUMN guru_shubuh_nama_snapshot TEXT',
@@ -97,6 +144,106 @@ async function ensureGuruJadwalSchemaOnce() {
   }
 
   await backfillManualWaliKelasFromGuruMaghrib()
+}
+
+export function normalizeGabunganKey(value: unknown) {
+  return String(value || '').trim().replace(/\s+/g, ' ')
+}
+
+export async function getKelasGabunganPengajian(kelasIds?: string[]) {
+  await ensureGuruJadwalSchema()
+
+  const cleanedIds = (kelasIds || []).filter(Boolean)
+  const whereClause = cleanedIds.length > 0
+    ? `WHERE a.kelas_id IN (${cleanedIds.map(() => '?').join(',')})`
+    : ''
+
+  return query<KelasGabunganPengajian>(`
+    SELECT
+      g.id,
+      g.group_key,
+      g.nama,
+      g.sesi,
+      g.tempat,
+      g.tahun_ajaran_id,
+      a.kelas_id,
+      k.nama_kelas
+    FROM kelas_gabungan_pengajian g
+    JOIN kelas_gabungan_pengajian_anggota a ON a.group_id = g.id
+    JOIN kelas k ON k.id = a.kelas_id
+    ${whereClause}
+    ORDER BY g.sesi, g.group_key, k.nama_kelas
+  `, cleanedIds)
+}
+
+export function buildGabunganByKelas(groups: KelasGabunganPengajian[]) {
+  const map = new Map<string, KelasGabunganPengajian>()
+  for (const group of groups) {
+    map.set(`${group.kelas_id}|${group.sesi}`, group)
+  }
+  return map
+}
+
+export function buildGabunganMembersByGroup(groups: KelasGabunganPengajian[]) {
+  const map = new Map<number, KelasGabunganPengajian[]>()
+  for (const group of groups) {
+    if (!map.has(group.id)) map.set(group.id, [])
+    map.get(group.id)!.push(group)
+  }
+  for (const members of map.values()) {
+    members.sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+  }
+  return map
+}
+
+export async function saveKelasGabunganPengajian(
+  kelasId: string,
+  tahunAjaranId: number | null,
+  inputs: KelasGabunganInput[]
+) {
+  await ensureGuruJadwalSchema()
+
+  for (const input of inputs) {
+    if (!GURU_JADWAL_SESSIONS.includes(input.sesi)) continue
+
+    await execute(`
+      DELETE FROM kelas_gabungan_pengajian_anggota
+      WHERE kelas_id = ?
+        AND group_id IN (SELECT id FROM kelas_gabungan_pengajian WHERE sesi = ? AND tahun_ajaran_id IS ?)
+    `, [kelasId, input.sesi, tahunAjaranId])
+
+    const groupKey = normalizeGabunganKey(input.groupKey)
+    if (!groupKey) continue
+
+    const tempat = String(input.tempat || '').trim() || null
+    await execute(`
+      INSERT INTO kelas_gabungan_pengajian (group_key, nama, sesi, tempat, tahun_ajaran_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(tahun_ajaran_id, sesi, group_key) DO UPDATE SET
+        nama = excluded.nama,
+        tempat = COALESCE(excluded.tempat, kelas_gabungan_pengajian.tempat),
+        updated_at = excluded.updated_at
+    `, [groupKey, groupKey, input.sesi, tempat, tahunAjaranId])
+
+    const group = await query<{ id: number }>(`
+      SELECT id
+      FROM kelas_gabungan_pengajian
+      WHERE tahun_ajaran_id IS ? AND sesi = ? AND group_key = ?
+      LIMIT 1
+    `, [tahunAjaranId, input.sesi, groupKey])
+
+    const groupId = group[0]?.id
+    if (!groupId) continue
+    await execute(`
+      INSERT OR IGNORE INTO kelas_gabungan_pengajian_anggota (group_id, kelas_id)
+      VALUES (?, ?)
+    `, [groupId, kelasId])
+  }
+
+  await execute(`
+    DELETE FROM kelas_gabungan_pengajian
+    WHERE id NOT IN (SELECT DISTINCT group_id FROM kelas_gabungan_pengajian_anggota)
+  `)
 }
 
 export function isPengajianLiburByHariIndex(hariIndex: number, sesi: GuruJadwalSession) {

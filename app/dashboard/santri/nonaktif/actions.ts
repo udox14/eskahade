@@ -7,6 +7,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 30
+const BULK_CHUNK_SIZE = 80
 
 type ListParams = {
   search?: string
@@ -17,6 +18,12 @@ type ListParams = {
 }
 
 type SantriStatus = 'aktif' | 'nonaktif_sementara'
+
+function chunkArray<T>(items: T[], size = BULK_CHUNK_SIZE) {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size))
+  return chunks
+}
 
 export async function getFilterOptions() {
   const [asramaRows, kelasRows] = await Promise.all([
@@ -249,29 +256,36 @@ export async function aktifkanKembaliSantri(params: {
   if (ids.length === 0) return { error: 'Pilih minimal satu santri' }
   if (!params.tanggalAktif) return { error: 'Tanggal aktif kembali wajib diisi' }
 
-  const placeholders = ids.map(() => '?').join(',')
-  const rows = await query<{ id: string }>(
-    `SELECT id FROM santri WHERE status_global = 'nonaktif_sementara' AND id IN (${placeholders})`,
-    ids
-  )
+  const rows: { id: string }[] = []
+  for (const chunk of chunkArray(ids)) {
+    const placeholders = chunk.map(() => '?').join(',')
+    rows.push(...await query<{ id: string }>(
+      `SELECT id FROM santri WHERE status_global = 'nonaktif_sementara' AND id IN (${placeholders})`,
+      chunk
+    ))
+  }
   if (rows.length === 0) return { error: 'Tidak ada santri nonaktif yang valid untuk diaktifkan' }
 
   const validIds = rows.map(r => r.id)
-  await batch([
-    {
-      sql: `UPDATE santri SET status_global = 'aktif' WHERE id IN (${validIds.map(() => '?').join(',')})`,
-      params: validIds,
-    },
-    ...validIds.map(id => ({
-      sql: `UPDATE santri_nonaktif_log
-            SET status = 'SELESAI',
-                tanggal_aktif_aktual = ?,
-                closed_by = ?,
-                updated_at = ?
-            WHERE santri_id = ? AND status = 'AKTIF'`,
-      params: [params.tanggalAktif, session.id, now(), id],
-    })),
-  ])
+  const updatedAt = now()
+  for (const chunk of chunkArray(validIds)) {
+    const placeholders = chunk.map(() => '?').join(',')
+    await batch([
+      {
+        sql: `UPDATE santri SET status_global = 'aktif' WHERE id IN (${placeholders})`,
+        params: chunk,
+      },
+      {
+        sql: `UPDATE santri_nonaktif_log
+              SET status = 'SELESAI',
+                  tanggal_aktif_aktual = ?,
+                  closed_by = ?,
+                  updated_at = ?
+              WHERE status = 'AKTIF' AND santri_id IN (${placeholders})`,
+        params: [params.tanggalAktif, session.id, updatedAt, ...chunk],
+      },
+    ])
+  }
 
   await logActivity({
     actor: actorFromSession(session),

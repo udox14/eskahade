@@ -12,6 +12,7 @@ import Link from 'next/link'
 type SessionKey = 's' | 'a' | 'm'
 type WeeklySessionKey = 'shubuh' | 'ashar' | 'maghrib'
 type WeeklyMap = Record<WeeklySessionKey, Record<number, string>>
+type GabunganMap = Record<WeeklySessionKey, { groupKey: string; tempat: string }>
 
 const HARI_LIST = [
   { index: 1, label: 'Senin' },
@@ -44,6 +45,14 @@ function makeEmptyWeeklyMap(): WeeklyMap {
   }
 }
 
+function makeEmptyGabunganMap(): GabunganMap {
+  return {
+    shubuh: { groupKey: '', tempat: '' },
+    ashar: { groupKey: '', tempat: '' },
+    maghrib: { groupKey: '', tempat: '' },
+  }
+}
+
 function buildRuleSignature(weekly: WeeklyMap) {
   return SESSION_META.flatMap(session =>
     HARI_LIST
@@ -53,6 +62,15 @@ function buildRuleSignature(weekly: WeeklyMap) {
       })
       .filter(Boolean)
   ).join('||')
+}
+
+function buildGabunganSignature(gabungan: GabunganMap) {
+  return SESSION_META
+    .map(session => {
+      const item = gabungan[session.serverKey]
+      return `${session.serverKey}|${String(item?.groupKey || '').trim()}|${String(item?.tempat || '').trim()}`
+    })
+    .join('||')
 }
 
 export default function ManajemenGuruPage() {
@@ -100,9 +118,19 @@ export default function ManajemenGuruPage() {
     setKelasList(kelas)
     const mappedLocal = kelas.map((k: any) => {
       const weekly = makeEmptyWeeklyMap()
+      const gabungan = makeEmptyGabunganMap()
       ;(k.weekly_rules || []).forEach((rule: any) => {
         if (weekly[rule.sesi as WeeklySessionKey]) {
           weekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
+        }
+      })
+      SESSION_META.forEach(session => {
+        const item = k.gabungan?.[session.serverKey]
+        if (item) {
+          gabungan[session.serverKey] = {
+            groupKey: item.group_key || '',
+            tempat: item.tempat || '',
+          }
         }
       })
 
@@ -115,6 +143,7 @@ export default function ManajemenGuruPage() {
         a: k.guru_ashar_id?.toString() || '',
         m: k.guru_maghrib_id?.toString() || '',
         weekly,
+        gabungan,
       }
     })
     setLocalKelasList(mappedLocal)
@@ -142,15 +171,41 @@ export default function ManajemenGuruPage() {
     }))
   }
 
+  const handleChangeGabungan = (kelasId: string, session: WeeklySessionKey, field: 'groupKey' | 'tempat', value: string) => {
+    setLocalKelasList(prev => prev.map(k => {
+      if (k.id !== kelasId) return k
+      return {
+        ...k,
+        gabungan: {
+          ...k.gabungan,
+          [session]: {
+            ...(k.gabungan?.[session] || { groupKey: '', tempat: '' }),
+            [field]: value,
+          },
+        },
+      }
+    }))
+  }
+
   const handleSimpanSemua = async () => {
     const changedClasses = localKelasList.filter(local => {
       const asli = kelasList.find((k: any) => k.id === local.id)
       if (!asli) return false
 
       const asliWeekly = makeEmptyWeeklyMap()
+      const asliGabungan = makeEmptyGabunganMap()
       ;(asli.weekly_rules || []).forEach((rule: any) => {
         if (asliWeekly[rule.sesi as WeeklySessionKey]) {
           asliWeekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
+        }
+      })
+      SESSION_META.forEach(session => {
+        const item = asli.gabungan?.[session.serverKey]
+        if (item) {
+          asliGabungan[session.serverKey] = {
+            groupKey: item.group_key || '',
+            tempat: item.tempat || '',
+          }
         }
       })
 
@@ -159,7 +214,8 @@ export default function ManajemenGuruPage() {
         (asli.guru_ashar_id?.toString() || '') !== local.a ||
         (asli.guru_maghrib_id?.toString() || '') !== local.m ||
         (asli.wali_kelas_id || '') !== local.wali_kelas_id ||
-        buildRuleSignature(asliWeekly) !== buildRuleSignature(local.weekly)
+        buildRuleSignature(asliWeekly) !== buildRuleSignature(local.weekly) ||
+        buildGabunganSignature(asliGabungan) !== buildGabunganSignature(local.gabungan)
       )
     })
 
@@ -185,6 +241,13 @@ export default function ManajemenGuruPage() {
           guruId: Number(k.weekly[session.serverKey]?.[day.index] || 0) || null,
         }))
       ),
+      gabungan: SESSION_META.reduce((acc: any, session) => {
+        acc[session.serverKey] = {
+          groupKey: k.gabungan?.[session.serverKey]?.groupKey || null,
+          tempat: k.gabungan?.[session.serverKey]?.tempat || null,
+        }
+        return acc
+      }, {}),
     }))
 
     const res = await simpanJadwalBatch(payload as any)
@@ -433,6 +496,32 @@ export default function ManajemenGuruPage() {
                       <option value="">- Kosong -</option>
                       {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                     </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 px-4 py-4">
+                  <div className="mb-3">
+                    <p className="text-sm font-bold text-slate-700">Kelas Gabungan per Sesi</p>
+                    <p className="text-xs text-slate-500">Isi kode yang sama pada beberapa kelas jika kelas itu digabung pada sesi tertentu. Jadwal gabungan mengikuti kelas pertama dalam kelompok.</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {SESSION_META.map(session => (
+                      <div key={session.serverKey} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <div className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{session.label}</div>
+                        <input
+                          value={k.gabungan?.[session.serverKey]?.groupKey || ''}
+                          onChange={e => handleChangeGabungan(k.id, session.serverKey, 'groupKey', e.target.value)}
+                          placeholder="Kode gabungan"
+                          className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <input
+                          value={k.gabungan?.[session.serverKey]?.tempat || ''}
+                          onChange={e => handleChangeGabungan(k.id, session.serverKey, 'tempat', e.target.value)}
+                          placeholder="Tempat"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 

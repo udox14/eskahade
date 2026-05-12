@@ -422,14 +422,21 @@ export default function SantriNonaktifPage() {
   const handleRestore = async () => {
     if (!await confirm(`Aktifkan kembali ${fmtNum(selectedIds.length)} santri?`)) return
     setRestoring(true)
-    const res = await aktifkanKembaliSantri({ santriIds: selectedIds, tanggalAktif: today() })
-    setRestoring(false)
-    if ('error' in res) {
-      toast.error('Gagal', { description: res.error })
-      return
+    try {
+      const res = await aktifkanKembaliSantri({ santriIds: selectedIds, tanggalAktif: today() })
+      if ('error' in res) {
+        toast.error('Gagal', { description: res.error })
+        return
+      }
+      toast.success(`${fmtNum(res.count)} santri aktif kembali`)
+      load(1)
+    } catch (error) {
+      toast.error('Gagal', {
+        description: error instanceof Error ? error.message : 'Aktifkan kembali santri belum berhasil.',
+      })
+    } finally {
+      setRestoring(false)
     }
-    toast.success(`${fmtNum(res.count)} santri aktif kembali`)
-    load(1)
   }
 
   const renderRows = () => {

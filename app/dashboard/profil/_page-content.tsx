@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getProfilData, updateProfil, updatePassword, uploadAvatar, toggleShowBottomNav } from './actions'
+import { compressImageFile } from '@/lib/image/compress-client'
 import {
   User, Camera, Save, Lock, Phone, Mail, Shield,
   Loader2, CheckCircle, Eye, EyeOff, Building2, Smartphone
@@ -21,6 +22,17 @@ const ROLE_COLOR: Record<string, string> = {
   bendahara: 'bg-orange-100 text-orange-700 border-orange-200',
 }
 
+type ProfilData = {
+  id: string
+  email: string
+  full_name: string | null
+  role: string
+  asrama_binaan: string | null
+  avatar_url: string | null
+  phone: string | null
+  show_bottomnav: number | null
+}
+
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
   return (
     <div className={`fixed top-4 right-4 z-[999] flex items-center gap-2 px-4 py-3 rounded-xl shadow-sm text-sm font-semibold ${
@@ -32,7 +44,7 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
 }
 
 export default function ProfilPage() {
-  const [profil, setProfil] = useState<any>(null)
+  const [profil, setProfil] = useState<ProfilData | null>(null)
   const [loading, setLoading] = useState(true)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -70,17 +82,45 @@ export default function ProfilPage() {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) { showToast('Ukuran file maksimal 2MB', 'error'); return }
-    const reader = new FileReader()
-    reader.onload = ev => setAvatarPreview(ev.target?.result as string)
-    reader.readAsDataURL(file)
+    if (!file.type.startsWith('image/')) { showToast('File harus berupa gambar', 'error'); return }
+    if (file.size > 10 * 1024 * 1024) { showToast('Ukuran file maksimal 10MB', 'error'); return }
+
     setUploadingAvatar(true)
-    const fd = new FormData(); fd.append('file', file)
-    const res = await uploadAvatar(fd)
-    setUploadingAvatar(false)
-    if ('error' in res) { showToast(res.error as string, 'error'); setAvatarPreview(profil?.avatar_url || null); return }
-    showToast('Foto profil diperbarui!', 'success')
-    setProfil((p: any) => ({ ...p, avatar_url: (res as any).url }))
+    try {
+      const compressedBase64 = await compressImageFile(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.78,
+        mimeType: 'image/jpeg',
+      })
+      setAvatarPreview(compressedBase64)
+
+      const compressedBlob = await fetch(compressedBase64).then(res => res.blob())
+      if (compressedBlob.size > 2 * 1024 * 1024) {
+        showToast('Foto masih terlalu besar setelah dikompres', 'error')
+        setAvatarPreview(profil?.avatar_url || null)
+        return
+      }
+
+      const fd = new FormData()
+      fd.append('file', compressedBlob, 'avatar.jpg')
+      const res = await uploadAvatar(fd)
+      if ('error' in res) {
+        showToast(res.error as string, 'error')
+        setAvatarPreview(profil?.avatar_url || null)
+        return
+      }
+
+      showToast('Foto profil diperbarui!', 'success')
+      setProfil(p => p ? { ...p, avatar_url: res.url } : p)
+      setAvatarPreview(res.url)
+    } catch (error: unknown) {
+      showToast(error instanceof Error ? error.message : 'Gagal memproses foto', 'error')
+      setAvatarPreview(profil?.avatar_url || null)
+    } finally {
+      setUploadingAvatar(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const handleSaveInfo = async () => {
@@ -89,7 +129,7 @@ export default function ProfilPage() {
     setSavingInfo(false)
     if ('error' in res) { showToast(res.error as string, 'error'); return }
     showToast('Profil berhasil disimpan!', 'success')
-    setProfil((p: any) => ({ ...p, full_name: nama, phone }))
+    setProfil(p => p ? { ...p, full_name: nama, phone } : p)
   }
 
   const handleChangePassword = async () => {
@@ -103,6 +143,7 @@ export default function ProfilPage() {
   }
 
   const initials = (profil?.full_name || '?').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+  const profileRole = profil?.role || ''
   const pwStrength = pwNew.length === 0 ? 0 : pwNew.length < 6 ? 1 : pwNew.length < 10 ? 2 : 3
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
@@ -138,8 +179,8 @@ export default function ProfilPage() {
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
               </div>
               <div className="mb-1">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${ROLE_COLOR[profil?.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                  <Shield className="w-3 h-3" />{ROLE_LABEL[profil?.role] || profil?.role}
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${ROLE_COLOR[profileRole] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                  <Shield className="w-3 h-3" />{ROLE_LABEL[profileRole] || profileRole}
                 </span>
               </div>
             </div>

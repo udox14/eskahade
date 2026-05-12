@@ -2,7 +2,14 @@
 
 import { query } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
-import { buildWeeklyGuruRuleMap, getWeeklyGuruRules, resolveGuruForDate } from '@/lib/akademik/guru-jadwal'
+import {
+  buildGabunganByKelas,
+  buildGabunganMembersByGroup,
+  buildWeeklyGuruRuleMap,
+  getKelasGabunganPengajian,
+  getWeeklyGuruRules,
+  resolveGuruForDate,
+} from '@/lib/akademik/guru-jadwal'
 
 function isLibur(dayOfWeek: number, session: 'shubuh' | 'ashar' | 'maghrib'): boolean {
   if (dayOfWeek === 2 && session === 'maghrib') return true
@@ -85,6 +92,9 @@ export async function getRekapKinerjaGuru(
   `, [...kelasIds, startDate, endDate])
 
   const ruleMap = buildWeeklyGuruRuleMap(await getWeeklyGuruRules(kelasIds))
+  const gabungan = await getKelasGabunganPengajian(kelasIds)
+  const gabunganByKelas = buildGabunganByKelas(gabungan)
+  const gabunganMembersByGroup = buildGabunganMembersByGroup(gabungan)
   const statsGuru = new Map<string, any>()
 
   const initGuru = (id: string | number | null, nama: string | null, kelasNama: string, label: string) => {
@@ -140,9 +150,17 @@ export async function getRekapKinerjaGuru(
       const processSession = (session: 'shubuh' | 'ashar' | 'maghrib', label: string) => {
         if (isLibur(dayOfWeek, session)) return
 
+        const group = gabunganByKelas.get(`${kelas.id}|${session}`)
+        const members = group ? (gabunganMembersByGroup.get(group.id) || []) : []
+        const representative = members[0]
+        if (representative && representative.kelas_id !== kelas.id) return
+
         const snapshot = snapshotBySession(absen, session)
         const targetGuru = snapshot.id && snapshot.nama ? snapshot : resolved[session]
-        const stat = initGuru(targetGuru.id, targetGuru.nama, kelas.nama_kelas, label)
+        const kelasLabel = group
+          ? `${members.map(member => member.nama_kelas).join(' + ')}${group.tempat ? ` - ${group.tempat}` : ''}`
+          : kelas.nama_kelas
+        const stat = initGuru(targetGuru.id, targetGuru.nama, kelasLabel, label)
         if (!stat) return
 
         stat.total_wajib += 1
