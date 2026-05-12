@@ -284,13 +284,13 @@ export async function hapusPeserta(plottingId: number) {
 }
 
 export async function cariSantriUnplotted(eventId: number, jk: string, keyword: string) {
-    // Cari santri aktif yang berjenis kelamin sesuai, dan BELUM diplot di event ini
+    // Cari santri peserta EHB yang berjenis kelamin sesuai, dan BELUM diplot di event ini
     return query<any>(`
         SELECT s.id, s.nama_lengkap, s.nis, k.nama_kelas
         FROM santri s
         JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
         JOIN kelas k ON k.id = rp.kelas_id
-        WHERE s.status_global = 'aktif' 
+        WHERE s.status_global IN ('aktif', 'nonaktif_sementara') 
           AND s.jenis_kelamin = ? 
           AND s.nama_lengkap LIKE ?
           AND s.id NOT IN (SELECT santri_id FROM ehb_plotting_santri WHERE ehb_event_id = ?)

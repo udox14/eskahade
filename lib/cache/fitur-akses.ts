@@ -3,7 +3,7 @@
 // Multi-role aware permission engine.
 // Supports: multi-role checks + per-user grant/revoke overrides.
 
-import { query } from '@/lib/db'
+import { execute, query } from '@/lib/db'
 
 export interface FiturAkses {
   id: number
@@ -32,9 +32,53 @@ interface FiturAksesRow {
   bottomnav_urutan: number
 }
 
+let fiturSchemaReady = false
+
+async function ensureFiturAksesReady() {
+  if (fiturSchemaReady) return
+
+  await execute(`
+    CREATE TABLE IF NOT EXISTS fitur_akses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_name TEXT NOT NULL,
+      title TEXT NOT NULL,
+      href TEXT NOT NULL UNIQUE,
+      icon TEXT NOT NULL DEFAULT '',
+      roles TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      urutan INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+  await execute('CREATE INDEX IF NOT EXISTS idx_fitur_akses_active ON fitur_akses(is_active)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_fitur_akses_href ON fitur_akses(href)')
+
+  const columns = await query<{ name: string }>('PRAGMA table_info(fitur_akses)')
+  if (!columns.some(col => col.name === 'is_bottomnav')) {
+    await execute('ALTER TABLE fitur_akses ADD COLUMN is_bottomnav INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!columns.some(col => col.name === 'bottomnav_urutan')) {
+    await execute('ALTER TABLE fitur_akses ADD COLUMN bottomnav_urutan INTEGER NOT NULL DEFAULT 0')
+  }
+
+  await execute(`
+    INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
+    VALUES
+      ('_standalone', 'Dashboard', '/dashboard', 'LayoutDashboard', '["admin","keamanan","sekpen","dewan_santri","pengurus_asrama","wali_kelas","bendahara"]', 1, 0),
+      ('Asrama', 'Kamar', '/dashboard/asrama/kamar', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 5),
+      ('Asrama', 'Perpindahan Kamar', '/dashboard/asrama/perpindahan-kamar', 'ArrowLeftRight', '["admin","pengurus_asrama"]', 1, 6),
+      ('Asrama', 'Plotting Kamar Manual', '/dashboard/asrama/plotting-kamar-manual', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 7),
+      ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8)
+  `)
+
+  fiturSchemaReady = true
+}
+
 // Ambil SEMUA fitur — query langsung ke D1, dengan fallback aman kalau DB error
 export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
   try {
+    await ensureFiturAksesReady()
     // Coba query dengan kolom bottomnav dulu (setelah migration 0016)
     // Kalau kolom belum ada, fallback ke query tanpa kolom bottomnav
     let rows: FiturAksesRow[] = []
@@ -59,8 +103,8 @@ export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
       is_active: r.is_active === 1,
       is_bottomnav: r.is_bottomnav === 1,
     }))
-  } catch (err: any) {
-    console.error('[fitur-akses] getCachedFiturAkses ERROR:', err?.message)
+  } catch (err: unknown) {
+    console.error('[fitur-akses] getCachedFiturAkses ERROR:', err instanceof Error ? err.message : err)
     return []
   }
 }

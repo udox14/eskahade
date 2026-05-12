@@ -242,7 +242,7 @@ export default function PlottingEhbPage() {
           <div className="bg-red-50 px-5 py-4 border-b border-red-100 flex justify-between items-center">
             <div>
               <h3 className="font-bold text-red-800 flex items-center gap-2"><UserX className="w-5 h-5"/> Santri Belum Mendapat Ruangan ({activeJamTab})</h3>
-              <p className="text-xs text-red-600 mt-1">Daftar santri aktif yang belum terplot karena kapasitas ruangan kurang atau ada penambahan santri baru.</p>
+              <p className="text-xs text-red-600 mt-1">Daftar peserta EHB yang belum terplot karena kapasitas ruangan kurang atau ada penambahan santri baru.</p>
             </div>
             <div className="bg-red-100 text-red-700 font-bold px-3 py-1 rounded-lg text-sm">
               {activeUnplotted.length} Santri
