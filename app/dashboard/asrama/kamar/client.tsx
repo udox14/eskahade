@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Crown, LogOut, MapPin, School, Shuffle, Users } from 'lucide-react'
+import { ArrowLeft, Crown, LogOut, MapPin, School, Users } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   batalTandaiSantriKeluarDariKamar,
@@ -127,7 +127,6 @@ export default function KamarClient({
   const [loading, setLoading] = useState(true)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
-  const [mutasiTargetRoom, setMutasiTargetRoom] = useState('')
   const [catatanKeluar, setCatatanKeluar] = useState('')
   const [pending, startTransition] = useTransition()
   const selectedKamar = searchParams.get('kamar')
@@ -183,7 +182,6 @@ export default function KamarClient({
 
   useEffect(() => {
     queueMicrotask(() => {
-      setMutasiTargetRoom('')
       setCatatanKeluar(selectedMember?.pending_keluar?.catatan || '')
     })
   }, [selectedMember?.id, selectedMember?.pending_keluar?.catatan])
@@ -343,19 +341,7 @@ export default function KamarClient({
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ketua Kamar</p>
                 <div className="mt-2 space-y-3">
                   <p className="text-lg font-black text-slate-800">{selectedRoom.ketua?.nama_lengkap || 'Belum ditentukan'}</p>
-                  <select
-                    value={selectedRoom.ketua?.santri_id || ''}
-                    onChange={(event) => handleSetKetua(selectedRoom.nomor_kamar, event.target.value || null)}
-                    disabled={pending}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
-                  >
-                    <option value="">-- Pilih Ketua Kamar --</option>
-                    {selectedRoom.members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.nama_lengkap}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="text-xs font-medium text-slate-400">Centang langsung dari tabel anggota.</p>
                 </div>
               </div>
               <div className="rounded-2xl border bg-white p-4 shadow-sm">
@@ -381,33 +367,6 @@ export default function KamarClient({
                     <div>
                       <p className="text-sm font-black text-slate-800">{selectedMember.nama_lengkap}</p>
                       <p className="text-xs text-slate-400">{selectedMember.nis}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mutasi Dalam Asrama</label>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={mutasiTargetRoom}
-                          onChange={(event) => setMutasiTargetRoom(event.target.value)}
-                          disabled={pending}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
-                        >
-                          <option value="">Pilih kamar tujuan</option>
-                          {roomNames.filter((room) => room !== selectedRoom.nomor_kamar).map((room) => (
-                            <option key={room} value={room}>Kamar {room}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={pending || !mutasiTargetRoom}
-                          onClick={() => {
-                            if (!mutasiTargetRoom) return
-                            handleMutasi(selectedMember.id, mutasiTargetRoom)
-                          }}
-                          className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:bg-slate-300"
-                        >
-                          <Shuffle className="h-3.5 w-3.5" /> Mutasi
-                        </button>
-                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tandai Keluar</label>
@@ -453,21 +412,23 @@ export default function KamarClient({
             </div>
 
             <div className="overflow-x-auto rounded-2xl border bg-white shadow-sm">
-              <table className="w-full min-w-[980px] text-sm">
+              <table className="w-full min-w-[1120px] text-sm">
                 <thead className="border-b bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
+                    <th className="w-20 px-4 py-3 text-center">Ketua</th>
                     <th className="px-4 py-3 text-left">Nama</th>
                     <th className="px-4 py-3 text-left">Kelas</th>
                     <th className="px-4 py-3 text-left">Sekolah</th>
                     <th className="px-4 py-3 text-left">Kelas Sekolah</th>
                     <th className="px-4 py-3 text-left">Kab/Kota</th>
+                    <th className="w-44 px-4 py-3 text-left">Mutasi</th>
                     <th className="px-4 py-3 text-left">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {selectedRoom.members.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-16 text-center text-slate-400">Belum ada anggota di kamar ini.</td>
+                      <td colSpan={8} className="px-4 py-16 text-center text-slate-400">Belum ada anggota di kamar ini.</td>
                     </tr>
                   ) : (
                     selectedRoom.members.map((member) => {
@@ -479,6 +440,17 @@ export default function KamarClient({
                           onClick={() => setSelectedMemberId(member.id)}
                           className={`cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
                         >
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isKetua}
+                              disabled={pending}
+                              aria-label={`Jadikan ${member.nama_lengkap} ketua kamar`}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => handleSetKetua(selectedRoom.nomor_kamar, event.target.checked ? member.id : null)}
+                              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-start gap-2">
                               {isKetua ? <Crown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> : null}
@@ -496,6 +468,25 @@ export default function KamarClient({
                               <MapPin className="h-3.5 w-3.5" />
                               {member.alamat_ringkas}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              value=""
+                              disabled={pending || roomNames.length <= 1}
+                              aria-label={`Pindahkan ${member.nama_lengkap} ke kamar lain`}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => {
+                                event.stopPropagation()
+                                if (!event.target.value) return
+                                handleMutasi(member.id, event.target.value)
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none transition focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                              <option value="">Pindah kamar</option>
+                              {roomNames.filter((room) => room !== selectedRoom.nomor_kamar).map((room) => (
+                                <option key={room} value={room}>Kamar {room}</option>
+                              ))}
+                            </select>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
