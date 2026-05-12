@@ -141,11 +141,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
       for (const sesi of VALID_SESI) {
         const group = gabunganByKelas.get(`${kelas.id}|${sesi}`)
         if (!group) continue
-        const members = gabunganMembersByGroup.get(group.id) || []
-        const representative = members[0]
-        if (representative && representative.kelas_id !== kelas.id) {
-          guru[sesi] = { id: null, nama: null, source: 'default' }
-        }
+        guru[sesi] = { id: null, nama: null, source: 'default' }
       }
       return { ...entry, guru }
     }),
