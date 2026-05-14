@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getRekapAbsenBerjamaah, getKamarList } from './actions'
-import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react'
+import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, FileSpreadsheet } from 'lucide-react'
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
+import { toast } from 'sonner'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -22,6 +23,9 @@ function getDaysInMonth(bulan: string) {
 function formatBulan(bulan: string) {
   const [y, m] = bulan.split('-').map(Number)
   return new Date(y, m - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+}
+function formatTanggalPendek(tanggal: string) {
+  return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
 }
 function prevBulan(b: string) {
   const [y, m] = b.split('-').map(Number)
@@ -51,6 +55,7 @@ export default function RekapAsramaPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
+  const [exportingMalam, setExportingMalam] = useState(false)
 
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
@@ -119,6 +124,59 @@ export default function RekapAsramaPage() {
       alert("Gagal memuat rekap asrama. Silakan coba lagi. Error: " + (error?.message || "Unknown error"))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleExportMalamExcel() {
+    if (filteredMalamSantri.length === 0) {
+      toast.info('Tidak ada data absen malam untuk diexport.')
+      return
+    }
+
+    setExportingMalam(true)
+    const exportToast = toast.loading('Menyiapkan file Excel...')
+    try {
+      const XLSX = await import('xlsx')
+      const headers = [
+        'Nama Santri',
+        'NIS',
+        'Asrama',
+        'Kamar',
+        'Total Alfa',
+        ...daysArr.map(tanggal => formatTanggalPendek(tanggal)),
+      ]
+
+      const rows = filteredMalamSantri.map(s => {
+        const detail = malamDetail[s.id] || {}
+        const statusValues = daysArr.map(tanggal => detail[tanggal] === 'ALFA' ? 'A' : '')
+        return [
+          s.nama_lengkap,
+          s.nis || '-',
+          asrama,
+          s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar',
+          malamAlfa[s.id] || 0,
+          ...statusValues,
+        ]
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws['!cols'] = headers.map((h, i) => ({
+        wch: Math.min(Math.max(h.length, ...rows.map(r => String(r[i] || '').length)) + 2, i < 5 ? 32 : 12),
+      }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absen Malam')
+
+      const namaAsrama = asrama.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '')
+      XLSX.writeFile(wb, `Rekap_Absen_Malam_${namaAsrama}_${bulan}.xlsx`)
+
+      toast.success('Berhasil export ke Excel')
+    } catch (err) {
+      console.error(err)
+      toast.error('Gagal export ke Excel')
+    } finally {
+      toast.dismiss(exportToast)
+      setExportingMalam(false)
     }
   }
 
@@ -226,6 +284,17 @@ export default function RekapAsramaPage() {
           </div>
           
           <div className="flex gap-2 w-full flex-wrap sm:w-auto sm:flex-nowrap">
+            {tab === 'malam' && (
+              <button
+                onClick={handleExportMalamExcel}
+                disabled={exportingMalam || filteredMalamSantri.length === 0}
+                className="flex shrink-0 items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-100 active:scale-95 transition text-sm disabled:opacity-50"
+                title="Export Excel Rekap Absen Malam"
+              >
+                {exportingMalam ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileSpreadsheet className="w-4 h-4"/>}
+                <span className="hidden lg:block">Export Excel</span>
+              </button>
+            )}
             {tab === 'berjamaah' && !isPutri && (
               <button 
                 onClick={() => setShowImportModal(true)} 
