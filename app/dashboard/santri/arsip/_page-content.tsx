@@ -19,6 +19,9 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
+const PAGE_SIZE_OPTIONS = [10, 50, 100, 0]
+const ARCHIVE_BATCH_SIZE = 10
+
 type Grup = {
   key: string
   angkatan: number | null
@@ -26,6 +29,70 @@ type Grup = {
   tanggal_arsip: string
   jumlah: number
   asramaList: string[]
+}
+
+function PaginationBar({
+  page,
+  total,
+  pageSize,
+  loading,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number
+  total: number
+  pageSize: number
+  loading: boolean
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+}) {
+  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(total / pageSize))
+  const start = total === 0 ? 0 : pageSize === 0 ? 1 : (page - 1) * pageSize + 1
+  const end = pageSize === 0 ? total : Math.min(page * pageSize, total)
+
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 border-t bg-slate-50">
+      <p className="text-xs text-slate-500">
+        {total === 0 ? 'Tidak ada data' : `Menampilkan ${start}-${end} dari ${total} santri`}
+      </p>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          Tampilkan
+          <select
+            value={pageSize}
+            disabled={loading}
+            onChange={e => onPageSizeChange(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-60"
+          >
+            {PAGE_SIZE_OPTIONS.map(size => (
+              <option key={size} value={size}>{size === 0 ? 'SEMUA' : size}</option>
+            ))}
+          </select>
+        </label>
+        {pageSize !== 0 && totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={loading || page <= 1}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Halaman sebelumnya"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-bold text-slate-600 min-w-16 text-center">{page} / {totalPages}</span>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={loading || page >= totalPages}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Halaman berikutnya"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function ArsipSantriPage() {
@@ -38,9 +105,8 @@ export default function ArsipSantriPage() {
   const [santriList, setSantriList] = useState<any[]>([])
   const [santriTotal, setSantriTotal] = useState(0)
   const [santriPage, setSantriPage] = useState(1)
-  const [santriHasMore, setSantriHasMore] = useState(false)
+  const [santriPageSize, setSantriPageSize] = useState(10)
   const [loadingSantri, setLoadingSantri] = useState(false)
-  const [loadingMoreSantri, setLoadingMoreSantri] = useState(false)
   const [filterSantri, setFilterSantri] = useState({ search: '', asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' })
   const [optsSantri, setOptsSantri] = useState<{ asramaList: string[], sekolahList: string[], kelasList: string[], tahunList: number[] }>({ asramaList: [], sekolahList: [], kelasList: [], tahunList: [] })
   const [selectedArsip, setSelectedArsip] = useState<Set<string>>(new Set())
@@ -58,9 +124,8 @@ export default function ArsipSantriPage() {
   const [santriArsipList, setSantriArsipList] = useState<any[]>([])
   const [santriArsipTotal, setSantriArsipTotal] = useState(0)
   const [santriArsipPage, setSantriArsipPage] = useState(1)
-  const [santriArsipHasMore, setSantriArsipHasMore] = useState(false)
+  const [santriArsipPageSize, setSantriArsipPageSize] = useState(10)
   const [loadingSantriArsip, setLoadingSantriArsip] = useState(false)
-  const [loadingMoreSantriArsip, setLoadingMoreSantriArsip] = useState(false)
   const [filterSantriArsip, setFilterSantriArsip] = useState({ search: '', asrama: '' })
   const [hasLoadedSantri, setHasLoadedSantri] = useState(false)
   const [hasLoadedGrup, setHasLoadedGrup] = useState(false)
@@ -80,21 +145,21 @@ export default function ArsipSantriPage() {
   }
 
   // ── LOAD SANTRI AKTIF ──
-  const loadSantri = async (page: number, filter: typeof filterSantri, append: boolean) => {
+  const loadSantri = async (page: number, filter: typeof filterSantri, pageSize = santriPageSize) => {
     setHasLoadedSantri(true)
-    append ? setLoadingMoreSantri(true) : setLoadingSantri(true)
-    const res = await getSantriAktifUntukArsip({ ...filter, tahun_masuk: filter.tahun_masuk ? Number(filter.tahun_masuk) : undefined, page })
-    if (append) setSantriList(prev => [...prev, ...res.data])
-    else { setSantriList(res.data); setSelectedArsip(new Set()) }
-    setSantriTotal(res.total); setSantriPage(page); setSantriHasMore(res.hasMore)
-    append ? setLoadingMoreSantri(false) : setLoadingSantri(false)
+    setLoadingSantri(true)
+    const res = await getSantriAktifUntukArsip({ ...filter, tahun_masuk: filter.tahun_masuk ? Number(filter.tahun_masuk) : undefined, page, pageSize })
+    setSantriList(res.data)
+    setSelectedArsip(new Set())
+    setSantriTotal(res.total); setSantriPage(page)
+    setLoadingSantri(false)
   }
 
   const handleFilterSantriChange = (key: string, val: string) => {
     const next = { ...filterSantri, [key]: val }
     setFilterSantri(next)
     clearTimeout(debounceRef.current ?? undefined)
-    debounceRef.current = setTimeout(() => loadSantri(1, next, false), 350)
+    debounceRef.current = setTimeout(() => loadSantri(1, next), 350)
   }
 
   // ── LOAD GRUP ARSIP (LEVEL 1) ──
@@ -113,30 +178,30 @@ export default function ArsipSantriPage() {
     setSelectedRestore(new Set())
     setFilterSantriArsip({ search: '', asrama: '' })
     setOptsArsipAsrama(grup.asramaList)
-    loadSantriGrup(1, { search: '', asrama: '' }, false, grup)
+    loadSantriGrup(1, { search: '', asrama: '' }, santriArsipPageSize, grup)
   }
 
   const loadSantriGrup = async (
     page: number,
     filter: typeof filterSantriArsip,
-    append: boolean,
+    pageSize = santriArsipPageSize,
     grup?: Grup
   ) => {
     const g = grup ?? activeGrup
     if (!g) return
-    append ? setLoadingMoreSantriArsip(true) : setLoadingSantriArsip(true)
-    const res = await getSantriDalamGrup(g.angkatan, g.catatan, g.tanggal_arsip, { ...filter, page })
-    if (append) setSantriArsipList(prev => [...prev, ...res.data])
-    else { setSantriArsipList(res.data); setSelectedRestore(new Set()) }
-    setSantriArsipTotal(res.total); setSantriArsipPage(page); setSantriArsipHasMore(res.hasMore)
-    append ? setLoadingMoreSantriArsip(false) : setLoadingSantriArsip(false)
+    setLoadingSantriArsip(true)
+    const res = await getSantriDalamGrup(g.angkatan, g.catatan, g.tanggal_arsip, { ...filter, page, pageSize })
+    setSantriArsipList(res.data)
+    setSelectedRestore(new Set())
+    setSantriArsipTotal(res.total); setSantriArsipPage(page)
+    setLoadingSantriArsip(false)
   }
 
   const handleFilterSantriArsipChange = (key: string, val: string) => {
     const next = { ...filterSantriArsip, [key]: val }
     setFilterSantriArsip(next)
     clearTimeout(debounceRef.current ?? undefined)
-    debounceRef.current = setTimeout(() => loadSantriGrup(1, next, false), 350)
+    debounceRef.current = setTimeout(() => loadSantriGrup(1, next), 350)
   }
 
   // ── SELECT HELPERS ──
@@ -158,14 +223,36 @@ export default function ArsipSantriPage() {
     if (selectedArsip.size === 0) return toast.warning("Pilih santri yang akan dijadikan alumni")
     if (!await confirm(`Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData historis tetap disimpan di D1. Santri hanya disembunyikan dari daftar aktif.`)) return
     setIsArsipkan(true)
-    const toastId = toast.loading(`Memproses ${selectedArsip.size} santri...`)
-    const res = await arsipkanSantri(Array.from(selectedArsip), catatanArsip)
-    toast.dismiss(toastId); setIsArsipkan(false)
-    if ('error' in res) { toast.error("Gagal", { description: res.error }); return }
-    const msg = (res?.gagal ?? 0) > 0 ? `${res?.berhasil} berhasil, ${res?.gagal} gagal` : `${res?.berhasil} santri berhasil diarsipkan`
-    toast.success("Selesai!", { description: msg })
-    if ((res?.errors?.length ?? 0) > 0) console.error("Errors:", res?.errors)
-    setCatatanArsip(''); loadSantri(1, filterSantri, false)
+    const ids = Array.from(selectedArsip)
+    const toastId = toast.loading(`Memproses 0 / ${ids.length} santri...`)
+    let berhasil = 0
+    let gagal = 0
+    const errors: string[] = []
+
+    try {
+      for (let i = 0; i < ids.length; i += ARCHIVE_BATCH_SIZE) {
+        const chunk = ids.slice(i, i + ARCHIVE_BATCH_SIZE)
+        toast.loading(`Memproses ${Math.min(i + chunk.length, ids.length)} / ${ids.length} santri...`, { id: toastId })
+        const res = await arsipkanSantri(chunk, catatanArsip)
+        if ('error' in res) throw new Error(res.error)
+        berhasil += res.berhasil
+        gagal += res.gagal
+        errors.push(...res.errors)
+      }
+
+      toast.dismiss(toastId)
+      const msg = gagal > 0 ? `${berhasil} berhasil, ${gagal} gagal` : `${berhasil} santri berhasil diarsipkan`
+      toast.success("Selesai!", { description: msg })
+      if (errors.length > 0) console.error("Errors:", errors)
+      setCatatanArsip('')
+      loadSantri(1, filterSantri)
+      if (hasLoadedGrup) loadGrup()
+    } catch (err: any) {
+      toast.dismiss(toastId)
+      toast.error("Gagal", { description: err?.message ?? 'Proses arsip terhenti' })
+    } finally {
+      setIsArsipkan(false)
+    }
   }
 
   const handleRestore = async () => {
@@ -179,7 +266,7 @@ export default function ArsipSantriPage() {
     const msg = (res?.gagal ?? 0) > 0 ? `${res?.berhasil} berhasil, ${res?.gagal} gagal` : `${res?.berhasil} santri berhasil direstore`
     toast.success("Restore Selesai!", { description: msg })
     // Refresh grup & level 2
-    loadSantriGrup(1, filterSantriArsip, false)
+    loadSantriGrup(1, filterSantriArsip)
     loadGrup()
   }
 
@@ -192,7 +279,7 @@ export default function ArsipSantriPage() {
     toast.dismiss(toastId); setIsHapusMassal(false)
     if ('error' in res) { toast.error("Gagal hapus", { description: res.error }); return }
     toast.success(`${res?.count} catatan arsip dihapus`)
-    loadSantriGrup(1, filterSantriArsip, false)
+    loadSantriGrup(1, filterSantriArsip)
     loadGrup()
     // Kalau grup sudah kosong, kembali ke level 1
     if ((santriArsipTotal - (res?.count ?? 0)) <= 0) setActiveGrup(null)
@@ -203,7 +290,7 @@ export default function ArsipSantriPage() {
     const res = await hapusArsipPermanen(id)
     if ('error' in res) { toast.error("Gagal hapus", { description: res.error }); return }
     toast.success("Catatan arsip dihapus")
-    loadSantriGrup(santriArsipPage, filterSantriArsip, false)
+    loadSantriGrup(santriArsipPage, filterSantriArsip)
     loadGrup()
   }
 
@@ -309,7 +396,7 @@ export default function ArsipSantriPage() {
                   <Filter className="w-4 h-4" /> Filter
                   {activeFilterCount > 0 && <span className="bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFilterCount}</span>}
                 </button>
-                <button onClick={() => loadSantri(1, filterSantri, false)} disabled={loadingSantri}
+                <button onClick={() => loadSantri(1, filterSantri)} disabled={loadingSantri}
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 disabled:opacity-60 flex items-center gap-2">
                   {loadingSantri ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   Tampilkan
@@ -351,7 +438,7 @@ export default function ArsipSantriPage() {
                   </select>
                 </div>
                 {activeFilterCount > 0 && (
-                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e, false) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
+                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
                     <X className="w-3 h-3" /> Reset filter
                   </button>
                 )}
@@ -417,14 +504,17 @@ export default function ArsipSantriPage() {
                       })}
                     </tbody>
                   </table>
-                  {santriHasMore && (
-                    <div className="p-4 text-center border-t">
-                      <button onClick={() => loadSantri(santriPage + 1, filterSantri, true)} disabled={loadingMoreSantri} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
-                        {loadingMoreSantri && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {loadingMoreSantri ? 'Memuat...' : `Muat lebih banyak (sisa ${santriTotal - santriList.length})`}
-                      </button>
-                    </div>
-                  )}
+                  <PaginationBar
+                    page={santriPage}
+                    total={santriTotal}
+                    pageSize={santriPageSize}
+                    loading={loadingSantri}
+                    onPageChange={nextPage => loadSantri(nextPage, filterSantri)}
+                    onPageSizeChange={nextPageSize => {
+                      setSantriPageSize(nextPageSize)
+                      loadSantri(1, filterSantri, nextPageSize)
+                    }}
+                  />
                 </>
               )}
             </div>
@@ -578,14 +668,17 @@ export default function ArsipSantriPage() {
                           })}
                         </tbody>
                       </table>
-                      {santriArsipHasMore && (
-                        <div className="p-4 text-center border-t">
-                          <button onClick={() => loadSantriGrup(santriArsipPage + 1, filterSantriArsip, true)} disabled={loadingMoreSantriArsip} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold flex items-center gap-2 mx-auto disabled:opacity-50">
-                            {loadingMoreSantriArsip && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {loadingMoreSantriArsip ? 'Memuat...' : `Muat lebih banyak (sisa ${santriArsipTotal - santriArsipList.length})`}
-                          </button>
-                        </div>
-                      )}
+                      <PaginationBar
+                        page={santriArsipPage}
+                        total={santriArsipTotal}
+                        pageSize={santriArsipPageSize}
+                        loading={loadingSantriArsip}
+                        onPageChange={nextPage => loadSantriGrup(nextPage, filterSantriArsip)}
+                        onPageSizeChange={nextPageSize => {
+                          setSantriArsipPageSize(nextPageSize)
+                          loadSantriGrup(1, filterSantriArsip, nextPageSize)
+                        }}
+                      />
                     </>
                   )}
                 </div>

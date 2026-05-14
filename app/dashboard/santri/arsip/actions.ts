@@ -6,7 +6,7 @@ import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
-const PAGE_SIZE = 30
+const DEFAULT_PAGE_SIZE = 10
 const ARCHIVE_STATUS = 'arsip'
 
 export type FilterSantri = {
@@ -17,6 +17,7 @@ export type FilterSantri = {
   kelas_pesantren?: string
   tahun_masuk?: number
   page?: number
+  pageSize?: number
 }
 
 type ArchiveGroupFilter = {
@@ -171,6 +172,16 @@ async function buildSantriSnapshot(profil: Row) {
   }
 }
 
+function buildSoftArchiveSnapshot(profil: Row) {
+  return {
+    schema_version: 3,
+    mode: 'soft_archive',
+    archived_at: now(),
+    profil,
+    note: 'Data historis tetap tersimpan di tabel asal. Snapshot ini menyimpan profil saat santri dijadikan alumni.',
+  }
+}
+
 async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
   const profil = { ...(snap.profil ?? {}) }
   if (!profil.nis || !profil.nama_lengkap) throw new Error('Snapshot profil tidak lengkap')
@@ -233,8 +244,11 @@ async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
 }
 
 export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
-  const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk, page = 1 } = filter
-  const offset = (page - 1) * PAGE_SIZE
+  const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk } = filter
+  const pageSize = filter.pageSize ?? DEFAULT_PAGE_SIZE
+  const showAll = pageSize === 0
+  const page = showAll ? 1 : Math.max(1, filter.page ?? 1)
+  const offset = showAll ? 0 : (page - 1) * pageSize
 
   const clauses = ["s.status_global = 'aktif'"]
   const params: any[] = []
@@ -257,6 +271,7 @@ export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
   )
   const total = countRow?.total ?? 0
 
+  const limitClause = showAll ? '' : 'LIMIT ? OFFSET ?'
   const data = await query<any>(
     `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar,
             s.sekolah, s.kelas_sekolah, s.tahun_masuk,
@@ -266,11 +281,11 @@ export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
      LEFT JOIN kelas k ON rp.kelas_id = k.id
      WHERE ${where}
      ORDER BY s.nama_lengkap
-     LIMIT ? OFFSET ?`,
-    [...params, PAGE_SIZE, offset]
+     ${limitClause}`,
+    showAll ? params : [...params, pageSize, offset]
   )
 
-  return { data, total, page, hasMore: offset + PAGE_SIZE < total }
+  return { data, total, page, hasMore: showAll ? false : offset + pageSize < total }
 }
 
 export async function getFilterOptionsSantri() {
@@ -318,7 +333,7 @@ export async function getGrupArsip() {
   }))
 }
 
-export type FilterSantriArsip = { search?: string; asrama?: string; page?: number }
+export type FilterSantriArsip = { search?: string; asrama?: string; page?: number; pageSize?: number }
 
 export async function getSantriDalamGrup(
   angkatan: number | null,
@@ -326,8 +341,11 @@ export async function getSantriDalamGrup(
   tanggalArsip: string,
   filter: FilterSantriArsip = {}
 ) {
-  const { search, asrama, page = 1 } = filter
-  const offset = (page - 1) * PAGE_SIZE
+  const { search, asrama } = filter
+  const pageSize = filter.pageSize ?? DEFAULT_PAGE_SIZE
+  const showAll = pageSize === 0
+  const page = showAll ? 1 : Math.max(1, filter.page ?? 1)
+  const offset = showAll ? 0 : (page - 1) * pageSize
 
   const clauses = ['DATE(a.tanggal_arsip) = ?']
   const params: any[] = [tanggalArsip]
@@ -348,6 +366,7 @@ export async function getSantriDalamGrup(
   )
   const total = countRow?.total ?? 0
 
+  const limitClause = showAll ? '' : 'LIMIT ? OFFSET ?'
   const data = await query<any>(
     `SELECT a.id, a.santri_id_asli, a.nis, a.nama_lengkap, a.asrama,
             a.tanggal_arsip, a.catatan, a.angkatan,
@@ -356,11 +375,11 @@ export async function getSantriDalamGrup(
      FROM santri_arsip a
      LEFT JOIN santri s ON s.id = a.santri_id_asli
      WHERE ${where}
-     ORDER BY a.nama_lengkap LIMIT ? OFFSET ?`,
-    [...params, PAGE_SIZE, offset]
+     ORDER BY a.nama_lengkap ${limitClause}`,
+    showAll ? params : [...params, pageSize, offset]
   )
 
-  return { data, total, page, hasMore: offset + PAGE_SIZE < total }
+  return { data, total, page, hasMore: showAll ? false : offset + pageSize < total }
 }
 
 export async function arsipkanSantri(santriIds: string[], catatan: string): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
@@ -372,10 +391,27 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
   let berhasil = 0
   let gagal = 0
   const errorList: string[] = []
+  const uniqueIds = Array.from(new Set(santriIds.filter(Boolean)))
 
-  for (const santriId of santriIds) {
-    try {
-      const profil = await queryOne<Row>('SELECT * FROM santri WHERE id = ?', [santriId])
+  if (uniqueIds.length === 0) return { error: 'Pilih minimal 1 santri' }
+
+  try {
+    const profiles = await query<Row>(
+      `SELECT * FROM santri WHERE id IN (${inClause(uniqueIds)})`,
+      uniqueIds
+    )
+    const profileMap = new Map(profiles.map(profil => [profil.id, profil]))
+    const existingRows = await query<{ id: string; santri_id_asli: string }>(
+      `SELECT id, santri_id_asli FROM santri_arsip WHERE santri_id_asli IN (${inClause(uniqueIds)})`,
+      uniqueIds
+    )
+    const existingMap = new Map(existingRows.map(row => [row.santri_id_asli, row.id]))
+    const timestamp = now()
+    const statements: { sql: string; params: any[] }[] = []
+    let pendingBerhasil = 0
+
+    for (const santriId of uniqueIds) {
+      const profil = profileMap.get(santriId)
       if (!profil) { gagal++; errorList.push(`ID ${santriId}: Data tidak ditemukan`); continue }
       if (profil.status_global !== 'aktif') {
         gagal++
@@ -383,42 +419,37 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
         continue
       }
 
-      const timestamp = now()
-      const snapshot = JSON.stringify(await buildSantriSnapshot(profil))
+      const snapshot = JSON.stringify(buildSoftArchiveSnapshot(profil))
       const angkatan = getAngkatan(profil)
-      const existing = await queryOne<{ id: string }>('SELECT id FROM santri_arsip WHERE santri_id_asli = ? LIMIT 1', [santriId])
+      const existingId = existingMap.get(santriId)
 
-      const statements = existing
-        ? [
-          {
-            sql: `UPDATE santri_arsip
-                  SET nis = ?, nama_lengkap = ?, angkatan = ?, asrama = ?, catatan = ?, snapshot = ?, tanggal_arsip = ?
-                  WHERE id = ?`,
-            params: [profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp, existing.id],
-          },
-          {
-            sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
-            params: [ARCHIVE_STATUS, timestamp, santriId],
-          },
-        ]
-        : [
-          {
-            sql: `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            params: [generateId(), santriId, profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp],
-          },
-          {
-            sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
-            params: [ARCHIVE_STATUS, timestamp, santriId],
-          },
-        ]
+      if (existingId) {
+        statements.push({
+          sql: `UPDATE santri_arsip
+                SET nis = ?, nama_lengkap = ?, angkatan = ?, asrama = ?, catatan = ?, snapshot = ?, tanggal_arsip = ?
+                WHERE id = ?`,
+          params: [profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp, existingId],
+        })
+      } else {
+        statements.push({
+          sql: `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          params: [generateId(), santriId, profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan || null, snapshot, timestamp],
+        })
+      }
 
-      await batch(statements)
-      berhasil++
-    } catch (err: any) {
-      gagal++
-      errorList.push(`ID ${santriId}: ${err.message}`)
+      statements.push({
+        sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
+        params: [ARCHIVE_STATUS, timestamp, santriId],
+      })
+      pendingBerhasil++
     }
+
+    if (statements.length > 0) await batch(statements)
+    berhasil += pendingBerhasil
+  } catch (err: any) {
+    gagal += Math.max(0, uniqueIds.length - gagal)
+    errorList.push(err?.message ?? 'Proses arsip gagal')
   }
 
   revalidatePath('/dashboard/santri/arsip')

@@ -4,6 +4,6 @@ import PageContent from './_page-content'
 export const dynamic = 'force-dynamic'
 
 export default async function GuardedPage() {
-  await guardPage('/dashboard/ehb/pengawas/plotting')
+  await guardPage('/dashboard/ehb/pengawas')
   return <PageContent />
 }

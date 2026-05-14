@@ -4,151 +4,37 @@
 
 ▲ Next.js 16.1.6 (Turbopack)
 - Local:         http://localhost:3000
-- Network:       http://192.168.1.8:3000
+- Network:       http://192.168.1.13:3000
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
-✓ Ready in 3.9s
+✓ Ready in 4.3s
 [layout] session null → redirect /login
-[layout] session null → redirect /login
- GET /dashboard/dewan-santri/setoran 307 in 2.7s (compile: 2.3s, render: 410ms)
- GET /dashboard/asrama/spp 307 in 2.7s (compile: 2.4s, render: 295ms)
-[layout] session null → redirect /login
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 234ms (compile: 9ms, render: 225ms)
- GET /dashboard/dewan-santri/setoran 307 in 241ms (compile: 112ms, render: 129ms)
-[layout] session null → redirect /login
-[layout] session null → redirect /login
- GET /dashboard/dewan-santri/setoran 307 in 1522ms (compile: 860ms, render: 661ms)
- GET /dashboard/asrama/spp 307 in 1619ms (compile: 1415ms, render: 203ms)
- GET /login 200 in 842ms (compile: 639ms, render: 203ms)
- GET /login 200 in 853ms (compile: 680ms, render: 173ms)
-[layout] session null → redirect /login
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 190ms (compile: 12ms, render: 179ms)
- GET /dashboard/dewan-santri/setoran 307 in 200ms (compile: 73ms, render: 126ms)
- GET /login 200 in 139ms (compile: 8ms, render: 131ms)
- GET /login 200 in 143ms (compile: 41ms, render: 101ms)
-[layout] session null → redirect /login
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 158ms (compile: 3ms, render: 155ms)
- GET /dashboard/dewan-santri/setoran 307 in 145ms (compile: 7ms, render: 137ms)
- GET /login 200 in 170ms (compile: 20ms, render: 149ms)
- GET /login 200 in 99ms (compile: 9ms, render: 90ms)
- POST /api/auth/login 500 in 3.4s (compile: 2.7s, render: 752ms)
- POST /api/auth/login 500 in 204ms (compile: 6ms, render: 198ms)
-✓ Compiled in 260ms
-✓ Compiled in 1289ms
-✓ Compiled in 361ms
-✓ Compiled in 442ms
- GET / 200 in 2.7s (compile: 1640ms, render: 1060ms)
- GET /api/version 200 in 1858ms
-○ Compiling /dashboard/asrama/kamar ...
+ GET /dashboard/santri/arsip 307 in 2.3s (compile: 2.1s, render: 214ms)
+ GET /login 200 in 169ms (compile: 98ms, render: 72ms)
+✓ Compiled in 298ms
+✓ Compiled in 218ms
 [layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
 [layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard/asrama/kamar 200 in 12.2s (compile: 10.9s, render: 1322ms)
- GET /api/version 200 in 12ms
- POST /dashboard/asrama/kamar 500 in 768ms (compile: 6ms, render: 761ms)
- GET / 200 in 121ms (compile: 9ms, render: 112ms)
- GET /api/version 200 in 10ms
- GET /login 200 in 291ms (compile: 217ms, render: 74ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 725ms (compile: 47ms, render: 677ms)
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 632ms (compile: 8ms, render: 624ms)
- GET / 200 in 92ms (compile: 5ms, render: 87ms)
- GET /api/version 200 in 9ms
- GET /login 200 in 42ms (compile: 7ms, render: 35ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 610ms (compile: 6ms, render: 604ms)
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 544ms (compile: 6ms, render: 538ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard/asrama/kamar 200 in 690ms (compile: 5ms, render: 685ms)
- GET /api/version 200 in 10ms
- POST /dashboard/asrama/kamar 500 in 509ms (compile: 7ms, render: 502ms)
-✓ Compiled in 313ms
- POST /dashboard/asrama/kamar 500 in 666ms (compile: 161ms, render: 505ms)
- GET /api/version 200 in 48ms
- GET /api/version 200 in 12ms
-✓ Compiled in 425ms
- GET /api/version 200 in 27ms
- GET /api/version 200 in 31ms
- GET /api/version 200 in 23ms
-✓ Compiled in 434ms
- GET /api/version 200 in 30ms
- GET / 200 in 824ms (compile: 206ms, render: 618ms)
- GET / 200 in 464ms (compile: 6ms, render: 457ms)
- GET /api/version 200 in 19ms
- GET /login 200 in 134ms (compile: 65ms, render: 69ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 1386ms (compile: 32ms, render: 1354ms)
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 881ms (compile: 11ms, render: 870ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard/asrama/perpulangan 200 in 2.8s (compile: 1777ms, render: 983ms)
- GET /api/version 200 in 8ms
- POST /dashboard/asrama/perpulangan 200 in 22ms (compile: 6ms, render: 16ms)
- POST /dashboard/asrama/perpulangan 500 in 849ms (compile: 6ms, render: 843ms)
- POST /dashboard/asrama/perpulangan 500 in 720ms (compile: 7ms, render: 713ms)
- GET /dashboard 200 in 349ms (compile: 7ms, render: 342ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard/asrama/perpulangan 200 in 793ms (compile: 7ms, render: 786ms)
- GET /api/version 200 in 14ms
- POST /dashboard/asrama/perpulangan 200 in 27ms (compile: 8ms, render: 18ms)
- POST /dashboard/asrama/perpulangan 500 in 769ms (compile: 9ms, render: 760ms)
- POST /dashboard/asrama/perpulangan 500 in 703ms (compile: 8ms, render: 695ms)
-[layout] session OK, roles: [ 'admin' ] id: 2b4d47cd
- GET /login 307 in 351ms (compile: 8ms, render: 343ms)
-[layout] userRoles: [ 'admin' ]
-[layout] fiturAkses count: 0
- GET /dashboard 200 in 843ms (compile: 9ms, render: 834ms)
+[layout] fiturAkses count: 1
+ GET /dashboard/akademik/absensi/rekap 200 in 8.2s (compile: 2.2s, render: 6.0s)
+ POST /dashboard/akademik/absensi/rekap 200 in 71ms (compile: 10ms, render: 61ms)
+ GET /api/version 200 in 358ms
+ POST /dashboard/akademik/absensi/rekap 500 in 1069ms (compile: 5ms, render: 1064ms)
+ POST /dashboard/akademik/absensi/rekap 500 in 3.9s (compile: 4ms, render: 3.9s)
+ GET /api/version 200 in 42ms
  GET /api/version 200 in 11ms
- GET /dashboard/login 404 in 2.8s (compile: 2.7s, render: 156ms)
- GET /api/version 200 in 15ms
- GET / 200 in 131ms (compile: 6ms, render: 124ms)
-✓ Compiled in 771ms
-✓ Finished filesystem cache database compaction in 11.2s
-✓ Compiled in 456ms
-✓ Compiled in 354ms
-✓ Compiled in 812ms
-✓ Compiled in 247ms
-✓ Compiled in 823ms
-✓ Compiled in 293ms
-✓ Compiled in 274ms
-✓ Compiled in 293ms
-✓ Finished filesystem cache database compaction in 11.8s
-✓ Compiled in 1493ms
-✓ Compiled in 819ms
-✓ Compiled in 600ms
-✓ Compiled in 537ms
-✓ Compiled in 543ms
-✓ Compiled in 531ms
-✓ Compiled in 445ms
-✓ Compiled in 475ms
-✓ Compiled in 567ms
-✓ Compiled in 550ms
-✓ Finished filesystem cache database compaction in 10.2s
-✓ Compiled in 533ms
-✓ Compiled in 1012ms
+ GET /api/version 200 in 24ms
+ GET /api/version 200 in 27ms
+ GET /api/version 200 in 17ms
+ GET /api/version 200 in 19ms
+ GET /api/version 200 in 28ms
+ GET /api/version 200 in 22ms
+ GET /api/version 200 in 23ms
+ GET /api/version 200 in 13ms
+ GET /api/version 200 in 23ms
+ GET /api/version 200 in 20ms
+ GET /api/version 200 in 19ms
+ GET /api/version 200 in 13ms
