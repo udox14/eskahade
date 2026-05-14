@@ -17,7 +17,7 @@ export type SortBy = 'nama_lengkap' | 'asrama' | 'kamar' | 'kelas_pesantren' | '
 export type KolomExport = (
   'nis' | 'nama_lengkap' | 'jenis_kelamin' | 'tempat_lahir' | 'tanggal_lahir' |
   'nama_ayah' | 'nama_ibu' | 'alamat' | 'asrama' | 'kamar' | 'tahun_masuk' |
-  'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik'
+  'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik' | 'kategori_santri'
 )
 
 export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[] = [
@@ -33,6 +33,7 @@ export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[
   { key: 'asrama',        label: 'Asrama',         group: 'Pesantren' },
   { key: 'kamar',         label: 'Kamar',          group: 'Pesantren' },
   { key: 'tahun_masuk',   label: 'Tahun Masuk',    group: 'Pesantren' },
+  { key: 'kategori_santri', label: 'Kategori Santri', group: 'Pesantren' },
   { key: 'nama_kelas',    label: 'Kelas Pesantren',group: 'Pesantren' },
   { key: 'marhalah',      label: 'Marhalah',       group: 'Pesantren' },
   { key: 'sekolah',       label: 'Sekolah',        group: 'Sekolah'   },
@@ -50,7 +51,7 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 ]
 
 export const KOLOM_DEFAULT: KolomExport[] = [
-  'nis', 'nama_lengkap', 'jenis_kelamin', 'asrama', 'kamar', 'sekolah', 'kelas_sekolah'
+  'nis', 'nama_lengkap', 'jenis_kelamin', 'asrama', 'kamar', 'kategori_santri', 'sekolah', 'kelas_sekolah'
 ]
 
 export const HEADER_MAP: Record<KolomExport, string> = {
@@ -58,6 +59,7 @@ export const HEADER_MAP: Record<KolomExport, string> = {
   nik: 'NIK', tempat_lahir: 'Tempat Lahir', tanggal_lahir: 'Tgl Lahir',
   nama_ayah: 'Nama Ayah', nama_ibu: 'Nama Ibu', alamat: 'Alamat',
   asrama: 'Asrama', kamar: 'Kamar', tahun_masuk: 'Tahun Masuk',
+  kategori_santri: 'Kategori Santri',
   sekolah: 'Sekolah', kelas_sekolah: 'Kelas Sekolah',
   nama_kelas: 'Kelas Pesantren', marhalah: 'Marhalah',
 }

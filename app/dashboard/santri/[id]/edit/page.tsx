@@ -4,6 +4,7 @@ import { getSantriById, updateSantri } from './actions'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
+import { KATEGORI_SANTRI_DASAR } from '@/lib/santri/kategori'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,7 @@ type Props = {
 
 const GOL_DARAH = ['A', 'B', 'AB', 'O']
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
-const KATEGORI_SANTRI_LIST = ["REGULER", "SADESA"] as const
+const KATEGORI_SANTRI_LIST = KATEGORI_SANTRI_DASAR
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 
 const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
@@ -165,10 +166,11 @@ export default async function EditSantriPage({ params }: Props) {
               <input name="kamar" defaultValue={s.kamar || ''} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Kategori Santri</label>
+              <label className={labelCls}>Kategori Setelah Masa Baru</label>
               <select name="kategori_santri" defaultValue={s.kategori_santri || 'REGULER'} className={inputCls + " bg-white"}>
                 {KATEGORI_SANTRI_LIST.map(kategori => <option key={kategori} value={kategori}>{kategori}</option>)}
               </select>
+              <p className="mt-1 text-[11px] text-slate-500">Jika santri masih dalam 3 bulan sejak ditambahkan, ia tetap tampil sebagai BARU.</p>
             </div>
             <div>
               <label className={labelCls}>Sekolah Formal</label>

@@ -24,7 +24,7 @@ export type TanggalOption = {
 }
 
 export type AbsensiStatus = 'HADIR' | 'TIDAK_HADIR' | 'BADAL'
-export type BadalSource = 'pengawas' | 'panitia' | 'manual'
+export type BadalSource = 'pengawas' | 'panitia' | 'sadesa'
 
 export type AbsensiPengawasRow = {
   jadwal_pengawas_id: number
@@ -56,14 +56,18 @@ export type BadalPanitiaOption = {
   label: string
 }
 
-export type BadalManualOption = {
+export type BadalSadesaOption = {
+  id: string
   nama: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
 }
 
 export type BadalOptions = {
   pengawas: BadalPengawasOption[]
   panitia: BadalPanitiaOption[]
-  manual: BadalManualOption[]
+  sadesa: BadalSadesaOption[]
 }
 
 export type AbsensiPengawasInput = {
@@ -157,7 +161,7 @@ export async function getAbsensiPengawasRows(eventId: number, tanggal: string, s
 
 export async function getBadalOptions(eventId: number): Promise<BadalOptions> {
   await ensureAbsensiPengawasSchema()
-  const [pengawas, panitia, manual] = await Promise.all([
+  const [pengawas, panitia, sadesa] = await Promise.all([
     query<BadalPengawasOption>(`
       SELECT id, guru_id, nama_pengawas as nama
       FROM ehb_pengawas
@@ -178,16 +182,15 @@ export async function getBadalOptions(eventId: number): Promise<BadalOptions> {
       WHERE ehb_event_id = ?
       ORDER BY tipe, urutan, nama
     `, [eventId]),
-    query<BadalManualOption>(`
-      SELECT DISTINCT TRIM(badal_nama) as nama
-      FROM ehb_absensi_pengawas
-      WHERE ehb_event_id = ?
-        AND badal_source = 'manual'
-        AND COALESCE(TRIM(badal_nama), '') <> ''
-      ORDER BY nama
-    `, [eventId]),
+    query<BadalSadesaOption>(`
+      SELECT id, nama_lengkap as nama, nis, asrama, kamar
+      FROM santri
+      WHERE status_global = 'aktif'
+        AND kategori_santri = 'SADESA'
+      ORDER BY nama_lengkap
+    `),
   ])
-  return { pengawas, panitia, manual }
+  return { pengawas, panitia, sadesa }
 }
 
 export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiPengawasInput[]) {

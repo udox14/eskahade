@@ -42,6 +42,21 @@ export async function getGuruList() {
     }
 }
 
+export async function getSadesaList() {
+    try {
+        return await query<any>(`
+            SELECT id, nama_lengkap as nama, nis, asrama, kamar
+            FROM santri
+            WHERE status_global = 'aktif'
+              AND kategori_santri = 'SADESA'
+            ORDER BY nama_lengkap
+        `)
+    } catch (e: any) {
+        console.error("DB ERROR in getSadesaList:", e.message)
+        return { __error: "getSadesaList: " + e.message } as any
+    }
+}
+
 export async function addPengawas(eventId: number, pengawas: { guru_id?: number, nama_pengawas: string, tag: string }[]) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }

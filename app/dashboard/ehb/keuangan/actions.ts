@@ -964,7 +964,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       JOIN ehb_sesi s ON s.id = jp.sesi_id
       WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'panitia'
     ),
-    badal_manual AS (
+    badal_sadesa AS (
       SELECT
         NULL as pengawas_id,
         NULL as guru_id,
@@ -974,13 +974,13 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
       JOIN ehb_ruangan r ON r.id = jp.ruangan_id
       JOIN ehb_sesi s ON s.id = jp.sesi_id
-      WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'manual' AND COALESCE(ap.badal_nama, '') <> ''
+      WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source IN ('sadesa', 'manual') AND COALESCE(ap.badal_nama, '') <> ''
     ),
     merged AS (
       SELECT * FROM hadir
       UNION ALL SELECT * FROM badal_pengawas
       UNION ALL SELECT * FROM badal_panitia
-      UNION ALL SELECT * FROM badal_manual
+      UNION ALL SELECT * FROM badal_sadesa
     )
     SELECT
       pengawas_id,
@@ -989,7 +989,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       COUNT(*) as qty,
       GROUP_CONCAT(detail, ', ') as detail
     FROM merged
-    GROUP BY COALESCE(CAST(pengawas_id AS TEXT), 'manual:' || nama), guru_id, nama
+    GROUP BY COALESCE(CAST(pengawas_id AS TEXT), 'sadesa:' || nama), guru_id, nama
     ORDER BY nama
   `, [eventId, eventId, eventId, eventId])
   const pengawasanItems: HonorItem[] = pengawasanRows.map(row => ({

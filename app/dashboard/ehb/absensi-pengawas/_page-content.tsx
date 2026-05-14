@@ -51,7 +51,7 @@ type SelectedSchedule = {
 function makeDraft(row?: AbsensiPengawasRow): DraftAbsensi {
   return {
     status: row?.status || 'HADIR',
-    badal_source: row?.badal_source || 'pengawas',
+    badal_source: row?.badal_source === 'sadesa' ? 'sadesa' : row?.badal_source === 'panitia' ? 'panitia' : 'pengawas',
     badal_pengawas_id: row?.badal_pengawas_id ?? '',
     badal_panitia_id: row?.badal_panitia_id ?? '',
     badal_nama: row?.badal_nama || '',
@@ -141,58 +141,28 @@ function BadalCombobox({
   )
 }
 
-function ManualBadalCombobox({
+function SadesaBadalSelect({
   value,
   options,
   onChange,
 }: {
   value: string
-  options: string[]
+  options: BadalOptions['sadesa']
   onChange: (value: string) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const filtered = useMemo(() => {
-    const needle = value.trim().toLowerCase()
-    const unique = Array.from(new Set(options.filter(Boolean)))
-    if (!needle) return unique.slice(0, 12)
-    return unique.filter(name => name.toLowerCase().includes(needle)).slice(0, 12)
-  }, [options, value])
-
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          value={value}
-          onChange={e => {
-            onChange(e.target.value)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder="Ketik nama badal"
-          className="w-full border rounded-xl pl-9 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
-        />
-      </div>
-      {open && filtered.length > 0 ? (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-          {filtered.map(name => (
-            <button
-              key={name}
-              type="button"
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => {
-                onChange(name)
-                setOpen(false)
-              }}
-              className="w-full px-3 py-2.5 text-left text-sm font-bold text-slate-800 hover:bg-amber-50 flex items-center justify-between gap-2"
-            >
-              <span className="truncate">{name}</span>
-              {value === name ? <Check className="w-4 h-4 text-amber-600 flex-shrink-0" /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full border rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
+    >
+      <option value="">-- Pilih SADESA --</option>
+      {options.map(item => (
+        <option key={item.id} value={item.nama}>
+          {item.nama}{item.kamar ? ` - ${item.kamar}` : ''}
+        </option>
+      ))}
+    </select>
   )
 }
 
@@ -201,7 +171,7 @@ export default function AbsensiPengawasPageContent() {
   const [tanggalList, setTanggalList] = useState<TanggalOption[]>([])
   const [sesiByTanggal, setSesiByTanggal] = useState<Record<string, SesiOption[]>>({})
   const [rows, setRows] = useState<AbsensiPengawasRow[]>([])
-  const [badalOptions, setBadalOptions] = useState<BadalOptions>({ pengawas: [], panitia: [], manual: [] })
+  const [badalOptions, setBadalOptions] = useState<BadalOptions>({ pengawas: [], panitia: [], sadesa: [] })
   const [selected, setSelected] = useState<SelectedSchedule | null>(null)
   const [drafts, setDrafts] = useState<Record<number, DraftAbsensi>>({})
   const [badalModalId, setBadalModalId] = useState<number | null>(null)
@@ -273,14 +243,6 @@ export default function AbsensiPengawasPageContent() {
   const selectedBadalDraft = selectedBadalRow
     ? drafts[selectedBadalRow.jadwal_pengawas_id] || makeDraft(selectedBadalRow)
     : null
-
-  const manualNameOptions = useMemo(() => {
-    const savedNames = badalOptions.manual.map(item => item.nama)
-    const draftNames = Object.values(drafts)
-      .filter(item => item.status === 'BADAL' && item.badal_source === 'manual' && item.badal_nama.trim())
-      .map(item => item.badal_nama.trim())
-    return Array.from(new Set([...savedNames, ...draftNames])).sort((a, b) => a.localeCompare(b))
-  }, [badalOptions.manual, drafts])
 
   const filteredRows = useMemo(() => {
     const needle = rowSearch.trim().toLowerCase()
@@ -607,7 +569,7 @@ export default function AbsensiPengawasPageContent() {
                   {([
                     ['pengawas', 'Pengawas'],
                     ['panitia', 'Panitia'],
-                    ['manual', 'Manual'],
+                    ['sadesa', 'SADESA'],
                   ] as const).map(([key, label]) => (
                     <button
                       key={key}
@@ -643,9 +605,9 @@ export default function AbsensiPengawasPageContent() {
                   })}
                 />
               ) : (
-                <ManualBadalCombobox
+                <SadesaBadalSelect
                   value={selectedBadalDraft.badal_nama}
-                  options={manualNameOptions}
+                  options={badalOptions.sadesa}
                   onChange={nama => updateDraft(selectedBadalRow.jadwal_pengawas_id, { badal_nama: nama })}
                 />
               )}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapBerjamaahAlfaRange, getKamarList, getSantriByAsrama, deleteAbsenBerjamaahRecords } from '../rekap-asrama/actions'
 import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
-import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X } from 'lucide-react'
+import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
@@ -70,6 +70,7 @@ export default function RekapAbsenBerjamaahPage() {
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
   const [allSantri, setAllSantri] = useState<any[]>([])
   const [page, setPage] = useState(1)
+  const [exporting, setExporting] = useState(false)
 
   const [santriList, setSantriList] = useState<any[]>([])
   const [detail, setDetail] = useState<Record<string, Record<string, any>>>({})
@@ -157,6 +158,76 @@ export default function RekapAbsenBerjamaahPage() {
       toast.error(err?.message || "Terjadi kesalahan")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleExportExcel() {
+    if (filteredSantri.length === 0) {
+      toast.info('Tidak ada data untuk diexport.')
+      return
+    }
+
+    setExporting(true)
+    const exportToast = toast.loading('Menyiapkan file Excel...')
+    try {
+      const XLSX = await import('xlsx')
+      const activeSessions = daysArr.flatMap(tgl =>
+        WAKTU.map(waktu => ({
+          tanggal: tgl,
+          waktu,
+          label: `${formatDayLabel(tgl)} ${WAKTU_LABEL[waktu]}`,
+        }))
+      )
+
+      const headers = [
+        'Nama Santri',
+        'NIS',
+        'Asrama',
+        'Kamar',
+        'Total Alfa',
+        ...activeSessions.map(session => session.label),
+      ]
+
+      const rows = filteredSantri.map(s => {
+        const rowData: any[] = [
+          s.nama_lengkap,
+          s.nis || '-',
+          asrama,
+          s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar',
+        ]
+        let total = 0
+        const statusValues = activeSessions.map(session => {
+          const isAlfa = detail[s.id]?.[session.tanggal]?.[session.waktu] === 'A'
+          const isDeleted = pendingDeletes.has(`${s.id}|${session.tanggal}|${session.waktu}`)
+          if (isAlfa && !isDeleted) {
+            total += 1
+            return 'A'
+          }
+          return ''
+        })
+        return [...rowData, total, ...statusValues]
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws['!cols'] = headers.map((h, i) => ({
+        wch: Math.min(Math.max(h.length, ...rows.map(r => String(r[i] || '').length)) + 2, i < 5 ? 32 : 18),
+      }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Rekap Berjamaah')
+
+      const tglAwal = weekWednesday.split('-').reverse().join('-')
+      const tglAkhir = weekEnd(weekWednesday).split('-').reverse().join('-')
+      const namaAsrama = asrama.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '')
+      XLSX.writeFile(wb, `Rekap_Absen_Berjamaah_${namaAsrama}_${tglAwal}_sd_${tglAkhir}.xlsx`)
+
+      toast.success('Berhasil export ke Excel')
+    } catch (err) {
+      console.error(err)
+      toast.error('Gagal export ke Excel')
+    } finally {
+      toast.dismiss(exportToast)
+      setExporting(false)
     }
   }
 
@@ -315,6 +386,14 @@ export default function RekapAbsenBerjamaahPage() {
             </div>
 
             <div className="flex gap-2 items-center flex-1 min-w-[200px] justify-end">
+              <button
+                onClick={handleExportExcel}
+                disabled={exporting || filteredSantri.length === 0}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs hover:bg-emerald-100 active:scale-95 transition disabled:opacity-50"
+              >
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <FileSpreadsheet className="w-3.5 h-3.5"/>}
+                Export Excel
+              </button>
               <div className="relative flex-1 max-w-[200px]">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                 <input

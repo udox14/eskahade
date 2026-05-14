@@ -10,6 +10,7 @@ import { SearchInput, LimitSelector, SantriFilter } from './santri-client'
 import { TableSkeleton, CardListSkeleton } from '@/components/ui/skeletons'
 import { SantriTable } from './santri-table'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { KATEGORI_SANTRI_EFEKTIF } from '@/lib/santri/kategori'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,6 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     asramaKamarRows,
     sekolahRows,
     kelasSekolahRows,
-    kategoriSantriRows,
     statusRows,
     golDarahRows,
     tahunRows,
@@ -65,10 +65,6 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     ),
     query<{ v: string }>(
       `SELECT DISTINCT kelas_sekolah AS v FROM santri ${appendScopedWhere("kelas_sekolah IS NOT NULL AND kelas_sekolah <> ''")} ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT kategori_santri AS v FROM santri ${appendScopedWhere("kategori_santri IS NOT NULL AND kategori_santri <> ''")} ORDER BY kategori_santri`,
       scopedParams
     ),
     query<{ v: string }>(
@@ -109,7 +105,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const filterOptions = {
     asramaKamar: asramaKamarRows,
     asramaList: [...new Set(asramaKamarRows.map(row => row.asrama).filter((value): value is string => Boolean(value)))],
-    kategoriSantriList: kategoriSantriRows.map(row => row.v),
+    kategoriSantriList: [...KATEGORI_SANTRI_EFEKTIF],
     sekolahList: sekolahRows.map(row => row.v),
     kelasSekolahList: kelasSekolahRows.map(row => row.v),
     statusList: statusRows.map(row => row.v),

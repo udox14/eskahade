@@ -5,6 +5,7 @@ import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { revalidatePath } from 'next/cache'
 
 const KAMAR_PATH = '/dashboard/asrama/kamar'
@@ -20,6 +21,8 @@ type SantriKamarRow = {
   kelas_sekolah: string | null
   kab_kota: string | null
   nama_kelas: string | null
+  kategori_santri: string
+  kategori_efektif: string
   pending_keluar_id: string | null
   pending_keluar_tanggal: string | null
   pending_keluar_catatan: string | null
@@ -369,6 +372,7 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
 
   const targetAsrama = access.requestedAsrama
   const targetKamar = String(nomorKamar ?? '').trim()
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
   if (!targetKamar) return { error: 'Kamar wajib dipilih', room: null as any }
   if (isAsramaTanpaKamar(targetAsrama)) return { error: 'Asrama ini tidak memakai kamar', room: null as any }
 
@@ -408,6 +412,8 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
     ),
     query<SantriKamarRow>(
       `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+              COALESCE(NULLIF(s.kategori_santri, ''), 'REGULER') AS kategori_santri,
+              ${kategoriEfektifSql} AS kategori_efektif,
               k.nama_kelas
        FROM santri s
        LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'

@@ -9,10 +9,11 @@ import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './action
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { KATEGORI_SANTRI_DASAR } from '@/lib/santri/kategori'
 
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
-const KATEGORI_SANTRI_LIST = ["REGULER", "SADESA"] as const
+const KATEGORI_SANTRI_LIST = KATEGORI_SANTRI_DASAR
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 
 const FORM_INIT = {
@@ -295,11 +296,11 @@ export default function InputSantriPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kategori Santri</label>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kategori Setelah Masa Baru</label>
               <select value={form.kategori_santri} onChange={e => set('kategori_santri', e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
                 {KATEGORI_SANTRI_LIST.map(kategori => <option key={kategori} value={kategori}>{kategori}</option>)}
               </select>
-              <p className="mt-1 text-[11px] text-slate-500">Pilih `SADESA` untuk santri khusus yang tidak memiliki status sekolah formal.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Santri baru otomatis tampil sebagai BARU selama 3 bulan sejak ditambahkan.</p>
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sekolah</label>

@@ -1,9 +1,10 @@
 'use server'
 
 import { query, getDB } from '@/lib/db'
-import { getSession, hasAnyRole } from '@/lib/auth/session'
+import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { parseWibDate } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 export async function getSessionInfo() {
@@ -55,8 +56,9 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 
   try {
     izinList = await query<any>(
-      `SELECT p.santri_id FROM perizinan p
+      `SELECT p.id, p.santri_id, p.jenis, p.alasan, p.tgl_selesai_rencana FROM perizinan p
        WHERE p.status = 'AKTIF'
+         AND p.tgl_kembali_aktual IS NULL
          AND p.tgl_mulai <= ?
          AND p.tgl_selesai_rencana >= ?
          AND p.santri_id IN (${ph})`,
@@ -66,13 +68,98 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 
   const absenMap: Record<string, string> = {}
   absenList.forEach((a: any) => { absenMap[a.santri_id] = a.status })
-  const izinSet = new Set(izinList.map((i: any) => i.santri_id))
+  const izinMap = new Map(izinList.map((i: any) => [i.santri_id, i]))
 
   return santriList.map((s: any) => ({
     ...s,
-    status: izinSet.has(s.id) ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
-    is_izin: izinSet.has(s.id),
+    status: izinMap.has(s.id) ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
+    is_izin: izinMap.has(s.id),
+    izin_id: izinMap.get(s.id)?.id ?? null,
+    izin_jenis: izinMap.get(s.id)?.jenis ?? null,
+    izin_alasan: izinMap.get(s.id)?.alasan ?? null,
+    izin_batas: izinMap.get(s.id)?.tgl_selesai_rencana ?? null,
   }))
+}
+
+export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tanggal: string) {
+  const session = await getSession()
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+
+  const actual = parseWibDate(tanggal, 'start')
+  if (Number.isNaN(actual.getTime())) return { error: 'Tanggal kembali tidak valid.' }
+
+  const izin = await query<any>(`
+    SELECT
+      p.id,
+      p.jenis,
+      p.status,
+      p.tgl_selesai_rencana,
+      p.tgl_kembali_aktual,
+      s.nama_lengkap,
+      s.asrama
+    FROM perizinan p
+    JOIN santri s ON s.id = p.santri_id
+    WHERE p.santri_id = ?
+      AND p.status = 'AKTIF'
+      AND p.tgl_kembali_aktual IS NULL
+      AND p.tgl_mulai <= ?
+      AND p.tgl_selesai_rencana >= ?
+    ORDER BY p.tgl_selesai_rencana ASC
+    LIMIT 1
+  `, [santriId, tanggal, tanggal])
+
+  const row = izin[0]
+  if (!row) return { error: 'Izin aktif santri ini tidak ditemukan atau sudah ditandai kembali.' }
+  if (row.jenis !== 'PULANG') return { error: 'Yang bisa ditandai kembali dari absen malam hanya izin pulang.' }
+
+  if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan && row.asrama !== session.asrama_binaan) {
+    return { error: 'Pengurus asrama hanya bisa menandai santri asramanya.' }
+  }
+
+  const rencana = new Date(row.tgl_selesai_rencana)
+  const isTelat = actual > rencana
+  const statusFinal = isTelat ? 'AKTIF' : 'KEMBALI'
+
+  const db = await getDB()
+  await db.batch([
+    db.prepare(`
+      UPDATE perizinan
+      SET status = ?, tgl_kembali_aktual = ?
+      WHERE id = ?
+    `).bind(statusFinal, actual.toISOString(), row.id),
+    db.prepare(`
+      DELETE FROM absen_malam_v2
+      WHERE tanggal = ? AND santri_id = ?
+    `).bind(tanggal, santriId),
+  ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_malam',
+    action: 'update',
+    fiturHref: '/dashboard/asrama/absen-malam',
+    logKind: 'update',
+    entityType: 'perizinan',
+    entityId: row.id,
+    entityLabel: row.nama_lengkap || santriId,
+    summary: `Menandai santri kembali dari absen malam ${row.nama_lengkap || santriId}`,
+    details: {
+      tanggal_absen: tanggal,
+      waktu_datang: actual.toISOString(),
+      status_final: statusFinal,
+      telat: isTelat,
+    },
+  })
+
+  revalidatePath('/dashboard/asrama/absen-malam')
+  revalidatePath('/dashboard/asrama/santri-kembali')
+  revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
+
+  if (isTelat) {
+    return { success: true, telat: true, message: 'Santri ditandai datang terlambat dan masuk verifikasi telat.' }
+  }
+  return { success: true, telat: false, message: 'Santri sudah ditandai kembali.' }
 }
 
 export async function batchSaveAbsenMalam(

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam } from './actions'
-import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle } from 'lucide-react'
+import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam, tandaiSantriKembaliDariAbsenMalam } from './actions'
+import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -29,6 +29,7 @@ export default function AbsenMalamPage() {
 
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [returningId, setReturningId] = useState<string | null>(null)
   const [savedKamars, setSavedKamars] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -92,6 +93,32 @@ export default function AbsenMalamPage() {
     if (santriKamar.find(s => s.id === id)?.is_izin) return
     setLocalStatus(prev => ({ ...prev, [id]: prev[id] === 'ALFA' ? 'HADIR' : 'ALFA' }))
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
+  }
+
+  const markReturned = async (santriId: string) => {
+    const santri = santriKamar.find(s => s.id === santriId)
+    if (!santri?.is_izin) return
+
+    setReturningId(santriId)
+    const res = await tandaiSantriKembaliDariAbsenMalam(santriId, tanggal)
+    setReturningId(null)
+
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+
+    const updated = santriKamar.map(s => (
+      s.id === santriId
+        ? { ...s, status: 'HADIR', is_izin: false, izin_id: null, izin_jenis: null, izin_alasan: null, izin_batas: null }
+        : s
+    ))
+
+    setSantriKamar(updated)
+    setLocalStatus(prev => ({ ...prev, [santriId]: 'HADIR' }))
+    setKamarCache(prev => ({ ...prev, [`${activeKamar}__${tanggal}`]: updated }))
+    setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
+    toast.success(res.message)
   }
 
   const saveKamar = async () => {
@@ -217,8 +244,9 @@ export default function AbsenMalamPage() {
               const st = localStatus[s.id] || 'HADIR'
               const isAlfa = st === 'ALFA'
               const isIzin = s.is_izin
+              const canMarkReturned = isIzin && s.izin_jenis === 'PULANG'
               return (
-                <button key={s.id} disabled={isIzin} onClick={() => toggle(s.id)}
+                <div key={s.id} role={isIzin ? undefined : 'button'} tabIndex={isIzin ? undefined : 0} onClick={() => !isIzin && toggle(s.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
                     isAlfa ? 'bg-red-50' : isIzin ? 'bg-blue-50' : 'hover:bg-slate-50'
                   }`}>
@@ -230,15 +258,34 @@ export default function AbsenMalamPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{s.nama_lengkap}</p>
                     <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
+                    {isIzin && s.izin_alasan ? (
+                      <p className="text-[10px] text-blue-500 font-semibold truncate mt-0.5">{s.izin_alasan}</p>
+                    ) : null}
                   </div>
-                  <span className={`text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ${
-                    isAlfa ? 'bg-red-500 text-white' :
-                    isIzin ? 'bg-blue-100 text-blue-600' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {isIzin ? 'IZIN' : isAlfa ? 'ALFA' : 'HADIR'}
-                  </span>
-                </button>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${
+                      isAlfa ? 'bg-red-500 text-white' :
+                      isIzin ? 'bg-blue-100 text-blue-600' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {isIzin ? 'IZIN' : isAlfa ? 'ALFA' : 'HADIR'}
+                    </span>
+                    {canMarkReturned ? (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          markReturned(s.id)
+                        }}
+                        disabled={returningId === s.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white hover:bg-emerald-700 disabled:bg-slate-300"
+                      >
+                        {returningId === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                        Kembali
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
               )
             })}
           </div>

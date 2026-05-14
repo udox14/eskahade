@@ -30,6 +30,8 @@ type RoomMember = {
   kelas_sekolah: string | null
   kab_kota: string | null
   nama_kelas: string | null
+  kategori_santri: string
+  kategori_efektif: string
   alamat_ringkas: string
   pending_keluar: {
     id: string
@@ -179,6 +181,10 @@ export default function KamarClient({
     const kamarTanpaPembina = rooms.filter((room) => room.total_anggota > 0 && !room.pembina_nama).length
     return { kamarTerisi, kamarTanpaKetua, kamarTanpaPembina }
   }, [rooms])
+  const selectedRoomBaruCount = useMemo(
+    () => selectedRoom?.members.filter((member) => member.kategori_efektif === 'BARU').length ?? 0,
+    [selectedRoom]
+  )
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -323,8 +329,9 @@ export default function KamarClient({
               description={`Asrama ${selectedAsrama}${selectedRoom?.blok ? ` - Blok ${selectedRoom.blok}` : ''}`}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <SummaryCard label="Anggota" value={selectedRoom?.total_anggota || 0} tone="slate" />
+            <SummaryCard label="Baru" value={selectedRoomBaruCount} tone="indigo" />
             <SummaryCard label="Ketua" value={selectedRoom?.ketua ? 1 : 0} tone="amber" />
             <SummaryCard label="Pembina" value={selectedRoom?.pembina_nama ? 1 : 0} tone="green" />
           </div>
@@ -456,7 +463,16 @@ export default function KamarClient({
                               {isKetua ? <Crown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> : null}
                               <div>
                                 <p className="font-semibold text-slate-800">{member.nama_lengkap}</p>
-                                <p className="text-xs text-slate-400">{member.nis}</p>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                  <p className="text-xs text-slate-400">{member.nis}</p>
+                                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-black ${
+                                    member.kategori_efektif === 'BARU'
+                                      ? 'bg-indigo-100 text-indigo-700'
+                                      : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {member.kategori_efektif || member.kategori_santri || 'REGULER'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </td>

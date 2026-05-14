@@ -17,6 +17,14 @@ export type GuruOption = {
   nama: string
 }
 
+export type SadesaOption = {
+  id: string
+  nama: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
+}
+
 export type EventOption = {
   id: number
   nama: string
@@ -174,6 +182,16 @@ export async function getGuruOptionsForKepanitiaan() {
   return query<GuruOption>(`
     SELECT id, nama_lengkap as nama
     FROM data_guru
+    ORDER BY nama_lengkap
+  `)
+}
+
+export async function getSadesaOptionsForKepanitiaan() {
+  return query<SadesaOption>(`
+    SELECT id, nama_lengkap as nama, nis, asrama, kamar
+    FROM santri
+    WHERE status_global = 'aktif'
+      AND kategori_santri = 'SADESA'
     ORDER BY nama_lengkap
   `)
 }

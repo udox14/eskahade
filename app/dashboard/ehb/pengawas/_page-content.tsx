@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import * as XLSX from 'xlsx'
+import { useState, useEffect } from 'react'
 import {
-  getActiveEventLight, getPengawasList, getGuruList, addPengawas, updatePengawas, deletePengawas,
+  getActiveEventLight, getPengawasList, getGuruList, getSadesaList, addPengawas, updatePengawas, deletePengawas,
   getJadwalPengawasAll, getSesiList, getTanggalList, getRuanganList,
   saveAssignmentManual, deleteAssignment, getKartuPengawasData
 } from './actions'
 import {
   UserCheck, Plus, Edit2, Trash2, Loader2, AlertTriangle, 
-  X, Users, Printer, Upload, Download, FileSpreadsheet
+  X, Users, Printer
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -24,6 +23,7 @@ export default function PengawasEhbPage() {
   
   const [pengawasList, setPengawasList] = useState<any[]>([])
   const [guruList, setGuruList] = useState<any[]>([])
+  const [sadesaList, setSadesaList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Form Pengawas (Edit saja - single)
@@ -32,13 +32,12 @@ export default function PengawasEhbPage() {
 
   // Form Tambah Massal
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addTab, setAddTab] = useState<'guru'|'manual'>('guru')
+  const [addTab, setAddTab] = useState<'guru'|'sadesa'>('guru')
   const [selectedGurus, setSelectedGurus] = useState<Set<number>>(new Set())
+  const [selectedSadesa, setSelectedSadesa] = useState<Set<string>>(new Set())
   const [defaultTag, setDefaultTag] = useState('junior')
-  const [manualName, setManualName] = useState('')
   const [guruSearch, setGuruSearch] = useState('')
-  const [importedRows, setImportedRows] = useState<{nama: string, tag: string}[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [sadesaSearch, setSadesaSearch] = useState('')
 
   // Jadwal State
   const [jadwal, setJadwal] = useState<any[]>([])
@@ -60,15 +59,18 @@ export default function PengawasEhbPage() {
       setEvent(evt || null)
       
       if (evt) {
-        const [pengawas, gurus] = await Promise.all([
+        const [pengawas, gurus, sadesa] = await Promise.all([
           getPengawasList(evt.id),
-          getGuruList()
+          getGuruList(),
+          getSadesaList()
         ])
         if (pengawas && pengawas.__error) throw new Error(pengawas.__error)
         if (gurus && gurus.__error) throw new Error(gurus.__error)
+        if (sadesa && sadesa.__error) throw new Error(sadesa.__error)
         
         setPengawasList(pengawas)
         setGuruList(gurus)
+        setSadesaList(sadesa)
       }
     } catch (err: any) {
       toast.error('Gagal memuat data: ' + err.message)
@@ -104,9 +106,10 @@ export default function PengawasEhbPage() {
 
   const handleOpenAdd = () => {
     setSelectedGurus(new Set())
+    setSelectedSadesa(new Set())
     setDefaultTag('junior')
-    setManualName('')
     setGuruSearch('')
+    setSadesaSearch('')
     setAddTab('guru')
     setShowAddModal(true)
   }
@@ -137,67 +140,25 @@ export default function PengawasEhbPage() {
     loadData()
   }
 
-  // ── TAMBAH MANUAL (NAMA BEBAS) ──
-  const handleSaveManual = async () => {
+  // ── TAMBAH MASSAL DARI SADESA ──
+  const handleSaveBulkSadesa = async () => {
     if (!event) return
-    if (!manualName.trim()) return toast.error('Masukkan nama pengawas')
-    const res = await addPengawas(event.id, [{ nama_pengawas: manualName.trim(), tag: defaultTag }])
-    if ('error' in res) return toast.error(res.error)
-    toast.success('Pengawas ditambahkan!')
-    setManualName('')
-    setShowAddModal(false)
-    loadData()
-  }
+    if (selectedSadesa.size === 0) return toast.error('Pilih minimal 1 santri SADESA')
 
-  // ── IMPORT EXCEL ──
-  const handleDownloadTemplate = () => {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['nama_pengawas', 'tag'],
-      ['Contoh: Ustadz Ahmad Fauzi', 'junior'],
-      ['Contoh: Ustadzah Siti Aminah', 'senior'],
-    ])
-    ws['!cols'] = [{ wch: 30 }, { wch: 10 }]
-    XLSX.utils.book_append_sheet(wb, ws, 'Pengawas')
-    XLSX.writeFile(wb, 'template_pengawas.xlsx')
-  }
+    const sudahAda = new Set(pengawasList.map((p: any) => String(p.nama_pengawas || '').trim().toLowerCase()))
+    const toAdd = [...selectedSadesa].filter(id => {
+      const s = sadesaList.find((x: any) => x.id === id)
+      return s?.nama && !sudahAda.has(String(s.nama).trim().toLowerCase())
+    })
+    if (toAdd.length === 0) return toast.error('Semua SADESA yang dipilih sudah terdaftar sebagai pengawas')
 
-  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target?.result, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: '' })
-        const parsed = rows
-          .map((r: any) => ({
-            nama: (r['nama_pengawas'] || r['nama'] || '').toString().trim(),
-            tag: ['senior', 'junior'].includes((r['tag'] || '').toString().toLowerCase())
-              ? (r['tag'] || '').toString().toLowerCase()
-              : 'junior'
-          }))
-          .filter((r: any) => r.nama.length > 0)
-        if (parsed.length === 0) return toast.error('Tidak ada data yang bisa dibaca dari file Excel')
-        setImportedRows(parsed)
-        toast.success(`${parsed.length} baris berhasil diimpor. Cek preview lalu klik Simpan.`)
-      } catch {
-        toast.error('Gagal membaca file Excel')
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = ''
-      }
-    }
-    reader.readAsBinaryString(file)
-  }
-
-  const handleSaveImport = async () => {
-    if (!event || importedRows.length === 0) return
-    const payload = importedRows.map(r => ({ nama_pengawas: r.nama, tag: r.tag }))
+    const payload = toAdd.map(id => {
+      const s = sadesaList.find((x: any) => x.id === id)
+      return { nama_pengawas: s?.nama || '', tag: defaultTag }
+    })
     const res = await addPengawas(event.id, payload)
     if ('error' in res) return toast.error(res.error)
-    toast.success(`${importedRows.length} pengawas berhasil ditambahkan!`)
-    setImportedRows([])
+    toast.success(`${toAdd.length} pengawas SADESA berhasil ditambahkan!`)
     setShowAddModal(false)
     loadData()
   }
@@ -322,6 +283,7 @@ export default function PengawasEhbPage() {
                                  <td className="px-5 py-3">
                                      <p className="font-bold text-slate-800">{p.nama_pengawas}</p>
                                      {p.guru_id && <span className="text-[10px] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Guru Terdaftar</span>}
+                                     {!p.guru_id && <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">SADESA</span>}
                                  </td>
                                  <td className="px-5 py-3 text-center">
                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${p.tag === 'senior' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
@@ -462,9 +424,9 @@ export default function PengawasEhbPage() {
                 className={`px-4 py-1.5 text-sm font-bold rounded-lg border transition-colors ${addTab === 'guru' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
               >Dari Data Guru</button>
               <button
-                onClick={() => setAddTab('manual')}
-                className={`px-4 py-1.5 text-sm font-bold rounded-lg border transition-colors ${addTab === 'manual' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-              >Nama Manual</button>
+                onClick={() => setAddTab('sadesa')}
+                className={`px-4 py-1.5 text-sm font-bold rounded-lg border transition-colors ${addTab === 'sadesa' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >SADESA</button>
             </div>
 
             {/* Tag default */}
@@ -557,109 +519,80 @@ export default function PengawasEhbPage() {
               </>
             )}
 
-            {addTab === 'manual' && (
-              <div className="px-5 py-4 flex-1 overflow-y-auto space-y-4 min-h-0">
-                {/* Input nama satu-satu */}
-                <div>
-                  <label className="text-xs font-bold text-slate-500">Tambah Satu Nama</label>
-                  <div className="flex gap-2 mt-1">
-                    <input
-                      value={manualName}
-                      onChange={e => setManualName(e.target.value)}
-                      placeholder="Masukkan nama pengawas..."
-                      className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
-                      onKeyDown={e => e.key === 'Enter' && handleSaveManual()}
-                    />
-                    <button
-                      onClick={handleSaveManual}
-                      className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shrink-0"
-                    >Tambah</button>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-slate-200"/>
-                  <span className="text-xs text-slate-400 font-bold">ATAU IMPORT EXCEL</span>
-                  <div className="flex-1 h-px bg-slate-200"/>
-                </div>
-
-                {/* Template & Upload */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            {addTab === 'sadesa' && (
+              <>
+                <div className="px-5 pt-3 shrink-0 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Cari nama SADESA..."
+                    value={sadesaSearch}
+                    onChange={e => setSadesaSearch(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  />
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-slate-700">Import dari Excel</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Kolom: <code className="bg-slate-200 px-1 rounded text-[11px]">nama_pengawas</code>, <code className="bg-slate-200 px-1 rounded text-[11px]">tag</code></p>
-                    </div>
+                    <span className="text-xs text-slate-500">{selectedSadesa.size} dipilih</span>
                     <button
-                      onClick={handleDownloadTemplate}
-                      className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100"
-                    >
-                      <Download className="w-3.5 h-3.5"/> Template
-                    </button>
+                      onClick={() => {
+                        const sudahAda = new Set(pengawasList.map((p: any) => String(p.nama_pengawas || '').trim().toLowerCase()))
+                        const visible = sadesaList.filter((s: any) => !sudahAda.has(String(s.nama || '').trim().toLowerCase()) && s.nama.toLowerCase().includes(sadesaSearch.toLowerCase()))
+                        if (selectedSadesa.size === visible.length) {
+                          setSelectedSadesa(new Set())
+                        } else {
+                          setSelectedSadesa(new Set(visible.map((s: any) => s.id)))
+                        }
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >Pilih Semua</button>
                   </div>
-                  <label className="flex items-center gap-3 border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors">
-                    <FileSpreadsheet className="w-5 h-5 text-indigo-500 shrink-0"/>
-                    <span className="text-sm text-slate-600">
-                      {importedRows.length > 0
-                        ? <><span className="font-bold text-indigo-700">{importedRows.length} baris</span> siap diimpor</>  
-                        : 'Klik untuk pilih file .xlsx / .xls'}
-                    </span>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".xlsx,.xls"
-                      className="hidden"
-                      onChange={handleImportExcel}
-                    />
-                  </label>
                 </div>
 
-                {/* Preview tabel import */}
-                {importedRows.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs font-bold text-slate-600">Preview ({importedRows.length} baris)</p>
-                      <button onClick={() => setImportedRows([])} className="text-xs text-red-500 hover:underline">Hapus semua</button>
-                    </div>
-                    <div className="border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-slate-100">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-bold text-slate-600">Nama</th>
-                            <th className="px-3 py-2 text-left font-bold text-slate-600 w-20">Tag</th>
-                            <th className="w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {importedRows.map((r, i) => (
-                            <tr key={i} className="hover:bg-slate-50">
-                              <td className="px-3 py-1.5">{r.nama}</td>
-                              <td className="px-3 py-1.5">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                  r.tag === 'senior' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                                }`}>{r.tag}</span>
-                              </td>
-                              <td className="px-2">
-                                <button
-                                  onClick={() => setImportedRows(prev => prev.filter((_, j) => j !== i))}
-                                  className="text-slate-300 hover:text-red-500"
-                                ><X className="w-3.5 h-3.5"/></button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <button
-                      onClick={handleSaveImport}
-                      className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
-                    >
-                      <Upload className="w-4 h-4"/> Simpan {importedRows.length} Pengawas
-                    </button>
-                  </div>
-                )}
-              </div>
+                <div className="flex-1 overflow-y-auto px-5 py-2 space-y-1 min-h-0">
+                  {(() => {
+                    const sudahAda = new Set(pengawasList.map((p: any) => String(p.nama_pengawas || '').trim().toLowerCase()))
+                    const filtered = sadesaList.filter((s: any) => s.nama.toLowerCase().includes(sadesaSearch.toLowerCase()))
+                    return filtered.map((s: any) => {
+                      const isAdded = sudahAda.has(String(s.nama || '').trim().toLowerCase())
+                      const isChecked = selectedSadesa.has(s.id)
+                      return (
+                        <label
+                          key={s.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                            isAdded ? 'opacity-40 cursor-not-allowed bg-slate-50' :
+                            isChecked ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={isAdded}
+                            checked={isChecked}
+                            onChange={e => {
+                              const next = new Set(selectedSadesa)
+                              if (e.target.checked) next.add(s.id)
+                              else next.delete(s.id)
+                              setSelectedSadesa(next)
+                            }}
+                            className="accent-indigo-600 w-4 h-4 shrink-0"
+                          />
+                          <span className="text-sm text-slate-800 flex-1">
+                            <span className="block">{s.nama}</span>
+                            <span className="block text-[11px] text-slate-400">{[s.asrama, s.kamar].filter(Boolean).join(' / ') || 'SADESA'}</span>
+                          </span>
+                          {isAdded && <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">Sudah</span>}
+                        </label>
+                      )
+                    })
+                  })()}
+                </div>
+
+                <div className="px-5 py-4 border-t shrink-0">
+                  <button
+                    onClick={handleSaveBulkSadesa}
+                    className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4"/> Tambah {selectedSadesa.size > 0 ? selectedSadesa.size + ' ' : ''}Pengawas
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

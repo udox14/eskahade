@@ -14,6 +14,7 @@ import {
   getGuruOptionsForKepanitiaan,
   getPanitiaList,
   getPembuatSoalList,
+  getSadesaOptionsForKepanitiaan,
   importPanitiaBatch,
   replacePanitiaBatch,
   savePembuatSoalBatch,
@@ -24,6 +25,7 @@ import {
   type PanitiaInput,
   type PanitiaRow,
   type PembuatSoalRow,
+  type SadesaOption,
 } from './actions'
 import { FONT } from '../cetak/_shared'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -56,8 +58,9 @@ type DraftPanitia = {
   jabatan_key?: string
   seksi_key?: string
   peran?: 'ketua' | 'anggota' | null
-  source: 'guru' | 'manual'
+  source: 'guru' | 'sadesa'
   guru_id: number | ''
+  sadesa_id: string
   nama: string
 }
 
@@ -226,15 +229,17 @@ function normalizeImportRow(raw: Record<string, unknown>, rowNumber: number, gur
   }
 }
 
-function rowToDraft(row: PanitiaRow): DraftPanitia {
+function rowToDraft(row: PanitiaRow, sadesaOptions: SadesaOption[] = []): DraftPanitia {
+  const sadesa = !row.guru_id ? sadesaOptions.find(item => item.nama === row.nama) : null
   return {
     id: `row-${row.id}`,
     tipe: row.tipe,
     jabatan_key: row.jabatan_key ?? undefined,
     seksi_key: row.seksi_key ?? undefined,
     peran: row.peran,
-    source: row.guru_id ? 'guru' : 'manual',
+    source: row.guru_id ? 'guru' : 'sadesa',
     guru_id: row.guru_id ?? '',
+    sadesa_id: sadesa?.id ?? '',
     nama: row.nama,
   }
 }
@@ -248,6 +253,7 @@ function makeEmptyDraft(tipe: 'inti' | 'seksi', key: string, peran: 'ketua' | 'a
     peran,
     source: 'guru',
     guru_id: '',
+    sadesa_id: '',
     nama: '',
   }
 }
@@ -255,12 +261,14 @@ function makeEmptyDraft(tipe: 'inti' | 'seksi', key: string, peran: 'ketua' | 'a
 function DraftPersonInput({
   draft,
   guruList,
+  sadesaOptions,
   onChange,
   onRemove,
   removable = true,
 }: {
   draft: DraftPanitia
   guruList: GuruOption[]
+  sadesaOptions: SadesaOption[]
   onChange: (patch: Partial<DraftPanitia>) => void
   onRemove?: () => void
   removable?: boolean
@@ -268,13 +276,13 @@ function DraftPersonInput({
   return (
     <div className="rounded-lg border bg-white p-3 space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        {(['guru', 'manual'] as const).map(source => (
+        {(['guru', 'sadesa'] as const).map(source => (
           <button
             key={source}
             onClick={() => onChange({ source })}
             className={`px-2 py-1.5 rounded-md border text-xs font-bold ${draft.source === source ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}`}
           >
-            {source === 'guru' ? 'Guru' : 'Manual'}
+            {source === 'guru' ? 'Guru' : 'SADESA'}
           </button>
         ))}
       </div>
@@ -288,12 +296,21 @@ function DraftPersonInput({
           {guruList.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
         </select>
       ) : (
-        <input
-          value={draft.nama}
-          onChange={e => onChange({ nama: e.target.value })}
+        <select
+          value={draft.sadesa_id}
+          onChange={e => {
+            const selected = sadesaOptions.find(item => item.id === e.target.value)
+            onChange({ sadesa_id: e.target.value, nama: selected?.nama ?? '' })
+          }}
           className="w-full border rounded-lg px-3 py-2 text-sm"
-          placeholder="Nama panitia"
-        />
+        >
+          <option value="">-- Pilih SADESA --</option>
+          {sadesaOptions.map(santri => (
+            <option key={santri.id} value={santri.id}>
+              {santri.nama}{santri.kamar ? ` - ${santri.kamar}` : ''}
+            </option>
+          ))}
+        </select>
       )}
       {removable && (
         <button onClick={onRemove} className="text-xs font-bold text-red-600 flex items-center gap-1">
@@ -307,6 +324,7 @@ function DraftPersonInput({
 export default function KepanitiaanPageContent() {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [guruList, setGuruList] = useState<GuruOption[]>([])
+  const [sadesaOptions, setSadesaOptions] = useState<SadesaOption[]>([])
   const [eventOptions, setEventOptions] = useState<EventOption[]>([])
   const [rows, setRows] = useState<PanitiaRow[]>([])
   const [drafts, setDrafts] = useState<DraftPanitia[]>([])
@@ -336,15 +354,17 @@ export default function KepanitiaanPageContent() {
     const evt = await getActiveEventForKepanitiaan()
     setEvent(evt)
     if (evt) {
-      const [gurus, panitia, events, pembuatSoal] = await Promise.all([
+      const [gurus, sadesa, panitia, events, pembuatSoal] = await Promise.all([
         getGuruOptionsForKepanitiaan(),
+        getSadesaOptionsForKepanitiaan(),
         getPanitiaList(evt.id),
         getEventOptionsForCopy(evt.id),
         getPembuatSoalList(evt.id),
       ])
       setGuruList(gurus)
+      setSadesaOptions(sadesa)
       setRows(panitia)
-      setDrafts(panitia.map(rowToDraft))
+      setDrafts(panitia.map(row => rowToDraft(row, sadesa)))
       setEventOptions(events)
       setSoalDrafts(pembuatSoal.map(row => ({ ...row, draft_guru_id: row.guru_id ?? '' })))
     }
@@ -359,16 +379,18 @@ export default function KepanitiaanPageContent() {
       if (cancelled) return
       setEvent(evt)
       if (evt) {
-        const [gurus, panitia, events, pembuatSoal] = await Promise.all([
+        const [gurus, sadesa, panitia, events, pembuatSoal] = await Promise.all([
           getGuruOptionsForKepanitiaan(),
+          getSadesaOptionsForKepanitiaan(),
           getPanitiaList(evt.id),
           getEventOptionsForCopy(evt.id),
           getPembuatSoalList(evt.id),
         ])
         if (cancelled) return
         setGuruList(gurus)
+        setSadesaOptions(sadesa)
         setRows(panitia)
-        setDrafts(panitia.map(rowToDraft))
+        setDrafts(panitia.map(row => rowToDraft(row, sadesa)))
         setEventOptions(events)
         setSoalDrafts(pembuatSoal.map(row => ({ ...row, draft_guru_id: row.guru_id ?? '' })))
       }
@@ -391,6 +413,7 @@ export default function KepanitiaanPageContent() {
       }
       if (patch.source) {
         next.guru_id = ''
+        next.sadesa_id = ''
         next.nama = ''
       }
       return next
@@ -417,6 +440,8 @@ export default function KepanitiaanPageContent() {
       .map(draft => {
         const nama = draft.source === 'guru'
           ? guruList.find(guru => guru.id === draft.guru_id)?.nama ?? ''
+          : draft.source === 'sadesa' && draft.sadesa_id
+            ? sadesaOptions.find(santri => santri.id === draft.sadesa_id)?.nama ?? draft.nama
           : draft.nama
         return {
           tipe: draft.tipe,
@@ -486,7 +511,7 @@ export default function KepanitiaanPageContent() {
       ...SEKSI.map(item => [item.key, item.label]),
       [],
       ['CATATAN'],
-      ['tipe: inti/seksi. peran: ketua/anggota. guru_id opsional; jika kosong nama dipakai sebagai input manual.'],
+      ['tipe: inti/seksi. peran: ketua/anggota. guru_id opsional; jika kosong nama dipakai sebagai nama SADESA.'],
     ])
     ws['!cols'] = [{ wch: 14 }, { wch: 22 }, { wch: 28 }, { wch: 14 }, { wch: 34 }, { wch: 10 }]
     XLSX.utils.book_append_sheet(wb, ws, 'Template Panitia')
@@ -765,6 +790,7 @@ export default function KepanitiaanPageContent() {
                       <DraftPersonInput
                         draft={draft}
                         guruList={guruList}
+                        sadesaOptions={sadesaOptions}
                         removable={false}
                         onChange={patch => updateDraft(draft.id, patch)}
                       />
@@ -802,6 +828,7 @@ export default function KepanitiaanPageContent() {
                           <DraftPersonInput
                             draft={ketuaDraft}
                             guruList={guruList}
+                            sadesaOptions={sadesaOptions}
                             onChange={patch => updateDraft(ketuaDraft.id, patch)}
                             onRemove={() => removeDraft(ketuaDraft.id)}
                           />
@@ -817,6 +844,7 @@ export default function KepanitiaanPageContent() {
                           key={draft.id}
                           draft={draft}
                           guruList={guruList}
+                          sadesaOptions={sadesaOptions}
                           onChange={patch => updateDraft(draft.id, patch)}
                           onRemove={() => removeDraft(draft.id)}
                         />

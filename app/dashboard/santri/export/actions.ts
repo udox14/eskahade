@@ -3,6 +3,7 @@
 import { query, queryOne } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import type { ExportFilter, SortBy, KolomExport } from './constants'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 // ─── Opsi filter (untuk populate dropdown) ───────────────────────────────────
 // Hemat row reads:
@@ -105,6 +106,7 @@ export async function getDataExport(
 
   // Enforce asrama untuk pengurus_asrama
   const forceAsrama = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
   // Helper: build IN clause untuk array filter
   const addInClause = (col: string, arr: any[] | undefined | null) => {
@@ -170,6 +172,7 @@ export async function getDataExport(
     kolom.includes('asrama')        ? 's.asrama'        : null,
     kolom.includes('kamar')         ? 's.kamar'         : null,
     kolom.includes('tahun_masuk')   ? 's.tahun_masuk'   : null,
+    kolom.includes('kategori_santri') ? `${kategoriEfektifSql} AS kategori_santri` : null,
     kolom.includes('sekolah')       ? 's.sekolah'       : null,
     kolom.includes('kelas_sekolah') ? 's.kelas_sekolah' : null,
     needKelas && kolom.includes('nama_kelas') ? 'k.nama_kelas' : null,

@@ -127,6 +127,7 @@ export default function UangJajanPage() {
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   const [autoRules, setAutoRules] = useState<AutoRuleRow[]>([])
+  const [isAutoModalOpen, setIsAutoModalOpen] = useState(false)
   const [ruleScope, setRuleScope] = useState<AutoRuleScope>('ASRAMA')
   const [ruleKamar, setRuleKamar] = useState('')
   const [ruleSantriId, setRuleSantriId] = useState('')
@@ -394,8 +395,7 @@ export default function UangJajanPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl bg-emerald-900 p-5 text-white shadow-sm">
+      <div className="rounded-2xl bg-emerald-900 p-5 text-white shadow-sm">
           {loadingStats ? (
             <Loader2 className="h-5 w-5 animate-spin"/>
           ) : (
@@ -414,7 +414,7 @@ export default function UangJajanPage() {
                   <p className="font-mono text-2xl font-bold">{fmtRp(stats?.total_titipan || 0)}</p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+                <div className="mt-4 grid gap-2 text-xs sm:grid-cols-4">
                 <div className="flex items-center justify-between rounded bg-white/10 p-2">
                   <span className="flex items-center gap-1 opacity-80"><TrendingUp className="h-3 w-3"/> Masuk Jajan</span>
                   <span className="font-bold text-green-300">+{fmtRp(stats?.masuk_bulan_ini || 0)}</span>
@@ -427,78 +427,16 @@ export default function UangJajanPage() {
                   <span className="flex items-center gap-1 opacity-80"><CalendarClock className="h-3 w-3"/> Auto</span>
                   <span className="font-bold text-orange-300">-{fmtRp(stats?.auto_bulan_ini || 0)}</span>
                 </div>
+                <button
+                  onClick={() => setIsAutoModalOpen(true)}
+                  className="flex items-center justify-center gap-2 rounded bg-white/10 p-2 font-bold text-white transition-colors hover:bg-white/20"
+                >
+                  <Settings className="h-3 w-3"/> Atur Auto
+                </button>
               </div>
             </>
           )}
         </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings className="h-4 w-4"/> Auto Potong</h2>
-            <button
-              onClick={async () => {
-                const res = await runAutoPotongNow()
-                if ('error' in res) toast.error('Gagal', { description: res.error })
-                else toast.success(`Diproses: ${res.result.deducted} santri`)
-                refreshAfterMutasi(activeKamar)
-              }}
-              className="text-xs font-semibold text-emerald-700 hover:underline"
-            >
-              Proses sekarang
-            </button>
-          </div>
-          <form onSubmit={handleSaveRule} className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <select value={ruleScope} onChange={e => setRuleScope(e.target.value as AutoRuleScope)} className="rounded-lg border px-2 py-2 text-sm">
-                <option value="ASRAMA">Semua asrama</option>
-                <option value="KAMAR">Per kamar</option>
-                <option value="SANTRI">Override santri</option>
-              </select>
-              <input value={ruleJam} onChange={e => setRuleJam(e.target.value)} type="time" className="rounded-lg border px-2 py-2 text-sm"/>
-            </div>
-            {ruleScope === 'KAMAR' && (
-              <select value={ruleKamar} onChange={e => setRuleKamar(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
-                {kamars.map(kamar => <option key={kamar} value={kamar}>Kamar {kamar}</option>)}
-              </select>
-            )}
-            {ruleScope === 'SANTRI' && (
-              <select value={ruleSantriId} onChange={e => setRuleSantriId(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
-                <option value="">Pilih dari daftar/search...</option>
-                {allRuleSantriOptions.map(s => <option key={s.id} value={s.id}>{s.nama_lengkap} - {s.nis}</option>)}
-              </select>
-            )}
-            <input value={ruleNominal} onChange={e => setRuleNominal(e.target.value)} inputMode="numeric" placeholder="Nominal" className="w-full rounded-lg border px-2 py-2 text-sm"/>
-            <div className="flex flex-wrap gap-1">
-              {DAY_OPTIONS.map(day => (
-                <button key={day.value} type="button" onClick={() => toggleRuleDay(day.value)}
-                  className={`rounded-lg border px-2 py-1 text-xs font-bold ${ruleDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
-                  {day.label}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-xs text-slate-600">
-              <input type="checkbox" checked={ruleActive} onChange={e => setRuleActive(e.target.checked)} />
-              Rule aktif
-            </label>
-            <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Simpan Rule</button>
-          </form>
-          <div className="mt-3 max-h-44 space-y-1 overflow-y-auto border-t pt-3">
-            {autoRules.length === 0 ? <p className="text-xs text-slate-400">Belum ada rule.</p> : autoRules.map(rule => (
-              <div key={rule.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2 text-xs">
-                <div className="min-w-0">
-                  <p className="truncate font-bold text-slate-700">
-                    {rule.scope_type === 'ASRAMA' ? 'Semua asrama' : rule.scope_type === 'KAMAR' ? `Kamar ${rule.kamar}` : rule.santri_nama}
-                  </p>
-                  <p className="text-slate-500">{fmtRp(rule.nominal)} · {rule.jam} · {describeDays(rule.days)}</p>
-                </div>
-                <button onClick={() => deleteAutoRule(rule.id).then(() => getAutoRules(asrama).then(setAutoRules))} className="p-1 text-slate-300 hover:text-red-500">
-                  <Trash2 className="h-4 w-4"/>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Cari Santri Cepat</label>
@@ -627,6 +565,117 @@ export default function UangJajanPage() {
               {isSaving ? 'Menyimpan...' : 'Simpan'}
             </div>
           </button>
+        </div>
+      )}
+
+      {isAutoModalOpen && (
+        <div className="fixed inset-0 z-50 flex animate-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm fade-in">
+          <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b bg-slate-50 p-5">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                  <Settings className="h-5 w-5 text-emerald-700"/> Auto Potong Uang Jajan
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">Atur rule massal, override santri, dan jadwal potong otomatis.</p>
+              </div>
+              <button onClick={() => setIsAutoModalOpen(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold text-slate-500 hover:bg-white hover:text-slate-800">
+                Tutup
+              </button>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
+              <form onSubmit={handleSaveRule} className="space-y-3 border-b p-5 lg:border-b-0 lg:border-r">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Cakupan</label>
+                    <select value={ruleScope} onChange={e => setRuleScope(e.target.value as AutoRuleScope)} className="w-full rounded-lg border px-2 py-2 text-sm">
+                      <option value="ASRAMA">Semua asrama</option>
+                      <option value="KAMAR">Per kamar</option>
+                      <option value="SANTRI">Override santri</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jam WIB</label>
+                    <input value={ruleJam} onChange={e => setRuleJam(e.target.value)} type="time" className="w-full rounded-lg border px-2 py-2 text-sm"/>
+                  </div>
+                </div>
+
+                {ruleScope === 'KAMAR' && (
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Kamar</label>
+                    <select value={ruleKamar} onChange={e => setRuleKamar(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
+                      {kamars.map(kamar => <option key={kamar} value={kamar}>Kamar {kamar}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {ruleScope === 'SANTRI' && (
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Santri</label>
+                    <select value={ruleSantriId} onChange={e => setRuleSantriId(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
+                      <option value="">Pilih dari daftar/search...</option>
+                      {allRuleSantriOptions.map(s => <option key={s.id} value={s.id}>{s.nama_lengkap} - {s.nis}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Nominal</label>
+                  <input value={ruleNominal} onChange={e => setRuleNominal(e.target.value)} inputMode="numeric" placeholder="Nominal" className="w-full rounded-lg border px-2 py-2 text-sm"/>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hari Aktif</label>
+                  <div className="flex flex-wrap gap-1">
+                    {DAY_OPTIONS.map(day => (
+                      <button key={day.value} type="button" onClick={() => toggleRuleDay(day.value)}
+                        className={`rounded-lg border px-2 py-1 text-xs font-bold ${ruleDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={ruleActive} onChange={e => setRuleActive(e.target.checked)} />
+                  Rule aktif
+                </label>
+
+                <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Simpan Rule</button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await runAutoPotongNow()
+                    if ('error' in res) toast.error('Gagal', { description: res.error })
+                    else toast.success(`Diproses: ${res.result.deducted} santri`)
+                    refreshAfterMutasi(activeKamar)
+                  }}
+                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Proses Sekarang
+                </button>
+              </form>
+
+              <div className="min-h-0 p-5">
+                <h4 className="mb-3 text-sm font-bold text-slate-700">Rule Aktif</h4>
+                <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+                  {autoRules.length === 0 ? <p className="text-xs text-slate-400">Belum ada rule.</p> : autoRules.map(rule => (
+                    <div key={rule.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-xs">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-700">
+                          {rule.scope_type === 'ASRAMA' ? 'Semua asrama' : rule.scope_type === 'KAMAR' ? `Kamar ${rule.kamar}` : rule.santri_nama}
+                        </p>
+                        <p className="text-slate-500">{fmtRp(rule.nominal)} · {rule.jam} · {describeDays(rule.days)}</p>
+                      </div>
+                      <button onClick={() => deleteAutoRule(rule.id).then(() => getAutoRules(asrama).then(setAutoRules))} className="p-1 text-slate-300 hover:text-red-500">
+                        <Trash2 className="h-4 w-4"/>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

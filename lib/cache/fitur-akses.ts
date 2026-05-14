@@ -69,6 +69,7 @@ async function ensureFiturAksesReady() {
       ('Asrama', 'Kamar', '/dashboard/asrama/kamar', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 5),
       ('Asrama', 'Perpindahan Kamar', '/dashboard/asrama/perpindahan-kamar', 'ArrowLeftRight', '["admin","pengurus_asrama"]', 1, 6),
       ('Asrama', 'Plotting Kamar Manual', '/dashboard/asrama/plotting-kamar-manual', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 7),
+      ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
       ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8)
   `)
 

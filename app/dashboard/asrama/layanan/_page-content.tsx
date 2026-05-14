@@ -45,6 +45,8 @@ type SantriRow = {
   kamar: string | null;
   tempat_makan_id: string | null;
   tempat_mencuci_id: string | null;
+  kategori_santri: string;
+  kategori_efektif: string;
 };
 
 type MasterJasaRow = {
@@ -65,6 +67,8 @@ type DetailRow = {
   nama_lengkap: string;
   asrama: string | null;
   kamar: string | null;
+  kategori_santri: string;
+  kategori_efektif: string;
 };
 
 type DetailModalState = {
@@ -87,6 +91,7 @@ export default function LayananAsramaPage() {
   const [selectedAsrama, setSelectedAsrama] = useState<string>("");
   const [selectedKamar, setSelectedKamar] = useState<string>("");
   const [belumDitempatkan, setBelumDitempatkan] = useState<boolean>(false);
+  const [santriBaruOnly, setSantriBaruOnly] = useState<boolean>(false);
 
   const [masterJasa, setMasterJasa] = useState<MasterJasaRow[]>([]);
   const [showModalJasa, setShowModalJasa] = useState(false);
@@ -152,12 +157,12 @@ export default function LayananAsramaPage() {
   useEffect(() => {
     if (!selectedAsrama) return;
     loadSantriPage(page, getEffectivePageSize(pageSize, totalSantri));
-  }, [selectedAsrama, selectedKamar, belumDitempatkan, page, pageSize]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly, page, pageSize]);
 
   useEffect(() => {
     if (!selectedAsrama) return;
     loadSebaran();
-  }, [selectedAsrama, selectedKamar, belumDitempatkan]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly]);
 
   useEffect(() => {
     setDetailModal(null);
@@ -165,7 +170,7 @@ export default function LayananAsramaPage() {
     setDetailPage(1);
     setDetailHasMore(false);
     setDetailTotal(0);
-  }, [selectedAsrama, selectedKamar, belumDitempatkan]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly]);
 
   useEffect(() => {
     if (!detailModal || !detailHasMore || detailLoading) return;
@@ -193,6 +198,7 @@ export default function LayananAsramaPage() {
         asrama: selectedAsrama,
         kamar: selectedKamar,
         belumDitempatkan,
+        santriBaruOnly,
         page: targetPage,
         limit: targetPageSize,
       });
@@ -219,6 +225,7 @@ export default function LayananAsramaPage() {
         asrama: selectedAsrama,
         kamar: selectedKamar,
         belumDitempatkan,
+        santriBaruOnly,
       });
 
       setSebaranMakan((res.makan || []) as SebaranRow[]);
@@ -243,6 +250,7 @@ export default function LayananAsramaPage() {
         asrama: selectedAsrama,
         kamar: selectedKamar,
         belumDitempatkan,
+        santriBaruOnly,
         jenis: modal.jenis,
         jasaId: modal.jasaId,
         page: targetPage,
@@ -432,7 +440,7 @@ export default function LayananAsramaPage() {
         }
       />
 
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pilih Asrama</label>
           <select
@@ -491,6 +499,21 @@ export default function LayananAsramaPage() {
               }}
             />
             <span className="text-sm font-medium text-slate-700">Tampilkan yang belum ditempatkan</span>
+          </label>
+        </div>
+
+        <div className="flex items-end pb-1">
+          <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-indigo-50 rounded-lg border border-transparent hover:border-indigo-200 w-full transition">
+            <input
+              type="checkbox"
+              className="w-5 h-5 text-indigo-600 rounded"
+              checked={santriBaruOnly}
+              onChange={(e) => {
+                setPage(1);
+                setSantriBaruOnly(e.target.checked);
+              }}
+            />
+            <span className="text-sm font-medium text-slate-700">Santri BARU saja</span>
           </label>
         </div>
       </div>
@@ -601,8 +624,9 @@ export default function LayananAsramaPage() {
                     >
                       <td className="p-4">
                         <div className="font-bold text-slate-800">{santri.nama_lengkap}</div>
-                        <div className="text-xs font-medium text-slate-500 mt-0.5">
-                          {santri.nis} • Kamar {santri.kamar || "-"}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500">
+                          <span>{santri.nis} • Kamar {santri.kamar || "-"}</span>
+                          <KategoriBadge kategori={santri.kategori_efektif || santri.kategori_santri || "REGULER"} />
                         </div>
                       </td>
                       <td className="p-4">
@@ -682,9 +706,12 @@ export default function LayananAsramaPage() {
                   )}
 
                   <h3 className="font-bold text-slate-800 text-lg leading-tight">{santri.nama_lengkap}</h3>
-                  <p className="text-xs font-semibold text-slate-500 mt-1 mb-3 bg-slate-100 w-fit px-2 py-0.5 rounded-md">
-                    {santri.nis} • Kamar {santri.kamar || "-"}
-                  </p>
+                  <div className="mt-1 mb-3 flex flex-wrap items-center gap-1.5">
+                    <p className="text-xs font-semibold text-slate-500 bg-slate-100 w-fit px-2 py-0.5 rounded-md">
+                      {santri.nis} • Kamar {santri.kamar || "-"}
+                    </p>
+                    <KategoriBadge kategori={santri.kategori_efektif || santri.kategori_santri || "REGULER"} />
+                  </div>
 
                   <div className="space-y-3">
                     <div>
@@ -962,7 +989,10 @@ export default function LayananAsramaPage() {
             <div className="overflow-y-auto flex-1 bg-slate-50/60 p-4 space-y-3">
               {detailRows.map((row) => (
                 <div key={row.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-                  <div className="font-bold text-slate-800">{row.nama_lengkap}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-bold text-slate-800">{row.nama_lengkap}</div>
+                    <KategoriBadge kategori={row.kategori_efektif || row.kategori_santri || "REGULER"} />
+                  </div>
                   <div className="text-sm text-slate-500 mt-1">
                     {row.nis} • Asrama {row.asrama || "-"} • Kamar {row.kamar || "-"}
                   </div>
@@ -1020,6 +1050,19 @@ function SummaryCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function KategoriBadge({ kategori }: { kategori: string }) {
+  const isBaru = kategori === "BARU";
+  return (
+    <span
+      className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-black ${
+        isBaru ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {kategori}
+    </span>
   );
 }
 

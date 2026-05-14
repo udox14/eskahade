@@ -3,12 +3,14 @@
 import { batch, execute, generateId, query } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { revalidatePath } from 'next/cache'
 
 type LayananFilterArgs = {
   asrama: string
   kamar?: string
   belumDitempatkan?: boolean
+  santriBaruOnly?: boolean
 }
 
 // Helper: ambil asrama restriction untuk pengurus_asrama
@@ -35,6 +37,10 @@ function buildSantriFilterSql(
 
   if (filters.belumDitempatkan) {
     where += ` AND (${prefix}tempat_makan_id IS NULL OR ${prefix}tempat_mencuci_id IS NULL)`
+  }
+
+  if (filters.santriBaruOnly) {
+    where += ` AND ${getKategoriSantriEfektifSql(alias || 'santri')} = 'BARU'`
   }
 
   return { where, params }
@@ -166,6 +172,7 @@ export async function getSantriLayanan({
   asrama,
   kamar,
   belumDitempatkan = false,
+  santriBaruOnly = false,
   page = 1,
   limit = 20,
 }: LayananFilterArgs & {
@@ -177,9 +184,10 @@ export async function getSantriLayanan({
   const safePage = Math.max(1, page)
   const safeLimit = Math.max(1, limit)
   const { where, params } = buildSantriFilterSql(
-    { asrama, kamar, belumDitempatkan },
+    { asrama, kamar, belumDitempatkan, santriBaruOnly },
     targetAsrama
   )
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('santri')
 
   const countResult = await query<{ total: number }>(
     `
@@ -193,7 +201,9 @@ export async function getSantriLayanan({
 
   const data = await query<any>(
     `
-      SELECT id, nis, nama_lengkap, kamar, tempat_makan_id, tempat_mencuci_id
+      SELECT id, nis, nama_lengkap, kamar, tempat_makan_id, tempat_mencuci_id,
+             COALESCE(NULLIF(kategori_santri, ''), 'REGULER') AS kategori_santri,
+             ${kategoriEfektifSql} AS kategori_efektif
       FROM santri
       ${where}
       ORDER BY kamar, nama_lengkap
@@ -214,11 +224,12 @@ export async function getSebaranLayanan({
   asrama,
   kamar,
   belumDitempatkan = false,
+  santriBaruOnly = false,
 }: LayananFilterArgs) {
   const restrictedAsrama = await getRestrictedAsrama()
   const targetAsrama = restrictedAsrama ?? asrama
   const { where, params } = buildSantriFilterSql(
-    { asrama, kamar, belumDitempatkan },
+    { asrama, kamar, belumDitempatkan, santriBaruOnly },
     targetAsrama,
     's'
   )
@@ -280,6 +291,7 @@ export async function getSantriSebaranDetail({
   asrama,
   kamar,
   belumDitempatkan = false,
+  santriBaruOnly = false,
   jenis,
   jasaId,
   page = 1,
@@ -295,7 +307,7 @@ export async function getSantriSebaranDetail({
   const safePage = Math.max(1, page)
   const safeLimit = Math.max(1, limit)
   const { where, params } = buildSantriFilterSql(
-    { asrama, kamar, belumDitempatkan },
+    { asrama, kamar, belumDitempatkan, santriBaruOnly },
     targetAsrama
   )
   const column = jenis === 'Makan' ? 'tempat_makan_id' : 'tempat_mencuci_id'
@@ -322,7 +334,9 @@ export async function getSantriSebaranDetail({
 
   const data = await query<any>(
     `
-      SELECT id, nis, nama_lengkap, asrama, kamar
+      SELECT id, nis, nama_lengkap, asrama, kamar,
+             COALESCE(NULLIF(kategori_santri, ''), 'REGULER') AS kategori_santri,
+             ${getKategoriSantriEfektifSql('santri')} AS kategori_efektif
       FROM santri
       ${detailWhere}
       ORDER BY kamar, nama_lengkap

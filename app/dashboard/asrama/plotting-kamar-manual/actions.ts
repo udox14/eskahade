@@ -6,6 +6,7 @@ import { hasRole, isAdmin } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { execute, getDB, query, queryOne } from '@/lib/db'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 const FEATURE_PATH = '/dashboard/asrama/plotting-kamar-manual'
 const KAMAR_PATH = '/dashboard/asrama/kamar'
@@ -49,6 +50,8 @@ type SantriRow = {
   kelas_sekolah: string | null
   marhalah_nama: string | null
   nama_kelas: string | null
+  kategori_santri: string
+  kategori_efektif: string
 }
 
 type ExistingKamarRow = {
@@ -204,6 +207,7 @@ export async function getDataPlottingManual(asrama: string) {
   }
 
   await cleanupKetuaInvalid(access.asrama)
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
   const [configs, drafts, ketuaList, santriList, existingKamar] = await Promise.all([
     query<KamarConfigRow>('SELECT nomor_kamar, kuota, reserved_baru, blok FROM kamar_config WHERE asrama = ? ORDER BY CAST(nomor_kamar AS INTEGER), nomor_kamar', [access.asrama]),
@@ -217,6 +221,8 @@ export async function getDataPlottingManual(asrama: string) {
     query<SantriRow>(`
       SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin,
              s.kamar AS kamar_asli, s.sekolah, s.kelas_sekolah,
+             COALESCE(NULLIF(s.kategori_santri, ''), 'REGULER') AS kategori_santri,
+             ${kategoriEfektifSql} AS kategori_efektif,
              m.nama AS marhalah_nama, k.nama_kelas
       FROM santri s
       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
@@ -351,18 +357,38 @@ export async function tambahSantriKeKamar(asrama: string, nomorKamar: string, sa
   const ids = [...new Set(santriIds.map((id) => String(id ?? '').trim()).filter(Boolean))]
   if (!ids.length) return { error: 'Pilih minimal satu santri' }
   const placeholders = ids.map(() => '?').join(',')
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
-  const [existingDraft, validSantri, currentCount] = await Promise.all([
+  const [existingDraft, validSantri, currentCounts] = await Promise.all([
     query<{ santri_id: string }>(`SELECT santri_id FROM kamar_draft WHERE asrama = ? AND santri_id IN (${placeholders})`, [access.asrama, ...ids]),
-    query<{ id: string; kamar: string | null }>(`SELECT id, kamar FROM santri WHERE status_global = 'aktif' AND asrama = ? AND id IN (${placeholders})`, [access.asrama, ...ids]),
-    queryOne<{ total: number }>('SELECT COUNT(*) AS total FROM kamar_draft WHERE asrama = ? AND kamar_baru = ?', [access.asrama, targetKamar]),
+    query<{ id: string; kamar: string | null; kategori_efektif: string }>(
+      `SELECT s.id, s.kamar, ${kategoriEfektifSql} AS kategori_efektif
+       FROM santri s
+       WHERE s.status_global = 'aktif' AND s.asrama = ? AND s.id IN (${placeholders})`,
+      [access.asrama, ...ids]
+    ),
+    query<{ kategori_efektif: string; total: number }>(`
+      SELECT ${kategoriEfektifSql} AS kategori_efektif, COUNT(*) AS total
+      FROM kamar_draft kd
+      JOIN santri s ON s.id = kd.santri_id AND s.status_global = 'aktif' AND s.asrama = kd.asrama
+      WHERE kd.asrama = ? AND kd.kamar_baru = ?
+      GROUP BY kategori_efektif
+    `, [access.asrama, targetKamar]),
   ])
 
   if (existingDraft.length) return { error: `${existingDraft.length} santri sudah ditempatkan di kamar lain` }
   if (validSantri.length !== ids.length) return { error: 'Ada santri yang tidak aktif atau bukan penghuni asrama ini' }
 
   const kuotaLama = Math.max(0, Number(kamar.kuota) - Number(kamar.reserved_baru ?? 0))
-  if (Number(currentCount?.total ?? 0) + ids.length > kuotaLama) {
+  const kuotaBaru = Math.max(0, Number(kamar.reserved_baru ?? 0))
+  const currentBaru = Number(currentCounts.find((row) => row.kategori_efektif === 'BARU')?.total ?? 0)
+  const currentLama = currentCounts.reduce((sum, row) => row.kategori_efektif === 'BARU' ? sum : sum + Number(row.total ?? 0), 0)
+  const tambahBaru = validSantri.filter((santri) => santri.kategori_efektif === 'BARU').length
+  const tambahLama = validSantri.length - tambahBaru
+  if (currentBaru + tambahBaru > kuotaBaru) {
+    return { error: `Kuota santri baru kamar ${targetKamar} tidak cukup` }
+  }
+  if (currentLama + tambahLama > kuotaLama) {
     return { error: `Kuota santri lama kamar ${targetKamar} tidak cukup` }
   }
 
@@ -465,6 +491,7 @@ export async function setKetuaKamarManual(asrama: string, nomorKamar: string, sa
 export async function terapkanPlottingManual(asrama: string) {
   const access = await assertAccess(asrama)
   if ('error' in access) return access
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
   const drafts = await query<DraftRow>(`
     SELECT kd.*
@@ -474,6 +501,32 @@ export async function terapkanPlottingManual(asrama: string) {
     WHERE kd.asrama = ?
   `, [access.asrama])
   if (!drafts.length) return { error: 'Tidak ada draft untuk diterapkan' }
+
+  const [configs, roomCounts] = await Promise.all([
+    query<{ nomor_kamar: string; kuota: number; reserved_baru: number }>(
+      'SELECT nomor_kamar, kuota, reserved_baru FROM kamar_config WHERE asrama = ?',
+      [access.asrama]
+    ),
+    query<{ kamar_baru: string; kategori_efektif: string; total: number }>(`
+      SELECT kd.kamar_baru, ${kategoriEfektifSql} AS kategori_efektif, COUNT(*) AS total
+      FROM kamar_draft kd
+      JOIN santri s ON s.id = kd.santri_id AND s.status_global = 'aktif' AND s.asrama = kd.asrama
+      WHERE kd.asrama = ?
+      GROUP BY kd.kamar_baru, kategori_efektif
+    `, [access.asrama]),
+  ])
+  const configMap = new Map(configs.map((config) => [config.nomor_kamar, config]))
+  for (const config of configs) {
+    const counts = roomCounts.filter((row) => row.kamar_baru === config.nomor_kamar)
+    const totalBaru = Number(counts.find((row) => row.kategori_efektif === 'BARU')?.total ?? 0)
+    const totalLama = counts.reduce((sum, row) => row.kategori_efektif === 'BARU' ? sum : sum + Number(row.total ?? 0), 0)
+    const kuotaBaru = Math.max(0, Number(config.reserved_baru ?? 0))
+    const kuotaLama = Math.max(0, Number(config.kuota ?? 0) - kuotaBaru)
+    if (totalBaru > kuotaBaru) return { error: `Kuota santri baru kamar ${config.nomor_kamar} melebihi batas` }
+    if (totalLama > kuotaLama) return { error: `Kuota santri lama kamar ${config.nomor_kamar} melebihi batas` }
+  }
+  const kamarTidakAda = [...new Set(drafts.map((draft) => draft.kamar_baru))].filter((nomorKamar) => !configMap.has(nomorKamar))
+  if (kamarTidakAda.length) return { error: `Ada draft menuju kamar yang tidak ada di konfigurasi: ${kamarTidakAda.join(', ')}` }
 
   const tanpaDraft = await queryOne<{ total: number }>(`
     SELECT COUNT(*) AS total

@@ -48,6 +48,8 @@ type SantriData = {
   kelas_sekolah: string | null
   marhalah_nama: string | null
   nama_kelas: string | null
+  kategori_santri: string
+  kategori_efektif: string
 }
 
 type DraftItem = {
@@ -163,6 +165,7 @@ export default function PlottingKamarManualClient({
         santri.nama_kelas,
         santri.sekolah,
         santri.kelas_sekolah,
+        santri.kategori_efektif,
       ].filter(Boolean).join(' ').toLowerCase().includes(q)
     })
   }, [placedIds, santriList, search])
@@ -307,7 +310,10 @@ export default function PlottingKamarManualClient({
   </style>
 </head>
 <body>
-${printRooms.map(({ cfg, ketua, members }) => `
+${printRooms.map(({ cfg, ketua, members }) => {
+  const totalBaru = members.filter((santri) => santri.kategori_efektif === 'BARU').length
+  const totalLama = members.length - totalBaru
+  return `
   <section class="page">
     <div class="header">
       <h1>Asrama ${escapeHtml(asrama)} - Kamar ${escapeHtml(cfg.nomor_kamar)}</h1>
@@ -315,7 +321,8 @@ ${printRooms.map(({ cfg, ketua, members }) => `
       <div class="meta">
         <div class="box"><div class="label">Kuota lama</div><div class="value">${cfg.kuota_lama}</div></div>
         <div class="box"><div class="label">Kuota baru</div><div class="value">${cfg.kuota_baru}</div></div>
-        <div class="box"><div class="label">Penghuni draft</div><div class="value">${members.length}</div></div>
+        <div class="box"><div class="label">Penghuni lama</div><div class="value">${totalLama}</div></div>
+        <div class="box"><div class="label">Penghuni baru</div><div class="value">${totalBaru}</div></div>
         <div class="box"><div class="label">Ketua kamar</div><div class="value">${escapeHtml(ketua?.nama_lengkap || '-')}</div></div>
       </div>
     </div>
@@ -327,6 +334,7 @@ ${printRooms.map(({ cfg, ketua, members }) => `
           <th style="width:90px">NIS</th>
           <th>Kelas</th>
           <th>Sekolah</th>
+          <th class="center" style="width:72px">Kategori</th>
           <th class="center" style="width:64px">Ket</th>
         </tr>
       </thead>
@@ -339,9 +347,10 @@ ${printRooms.map(({ cfg, ketua, members }) => `
             <td>${escapeHtml(santri.nis)}</td>
             <td>${escapeHtml(santri.nama_kelas || santri.kelas_sekolah || '-')}</td>
             <td>${escapeHtml([santri.sekolah, santri.kelas_sekolah ? `Kls ${santri.kelas_sekolah}` : ''].filter(Boolean).join(' ') || '-')}</td>
+            <td class="center">${escapeHtml(santri.kategori_efektif || santri.kategori_santri || 'REGULER')}</td>
             <td class="center">${isKetua ? 'Ketua' : ''}</td>
           </tr>`
-        }).join('') : '<tr><td colspan="6" class="center">Belum ada santri di kamar ini.</td></tr>'}
+        }).join('') : '<tr><td colspan="7" class="center">Belum ada santri di kamar ini.</td></tr>'}
       </tbody>
     </table>
     <div class="footer">
@@ -349,7 +358,7 @@ ${printRooms.map(({ cfg, ketua, members }) => `
       <div class="sign">Pembina/Ketua Kamar</div>
     </div>
   </section>
-`).join('')}
+`}).join('')}
   <script>window.onload = () => setTimeout(() => window.print(), 250)</script>
 </body>
 </html>`
@@ -566,7 +575,10 @@ ${printRooms.map(({ cfg, ketua, members }) => `
           {configs.map((cfg) => {
             const members = getSantriDiKamar(cfg.nomor_kamar)
             const ketua = ketuaMap[cfg.nomor_kamar]
-            const isOver = members.length > cfg.kuota_lama
+            const totalBaru = members.filter((santri) => santri.kategori_efektif === 'BARU').length
+            const totalLama = members.length - totalBaru
+            const isOver = totalLama > cfg.kuota_lama || totalBaru > cfg.kuota_baru
+            const isFull = totalLama >= cfg.kuota_lama && totalBaru >= cfg.kuota_baru
             return (
               <div key={cfg.nomor_kamar} className={`rounded-2xl border bg-white shadow-sm ${isOver ? 'border-red-200' : 'border-slate-200'}`}>
                 <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
@@ -576,10 +588,10 @@ ${printRooms.map(({ cfg, ketua, members }) => `
                       {cfg.blok ? <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600">Blok {cfg.blok}</span> : null}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500">
-                      <span>Lama {members.length}/{cfg.kuota_lama}</span>
-                      <span>Baru {cfg.kuota_baru}</span>
-                      <span className={`rounded-full px-2 py-0.5 ${statusClass(members.length, cfg.kuota_lama)}`}>
-                        {isOver ? 'Over' : members.length === cfg.kuota_lama ? 'Penuh' : 'Tersedia'}
+                      <span>Lama {totalLama}/{cfg.kuota_lama}</span>
+                      <span>Baru {totalBaru}/{cfg.kuota_baru}</span>
+                      <span className={`rounded-full px-2 py-0.5 ${statusClass(totalLama + totalBaru, cfg.kuota_lama + cfg.kuota_baru)}`}>
+                        {isOver ? 'Over' : isFull ? 'Penuh' : 'Tersedia'}
                       </span>
                     </div>
                   </div>
@@ -611,7 +623,7 @@ ${printRooms.map(({ cfg, ketua, members }) => `
                 <div className="space-y-2 p-3">
                   <button
                     type="button"
-                    disabled={pending || members.length >= cfg.kuota_lama}
+                    disabled={pending || isFull}
                     onClick={() => {
                       setPanelKamar(cfg.nomor_kamar)
                       setSelectedIds(new Set())
@@ -633,6 +645,9 @@ ${printRooms.map(({ cfg, ketua, members }) => `
                             <div className="flex items-center gap-1.5">
                               <p className="truncate text-xs font-bold text-slate-800">{santri.nama_lengkap}</p>
                               {isKetua ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
+                              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black ${santri.kategori_efektif === 'BARU' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
+                                {santri.kategori_efektif || santri.kategori_santri || 'REGULER'}
+                              </span>
                             </div>
                             <p className="truncate text-[10px] text-slate-400">{santri.nis} - {santri.nama_kelas || santri.sekolah || '-'}</p>
                           </div>
@@ -700,6 +715,9 @@ ${printRooms.map(({ cfg, ketua, members }) => `
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-slate-800">{santri.nama_lengkap}</p>
                       <p className="truncate text-xs text-slate-400">{santri.nis} - {santri.nama_kelas || 'Belum masuk kelas'} - Kamar lama {santri.kamar_asli || '-'}</p>
+                      <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-black ${santri.kategori_efektif === 'BARU' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {santri.kategori_efektif || santri.kategori_santri || 'REGULER'}
+                      </span>
                     </div>
                   </button>
                 )

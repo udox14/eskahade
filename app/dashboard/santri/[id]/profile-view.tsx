@@ -98,7 +98,22 @@ export function SantriProfileView({
                     } 
                     isCustom 
                 />
-                <InfoRow label="Kategori Santri" value={santri.kategori_santri || 'REGULER'} />
+                <InfoRow
+                  label="Kategori Santri"
+                  value={
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                      santri.kategori_efektif === 'BARU'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {santri.kategori_efektif || santri.kategori_santri || 'REGULER'}
+                    </span>
+                  }
+                  isCustom
+                />
+                {santri.kategori_efektif === 'BARU' && (
+                  <InfoRow label="Kategori Setelah Masa Baru" value={santri.kategori_santri || 'REGULER'} />
+                )}
                 <InfoRow label="Tanggal Masuk" value={safeFormat(santri.tanggal_masuk, 'dd MMMM yyyy')} />
                 {santri.tanggal_keluar && (
                   <InfoRow label="Tanggal Keluar" value={safeFormat(santri.tanggal_keluar, 'dd MMMM yyyy')} />

@@ -4,6 +4,7 @@ import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { normalizeKategoriSantriDasar } from '@/lib/santri/kategori'
 import { revalidatePath } from 'next/cache'
 
 type SantriImportData = {
@@ -53,10 +54,6 @@ async function upsertJasa(nama: string, jenis: 'Makan' | 'Cuci'): Promise<string
   return id
 }
 
-function normalizeKategoriSantri(value: unknown) {
-  return String(value ?? '').trim().toUpperCase() === 'SADESA' ? 'SADESA' : 'REGULER'
-}
-
 export async function getKelasList() {
   const data = await query<{ id: string; nama_kelas: string }>(`
     SELECT k.id, k.nama_kelas
@@ -102,7 +99,7 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
     tanggal_masuk: s.tanggal_masuk || `${tahunMasukDefault}-01-01`,
     tanggal_keluar: s.tanggal_keluar || null,
     status_global: 'aktif',
-    kategori_santri: normalizeKategoriSantri(s.kategori_santri ?? s.sekolah),
+    kategori_santri: normalizeKategoriSantriDasar(s.kategori_santri ?? s.sekolah),
     sekolah: s.sekolah ? String(s.sekolah).toUpperCase().trim() : null,
     kelas_sekolah: s.kelas_sekolah ? String(s.kelas_sekolah).trim() : null,
     asrama: s.asrama ? String(s.asrama).toUpperCase().trim() : null,
@@ -225,7 +222,7 @@ export async function tambahSantriSatuSatu(data: {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   const tahunMasuk = new Date().getFullYear()
-  const kategoriSantri = normalizeKategoriSantri(data.kategori_santri)
+  const kategoriSantri = normalizeKategoriSantriDasar(data.kategori_santri)
   const sekolah = kategoriSantri === 'SADESA' ? null : rest.sekolah?.toUpperCase().trim() || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : rest.kelas_sekolah?.trim() || null
 

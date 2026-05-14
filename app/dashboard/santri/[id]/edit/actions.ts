@@ -4,6 +4,7 @@ import { query, queryOne } from '@/lib/db'
 import { assertCrud } from '@/lib/auth/crud'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
+import { normalizeKategoriSantriDasar } from '@/lib/santri/kategori'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -29,7 +30,7 @@ export async function updateSantri(id: string, formData: FormData) {
   if (!beforeSantri) return { error: 'Santri tidak ditemukan.' }
 
   const now = new Date().toISOString()
-  const kategoriSantri = String(formData.get('kategori_santri') ?? '').trim().toUpperCase() === 'SADESA' ? 'SADESA' : 'REGULER'
+  const kategoriSantri = normalizeKategoriSantriDasar(formData.get('kategori_santri'))
   const sekolah = kategoriSantri === 'SADESA' ? null : formData.get('sekolah') || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : formData.get('kelas_sekolah') || null
   const afterSantri = {

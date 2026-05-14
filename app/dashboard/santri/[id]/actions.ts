@@ -1,9 +1,11 @@
 'use server'
 
 import { query, queryOne } from '@/lib/db'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 export async function getSantriDetail(id: string) {
-  const data = await queryOne<any>('SELECT * FROM santri WHERE id = ?', [id])
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
+  const data = await queryOne<any>(`SELECT s.*, ${kategoriEfektifSql} AS kategori_efektif FROM santri s WHERE s.id = ?`, [id])
   if (!data) return null
 
   const riwayat = await query<any>(`
