@@ -246,6 +246,107 @@ export async function getTempelanRuanganSemuaData(eventId: number) {
     ORDER BY r.nomor_ruangan, ps.jam_group, ps.nomor_kursi
   `, [eventId])
 }
+
+export type TempelanHumasKelasOption = {
+  kelas_id: string
+  nama_kelas: string
+  marhalah_nama: string | null
+  marhalah_urutan: number | null
+}
+
+export type TempelanHumasItem = TempelanHumasKelasOption & {
+  nomor_ruangan: number
+  jumlah: number
+  semester: number
+  tahun_ajaran_nama: string
+}
+
+export async function getTempelanHumasKelasList(eventId: number) {
+  return query<TempelanHumasKelasOption>(`
+    SELECT DISTINCT
+      k.id as kelas_id,
+      k.nama_kelas,
+      m.nama as marhalah_nama,
+      m.urutan as marhalah_urutan
+    FROM ehb_plotting_santri ps
+    JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE ps.ehb_event_id = ?
+    ORDER BY COALESCE(m.urutan, 999), k.nama_kelas
+  `, [eventId])
+}
+
+export async function getTempelanHumasData(eventId: number, kelasId?: string) {
+  const params: unknown[] = [eventId]
+  const filter = kelasId ? 'AND k.id = ?' : ''
+  if (kelasId) params.push(kelasId)
+
+  return query<TempelanHumasItem>(`
+    SELECT
+      k.id as kelas_id,
+      k.nama_kelas,
+      m.nama as marhalah_nama,
+      m.urutan as marhalah_urutan,
+      r.nomor_ruangan,
+      COUNT(ps.id) as jumlah,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE ps.ehb_event_id = ? ${filter}
+    GROUP BY k.id, k.nama_kelas, m.nama, m.urutan, r.nomor_ruangan, e.semester, ta.nama
+    ORDER BY COALESCE(m.urutan, 999), k.nama_kelas, r.nomor_ruangan
+  `, params)
+}
+
+export type TempelanPengepakanItem = {
+  ruangan_id: number
+  nomor_ruangan: number
+  jam_group: string
+  kelas_id: string | null
+  nama_kelas: string | null
+  marhalah_nama: string | null
+  marhalah_urutan: number | null
+  jumlah: number
+  semester: number
+  tahun_ajaran_nama: string
+}
+
+export async function getTempelanPengepakanData(eventId: number, ruanganId?: number) {
+  const params: unknown[] = [eventId]
+  const filter = ruanganId ? 'AND r.id = ?' : ''
+  if (ruanganId) params.push(ruanganId)
+
+  return query<TempelanPengepakanItem>(`
+    SELECT
+      r.id as ruangan_id,
+      r.nomor_ruangan,
+      ps.jam_group,
+      k.id as kelas_id,
+      k.nama_kelas,
+      m.nama as marhalah_nama,
+      m.urutan as marhalah_urutan,
+      COUNT(ps.id) as jumlah,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE ps.ehb_event_id = ? ${filter}
+    GROUP BY r.id, r.nomor_ruangan, ps.jam_group, k.id, k.nama_kelas, m.nama, m.urutan, e.semester, ta.nama
+    ORDER BY r.nomor_ruangan, ps.jam_group, COALESCE(m.urutan, 999), k.nama_kelas
+  `, params)
+}
 export type DaftarHadirSesi = {
   tanggal: string
   label: string

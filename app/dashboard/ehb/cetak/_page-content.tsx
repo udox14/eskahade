@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import {
   Printer, CreditCard, Hash,
-  ClipboardList, LayoutList, CalendarCheck, Calendar,
+  ClipboardList, LayoutList, CalendarCheck, Calendar, Megaphone, Boxes,
 } from 'lucide-react'
 import { KartuPesertaView } from './_view-kartu'
 import { NomorPesertaView } from './_view-nomor'
 import { DaftarHadirView } from './_view-daftar-hadir'
 import { TempelanRuanganView } from './_view-tempelan-ruangan'
+import { TempelanHumasView, TempelanPengepakanView } from './_view-tempelan-humas-packing'
 import { JadwalMengawasView } from './_view-jadwal-mengawas'
 import { JadwalEhbView } from './_view-jadwal-ehb'
 import { PlaceholderView } from './_shared'
@@ -22,6 +23,8 @@ type View =
   | 'nomor-peserta'
   | 'daftar-hadir'
   | 'tempelan-ruangan'
+  | 'tempelan-humas'
+  | 'tempelan-pengepakan'
   | 'jadwal-mengawas'
   | 'jadwal-ehb'
 
@@ -32,6 +35,8 @@ const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.Element
   { view: 'nomor-peserta',    label: 'Nomor Peserta',        desc: 'Nomor ujian besar untuk ditempel di meja peserta.',         icon: Hash },
   { view: 'daftar-hadir',     label: 'Blanko Daftar Hadir',  desc: 'Lembar daftar hadir kosong untuk diisi peserta tiap sesi.',  icon: ClipboardList },
   { view: 'tempelan-ruangan', label: 'Tempelan Ruangan',     desc: 'Nomor ruangan beserta daftar peserta di dalamnya.',         icon: LayoutList },
+  { view: 'tempelan-humas',   label: 'Tempelan Humas',       desc: 'Rekap jumlah peserta per ruangan untuk setiap kelas.',       icon: Megaphone },
+  { view: 'tempelan-pengepakan', label: 'Tempelan Pengepakan', desc: 'Rekap kelas dan peserta per jam untuk setiap ruangan.',     icon: Boxes },
   { view: 'jadwal-mengawas',  label: 'Jadwal Mengawas',      desc: 'Jadwal tugas mengawas seluruh pengawas EHB.',               icon: CalendarCheck },
   { view: 'jadwal-ehb',       label: 'Jadwal EHB',           desc: 'Jadwal ujian keseluruhan untuk ditempel di mading.',        icon: Calendar },
 ]
@@ -45,6 +50,8 @@ export default function CetakEhbPage() {
   if (view === 'nomor-peserta') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><NomorPesertaView onBack={() => setView('menu')} /></div>
   if (view === 'daftar-hadir')  return <div className="max-w-6xl mx-auto pb-20 space-y-6"><DaftarHadirView onBack={() => setView('menu')} /></div>
   if (view === 'tempelan-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanRuanganView onBack={() => setView('menu')} /></div>
+  if (view === 'tempelan-humas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanHumasView onBack={() => setView('menu')} /></div>
+  if (view === 'tempelan-pengepakan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanPengepakanView onBack={() => setView('menu')} /></div>
   if (view === 'jadwal-mengawas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalMengawasView onBack={() => setView('menu')} /></div>
   if (view === 'jadwal-ehb') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalEhbView onBack={() => setView('menu')} /></div>
 
