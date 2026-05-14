@@ -6,6 +6,62 @@ import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
+let santriToolsSchemaReady: Promise<void> | null = null
+
+async function ensureSantriToolsSchema() {
+  santriToolsSchemaReady ??= (async () => {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS pembayaran_tahunan (
+        id              TEXT PRIMARY KEY,
+        santri_id       TEXT REFERENCES santri(id),
+        jenis_biaya     TEXT NOT NULL,
+        tahun_tagihan   INTEGER,
+        nominal_bayar   INTEGER NOT NULL,
+        tanggal_bayar   TEXT NOT NULL DEFAULT (datetime('now')),
+        penerima_id     TEXT REFERENCES users(id),
+        keterangan      TEXT
+      )
+    `)
+
+    const pembayaranColumns = await query<{ name: string }>('PRAGMA table_info(pembayaran_tahunan)')
+    const hasPembayaranColumn = (name: string) => pembayaranColumns.some((col) => col.name === name)
+    if (!hasPembayaranColumn('santri_id')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN santri_id TEXT REFERENCES santri(id)')
+    }
+    if (!hasPembayaranColumn('jenis_biaya')) {
+      await execute("ALTER TABLE pembayaran_tahunan ADD COLUMN jenis_biaya TEXT NOT NULL DEFAULT ''")
+    }
+    if (!hasPembayaranColumn('tahun_tagihan')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN tahun_tagihan INTEGER')
+    }
+    if (!hasPembayaranColumn('nominal_bayar')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN nominal_bayar INTEGER NOT NULL DEFAULT 0')
+    }
+    if (!hasPembayaranColumn('tanggal_bayar')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN tanggal_bayar TEXT')
+    }
+    if (!hasPembayaranColumn('penerima_id')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN penerima_id TEXT REFERENCES users(id)')
+    }
+    if (!hasPembayaranColumn('keterangan')) {
+      await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN keterangan TEXT')
+    }
+
+    const santriColumns = await query<{ name: string }>('PRAGMA table_info(santri)')
+    if (!santriColumns.some((col) => col.name === 'bebas_spp')) {
+      await execute('ALTER TABLE santri ADD COLUMN bebas_spp INTEGER NOT NULL DEFAULT 0')
+    }
+    if (!santriColumns.some((col) => col.name === 'updated_at')) {
+      await execute("ALTER TABLE santri ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))")
+    }
+  })().catch((error) => {
+    santriToolsSchemaReady = null
+    throw error
+  })
+
+  await santriToolsSchemaReady
+}
+
 // ── Helper: ekstrak angka kelas dari string bebas ─────────────────────────
 // "7" → 7, "7A" → 7, "8B" → 8, "12 IPA" → 12, null → null
 function parseKelas(raw: string | null): number | null {
@@ -120,6 +176,7 @@ export async function getSantriPembebasan(filter: {
   tahun?: number
 }): Promise<any[] | { error: string }> {
   try {
+    await ensureSantriToolsSchema()
     const access = await assertFeature('/dashboard/master/santri-tools')
     if ('error' in access) return { error: access.error }
 
@@ -164,7 +221,7 @@ export async function getSantriPembebasan(filter: {
     }))
   } catch (err: any) {
     console.error('[santri-tools] getSantriPembebasan ERROR:', err?.message)
-    return { error: 'Gagal memuat data pembebasan pembayaran.' }
+    return { error: `Gagal memuat data pembebasan pembayaran: ${err?.message ?? 'error tidak diketahui'}` }
   }
 }
 
@@ -173,6 +230,7 @@ export async function setBebas(
   santriIds: string[],
   bebas: boolean
 ): Promise<{ success: boolean; updated: number } | { error: string }> {
+  await ensureSantriToolsSchema()
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
@@ -209,6 +267,7 @@ export async function catatBebasPembayaran(
   tahun: number,
   keterangan: string
 ): Promise<{ success: boolean } | { error: string }> {
+  await ensureSantriToolsSchema()
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
   const session = access
@@ -254,6 +313,7 @@ export async function hapusBebasPembayaran(
   jenisBiaya: string,
   tahun: number
 ): Promise<{ success: boolean } | { error: string }> {
+  await ensureSantriToolsSchema()
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
