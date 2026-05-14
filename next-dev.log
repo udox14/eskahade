@@ -178,3 +178,11 @@
  GET /login 200 in 358ms (compile: 263ms, render: 95ms)
 [LOGIN] Step 1: email= udox@***
  POST /login 200 in 8.2s (compile: 17ms, render: 8.2s)
+ GET /api/version 200 in 26ms
+ GET /api/version 200 in 24ms
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 17ms
+ GET /api/version 200 in 21ms
+ GET /api/version 200 in 22ms
+ GET /api/version 200 in 71ms
+ GET /api/version 200 in 29ms

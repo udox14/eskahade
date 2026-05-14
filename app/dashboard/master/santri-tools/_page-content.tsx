@@ -128,9 +128,24 @@ export default function SantriToolsPage() {
     setPbLoading(true)
     setPbData([])
     setPbSelected(new Set())
-    const res = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: pbSearch || undefined, hanyaBebasSpp: pbHanyaBebas })
-    setPbData(res)
-    setPbLoading(false)
+    try {
+      const res = await getSantriPembebasan({
+        asrama: pbAsrama || undefined,
+        search: pbSearch || undefined,
+        hanyaBebasSpp: pbHanyaBebas,
+        tahun: pbTahun,
+      })
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      setPbData(res)
+    } catch (err) {
+      console.error('[santri-tools] loadPembebasan ERROR:', err)
+      toast.error('Gagal memuat data pembebasan pembayaran.')
+    } finally {
+      setPbLoading(false)
+    }
   }
 
   const handleToggleBebas = async (ids: string[], bebas: boolean) => {
@@ -145,8 +160,8 @@ export default function SantriToolsPage() {
     if ('error' in res) { toast.error(res.error as string); return }
     toast.success(`${jenis} tahun ${pbTahun} dicatat bebas`)
     // Update modal data
-    const updated = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: modalSantri?.nis })
-    if (updated.length) setModalSantri(updated[0])
+    const updated = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: modalSantri?.nis, tahun: pbTahun })
+    if (!('error' in updated) && updated.length) setModalSantri(updated[0])
     loadPembebasan()
   }
 
@@ -154,8 +169,8 @@ export default function SantriToolsPage() {
     const res = await hapusBebasPembayaran(santriId, jenis, pbTahun)
     if ('error' in res) { toast.error(res.error as string); return }
     toast.success(`Pembebasan ${jenis} dihapus`)
-    const updated = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: modalSantri?.nis })
-    if (updated.length) setModalSantri(updated[0])
+    const updated = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: modalSantri?.nis, tahun: pbTahun })
+    if (!('error' in updated) && updated.length) setModalSantri(updated[0])
     loadPembebasan()
   }
 

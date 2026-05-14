@@ -117,49 +117,55 @@ export async function getSantriPembebasan(filter: {
   asrama?: string
   search?: string
   hanyaBebasSpp?: boolean
-}) {
-  const access = await assertFeature('/dashboard/master/santri-tools')
-  if ('error' in access) return []
+  tahun?: number
+}): Promise<any[] | { error: string }> {
+  try {
+    const access = await assertFeature('/dashboard/master/santri-tools')
+    if ('error' in access) return { error: access.error }
 
-  let where = "s.status_global = 'aktif'"
-  const params: any[] = []
+    let where = "s.status_global = 'aktif'"
+    const params: any[] = []
 
-  if (filter.asrama) { where += ' AND s.asrama = ?'; params.push(filter.asrama) }
-  if (filter.search) { where += ' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)'; params.push(`%${filter.search}%`, `%${filter.search}%`) }
-  if (filter.hanyaBebasSpp) { where += ' AND s.bebas_spp = 1' }
+    if (filter.asrama) { where += ' AND s.asrama = ?'; params.push(filter.asrama) }
+    if (filter.search) { where += ' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)'; params.push(`%${filter.search}%`, `%${filter.search}%`) }
+    if (filter.hanyaBebasSpp) { where += ' AND s.bebas_spp = 1' }
 
-  const rows = await query<any>(
-    `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.bebas_spp
-     FROM santri s
-     WHERE ${where}
-     ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
-     LIMIT 200`,
-    params
-  )
+    const rows = await query<any>(
+      `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.bebas_spp
+       FROM santri s
+       WHERE ${where}
+       ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
+       LIMIT 200`,
+      params
+    )
 
-  // Ambil pembayaran tahunan yang sudah lunas per santri (untuk tahu mana yang sudah bebas)
-  if (!rows.length) return []
-  const ids = rows.map((r: any) => r.id)
-  const idPh = ids.map(() => '?').join(',')
-  const tahun = new Date().getFullYear()
+    // Ambil pembayaran tahunan yang sudah lunas per santri (untuk tahu mana yang sudah bebas)
+    if (!rows.length) return []
+    const ids = rows.map((r: any) => r.id)
+    const idPh = ids.map(() => '?').join(',')
+    const tahun = filter.tahun ?? new Date().getFullYear()
 
-  const bayarList = await query<{ santri_id: string; jenis_biaya: string; tahun_tagihan: number }>(
-    `SELECT santri_id, jenis_biaya, tahun_tagihan FROM pembayaran_tahunan
-     WHERE santri_id IN (${idPh}) AND tahun_tagihan = ?`,
-    [...ids, tahun]
-  )
+    const bayarList = await query<{ santri_id: string; jenis_biaya: string; tahun_tagihan: number }>(
+      `SELECT santri_id, jenis_biaya, tahun_tagihan FROM pembayaran_tahunan
+       WHERE santri_id IN (${idPh}) AND tahun_tagihan = ?`,
+      [...ids, tahun]
+    )
 
-  const bayarMap: Record<string, Set<string>> = {}
-  bayarList.forEach((b: any) => {
-    if (!bayarMap[b.santri_id]) bayarMap[b.santri_id] = new Set()
-    bayarMap[b.santri_id].add(b.jenis_biaya)
-  })
+    const bayarMap: Record<string, Set<string>> = {}
+    bayarList.forEach((b: any) => {
+      if (!bayarMap[b.santri_id]) bayarMap[b.santri_id] = new Set()
+      bayarMap[b.santri_id].add(b.jenis_biaya)
+    })
 
-  return rows.map((s: any) => ({
-    ...s,
-    bebas_spp: s.bebas_spp === 1,
-    sudah_bayar: bayarMap[s.id] ? [...bayarMap[s.id]] : [],
-  }))
+    return rows.map((s: any) => ({
+      ...s,
+      bebas_spp: s.bebas_spp === 1,
+      sudah_bayar: bayarMap[s.id] ? [...bayarMap[s.id]] : [],
+    }))
+  } catch (err: any) {
+    console.error('[santri-tools] getSantriPembebasan ERROR:', err?.message)
+    return { error: 'Gagal memuat data pembebasan pembayaran.' }
+  }
 }
 
 // ── Toggle bebas_spp satu atau banyak santri ─────────────────────────────

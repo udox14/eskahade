@@ -68,3 +68,7 @@ Error: Failed to start the remote proxy session. There is likely additional logg
   digest: '2478136698',
   [cause]: [Object]
 }
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mA request to the Cloudflare API (/accounts/a170ed4144c00927988a828aa9a41896/workers/subdomain/edge-preview) failed.[0m
+
+
+[LOGIN] Step 2 ERROR: Failed to start the remote proxy session. There is likely additional logging output above.
