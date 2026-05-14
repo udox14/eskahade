@@ -54,10 +54,13 @@ type SummaryRow = {
   asrama: string
   total_santri: number
   total_saldo: number
+  total_saldo_jajan: number
+  total_saldo_tabungan: number
   punya_saldo: number
   tidak_punya_saldo: number
   masuk_bulan_ini: number
   keluar_bulan_ini: number
+  auto_bulan_ini: number
   santri_topup_bulan_ini: number
 }
 
@@ -68,8 +71,10 @@ type SantriRow = {
   asrama: string
   kamar: string
   saldo: number
+  saldo_tabungan: number
   masuk_bulan_ini: number
   keluar_bulan_ini: number
+  auto_bulan_ini: number
   terakhir_masuk: string | null
   terakhir_keluar: string | null
 }
@@ -78,6 +83,8 @@ type DetailRow = {
   id: string
   jenis: string
   nominal: number
+  dompet: string
+  source: string
   keterangan: string | null
   created_at: string
   admin_nama: string | null
@@ -125,7 +132,7 @@ function AsramaCard({ row, active, onClick }: { row: SummaryRow; active: boolean
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-xl bg-slate-50 p-2.5">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total Saldo</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total Titipan</div>
           <div className="font-bold text-slate-800">{fmtRp(row.total_saldo)}</div>
         </div>
         <div className={`rounded-xl p-2.5 ${net >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
@@ -135,11 +142,19 @@ function AsramaCard({ row, active, onClick }: { row: SummaryRow; active: boolean
           <div className={`font-bold ${net >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{net >= 0 ? '+' : ''}{fmtRp(net)}</div>
         </div>
         <div className="rounded-xl bg-blue-50 p-2.5">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-500">Masuk</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-500">Uang Jajan</div>
+          <div className="font-bold text-blue-700">{fmtRp(row.total_saldo_jajan)}</div>
+        </div>
+        <div className="rounded-xl bg-orange-50 p-2.5">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-orange-500">Tabungan</div>
+          <div className="font-bold text-orange-700">{fmtRp(row.total_saldo_tabungan)}</div>
+        </div>
+        <div className="rounded-xl bg-blue-50 p-2.5">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-500">Masuk Jajan</div>
           <div className="font-bold text-blue-700">{fmtRp(row.masuk_bulan_ini)}</div>
         </div>
         <div className="rounded-xl bg-orange-50 p-2.5">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-orange-500">Keluar</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-orange-500">Keluar Jajan</div>
           <div className="font-bold text-orange-700">{fmtRp(row.keluar_bulan_ini)}</div>
         </div>
       </div>
@@ -191,7 +206,10 @@ function DetailModal({ santri, tahun, bulan, onClose }: { santri: SantriRow; tah
               <span>{santri.asrama}</span>
               <span>Kamar {santri.kamar}</span>
               <span className={`font-semibold ${santri.saldo > 0 ? 'text-emerald-700' : 'text-rose-500'}`}>
-                Saldo {fmtRp(santri.saldo)}
+                Uang Jajan {fmtRp(santri.saldo)}
+              </span>
+              <span className="font-semibold text-blue-700">
+                Tabungan {fmtRp(santri.saldo_tabungan)}
               </span>
             </div>
           </div>
@@ -224,6 +242,11 @@ function DetailModal({ santri, tahun, bulan, onClose }: { santri: SantriRow; tah
                           <ArrowUpFromLine className="h-4 w-4 shrink-0 text-orange-500" />
                         )}
                         <span className="truncate">{d.keterangan || (d.jenis === 'MASUK' ? 'Topup' : 'Jajan')}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${d.dompet === 'JAJAN' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {d.dompet === 'JAJAN' ? 'Uang Jajan' : 'Tabungan'}
+                        </span>
+                        {d.source === 'AUTO_POTONG' && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">Auto</span>}
+                        {d.source === 'TRANSFER' && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">Transfer</span>}
                       </div>
                       <div className="mt-1 text-xs text-slate-500">
                         {fmtDateTime(d.created_at)}
@@ -371,8 +394,11 @@ export default function MonitoringUangJajanPage() {
 
   const gt = {
     saldo: summaryData.reduce((a, r) => a + r.total_saldo, 0),
+    saldoJajan: summaryData.reduce((a, r) => a + r.total_saldo_jajan, 0),
+    saldoTabungan: summaryData.reduce((a, r) => a + r.total_saldo_tabungan, 0),
     masuk: summaryData.reduce((a, r) => a + r.masuk_bulan_ini, 0),
     keluar: summaryData.reduce((a, r) => a + r.keluar_bulan_ini, 0),
+    auto: summaryData.reduce((a, r) => a + r.auto_bulan_ini, 0),
     punya: summaryData.reduce((a, r) => a + r.punya_saldo, 0),
     total: summaryData.reduce((a, r) => a + r.total_santri, 0),
   }
@@ -426,10 +452,12 @@ export default function MonitoringUangJajanPage() {
       {summaryLoaded && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: 'Total Saldo', value: fmtRp(gt.saldo), icon: Banknote, cls: 'bg-emerald-50 text-emerald-600' },
-            { label: 'Masuk Bulan Ini', value: fmtRp(gt.masuk), icon: ArrowDownToLine, cls: 'bg-blue-50 text-blue-600' },
-            { label: 'Keluar Bulan Ini', value: fmtRp(gt.keluar), icon: ArrowUpFromLine, cls: 'bg-orange-50 text-orange-600' },
-            { label: 'Saldo Kosong', value: `${fmtNum(gt.total - gt.punya)} orang`, icon: AlertCircle, cls: 'bg-rose-50 text-rose-600' },
+            { label: 'Total Titipan', value: fmtRp(gt.saldo), icon: Banknote, cls: 'bg-emerald-50 text-emerald-600' },
+            { label: 'Uang Jajan', value: fmtRp(gt.saldoJajan), icon: Wallet, cls: 'bg-blue-50 text-blue-600' },
+            { label: 'Tabungan', value: fmtRp(gt.saldoTabungan), icon: Banknote, cls: 'bg-indigo-50 text-indigo-600' },
+            { label: 'Auto Potong', value: fmtRp(gt.auto), icon: ArrowUpFromLine, cls: 'bg-orange-50 text-orange-600' },
+            { label: 'Masuk Jajan', value: fmtRp(gt.masuk), icon: ArrowDownToLine, cls: 'bg-sky-50 text-sky-600' },
+            { label: 'Saldo Jajan Kosong', value: `${fmtNum(gt.total - gt.punya)} orang`, icon: AlertCircle, cls: 'bg-rose-50 text-rose-600' },
           ].map(item => (
             <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className={`mb-3 inline-flex rounded-xl p-2 ${item.cls}`}>
@@ -605,11 +633,11 @@ export default function MonitoringUangJajanPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      {['No', 'Nama Santri', 'Asrama', 'Kamar', 'Saldo Sekarang', 'Masuk', 'Keluar', ''].map(h => (
+                      {['No', 'Nama Santri', 'Asrama', 'Kamar', 'Uang Jajan', 'Tabungan', 'Masuk', 'Keluar', 'Auto', ''].map(h => (
                         <th
                           key={h}
                           className={`px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 ${
-                            h === 'Saldo Sekarang' || h === 'Masuk' || h === 'Keluar' ? 'text-right' : 'text-left'
+                            h === 'Uang Jajan' || h === 'Tabungan' || h === 'Masuk' || h === 'Keluar' || h === 'Auto' ? 'text-right' : 'text-left'
                           }`}
                         >
                           {h}
@@ -633,6 +661,9 @@ export default function MonitoringUangJajanPage() {
                           <span className={`text-sm font-bold ${r.saldo > 0 ? 'text-emerald-700' : 'text-rose-500'}`}>{fmtRp(r.saldo)}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
+                          <span className={`text-sm font-bold ${r.saldo_tabungan > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{fmtRp(r.saldo_tabungan)}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
                           {r.masuk_bulan_ini > 0 ? (
                             <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-600">
                               +{fmtRp(r.masuk_bulan_ini)}
@@ -645,6 +676,15 @@ export default function MonitoringUangJajanPage() {
                           {r.keluar_bulan_ini > 0 ? (
                             <span className="rounded-lg bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-600">
                               -{fmtRp(r.keluar_bulan_ini)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {r.auto_bulan_ini > 0 ? (
+                            <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                              -{fmtRp(r.auto_bulan_ini)}
                             </span>
                           ) : (
                             <span className="text-xs text-slate-300">—</span>
@@ -689,8 +729,12 @@ export default function MonitoringUangJajanPage() {
                       <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-bold text-slate-700">{r.kamar}</span>
                     </div>
                     <div className="flex justify-between border-t border-slate-100 pt-1.5">
-                      <span className="text-slate-400">Saldo</span>
+                      <span className="text-slate-400">Uang Jajan</span>
                       <span className={`font-bold ${r.saldo > 0 ? 'text-emerald-700' : 'text-rose-500'}`}>{fmtRp(r.saldo)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-400">Tabungan</span>
+                      <span className={`font-bold ${r.saldo_tabungan > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{fmtRp(r.saldo_tabungan)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-blue-400">Masuk</span>
@@ -699,6 +743,10 @@ export default function MonitoringUangJajanPage() {
                     <div className="flex justify-between">
                       <span className="text-orange-400">Keluar</span>
                       <span className="font-semibold text-orange-600">{r.keluar_bulan_ini > 0 ? `-${fmtRp(r.keluar_bulan_ini)}` : '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-amber-500">Auto</span>
+                      <span className="font-semibold text-amber-700">{r.auto_bulan_ini > 0 ? `-${fmtRp(r.auto_bulan_ini)}` : '—'}</span>
                     </div>
                   </div>
                   <button

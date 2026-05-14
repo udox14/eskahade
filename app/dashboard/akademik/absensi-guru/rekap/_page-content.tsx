@@ -11,6 +11,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 type TabMode = 'semua' | 'per_guru'
 type PrintMode = 'colorful' | 'bw'
 type GuruSession = 'shubuh' | 'ashar' | 'maghrib'
+type StatusFilter = 'semua' | 'H' | 'B' | 'A' | 'A_B'
 
 const SESI_OPTIONS = [
   { value: 'semua',          label: 'Semua Sesi' },
@@ -30,6 +31,14 @@ const SORT_OPTIONS = [
   { value: 'hadir',    label: 'Hadir (Terbanyak)' },
   { value: 'badal',    label: 'Badal (Terbanyak)' },
   { value: 'kosong',   label: 'Alfa/Kosong (Terbanyak)' },
+]
+
+const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'semua', label: 'Semua Status' },
+  { value: 'H', label: 'Hadir Saja' },
+  { value: 'B', label: 'Badal Saja' },
+  { value: 'A', label: 'Alfa Saja' },
+  { value: 'A_B', label: 'Alfa + Badal' },
 ]
 
 const SESSION_LABEL: Record<GuruSession, string> = {
@@ -68,6 +77,17 @@ function statusPrintColor(status: string, isBW: boolean) {
   return { bg: '#f0fdf4', color: '#16a34a' }
 }
 
+function filterDetailRows(detail: any | null, statusFilter: StatusFilter) {
+  if (!detail) return null
+  if (statusFilter === 'semua') return detail
+
+  const allowed = statusFilter === 'A_B' ? new Set(['A', 'B']) : new Set([statusFilter])
+  return {
+    ...detail,
+    detail: (detail.detail || []).filter((row: any) => allowed.has(row.status)),
+  }
+}
+
 export default function RekapAbsensiGuruPage() {
   const [activeTab, setActiveTab] = useState<TabMode>('semua')
   const [startDate, setStartDate] = useState('')
@@ -78,6 +98,7 @@ export default function RekapAbsensiGuruPage() {
   const [sortBy, setSortBy] = useState('performa')
   const [filterSesi, setFilterSesi] = useState('semua')
   const [printMode, setPrintMode] = useState<PrintMode>('colorful')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua')
 
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -184,6 +205,8 @@ export default function RekapAbsensiGuruPage() {
   const namaMarhalah = selectedMarhalah
     ? marhalahList.find(m => String(m.id) === String(selectedMarhalah))?.nama || ''
     : 'Semua Tingkat'
+  const statusFilterLabel = STATUS_FILTER_OPTIONS.find(option => option.value === statusFilter)?.label || 'Semua Status'
+  const filteredGuruDetail = useMemo(() => filterDetailRows(guruDetail, statusFilter), [guruDetail, statusFilter])
 
   const isBW = printMode === 'bw'
   const S = {
@@ -207,7 +230,7 @@ export default function RekapAbsensiGuruPage() {
   }
 
   const canPrintSemua = activeTab === 'semua' && hasSearched && !loading && processedData.length > 0
-  const canPrintGuru = activeTab === 'per_guru' && guruHasSearched && !guruLoading && Boolean(guruDetail)
+  const canPrintGuru = activeTab === 'per_guru' && guruHasSearched && !guruLoading && Boolean(filteredGuruDetail)
   const canPrint = canPrintSemua || canPrintGuru
 
   return (
@@ -242,7 +265,7 @@ export default function RekapAbsensiGuruPage() {
       </div>
 
       <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-        <div className={`grid grid-cols-1 gap-4 ${activeTab === 'per_guru' ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 gap-4 ${activeTab === 'per_guru' ? 'md:grid-cols-6' : 'md:grid-cols-4'}`}>
           <div className="md:col-span-2 flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Dari</label>
@@ -266,6 +289,14 @@ export default function RekapAbsensiGuruPage() {
               <select value={selectedGuru} onChange={e => setSelectedGuru(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white" disabled={guruOptionsLoading}>
                 <option value="">{guruOptionsLoading ? 'Memuat guru...' : 'Pilih guru'}</option>
                 {guruOptions.map(guru => <option key={guru.id} value={guru.id}>{guru.nama}</option>)}
+              </select>
+            </div>
+          )}
+          {activeTab === 'per_guru' && (
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Status Tampil</label>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
+                {STATUS_FILTER_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
           )}
@@ -334,10 +365,12 @@ export default function RekapAbsensiGuruPage() {
         />
       ) : (
         <PerGuruView
-          detail={guruDetail}
+          detail={filteredGuruDetail}
+          rawDetail={guruDetail}
           loading={guruLoading}
           hasSearched={guruHasSearched}
           selectedGuru={selectedGuru}
+          statusFilterLabel={statusFilterLabel}
         />
       )}
 
@@ -352,12 +385,13 @@ export default function RekapAbsensiGuruPage() {
 
           {activeTab === 'per_guru' && guruDetail ? (
             <PrintPerGuru
-              detail={guruDetail}
+              detail={filteredGuruDetail}
               fmtDate={fmtDate}
               startDate={startDate}
               endDate={endDate}
               namaMarhalah={namaMarhalah}
               badalAsHadir={badalAsHadir}
+              statusFilterLabel={statusFilterLabel}
               isBW={isBW}
               S={S}
             />
@@ -487,11 +521,13 @@ function SemuaGuruView({
   )
 }
 
-function PerGuruView({ detail, loading, hasSearched, selectedGuru }: {
+function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, statusFilterLabel }: {
   detail: any | null
+  rawDetail: any | null
   loading: boolean
   hasSearched: boolean
   selectedGuru: string
+  statusFilterLabel: string
 }) {
   if (!selectedGuru && !hasSearched) {
     return (
@@ -522,6 +558,8 @@ function PerGuruView({ detail, loading, hasSearched, selectedGuru }: {
   if (!detail) {
     return <div className="bg-white border rounded-xl shadow-sm py-32 text-center text-slate-400">Tidak ada data untuk guru dan filter yang dipilih.</div>
   }
+
+  const rawDetailCount = rawDetail?.detail?.length ?? detail.detail.length
 
   return (
     <div className="space-y-4">
@@ -570,10 +608,12 @@ function PerGuruView({ detail, loading, hasSearched, selectedGuru }: {
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100">
           <p className="font-black text-slate-800">Detail Tanggal dan Waktu</p>
-          <p className="text-xs text-slate-400 mt-1">{detail.detail.length} waktu wajib dalam rentang ini</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Status tampil: {statusFilterLabel} - {detail.detail.length} dari {rawDetailCount} waktu wajib dalam rentang ini
+          </p>
         </div>
         {detail.detail.length === 0 ? (
-          <div className="py-16 text-center text-slate-400">Tidak ada waktu wajib untuk guru ini pada rentang yang dipilih.</div>
+          <div className="py-16 text-center text-slate-400">Tidak ada detail dengan status {statusFilterLabel.toLowerCase()} pada rentang yang dipilih.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -683,13 +723,13 @@ function PrintSemuaGuru({ processedData, fmtDate, startDate, endDate, namaMarhal
   )
 }
 
-function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badalAsHadir, isBW, S }: any) {
+function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badalAsHadir, statusFilterLabel, isBW, S }: any) {
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
       <PrintHeader
         title="REKAP ABSEN PER GURU"
         subtitle={`${detail.guru.nama} | ${fmtDate(startDate)} - ${fmtDate(endDate)}`}
-        meta={`Tingkat: ${namaMarhalah} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Jadwal: ${detail.kelas_ajar || '-'}`}
+        meta={`Tingkat: ${namaMarhalah} | Status tampil: ${statusFilterLabel} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Jadwal: ${detail.kelas_ajar || '-'}`}
         S={S}
         isBW={isBW}
       />
@@ -756,7 +796,7 @@ function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badal
         </tbody>
       </table>
 
-      <PrintFooter total={`Total: ${detail.detail.length} waktu wajib`} S={S} />
+      <PrintFooter total={`Total ditampilkan: ${detail.detail.length} waktu`} S={S} />
     </div>
   )
 }

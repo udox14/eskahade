@@ -24,16 +24,18 @@ export async function getSummaryPerAsrama(tahun: number, bulan: number) {
   const santriRows = await query<{
     asrama: string
     total_santri: number
-    total_saldo: number
+    total_saldo_jajan: number
+    total_saldo_tabungan: number
     punya_saldo: number
     tidak_punya_saldo: number
   }>(`
     SELECT
       asrama,
       COUNT(*)                                                             AS total_santri,
-      COALESCE(SUM(saldo_tabungan), 0)                                     AS total_saldo,
-      SUM(CASE WHEN COALESCE(saldo_tabungan,0) > 0 THEN 1 ELSE 0 END)     AS punya_saldo,
-      SUM(CASE WHEN COALESCE(saldo_tabungan,0) = 0 THEN 1 ELSE 0 END)     AS tidak_punya_saldo
+      COALESCE(SUM(saldo_uang_jajan), 0)                                  AS total_saldo_jajan,
+      COALESCE(SUM(saldo_tabungan), 0)                                    AS total_saldo_tabungan,
+      SUM(CASE WHEN COALESCE(saldo_uang_jajan,0) > 0 THEN 1 ELSE 0 END)   AS punya_saldo,
+      SUM(CASE WHEN COALESCE(saldo_uang_jajan,0) = 0 THEN 1 ELSE 0 END)   AS tidak_punya_saldo
     FROM santri
     WHERE status_global = 'aktif' AND asrama IS NOT NULL AND asrama != 'AL-BAGHORY'
     GROUP BY asrama ORDER BY asrama
@@ -44,13 +46,15 @@ export async function getSummaryPerAsrama(tahun: number, bulan: number) {
     asrama: string
     masuk: number
     keluar: number
+    auto: number
     cnt_masuk: number
   }>(`
     SELECT
       s.asrama,
-      COALESCE(SUM(CASE WHEN tl.jenis='MASUK'  THEN tl.nominal ELSE 0 END),0) AS masuk,
-      COALESCE(SUM(CASE WHEN tl.jenis='KELUAR' THEN tl.nominal ELSE 0 END),0) AS keluar,
-      COUNT(DISTINCT CASE WHEN tl.jenis='MASUK' THEN tl.santri_id END)        AS cnt_masuk
+      COALESCE(SUM(CASE WHEN tl.jenis='MASUK' AND COALESCE(tl.dompet,'JAJAN')='JAJAN' THEN tl.nominal ELSE 0 END),0) AS masuk,
+      COALESCE(SUM(CASE WHEN tl.jenis='KELUAR' AND COALESCE(tl.dompet,'JAJAN')='JAJAN' THEN tl.nominal ELSE 0 END),0) AS keluar,
+      COALESCE(SUM(CASE WHEN tl.source='AUTO_POTONG' THEN tl.nominal ELSE 0 END),0) AS auto,
+      COUNT(DISTINCT CASE WHEN tl.jenis='MASUK' AND COALESCE(tl.dompet,'JAJAN')='JAJAN' THEN tl.santri_id END)        AS cnt_masuk
     FROM tabungan_log tl
     INNER JOIN santri s ON s.id = tl.santri_id AND s.status_global = 'aktif'
     WHERE tl.created_at >= ? AND tl.created_at <= ?
@@ -62,8 +66,10 @@ export async function getSummaryPerAsrama(tahun: number, bulan: number) {
     const m = mutasiMap.get(r.asrama)
     return {
       ...r,
+      total_saldo:             (r.total_saldo_jajan ?? 0) + (r.total_saldo_tabungan ?? 0),
       masuk_bulan_ini:        m?.masuk     ?? 0,
       keluar_bulan_ini:       m?.keluar    ?? 0,
+      auto_bulan_ini:         m?.auto      ?? 0,
       santri_topup_bulan_ini: m?.cnt_masuk ?? 0,
     }
   })
@@ -91,7 +97,7 @@ export async function getKamarList(asrama: string) {
 
 // ─── Tabel santri (lazy + pagination + filter bulan) ─────────────────────
 // Row reads hemat:
-// - saldo_tabungan: langsung dari kolom santri
+// - saldo uang jajan/tabungan: langsung dari kolom santri
 // - masuk + keluar: 1 query aggregate untuk SEMUA santri di halaman (max 30)
 //   pakai IN(id1,id2,...) — tidak ada subquery per baris
 export async function getSantriUangJajan(params: {
@@ -108,7 +114,7 @@ export async function getSantriUangJajan(params: {
   const offset = (page - 1) * PAGE_SIZE
 
   const clauses: string[] = ["s.status_global='aktif'"]
-  const baseParams: any[] = []
+  const baseParams: unknown[] = []
 
   clauses.push("s.asrama != 'AL-BAGHORY'")
   if (asrama) { clauses.push('s.asrama=?'); baseParams.push(asrama) }
@@ -117,8 +123,8 @@ export async function getSantriUangJajan(params: {
     clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
     baseParams.push(`%${search}%`, `%${search}%`)
   }
-  if (filterSaldo === 'PUNYA')  clauses.push('COALESCE(s.saldo_tabungan,0) > 0')
-  if (filterSaldo === 'KOSONG') clauses.push('COALESCE(s.saldo_tabungan,0) = 0')
+  if (filterSaldo === 'PUNYA')  clauses.push('COALESCE(s.saldo_uang_jajan,0) > 0')
+  if (filterSaldo === 'KOSONG') clauses.push('COALESCE(s.saldo_uang_jajan,0) = 0')
 
   const where = clauses.join(' AND ')
 
@@ -131,10 +137,11 @@ export async function getSantriUangJajan(params: {
   // Ambil santri halaman ini
   const santriRows = await query<{
     id: string; nama_lengkap: string; nis: string
-    asrama: string; kamar: string; saldo: number
+    asrama: string; kamar: string; saldo: number; saldo_tabungan: number
   }>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
-            COALESCE(s.saldo_tabungan,0) AS saldo
+            COALESCE(s.saldo_uang_jajan,0) AS saldo,
+            COALESCE(s.saldo_tabungan,0) AS saldo_tabungan
      FROM santri s WHERE ${where}
      ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
      LIMIT ? OFFSET ?`,
@@ -149,13 +156,15 @@ export async function getSantriUangJajan(params: {
   const mutasiRows = await query<{
     santri_id: string
     masuk: number; keluar: number
+    auto: number
     terakhir_masuk: string|null; terakhir_keluar: string|null
   }>(
     `SELECT santri_id,
-       COALESCE(SUM(CASE WHEN jenis='MASUK'  THEN nominal ELSE 0 END),0) AS masuk,
-       COALESCE(SUM(CASE WHEN jenis='KELUAR' THEN nominal ELSE 0 END),0) AS keluar,
-       MAX(CASE WHEN jenis='MASUK'  THEN created_at END) AS terakhir_masuk,
-       MAX(CASE WHEN jenis='KELUAR' THEN created_at END) AS terakhir_keluar
+       COALESCE(SUM(CASE WHEN jenis='MASUK' AND COALESCE(dompet,'JAJAN')='JAJAN' THEN nominal ELSE 0 END),0) AS masuk,
+       COALESCE(SUM(CASE WHEN jenis='KELUAR' AND COALESCE(dompet,'JAJAN')='JAJAN' THEN nominal ELSE 0 END),0) AS keluar,
+       COALESCE(SUM(CASE WHEN source='AUTO_POTONG' THEN nominal ELSE 0 END),0) AS auto,
+       MAX(CASE WHEN jenis='MASUK' AND COALESCE(dompet,'JAJAN')='JAJAN' THEN created_at END) AS terakhir_masuk,
+       MAX(CASE WHEN jenis='KELUAR' AND COALESCE(dompet,'JAJAN')='JAJAN' THEN created_at END) AS terakhir_keluar
      FROM tabungan_log
      WHERE santri_id IN (${ph}) AND created_at>=? AND created_at<=?
      GROUP BY santri_id`,
@@ -169,6 +178,7 @@ export async function getSantriUangJajan(params: {
       ...s,
       masuk_bulan_ini:  m?.masuk           ?? 0,
       keluar_bulan_ini: m?.keluar          ?? 0,
+      auto_bulan_ini:   m?.auto            ?? 0,
       terakhir_masuk:   m?.terakhir_masuk  ?? null,
       terakhir_keluar:  m?.terakhir_keluar ?? null,
     }
@@ -182,9 +192,13 @@ export async function getDetailTransaksiSantri(santriId: string, tahun: number, 
   const { start, end } = getMonthRange(tahun, bulan)
   return query<{
     id: string; jenis: string; nominal: number
+    dompet: string; source: string
     keterangan: string|null; created_at: string; admin_nama: string|null
   }>(
-    `SELECT tl.id, tl.jenis, tl.nominal, tl.keterangan,
+    `SELECT tl.id, tl.jenis, tl.nominal,
+            COALESCE(tl.dompet, 'JAJAN') AS dompet,
+            COALESCE(tl.source, 'MANUAL') AS source,
+            tl.keterangan,
             tl.created_at, u.full_name AS admin_nama
      FROM tabungan_log tl
      LEFT JOIN users u ON u.id=tl.created_by

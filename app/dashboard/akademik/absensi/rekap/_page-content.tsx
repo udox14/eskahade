@@ -10,6 +10,14 @@ import { id as localeId } from 'date-fns/locale'
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 
 type PrintMode = 'colorful' | 'bw'
+type PrintStatus = 'hadir' | 'alfa' | 'sakit' | 'izin'
+
+const PRINT_STATUS_OPTIONS: { key: PrintStatus; label: string; field: string }[] = [
+  { key: 'hadir', label: 'Hadir', field: 'total_h' },
+  { key: 'alfa', label: 'Alfa', field: 'total_a' },
+  { key: 'sakit', label: 'Sakit', field: 'total_s' },
+  { key: 'izin', label: 'Izin', field: 'total_i' },
+]
 
 export default function RekapAbsensiPage() {
   const [scope, setScope] = useState<any>(null)
@@ -20,6 +28,12 @@ export default function RekapAbsensiPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [printMode, setPrintMode] = useState<PrintMode>('colorful')
+  const [printStatuses, setPrintStatuses] = useState<Record<PrintStatus, boolean>>({
+    hadir: true,
+    alfa: true,
+    sakit: true,
+    izin: false,
+  })
 
   const [refKelas, setRefKelas] = useState<any[]>([])
   const [data, setData] = useState<any[]>([])
@@ -112,9 +126,23 @@ export default function RekapAbsensiPage() {
     alfaColor: isBW ? '#000000' : '#dc2626',
     sakitBg: isBW ? '#ffffff' : '#fffbeb',
     sakitColor: isBW ? '#000000' : '#d97706',
+    izinBg: isBW ? '#ffffff' : '#eff6ff',
+    izinColor: isBW ? '#000000' : '#2563eb',
   }
 
   const canPrint = hasSearched && !loading && data.length > 0
+  const selectedPrintStatuses = PRINT_STATUS_OPTIONS.filter(option => printStatuses[option.key])
+  const printableData = data.filter(row =>
+    selectedPrintStatuses.some(option => Number(row[option.field] || 0) > 0)
+  )
+  const canPrintSelected = canPrint && selectedPrintStatuses.length > 0 && printableData.length > 0
+
+  const togglePrintStatus = (status: PrintStatus) => {
+    setPrintStatuses(current => ({
+      ...current,
+      [status]: !current[status],
+    }))
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
@@ -217,6 +245,19 @@ export default function RekapAbsensiPage() {
               <b>{data.length}</b> santri siap dicetak untuk periode <b>{fmtDate(startDate)}</b> sampai <b>{fmtDate(endDate)}</b>.
             </div>
             <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center bg-white rounded-lg p-1 gap-1 border border-slate-200">
+                {PRINT_STATUS_OPTIONS.map(option => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => togglePrintStatus(option.key)}
+                    title={`Cetak ${option.label}`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${printStatuses[option.key] ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100' : 'text-slate-400 hover:text-slate-700'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center bg-white rounded-lg p-1 gap-1 border border-slate-200">
                 <button
                   onClick={() => setPrintMode('colorful')}
@@ -233,10 +274,17 @@ export default function RekapAbsensiPage() {
                   <Circle className="w-3.5 h-3.5" /> Hitam Putih
                 </button>
               </div>
-              <button onClick={() => handlePrint()} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg font-bold shadow hover:bg-blue-700 transition-colors text-sm">
+              <button
+                onClick={() => handlePrint()}
+                disabled={!canPrintSelected}
+                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg font-bold shadow hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:hover:bg-blue-600"
+              >
                 <Printer className="w-4 h-4" /> Cetak / PDF
               </button>
             </div>
+            {!canPrintSelected && (
+              <p className="text-xs font-medium text-red-500 md:text-right">Pilih minimal satu status yang punya data untuk dicetak.</p>
+            )}
           </div>
         )}
       </div>
@@ -353,7 +401,8 @@ export default function RekapAbsensiPage() {
             }
           `}</style>
           <PrintRekapSantri
-            data={data}
+            data={printableData}
+            selectedStatuses={selectedPrintStatuses}
             fmtDate={fmtDate}
             startDate={startDate}
             endDate={endDate}
@@ -376,7 +425,7 @@ function BadgeStatus({ status }: { status: string }) {
   return <span className="text-slate-300">-</span>
 }
 
-function PrintRekapSantri({ data, fmtDate, startDate, endDate, filterAsrama, filterKamar, filterKelas, searchName, S }: any) {
+function PrintRekapSantri({ data, selectedStatuses, fmtDate, startDate, endDate, filterAsrama, filterKamar, filterKelas, searchName, S }: any) {
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
       <PrintHeader
@@ -392,9 +441,9 @@ function PrintRekapSantri({ data, fmtDate, startDate, endDate, filterAsrama, fil
             <th style={{ padding: '5px 4px', textAlign: 'center', width: '24px', border: `1px solid ${S.headerBorder}` }}>No</th>
             <th style={{ padding: '5px 6px', textAlign: 'left', border: `1px solid ${S.headerBorder}` }}>Nama Santri</th>
             <th style={{ padding: '5px 6px', textAlign: 'left', width: '145px', border: `1px solid ${S.headerBorder}` }}>Asrama / Kamar</th>
-            <th style={{ padding: '5px 4px', textAlign: 'center', width: '56px', border: `1px solid ${S.headerBorder}`, backgroundColor: S.headerBg }}>Hadir</th>
-            <th style={{ padding: '5px 4px', textAlign: 'center', width: '56px', border: `1px solid ${S.headerBorder}`, backgroundColor: S.headerBg }}>Alfa</th>
-            <th style={{ padding: '5px 4px', textAlign: 'center', width: '56px', border: `1px solid ${S.headerBorder}`, backgroundColor: S.headerBg }}>Sakit</th>
+            {selectedStatuses.map((option: any) => (
+              <th key={option.key} style={{ padding: '5px 4px', textAlign: 'center', width: '56px', border: `1px solid ${S.headerBorder}`, backgroundColor: S.headerBg }}>{option.label}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -403,9 +452,14 @@ function PrintRekapSantri({ data, fmtDate, startDate, endDate, filterAsrama, fil
               <td style={{ padding: '4px', textAlign: 'center', border: `1px solid ${S.borderColor}`, color: S.metaColor }}>{idx + 1}</td>
               <td style={{ padding: '4px 6px', fontWeight: 'bold', border: `1px solid ${S.borderColor}` }}>{row.nama}</td>
               <td style={{ padding: '4px 6px', color: S.metaColor, fontSize: '9px', border: `1px solid ${S.borderColor}` }}>{row.info_asrama}</td>
-              <td style={{ padding: '4px', textAlign: 'center', border: `1px solid ${S.borderColor}`, backgroundColor: S.hadirBg }}><b style={{ color: S.hadirColor }}>{row.total_h || '-'}</b></td>
-              <td style={{ padding: '4px', textAlign: 'center', border: `1px solid ${S.borderColor}`, backgroundColor: S.alfaBg }}><b style={{ color: S.alfaColor }}>{row.total_a || '-'}</b></td>
-              <td style={{ padding: '4px', textAlign: 'center', border: `1px solid ${S.borderColor}`, backgroundColor: S.sakitBg }}><b style={{ color: S.sakitColor }}>{row.total_s || '-'}</b></td>
+              {selectedStatuses.map((option: any) => {
+                const styleKey = option.key === 'izin' ? 'izin' : option.key
+                const bg = S[`${styleKey}Bg`] || '#ffffff'
+                const color = S[`${styleKey}Color`] || '#000000'
+                return (
+                  <td key={option.key} style={{ padding: '4px', textAlign: 'center', border: `1px solid ${S.borderColor}`, backgroundColor: bg }}><b style={{ color }}>{row[option.field] || '-'}</b></td>
+                )
+              })}
             </tr>
           ))}
         </tbody>
