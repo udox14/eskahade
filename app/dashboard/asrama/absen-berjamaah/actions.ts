@@ -52,7 +52,7 @@ export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, 
   let absenList: any[] = []
   try {
     absenList = await query<any>(
-      `SELECT santri_id, shubuh, ashar, maghrib, isya FROM absen_berjamaah WHERE tanggal = ? AND santri_id IN (${ph})`,
+      `SELECT santri_id, shubuh, dzuhur, ashar, maghrib, isya FROM absen_berjamaah WHERE tanggal = ? AND santri_id IN (${ph})`,
       [tanggal, ...ids]
     )
   } catch {}
@@ -63,6 +63,7 @@ export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, 
   return santriList.map((s: any) => ({
     ...s,
     shubuh:  absenMap[s.id]?.shubuh  ?? null,
+    dzuhur:  absenMap[s.id]?.dzuhur  ?? null,
     ashar:   absenMap[s.id]?.ashar   ?? null,
     maghrib: absenMap[s.id]?.maghrib ?? null,
     isya:    absenMap[s.id]?.isya    ?? null,
@@ -70,7 +71,7 @@ export async function getDataAbsenBerjamaahKamar(asrama: string, kamar: string, 
 }
 
 export async function batchSaveAbsenBerjamaah(
-  records: { santri_id: string; shubuh: string | null; ashar: string | null; maghrib: string | null; isya: string | null }[],
+  records: { santri_id: string; shubuh: string | null; dzuhur: string | null; ashar: string | null; maghrib: string | null; isya: string | null }[],
   tanggal: string
 ) {
   const session = await getSession()
@@ -89,8 +90,8 @@ export async function batchSaveAbsenBerjamaah(
   const db = await getDB()
   const stmts: any[] = []
 
-  const allHadir = records.filter(r => !r.shubuh && !r.ashar && !r.maghrib && !r.isya).map(r => r.santri_id)
-  const toUpsert = records.filter(r => r.shubuh || r.ashar || r.maghrib || r.isya)
+  const allHadir = records.filter(r => !r.shubuh && !r.dzuhur && !r.ashar && !r.maghrib && !r.isya).map(r => r.santri_id)
+  const toUpsert = records.filter(r => r.shubuh || r.dzuhur || r.ashar || r.maghrib || r.isya)
 
   for (let i = 0; i < allHadir.length; i += 100) {
     const chunk = allHadir.slice(i, i + 100)
@@ -101,13 +102,13 @@ export async function batchSaveAbsenBerjamaah(
 
   for (const r of toUpsert) {
     stmts.push(db.prepare(`
-      INSERT INTO absen_berjamaah (santri_id, tanggal, shubuh, ashar, maghrib, isya, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO absen_berjamaah (santri_id, tanggal, shubuh, dzuhur, ashar, maghrib, isya, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(santri_id, tanggal) DO UPDATE SET
-        shubuh = excluded.shubuh, ashar = excluded.ashar,
+        shubuh = excluded.shubuh, dzuhur = excluded.dzuhur, ashar = excluded.ashar,
         maghrib = excluded.maghrib, isya = excluded.isya,
         created_by = excluded.created_by
-    `).bind(r.santri_id, tanggal, r.shubuh, r.ashar, r.maghrib, r.isya, session.id))
+    `).bind(r.santri_id, tanggal, r.shubuh, r.dzuhur, r.ashar, r.maghrib, r.isya, session.id))
   }
 
   for (let i = 0; i < stmts.length; i += 100) {
@@ -128,6 +129,7 @@ export async function batchSaveAbsenBerjamaah(
       tanggal,
       count: records.length,
       alfa_shubuh: records.filter((record) => record.shubuh).length,
+      alfa_dzuhur: records.filter((record) => record.dzuhur).length,
       alfa_ashar: records.filter((record) => record.ashar).length,
       alfa_maghrib: records.filter((record) => record.maghrib).length,
       alfa_isya: records.filter((record) => record.isya).length,

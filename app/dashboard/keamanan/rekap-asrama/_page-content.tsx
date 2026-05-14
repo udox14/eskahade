@@ -9,10 +9,10 @@ import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
-const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
+const WAKTU = ['shubuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
 
-const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shb', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
+const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'Shb', dzuhur: 'Dzh', ashar: 'Ash', maghrib: 'Mgr', isya: 'Isy' }
 
 function bulanIni() { return new Date().toISOString().slice(0, 7) }
 function getDaysInMonth(bulan: string) {
@@ -369,14 +369,14 @@ export default function RekapAsramaPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                     {WAKTU.map(w => {
                       const alfa = filteredBjSantri.reduce((s, santri) => {
                         return s + Object.values(bjDetail[santri.id] || {}).filter((d: any) => d[w] === 'A').length
                       }, 0)
                       return (
                         <div key={w} className="bg-white border rounded-xl p-3 text-center shadow-sm">
-                          <p className="text-sm text-slate-500 font-semibold capitalize">{w}</p>
+                          <p className="text-sm text-slate-500 font-semibold capitalize">{WAKTU_LABEL[w]}</p>
                           <p className="text-xl font-black text-red-600 tabular-nums">{alfa}</p>
                           <p className="text-[10px] text-slate-400">alfa bulan ini</p>
                         </div>
@@ -409,7 +409,7 @@ export default function RekapAsramaPage() {
                               {santriKamar.map((s: any) => {
                                 const detail = bjDetail[s.id] || {}
                                 const counts: Record<Waktu, Record<string, number>> = {
-                                  shubuh: {}, ashar: {}, maghrib: {}, isya: {}
+                                  shubuh: {}, dzuhur: {}, ashar: {}, maghrib: {}, isya: {}
                                 }
                                 Object.values(detail).forEach((d: any) => {
                                   WAKTU.forEach(w => {

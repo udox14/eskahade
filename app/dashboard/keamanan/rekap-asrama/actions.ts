@@ -79,18 +79,19 @@ export async function getRekapAbsenBerjamaah(asrama: string, bulan: string, hide
   if (!santriList.length) return { santriList: [], detail: {} }
 
   const rows = await query<any>(`
-    SELECT a.santri_id, a.tanggal, a.shubuh, a.ashar, a.maghrib, a.isya FROM absen_berjamaah a
+    SELECT a.santri_id, a.tanggal, a.shubuh, a.dzuhur, a.ashar, a.maghrib, a.isya FROM absen_berjamaah a
     JOIN santri s ON a.santri_id = s.id
     WHERE a.tanggal >= ? AND a.tanggal <= ? AND s.asrama = ? AND s.status_global = 'aktif'
     ORDER BY a.tanggal
   `, [startDate, endDate, asrama])
 
-  // detail[santri_id][tanggal] = { shubuh, ashar, maghrib, isya }
+  // detail[santri_id][tanggal] = { shubuh, dzuhur, ashar, maghrib, isya }
   const detail: Record<string, Record<string, any>> = {}
   rows.forEach((r: any) => {
     if (!detail[r.santri_id]) detail[r.santri_id] = {}
     detail[r.santri_id][r.tanggal] = {
       shubuh: hideHaid && r.shubuh === 'H' ? 'S' : r.shubuh,  // Sembunyikan Haid → tampilkan sebagai 'S' ke non-putri
+      dzuhur: hideHaid && r.dzuhur === 'H' ? 'S' : r.dzuhur,
       ashar:  hideHaid && r.ashar === 'H'  ? 'S' : r.ashar,
       maghrib:hideHaid && r.maghrib === 'H'? 'S' : r.maghrib,
       isya:   hideHaid && r.isya === 'H'   ? 'S' : r.isya,
@@ -114,12 +115,12 @@ export async function getRekapBerjamaahAlfaRange(asrama: string, startDate: stri
   if (isAsramaTanpaKamar(asrama)) return { santriList: [], detail: {} }
   const rows = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar,
-           a.tanggal, a.shubuh, a.ashar, a.maghrib, a.isya
+           a.tanggal, a.shubuh, a.dzuhur, a.ashar, a.maghrib, a.isya
     FROM absen_berjamaah a
     JOIN santri s ON a.santri_id = s.id
     WHERE a.tanggal >= ? AND a.tanggal <= ?
       AND s.asrama = ? AND s.status_global = 'aktif'
-      AND (a.shubuh = 'A' OR a.ashar = 'A' OR a.maghrib = 'A' OR a.isya = 'A')
+      AND (a.shubuh = 'A' OR a.dzuhur = 'A' OR a.ashar = 'A' OR a.maghrib = 'A' OR a.isya = 'A')
     ORDER BY CAST(s.kamar AS INTEGER), s.nama_lengkap, a.tanggal
   `, [startDate, endDate, asrama])
 
@@ -133,6 +134,7 @@ export async function getRekapBerjamaahAlfaRange(asrama: string, startDate: stri
     if (!detail[r.id]) detail[r.id] = {}
     detail[r.id][r.tanggal] = {
       shubuh:  r.shubuh  === 'A' ? 'A' : null,
+      dzuhur:  r.dzuhur  === 'A' ? 'A' : null,
       ashar:   r.ashar   === 'A' ? 'A' : null,
       maghrib: r.maghrib === 'A' ? 'A' : null,
       isya:    r.isya    === 'A' ? 'A' : null,
@@ -146,7 +148,7 @@ export async function getRekapBerjamaahAlfaRange(asrama: string, startDate: stri
 export async function deleteAbsenBerjamaahRecords(records: { santriId: string, tanggal: string, waktu: string }[]) {
   if (!records.length) return { success: true, count: 0 }
 
-  const VALID_WAKTU = new Set(['shubuh', 'ashar', 'maghrib', 'isya'])
+  const VALID_WAKTU = new Set(['shubuh', 'dzuhur', 'ashar', 'maghrib', 'isya'])
   const valid = records.filter(r => VALID_WAKTU.has(r.waktu))
   if (!valid.length) return { success: true, count: 0 }
 
@@ -163,6 +165,7 @@ export async function deleteAbsenBerjamaahRecords(records: { santriId: string, t
     const [santriId, tanggal] = key.split('|')
     const setParts: string[] = []
     if (waktus.has('shubuh'))  setParts.push("shubuh = NULL")
+    if (waktus.has('dzuhur'))  setParts.push("dzuhur = NULL")
     if (waktus.has('ashar'))   setParts.push("ashar = NULL")
     if (waktus.has('maghrib')) setParts.push("maghrib = NULL")
     if (waktus.has('isya'))    setParts.push("isya = NULL")
@@ -171,7 +174,7 @@ export async function deleteAbsenBerjamaahRecords(records: { santriId: string, t
       params: [santriId, tanggal]
     })
     stmts.push({
-      sql: `DELETE FROM absen_berjamaah WHERE santri_id = ? AND tanggal = ? AND shubuh IS NULL AND ashar IS NULL AND maghrib IS NULL AND isya IS NULL`,
+      sql: `DELETE FROM absen_berjamaah WHERE santri_id = ? AND tanggal = ? AND shubuh IS NULL AND dzuhur IS NULL AND ashar IS NULL AND maghrib IS NULL AND isya IS NULL`,
       params: [santriId, tanggal]
     })
   })

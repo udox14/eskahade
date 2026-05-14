@@ -6,7 +6,7 @@ import { Sun, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, Shiel
 import { toast } from 'sonner'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
-const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
+const WAKTU = ['shubuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
 type Status = null | 'A' | 'S' | 'H' | 'P'
 
@@ -20,6 +20,7 @@ const STATUS_OPTS: { val: Status; label: string; color: string; bg: string }[] =
 
 const WAKTU_META = {
   shubuh:  { label: 'Shubuh',  icon: '🌙', color: 'from-indigo-900 to-slate-900' },
+  dzuhur:  { label: 'Dzuhur',  icon: 'D', color: 'from-sky-700 to-cyan-800' },
   ashar:   { label: 'Ashar',   icon: '☀️', color: 'from-orange-700 to-amber-800' },
   maghrib: { label: 'Maghrib', icon: '🌅', color: 'from-rose-800 to-orange-900' },
   isya:    { label: 'Isya',    icon: '🌃', color: 'from-slate-800 to-indigo-950' },
@@ -29,7 +30,7 @@ function todayStr() { return new Date().toISOString().slice(0, 10) }
 
 type SantriRow = {
   id: string; nama_lengkap: string; nis: string; kamar: string
-  shubuh: Status; ashar: Status; maghrib: Status; isya: Status
+  shubuh: Status; dzuhur: Status; ashar: Status; maghrib: Status; isya: Status
 }
 
 export default function AbsenBerjamaahPage() {
@@ -86,7 +87,7 @@ export default function AbsenBerjamaahPage() {
       const cached = kamarCache[cacheKey]
       setSantriKamar(cached)
       const map: Record<string, Record<Waktu, Status>> = {}
-      cached.forEach(s => { map[s.id] = { shubuh: s.shubuh, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
+      cached.forEach(s => { map[s.id] = { shubuh: s.shubuh, dzuhur: s.dzuhur, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
       setLocalData(prev => ({ ...prev, ...map }))
       return
     }
@@ -97,7 +98,7 @@ export default function AbsenBerjamaahPage() {
       setSantriKamar(res as SantriRow[])
       setKamarCache(prev => ({ ...prev, [cacheKey]: res as SantriRow[] }))
       const map: Record<string, Record<Waktu, Status>> = {}
-      res.forEach((s: any) => { map[s.id] = { shubuh: s.shubuh, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
+      res.forEach((s: any) => { map[s.id] = { shubuh: s.shubuh, dzuhur: s.dzuhur, ashar: s.ashar, maghrib: s.maghrib, isya: s.isya } })
       setLocalData(prev => ({ ...prev, ...map }))
       setLoadingKamar(false)
     })
@@ -106,7 +107,7 @@ export default function AbsenBerjamaahPage() {
   const activeKamar = kamars[kamarIdx] ?? ''
 
   const setStatus = (santriId: string, waktu: Waktu, val: Status) => {
-    setLocalData(prev => ({ ...prev, [santriId]: { ...(prev[santriId] || { shubuh: null, ashar: null, maghrib: null, isya: null }), [waktu]: val } }))
+    setLocalData(prev => ({ ...prev, [santriId]: { ...(prev[santriId] || { shubuh: null, dzuhur: null, ashar: null, maghrib: null, isya: null }), [waktu]: val } }))
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
   }
 
@@ -122,6 +123,7 @@ export default function AbsenBerjamaahPage() {
     const records = santriKamar.map(s => ({
       santri_id: s.id,
       shubuh:  localData[s.id]?.shubuh  ?? null,
+      dzuhur:  localData[s.id]?.dzuhur  ?? null,
       ashar:   localData[s.id]?.ashar   ?? null,
       maghrib: localData[s.id]?.maghrib ?? null,
       isya:    localData[s.id]?.isya    ?? null,
@@ -137,6 +139,7 @@ export default function AbsenBerjamaahPage() {
       [cacheKey]: santriKamar.map(s => ({
         ...s,
         shubuh:  localData[s.id]?.shubuh  ?? null,
+        dzuhur:  localData[s.id]?.dzuhur  ?? null,
         ashar:   localData[s.id]?.ashar   ?? null,
         maghrib: localData[s.id]?.maghrib ?? null,
         isya:    localData[s.id]?.isya    ?? null,
@@ -191,7 +194,7 @@ export default function AbsenBerjamaahPage() {
             className="bg-white/10 text-white text-sm px-3 py-1.5 rounded-xl outline-none border border-white/20 w-full cursor-pointer"/>
 
           {/* Statistik kamar aktif saja — zero row reads */}
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-5 gap-1.5">
             {WAKTU.map(w => {
               const alfa  = countStatus(w, 'A')
               const sakit = countStatus(w, 'S')
@@ -262,10 +265,10 @@ export default function AbsenBerjamaahPage() {
           </div>
 
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2 bg-slate-50 border-b">
+          <div className="grid grid-cols-[minmax(0,1fr)_repeat(5,38px)] gap-1 px-3 py-2 bg-slate-50 border-b">
             <div className="text-[10px] text-slate-400 font-bold uppercase">Nama</div>
             {WAKTU.map(w => (
-              <div key={w} className="text-[10px] text-slate-500 font-bold text-center leading-tight">
+              <div key={w} className="text-[9px] text-slate-500 font-bold text-center leading-tight">
                 {WAKTU_META[w].icon}<br/>{WAKTU_META[w].label}
               </div>
             ))}
@@ -274,9 +277,9 @@ export default function AbsenBerjamaahPage() {
           {/* Santri rows */}
           <div className="divide-y divide-slate-100">
             {santriKamar.map((s: SantriRow) => (
-              <div key={s.id} className="grid grid-cols-[1fr_repeat(4,44px)] gap-1 px-3 py-2.5 items-center hover:bg-slate-50">
+              <div key={s.id} className="grid grid-cols-[minmax(0,1fr)_repeat(5,38px)] gap-1 px-3 py-2.5 items-center hover:bg-slate-50">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{s.nama_lengkap}</p>
+                  <p className="text-sm font-semibold text-slate-800 leading-tight break-words line-clamp-2">{s.nama_lengkap}</p>
                   <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
                 </div>
                 {WAKTU.map(w => {
@@ -284,7 +287,7 @@ export default function AbsenBerjamaahPage() {
                   const opt = STATUS_OPTS.find(o => o.val === val) || STATUS_OPTS[0]
                   return (
                     <button key={w} onClick={() => cycleStatus(s.id, w)}
-                      className={`w-10 h-10 rounded-xl border-2 text-xs font-black transition-all active:scale-90 ${opt.bg} ${opt.color}`}>
+                      className={`w-9 h-9 rounded-xl border-2 text-[11px] font-black transition-all active:scale-90 ${opt.bg} ${opt.color}`}>
                       {val === null ? '✓' : val}
                     </button>
                   )

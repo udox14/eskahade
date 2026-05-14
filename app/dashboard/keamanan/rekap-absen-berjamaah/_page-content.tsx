@@ -10,11 +10,12 @@ import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
-const WAKTU = ['shubuh', 'ashar', 'maghrib', 'isya'] as const
+const WAKTU = ['shubuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const
 type Waktu = typeof WAKTU[number]
-const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'SBH', ashar: 'ASR', maghrib: 'MAG', isya: 'ISYA' }
+const WAKTU_LABEL: Record<Waktu, string> = { shubuh: 'SBH', dzuhur: 'DZH', ashar: 'ASR', maghrib: 'MAG', isya: 'ISYA' }
 const WAKTU_COLOR: Record<Waktu, string> = {
   shubuh:  'bg-blue-500 hover:bg-blue-600 text-white',
+  dzuhur:  'bg-sky-500 hover:bg-sky-600 text-white',
   ashar:   'bg-orange-400 hover:bg-orange-500 text-white',
   maghrib: 'bg-purple-500 hover:bg-purple-600 text-white',
   isya:    'bg-slate-600 hover:bg-slate-700 text-white',
@@ -476,7 +477,7 @@ export default function RekapAbsenBerjamaahPage() {
                         return (
                           <div key={tgl} className="px-4 py-3 flex items-center gap-3">
                             <p className="text-xs text-slate-500 font-semibold w-24 shrink-0">{formatDayLabel(tgl)}</p>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               {WAKTU.map(w => {
                                 const isAlfa = dayData[w] === 'A'
                                 if (!isAlfa) {
