@@ -58,3 +58,21 @@
 ✓ Finished filesystem cache database compaction in 13.4s
  GET /api/version 200 in 23ms
  GET /api/version 200 in 16ms
+ GET /api/version 200 in 34ms
+ GET /api/version 200 in 15ms
+ GET /api/version 200 in 18ms
+ GET /api/version 200 in 118ms
+ GET /api/version 200 in 20ms
+ GET /api/version 200 in 19ms
+ GET /api/version 200 in 32ms
+ GET /api/version 200 in 19ms
+ GET /api/version 200 in 27ms
+ GET /api/version 200 in 14ms
+ GET /api/version 200 in 150ms
+ GET /api/version 200 in 118ms
+ GET /api/version 200 in 91ms
+ GET /api/version 200 in 96ms
+ GET /api/version 200 in 144ms
+ GET /api/version 200 in 101ms
+ GET /api/version 200 in 56ms
+ GET /api/version 200 in 56ms

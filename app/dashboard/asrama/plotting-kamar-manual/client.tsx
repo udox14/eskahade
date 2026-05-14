@@ -250,14 +250,14 @@ export default function PlottingKamarManualClient({
   }
 
   const handleApply = () => {
-    if (!window.confirm(`Terapkan plotting untuk ${drafts.length} santri di asrama ${asrama}?`)) return
+    if (!window.confirm(`Terapkan plotting untuk ${drafts.length} santri di asrama ${asrama}?\n\nSantri aktif yang tidak masuk draft akan dikosongkan kamarnya.`)) return
     startTransition(async () => {
       const result = await terapkanPlottingManual(asrama)
       if ('error' in result) {
         toast.error(result.error)
         return
       }
-      toast.success(`Plotting diterapkan untuk ${result.count} santri`)
+      toast.success(`Plotting diterapkan untuk ${result.count} santri. ${result.clearedCount} santri dikosongkan kamarnya.`)
       await load()
     })
   }

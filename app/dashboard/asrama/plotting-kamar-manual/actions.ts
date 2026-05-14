@@ -475,6 +475,21 @@ export async function terapkanPlottingManual(asrama: string) {
   `, [access.asrama])
   if (!drafts.length) return { error: 'Tidak ada draft untuk diterapkan' }
 
+  const tanpaDraft = await queryOne<{ total: number }>(`
+    SELECT COUNT(*) AS total
+    FROM santri s
+    WHERE s.status_global = 'aktif'
+      AND s.asrama = ?
+      AND s.kamar IS NOT NULL
+      AND TRIM(s.kamar) <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM kamar_draft kd
+        JOIN kamar_config kc ON kc.asrama = kd.asrama AND kc.nomor_kamar = kd.kamar_baru
+        WHERE kd.asrama = s.asrama AND kd.santri_id = s.id
+      )
+  `, [access.asrama])
+
   const db = await getDB()
   const updateStmts = drafts.map((draft) =>
     db.prepare('UPDATE santri SET kamar = ?, updated_at = datetime(\'now\') WHERE id = ? AND status_global = ? AND asrama = ?')
@@ -483,6 +498,20 @@ export async function terapkanPlottingManual(asrama: string) {
   for (let i = 0; i < updateStmts.length; i += 100) {
     await db.batch(updateStmts.slice(i, i + 100))
   }
+  await execute(`
+    UPDATE santri
+    SET kamar = NULL, updated_at = datetime('now')
+    WHERE status_global = 'aktif'
+      AND asrama = ?
+      AND kamar IS NOT NULL
+      AND TRIM(kamar) <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM kamar_draft kd
+        JOIN kamar_config kc ON kc.asrama = kd.asrama AND kc.nomor_kamar = kd.kamar_baru
+        WHERE kd.asrama = santri.asrama AND kd.santri_id = santri.id
+      )
+  `, [access.asrama])
   await execute('UPDATE kamar_draft SET applied = 1 WHERE asrama = ?', [access.asrama])
   await cleanupKetuaInvalid(access.asrama)
 
@@ -496,10 +525,10 @@ export async function terapkanPlottingManual(asrama: string) {
     entityId: access.asrama,
     entityLabel: access.asrama,
     summary: `Menerapkan plotting manual kamar asrama ${access.asrama}`,
-    details: { total: drafts.length },
+    details: { total: drafts.length, dikosongkan: Number(tanpaDraft?.total ?? 0) },
   })
   revalidatePath(FEATURE_PATH)
   revalidatePath(KAMAR_PATH)
   revalidatePath(LEGACY_PATH)
-  return { success: true, count: drafts.length }
+  return { success: true, count: drafts.length, clearedCount: Number(tanpaDraft?.total ?? 0) }
 }
