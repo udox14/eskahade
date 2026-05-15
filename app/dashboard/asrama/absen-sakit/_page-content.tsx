@@ -129,6 +129,7 @@ export default function DataSakitPage() {
   const [selectedSantri, setSelectedSantri] = useState<SantriSakitOption | null>(null)
   const [sakitApa, setSakitApa] = useState('')
   const [beliSurat, setBeliSurat] = useState(false)
+  const [nomorSuratSakit, setNomorSuratSakit] = useState('')
   const [mulaiAt, setMulaiAt] = useState(localDateTimeNow())
 
   const [detailSantri, setDetailSantri] = useState<DataSakitRow | null>(null)
@@ -180,6 +181,7 @@ export default function DataSakitPage() {
       row.asrama,
       row.sakit_apa,
       row.beli_surat ? 'beli surat surat sakit' : 'tanpa surat',
+      row.nomor_surat_sakit,
     ].some(value => String(value || '').toLowerCase().includes(needle)))
   }, [rows, tableSearch])
 
@@ -195,6 +197,7 @@ export default function DataSakitPage() {
     setSelectedSantri(null)
     setSakitApa('')
     setBeliSurat(false)
+    setNomorSuratSakit('')
     setMulaiAt(localDateTimeNow())
     setSesi(getDefaultSesi())
     setTanggal(todayKey())
@@ -230,6 +233,7 @@ export default function DataSakitPage() {
     if (current) {
       setSakitApa(current.sakit_apa === '-' ? '' : current.sakit_apa)
       setBeliSurat(current.beli_surat === 1)
+      setNomorSuratSakit(current.nomor_surat_sakit || '')
       if (current.mulai_at) {
         const date = new Date(current.mulai_at)
         if (!Number.isNaN(date.getTime())) {
@@ -240,6 +244,7 @@ export default function DataSakitPage() {
     } else {
       setSakitApa('')
       setBeliSurat(false)
+      setNomorSuratSakit('')
       setMulaiAt(localDateTimeNow())
     }
   }
@@ -269,6 +274,7 @@ export default function DataSakitPage() {
         mulaiAt,
         sakitApa,
         beliSurat,
+        nomorSuratSakit,
       })
 
       if ('error' in res) {
@@ -385,7 +391,7 @@ export default function DataSakitPage() {
                     </button>
                     {row.beli_surat ? (
                       <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-1 rounded-full">
-                        <FileText className="w-3 h-3" /> Surat
+                        <FileText className="w-3 h-3" /> {row.nomor_surat_sakit || 'Surat'}
                       </span>
                     ) : (
                       <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full">
@@ -458,9 +464,14 @@ export default function DataSakitPage() {
                   <td className="px-4 py-3 text-slate-700">{row.sakit_apa}</td>
                   <td className="px-4 py-3">
                     {row.beli_surat ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
-                        <FileText className="w-3 h-3" /> Beli Surat
-                      </span>
+                      <div className="space-y-1">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
+                          <FileText className="w-3 h-3" /> Beli Surat
+                        </span>
+                        {row.nomor_surat_sakit ? (
+                          <p className="text-xs font-semibold text-slate-500">No. {row.nomor_surat_sakit}</p>
+                        ) : null}
+                      </div>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
                         Tanpa Surat
@@ -679,10 +690,25 @@ export default function DataSakitPage() {
                 <input
                   type="checkbox"
                   checked={beliSurat}
-                  onChange={e => setBeliSurat(e.target.checked)}
+                  onChange={e => {
+                    setBeliSurat(e.target.checked)
+                    if (!e.target.checked) setNomorSuratSakit('')
+                  }}
                   className="w-5 h-5 accent-emerald-600"
                 />
               </label>
+
+              {beliSurat ? (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Nomor Surat Sakit</label>
+                  <input
+                    value={nomorSuratSakit}
+                    onChange={e => setNomorSuratSakit(e.target.value)}
+                    placeholder="Contoh: 012/SS/IV/2026"
+                    className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="p-5 border-t bg-white">
@@ -736,7 +762,7 @@ export default function DataSakitPage() {
                           ) : null}
                           {item.beli_surat ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full">
-                              <FileText className="w-3 h-3" /> Beli Surat
+                              <FileText className="w-3 h-3" /> {item.nomor_surat_sakit || 'Beli Surat'}
                             </span>
                           ) : null}
                         </div>

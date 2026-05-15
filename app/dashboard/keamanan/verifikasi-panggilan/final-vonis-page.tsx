@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getFinalVonisQueue,
   simpanFinalVonis,
@@ -155,12 +156,10 @@ export default function FinalVonisPage({
   source,
   title,
   description,
-  accentClass = 'text-blue-600',
 }: {
   source: SourceType
   title: string
   description: string
-  accentClass?: string
 }) {
   const confirm = useConfirm()
   const [tanggalRef, setTanggalRef] = useState(todayYmd())
@@ -260,17 +259,15 @@ export default function FinalVonisPage({
 
   return (
     <div className="max-w-6xl mx-auto pb-28 space-y-5">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Gavel className={`w-6 h-6 ${accentClass}`} /> {title}
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">{description}</p>
-        </div>
-        <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 self-start lg:self-auto">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-        </button>
-      </div>
+      <DashboardPageHeader
+        title={title}
+        description={description}
+        action={
+          <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {hasLoaded ? 'Perbarui' : 'Tampilkan'}
+          </button>
+        }
+      />
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-4">
         <div className="flex items-center gap-2 text-sm font-black text-slate-700">

@@ -8,6 +8,7 @@ import {
 import { useReactToPrint } from 'react-to-print'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getAntrianPanggilan,
   getAsramaList,
@@ -438,25 +439,23 @@ export default function VerifikasiPanggilanPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-28 space-y-5">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Users className="w-6 h-6 text-blue-600" /> Verifikasi Panggilan
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Gabungkan alfa pengajian, berjamaah, izin pulang, dan sakit sebelum menentukan daftar panggilan.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => preparePrint('tempelan')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
-            <Printer className="w-4 h-4" /> Cetak Tempelan
-          </button>
-          <button onClick={() => preparePrint('eksekutor')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
-            <FileText className="w-4 h-4" /> Cetak Eksekutor
-          </button>
-          <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-          </button>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Verifikasi Panggilan"
+        description="Gabungkan alfa pengajian, berjamaah, izin pulang, dan sakit sebelum menentukan daftar panggilan."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => preparePrint('tempelan')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <Printer className="w-4 h-4" /> Cetak Tempelan
+            </button>
+            <button onClick={() => preparePrint('eksekutor')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <FileText className="w-4 h-4" /> Cetak Eksekutor
+            </button>
+            <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {hasLoaded ? 'Perbarui' : 'Tampilkan'}
+            </button>
+          </div>
+        }
+      />
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-4">
         <div className="flex items-center gap-2 text-sm font-black text-slate-700">

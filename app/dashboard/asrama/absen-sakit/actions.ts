@@ -31,6 +31,7 @@ export type DataSakitRow = {
   sesi: SesiSakit
   sakit_apa: string
   beli_surat: number
+  nomor_surat_sakit: string | null
   status_sakit: 'SAKIT' | 'SEMBUH'
   mulai_at: string | null
   sembuh_at: string | null
@@ -51,6 +52,7 @@ async function ensureSchema() {
     `ALTER TABLE absen_sakit ADD COLUMN sesi TEXT NOT NULL DEFAULT 'PAGI'`,
     `ALTER TABLE absen_sakit ADD COLUMN sakit_apa TEXT`,
     `ALTER TABLE absen_sakit ADD COLUMN beli_surat INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE absen_sakit ADD COLUMN nomor_surat_sakit TEXT`,
     `ALTER TABLE absen_sakit ADD COLUMN updated_at TEXT`,
     `ALTER TABLE absen_sakit ADD COLUMN episode_id TEXT`,
     `ALTER TABLE absen_sakit ADD COLUMN status_sakit TEXT NOT NULL DEFAULT 'SAKIT'`,
@@ -181,6 +183,10 @@ export async function getDataSakit(params: { asrama: string }) {
         WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN 1
         ELSE 0
       END AS beli_surat,
+      CASE
+        WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN NULLIF(ab.nomor_surat_sakit, '')
+        ELSE NULL
+      END AS nomor_surat_sakit,
       COALESCE(ab.status_sakit, 'SAKIT') AS status_sakit,
       ab.mulai_at,
       ab.sembuh_at,
@@ -207,6 +213,7 @@ export async function simpanDataSakit(payload: {
   mulaiAt: string
   sakitApa: string
   beliSurat: boolean
+  nomorSuratSakit?: string
 }) {
   await ensureSchema()
 
@@ -232,6 +239,8 @@ export async function simpanDataSakit(payload: {
   const sesi = normalizeSesi(payload.sesi)
   const mulaiAt = normalizeDateTime(payload.mulaiAt).toISOString()
   const beliSurat = payload.beliSurat ? 1 : 0
+  const nomorSuratSakit = beliSurat ? (payload.nomorSuratSakit || '').trim() : ''
+  if (beliSurat && !nomorSuratSakit) return { error: 'Isi dulu nomor surat sakit.' }
   const active = await queryOne<{ episode_id: string; mulai_at: string | null }>(`
     WITH closed AS (
       SELECT DISTINCT COALESCE(episode_id, id) AS episode_key
@@ -253,15 +262,15 @@ export async function simpanDataSakit(payload: {
   if (active) {
     await execute(`
       INSERT INTO absen_sakit
-        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
-    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, episodeStart, session.id ?? null])
+        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, nomor_surat_sakit, keterangan, status_sakit, mulai_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
+    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, nomorSuratSakit || null, sakitApa, episodeStart, session.id ?? null])
   } else {
     await execute(`
       INSERT INTO absen_sakit
-        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
-    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, sakitApa, mulaiAt, session.id ?? null])
+        (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, nomor_surat_sakit, keterangan, status_sakit, mulai_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SAKIT', ?, ?)
+    `, [rowId, episodeId, payload.santriId, tanggal, sesi, sakitApa, beliSurat, nomorSuratSakit || null, sakitApa, mulaiAt, session.id ?? null])
   }
 
   await logActivity({
@@ -279,6 +288,7 @@ export async function simpanDataSakit(payload: {
       sesi,
       sakit_apa: sakitApa,
       beli_surat: Boolean(beliSurat),
+      nomor_surat_sakit: nomorSuratSakit || null,
       mulai_at: active ? episodeStart : mulaiAt,
     },
   })
@@ -300,6 +310,7 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
     asrama: string | null
     sakit_apa: string | null
     beli_surat: number | null
+    nomor_surat_sakit: string | null
     mulai_at: string | null
   }>(`
     SELECT
@@ -308,6 +319,7 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
       s.asrama,
       ab.sakit_apa,
       ab.beli_surat,
+      ab.nomor_surat_sakit,
       ab.mulai_at
     FROM absen_sakit ab
     JOIN santri s ON s.id = ab.santri_id
@@ -327,8 +339,8 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
 
   await execute(`
     INSERT INTO absen_sakit
-      (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, keterangan, status_sakit, mulai_at, sembuh_at, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'Sembuh', 'SEMBUH', ?, ?, ?)
+      (id, episode_id, santri_id, tanggal, sesi, sakit_apa, beli_surat, nomor_surat_sakit, keterangan, status_sakit, mulai_at, sembuh_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Sembuh', 'SEMBUH', ?, ?, ?)
   `, [
     generateId(),
     active.episode_id,
@@ -337,6 +349,7 @@ export async function tandaiSembuh(payload: { episodeId: string; tanggal: string
     sesi,
     active.sakit_apa || 'Sembuh',
     active.beli_surat || 0,
+    active.beli_surat ? active.nomor_surat_sakit : null,
     active.mulai_at,
     sembuhAt,
     session.id ?? null,
@@ -450,6 +463,10 @@ export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitIte
         WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN 1
         ELSE 0
       END AS beli_surat,
+      CASE
+        WHEN ab.beli_surat = 1 OR ab.keterangan = 'BELI_SURAT' THEN NULLIF(ab.nomor_surat_sakit, '')
+        ELSE NULL
+      END AS nomor_surat_sakit,
       COALESCE(ab.status_sakit, 'SAKIT') AS status_sakit,
       ab.mulai_at,
       ab.sembuh_at,

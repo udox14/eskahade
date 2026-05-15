@@ -13,6 +13,15 @@ export async function getSessionInfo() {
   return { role: session.role, asrama_binaan: session.asrama_binaan ?? null }
 }
 
+async function ensureAbsenMalamSchema() {
+  const db = await getDB()
+  try {
+    await db.prepare(`ALTER TABLE absen_malam_v2 ADD COLUMN keterangan TEXT`).run()
+  } catch {
+    // Kolom sudah ada pada database yang sudah termigrasi.
+  }
+}
+
 // Hanya ambil daftar kamar — ringan, dipanggil saat halaman pertama dibuka
 export async function getKamarsMalam(asrama: string) {
   if (isAsramaTanpaKamar(asrama)) return []
@@ -28,6 +37,8 @@ export async function getKamarsMalam(asrama: string) {
 
 // Ambil santri + status absen + izin hanya untuk 1 kamar
 export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tanggal: string) {
+  await ensureAbsenMalamSchema()
+
   const session = await getSession()
   if (!session) return []
   if (isAsramaTanpaKamar(asrama)) return []
@@ -49,7 +60,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 
   try {
     absenList = await query<any>(
-      `SELECT santri_id, status FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
+      `SELECT santri_id, status, keterangan FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
       [tanggal, ...ids]
     )
   } catch {}
@@ -67,12 +78,17 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   } catch {}
 
   const absenMap: Record<string, string> = {}
-  absenList.forEach((a: any) => { absenMap[a.santri_id] = a.status })
+  const keteranganMap: Record<string, string> = {}
+  absenList.forEach((a: any) => {
+    absenMap[a.santri_id] = a.status
+    keteranganMap[a.santri_id] = a.keterangan || ''
+  })
   const izinMap = new Map(izinList.map((i: any) => [i.santri_id, i]))
 
   return santriList.map((s: any) => ({
     ...s,
     status: izinMap.has(s.id) ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
+    keterangan: izinMap.has(s.id) ? '' : (keteranganMap[s.id] || ''),
     is_izin: izinMap.has(s.id),
     izin_id: izinMap.get(s.id)?.id ?? null,
     izin_jenis: izinMap.get(s.id)?.jenis ?? null,
@@ -82,6 +98,8 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 }
 
 export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tanggal: string) {
+  await ensureAbsenMalamSchema()
+
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
@@ -163,9 +181,11 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
 }
 
 export async function batchSaveAbsenMalam(
-  records: { santri_id: string; status: string }[],
+  records: { santri_id: string; status: string; keterangan?: string }[],
   tanggal: string
 ) {
+  await ensureAbsenMalamSchema()
+
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
   const santriIds = records.map((record) => record.santri_id)
@@ -178,8 +198,13 @@ export async function batchSaveAbsenMalam(
       )
     : []
 
-  const toSave = records.filter(r => r.status === 'ALFA')
-  const toDelete = records.filter(r => r.status !== 'ALFA').map(r => r.santri_id)
+  const normalized = records.map(record => ({
+    ...record,
+    status: record.status === 'ALFA' ? 'ALFA' : 'HADIR',
+    keterangan: (record.keterangan || '').trim(),
+  }))
+  const toSave = normalized.filter(r => r.status === 'ALFA' || r.keterangan)
+  const toDelete = normalized.filter(r => r.status !== 'ALFA' && !r.keterangan).map(r => r.santri_id)
 
   const db = await getDB()
   const stmts: any[] = []
@@ -193,10 +218,13 @@ export async function batchSaveAbsenMalam(
 
   for (const r of toSave) {
     stmts.push(db.prepare(`
-      INSERT INTO absen_malam_v2 (santri_id, tanggal, status, created_by)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(santri_id, tanggal) DO UPDATE SET status = excluded.status, created_by = excluded.created_by
-    `).bind(r.santri_id, tanggal, r.status, session.id))
+      INSERT INTO absen_malam_v2 (santri_id, tanggal, status, keterangan, created_by)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(santri_id, tanggal) DO UPDATE SET
+        status = excluded.status,
+        keterangan = excluded.keterangan,
+        created_by = excluded.created_by
+    `).bind(r.santri_id, tanggal, r.status, r.keterangan || null, session.id))
   }
 
   for (let i = 0; i < stmts.length; i += 100) {
@@ -216,7 +244,8 @@ export async function batchSaveAbsenMalam(
     details: {
       tanggal,
       count: records.length,
-      alfa_count: toSave.length,
+      alfa_count: normalized.filter(record => record.status === 'ALFA').length,
+      keterangan_count: normalized.filter(record => record.keterangan).length,
       scope: santriScope,
     },
   })

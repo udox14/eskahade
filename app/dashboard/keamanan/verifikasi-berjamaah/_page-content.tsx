@@ -8,7 +8,6 @@ export default function VerifikasiBerjamaahPage() {
       source="berjamaah"
       title="Vonis Final Berjamaah"
       description="Proses status final hasil blanko eksekutor untuk alfa shalat berjamaah."
-      accentClass="text-red-600"
     />
   )
 }

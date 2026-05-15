@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam, tandaiSantriKembaliDariAbsenMalam } from './actions'
-import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, LogIn } from 'lucide-react'
+import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, LogIn, MessageSquareText } from 'lucide-react'
 import { toast } from 'sonner'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -28,6 +28,7 @@ export default function AbsenMalamPage() {
   const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
 
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
+  const [localKeterangan, setLocalKeterangan] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [returningId, setReturningId] = useState<string | null>(null)
   const [savedKamars, setSavedKamars] = useState<Set<string>>(new Set())
@@ -65,8 +66,11 @@ export default function AbsenMalamPage() {
       setSantriKamar(cached)
       // Restore localStatus dari cache
       const map: Record<string, string> = {}
+      const ketMap: Record<string, string> = {}
       cached.forEach((s: any) => { map[s.id] = s.status })
+      cached.forEach((s: any) => { ketMap[s.id] = s.keterangan || '' })
       setLocalStatus(prev => ({ ...prev, ...map }))
+      setLocalKeterangan(prev => ({ ...prev, ...ketMap }))
       return
     }
 
@@ -76,8 +80,11 @@ export default function AbsenMalamPage() {
       setSantriKamar(res)
       setKamarCache(prev => ({ ...prev, [`${kamar}__${tanggal}`]: res }))
       const map: Record<string, string> = {}
+      const ketMap: Record<string, string> = {}
       res.forEach((s: any) => { map[s.id] = s.status })
+      res.forEach((s: any) => { ketMap[s.id] = s.keterangan || '' })
       setLocalStatus(prev => ({ ...prev, ...map }))
+      setLocalKeterangan(prev => ({ ...prev, ...ketMap }))
       setLoadingKamar(false)
     })
   }, [kamarIdx, kamars, tanggal])
@@ -92,6 +99,11 @@ export default function AbsenMalamPage() {
   const toggle = (id: string) => {
     if (santriKamar.find(s => s.id === id)?.is_izin) return
     setLocalStatus(prev => ({ ...prev, [id]: prev[id] === 'ALFA' ? 'HADIR' : 'ALFA' }))
+    setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
+  }
+
+  const updateKeterangan = (id: string, value: string) => {
+    setLocalKeterangan(prev => ({ ...prev, [id]: value }))
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
   }
 
@@ -125,7 +137,11 @@ export default function AbsenMalamPage() {
     setSaving(true)
     const records = santriKamar
       .filter(s => !s.is_izin)
-      .map(s => ({ santri_id: s.id, status: localStatus[s.id] || 'HADIR' }))
+      .map(s => ({
+        santri_id: s.id,
+        status: localStatus[s.id] || 'HADIR',
+        keterangan: localKeterangan[s.id] || '',
+      }))
     const res = await batchSaveAbsenMalam(records, tanggal)
     setSaving(false)
     if ('error' in res) { toast.error(res.error); return }
@@ -134,7 +150,11 @@ export default function AbsenMalamPage() {
     const cacheKey = `${activeKamar}__${tanggal}`
     setKamarCache(prev => ({
       ...prev,
-      [cacheKey]: santriKamar.map(s => ({ ...s, status: localStatus[s.id] || 'HADIR' }))
+      [cacheKey]: santriKamar.map(s => ({
+        ...s,
+        status: localStatus[s.id] || 'HADIR',
+        keterangan: localKeterangan[s.id] || '',
+      }))
     }))
     toast.success(`Kamar ${activeKamar} tersimpan`)
     const nextIdx = kamars.findIndex((k, i) => i > kamarIdx && !savedKamars.has(k))
@@ -242,12 +262,13 @@ export default function AbsenMalamPage() {
           <div className="divide-y divide-slate-100">
             {santriKamar.map((s: any) => {
               const st = localStatus[s.id] || 'HADIR'
+              const keterangan = localKeterangan[s.id] || ''
               const isAlfa = st === 'ALFA'
               const isIzin = s.is_izin
               const canMarkReturned = isIzin && s.izin_jenis === 'PULANG'
               return (
                 <div key={s.id} role={isIzin ? undefined : 'button'} tabIndex={isIzin ? undefined : 0} onClick={() => !isIzin && toggle(s.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
+                  className={`w-full grid grid-cols-[auto_1fr_auto] gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
                     isAlfa ? 'bg-red-50' : isIzin ? 'bg-blue-50' : 'hover:bg-slate-50'
                   }`}>
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 border-2 ${
@@ -260,6 +281,19 @@ export default function AbsenMalamPage() {
                     <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
                     {isIzin && s.izin_alasan ? (
                       <p className="text-[10px] text-blue-500 font-semibold truncate mt-0.5">{s.izin_alasan}</p>
+                    ) : null}
+                    {!isIzin ? (
+                      <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+                        <MessageSquareText className={`w-4 h-4 shrink-0 ${keterangan ? 'text-amber-500' : 'text-slate-300'}`} />
+                        <input
+                          value={keterangan}
+                          onClick={event => event.stopPropagation()}
+                          onKeyDown={event => event.stopPropagation()}
+                          onChange={event => updateKeterangan(s.id, event.target.value)}
+                          placeholder="Keterangan opsional"
+                          className="min-w-0 flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-300"
+                        />
+                      </div>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
