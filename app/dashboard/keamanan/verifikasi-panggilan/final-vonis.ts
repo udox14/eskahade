@@ -101,6 +101,12 @@ async function ensureFinalVonisTable() {
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_vonis_periode ON verifikasi_panggilan_vonis(periode_awal, periode_akhir, source)`)
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_vonis_status ON verifikasi_panggilan_vonis(status_final)`)
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_vonis_santri ON verifikasi_panggilan_vonis(santri_id)`)
+
+  try {
+    await execute(`ALTER TABLE absen_berjamaah ADD COLUMN dzuhur TEXT`)
+  } catch {
+    // Kolom sudah tersedia pada database yang sudah termigrasi.
+  }
 }
 
 function parseSnapshot(value: string) {

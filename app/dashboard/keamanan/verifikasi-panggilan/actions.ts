@@ -128,6 +128,28 @@ async function ensureVerifikasiTable() {
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_periode ON verifikasi_panggilan(periode_awal, periode_akhir)`)
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_keputusan ON verifikasi_panggilan(keputusan)`)
   await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_santri ON verifikasi_panggilan(santri_id)`)
+
+  const compatibilityStatements = [
+    `ALTER TABLE absen_berjamaah ADD COLUMN dzuhur TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN sakit_apa TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN status_sakit TEXT NOT NULL DEFAULT 'SAKIT'`,
+    `ALTER TABLE absen_sakit ADD COLUMN mulai_at TEXT`,
+    `ALTER TABLE absen_sakit ADD COLUMN sembuh_at TEXT`,
+  ]
+
+  for (const sql of compatibilityStatements) {
+    try {
+      await execute(sql)
+    } catch {
+      // Kolom sudah tersedia pada database yang sudah termigrasi.
+    }
+  }
+
+  try {
+    await execute(`UPDATE absen_sakit SET mulai_at = COALESCE(mulai_at, tanggal || 'T00:00:00.000Z') WHERE mulai_at IS NULL OR mulai_at = ''`)
+  } catch {
+    // Data sakit lama tetap boleh kosong jika tabelnya belum lengkap di database tertentu.
+  }
 }
 
 function placeholders(ids: string[]) {
