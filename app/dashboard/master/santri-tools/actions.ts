@@ -196,16 +196,24 @@ export async function getSantriPembebasan(filter: {
       params
     )
 
-    // Ambil pembayaran tahunan yang sudah lunas per santri (untuk tahu mana yang sudah bebas)
+    // Ambil pembayaran tahunan yang sudah lunas per santri (untuk tahu mana yang sudah bebas).
+    // Pakai CTE, bukan `IN (?, ?, ...)`, supaya tidak kena batas SQL variables D1.
     if (!rows.length) return []
-    const ids = rows.map((r: any) => r.id)
-    const idPh = ids.map(() => '?').join(',')
     const tahun = filter.tahun ?? new Date().getFullYear()
 
     const bayarList = await query<{ santri_id: string; jenis_biaya: string; tahun_tagihan: number }>(
-      `SELECT santri_id, jenis_biaya, tahun_tagihan FROM pembayaran_tahunan
-       WHERE santri_id IN (${idPh}) AND tahun_tagihan = ?`,
-      [...ids, tahun]
+      `WITH selected_santri AS (
+         SELECT s.id
+         FROM santri s
+         WHERE ${where}
+         ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
+         LIMIT 200
+       )
+       SELECT p.santri_id, p.jenis_biaya, p.tahun_tagihan
+       FROM pembayaran_tahunan p
+       INNER JOIN selected_santri ss ON ss.id = p.santri_id
+       WHERE p.tahun_tagihan = ?`,
+      [...params, tahun]
     )
 
     const bayarMap: Record<string, Set<string>> = {}

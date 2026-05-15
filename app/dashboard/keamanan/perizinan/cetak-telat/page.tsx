@@ -1,9 +1,7 @@
-import { guardPage } from '@/lib/auth/guard'
-import PageContent from './_page-content'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function GuardedPage() {
-  await guardPage('/dashboard/keamanan/perizinan/cetak-telat')
-  return <PageContent />
+export default function LegacyCetakTelatPage() {
+  redirect('/dashboard/asrama/perpulangan/cetak-telat')
 }

@@ -1,0 +1,97 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import { ArrowLeft, Loader2, Printer, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useReactToPrint } from 'react-to-print'
+import { toast } from 'sonner'
+import { getSantriTelatPerpulangan } from './actions'
+import { PemanggilanTelatView } from './pemanggilan-telat-view'
+
+export default function CetakTelatPerpulanganPage() {
+  const router = useRouter()
+  const [tglRef, setTglRef] = useState(new Date().toISOString().slice(0, 10))
+  const [tglPanggil, setTglPanggil] = useState(new Date().toISOString().slice(0, 10))
+  const [data, setData] = useState<Record<string, any[]> | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
+  const printRef = useRef<HTMLDivElement>(null)
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Pemanggilan_Telat_Perpulangan_${tglRef}`,
+    onAfterPrint: () => toast.success('Dokumen dikirim ke printer'),
+  })
+
+  async function handleLoad() {
+    setLoading(true)
+    setHasSearched(true)
+    const res = await getSantriTelatPerpulangan(tglRef)
+    setData(res)
+    setLoading(false)
+
+    const count = res ? Object.values(res).reduce((acc: number, curr: any) => acc + curr.length, 0) : 0
+    if (count > 0) toast.success(`Ditemukan ${count} santri telat perpulangan.`)
+    else toast.info('Tidak ada data santri telat perpulangan.')
+  }
+
+  const totalSantri = data ? Object.values(data).reduce((acc: number, curr: any) => acc + curr.length, 0) : 0
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4 print:hidden">
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Cetak Telat Perpulangan</h1>
+          <p className="text-slate-500 text-sm">Daftar santri yang belum kembali setelah batas periode perpulangan.</p>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border flex flex-col md:flex-row gap-6 items-end shadow-sm print:hidden">
+        <div className="w-full md:w-1/3">
+          <label className="text-sm font-bold text-slate-700 block mb-1">1. Tanggal Referensi</label>
+          <input type="date" className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={tglRef} onChange={(e) => setTglRef(e.target.value)} />
+          <p className="text-xs text-slate-500 mt-1">Menampilkan telat perpulangan dengan batas kembali sampai tanggal ini.</p>
+        </div>
+        <div className="w-full md:w-1/3">
+          <label className="text-sm font-bold text-slate-700 block mb-1">2. Tanggal Pemanggilan</label>
+          <input type="date" className="w-full p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={tglPanggil} onChange={(e) => setTglPanggil(e.target.value)} />
+        </div>
+        <div className="flex gap-2 items-center flex-1 justify-end">
+          <button onClick={handleLoad} disabled={loading} className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Tampilkan Data
+          </button>
+          {totalSantri > 0 && (
+            <button onClick={() => handlePrint()} className="bg-green-700 text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-green-800 font-bold shadow-sm">
+              <Printer className="w-4 h-4" /> Cetak PDF
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-slate-100 p-8 rounded-xl border overflow-auto min-h-[500px] flex justify-center items-start">
+        {!hasSearched ? (
+          <div className="text-center text-slate-400 py-32 flex flex-col items-center">
+            <Search className="w-12 h-12 mb-3 text-slate-300" />
+            <p className="font-medium">Siap Mencari Data</p>
+            <p className="text-sm">Pilih tanggal lalu klik Tampilkan Data.</p>
+          </div>
+        ) : loading ? (
+          <div className="text-center py-32"><Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto" /></div>
+        ) : !data || totalSantri === 0 ? (
+          <div className="text-center text-slate-400 py-32 flex flex-col items-center bg-white p-10 rounded-xl border border-dashed">
+            <p className="font-bold text-slate-600">Tidak Ada Data</p>
+            <p className="text-sm">Tidak ditemukan santri telat perpulangan.</p>
+          </div>
+        ) : (
+          <div ref={printRef}>
+            <PemanggilanTelatView dataPerAsrama={data} tglPanggil={new Date(tglPanggil)} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
