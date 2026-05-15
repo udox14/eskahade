@@ -75,7 +75,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
   '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode dan filter.',
   '/dashboard/akademik/absensi/verifikasi':          'Proses vonis final alfa pengajian dari hasil pemanggilan.',
-  '/dashboard/akademik/absensi/cetak':               'Dialihkan ke Verifikasi Panggilan.',
+  '/dashboard/akademik/absensi/cetak':               'Cetak surat pemanggilan untuk santri yang banyak alfa.',
   '/dashboard/akademik/absensi/cetak-blanko':        'Cetak blanko absen kosong untuk diisi manual di kelas.',
   '/dashboard/akademik/absensi-guru':                'Catat kehadiran guru pengajar setiap pertemuan.',
   '/dashboard/akademik/absensi-guru/rekap':          'Lihat rekap kinerja kehadiran guru per periode.',

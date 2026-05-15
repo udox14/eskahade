@@ -48,6 +48,11 @@ SET title = 'Vonis Final Pengajian',
 WHERE href = '/dashboard/akademik/absensi/verifikasi';
 
 UPDATE fitur_akses
-SET is_active = 0,
+SET title = 'Cetak Pemanggilan',
+    group_name = 'Absensi Akademik',
+    icon = 'Printer',
+    roles = '["admin","sekpen"]',
+    is_active = 1,
+    urutan = 3,
     updated_at = datetime('now')
 WHERE href = '/dashboard/akademik/absensi/cetak';
