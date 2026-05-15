@@ -276,11 +276,11 @@ export async function getDendaBukuPribadiDetail(santriId: string) {
 
 export async function getNextDendaBukuPribadi(santriId: string) {
   await ensureDendaBukuPribadiSchema()
-  const row = await queryOne<{ total: number }>(
-    'SELECT COUNT(*) as total FROM denda_buku_pribadi WHERE santri_id = ?',
+  const row = await queryOne<{ terakhir: number | null }>(
+    'SELECT MAX(kehilangan_ke) as terakhir FROM denda_buku_pribadi WHERE santri_id = ?',
     [santriId]
   )
-  const kehilanganKe = Number(row?.total || 0) + 1
+  const kehilanganKe = Number(row?.terakhir || 0) + 1
   return {
     kehilanganKe,
     nominal: kehilanganKe * DENDA_STEP,
@@ -296,11 +296,15 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
   const tanggal = String(formData.get('tanggal') || '').trim()
   const keterangan = String(formData.get('keterangan') || '').trim()
   const langsungLunas = String(formData.get('langsung_lunas') || '') === '1'
+  const kehilanganKeInput = Number(formData.get('kehilangan_ke') || 0)
 
   if (!santriId) return { error: 'Pilih santri dulu.' }
   if (!tanggal) return { error: 'Tanggal wajib diisi.' }
+  if (!Number.isInteger(kehilanganKeInput) || kehilanganKeInput < 1) {
+    return { error: 'Hilang ke harus berupa angka bulat minimal 1.' }
+  }
 
-  const next = await getNextDendaBukuPribadi(santriId)
+  const nominal = kehilanganKeInput * DENDA_STEP
   const paidAt = langsungLunas ? `${tanggal}T00:00:00.000Z` : null
   const paidBy = langsungLunas ? session.id : null
 
@@ -312,8 +316,8 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
     generateId(),
     santriId,
     tanggal,
-    next.kehilanganKe,
-    next.nominal,
+    kehilanganKeInput,
+    nominal,
     langsungLunas ? 'LUNAS' : 'BELUM_BAYAR',
     keterangan || null,
     session.id,
@@ -330,12 +334,12 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
     fiturHref: FEATURE_PATH,
     logKind: 'create',
     entityType: 'denda_buku_pribadi',
-    entityId: `${santriId}:${next.kehilanganKe}`,
+    entityId: `${santriId}:${kehilanganKeInput}`,
     entityLabel: santri?.nama_lengkap || santriId,
     summary: `Mencatat denda buku pribadi untuk ${santri?.nama_lengkap || santriId}`,
     details: {
-      kehilangan_ke: next.kehilanganKe,
-      nominal: next.nominal,
+      kehilangan_ke: kehilanganKeInput,
+      nominal,
       tanggal,
       langsung_lunas: langsungLunas,
       keterangan: keterangan || null,
@@ -343,7 +347,7 @@ export async function catatDendaBukuPribadi(formData: FormData): Promise<{ succe
   })
 
   revalidatePath(FEATURE_PATH)
-  return { success: true, kehilanganKe: next.kehilanganKe, nominal: next.nominal }
+  return { success: true, kehilanganKe: kehilanganKeInput, nominal }
 }
 
 export async function tandaiDendaBukuPribadiLunas(id: string): Promise<{ success: boolean } | { error: string }> {

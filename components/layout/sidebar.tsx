@@ -46,6 +46,7 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'Operasional': Wallet,
   'UPK': Package,
   'EHB': ClipboardList,
+  'PSB': ClipboardList,
   'Master Data': Database,
 };
 
@@ -225,6 +226,7 @@ const GROUP_ORDER = [
   'Operasional',
   'UPK',
   'EHB',
+  'PSB',
   'Master Data',
 ];
 

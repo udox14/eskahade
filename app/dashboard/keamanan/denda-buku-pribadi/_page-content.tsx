@@ -39,6 +39,8 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const DENDA_BUKU_PRIBADI_STEP = 25000
+
 const emptyStats: DendaStats = {
   totalSantri: 0,
   totalKasus: 0,
@@ -184,6 +186,14 @@ export default function DendaBukuPribadiPageContent() {
     setNextDenda(next)
   }
 
+  const handleKehilanganKeChange = (value: string) => {
+    const kehilanganKe = Math.max(1, Number.parseInt(value || '1', 10) || 1)
+    setNextDenda({
+      kehilanganKe,
+      nominal: kehilanganKe * DENDA_BUKU_PRIBADI_STEP,
+    })
+  }
+
   const submitDenda = () => {
     if (!selectedSantri) {
       toast.error('Pilih santri dulu')
@@ -195,6 +205,7 @@ export default function DendaBukuPribadiPageContent() {
     payload.set('tanggal', tanggal)
     payload.set('keterangan', keterangan)
     payload.set('langsung_lunas', langsungLunas ? '1' : '0')
+    payload.set('kehilangan_ke', String(nextDenda?.kehilanganKe || 1))
 
     startTransition(async () => {
       const res = await catatDendaBukuPribadi(payload)
@@ -473,8 +484,15 @@ export default function DendaBukuPribadiPageContent() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <div className="bg-white rounded-xl border p-3">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase">Hilang Ke</p>
-                      <p className="text-xl font-bold text-slate-800">{nextDenda?.kehilanganKe || '-'}</p>
+                      <label className="text-[11px] font-bold text-slate-400 uppercase">Hilang Ke</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={nextDenda?.kehilanganKe || 1}
+                        onChange={e => handleKehilanganKeChange(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                      />
                     </div>
                     <div className="bg-white rounded-xl border p-3">
                       <p className="text-[11px] font-bold text-slate-400 uppercase">Nominal</p>

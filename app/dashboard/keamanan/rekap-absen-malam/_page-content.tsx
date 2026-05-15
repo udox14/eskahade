@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam } from '../rekap-asrama/actions'
-import { Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -35,6 +35,7 @@ export default function RekapAbsenMalamPage() {
   const [bulan, setBulan] = useState(bulanIni())
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState<'bulan' | 'riwayat'>('bulan')
   const [filterKamar, setFilterKamar] = useState('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
@@ -181,9 +182,29 @@ export default function RekapAbsenMalamPage() {
         </div>
       </div>
 
-      {/* FILTER CARI */}
+      {/* TABS & FILTER */}
       {hasLoaded && !loading && (
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-fit gap-1 rounded-xl bg-slate-100 p-1">
+            <button
+              onClick={() => setActiveTab('bulan')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                activeTab === 'bulan' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Moon className="h-4 w-4" />
+              Rekap Bulan Ini
+            </button>
+            <button
+              onClick={() => setActiveTab('riwayat')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                activeTab === 'riwayat' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <History className="h-4 w-4" />
+              Riwayat Semua Alfa
+            </button>
+          </div>
           <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -225,20 +246,25 @@ export default function RekapAbsenMalamPage() {
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
-              <p className="text-2xl font-black text-red-600">
-                {filteredSantri.reduce((s, santri) => s + (malamAlfa[santri.id] || 0), 0)}
-              </p>
-              <p className="text-xs text-red-400 mt-1">Total Alfa</p>
-            </div>
-            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-              <p className="text-2xl font-black text-slate-800">
-                {filteredRiwayatAlfa.reduce((sum, santri) => sum + santri.total_alfa, 0)}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">Riwayat Semua Alfa</p>
-            </div>
+            {activeTab === 'bulan' && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
+                <p className="text-2xl font-black text-red-600">
+                  {filteredSantri.reduce((s, santri) => s + (malamAlfa[santri.id] || 0), 0)}
+                </p>
+                <p className="text-xs text-red-400 mt-1">Total Alfa</p>
+              </div>
+            )}
+            {activeTab === 'riwayat' && (
+              <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
+                <p className="text-2xl font-black text-slate-800">
+                  {filteredRiwayatAlfa.reduce((sum, santri) => sum + santri.total_alfa, 0)}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">Riwayat Semua Alfa</p>
+              </div>
+            )}
           </div>
 
+          {activeTab === 'riwayat' && (
           <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
             <div className="bg-slate-900 text-white px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -277,8 +303,9 @@ export default function RekapAbsenMalamPage() {
               </div>
             )}
           </div>
+          )}
 
-          {filteredSantri.length === 0 ? (
+          {activeTab === 'bulan' && (filteredSantri.length === 0 ? (
             <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
               Tidak ada record ALFA absen malam untuk filter ini.
             </div>
@@ -335,7 +362,7 @@ export default function RekapAbsenMalamPage() {
                 </div>
               </div>
             )
-          })}
+          }))}
         </div>
       )}
     </div>
