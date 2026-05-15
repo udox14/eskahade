@@ -349,28 +349,18 @@ export default function RekapAsramaPage() {
           {/* ABSEN MALAM */}
           {tab === 'malam' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-black text-slate-800">{filteredMalamSantri.length}</p>
-                  <p className="text-xs text-slate-400 mt-1">Total Santri</p>
-                </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
                   <p className="text-2xl font-black text-red-600">
                     {filteredMalamSantri.reduce((s, santri) => s + (malamAlfa[santri.id] || 0), 0)}
                   </p>
                   <p className="text-xs text-red-400 mt-1">Total Alfa</p>
                 </div>
-                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-black text-orange-600">
-                    {filteredMalamSantri.filter(santri => (malamAlfa[santri.id] || 0) > 0).length}
-                  </p>
-                  <p className="text-xs text-orange-400 mt-1">Santri Pernah Alfa</p>
-                </div>
               </div>
 
               {filteredMalamSantri.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
-                  Tidak ada data absen malam untuk filter ini.
+                  Tidak ada record ALFA absen malam untuk filter ini.
                 </div>
               ) : sortedKamars(filteredMalamSantri).map(kamar => {
                 const santriKamar = grouped(filteredMalamSantri)[kamar]
@@ -378,7 +368,7 @@ export default function RekapAsramaPage() {
                   <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                     <div className="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center">
                       <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
-                      <span className="text-xs text-slate-400">{santriKamar.length} santri</span>
+                      <span className="text-xs text-slate-400">{santriKamar.length} santri alfa</span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs min-w-[500px]">

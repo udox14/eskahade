@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSessionRekap, getRekapAbsenMalam, getKamarList } from '../rekap-asrama/actions'
+import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam } from '../rekap-asrama/actions'
 import { Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
@@ -16,6 +16,9 @@ function getDaysInMonth(bulan: string) {
 function formatBulan(bulan: string) {
   const [y, m] = bulan.split('-').map(Number)
   return new Date(y, m - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+}
+function formatTanggal(tanggal: string) {
+  return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 function prevBulan(b: string) {
   const [y, m] = b.split('-').map(Number)
@@ -39,6 +42,7 @@ export default function RekapAbsenMalamPage() {
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
   const [malamDetail, setMalamDetail] = useState<Record<string, Record<string, string>>>({})
+  const [riwayatAlfa, setRiwayatAlfa] = useState<any[]>([])
 
   const sessionInfoRef = useRef<any>(null)
   const asramaRef = useRef(asrama)
@@ -75,10 +79,14 @@ export default function RekapAbsenMalamPage() {
   async function load() {
     setLoading(true)
     try {
-      const malam = await getRekapAbsenMalam(asramaRef.current, bulanRef.current)
+      const [malam, riwayat] = await Promise.all([
+        getRekapAbsenMalam(asramaRef.current, bulanRef.current),
+        getRiwayatAlfaAbsenMalam(asramaRef.current),
+      ])
       setMalamSantri(malam.santriList)
       setMalamAlfa(malam.alfaPerSantri)
       setMalamDetail(malam.detailPerSantri)
+      setRiwayatAlfa(riwayat)
       setHasLoaded(true)
     } catch (error: any) {
       console.error(error)
@@ -105,6 +113,11 @@ export default function RekapAbsenMalamPage() {
     Object.keys(grouped(list)).sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
 
   const filteredSantri = malamSantri.filter(s => {
+    const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
+    const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
+    return matchKamar && matchSearch
+  })
+  const filteredRiwayatAlfa = riwayatAlfa.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
     return matchKamar && matchSearch
@@ -211,28 +224,63 @@ export default function RekapAbsenMalamPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
-              <p className="text-2xl font-black text-slate-800">{filteredSantri.length}</p>
-              <p className="text-xs text-slate-400 mt-1">Total Santri</p>
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
               <p className="text-2xl font-black text-red-600">
                 {filteredSantri.reduce((s, santri) => s + (malamAlfa[santri.id] || 0), 0)}
               </p>
               <p className="text-xs text-red-400 mt-1">Total Alfa</p>
             </div>
-            <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 text-center shadow-sm">
-              <p className="text-2xl font-black text-orange-600">
-                {filteredSantri.filter(santri => (malamAlfa[santri.id] || 0) > 0).length}
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
+              <p className="text-2xl font-black text-slate-800">
+                {filteredRiwayatAlfa.reduce((sum, santri) => sum + santri.total_alfa, 0)}
               </p>
-              <p className="text-xs text-orange-400 mt-1">Santri Pernah Alfa</p>
+              <p className="text-xs text-slate-400 mt-1">Riwayat Semua Alfa</p>
             </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-slate-900 text-white px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold">Riwayat Semua Alfa</p>
+                <p className="text-xs text-slate-400">Tidak tergantung bulan yang sedang dibuka.</p>
+              </div>
+              <span className="text-xs text-slate-400">{filteredRiwayatAlfa.length} santri</span>
+            </div>
+            {filteredRiwayatAlfa.length === 0 ? (
+              <div className="py-10 text-center text-slate-400">
+                Belum ada riwayat ALFA absen malam untuk filter ini.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {filteredRiwayatAlfa.map((santri: any) => (
+                  <div key={santri.id} className="px-4 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
+                        <p className="text-xs text-slate-400">{santri.nis || '-'} / Kamar {santri.kamar || '-'}</p>
+                      </div>
+                      <span className="w-fit rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-600">
+                        {santri.total_alfa}x ALFA
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {santri.tanggal.map((item: any) => (
+                        <span key={`${santri.id}-${item.tanggal}`} className="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+                          {formatTanggal(item.tanggal)}
+                          {item.keterangan ? ` - ${item.keterangan}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {filteredSantri.length === 0 ? (
             <div className="py-12 text-center text-slate-400 bg-white border rounded-2xl">
-              Tidak ada data absen malam untuk filter ini.
+              Tidak ada record ALFA absen malam untuk filter ini.
             </div>
           ) : sortedKamars(filteredSantri).map(kamar => {
             const santriKamar = grouped(filteredSantri)[kamar]
@@ -240,7 +288,7 @@ export default function RekapAbsenMalamPage() {
               <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                 <div className="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center">
                   <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
-                  <span className="text-xs text-slate-400">{santriKamar.length} santri</span>
+                  <span className="text-xs text-slate-400">{santriKamar.length} santri alfa</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs min-w-[500px]">

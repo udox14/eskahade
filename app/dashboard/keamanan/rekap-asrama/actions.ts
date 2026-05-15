@@ -33,32 +33,78 @@ export async function getRekapAbsenMalam(asrama: string, bulan: string) {
   const startDate = `${tahun}-${bln}-01`
   const endDate = `${tahun}-${bln}-31`
 
-  const santriList = await query<any>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.kamar
-    FROM santri s
-    WHERE s.asrama = ? AND s.status_global = 'aktif'
-    ORDER BY CAST(s.kamar AS INTEGER), s.nama_lengkap
-  `, [asrama])
-
-  if (!santriList.length) return { santriList: [], alfaPerSantri: {}, detailPerSantri: {} }
-
   const absenList = await query<any>(`
-    SELECT a.santri_id, a.tanggal, a.status FROM absen_malam_v2 a
+    SELECT s.id, s.nama_lengkap, s.nis, s.kamar, a.santri_id, a.tanggal, a.status FROM absen_malam_v2 a
     JOIN santri s ON a.santri_id = s.id
-    WHERE a.tanggal >= ? AND a.tanggal <= ? AND s.asrama = ? AND s.status_global = 'aktif'
-    ORDER BY a.tanggal
+    WHERE a.tanggal >= ? AND a.tanggal <= ?
+      AND s.asrama = ? AND s.status_global = 'aktif'
+      AND a.status = 'ALFA'
+    ORDER BY CAST(s.kamar AS INTEGER), s.nama_lengkap, a.tanggal
   `, [startDate, endDate, asrama])
 
-  // Build detail per santri: { santri_id: { 'YYYY-MM-DD': status } }
+  const santriMap: Record<string, any> = {}
   const detailPerSantri: Record<string, Record<string, string>> = {}
   const alfaPerSantri: Record<string, number> = {}
   absenList.forEach((a: any) => {
+    if (!santriMap[a.id]) {
+      santriMap[a.id] = { id: a.id, nama_lengkap: a.nama_lengkap, nis: a.nis, kamar: a.kamar }
+    }
     if (!detailPerSantri[a.santri_id]) detailPerSantri[a.santri_id] = {}
     detailPerSantri[a.santri_id][a.tanggal] = a.status
-    if (a.status === 'ALFA') alfaPerSantri[a.santri_id] = (alfaPerSantri[a.santri_id] || 0) + 1
+    alfaPerSantri[a.santri_id] = (alfaPerSantri[a.santri_id] || 0) + 1
   })
 
-  return { santriList, alfaPerSantri, detailPerSantri }
+  return { santriList: Object.values(santriMap), alfaPerSantri, detailPerSantri }
+}
+
+// Riwayat ALFA absen malam: semua bulan, supaya histori lama tetap mudah dicek.
+export async function getRiwayatAlfaAbsenMalam(asrama: string) {
+  if (isAsramaTanpaKamar(asrama)) return []
+
+  const rows = await query<any>(`
+    SELECT
+      s.id,
+      s.nama_lengkap,
+      s.nis,
+      s.kamar,
+      a.tanggal,
+      a.keterangan
+    FROM absen_malam_v2 a
+    JOIN santri s ON a.santri_id = s.id
+    WHERE s.asrama = ?
+      AND s.status_global = 'aktif'
+      AND a.status = 'ALFA'
+    ORDER BY CAST(s.kamar AS INTEGER), s.nama_lengkap, a.tanggal DESC
+  `, [asrama])
+
+  const map: Record<string, {
+    id: string
+    nama_lengkap: string
+    nis: string | null
+    kamar: string | null
+    total_alfa: number
+    tanggal: { tanggal: string; keterangan: string | null }[]
+  }> = {}
+
+  rows.forEach((row: any) => {
+    if (!map[row.id]) {
+      map[row.id] = {
+        id: row.id,
+        nama_lengkap: row.nama_lengkap,
+        nis: row.nis,
+        kamar: row.kamar,
+        total_alfa: 0,
+        tanggal: [],
+      }
+    }
+    map[row.id].total_alfa += 1
+    map[row.id].tanggal.push({
+      tanggal: row.tanggal,
+      keterangan: row.keterangan || null,
+    })
+  })
+
+  return Object.values(map)
 }
 
 // Rekap Absen Berjamaah: per santri, per waktu, per bulan
