@@ -1,4 +1,5 @@
 import { guardPage } from '@/lib/auth/guard'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { canCrud } from '@/lib/auth/crud'
 import { getSantriById, updateSantri } from './actions'
 import { notFound, redirect } from 'next/navigation'
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic'
 
 type Props = {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 const GOL_DARAH = ['A', 'B', 'AB', 'O']
@@ -20,10 +22,12 @@ const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 const inputCls = "w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
 const labelCls = "block text-xs font-bold text-gray-500 uppercase mb-1"
 
-export default async function EditSantriPage({ params }: Props) {
+export default async function EditSantriPage({ params, searchParams }: Props) {
   await guardPage('/dashboard/santri')
   if (!(await canCrud('/dashboard/santri', 'update'))) redirect('/dashboard/santri')
   const { id } = await params
+  const query = await searchParams
+  const backHref = query.from === 'psb' ? '/dashboard/psb' : `/dashboard/santri/${id}`
   const { data: santri, error } = await getSantriById(id)
 
   if (!santri || error) return notFound()
@@ -38,7 +42,7 @@ export default async function EditSantriPage({ params }: Props) {
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/santri/${id}`} className="p-2 bg-white border hover:bg-gray-50 rounded-full transition-colors shadow-sm text-gray-600">
+        <Link href={backHref} className="p-2 bg-white border hover:bg-gray-50 rounded-full transition-colors shadow-sm text-gray-600">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
@@ -48,6 +52,7 @@ export default async function EditSantriPage({ params }: Props) {
       </div>
 
       <form action={handleUpdate} className="space-y-6">
+        {query.from === 'psb' ? <input type="hidden" name="redirect_to" value="/dashboard/psb" /> : null}
 
         {/* ── IDENTITAS ── */}
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
@@ -196,7 +201,7 @@ export default async function EditSantriPage({ params }: Props) {
 
         {/* ── TOMBOL ── */}
         <div className="flex justify-end gap-3 pt-2">
-          <Link href={`/dashboard/santri/${id}`} className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100">
+          <Link href={backHref} className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100">
             Batal
           </Link>
           <button type="submit" className="bg-green-700 hover:bg-green-800 text-white px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-md transition-colors text-sm">

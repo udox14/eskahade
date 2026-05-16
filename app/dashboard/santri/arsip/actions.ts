@@ -12,6 +12,7 @@ const ARCHIVE_STATUS = 'arsip'
 export type FilterSantri = {
   search?: string
   asrama?: string
+  status_kamar?: string
   sekolah?: string
   kelas_sekolah?: string
   kelas_pesantren?: string
@@ -244,7 +245,7 @@ async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
 }
 
 export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
-  const { search, asrama, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk } = filter
+  const { search, asrama, status_kamar, sekolah, kelas_sekolah, kelas_pesantren, tahun_masuk } = filter
   const pageSize = filter.pageSize ?? DEFAULT_PAGE_SIZE
   const showAll = pageSize === 0
   const page = showAll ? 1 : Math.max(1, filter.page ?? 1)
@@ -255,6 +256,7 @@ export async function getSantriAktifUntukArsip(filter: FilterSantri = {}) {
 
   if (search) { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); params.push(`%${search}%`, `%${search}%`) }
   if (asrama) { clauses.push('s.asrama = ?'); params.push(asrama) }
+  if (status_kamar === 'TANPA_KAMAR') { clauses.push("(s.kamar IS NULL OR TRIM(s.kamar) = '')") }
   if (sekolah) { clauses.push('s.sekolah = ?'); params.push(sekolah) }
   if (kelas_sekolah) { clauses.push('s.kelas_sekolah LIKE ?'); params.push(`%${kelas_sekolah}%`) }
   if (kelas_pesantren) { clauses.push('LOWER(k.nama_kelas) = LOWER(?)'); params.push(kelas_pesantren) }

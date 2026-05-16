@@ -335,3 +335,4 @@
 ✓ Compiled in 379ms
 ✓ Compiled in 970ms
  GET /api/version 200 in 1038ms
+ GET /api/version 200 in 120ms

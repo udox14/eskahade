@@ -107,7 +107,7 @@ export default function ArsipSantriPage() {
   const [santriPage, setSantriPage] = useState(1)
   const [santriPageSize, setSantriPageSize] = useState(10)
   const [loadingSantri, setLoadingSantri] = useState(false)
-  const [filterSantri, setFilterSantri] = useState({ search: '', asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' })
+  const [filterSantri, setFilterSantri] = useState({ search: '', asrama: '', status_kamar: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' })
   const [optsSantri, setOptsSantri] = useState<{ asramaList: string[], sekolahList: string[], kelasList: string[], tahunList: number[] }>({ asramaList: [], sekolahList: [], kelasList: [], tahunList: [] })
   const [selectedArsip, setSelectedArsip] = useState<Set<string>>(new Set())
   const [catatanArsip, setCatatanArsip] = useState('')
@@ -413,6 +413,13 @@ export default function ArsipSantriPage() {
                   </select>
                 </div>
                 <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Kamar</label>
+                  <select value={filterSantri.status_kamar} onChange={e => handleFilterSantriChange('status_kamar', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
+                    <option value="">Semua</option>
+                    <option value="TANPA_KAMAR">Tanpa Kamar</option>
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
                   <select value={filterSantri.sekolah} onChange={e => handleFilterSantriChange('sekolah', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
                     <option value="">Semua</option>
@@ -438,7 +445,7 @@ export default function ArsipSantriPage() {
                   </select>
                 </div>
                 {activeFilterCount > 0 && (
-                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
+                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', status_kamar: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
                     <X className="w-3 h-3" /> Reset filter
                   </button>
                 )}

@@ -127,7 +127,11 @@ export async function updateSantri(id: string, formData: FormData) {
     },
   })
 
+  const redirectTo = String(formData.get('redirect_to') || '')
+  const target = redirectTo === '/dashboard/psb' ? redirectTo : '/dashboard/santri'
+
   revalidatePath('/dashboard/santri')
+  revalidatePath('/dashboard/psb')
   revalidatePath(`/dashboard/santri/${id}`)
-  redirect('/dashboard/santri')
+  redirect(target)
 }
