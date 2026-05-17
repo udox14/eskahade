@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Pencil, ChevronRight, Users, Home, BookOpen } from 'lucide-react'
 import { PaginationControls } from './santri-client'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 interface Props {
   page: number
@@ -75,7 +76,7 @@ export async function SantriTable({
       `SELECT COUNT(*) AS total FROM santri s ${joinClause} ${whereStr}`, params
     ),
     query<any>(
-      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kategori_santri, ${kategoriEfektifSql} AS kategori_efektif, s.status_global,
+      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kategori_santri, s.foto_url, ${kategoriEfektifSql} AS kategori_efektif, s.status_global,
               k.nama_kelas AS kelas_pesantren
        FROM santri s ${joinClause} ${whereStr}
        ORDER BY s.nama_lengkap ASC
@@ -105,11 +106,19 @@ export async function SantriTable({
       <div className="md:hidden space-y-2">
         {santriList.map((santri: any) => (
           <div key={santri.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{santri.kelas_pesantren || '-'}</p>
-                <p className="text-[11px] text-indigo-600 mt-1 font-semibold">{santri.kategori_efektif || santri.kategori_santri || 'REGULER'}</p>
+            <div className="flex justify-between items-start gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <SantriPhotoAvatar
+                  src={santri.foto_url}
+                  alt={santri.nama_lengkap}
+                  name={santri.nama_lengkap}
+                  size="md"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{santri.kelas_pesantren || '-'}</p>
+                  <p className="text-[11px] text-indigo-600 mt-1 font-semibold">{santri.kategori_efektif || santri.kategori_santri || 'REGULER'}</p>
+                </div>
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 santri.status_global === 'aktif' ? 'bg-green-100 text-green-700'
@@ -165,9 +174,19 @@ export async function SantriTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {santriList.map((santri: any) => (
+                {santriList.map((santri: any) => (
                 <tr key={santri.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-gray-900">{santri.nama_lengkap}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <SantriPhotoAvatar
+                        src={santri.foto_url}
+                        alt={santri.nama_lengkap}
+                        name={santri.nama_lengkap}
+                        size="sm"
+                      />
+                      <span className="font-medium text-gray-900">{santri.nama_lengkap}</span>
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-gray-500 font-mono text-xs">{santri.nis}</td>
                   <td className="px-5 py-3.5">
                     <p className="text-gray-800 font-medium text-xs">{santri.asrama || '-'}</p>

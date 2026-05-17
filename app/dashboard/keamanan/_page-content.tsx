@@ -18,6 +18,7 @@ import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 function fmtTgl(s: string) {
   try { return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale }) }
@@ -166,7 +167,7 @@ function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
                   {hasilCari.map(s => (
                     <button key={s.id} onClick={() => { setSelectedSantri(s); setStep(2) }}
                       className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl text-left transition-all group">
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-rose-100 flex items-center justify-center text-sm font-black text-slate-600 group-hover:text-rose-700 transition-colors shrink-0">{s.nama_lengkap.charAt(0)}</div>
+                      <SantriPhotoAvatar src={s.foto_url} alt={s.nama_lengkap} name={s.nama_lengkap} size="sm" />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
                         <p className="text-xs text-slate-400">{s.nis} · {s.asrama} / {s.kamar}</p>
@@ -186,7 +187,7 @@ function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
           {step === 2 && (
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-sm font-black text-rose-700 shrink-0">{selectedSantri?.nama_lengkap.charAt(0)}</div>
+                <SantriPhotoAvatar src={selectedSantri?.foto_url} alt={selectedSantri?.nama_lengkap} name={selectedSantri?.nama_lengkap || 'Santri'} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-rose-800 text-sm truncate">{selectedSantri?.nama_lengkap}</p>
                   <p className="text-xs text-rose-500">{selectedSantri?.nis} · {selectedSantri?.asrama} / {selectedSantri?.kamar}</p>
@@ -328,7 +329,7 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
           <div className="flex items-center gap-3">
             {loading ? <div className="h-4 w-40 bg-slate-100 rounded-lg animate-pulse" /> : (
               <>
-                <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-sm font-black text-rose-700 shrink-0">{data?.profil?.nama_lengkap?.charAt(0)}</div>
+                <SantriPhotoAvatar src={data?.profil?.foto_url} alt={data?.profil?.nama_lengkap} name={data?.profil?.nama_lengkap || 'Santri'} size="sm" />
                 <div>
                   <p className="font-bold text-slate-900 text-sm">{data?.profil?.nama_lengkap}</p>
                   <p className="text-[11px] text-slate-400">{data?.profil?.nis} · {data?.profil?.asrama}/{data?.profil?.kamar}</p>
@@ -504,8 +505,13 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
                   <tr key={r.id} className="hover:bg-slate-50/70 transition-colors cursor-pointer group" onClick={() => setModalId(r.id)}>
                     <td className="px-4 py-3 text-xs text-slate-300">{(page - 1) * 30 + i + 1}</td>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800 group-hover:text-rose-700 transition-colors">{r.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{r.nis}</p>
+                      <div className="flex items-center gap-3">
+                        <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="sm" />
+                        <div>
+                          <p className="font-semibold text-slate-800 group-hover:text-rose-700 transition-colors">{r.nama_lengkap}</p>
+                          <p className="text-xs text-slate-400">{r.nis}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{r.asrama}/{r.kamar}</td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-700">{r.jumlah_pelanggaran}x</td>
@@ -524,9 +530,12 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
               <button key={r.id} onClick={() => setModalId(r.id)}
                 className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-left hover:border-rose-200 active:scale-[0.98] transition-all">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-slate-900">{r.nama_lengkap}</p>
-                    <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
+                  <div className="flex items-start gap-3 min-w-0">
+                    <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="md" />
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
+                      <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
+                    </div>
                   </div>
                   {r.sp_terakhir && <span className={cn('shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border', SP_COLOR[r.sp_terakhir])}>{r.sp_terakhir}</span>}
                 </div>

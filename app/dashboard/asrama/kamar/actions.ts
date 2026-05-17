@@ -15,6 +15,7 @@ type SantriKamarRow = {
   id: string
   nis: string
   nama_lengkap: string
+  foto_url: string | null
   asrama: string | null
   kamar: string | null
   sekolah: string | null
@@ -301,7 +302,7 @@ export async function getKamarOverview(asrama?: string | null) {
       [currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama]
     ),
     query<SantriKamarRow>(
-      `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
               k.nama_kelas,
               (
                 SELECT sk.id
@@ -411,7 +412,7 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
       [targetKamar, targetAsrama, targetKamar, targetAsrama, targetAsrama, targetAsrama, targetAsrama]
     ),
     query<SantriKamarRow>(
-      `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
               COALESCE(NULLIF(s.kategori_santri, ''), 'REGULER') AS kategori_santri,
               ${kategoriEfektifSql} AS kategori_efektif,
               k.nama_kelas

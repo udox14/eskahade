@@ -10,7 +10,7 @@ const PAGE_SIZE = 30
 // ─── CARI SANTRI ─────────────────────────────────────────────────────────────
 export async function cariSantriSurat(keyword: string) {
   return query<any>(
-    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             s.nama_ayah, s.alamat,
             k.nama_kelas,
             COUNT(p.id) AS jumlah_pelanggaran
@@ -118,7 +118,7 @@ export async function getDaftarSurat(params: {
     SELECT
       'pernyataan' AS tipe,
       sp.id, sp.tanggal, sp.created_at,
-      s.id AS santri_id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+      s.id AS santri_id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
       sp.pelanggaran_ids AS detail,
       NULL AS level,
       NULL AS catatan,
@@ -133,7 +133,7 @@ export async function getDaftarSurat(params: {
     SELECT
       'perjanjian' AS tipe,
       sp.id, sp.tanggal, sp.created_at,
-      s.id AS santri_id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+      s.id AS santri_id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
       NULL AS detail,
       sp.level,
       sp.catatan,

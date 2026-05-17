@@ -18,6 +18,7 @@ import { id as idLocale } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string) {
@@ -383,7 +384,7 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
             {hasilCari.map(s => (
               <button key={s.id} onClick={() => selectSantri(s)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-left transition-all">
-                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-600 shrink-0">{s.nama_lengkap.charAt(0)}</div>
+                <SantriPhotoAvatar src={s.foto_url} alt={s.nama_lengkap} name={s.nama_lengkap} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
                   <p className="text-xs text-slate-400">{s.nis} · {s.asrama}/{s.kamar} · {s.jumlah_pelanggaran}x pelanggaran</p>
@@ -393,9 +394,12 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
           </div>
         ) : (
           <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
-              <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+            <div className="flex items-center gap-3">
+              <SantriPhotoAvatar src={selectedSantri.foto_url} alt={selectedSantri.nama_lengkap} name={selectedSantri.nama_lengkap} size="sm" />
+              <div>
+                <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
+                <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+              </div>
             </div>
             <button onClick={() => { setSelectedSantri(null); setPelanggaran([]); setChecked(new Set()) }}
               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
@@ -529,7 +533,7 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
             {hasilCari.map(s => (
               <button key={s.id} onClick={() => selectSantri(s)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 border border-slate-200 rounded-xl text-left transition-all">
-                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-600 shrink-0">{s.nama_lengkap.charAt(0)}</div>
+                <SantriPhotoAvatar src={s.foto_url} alt={s.nama_lengkap} name={s.nama_lengkap} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
                   <p className="text-xs text-slate-400">{s.nis} · {s.asrama}/{s.kamar}</p>
@@ -539,9 +543,12 @@ function FormSuratSP({ onBack, onSuccess }: { onBack: () => void; onSuccess: () 
           </div>
         ) : (
           <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
-              <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+            <div className="flex items-center gap-3">
+              <SantriPhotoAvatar src={selectedSantri.foto_url} alt={selectedSantri.nama_lengkap} name={selectedSantri.nama_lengkap} size="sm" />
+              <div>
+                <p className="font-bold text-slate-900 text-sm">{selectedSantri.nama_lengkap}</p>
+                <p className="text-xs text-slate-400">{selectedSantri.nis} · {selectedSantri.asrama}/{selectedSantri.kamar}</p>
+              </div>
             </div>
             <button onClick={() => { setSelectedSantri(null); setSuggestLevel('') }}
               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
@@ -721,8 +728,13 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
                   <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-4 py-3 text-xs text-slate-300">{(page - 1) * 30 + i + 1}</td>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{r.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{r.nis}</p>
+                      <div className="flex items-center gap-3">
+                        <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="sm" />
+                        <div>
+                          <p className="font-semibold text-slate-800">{r.nama_lengkap}</p>
+                          <p className="text-xs text-slate-400">{r.nis}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{r.asrama}/{r.kamar}</td>
                     <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px]">
@@ -761,9 +773,12 @@ function TabelDaftarSurat({ refreshKey }: { refreshKey: number }) {
             {rows.map(r => (
               <div key={r.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
-                    <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="md" />
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
+                      <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
+                    </div>
                   </div>
                   <span className="text-xs font-semibold text-slate-600 shrink-0">{jenisLabel(r)}</span>
                 </div>

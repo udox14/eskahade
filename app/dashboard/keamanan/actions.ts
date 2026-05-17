@@ -130,7 +130,7 @@ export async function hapusMasterPelanggaran(id: number): Promise<{ success: boo
 // ─── CARI SANTRI ──────────────────────────────────────────────────────────────
 export async function cariSantri(keyword: string) {
   return query<any>(
-    `SELECT id, nama_lengkap, nis, asrama, kamar, nama_ayah, alamat
+    `SELECT id, nama_lengkap, nis, asrama, kamar, nama_ayah, alamat, foto_url
      FROM santri
      WHERE status_global = 'aktif'
        AND (nama_lengkap LIKE ? OR nis = ?)
@@ -279,7 +279,7 @@ export async function getDaftarPelanggar(params: {
   const total = countRow?.total ?? 0
 
   const rows = await query<any>(
-    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             COUNT(p.id)    AS jumlah_pelanggaran,
             SUM(p.poin)    AS total_poin,
             MAX(p.tanggal) AS terakhir,
@@ -304,7 +304,7 @@ export async function getDaftarPelanggar(params: {
 export async function getDetailSantri(santriId: string) {
   const [profil, pelanggaran, suratPernyataan, suratPerjanjian] = await Promise.all([
     queryOne<any>(
-      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+      `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
               s.nama_ayah, s.alamat,
               k.nama_kelas
        FROM santri s

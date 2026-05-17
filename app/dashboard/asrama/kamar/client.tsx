@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowLeft, Crown, LogOut, MapPin, School, Users } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import {
   batalTandaiSantriKeluarDariKamar,
   getKamarDetail,
@@ -23,6 +24,7 @@ type KetuaInfo = {
 type RoomMember = {
   id: string
   nis: string
+  foto_url: string | null
   asrama: string | null
   kamar: string | null
   nama_lengkap: string
@@ -371,9 +373,12 @@ export default function KamarClient({
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Aksi Santri</p>
                 {selectedMember ? (
                   <div className="mt-2 space-y-3">
-                    <div>
-                      <p className="text-sm font-black text-slate-800">{selectedMember.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{selectedMember.nis}</p>
+                    <div className="flex items-start gap-3">
+                      <SantriPhotoAvatar src={selectedMember.foto_url} alt={selectedMember.nama_lengkap} name={selectedMember.nama_lengkap} size="md" />
+                      <div>
+                        <p className="text-sm font-black text-slate-800">{selectedMember.nama_lengkap}</p>
+                        <p className="text-xs text-slate-400">{selectedMember.nis}</p>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tandai Keluar</label>
@@ -461,6 +466,7 @@ export default function KamarClient({
                           <td className="px-4 py-3">
                             <div className="flex items-start gap-2">
                               {isKetua ? <Crown className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> : null}
+                              <SantriPhotoAvatar src={member.foto_url} alt={member.nama_lengkap} name={member.nama_lengkap} size="sm" />
                               <div>
                                 <p className="font-semibold text-slate-800">{member.nama_lengkap}</p>
                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
