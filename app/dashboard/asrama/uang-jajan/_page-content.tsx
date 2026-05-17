@@ -493,7 +493,7 @@ export default function UangJajanPage() {
                 <div key={s.id} className={`p-4 transition-colors ${draftVal ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-800">{s.nama_lengkap}</p>
+                      <p className="font-bold text-slate-800 whitespace-normal break-words leading-snug">{s.nama_lengkap}</p>
                       <p className="text-xs font-mono text-slate-500">{s.nis}{s.kamar ? ` · Kamar ${s.kamar}` : ''}</p>
                     </div>
                     <div className="text-right">
@@ -662,7 +662,7 @@ export default function UangJajanPage() {
                   {autoRules.length === 0 ? <p className="text-xs text-slate-400">Belum ada rule.</p> : autoRules.map(rule => (
                     <div key={rule.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-xs">
                       <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-700">
+                        <p className="font-bold text-slate-700 whitespace-normal break-words leading-snug">
                           {rule.scope_type === 'ASRAMA' ? 'Semua asrama' : rule.scope_type === 'KAMAR' ? `Kamar ${rule.kamar}` : rule.santri_nama}
                         </p>
                         <p className="text-slate-500">{fmtRp(rule.nominal)} · {rule.jam} · {describeDays(rule.days)}</p>

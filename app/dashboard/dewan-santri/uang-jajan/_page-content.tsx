@@ -715,7 +715,7 @@ export default function MonitoringUangJajanPage() {
                       {r.nama_lengkap.split(' ').map(n => n[0]).slice(0, 2).join('')}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-800">{r.nama_lengkap}</div>
+                      <div className="text-sm font-semibold text-slate-800 whitespace-normal break-words leading-snug">{r.nama_lengkap}</div>
                       <div className="text-xs text-slate-400">{r.nis}</div>
                     </div>
                   </div>

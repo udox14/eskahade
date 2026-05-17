@@ -62,7 +62,7 @@ function SantriPhotoLightbox({
         >
           <X className="h-4 w-4" />
         </button>
-        <div className="overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="overflow-hidden rounded-xl bg-white shadow-2xl">
           <div className="aspect-[3/4] w-full bg-slate-100">
             <img src={src} alt={alt} className="h-full w-full object-cover" />
           </div>
@@ -87,7 +87,7 @@ export function SantriPhotoAvatar({
   const frame = (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm',
+        'relative overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm',
         sizeClassMap[size],
         className
       )}
@@ -112,7 +112,7 @@ export function SantriPhotoAvatar({
           event.stopPropagation()
           setOpen(true)
         }}
-        className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         aria-label={`Lihat foto ${name}`}
       >
         {frame}

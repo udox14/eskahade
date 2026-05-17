@@ -277,7 +277,7 @@ export default function AbsenMalamPage() {
                     'bg-green-100 text-green-700 border-green-200'
                   }`}>{s.nis?.slice(-2) || '??'}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">{s.nama_lengkap}</p>
+                    <p className="text-sm font-bold text-slate-800 whitespace-normal break-words leading-snug">{s.nama_lengkap}</p>
                     <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>
                     {isIzin && s.izin_alasan ? (
                       <p className="text-[10px] text-blue-500 font-semibold truncate mt-0.5">{s.izin_alasan}</p>
