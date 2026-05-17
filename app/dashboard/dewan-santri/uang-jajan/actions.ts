@@ -137,9 +137,9 @@ export async function getSantriUangJajan(params: {
   // Ambil santri halaman ini
   const santriRows = await query<{
     id: string; nama_lengkap: string; nis: string
-    asrama: string; kamar: string; saldo: number; saldo_tabungan: number
+    asrama: string; kamar: string; foto_url: string | null; saldo: number; saldo_tabungan: number
   }>(
-    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             COALESCE(s.saldo_uang_jajan,0) AS saldo,
             COALESCE(s.saldo_tabungan,0) AS saldo_tabungan
      FROM santri s WHERE ${where}

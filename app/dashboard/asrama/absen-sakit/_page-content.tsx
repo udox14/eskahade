@@ -34,6 +34,7 @@ import {
   type SesiSakit,
   type SessionInfo,
 } from './actions'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 const SESI_OPTIONS: Array<{
   value: SesiSakit
@@ -257,6 +258,7 @@ export default function DataSakitPage() {
       nis: row.nis,
       kamar: row.kamar,
       asrama: row.asrama,
+      foto_url: row.foto_url,
     })
   }
 
@@ -385,9 +387,18 @@ export default function DataSakitPage() {
               {visibleRows.map(row => (
                 <article key={row.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
-                    <button onClick={() => openDetail(row)} className="text-left min-w-0">
-                      <p className="font-bold text-slate-800 leading-snug">{row.nama_lengkap}</p>
-                      <p className="text-[11px] text-slate-500 mt-1">{row.nis || '-'} · Kamar {row.kamar || '-'}</p>
+                    <button onClick={() => openDetail(row)} className="flex min-w-0 items-start gap-3 text-left">
+                      <SantriPhotoAvatar
+                        src={row.foto_url}
+                        name={row.nama_lengkap}
+                        alt={`Foto ${row.nama_lengkap}`}
+                        size="sm"
+                        className="shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 leading-snug">{row.nama_lengkap}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">{row.nis || '-'} · Kamar {row.kamar || '-'}</p>
+                      </div>
                     </button>
                     {row.beli_surat ? (
                       <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-1 rounded-full">
@@ -455,9 +466,18 @@ export default function DataSakitPage() {
               ) : visibleRows.map(row => (
                 <tr key={row.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <button onClick={() => openDetail(row)} className="text-left">
-                      <p className="font-bold text-slate-800 hover:text-emerald-700">{row.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{row.nis || '-'} - Kamar {row.kamar || '-'}</p>
+                    <button onClick={() => openDetail(row)} className="flex items-start gap-3 text-left">
+                      <SantriPhotoAvatar
+                        src={row.foto_url}
+                        name={row.nama_lengkap}
+                        alt={`Foto ${row.nama_lengkap}`}
+                        size="sm"
+                        className="shrink-0"
+                      />
+                      <div>
+                        <p className="font-bold text-slate-800 hover:text-emerald-700">{row.nama_lengkap}</p>
+                        <p className="text-xs text-slate-400">{row.nis || '-'} - Kamar {row.kamar || '-'}</p>
+                      </div>
                     </button>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{formatDateTime(row.mulai_at)}</td>
@@ -636,8 +656,19 @@ export default function DataSakitPage() {
                         onClick={() => handlePilihSantri(santri)}
                         className="w-full text-left px-3 py-2.5 border-b last:border-b-0 hover:bg-emerald-50"
                       >
-                        <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
-                        <p className="text-xs text-slate-500">{santri.asrama || '-'} / Kamar {santri.kamar || '-'}</p>
+                        <div className="flex items-start gap-3">
+                          <SantriPhotoAvatar
+                            src={santri.foto_url}
+                            name={santri.nama_lengkap}
+                            alt={`Foto ${santri.nama_lengkap}`}
+                            size="sm"
+                            className="shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
+                            <p className="text-xs text-slate-500">{santri.asrama || '-'} / Kamar {santri.kamar || '-'}</p>
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -648,9 +679,20 @@ export default function DataSakitPage() {
                 <div className="border rounded-2xl p-4 bg-emerald-50 border-emerald-100">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold text-emerald-700 uppercase">Santri Dipilih</p>
-                      <p className="font-bold text-slate-900 mt-0.5">{selectedSantri.nama_lengkap}</p>
-                      <p className="text-xs text-slate-500">{selectedSantri.asrama || '-'} / Kamar {selectedSantri.kamar || '-'}</p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <SantriPhotoAvatar
+                          src={selectedSantri.foto_url}
+                          name={selectedSantri.nama_lengkap}
+                          alt={`Foto ${selectedSantri.nama_lengkap}`}
+                          size="sm"
+                          className="shrink-0"
+                        />
+                        <div>
+                          <p className="text-xs font-bold uppercase text-emerald-700">Santri Dipilih</p>
+                          <p className="mt-0.5 font-bold text-slate-900">{selectedSantri.nama_lengkap}</p>
+                          <p className="text-xs text-slate-500">{selectedSantri.asrama || '-'} / Kamar {selectedSantri.kamar || '-'}</p>
+                        </div>
+                      </div>
                     </div>
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   </div>
@@ -729,9 +771,18 @@ export default function DataSakitPage() {
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-bold text-slate-800">{detailSantri.nama_lengkap}</h2>
-                <p className="text-sm text-slate-500">{detailSantri.asrama || '-'} / Kamar {detailSantri.kamar || '-'}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <SantriPhotoAvatar
+                  src={detailSantri.foto_url}
+                  name={detailSantri.nama_lengkap}
+                  alt={`Foto ${detailSantri.nama_lengkap}`}
+                  size="sm"
+                  className="shrink-0"
+                />
+                <div>
+                  <h2 className="font-bold text-slate-800">{detailSantri.nama_lengkap}</h2>
+                  <p className="text-sm text-slate-500">{detailSantri.asrama || '-'} / Kamar {detailSantri.kamar || '-'}</p>
+                </div>
               </div>
               <button onClick={() => setDetailSantri(null)} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                 <X className="w-5 h-5" />

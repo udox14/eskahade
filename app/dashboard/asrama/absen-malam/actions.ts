@@ -44,7 +44,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   if (isAsramaTanpaKamar(asrama)) return []
 
   const santriList = await query<any>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.kamar
+    SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.foto_url
     FROM santri s
     WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap

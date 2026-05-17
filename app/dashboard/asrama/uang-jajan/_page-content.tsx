@@ -47,6 +47,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
@@ -492,9 +493,18 @@ export default function UangJajanPage() {
               return (
                 <div key={s.id} className={`p-4 transition-colors ${draftVal ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
                   <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-800 whitespace-normal break-words leading-snug">{s.nama_lengkap}</p>
-                      <p className="text-xs font-mono text-slate-500">{s.nis}{s.kamar ? ` · Kamar ${s.kamar}` : ''}</p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <SantriPhotoAvatar
+                        src={s.foto_url}
+                        name={s.nama_lengkap}
+                        alt={`Foto ${s.nama_lengkap}`}
+                        size="sm"
+                        className="shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 whitespace-normal break-words leading-snug">{s.nama_lengkap}</p>
+                        <p className="text-xs font-mono text-slate-500">{s.nis}{s.kamar ? ` · Kamar ${s.kamar}` : ''}</p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className={`font-mono font-bold ${finalSaldo < 0 ? 'text-red-600' : isLow ? 'text-orange-600' : 'text-emerald-700'}`}>
@@ -683,10 +693,21 @@ export default function UangJajanPage() {
         <div className="fixed inset-0 z-50 flex animate-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm fade-in">
           <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="border-b bg-slate-50 p-5">
-              <h3 className="mb-1 text-lg font-bold text-slate-800">{selectedSantri.nama_lengkap}</h3>
-              <div className="grid gap-2 text-sm sm:grid-cols-2">
-                <p className="flex items-center gap-2 font-mono text-emerald-700"><Wallet className="h-4 w-4"/> Uang Jajan: {fmtRp(selectedSantri.saldo_jajan)}</p>
-                <p className="flex items-center gap-2 font-mono text-blue-700"><PiggyBank className="h-4 w-4"/> Tabungan: {fmtRp(selectedSantri.saldo_tabungan)}</p>
+              <div className="flex items-start gap-3">
+                <SantriPhotoAvatar
+                  src={selectedSantri.foto_url}
+                  name={selectedSantri.nama_lengkap}
+                  alt={`Foto ${selectedSantri.nama_lengkap}`}
+                  size="md"
+                  className="shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <h3 className="mb-1 text-lg font-bold text-slate-800">{selectedSantri.nama_lengkap}</h3>
+                  <div className="grid gap-2 text-sm sm:grid-cols-2">
+                    <p className="flex items-center gap-2 font-mono text-emerald-700"><Wallet className="h-4 w-4"/> Uang Jajan: {fmtRp(selectedSantri.saldo_jajan)}</p>
+                    <p className="flex items-center gap-2 font-mono text-blue-700"><PiggyBank className="h-4 w-4"/> Tabungan: {fmtRp(selectedSantri.saldo_tabungan)}</p>
+                  </div>
+                </div>
               </div>
             </div>
 

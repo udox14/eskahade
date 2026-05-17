@@ -12,6 +12,7 @@ import {
   type SessionInfo,
 } from './actions'
 import { formatWibDate, toWibDateInputValue } from '@/lib/date/wib'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 const PAGE_SIZE = 30
 
@@ -170,8 +171,19 @@ export default function SantriKembaliPageContent() {
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-bold text-slate-800">{row.nama}</p>
-                      <p className="text-xs text-slate-400">{row.nis || '-'} - Kamar {row.kamar || '-'}</p>
+                      <div className="flex items-start gap-3">
+                        <SantriPhotoAvatar
+                          src={row.foto_url}
+                          name={row.nama}
+                          alt={`Foto ${row.nama}`}
+                          size="sm"
+                          className="shrink-0"
+                        />
+                        <div>
+                          <p className="font-bold text-slate-800">{row.nama}</p>
+                          <p className="text-xs text-slate-400">{row.nis || '-'} - Kamar {row.kamar || '-'}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
                     <td className="px-4 py-3">
@@ -219,9 +231,18 @@ export default function SantriKembaliPageContent() {
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden">
             <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-bold text-slate-800">Tandai Kembali</h2>
-                <p className="text-sm text-slate-500">{selectedRow.nama}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <SantriPhotoAvatar
+                  src={selectedRow.foto_url}
+                  name={selectedRow.nama}
+                  alt={`Foto ${selectedRow.nama}`}
+                  size="sm"
+                  className="shrink-0"
+                />
+                <div>
+                  <h2 className="font-bold text-slate-800">Tandai Kembali</h2>
+                  <p className="text-sm text-slate-500">{selectedRow.nama}</p>
+                </div>
               </div>
               <button onClick={() => setSelectedRow(null)} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                 <X className="w-5 h-5" />

@@ -21,6 +21,7 @@ export type SantriKembaliRow = {
   nis: string | null
   asrama: string | null
   kamar: string | null
+  foto_url: string | null
   alasan: string
   pemberi_izin: string
   tgl_mulai: string
@@ -120,7 +121,8 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
       s.nama_lengkap AS nama,
       s.nis,
       s.asrama,
-      s.kamar
+      s.kamar,
+      s.foto_url
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE ${where}

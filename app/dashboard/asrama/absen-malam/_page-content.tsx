@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam, tandaiSantriKembaliDariAbsenMalam } from './actions'
 import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, LogIn, MessageSquareText } from 'lucide-react'
 import { toast } from 'sonner'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
@@ -271,11 +272,13 @@ export default function AbsenMalamPage() {
                   className={`w-full grid grid-cols-[auto_1fr_auto] gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
                     isAlfa ? 'bg-red-50' : isIzin ? 'bg-blue-50' : 'hover:bg-slate-50'
                   }`}>
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 border-2 ${
-                    isAlfa ? 'bg-red-500 text-white border-red-400' :
-                    isIzin ? 'bg-blue-100 text-blue-600 border-blue-200' :
-                    'bg-green-100 text-green-700 border-green-200'
-                  }`}>{s.nis?.slice(-2) || '??'}</div>
+                  <SantriPhotoAvatar
+                    src={s.foto_url}
+                    name={s.nama_lengkap}
+                    alt={`Foto ${s.nama_lengkap}`}
+                    size="sm"
+                    className="shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-800 whitespace-normal break-words leading-snug">{s.nama_lengkap}</p>
                     <p className="text-[10px] text-slate-400 font-mono">{s.nis}</p>

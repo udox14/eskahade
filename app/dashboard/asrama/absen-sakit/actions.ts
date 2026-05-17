@@ -21,6 +21,7 @@ export type SantriSakitOption = {
   nis: string | null
   kamar: string | null
   asrama: string | null
+  foto_url: string | null
 }
 
 export type DataSakitRow = {
@@ -41,6 +42,7 @@ export type DataSakitRow = {
   nis: string | null
   kamar: string | null
   asrama: string | null
+  foto_url: string | null
 }
 
 export type RiwayatSakitItem = DataSakitRow & {
@@ -138,7 +140,7 @@ export async function cariSantriSakit(keyword: string, asramaRequest: string): P
   const targetAsrama = restrictedAsrama || asramaRequest
 
   return query<SantriSakitOption>(`
-    SELECT id, nama_lengkap, nis, kamar, asrama
+    SELECT id, nama_lengkap, nis, kamar, asrama, foto_url
     FROM santri
     WHERE asrama = ?
       AND status_global = 'aktif'
@@ -195,7 +197,8 @@ export async function getDataSakit(params: { asrama: string }) {
       s.nama_lengkap,
       s.nis,
       s.kamar,
-      s.asrama
+      s.asrama,
+      s.foto_url
     FROM absen_sakit ab
     JOIN latest l ON l.episode_key = COALESCE(ab.episode_id, ab.id) AND l.max_created_at = ab.created_at
     JOIN santri s ON s.id = ab.santri_id

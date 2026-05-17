@@ -19,6 +19,7 @@ type SantriRow = {
   id: string
   asrama: string | null
   nama_lengkap?: string
+  foto_url?: string | null
   saldo_jajan: number
   saldo_tabungan: number
 }
@@ -39,6 +40,7 @@ type SantriKamarRow = {
   nis: string
   kamar: string | null
   asrama: string | null
+  foto_url: string | null
   saldo_jajan: number
   saldo_tabungan: number
 }
@@ -131,7 +133,7 @@ async function getAllowedSantriRows(ids: string[]) {
   }
 
   const rows = await query<SantriRow>(
-    `SELECT id, asrama, nama_lengkap,
+    `SELECT id, asrama, nama_lengkap, foto_url,
             COALESCE(saldo_uang_jajan, 0) AS saldo_jajan,
             COALESCE(saldo_tabungan, 0) AS saldo_tabungan
      FROM santri
@@ -233,7 +235,7 @@ export async function getSantriKamarTabungan(asramaRequest: string, kamar: strin
   const targetAsrama = restrictedAsrama || asramaRequest
   if (isAsramaTanpaKamar(targetAsrama)) return []
   return query<SantriKamarRow>(
-    `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama,
+    `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama, s.foto_url,
             COALESCE(s.saldo_uang_jajan, 0) AS saldo_jajan,
             COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan
      FROM santri s
@@ -249,7 +251,7 @@ export async function searchSantriTabungan(asramaRequest: string, search: string
   const q = search.trim()
   if (!q) return []
   return query<SantriKamarRow>(
-    `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama,
+    `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama, s.foto_url,
             COALESCE(s.saldo_uang_jajan, 0) AS saldo_jajan,
             COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan
      FROM santri s

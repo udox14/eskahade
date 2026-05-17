@@ -1,5 +1,7 @@
 'use client'
 
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
+
 import { useState, useEffect, useCallback } from 'react'
 import {
   getSummaryPerAsrama,
@@ -650,8 +652,19 @@ export default function MonitoringUangJajanPage() {
                       <tr key={r.id} className="border-b border-slate-50 transition-colors hover:bg-slate-50/50">
                         <td className="px-4 py-3 text-xs text-slate-300">{(page - 1) * 30 + i + 1}</td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-800">{r.nama_lengkap}</div>
-                          <div className="text-xs text-slate-400">{r.nis}</div>
+                          <div className="flex items-start gap-3">
+                            <SantriPhotoAvatar
+                              src={r.foto_url}
+                              name={r.nama_lengkap}
+                              alt={`Foto ${r.nama_lengkap}`}
+                              size="sm"
+                              className="shrink-0"
+                            />
+                            <div>
+                              <div className="font-semibold text-slate-800">{r.nama_lengkap}</div>
+                              <div className="text-xs text-slate-400">{r.nis}</div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600">{r.asrama}</td>
                         <td className="px-4 py-3">
@@ -711,9 +724,13 @@ export default function MonitoringUangJajanPage() {
               {rows.map(r => (
                 <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 text-xs font-bold text-white">
-                      {r.nama_lengkap.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                    </div>
+                    <SantriPhotoAvatar
+                      src={r.foto_url}
+                      name={r.nama_lengkap}
+                      alt={`Foto ${r.nama_lengkap}`}
+                      size="sm"
+                      className="shrink-0"
+                    />
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-slate-800 whitespace-normal break-words leading-snug">{r.nama_lengkap}</div>
                       <div className="text-xs text-slate-400">{r.nis}</div>
