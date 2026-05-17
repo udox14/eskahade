@@ -12,6 +12,7 @@ const BULK_CHUNK_SIZE = 80
 type ListParams = {
   search?: string
   asrama?: string
+  kamar?: string
   kelasSekolah?: string
   page?: number
   pageSize?: number
@@ -26,12 +27,18 @@ function chunkArray<T>(items: T[], size = BULK_CHUNK_SIZE) {
 }
 
 export async function getFilterOptions() {
-  const [asramaRows, kelasRows] = await Promise.all([
+  const [asramaRows, kamarRows, kelasRows] = await Promise.all([
     query<{ v: string }>(
       `SELECT DISTINCT asrama AS v FROM santri
        WHERE status_global IN ('aktif', 'nonaktif_sementara')
          AND asrama IS NOT NULL AND asrama <> ''
        ORDER BY asrama`
+    ),
+    query<{ v: string }>(
+      `SELECT DISTINCT kamar AS v FROM santri
+       WHERE status_global IN ('aktif', 'nonaktif_sementara')
+         AND kamar IS NOT NULL AND TRIM(kamar) <> ''
+       ORDER BY CAST(kamar AS INTEGER), kamar`
     ),
     query<{ v: string }>(
       `SELECT DISTINCT kelas_sekolah AS v FROM santri
@@ -43,6 +50,7 @@ export async function getFilterOptions() {
 
   return {
     asramaList: asramaRows.map(r => r.v),
+    kamarList: kamarRows.map(r => r.v),
     kelasSekolahList: kelasRows.map(r => r.v),
   }
 }
@@ -54,6 +62,12 @@ function buildWhere(status: SantriStatus, params: ListParams) {
   if (params.asrama) {
     clauses.push('s.asrama = ?')
     values.push(params.asrama)
+  }
+  if (params.kamar === 'TANPA_KAMAR') {
+    clauses.push("(s.kamar IS NULL OR TRIM(s.kamar) = '')")
+  } else if (params.kamar) {
+    clauses.push('s.kamar = ?')
+    values.push(params.kamar)
   }
   if (params.kelasSekolah) {
     clauses.push('s.kelas_sekolah = ?')
@@ -179,68 +193,77 @@ export async function nonaktifkanSantri(params: {
   if (!params.tanggalMulai) return { error: 'Tanggal mulai wajib diisi' }
   if (!params.alasan.trim()) return { error: 'Alasan wajib diisi' }
 
-  const placeholders = ids.map(() => '?').join(',')
-  const activeRows = await query<{ id: string }>(
-    `SELECT id FROM santri WHERE status_global = 'aktif' AND id IN (${placeholders})`,
-    ids
-  )
-  if (activeRows.length === 0) return { error: 'Tidak ada santri aktif yang valid untuk dinonaktifkan' }
+  try {
+    const placeholders = ids.map(() => '?').join(',')
+    const activeRows = await query<{ id: string }>(
+      `SELECT id FROM santri WHERE status_global = 'aktif' AND id IN (${placeholders})`,
+      ids
+    )
+    if (activeRows.length === 0) return { error: 'Tidak ada santri aktif yang valid untuk dinonaktifkan' }
 
-  const activeIds = activeRows.map(r => r.id)
-  const statements = [
-    {
-      sql: `UPDATE santri SET status_global = 'nonaktif_sementara' WHERE id IN (${activeIds.map(() => '?').join(',')})`,
-      params: activeIds,
-    },
-    ...activeIds.map(id => ({
-      sql: `UPDATE santri_nonaktif_log
-            SET status = 'SELESAI',
-                tanggal_aktif_aktual = COALESCE(tanggal_aktif_aktual, ?),
-                closed_by = ?,
-                updated_at = ?
-            WHERE santri_id = ? AND status = 'AKTIF'`,
-      params: [params.tanggalMulai, session.id, now(), id],
-    })),
-    ...activeIds.map(id => ({
-      sql: `INSERT INTO santri_nonaktif_log
-            (id, santri_id, tanggal_mulai, tanggal_rencana_aktif, alasan, catatan, status, created_by, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'AKTIF', ?, ?, ?)`,
-      params: [
-        generateId(),
-        id,
-        params.tanggalMulai,
-        params.tanggalRencanaAktif || null,
-        params.alasan.trim(),
-        params.catatan?.trim() || null,
-        session.id,
-        now(),
-        now(),
-      ],
-    })),
-  ]
+    const activeIds = activeRows.map(r => r.id)
+    const timestamp = now()
+    const statements = [
+      {
+        sql: `UPDATE santri SET status_global = 'nonaktif_sementara', updated_at = ? WHERE id IN (${activeIds.map(() => '?').join(',')})`,
+        params: [timestamp, ...activeIds],
+      },
+      ...activeIds.map(id => ({
+        sql: `UPDATE santri_nonaktif_log
+              SET status = 'SELESAI',
+                  tanggal_aktif_aktual = COALESCE(tanggal_aktif_aktual, ?),
+                  closed_by = ?,
+                  updated_at = ?
+              WHERE santri_id = ? AND status = 'AKTIF'`,
+        params: [params.tanggalMulai, session.id, timestamp, id],
+      })),
+      ...activeIds.map(id => ({
+        sql: `INSERT INTO santri_nonaktif_log
+              (id, santri_id, tanggal_mulai, tanggal_rencana_aktif, alasan, catatan, status, created_by, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, 'AKTIF', ?, ?, ?)`,
+        params: [
+          generateId(),
+          id,
+          params.tanggalMulai,
+          params.tanggalRencanaAktif || null,
+          params.alasan.trim(),
+          params.catatan?.trim() || null,
+          session.id,
+          timestamp,
+          timestamp,
+        ],
+      })),
+    ]
 
-  await batch(statements)
-  await logActivity({
-    actor: actorFromSession(session),
-    module: 'santri',
-    action: 'update',
-    fiturHref: '/dashboard/santri',
-    logKind: 'update',
-    entityType: 'santri_nonaktif_batch',
-    entityId: 'nonaktifkan',
-    entityLabel: 'Nonaktifkan santri',
-    summary: `Menonaktifkan sementara ${activeIds.length} santri`,
-    details: {
-      count: activeIds.length,
-      tanggal_mulai: params.tanggalMulai,
-      tanggal_rencana_aktif: params.tanggalRencanaAktif || null,
-      alasan: params.alasan.trim(),
-      catatan: params.catatan?.trim() || null,
-    },
-  })
-  revalidatePath('/dashboard/santri/nonaktif')
-  revalidatePath('/dashboard/santri')
-  return { success: true, count: activeIds.length }
+    await batch(statements)
+    try {
+      await logActivity({
+        actor: actorFromSession(session),
+        module: 'santri',
+        action: 'update',
+        fiturHref: '/dashboard/santri',
+        logKind: 'update',
+        entityType: 'santri_nonaktif_batch',
+        entityId: 'nonaktifkan',
+        entityLabel: 'Nonaktifkan santri',
+        summary: `Menonaktifkan sementara ${activeIds.length} santri`,
+        details: {
+          count: activeIds.length,
+          tanggal_mulai: params.tanggalMulai,
+          tanggal_rencana_aktif: params.tanggalRencanaAktif || null,
+          alasan: params.alasan.trim(),
+          catatan: params.catatan?.trim() || null,
+        },
+      })
+    } catch (logError) {
+      console.error('[santri_nonaktif] log nonaktifkan gagal:', logError)
+    }
+    revalidatePath('/dashboard/santri/nonaktif')
+    revalidatePath('/dashboard/santri')
+    return { success: true, count: activeIds.length }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal menonaktifkan santri' }
+  }
 }
 
 export async function aktifkanKembaliSantri(params: {
@@ -256,54 +279,62 @@ export async function aktifkanKembaliSantri(params: {
   if (ids.length === 0) return { error: 'Pilih minimal satu santri' }
   if (!params.tanggalAktif) return { error: 'Tanggal aktif kembali wajib diisi' }
 
-  const rows: { id: string }[] = []
-  for (const chunk of chunkArray(ids)) {
-    const placeholders = chunk.map(() => '?').join(',')
-    rows.push(...await query<{ id: string }>(
-      `SELECT id FROM santri WHERE status_global = 'nonaktif_sementara' AND id IN (${placeholders})`,
-      chunk
-    ))
+  try {
+    const rows: { id: string }[] = []
+    for (const chunk of chunkArray(ids)) {
+      const placeholders = chunk.map(() => '?').join(',')
+      rows.push(...await query<{ id: string }>(
+        `SELECT id FROM santri WHERE status_global = 'nonaktif_sementara' AND id IN (${placeholders})`,
+        chunk
+      ))
+    }
+    if (rows.length === 0) return { error: 'Tidak ada santri nonaktif yang valid untuk diaktifkan' }
+
+    const validIds = rows.map(r => r.id)
+    const updatedAt = now()
+    for (const chunk of chunkArray(validIds)) {
+      const placeholders = chunk.map(() => '?').join(',')
+      await batch([
+        {
+          sql: `UPDATE santri SET status_global = 'aktif', updated_at = ? WHERE id IN (${placeholders})`,
+          params: [updatedAt, ...chunk],
+        },
+        {
+          sql: `UPDATE santri_nonaktif_log
+                SET status = 'SELESAI',
+                    tanggal_aktif_aktual = ?,
+                    closed_by = ?,
+                    updated_at = ?
+                WHERE status = 'AKTIF' AND santri_id IN (${placeholders})`,
+          params: [params.tanggalAktif, session.id, updatedAt, ...chunk],
+        },
+      ])
+    }
+
+    try {
+      await logActivity({
+        actor: actorFromSession(session),
+        module: 'santri',
+        action: 'update',
+        fiturHref: '/dashboard/santri',
+        logKind: 'update',
+        entityType: 'santri_nonaktif_batch',
+        entityId: 'aktifkan-kembali',
+        entityLabel: 'Aktifkan kembali santri',
+        summary: `Mengaktifkan kembali ${validIds.length} santri`,
+        details: {
+          count: validIds.length,
+          tanggal_aktif: params.tanggalAktif,
+        },
+      })
+    } catch (logError) {
+      console.error('[santri_nonaktif] log aktifkan kembali gagal:', logError)
+    }
+
+    revalidatePath('/dashboard/santri/nonaktif')
+    revalidatePath('/dashboard/santri')
+    return { success: true, count: validIds.length }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengaktifkan kembali santri' }
   }
-  if (rows.length === 0) return { error: 'Tidak ada santri nonaktif yang valid untuk diaktifkan' }
-
-  const validIds = rows.map(r => r.id)
-  const updatedAt = now()
-  for (const chunk of chunkArray(validIds)) {
-    const placeholders = chunk.map(() => '?').join(',')
-    await batch([
-      {
-        sql: `UPDATE santri SET status_global = 'aktif' WHERE id IN (${placeholders})`,
-        params: chunk,
-      },
-      {
-        sql: `UPDATE santri_nonaktif_log
-              SET status = 'SELESAI',
-                  tanggal_aktif_aktual = ?,
-                  closed_by = ?,
-                  updated_at = ?
-              WHERE status = 'AKTIF' AND santri_id IN (${placeholders})`,
-        params: [params.tanggalAktif, session.id, updatedAt, ...chunk],
-      },
-    ])
-  }
-
-  await logActivity({
-    actor: actorFromSession(session),
-    module: 'santri',
-    action: 'update',
-    fiturHref: '/dashboard/santri',
-    logKind: 'update',
-    entityType: 'santri_nonaktif_batch',
-    entityId: 'aktifkan-kembali',
-    entityLabel: 'Aktifkan kembali santri',
-    summary: `Mengaktifkan kembali ${validIds.length} santri`,
-    details: {
-      count: validIds.length,
-      tanggal_aktif: params.tanggalAktif,
-    },
-  })
-
-  revalidatePath('/dashboard/santri/nonaktif')
-  revalidatePath('/dashboard/santri')
-  return { success: true, count: validIds.length }
 }

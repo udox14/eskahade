@@ -144,11 +144,14 @@ function Pager({
 
 function FilterBar({
   asramaList,
+  kamarList,
   kelasSekolahList,
   searchInput,
   setSearchInput,
   asrama,
   setAsrama,
+  kamar,
+  setKamar,
   kelasSekolah,
   setKelasSekolah,
   pageSize,
@@ -157,11 +160,14 @@ function FilterBar({
   onApply,
 }: {
   asramaList: string[]
+  kamarList: string[]
   kelasSekolahList: string[]
   searchInput: string
   setSearchInput: (value: string) => void
   asrama: string
   setAsrama: (value: string) => void
+  kamar: string
+  setKamar: (value: string) => void
   kelasSekolah: string
   setKelasSekolah: (value: string) => void
   pageSize: number
@@ -181,6 +187,18 @@ function FilterBar({
           >
             <option value="SEMUA">Semua Asrama</option>
             {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="min-w-[140px]">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Kamar</label>
+          <select
+            value={kamar}
+            onChange={e => setKamar(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
+            <option value="SEMUA">Semua Kamar</option>
+            <option value="TANPA_KAMAR">Tanpa Kamar</option>
+            {kamarList.map(k => <option key={k} value={k}>Kamar {k}</option>)}
           </select>
         </div>
         <div className="min-w-[140px]">
@@ -248,8 +266,11 @@ function NonaktifModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await onSubmit({ tanggalMulai, tanggalRencanaAktif, alasan, catatan })
-    setSaving(false)
+    try {
+      await onSubmit({ tanggalMulai, tanggalRencanaAktif, alasan, catatan })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -354,8 +375,11 @@ function AlumniModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await onSubmit({ mode, groupKey, catatan })
-    setSaving(false)
+    try {
+      await onSubmit({ mode, groupKey, catatan })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -451,6 +475,7 @@ export default function SantriNonaktifPage() {
       : 'aktif'
   const [tab, setTab] = useState<TabKey>(initialTab)
   const [asramaList, setAsramaList] = useState<string[]>([])
+  const [kamarList, setKamarList] = useState<string[]>([])
   const [kelasSekolahList, setKelasSekolahList] = useState<string[]>([])
   const [rows, setRows] = useState<Array<SantriRow | SantriNonaktifRow>>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -462,6 +487,7 @@ export default function SantriNonaktifPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [asrama, setAsrama] = useState('SEMUA')
+  const [kamar, setKamar] = useState('SEMUA')
   const [kelasSekolah, setKelasSekolah] = useState('SEMUA')
   const [pageSize, setPageSize] = useState(20)
   const [showModal, setShowModal] = useState(false)
@@ -486,6 +512,7 @@ export default function SantriNonaktifPage() {
   useEffect(() => {
     getFilterOptions().then(options => {
       setAsramaList(options.asramaList)
+      setKamarList(options.kamarList)
       setKelasSekolahList(options.kelasSekolahList)
     })
   }, [])
@@ -513,17 +540,19 @@ export default function SantriNonaktifPage() {
 
   const load = useCallback(async (
     pg = 1,
-    override?: { search?: string; asrama?: string; kelasSekolah?: string; pageSize?: number }
+    override?: { search?: string; asrama?: string; kamar?: string; kelasSekolah?: string; pageSize?: number }
   ) => {
     setLoading(true)
     try {
       const effectiveSearch = override?.search ?? search
       const effectiveAsrama = override?.asrama ?? asrama
+      const effectiveKamar = override?.kamar ?? kamar
       const effectiveKelasSekolah = override?.kelasSekolah ?? kelasSekolah
       const effectivePageSize = override?.pageSize ?? pageSize
       const params = {
         search: effectiveSearch || undefined,
         asrama: effectiveAsrama !== 'SEMUA' ? effectiveAsrama : undefined,
+        kamar: effectiveKamar !== 'SEMUA' ? effectiveKamar : undefined,
         kelasSekolah: effectiveKelasSekolah !== 'SEMUA' ? effectiveKelasSekolah : undefined,
         page: pg,
         pageSize: effectivePageSize,
@@ -540,7 +569,7 @@ export default function SantriNonaktifPage() {
     } finally {
       setLoading(false)
     }
-  }, [asrama, kelasSekolah, pageSize, search, tab])
+  }, [asrama, kamar, kelasSekolah, pageSize, search, tab])
 
   useEffect(() => {
     if (hasLoaded && tab !== 'alumni') load(1)
@@ -570,6 +599,7 @@ export default function SantriNonaktifPage() {
         {
           search: search || undefined,
           asrama: asrama !== 'SEMUA' ? asrama : undefined,
+          kamar: kamar !== 'SEMUA' ? kamar : undefined,
           kelasSekolah: kelasSekolah !== 'SEMUA' ? kelasSekolah : undefined,
         }
       )
@@ -592,20 +622,26 @@ export default function SantriNonaktifPage() {
   }
 
   const handleNonaktif = async (payload: { tanggalMulai: string; tanggalRencanaAktif: string; alasan: string; catatan: string }) => {
-    const res = await nonaktifkanSantri({
-      santriIds: selectedIds,
-      tanggalMulai: payload.tanggalMulai,
-      tanggalRencanaAktif: payload.tanggalRencanaAktif || undefined,
-      alasan: payload.alasan,
-      catatan: payload.catatan || undefined,
-    })
-    if ('error' in res) {
-      toast.error('Gagal', { description: res.error })
-      return
+    try {
+      const res = await nonaktifkanSantri({
+        santriIds: selectedIds,
+        tanggalMulai: payload.tanggalMulai,
+        tanggalRencanaAktif: payload.tanggalRencanaAktif || undefined,
+        alasan: payload.alasan,
+        catatan: payload.catatan || undefined,
+      })
+      if ('error' in res) {
+        toast.error('Gagal', { description: res.error })
+        return
+      }
+      toast.success(`${fmtNum(res.count)} santri dinonaktifkan sementara`)
+      setShowModal(false)
+      await load(page)
+    } catch (error) {
+      toast.error('Gagal', {
+        description: error instanceof Error ? error.message : 'Nonaktifkan santri belum berhasil.',
+      })
     }
-    toast.success(`${fmtNum(res.count)} santri dinonaktifkan sementara`)
-    setShowModal(false)
-    load(page)
   }
 
   const handleRestore = async () => {
@@ -669,7 +705,11 @@ export default function SantriNonaktifPage() {
       toast.success('Arsip Alumni diperbarui', { description: msg })
       setShowAlumniModal(false)
       await loadGroups()
-      load(1)
+      await load(1)
+    } catch (error) {
+      toast.error('Gagal', {
+        description: error instanceof Error ? error.message : 'Jadikan alumni belum berhasil.',
+      })
     } finally {
       setArchiving(false)
     }
@@ -688,6 +728,10 @@ export default function SantriNonaktifPage() {
       toast.success(`${fmtNum(res.berhasil)} santri direstore`)
       await loadGroups()
       if (activeGroup) await openArchiveGroup(activeGroup, archivePage)
+    } catch (error) {
+      toast.error('Gagal', {
+        description: error instanceof Error ? error.message : 'Restore alumni belum berhasil.',
+      })
     } finally {
       setArchiveBusy(false)
     }
@@ -707,6 +751,10 @@ export default function SantriNonaktifPage() {
       toast.success('Catatan arsip diperbarui')
       await loadGroups()
       if (activeGroup) await openArchiveGroup(activeGroup, archivePage)
+    } catch (error) {
+      toast.error('Gagal hapus', {
+        description: error instanceof Error ? error.message : 'Hapus catatan arsip belum berhasil.',
+      })
     } finally {
       setArchiveBusy(false)
     }
@@ -1137,11 +1185,14 @@ export default function SantriNonaktifPage() {
       {tab !== 'alumni' && (
         <FilterBar
           asramaList={asramaList}
+          kamarList={kamarList}
           kelasSekolahList={kelasSekolahList}
           searchInput={searchInput}
           setSearchInput={setSearchInput}
           asrama={asrama}
           setAsrama={setAsrama}
+          kamar={kamar}
+          setKamar={setKamar}
           kelasSekolah={kelasSekolah}
           setKelasSekolah={setKelasSekolah}
           pageSize={pageSize}

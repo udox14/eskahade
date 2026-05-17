@@ -569,18 +569,22 @@ export async function arsipkanSantriDariNonaktif(params: {
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
   if (berhasil > 0) {
-    await logActivity({
-      actor: actorFromSession(session),
-      module: 'santri_arsip',
-      action: 'update',
-      fiturHref: '/dashboard/santri/nonaktif',
-      logKind: 'update',
-      entityType: 'santri_batch',
-      entityId: 'arsipkan-dari-nonaktif',
-      entityLabel: 'Arsip santri nonaktif',
-      summary: `Mengarsipkan ${berhasil} santri nonaktif menjadi alumni`,
-      details: { berhasil, gagal, target: params.target },
-    })
+    try {
+      await logActivity({
+        actor: actorFromSession(session),
+        module: 'santri_arsip',
+        action: 'update',
+        fiturHref: '/dashboard/santri/nonaktif',
+        logKind: 'update',
+        entityType: 'santri_batch',
+        entityId: 'arsipkan-dari-nonaktif',
+        entityLabel: 'Arsip santri nonaktif',
+        summary: `Mengarsipkan ${berhasil} santri nonaktif menjadi alumni`,
+        details: { berhasil, gagal, target: params.target },
+      })
+    } catch (logError) {
+      console.error('[santri_arsip] log arsipkan dari nonaktif gagal:', logError)
+    }
   }
   return { success: true, berhasil, gagal, errors: errorList }
 }
@@ -633,18 +637,22 @@ export async function restoreSantri(arsipIds: string[]): Promise<{ success: bool
   revalidatePath('/dashboard/santri/arsip')
   revalidatePath('/dashboard/santri')
   if (berhasil > 0) {
-    await logActivity({
-      actor: actorFromSession(session),
-      module: 'santri_arsip',
-      action: 'update',
-      fiturHref: '/dashboard/santri/arsip',
-      logKind: 'update',
-      entityType: 'santri_batch',
-      entityId: 'restore',
-      entityLabel: 'Restore arsip santri',
-      summary: `Merestore ${berhasil} arsip santri`,
-      details: { berhasil, gagal },
-    })
+    try {
+      await logActivity({
+        actor: actorFromSession(session),
+        module: 'santri_arsip',
+        action: 'update',
+        fiturHref: '/dashboard/santri/arsip',
+        logKind: 'update',
+        entityType: 'santri_batch',
+        entityId: 'restore',
+        entityLabel: 'Restore arsip santri',
+        summary: `Merestore ${berhasil} arsip santri`,
+        details: { berhasil, gagal },
+      })
+    } catch (logError) {
+      console.error('[santri_arsip] log restore gagal:', logError)
+    }
   }
   return { success: true, berhasil, gagal, errors: errorList }
 }
