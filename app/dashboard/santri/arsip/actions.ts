@@ -27,6 +27,10 @@ type ArchiveGroupFilter = {
   tanggal_arsip: string
 }
 
+type ArchiveTarget =
+  | { mode: 'new'; catatan?: string }
+  | { mode: 'existing'; group: ArchiveGroupFilter }
+
 type TableInfo = { name: string }
 type Row = Record<string, any>
 
@@ -468,6 +472,114 @@ export async function arsipkanSantri(santriIds: string[], catatan: string): Prom
       entityLabel: 'Arsip santri',
       summary: `Mengarsipkan ${berhasil} santri`,
       details: { berhasil, gagal, catatan: catatan || null },
+    })
+  }
+  return { success: true, berhasil, gagal, errors: errorList }
+}
+
+export async function arsipkanSantriDariNonaktif(params: {
+  santriIds: string[]
+  target: ArchiveTarget
+}): Promise<{ success: boolean; berhasil: number; gagal: number; errors: string[] } | { error: string }> {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return access
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const uniqueIds = Array.from(new Set((params.santriIds ?? []).filter(Boolean)))
+  if (uniqueIds.length === 0) return { error: 'Pilih minimal 1 santri' }
+  if (params.target.mode === 'new' && !params.target.catatan?.trim()) {
+    return { error: 'Catatan grup arsip wajib diisi untuk grup baru' }
+  }
+
+  let berhasil = 0
+  let gagal = 0
+  const errorList: string[] = []
+
+  try {
+    const profiles = await query<Row>(
+      `SELECT * FROM santri WHERE id IN (${inClause(uniqueIds)})`,
+      uniqueIds
+    )
+    const profileMap = new Map(profiles.map(profil => [profil.id, profil]))
+    const existingRows = await query<{ id: string; santri_id_asli: string }>(
+      `SELECT id, santri_id_asli FROM santri_arsip WHERE santri_id_asli IN (${inClause(uniqueIds)})`,
+      uniqueIds
+    )
+    const existingMap = new Map(existingRows.map(row => [row.santri_id_asli, row.id]))
+    const timestamp = params.target.mode === 'existing'
+      ? `${params.target.group.tanggal_arsip} 00:00:00`
+      : now()
+    const catatan = params.target.mode === 'existing'
+      ? params.target.group.catatan
+      : params.target.catatan?.trim() || null
+    const statements: { sql: string; params: any[] }[] = []
+
+    for (const santriId of uniqueIds) {
+      const profil = profileMap.get(santriId)
+      if (!profil) { gagal++; errorList.push(`ID ${santriId}: Data tidak ditemukan`); continue }
+      if (profil.status_global !== 'nonaktif_sementara') {
+        gagal++
+        errorList.push(`${profil.nama_lengkap ?? santriId}: status saat ini ${profil.status_global}, bukan nonaktif sementara`)
+        continue
+      }
+
+      const snapshot = JSON.stringify(buildSoftArchiveSnapshot(profil))
+      const angkatan = params.target.mode === 'existing' ? params.target.group.angkatan : getAngkatan(profil)
+      const existingId = existingMap.get(santriId)
+
+      if (existingId) {
+        statements.push({
+          sql: `UPDATE santri_arsip
+                SET nis = ?, nama_lengkap = ?, angkatan = ?, asrama = ?, catatan = ?, snapshot = ?, tanggal_arsip = ?
+                WHERE id = ?`,
+          params: [profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan, snapshot, timestamp, existingId],
+        })
+      } else {
+        statements.push({
+          sql: `INSERT INTO santri_arsip (id, santri_id_asli, nis, nama_lengkap, angkatan, asrama, catatan, snapshot, tanggal_arsip)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          params: [generateId(), santriId, profil.nis, profil.nama_lengkap, angkatan, profil.asrama, catatan, snapshot, timestamp],
+        })
+      }
+
+      statements.push({
+        sql: `UPDATE santri_nonaktif_log
+              SET status = 'SELESAI',
+                  tanggal_aktif_aktual = COALESCE(tanggal_aktif_aktual, ?),
+                  closed_by = ?,
+                  updated_at = ?
+              WHERE santri_id = ? AND status = 'AKTIF'`,
+        params: [timestamp, session.id, now(), santriId],
+      })
+      statements.push({
+        sql: `UPDATE santri SET status_global = ?, updated_at = ? WHERE id = ?`,
+        params: [ARCHIVE_STATUS, now(), santriId],
+      })
+      berhasil++
+    }
+
+    if (statements.length > 0) await batch(statements)
+  } catch (err: any) {
+    gagal += Math.max(0, uniqueIds.length - berhasil - gagal)
+    errorList.push(err?.message ?? 'Proses arsip gagal')
+  }
+
+  revalidatePath('/dashboard/santri/nonaktif')
+  revalidatePath('/dashboard/santri/arsip')
+  revalidatePath('/dashboard/santri')
+  if (berhasil > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'santri_arsip',
+      action: 'update',
+      fiturHref: '/dashboard/santri/nonaktif',
+      logKind: 'update',
+      entityType: 'santri_batch',
+      entityId: 'arsipkan-dari-nonaktif',
+      entityLabel: 'Arsip santri nonaktif',
+      summary: `Mengarsipkan ${berhasil} santri nonaktif menjadi alumni`,
+      details: { berhasil, gagal, target: params.target },
     })
   }
   return { success: true, berhasil, gagal, errors: errorList }
