@@ -3,6 +3,9 @@
 import React from 'react'
 
 import { useState } from "react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
@@ -24,6 +27,10 @@ interface ClientLayoutProps {
 export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+  const showSetupReturn = returnTo === '/dashboard/setup-tahun-ajaran' && pathname !== '/dashboard/setup-tahun-ajaran';
 
   return (
     <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
@@ -95,6 +102,17 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
           <div className="max-w-7xl mx-auto w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+            {showSetupReturn ? (
+              <div className="no-print sticky top-0 z-30 flex justify-end">
+                <Link
+                  href="/dashboard/setup-tahun-ajaran"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/95 px-4 py-2 text-sm font-bold text-emerald-700 shadow-sm backdrop-blur transition hover:bg-emerald-50"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Kembali ke Setup
+                </Link>
+              </div>
+            ) : null}
             {children}
           </div>
         </main>

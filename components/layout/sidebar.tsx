@@ -66,6 +66,7 @@ function getMenuTitle(title: string) {
 const GROUP_ITEM_ORDER: Record<string, string[]> = {
   'Master Data': [
     'Tahun Ajaran',
+    'Setup Tahun Ajaran',
     'Kelas',
     'Kitab',
     'Guru & Jadwal',

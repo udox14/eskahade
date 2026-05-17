@@ -175,44 +175,39 @@ export default function PsbPageContent() {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 py-3 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Cari nama atau NIS santri baru..."
-          />
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Cari nama atau NIS santri baru..."
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Aksi Cepat</span>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5">
+              <button onClick={() => setTahunTagihan(t => t - 1)} className="px-1 text-sm font-bold text-slate-500">-</button>
+              <span className="font-mono text-xs font-bold text-slate-800">{tahunTagihan}</span>
+              <button onClick={() => setTahunTagihan(t => t + 1)} className="px-1 text-sm font-bold text-slate-500">+</button>
+            </div>
+            <button onClick={() => { setQ(''); setTab('ALL') }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Reset</button>
+            {data?.user?.canSekretariat ? (
+              <button
+                onClick={() => setShowDadakanModal(true)}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Santri Dadakan
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-        <div className="space-y-4">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">Aksi Cepat</h2>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-                <button onClick={() => setTahunTagihan(t => t - 1)} className="font-bold text-slate-500">-</button>
-                <span className="font-mono text-sm font-bold text-slate-800">{tahunTagihan}</span>
-                <button onClick={() => setTahunTagihan(t => t + 1)} className="font-bold text-slate-500">+</button>
-              </div>
-              <button onClick={() => { setQ(''); setTab('ALL') }} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Reset Tampilan</button>
-              {data?.user?.canSekretariat ? (
-                <button
-                  onClick={() => setShowDadakanModal(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Santri Dadakan
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
+      <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {STATUS_TABS.map(item => (
               <button
@@ -348,7 +343,6 @@ export default function PsbPageContent() {
               )
             })
           )}
-        </div>
       </div>
 
       {showDadakanModal ? (
