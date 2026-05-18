@@ -746,7 +746,7 @@ export default function DataSakitPage() {
                   <input
                     value={nomorSuratSakit}
                     onChange={e => setNomorSuratSakit(e.target.value)}
-                    placeholder="Contoh: 012/SS/IV/2026"
+                    placeholder="Contoh: 12"
                     className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
                   />
                 </div>
