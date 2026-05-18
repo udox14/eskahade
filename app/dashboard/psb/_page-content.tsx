@@ -5,8 +5,21 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Banknote, Bed, Check, ClipboardCheck, Home, Loader2, Printer,
-  Search, UserPlus, Wallet
+  AlertTriangle,
+  ArrowLeft,
+  Banknote,
+  Bed,
+  Building2,
+  Check,
+  ClipboardCheck,
+  DoorOpen,
+  Home,
+  Loader2,
+  Printer,
+  RefreshCw,
+  Search,
+  UserPlus,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -23,6 +36,8 @@ import {
   type PsbStatus,
 } from './actions'
 
+const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PLACED_KAMAR', 'PAID', 'DONE']
+
 const STATUS_LABEL: Record<PsbStatus, string> = {
   VERIFICATION: 'Belum Verifikasi',
   VERIFIED: 'Sudah Verifikasi',
@@ -32,16 +47,19 @@ const STATUS_LABEL: Record<PsbStatus, string> = {
   DONE: 'Selesai',
 }
 
-const STATUS_TABS: Array<{ key: 'ALL' | PsbStatus; label: string }> = [
-  { key: 'ALL', label: 'Semua' },
-  { key: 'VERIFICATION', label: 'Sekretariat' },
-  { key: 'VERIFIED', label: 'Penempatan' },
-  { key: 'PLACED_ASRAMA', label: 'Kamar' },
-  { key: 'PLACED_KAMAR', label: 'Pembayaran' },
-  { key: 'PAID', label: 'Final' },
-]
+const STATUS_COLOR: Record<PsbStatus, string> = {
+  VERIFICATION: 'bg-slate-100 text-slate-600',
+  VERIFIED: 'bg-blue-50 text-blue-700',
+  PLACED_ASRAMA: 'bg-cyan-50 text-cyan-700',
+  PLACED_KAMAR: 'bg-amber-50 text-amber-700',
+  PAID: 'bg-emerald-50 text-emerald-700',
+  DONE: 'bg-emerald-700 text-white',
+}
 
 const SEKOLAH_LIST = ['MTSU', 'MTSN', 'MAN', 'SMK', 'SMA', 'SMP', 'LAINNYA']
+const PAYMENT_TYPES = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
+
+type RoleKey = 'sekretariat' | 'asrama' | 'kamar' | 'pembayaran'
 
 function rupiah(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
@@ -57,26 +75,55 @@ function paymentLabel(value: string) {
   return labels[value] ?? value
 }
 
+function statusAtLeast(status: PsbStatus, minimum: PsbStatus) {
+  return STATUS_LIST.indexOf(status) >= STATUS_LIST.indexOf(minimum)
+}
+
+function paymentTarget(row: any) {
+  const payment = row.pembayaran
+  if (!payment) return 0
+  return Number(payment.bangunan?.target ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
+    return sum + Number(payment.tahunan?.[jenis]?.nominal ?? 0)
+  }, 0)
+}
+
+function paymentPaid(row: any) {
+  const payment = row.pembayaran
+  if (!payment) return 0
+  return Number(payment.bangunan?.paid ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
+    return sum + (payment.tahunan?.[jenis]?.lunas ? Number(payment.tahunan?.[jenis]?.nominal ?? 0) : 0)
+  }, 0)
+}
+
+function paymentOutstanding(row: any) {
+  return Math.max(0, paymentTarget(row) - paymentPaid(row))
+}
+
 export default function PsbPageContent() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [tab, setTab] = useState<'ALL' | PsbStatus>('ALL')
+  const [selectedRole, setSelectedRole] = useState<RoleKey | null>(null)
   const [q, setQ] = useState('')
   const [tahunTagihan, setTahunTagihan] = useState(new Date().getFullYear())
   const [showDadakanModal, setShowDadakanModal] = useState(false)
   const [paymentModalRow, setPaymentModalRow] = useState<any | null>(null)
   const [dadakan, setDadakan] = useState({ nama_lengkap: '', jenis_kelamin: 'L' as 'L' | 'P', sekolah: '' })
   const [selectedAsrama, setSelectedAsrama] = useState<Record<string, string>>({})
+  const [activeRoomAsrama, setActiveRoomAsrama] = useState('')
   const [kamarOptions, setKamarOptions] = useState<Record<string, any[]>>({})
   const [selectedKamar, setSelectedKamar] = useState<Record<string, string>>({})
   const [bangunanNominal, setBangunanNominal] = useState<Record<string, string>>({})
   const [paymentItems, setPaymentItems] = useState<Record<string, Record<string, boolean>>>({})
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (silent = false) => {
+    if (silent) setRefreshing(true)
+    else setLoading(true)
+
     const result = await getPsbDashboard({ q, tahunTagihan })
     setLoading(false)
+    setRefreshing(false)
     if ('error' in result) {
       toast.error(result.error)
       return
@@ -86,17 +133,68 @@ export default function PsbPageContent() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      load()
+      void load()
     }, 250)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, tahunTagihan])
 
-  const rows = useMemo(() => {
-    const all = data?.rows ?? []
-    if (tab === 'ALL') return all
-    return all.filter((row: any) => row.status === tab)
-  }, [data, tab])
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void load(true)
+    }, 5000)
+    return () => window.clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, tahunTagihan])
+
+  useEffect(() => {
+    if (!data || activeRoomAsrama) return
+    setActiveRoomAsrama(data.user?.asrama_binaan || data.asramaList?.[0] || '')
+  }, [activeRoomAsrama, data])
+
+  useEffect(() => {
+    if (selectedRole !== 'kamar' || !activeRoomAsrama) return
+    void loadKamar(activeRoomAsrama, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoomAsrama, selectedRole])
+
+  const rows = useMemo(() => data?.rows ?? [], [data])
+  const sekretariatRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFICATION'), [rows])
+  const placementRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFIED'), [rows])
+  const roomRows = useMemo(() => {
+    return rows.filter((row: any) => row.status === 'PLACED_ASRAMA' && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
+  }, [activeRoomAsrama, rows])
+  const paymentRows = useMemo(() => {
+    return rows.filter((row: any) => statusAtLeast(row.status, 'PLACED_KAMAR'))
+  }, [rows])
+
+  const sekretariatStats = useMemo(() => {
+    const verified = rows.filter((row: any) => statusAtLeast(row.status, 'VERIFIED')).length
+    return {
+      total: rows.length,
+      verified,
+      unverified: rows.length - verified,
+    }
+  }, [rows])
+
+  const asramaStats = data?.asramaStats ?? []
+  const totalKuotaBaru = asramaStats.reduce((sum: number, item: any) => sum + Number(item.kuota_baru ?? 0), 0)
+  const totalTerisiAsrama = asramaStats.reduce((sum: number, item: any) => sum + Number(item.terisi_baru ?? 0), 0)
+  const roomOptions = useMemo(() => {
+    return activeRoomAsrama ? (kamarOptions[activeRoomAsrama] ?? []) : []
+  }, [activeRoomAsrama, kamarOptions])
+  const roomStats = useMemo(() => {
+    const totalKuota = roomOptions.reduce((sum: number, room: any) => sum + Number(room.kuota ?? 0), 0)
+    const terisi = roomOptions.reduce((sum: number, room: any) => sum + Number(room.terisi ?? 0), 0)
+    const over = roomOptions.reduce((sum: number, room: any) => sum + Math.max(0, Number(room.terisi ?? 0) - Number(room.kuota ?? 0)), 0)
+    return { totalKuota, terisi, kosong: Math.max(0, totalKuota - terisi), over }
+  }, [roomOptions])
+
+  const paymentStats = useMemo(() => {
+    const potential = rows.reduce((sum: number, row: any) => sum + paymentTarget(row), 0)
+    const paid = rows.reduce((sum: number, row: any) => sum + paymentPaid(row), 0)
+    return { potential, paid, unpaid: Math.max(0, potential - paid) }
+  }, [rows])
 
   const run = async (id: string, fn: () => Promise<any>, success: string) => {
     setBusyId(id)
@@ -107,11 +205,7 @@ export default function PsbPageContent() {
         return null
       }
       toast.success(success)
-      try {
-        await load()
-      } catch (error: any) {
-        console.error('Failed to refresh PSB dashboard after action', error)
-      }
+      await load(true)
       return result
     } catch (error: any) {
       toast.error(error?.message || 'Proses gagal diselesaikan.')
@@ -130,8 +224,8 @@ export default function PsbPageContent() {
     }
   }
 
-  const loadKamar = async (asrama: string) => {
-    if (!asrama || kamarOptions[asrama]) return
+  const loadKamar = async (asrama: string, force = false) => {
+    if (!asrama || (!force && kamarOptions[asrama])) return
     const result = await getKamarPsb(asrama)
     if (Array.isArray(result)) {
       setKamarOptions(prev => ({ ...prev, [asrama]: result }))
@@ -153,7 +247,7 @@ export default function PsbPageContent() {
     if (picks.BANGUNAN) {
       items.push({ jenis: 'BANGUNAN', nominal: Number(bangunanNominal[row.id] || 0) })
     }
-    ;(['KESEHATAN', 'EHB', 'EKSKUL'] as const).forEach((jenis) => {
+    PAYMENT_TYPES.forEach((jenis) => {
       if (picks[jenis]) items.push({ jenis })
     })
     const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items }), 'Pembayaran PSB tersimpan')
@@ -187,7 +281,7 @@ export default function PsbPageContent() {
     if (picks.BANGUNAN) {
       items.push({ label: paymentLabel('BANGUNAN'), tahun: '-', nominal: Number(bangunanNominal[row.id] || 0) })
     }
-    ;(['KESEHATAN', 'EHB', 'EKSKUL'] as const).forEach(jenis => {
+    PAYMENT_TYPES.forEach(jenis => {
       if (picks[jenis]) {
         items.push({ label: paymentLabel(jenis), tahun: String(tahunTagihan), nominal: Number(payment?.tahunan?.[jenis]?.nominal ?? 0) })
       }
@@ -195,396 +289,777 @@ export default function PsbPageContent() {
     return items
   }
 
+  const roles = [
+    {
+      key: 'sekretariat' as const,
+      title: 'Kesekretariatan',
+      description: 'Verifikasi santri baru dan input santri dadakan.',
+      icon: ClipboardCheck,
+      can: !!data?.user?.canSekretariat,
+      count: sekretariatRows.length,
+    },
+    {
+      key: 'asrama' as const,
+      title: 'Penempatan Asrama',
+      description: 'Tempatkan santri terverifikasi ke asrama tujuan.',
+      icon: Building2,
+      can: !!data?.user?.canPenempatan,
+      count: placementRows.length,
+    },
+    {
+      key: 'kamar' as const,
+      title: 'Penentuan Kamar',
+      description: 'Kelola kamar santri sesuai asrama binaan.',
+      icon: Bed,
+      can: !!data?.user?.canKamar,
+      count: roomRows.length,
+    },
+    {
+      key: 'pembayaran' as const,
+      title: 'Pembayaran',
+      description: 'Input pembayaran dan cetak kuitansi PSB.',
+      icon: Wallet,
+      can: !!data?.user?.canBayar,
+      count: paymentRows.filter((row: any) => row.status !== 'DONE').length,
+    },
+  ]
+
+  if (loading && !data) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white py-24 text-center text-slate-400 shadow-sm">
+        <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-blue-500" />
+        Memuat flow PSB...
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-6">
-        {(['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PLACED_KAMAR', 'PAID', 'DONE'] as PsbStatus[]).map(status => (
-          <button
-            key={status}
-            onClick={() => setTab(status)}
-            className={`rounded-lg border bg-white p-3 text-left shadow-sm transition-colors ${tab === status ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:bg-slate-50'}`}
-          >
-            <p className="text-[11px] font-bold uppercase text-slate-500">{STATUS_LABEL[status]}</p>
-            <p className="mt-1 text-2xl font-black text-slate-900">{data?.summary?.[status] ?? 0}</p>
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Cari nama atau NIS santri baru..."
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Aksi Cepat</span>
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5">
-              <button onClick={() => setTahunTagihan(t => t - 1)} className="px-1 text-sm font-bold text-slate-500">-</button>
-              <span className="font-mono text-xs font-bold text-slate-800">{tahunTagihan}</span>
-              <button onClick={() => setTahunTagihan(t => t + 1)} className="px-1 text-sm font-bold text-slate-500">+</button>
-            </div>
-            <button onClick={() => { setQ(''); setTab('ALL') }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Reset</button>
-            {data?.user?.canSekretariat ? (
+    <div className="space-y-5">
+      {!selectedRole ? (
+        <div className="grid gap-4 lg:grid-cols-4">
+          {roles.map((role) => {
+            const Icon = role.icon
+            return (
               <button
-                onClick={() => setShowDadakanModal(true)}
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+                key={role.key}
+                type="button"
+                disabled={!role.can}
+                onClick={() => setSelectedRole(role.key)}
+                className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
               >
-                <UserPlus className="h-3.5 w-3.5" />
-                Santri Dadakan
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {STATUS_TABS.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`rounded-lg border px-3 py-2 text-xs font-bold ${tab === item.key ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {loading ? (
-            <div className="rounded-lg border bg-white py-20 text-center text-slate-400">
-              <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-blue-500" />
-              Memuat data PSB...
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="rounded-lg border bg-white py-20 text-center text-slate-400">Belum ada data pada tahap ini.</div>
-          ) : (
-            rows.map((row: any) => {
-              const payment = row.pembayaran
-              const opts = row.asrama ? kamarOptions[row.asrama] ?? [] : []
-              return (
-                <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold text-slate-900">{row.nama_lengkap}</h3>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{STATUS_LABEL[row.status as PsbStatus]}</span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {row.nis} · {row.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'} · {row.sekolah || 'Sekolah belum diisi'} · {row.asrama || 'Belum asrama'} {row.kamar ? `kamar ${row.kamar}` : ''}
-                      </p>
-                    </div>
-                    <Link href={`/dashboard/santri/${row.id}/edit?from=psb`} className="text-xs font-bold text-blue-700 hover:underline">
-                      Edit Data
-                    </Link>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 xl:grid-cols-4">
-                    <div className="rounded-lg border border-slate-200 p-3">
-                      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                        <ClipboardCheck className="h-4 w-4" /> Sekretariat
-                      </div>
-                      <button
-                        disabled={!data?.user?.canSekretariat || row.status !== 'VERIFICATION' || busyId === row.id}
-                        onClick={() => run(row.id, () => verifikasiSantriPsb(row.id), 'Santri terverifikasi')}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                      >
-                        <Check className="h-4 w-4" /> Verifikasi
-                      </button>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 p-3">
-                      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                        <Home className="h-4 w-4" /> Penempatan
-                      </div>
-                      <div className="flex gap-2">
-                        <select
-                          disabled={!data?.user?.canPenempatan || row.status !== 'VERIFIED'}
-                          value={selectedAsrama[row.id] ?? row.asrama ?? ''}
-                          onChange={e => setSelectedAsrama(prev => ({ ...prev, [row.id]: e.target.value }))}
-                          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none"
-                        >
-                          <option value="">Asrama</option>
-                          {data?.asramaList?.map((a: string) => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                        <button
-                          disabled={!data?.user?.canPenempatan || row.status !== 'VERIFIED' || busyId === row.id}
-                          onClick={() => run(row.id, () => tempatkanAsramaPsb(row.id, selectedAsrama[row.id] ?? row.asrama), 'Asrama tersimpan')}
-                          className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                        >
-                          Simpan
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 p-3">
-                      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                        <Bed className="h-4 w-4" /> Kamar
-                      </div>
-                      <div className="flex gap-2">
-                        <select
-                          disabled={!data?.user?.canKamar || row.status !== 'PLACED_ASRAMA' || !row.asrama}
-                          value={selectedKamar[row.id] ?? row.kamar ?? ''}
-                          onFocus={() => row.asrama && loadKamar(row.asrama)}
-                          onChange={e => setSelectedKamar(prev => ({ ...prev, [row.id]: e.target.value }))}
-                          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none"
-                        >
-                          <option value="">Kamar</option>
-                          {opts.map((k: any) => <option key={k.nomor_kamar} value={k.nomor_kamar}>{k.nomor_kamar} · sisa {k.sisa_slot_baru}</option>)}
-                        </select>
-                        <button
-                          disabled={!data?.user?.canKamar || row.status !== 'PLACED_ASRAMA' || busyId === row.id}
-                          onClick={() => run(row.id, () => tempatkanKamarPsb(row.id, selectedKamar[row.id] ?? row.kamar), 'Kamar tersimpan')}
-                          className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                        >
-                          Simpan
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 p-3">
-                      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                        <Wallet className="h-4 w-4" /> Pembayaran
-                      </div>
-                      <div className="space-y-2 text-xs text-slate-600">
-                        <div className="rounded-lg bg-slate-50 px-3 py-2">
-                          <p>Bangunan: <b>{rupiah(payment?.bangunan?.sisa ?? 0)}</b></p>
-                          <p>Tahunan: {(['KESEHATAN', 'EHB', 'EKSKUL'] as const).filter(jenis => !payment?.tahunan?.[jenis]?.lunas).length} item belum lunas</p>
-                        </div>
-                        <button
-                          disabled={!data?.user?.canBayar || row.status !== 'PLACED_KAMAR' || busyId === row.id}
-                          onClick={() => setPaymentModalRow(row)}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                        >
-                          <Banknote className="h-4 w-4" /> Input Pembayaran
-                        </button>
-                        {data?.user?.canBayar && payment?.latestReceipt?.id ? (
-                          <button
-                            disabled={busyId === row.id}
-                            onClick={() => handleCancelPayment(row)}
-                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
-                          >
-                            <Printer className="h-4 w-4" /> Batalkan Pembayaran Terakhir
-                          </button>
-                        ) : null}
-                        {row.status === 'PAID' && data?.user?.canBayar ? (
-                          <button
-                            disabled={busyId === row.id}
-                            onClick={() => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
-                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"
-                          >
-                            <Printer className="h-4 w-4" /> Tandai Selesai
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="rounded-2xl bg-slate-900 p-3 text-white">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                    {role.count} antrean
+                  </span>
                 </div>
-              )
-            })
-          )}
-      </div>
+                <h2 className="mt-4 text-lg font-black text-slate-900">{role.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{role.description}</p>
+                <p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {role.can ? 'Masuk halaman kerja' : 'Tidak ada akses akun'}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole(null)}
+                  className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                  aria-label="Kembali ke pilihan tugas"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div>
+                  <h2 className="font-black text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
+                  <p className="text-xs text-slate-500">
+                    Data refresh otomatis setiap 5 detik. {refreshing ? 'Sedang sinkron...' : 'Siap dipakai.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative min-w-0 sm:w-80">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={q}
+                    onChange={e => setQ(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Cari nama atau NIS..."
+                  />
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-2">
+                  <button onClick={() => setTahunTagihan(t => t - 1)} className="px-1 text-sm font-bold text-slate-500">-</button>
+                  <span className="font-mono text-xs font-bold text-slate-800">{tahunTagihan}</span>
+                  <button onClick={() => setTahunTagihan(t => t + 1)} className="px-1 text-sm font-bold text-slate-500">+</button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => load(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {selectedRole === 'sekretariat' ? (
+            <SekretariatView
+              rows={sekretariatRows}
+              stats={sekretariatStats}
+              canCreate={!!data?.user?.canSekretariat}
+              busyId={busyId}
+              onDadakan={() => setShowDadakanModal(true)}
+              onVerify={(row: any) => run(row.id, () => verifikasiSantriPsb(row.id), 'Santri terverifikasi')}
+            />
+          ) : null}
+
+          {selectedRole === 'asrama' ? (
+            <AsramaPlacementView
+              rows={placementRows}
+              stats={asramaStats}
+              totalKuotaBaru={totalKuotaBaru}
+              totalTerisi={totalTerisiAsrama}
+              selectedAsrama={selectedAsrama}
+              setSelectedAsrama={setSelectedAsrama}
+              busyId={busyId}
+              onPlace={(row: any) => run(row.id, () => tempatkanAsramaPsb(row.id, selectedAsrama[row.id] ?? row.asrama), 'Asrama tersimpan')}
+            />
+          ) : null}
+
+          {selectedRole === 'kamar' ? (
+            <KamarPlacementView
+              rows={roomRows}
+              user={data?.user}
+              asramaList={data?.asramaList ?? []}
+              activeAsrama={activeRoomAsrama}
+              setActiveAsrama={setActiveRoomAsrama}
+              roomOptions={roomOptions}
+              roomStats={roomStats}
+              selectedKamar={selectedKamar}
+              setSelectedKamar={setSelectedKamar}
+              busyId={busyId}
+              onPlace={async (row: any) => {
+                const result = await run(row.id, () => tempatkanKamarPsb(row.id, selectedKamar[row.id] ?? row.kamar), 'Kamar tersimpan')
+                if (result && row.asrama) await loadKamar(row.asrama, true)
+              }}
+            />
+          ) : null}
+
+          {selectedRole === 'pembayaran' ? (
+            <PembayaranView
+              rows={paymentRows}
+              stats={paymentStats}
+              busyId={busyId}
+              onOpenPayment={setPaymentModalRow}
+              onCancelPayment={handleCancelPayment}
+              onDone={(row: any) => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
+            />
+          ) : null}
+        </div>
+      )}
 
       {showDadakanModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-          <button
-            type="button"
-            aria-label="Tutup modal"
-            className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
-            onClick={() => setShowDadakanModal(false)}
-          />
-          <form
-            onSubmit={handleDadakan}
-            className="relative z-10 w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl"
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <UserPlus className="h-4 w-4 text-blue-600" />
-                  <h2 className="text-base font-bold text-slate-900">Santri Dadakan</h2>
-                </div>
-                <p className="text-xs leading-5 text-slate-500">
-                  Cukup isi data dasar agar santri langsung masuk tahap penempatan PSB.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDadakanModal(false)}
-                className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50"
-              >
-                Tutup
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Nama Lengkap</span>
-                <input
-                  required
-                  autoFocus
-                  value={dadakan.nama_lengkap}
-                  onChange={e => setDadakan(prev => ({ ...prev, nama_lengkap: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nama santri"
-                />
-              </label>
-              <div>
-                <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Jenis Kelamin</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['L', 'P'] as const).map(jk => (
-                    <button
-                      type="button"
-                      key={jk}
-                      onClick={() => setDadakan(prev => ({ ...prev, jenis_kelamin: jk }))}
-                      className={`rounded-lg border px-3 py-2 text-sm font-bold ${dadakan.jenis_kelamin === jk ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      {jk === 'L' ? 'Laki-laki' : 'Perempuan'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sekolah</span>
-                <select
-                  value={dadakan.sekolah}
-                  onChange={e => setDadakan(prev => ({ ...prev, sekolah: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Belum dipilih</option>
-                  {SEKOLAH_LIST.map(item => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </label>
-              <button
-                disabled={busyId === 'dadakan'}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60"
-              >
-                {busyId === 'dadakan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                Masukkan ke PSB
-              </button>
-            </div>
-          </form>
-        </div>
+        <DadakanModal
+          dadakan={dadakan}
+          busy={busyId === 'dadakan'}
+          setDadakan={setDadakan}
+          onClose={() => setShowDadakanModal(false)}
+          onSubmit={handleDadakan}
+        />
       ) : null}
 
       {paymentModalRow ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-          <button
-            type="button"
-            aria-label="Tutup modal pembayaran"
-            className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
-            onClick={() => setPaymentModalRow(null)}
-          />
-          <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-emerald-700" />
-                  <h2 className="text-lg font-bold text-slate-900">Pembayaran PSB</h2>
-                </div>
-                <p className="mt-1 text-sm text-slate-500">{paymentModalRow.nama_lengkap} · {paymentModalRow.nis}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPaymentModalRow(null)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50"
-              >
-                Tutup
-              </button>
-            </div>
-
-            <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[420px_1fr]">
-              <div className="space-y-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-bold uppercase text-slate-500">Asrama / Kamar</p>
-                  <p className="mt-1 font-bold text-slate-900">{paymentModalRow.asrama || '-'} / {paymentModalRow.kamar || '-'}</p>
-                </div>
-
-                <div className="space-y-3">
-                  <PaymentOption
-                    title="Uang Bangunan"
-                    subtitle={`Sisa tagihan ${rupiah(paymentModalRow.pembayaran?.bangunan?.sisa ?? 0)}`}
-                    checked={!!paymentItems[paymentModalRow.id]?.BANGUNAN}
-                    disabled={(paymentModalRow.pembayaran?.bangunan?.sisa ?? 0) <= 0}
-                    onChange={checked => togglePayment(paymentModalRow.id, 'BANGUNAN', checked)}
-                  />
-                  {paymentItems[paymentModalRow.id]?.BANGUNAN ? (
-                    <label className="block rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                      <span className="mb-1 block text-[11px] font-bold uppercase text-emerald-700">Nominal Bangunan</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={paymentModalRow.pembayaran?.bangunan?.sisa ?? undefined}
-                        value={bangunanNominal[paymentModalRow.id] ?? ''}
-                        onChange={e => setBangunanNominal(prev => ({ ...prev, [paymentModalRow.id]: e.target.value }))}
-                        placeholder="Contoh: 500000"
-                        className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </label>
-                  ) : null}
-
-                  {(['KESEHATAN', 'EHB', 'EKSKUL'] as const).map(jenis => (
-                    <PaymentOption
-                      key={jenis}
-                      title={jenis}
-                      subtitle={paymentModalRow.pembayaran?.tahunan?.[jenis]?.lunas ? 'Sudah lunas' : `${rupiah(paymentModalRow.pembayaran?.tahunan?.[jenis]?.nominal ?? 0)} tahun ${tahunTagihan}`}
-                      checked={!!paymentItems[paymentModalRow.id]?.[jenis]}
-                      disabled={!!paymentModalRow.pembayaran?.tahunan?.[jenis]?.lunas || Number(paymentModalRow.pembayaran?.tahunan?.[jenis]?.nominal ?? 0) <= 0}
-                      onChange={checked => togglePayment(paymentModalRow.id, jenis, checked)}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  disabled={busyId === paymentModalRow.id || getPreviewItems(paymentModalRow).length === 0}
-                  onClick={() => handlePayment(paymentModalRow)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500"
-                >
-                  {busyId === paymentModalRow.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                  Simpan & Cetak Kuitansi
-                </button>
-              </div>
-
-              <ReceiptPreview
-                row={paymentModalRow}
-                items={getPreviewItems(paymentModalRow)}
-                total={getPreviewItems(paymentModalRow).reduce((sum, item) => sum + item.nominal, 0)}
-                tahunTagihan={tahunTagihan}
-              />
-            </div>
-          </div>
-        </div>
+        <PaymentModal
+          row={paymentModalRow}
+          tahunTagihan={tahunTagihan}
+          busy={busyId === paymentModalRow.id}
+          paymentItems={paymentItems}
+          bangunanNominal={bangunanNominal}
+          setBangunanNominal={setBangunanNominal}
+          togglePayment={togglePayment}
+          getPreviewItems={getPreviewItems}
+          onClose={() => setPaymentModalRow(null)}
+          onSubmit={() => handlePayment(paymentModalRow)}
+        />
       ) : null}
     </div>
   )
 }
 
-function PaymentOption({
-  title,
-  subtitle,
-  checked,
-  disabled,
-  onChange,
-}: {
-  title: string
-  subtitle: string
-  checked: boolean
-  disabled?: boolean
-  onChange: (checked: boolean) => void
-}) {
+function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <StatCard label="Jumlah Santri Baru" value={stats.total} tone="slate" />
+        <StatCard label="Sudah Diverifikasi" value={stats.verified} tone="emerald" />
+        <StatCard label="Belum Diverifikasi" value={stats.unverified} tone="amber" />
+      </div>
+      <div className="flex justify-end">
+        {canCreate ? (
+          <button onClick={onDadakan} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">
+            <UserPlus className="h-4 w-4" />
+            Santri Dadakan
+          </button>
+        ) : null}
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Antrean Verifikasi" description="Santri yang sudah diverifikasi akan langsung masuk ke halaman penempatan asrama." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Santri</th>
+                <th className="px-4 py-3">Sekolah</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Asrama</th>
+                <th className="px-4 py-3">Kamar</th>
+                <th className="px-4 py-3">Pembayaran</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length ? rows.map((row: any) => (
+                <tr key={row.id} className="hover:bg-slate-50">
+                  <SantriCells row={row} />
+                  <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600">{row.kamar || '-'}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-700">{rupiah(paymentPaid(row))}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      disabled={busyId === row.id}
+                      onClick={() => onVerify(row)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      {busyId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Verifikasi
+                    </button>
+                  </td>
+                </tr>
+              )) : <EmptyRow colSpan={7} text="Tidak ada santri yang menunggu verifikasi." />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selectedAsrama, setSelectedAsrama, busyId, onPlace }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <StatCard label="Total Kuota Santri Baru" value={totalKuotaBaru} tone="slate" />
+        <StatCard label="Sudah Ditempatkan" value={totalTerisi} tone="emerald" />
+        <StatCard label="Sisa Kuota" value={Math.max(0, totalKuotaBaru - totalTerisi)} tone="blue" />
+        <StatCard label="Over Kuota" value={Math.max(0, totalTerisi - totalKuotaBaru)} tone="rose" />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<Building2 className="h-4 w-4" />} title="Kuota Asrama" description="Jika penuh, penempatan tetap bisa disimpan dan akan diberi status over." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Asrama</th>
+                <th className="px-4 py-3 text-right">Kuota Baru</th>
+                <th className="px-4 py-3 text-right">Terisi Baru</th>
+                <th className="px-4 py-3 text-right">Sisa</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {stats.map((item: any) => (
+                <tr key={item.asrama} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-bold text-slate-900">{item.asrama}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.kuota_baru}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.terisi_baru}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.sisa}</td>
+                  <td className="px-4 py-3"><AsramaStatusBadge status={item.status} over={item.over} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<Home className="h-4 w-4" />} title="Antrean Penempatan Asrama" description="Data verifikasi sekretariat tampil di sini otomatis tanpa refresh browser." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Santri</th>
+                <th className="px-4 py-3">Sekolah</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Pilih Asrama</th>
+                <th className="px-4 py-3">Catatan Kuota</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length ? rows.map((row: any) => {
+                const target = selectedAsrama[row.id] ?? row.asrama ?? ''
+                const quota = stats.find((item: any) => item.asrama === target)
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <SantriCells row={row} />
+                    <td className="px-4 py-3">
+                      <select
+                        value={target}
+                        onChange={e => setSelectedAsrama((prev: Record<string, string>) => ({ ...prev, [row.id]: e.target.value }))}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Pilih asrama</option>
+                        {stats.map((item: any) => <option key={item.asrama} value={item.asrama}>{item.asrama}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">{quota ? <AsramaStatusBadge status={quota.status} over={quota.over} /> : <span className="text-xs text-slate-400">Pilih asrama</span>}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        disabled={!target || busyId === row.id}
+                        onClick={() => onPlace(row)}
+                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                      >
+                        Simpan Asrama
+                      </button>
+                    </td>
+                  </tr>
+                )
+              }) : <EmptyRow colSpan={6} text="Tidak ada santri yang menunggu penempatan asrama." />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Asrama yang dikelola</p>
+          <h3 className="text-lg font-black text-slate-900">{activeAsrama || user?.asrama_binaan || '-'}</h3>
+          <p className="text-sm text-slate-500">Pengurus asrama hanya melihat santri dan kamar dari asrama binaannya.</p>
+        </div>
+        {!user?.asrama_binaan ? (
+          <select
+            value={activeAsrama}
+            onChange={e => setActiveAsrama(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {asramaList.map((asrama: string) => <option key={asrama} value={asrama}>{asrama}</option>)}
+          </select>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <StatCard label="Jumlah Kuota Kamar" value={roomStats.totalKuota} tone="slate" />
+        <StatCard label="Terisi" value={roomStats.terisi} tone="emerald" />
+        <StatCard label="Belum Terisi" value={roomStats.kosong} tone="blue" />
+        <StatCard label="Over" value={roomStats.over} tone="rose" />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<DoorOpen className="h-4 w-4" />} title="Kuota Kamar" description="Kamar penuh tetap bisa dipilih, tetapi ditandai over." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Kamar</th>
+                <th className="px-4 py-3 text-right">Kuota</th>
+                <th className="px-4 py-3 text-right">Terisi</th>
+                <th className="px-4 py-3 text-right">Sisa</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {roomOptions.length ? roomOptions.map((room: any) => (
+                <tr key={room.nomor_kamar} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-bold text-slate-900">Kamar {room.nomor_kamar}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{room.kuota}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{room.terisi}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{Number(room.kuota ?? 0) - Number(room.terisi ?? 0)}</td>
+                  <td className="px-4 py-3"><KamarStatusBadge terisi={Number(room.terisi ?? 0)} kuota={Number(room.kuota ?? 0)} /></td>
+                </tr>
+              )) : <EmptyRow colSpan={5} text="Belum ada konfigurasi kamar untuk asrama ini." />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah ditempatkan ke asrama aktif yang muncul di tabel ini." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Santri</th>
+                <th className="px-4 py-3">Sekolah</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Asrama</th>
+                <th className="px-4 py-3">Pilih Kamar</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length ? rows.map((row: any) => (
+                <tr key={row.id} className="hover:bg-slate-50">
+                  <SantriCells row={row} />
+                  <td className="px-4 py-3 font-semibold text-slate-700">{row.asrama || '-'}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={selectedKamar[row.id] ?? row.kamar ?? ''}
+                      onChange={e => setSelectedKamar((prev: Record<string, string>) => ({ ...prev, [row.id]: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Pilih kamar</option>
+                      {roomOptions.map((room: any) => {
+                        const over = Number(room.terisi ?? 0) >= Number(room.kuota ?? 0)
+                        return <option key={room.nomor_kamar} value={room.nomor_kamar}>Kamar {room.nomor_kamar} - {room.terisi}/{room.kuota}{over ? ' over' : ''}</option>
+                      })}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      disabled={!(selectedKamar[row.id] ?? row.kamar) || busyId === row.id}
+                      onClick={() => onPlace(row)}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      Simpan Kamar
+                    </button>
+                  </td>
+                </tr>
+              )) : <EmptyRow colSpan={6} text="Tidak ada santri yang menunggu penentuan kamar untuk asrama ini." />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, onDone }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <MoneyCard label="Potensi Uang Masuk" value={stats.potential} tone="slate" />
+        <MoneyCard label="Uang Sudah Masuk" value={stats.paid} tone="emerald" />
+        <MoneyCard label="Belum Masuk" value={stats.unpaid} tone="rose" />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <TableTitle icon={<Wallet className="h-4 w-4" />} title="Antrean Pembayaran" description="Status verifikasi, asrama, dan kamar ditampilkan sebagai tabel agar bendahara bisa cek cepat." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] text-left text-sm">
+            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Santri</th>
+                <th className="px-4 py-3">Sekolah</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Asrama</th>
+                <th className="px-4 py-3">Kamar</th>
+                <th className="px-4 py-3 text-right">Tagihan</th>
+                <th className="px-4 py-3 text-right">Masuk</th>
+                <th className="px-4 py-3 text-right">Sisa</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length ? rows.map((row: any) => {
+                const outstanding = paymentOutstanding(row)
+                const canPay = row.status !== 'DONE' && statusAtLeast(row.status, 'PLACED_KAMAR') && outstanding > 0
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <SantriCells row={row} />
+                    <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{row.kamar || '-'}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{rupiah(paymentTarget(row))}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700">{rupiah(paymentPaid(row))}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-rose-700">{rupiah(outstanding)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          disabled={!canPay || busyId === row.id}
+                          onClick={() => onOpenPayment(row)}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          <Banknote className="h-3.5 w-3.5" />
+                          Input
+                        </button>
+                        {row.pembayaran?.latestReceipt?.id ? (
+                          <button
+                            disabled={busyId === row.id}
+                            onClick={() => onCancelPayment(row)}
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            Batalkan
+                          </button>
+                        ) : null}
+                        {row.status === 'PAID' ? (
+                          <button
+                            disabled={busyId === row.id}
+                            onClick={() => onDone(row)}
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            Selesai
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }) : <EmptyRow colSpan={9} text="Belum ada santri yang masuk tahap pembayaran." />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SantriCells({ row }: { row: any }) {
+  return (
+    <>
+      <td className="px-4 py-3">
+        <p className="font-bold text-slate-900">{row.nama_lengkap}</p>
+        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+          <span>{row.nis || '-'}</span>
+          <Link href={`/dashboard/santri/${row.id}/edit?from=psb`} className="font-bold text-blue-700 hover:underline">Edit</Link>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-slate-600">{row.sekolah || '-'}</td>
+      <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+    </>
+  )
+}
+
+function StatusBadge({ status }: { status: PsbStatus }) {
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_COLOR[status]}`}>{STATUS_LABEL[status]}</span>
+}
+
+function AsramaStatusBadge({ status, over }: { status: string; over?: number }) {
+  if (status === 'OVER') return <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700"><AlertTriangle className="h-3 w-3" /> Over {over ? `+${over}` : ''}</span>
+  if (status === 'PENUH') return <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">Penuh</span>
+  if (status === 'BELUM_CONFIG') return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">Belum config</span>
+  return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">Tersedia</span>
+}
+
+function KamarStatusBadge({ terisi, kuota }: { terisi: number; kuota: number }) {
+  if (kuota <= 0 && terisi > 0) return <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700"><AlertTriangle className="h-3 w-3" /> Over</span>
+  if (terisi > kuota) return <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700"><AlertTriangle className="h-3 w-3" /> Over +{terisi - kuota}</span>
+  if (terisi === kuota) return <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">Penuh</span>
+  return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">Tersedia</span>
+}
+
+function TableTitle({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="flex items-start gap-3 p-4">
+      <span className="rounded-xl bg-slate-100 p-2 text-slate-700">{icon}</span>
+      <div>
+        <h3 className="font-black text-slate-900">{title}</h3>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'amber' | 'blue' | 'rose' }) {
+  const color = {
+    slate: 'text-slate-900',
+    emerald: 'text-emerald-700',
+    amber: 'text-amber-700',
+    blue: 'text-blue-700',
+    rose: 'text-rose-700',
+  }[tone]
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className={`text-3xl font-black ${color}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    </div>
+  )
+}
+
+function MoneyCard({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'rose' }) {
+  const color = {
+    slate: 'text-slate-900',
+    emerald: 'text-emerald-700',
+    rose: 'text-rose-700',
+  }[tone]
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className={`text-2xl font-black ${color}`}>{rupiah(value)}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    </div>
+  )
+}
+
+function EmptyRow({ colSpan, text }: { colSpan: number; text: string }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-4 py-16 text-center text-slate-400">{text}</td>
+    </tr>
+  )
+}
+
+function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button type="button" aria-label="Tutup modal" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
+      <form onSubmit={onSubmit} className="relative z-10 w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-blue-600" />
+              <h2 className="text-base font-bold text-slate-900">Santri Dadakan</h2>
+            </div>
+            <p className="text-xs leading-5 text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Nama Lengkap</span>
+            <input
+              required
+              autoFocus
+              value={dadakan.nama_lengkap}
+              onChange={e => setDadakan((prev: any) => ({ ...prev, nama_lengkap: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Nama santri"
+            />
+          </label>
+          <div>
+            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Jenis Kelamin</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(['L', 'P'] as const).map(jk => (
+                <button
+                  type="button"
+                  key={jk}
+                  onClick={() => setDadakan((prev: any) => ({ ...prev, jenis_kelamin: jk }))}
+                  className={`rounded-lg border px-3 py-2 text-sm font-bold ${dadakan.jenis_kelamin === jk ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  {jk === 'L' ? 'Laki-laki' : 'Perempuan'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sekolah</span>
+            <select
+              value={dadakan.sekolah}
+              onChange={e => setDadakan((prev: any) => ({ ...prev, sekolah: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Belum dipilih</option>
+              {SEKOLAH_LIST.map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            Masukkan ke PSB
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onClose, onSubmit }: any) {
+  const items = getPreviewItems(row)
+  const total = items.reduce((sum: number, item: any) => sum + item.nominal, 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button type="button" aria-label="Tutup modal pembayaran" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-emerald-700" />
+              <h2 className="text-lg font-bold text-slate-900">Pembayaran PSB</h2>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">{row.nama_lengkap} - {row.nis}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[420px_1fr]">
+          <div className="space-y-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase text-slate-500">Asrama / Kamar</p>
+              <p className="mt-1 font-bold text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</p>
+            </div>
+
+            <div className="space-y-3">
+              <PaymentOption
+                title="Uang Bangunan"
+                subtitle={`Sisa tagihan ${rupiah(row.pembayaran?.bangunan?.sisa ?? 0)}`}
+                checked={!!paymentItems[row.id]?.BANGUNAN}
+                disabled={(row.pembayaran?.bangunan?.sisa ?? 0) <= 0}
+                onChange={(checked: boolean) => togglePayment(row.id, 'BANGUNAN', checked)}
+              />
+              {paymentItems[row.id]?.BANGUNAN ? (
+                <label className="block rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <span className="mb-1 block text-[11px] font-bold uppercase text-emerald-700">Nominal Bangunan</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={row.pembayaran?.bangunan?.sisa ?? undefined}
+                    value={bangunanNominal[row.id] ?? ''}
+                    onChange={e => setBangunanNominal((prev: Record<string, string>) => ({ ...prev, [row.id]: e.target.value }))}
+                    placeholder="Contoh: 500000"
+                    className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+              ) : null}
+
+              {PAYMENT_TYPES.map(jenis => (
+                <PaymentOption
+                  key={jenis}
+                  title={paymentLabel(jenis)}
+                  subtitle={row.pembayaran?.tahunan?.[jenis]?.lunas ? 'Sudah lunas' : `${rupiah(row.pembayaran?.tahunan?.[jenis]?.nominal ?? 0)} tahun ${tahunTagihan}`}
+                  checked={!!paymentItems[row.id]?.[jenis]}
+                  disabled={!!row.pembayaran?.tahunan?.[jenis]?.lunas || Number(row.pembayaran?.tahunan?.[jenis]?.nominal ?? 0) <= 0}
+                  onChange={(checked: boolean) => togglePayment(row.id, jenis, checked)}
+                />
+              ))}
+            </div>
+
+            <button
+              disabled={busy || items.length === 0}
+              onClick={onSubmit}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Simpan & Cetak Kuitansi
+            </button>
+          </div>
+
+          <ReceiptPreview row={row} items={items} total={total} tahunTagihan={tahunTagihan} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PaymentOption({ title, subtitle, checked, disabled, onChange }: any) {
   return (
     <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'} ${disabled ? 'cursor-not-allowed opacity-55' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={e => onChange(e.target.checked)}
-        className="h-4 w-4 accent-emerald-700"
-      />
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} className="h-4 w-4 accent-emerald-700" />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold text-slate-900">{title}</span>
         <span className="block text-xs text-slate-500">{subtitle}</span>
@@ -593,17 +1068,7 @@ function PaymentOption({
   )
 }
 
-function ReceiptPreview({
-  row,
-  items,
-  total,
-  tahunTagihan,
-}: {
-  row: any
-  items: Array<{ label: string; tahun: string; nominal: number }>
-  total: number
-  tahunTagihan: number
-}) {
+function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
   return (
     <div className="bg-slate-100 p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -632,26 +1097,10 @@ function ReceiptPreview({
 
             <div className="mt-3 grid grid-cols-[1.1fr_auto_0.9fr] gap-3">
               <div className="space-y-1 text-[11px]">
-                <div className="grid grid-cols-[78px_8px_1fr]">
-                  <span className="text-slate-500">Nama Santri</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="font-bold text-slate-900">{row.nama_lengkap}</span>
-                </div>
-                <div className="grid grid-cols-[78px_8px_1fr]">
-                  <span className="text-slate-500">NIS</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">{row.nis || '-'}</span>
-                </div>
-                <div className="grid grid-cols-[78px_8px_1fr]">
-                  <span className="text-slate-500">Kelas</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">{row.sekolah || '-'}</span>
-                </div>
-                <div className="grid grid-cols-[78px_8px_1fr]">
-                  <span className="text-slate-500">Asrama</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</span>
-                </div>
+                <PreviewInfo label="Nama Santri" value={row.nama_lengkap} />
+                <PreviewInfo label="NIS" value={row.nis || '-'} />
+                <PreviewInfo label="Kelas" value={row.sekolah || '-'} />
+                <PreviewInfo label="Asrama" value={`${row.asrama || '-'} / ${row.kamar || '-'}`} />
               </div>
 
               <div className="pt-1 text-center">
@@ -660,26 +1109,10 @@ function ReceiptPreview({
               </div>
 
               <div className="space-y-1 text-[11px]">
-                <div className="grid grid-cols-[68px_8px_1fr]">
-                  <span className="text-slate-500">No. Bukti</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="font-bold text-slate-900">Nomor otomatis</span>
-                </div>
-                <div className="grid grid-cols-[68px_8px_1fr]">
-                  <span className="text-slate-500">Tanggal</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">Tanggal transaksi</span>
-                </div>
-                <div className="grid grid-cols-[68px_8px_1fr]">
-                  <span className="text-slate-500">Metode</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">Tunai</span>
-                </div>
-                <div className="grid grid-cols-[68px_8px_1fr]">
-                  <span className="text-slate-500">Petugas</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-slate-900">Bendahara</span>
-                </div>
+                <PreviewInfo label="No. Bukti" value="Nomor otomatis" />
+                <PreviewInfo label="Tanggal" value="Tanggal transaksi" />
+                <PreviewInfo label="Metode" value="Tunai" />
+                <PreviewInfo label="Petugas" value="Bendahara" />
               </div>
             </div>
 
@@ -697,7 +1130,7 @@ function ReceiptPreview({
                   </tr>
                 </thead>
                 <tbody>
-                  {items.length ? items.map(item => (
+                  {items.length ? items.map((item: any) => (
                     <tr key={`${item.label}-${item.tahun}`} className="border-t border-slate-100">
                       <td className="px-2 py-1.5 font-medium">{item.label}</td>
                       <td className="px-2 py-1.5 text-right">{rupiah(item.nominal)}</td>
@@ -730,6 +1163,16 @@ function ReceiptPreview({
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function PreviewInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[78px_8px_1fr]">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-400">:</span>
+      <span className="font-medium text-slate-900">{value}</span>
     </div>
   )
 }

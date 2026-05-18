@@ -362,12 +362,17 @@ export default function KamarClient({
                 <div className="mt-2 flex items-center gap-2">
                   <KamarStatusBadge
                     isi={selectedRoom.total_anggota}
-                    kuota={Math.max(0, selectedRoom.kuota - (selectedRoom.reserved_baru ?? 0))}
+                    kuota={selectedRoom.kuota}
                   />
                   <span className="text-sm font-semibold text-slate-600">
-                    {selectedRoom.total_anggota}/{Math.max(0, selectedRoom.kuota - (selectedRoom.reserved_baru ?? 0))} efektif
+                    {selectedRoom.total_anggota}/{selectedRoom.kuota} kuota fisik
                   </span>
                 </div>
+                {selectedRoom.reserved_baru ? (
+                  <p className="mt-1 text-xs text-slate-400">
+                    Reserve santri baru: {selectedRoom.reserved_baru} slot
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-2xl border bg-white p-4 shadow-sm xl:col-span-1">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Aksi Santri</p>
@@ -629,7 +634,7 @@ export default function KamarClient({
           </div>
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rooms.map((room) => {
-              const kuotaEfektif = Math.max(0, room.kuota - (room.reserved_baru ?? 0))
+              const kuotaFisik = Number(room.kuota ?? 0)
               return (
                 <button
                   key={room.nomor_kamar}
@@ -645,9 +650,9 @@ export default function KamarClient({
                           Blok {room.blok}
                         </span>
                       ) : null}
-                      <KamarStatusBadge isi={room.total_anggota} kuota={kuotaEfektif} />
+                      <KamarStatusBadge isi={room.total_anggota} kuota={kuotaFisik} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600">{room.total_anggota}/{kuotaEfektif}</span>
+                    <span className="text-xs font-bold text-slate-600">{room.total_anggota}/{kuotaFisik}</span>
                   </div>
                   <div className="px-3 py-2 space-y-2">
                     <div className="flex items-start justify-between gap-3">

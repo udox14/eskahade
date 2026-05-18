@@ -252,6 +252,59 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
   return result
 }
 
+async function getAsramaPsbStats() {
+  const kategoriSql = getKategoriSantriEfektifSql('s')
+  const placeholders = ASRAMA_LIST.map(() => '?').join(',')
+  const [quotaRows, placedRows] = await Promise.all([
+    query<{ asrama: string; total_kuota: number; kuota_baru: number }>(
+      `SELECT asrama,
+              SUM(COALESCE(kuota, 0)) AS total_kuota,
+              SUM(COALESCE(reserved_baru, 0)) AS kuota_baru
+       FROM kamar_config
+       WHERE asrama IN (${placeholders})
+       GROUP BY asrama`,
+      ASRAMA_LIST
+    ),
+    query<{ asrama: string; terisi_baru: number }>(
+      `SELECT s.asrama, COUNT(*) AS terisi_baru
+       FROM santri s
+       LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+       WHERE s.status_global = 'aktif'
+         AND s.asrama IS NOT NULL
+         AND TRIM(s.asrama) <> ''
+         AND ((${kategoriSql}) = 'BARU' OR pf.id IS NOT NULL)
+       GROUP BY s.asrama`
+    ),
+  ])
+
+  const quotaByAsrama = new Map(quotaRows.map((row) => [row.asrama, row]))
+  const placedByAsrama = new Map(placedRows.map((row) => [row.asrama, Number(row.terisi_baru ?? 0)]))
+
+  return ASRAMA_LIST.map((asrama) => {
+    const quota = quotaByAsrama.get(asrama)
+    const totalKuota = Number(quota?.total_kuota ?? 0)
+    const reservedKuota = Number(quota?.kuota_baru ?? 0)
+    const kuotaBaru = reservedKuota > 0 ? reservedKuota : totalKuota
+    const terisiBaru = Number(placedByAsrama.get(asrama) ?? 0)
+    const sisa = kuotaBaru - terisiBaru
+    return {
+      asrama,
+      total_kuota: totalKuota,
+      kuota_baru: kuotaBaru,
+      terisi_baru: terisiBaru,
+      sisa,
+      over: Math.max(0, terisiBaru - kuotaBaru),
+      status: kuotaBaru <= 0
+        ? (terisiBaru > 0 ? 'OVER' : 'BELUM_CONFIG')
+        : terisiBaru > kuotaBaru
+          ? 'OVER'
+          : terisiBaru === kuotaBaru
+            ? 'PENUH'
+            : 'TERSEDIA',
+    }
+  })
+}
+
 export async function getPsbDashboard(filters?: {
   q?: string
   sekolah?: string
@@ -266,6 +319,7 @@ export async function getPsbDashboard(filters?: {
   const tahunTagihan = Number(filters?.tahunTagihan ?? new Date().getFullYear())
   const rows = await getPsbRows(access, filters)
   const payments = await getPaymentInfoForRows(rows, tahunTagihan)
+  const asramaStats = await getAsramaPsbStats()
   const summary = STATUS_ORDER.reduce((acc, status) => ({ ...acc, [status]: 0 }), {} as Record<PsbStatus, number>)
   rows.forEach((row) => { summary[normalizeStatus(row.status)] += 1 })
 
@@ -277,6 +331,7 @@ export async function getPsbDashboard(filters?: {
       pembayaran: payments.get(row.id) ?? null,
     })),
     summary,
+    asramaStats,
     asramaList: ASRAMA_LIST,
     sekolahList: SEKOLAH_LIST,
     user: {
@@ -472,8 +527,8 @@ export async function getKamarPsb(asrama: string) {
   return query<any>(`
     SELECT kc.nomor_kamar, kc.kuota, COALESCE(kc.reserved_baru, 0) AS reserved_baru, kc.blok,
            COUNT(s.id) AS terisi,
-           MAX(0, kc.kuota - COUNT(s.id)) AS slot_kosong,
-           MIN(COALESCE(kc.reserved_baru, 0), MAX(0, kc.kuota - COUNT(s.id))) AS sisa_slot_baru
+           (kc.kuota - COUNT(s.id)) AS slot_kosong,
+           ((CASE WHEN COALESCE(kc.reserved_baru, 0) > 0 THEN COALESCE(kc.reserved_baru, 0) ELSE kc.kuota END) - COUNT(s.id)) AS sisa_slot_baru
     FROM kamar_config kc
     LEFT JOIN santri s ON s.asrama = kc.asrama AND s.kamar = kc.nomor_kamar AND s.status_global = 'aktif'
     WHERE kc.asrama = ?
@@ -506,15 +561,13 @@ export async function tempatkanKamarPsb(santriId: string, kamar: string) {
   const kamarRow = await queryOne<{ nomor_kamar: string; kuota: number; reserved_baru: number; terisi: number; sisa_slot_baru: number }>(`
     SELECT kc.nomor_kamar, kc.kuota, COALESCE(kc.reserved_baru, 0) AS reserved_baru,
            COUNT(s.id) AS terisi,
-           MIN(COALESCE(kc.reserved_baru, 0), MAX(0, kc.kuota - COUNT(s.id))) AS sisa_slot_baru
+           ((CASE WHEN COALESCE(kc.reserved_baru, 0) > 0 THEN COALESCE(kc.reserved_baru, 0) ELSE kc.kuota END) - COUNT(s.id)) AS sisa_slot_baru
     FROM kamar_config kc
     LEFT JOIN santri s ON s.asrama = kc.asrama AND s.kamar = kc.nomor_kamar AND s.status_global = 'aktif' AND s.id <> ?
     WHERE kc.asrama = ? AND kc.nomor_kamar = ?
     GROUP BY kc.asrama, kc.nomor_kamar, kc.kuota, kc.reserved_baru
   `, [santriId, row.asrama, targetKamar])
   if (!kamarRow) return { error: 'Kamar belum dikonfigurasi di asrama ini' }
-  if (Number(kamarRow.terisi) >= Number(kamarRow.kuota)) return { error: 'Kamar sudah penuh' }
-  if (Number(kamarRow.sisa_slot_baru) <= 0) return { error: 'Slot santri baru kamar ini sudah habis' }
 
   const db = await getDB()
   await db.batch([
