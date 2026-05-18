@@ -4,14 +4,25 @@ import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import {
+    ensurePengawasSchema,
+    getPengawasRuleConfig,
+    getSeniorRuleViolation,
+    normalizeJenisKelamin,
+    normalizePengawasTag,
+} from '../rules'
 
 export async function getPlottingPengawasStatus(eventId: number) {
+    await ensurePengawasSchema()
+
     // Info pengawas
     const pengawas = await query<any>(`
         SELECT 
             COUNT(id) as total,
             SUM(CASE WHEN tag = 'senior' THEN 1 ELSE 0 END) as total_senior,
-            SUM(CASE WHEN tag = 'junior' THEN 1 ELSE 0 END) as total_junior
+            SUM(CASE WHEN tag = 'junior' THEN 1 ELSE 0 END) as total_junior,
+            SUM(CASE WHEN jenis_kelamin = 'P' THEN 1 ELSE 0 END) as total_perempuan,
+            SUM(CASE WHEN jenis_kelamin = 'L' THEN 1 ELSE 0 END) as total_laki
         FROM ehb_pengawas WHERE ehb_event_id = ?
     `, [eventId])
 
@@ -47,6 +58,8 @@ export async function getPlottingPengawasStatus(eventId: number) {
 }
 
 export async function resetPlottingPengawas(eventId: number) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     
@@ -68,12 +81,18 @@ export async function resetPlottingPengawas(eventId: number) {
 }
 
 export async function autoPlotPengawas(eventId: number) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
     try {
         // 1. Ambil data pengawas
-        const pengawasObj = await query<any>(`SELECT id, tag FROM ehb_pengawas WHERE ehb_event_id = ?`, [eventId])
+        const pengawasObj = await query<any>(`
+            SELECT id, tag, jenis_kelamin
+            FROM ehb_pengawas
+            WHERE ehb_event_id = ?
+        `, [eventId])
         if (pengawasObj.length === 0) return { error: 'Belum ada pengawas terdaftar.' }
 
         // 2. Ambil jadwal aktif (tanggal & sesi yang ada ujiannya)
@@ -89,8 +108,15 @@ export async function autoPlotPengawas(eventId: number) {
         if (activeSesi.length === 0) return { error: 'Belum ada jadwal ujian yang terisi.' }
 
         // 3. Ambil ruangan (semua ruangan)
-        const ruanganList = await query<{id: number, nomor_ruangan: number}>(`SELECT id, nomor_ruangan FROM ehb_ruangan WHERE ehb_event_id = ? ORDER BY nomor_ruangan`, [eventId])
+        const ruanganList = await query<{id: number, nomor_ruangan: number, jenis_kelamin: string}>(`
+            SELECT id, nomor_ruangan, jenis_kelamin
+            FROM ehb_ruangan
+            WHERE ehb_event_id = ?
+            ORDER BY nomor_ruangan
+        `, [eventId])
         if (ruanganList.length === 0) return { error: 'Belum ada ruangan.' }
+
+        const seniorConfig = await getPengawasRuleConfig(eventId)
 
         // Jika slot > pengawas, berarti pengawas akan jaga berkali-kali
         
@@ -113,57 +139,104 @@ export async function autoPlotPengawas(eventId: number) {
             sesiPerTgl[s.tanggal].push(s.nomor_sesi)
         })
 
+        const pickCandidate = (
+            roomGender: 'L' | 'P',
+            tanggal: string,
+            nomorSesi: number,
+            isLastSession: boolean,
+            options?: {
+                requiredGender?: 'L' | 'P'
+                disallowGender?: 'L' | 'P'
+                ignoreBackToBack?: boolean
+            }
+        ) => {
+            const seeded = pengawasObj
+                .map(p => ({ ...p, seed: Math.random() }))
+                .sort((a, b) => a.seed - b.seed)
+                .sort((a, b) => tugasCount[a.id] - tugasCount[b.id])
+
+            for (const p of seeded) {
+                const pengawasGender = normalizeJenisKelamin(p.jenis_kelamin)
+                const pengawasTag = normalizePengawasTag(p.tag)
+
+                if (pengawasGender === 'P' && roomGender !== 'P') continue
+                if (options?.requiredGender && pengawasGender !== options.requiredGender) continue
+                if (options?.disallowGender && pengawasGender === options.disallowGender) continue
+
+                if (pengawasTag === 'senior') {
+                    const violation = getSeniorRuleViolation(seniorConfig, nomorSesi, isLastSession)
+                    if (violation) continue
+                }
+
+                const jagaDiSesiSama = historySesi[p.id].some(h => h.tgl === tanggal && h.sesi === nomorSesi)
+                if (jagaDiSesiSama) continue
+
+                if (!options?.ignoreBackToBack) {
+                    const lastTugas = historySesi[p.id].slice(-1)[0]
+                    if (lastTugas && lastTugas.tgl === tanggal && nomorSesi - lastTugas.sesi === 1) {
+                        continue
+                    }
+                }
+
+                return p
+            }
+
+            return null
+        }
+
         // Loop setiap slot: (tanggal, sesi, ruangan)
         for (const s of activeSesi) {
             const isLastSession = Math.max(...sesiPerTgl[s.tanggal]) === s.nomor_sesi
+            const femaleRooms = ruanganList
+                .filter(room => normalizeJenisKelamin(room.jenis_kelamin) === 'P')
+                .sort((a, b) => a.nomor_ruangan - b.nomor_ruangan)
+            const maleRooms = ruanganList
+                .filter(room => normalizeJenisKelamin(room.jenis_kelamin) !== 'P')
+                .sort((a, b) => a.nomor_ruangan - b.nomor_ruangan)
 
-            for (const r of ruanganList) {
-                // Cari pengawas yang cocok
-                let selectedP = null
-                
-                // Shuffle pengawas to randomize tie-breakers
-                const candidates = [...pengawasObj].sort(() => Math.random() - 0.5)
-                
-                // Sort by least assigned
-                candidates.sort((a, b) => tugasCount[a.id] - tugasCount[b.id])
+            const femaleCandidatesForSession = pengawasObj.filter(p => {
+                if (normalizeJenisKelamin(p.jenis_kelamin) !== 'P') return false
+                if (historySesi[p.id].some(h => h.tgl === s.tanggal && h.sesi === s.nomor_sesi)) return false
+                if (normalizePengawasTag(p.tag) === 'senior') {
+                    const violation = getSeniorRuleViolation(seniorConfig, s.nomor_sesi, isLastSession)
+                    if (violation) return false
+                }
+                return true
+            })
 
-                for (const p of candidates) {
-                    // Constraint 1: Senior tidak jaga sesi terakhir hari itu
-                    if (isLastSession && p.tag === 'senior') continue
+            const femaleBlockSize = Math.min(femaleRooms.length, femaleCandidatesForSession.length)
+            const reservedFemaleRoomIds = new Set(femaleRooms.slice(0, femaleBlockSize).map(room => room.id))
 
-                    // Constraint 2: Tidak boleh jaga sesi berurutan di hari yang sama
-                    const lastTugas = historySesi[p.id].slice(-1)[0]
-                    if (lastTugas && lastTugas.tgl === s.tanggal && (s.nomor_sesi - lastTugas.sesi === 1)) {
-                        continue // back-to-back
+            const roomSequence = [
+                ...maleRooms,
+                ...femaleRooms.filter(room => reservedFemaleRoomIds.has(room.id)),
+                ...femaleRooms.filter(room => !reservedFemaleRoomIds.has(room.id)),
+            ]
+
+            for (const r of roomSequence) {
+                const roomGender = normalizeJenisKelamin(r.jenis_kelamin)
+                const isReservedFemaleRoom = reservedFemaleRoomIds.has(r.id)
+
+                let selectedP = pickCandidate(roomGender, s.tanggal, s.nomor_sesi, isLastSession, {
+                    requiredGender: isReservedFemaleRoom ? 'P' : undefined,
+                    disallowGender: roomGender === 'P' && !isReservedFemaleRoom ? 'P' : undefined,
+                })
+
+                if (!selectedP) {
+                    selectedP = pickCandidate(roomGender, s.tanggal, s.nomor_sesi, isLastSession, {
+                        requiredGender: isReservedFemaleRoom ? 'P' : undefined,
+                        disallowGender: roomGender === 'P' && !isReservedFemaleRoom ? 'P' : undefined,
+                        ignoreBackToBack: true,
+                    })
+                }
+
+                if (!selectedP) {
+                    const targetRoomLabel = `ruangan ${r.nomor_ruangan}`
+                    return {
+                        error: `Jumlah pengawas tidak mencukupi untuk memenuhi ${targetRoomLabel} pada tanggal ${s.tanggal} sesi ${s.nomor_sesi}.`
                     }
-                    
-                    // Constraint 3: Tentu saja tidak boleh di assign 2x di sesi yang sama
-                    const jagaDiSesiSama = historySesi[p.id].some(h => h.tgl === s.tanggal && h.sesi === s.nomor_sesi)
-                    if (jagaDiSesiSama) continue
-
-                    // Memenuhi syarat!
-                    selectedP = p
-                    break
                 }
 
-                // Jika karena constraint yang sangat ketat kita tidak menemukan pengawas (misal semua back-to-back)
-                // Kita fallback ambil siapa saja yang belum jaga di sesi ini (mengabaikan back-to-back)
-                if (!selectedP) {
-                     for (const p of candidates) {
-                        const jagaDiSesiSama = historySesi[p.id].some(h => h.tgl === s.tanggal && h.sesi === s.nomor_sesi)
-                        if (!jagaDiSesiSama) {
-                            selectedP = p
-                            break
-                        }
-                     }
-                }
-
-                // Masih ga ketemu? (Pengawas lebih sedikit dari ruangan) -> ini error fatal
-                if (!selectedP) {
-                     return { error: `Jumlah pengawas tidak mencukupi untuk memenuhi Ruangan pada Tanggal ${s.tanggal} Sesi ${s.nomor_sesi}. Tambah pengawas lagi.` }
-                }
-
-                // Assign
                 insertStmts.push({
                     sql: `INSERT INTO ehb_jadwal_pengawas (ehb_event_id, pengawas_id, ruangan_id, tanggal, sesi_id) VALUES (?, ?, ?, ?, ?)`,
                     params: [eventId, selectedP.id, r.id, s.tanggal, s.sesi_id]

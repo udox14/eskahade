@@ -4,6 +4,14 @@ import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import {
+    ensurePengawasSchema,
+    getPengawasRuleConfig,
+    getSeniorRuleViolation,
+    normalizeJenisKelamin,
+    normalizePengawasTag,
+    upsertPengawasRuleConfig,
+} from './rules'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // EVENT
@@ -18,6 +26,8 @@ export async function getActiveEventLight() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function getPengawasList(eventId: number) {
+    await ensurePengawasSchema()
+
     try {
         return await query<any>(`
             SELECT p.*,
@@ -45,7 +55,7 @@ export async function getGuruList() {
 export async function getSadesaList() {
     try {
         return await query<any>(`
-            SELECT id, nama_lengkap as nama, nis, asrama, kamar
+            SELECT id, nama_lengkap as nama, nis, asrama, kamar, jenis_kelamin
             FROM santri
             WHERE status_global = 'aktif'
               AND kategori_santri = 'SADESA'
@@ -57,14 +67,22 @@ export async function getSadesaList() {
     }
 }
 
-export async function addPengawas(eventId: number, pengawas: { guru_id?: number, nama_pengawas: string, tag: string }[]) {
+export async function addPengawas(eventId: number, pengawas: { guru_id?: number, nama_pengawas: string, tag: string, jenis_kelamin: string }[]) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     if (pengawas.length === 0) return { error: 'Data kosong' }
 
     const stmts = pengawas.map(p => ({
-        sql: `INSERT INTO ehb_pengawas (ehb_event_id, guru_id, nama_pengawas, tag) VALUES (?, ?, ?, ?)`,
-        params: [eventId, p.guru_id || null, p.nama_pengawas, p.tag]
+        sql: `INSERT INTO ehb_pengawas (ehb_event_id, guru_id, nama_pengawas, tag, jenis_kelamin) VALUES (?, ?, ?, ?, ?)`,
+        params: [
+            eventId,
+            p.guru_id || null,
+            p.nama_pengawas,
+            normalizePengawasTag(p.tag),
+            normalizeJenisKelamin(p.jenis_kelamin),
+        ]
     }))
 
     await batch(stmts)
@@ -84,11 +102,16 @@ export async function addPengawas(eventId: number, pengawas: { guru_id?: number,
     return { success: true }
 }
 
-export async function updatePengawas(id: number, data: { nama_pengawas: string, tag: string }) {
+export async function updatePengawas(id: number, data: { nama_pengawas: string, tag: string, jenis_kelamin: string }) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
-    await execute(`UPDATE ehb_pengawas SET nama_pengawas = ?, tag = ? WHERE id = ?`, [data.nama_pengawas, data.tag, id])
+    await execute(
+        `UPDATE ehb_pengawas SET nama_pengawas = ?, tag = ?, jenis_kelamin = ? WHERE id = ?`,
+        [data.nama_pengawas, normalizePengawasTag(data.tag), normalizeJenisKelamin(data.jenis_kelamin), id]
+    )
     await logActivity({
         actor: actorFromSession(session),
         module: 'ehb_pengawas',
@@ -99,13 +122,15 @@ export async function updatePengawas(id: number, data: { nama_pengawas: string, 
         entityId: String(id),
         entityLabel: data.nama_pengawas,
         summary: `Memperbarui pengawas ${data.nama_pengawas}`,
-        details: { tag: data.tag },
+        details: { tag: normalizePengawasTag(data.tag), jenis_kelamin: normalizeJenisKelamin(data.jenis_kelamin) },
     })
     revalidatePath('/dashboard/ehb/pengawas')
     return { success: true }
 }
 
 export async function deletePengawas(id: number) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     const target = await queryOne<{ nama_pengawas: string }>('SELECT nama_pengawas FROM ehb_pengawas WHERE id = ?', [id])
@@ -134,9 +159,11 @@ export async function deletePengawas(id: number) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export async function getJadwalPengawasAll(eventId: number) {
+    await ensurePengawasSchema()
+
     // Return flat list of all assignments
     return query<any>(`
-        SELECT jp.*, p.nama_pengawas, p.tag, r.nomor_ruangan, r.nama_ruangan, r.jenis_kelamin,
+        SELECT jp.*, p.nama_pengawas, p.tag, p.jenis_kelamin as pengawas_jenis_kelamin, r.nomor_ruangan, r.nama_ruangan, r.jenis_kelamin,
                s.nomor_sesi, s.label as sesi_label, s.jam_group
         FROM ehb_jadwal_pengawas jp
         JOIN ehb_pengawas p ON p.id = jp.pengawas_id
@@ -161,40 +188,95 @@ export async function getRuanganList(eventId: number) {
     return query<any>(`SELECT * FROM ehb_ruangan WHERE ehb_event_id = ? ORDER BY nomor_ruangan`, [eventId])
 }
 
-export async function saveAssignmentManual(eventId: number, jpId: number | null, pengawasId: number, ruanganId: number, tanggal: string, sesiId: number) {
-     const session = await getSession()
-     if (!session) return { error: 'Unauthorized' }
+async function getLastSessionNumber(eventId: number, tanggal: string) {
+    const row = await queryOne<{ max_sesi: number | null }>(`
+        SELECT MAX(s.nomor_sesi) as max_sesi
+        FROM ehb_jadwal j
+        JOIN ehb_sesi s ON s.id = j.sesi_id
+        WHERE j.ehb_event_id = ? AND j.tanggal = ?
+    `, [eventId, tanggal])
 
-     try {
-         if (jpId) {
-             await execute(`UPDATE ehb_jadwal_pengawas SET pengawas_id = ? WHERE id = ?`, [pengawasId, jpId])
-         } else {
-             await execute(`
-                 INSERT INTO ehb_jadwal_pengawas (ehb_event_id, pengawas_id, ruangan_id, tanggal, sesi_id)
-                 VALUES (?, ?, ?, ?, ?)
-             `, [eventId, pengawasId, ruanganId, tanggal, sesiId])
-         }
-         await logActivity({
-             actor: actorFromSession(session),
-             module: 'ehb_pengawas',
-             action: jpId ? 'update' : 'create',
-             fiturHref: '/dashboard/ehb/pengawas',
-             logKind: jpId ? 'update' : 'create',
-             entityType: 'ehb_jadwal_pengawas',
-             entityId: jpId ? String(jpId) : `${eventId}:${pengawasId}:${ruanganId}:${tanggal}:${sesiId}`,
-             entityLabel: 'Jadwal pengawas EHB',
-             summary: `${jpId ? 'Memperbarui' : 'Menambahkan'} jadwal pengawas manual`,
-             details: { event_id: eventId, pengawas_id: pengawasId, ruangan_id: ruanganId, tanggal, sesi_id: sesiId },
-         })
-         revalidatePath('/dashboard/ehb/pengawas')
-         return { success: true }
-     } catch(err: any) {
-         if (err.message?.includes('UNIQUE')) return { error: 'Pengawas ini sudah bertugas di sesi yang sama, atau ruangan sudah terisi.'}
-         return { error: err.message }
-     }
+    return Number(row?.max_sesi || 0)
+}
+
+export async function saveAssignmentManual(eventId: number, jpId: number | null, pengawasId: number, ruanganId: number, tanggal: string, sesiId: number) {
+    await ensurePengawasSchema()
+
+    const session = await getSession()
+    if (!session) return { error: 'Unauthorized' }
+
+    const detail = await queryOne<{
+        nama_pengawas: string
+        tag: string
+        pengawas_jenis_kelamin: string
+        ruangan_jenis_kelamin: string
+        nomor_sesi: number
+    }>(`
+        SELECT
+            p.nama_pengawas,
+            p.tag,
+            p.jenis_kelamin as pengawas_jenis_kelamin,
+            r.jenis_kelamin as ruangan_jenis_kelamin,
+            s.nomor_sesi
+        FROM ehb_pengawas p
+        JOIN ehb_ruangan r ON r.id = ?
+        JOIN ehb_sesi s ON s.id = ?
+        WHERE p.id = ?
+    `, [ruanganId, sesiId, pengawasId])
+
+    if (!detail) return { error: 'Data pengawas, ruangan, atau sesi tidak ditemukan.' }
+
+    const pengawasGender = normalizeJenisKelamin(detail.pengawas_jenis_kelamin)
+    const ruanganGender = normalizeJenisKelamin(detail.ruangan_jenis_kelamin)
+
+    if (pengawasGender === 'P' && ruanganGender !== 'P') {
+        return { error: `Pengawas perempuan hanya boleh diplot di ruangan perempuan.` }
+    }
+
+    if (normalizePengawasTag(detail.tag) === 'senior') {
+        const lastSessionNumber = await getLastSessionNumber(eventId, tanggal)
+        const config = await getPengawasRuleConfig(eventId)
+        const violation = getSeniorRuleViolation(
+            config,
+            detail.nomor_sesi,
+            lastSessionNumber > 0 && detail.nomor_sesi === lastSessionNumber
+        )
+
+        if (violation) return { error: violation }
+    }
+
+    try {
+        if (jpId) {
+            await execute(`UPDATE ehb_jadwal_pengawas SET pengawas_id = ? WHERE id = ?`, [pengawasId, jpId])
+        } else {
+            await execute(`
+                INSERT INTO ehb_jadwal_pengawas (ehb_event_id, pengawas_id, ruangan_id, tanggal, sesi_id)
+                VALUES (?, ?, ?, ?, ?)
+            `, [eventId, pengawasId, ruanganId, tanggal, sesiId])
+        }
+        await logActivity({
+            actor: actorFromSession(session),
+            module: 'ehb_pengawas',
+            action: jpId ? 'update' : 'create',
+            fiturHref: '/dashboard/ehb/pengawas',
+            logKind: jpId ? 'update' : 'create',
+            entityType: 'ehb_jadwal_pengawas',
+            entityId: jpId ? String(jpId) : `${eventId}:${pengawasId}:${ruanganId}:${tanggal}:${sesiId}`,
+            entityLabel: 'Jadwal pengawas EHB',
+            summary: `${jpId ? 'Memperbarui' : 'Menambahkan'} jadwal pengawas manual`,
+            details: { event_id: eventId, pengawas_id: pengawasId, ruangan_id: ruanganId, tanggal, sesi_id: sesiId },
+        })
+        revalidatePath('/dashboard/ehb/pengawas')
+        return { success: true }
+    } catch(err: any) {
+        if (err.message?.includes('UNIQUE')) return { error: 'Pengawas ini sudah bertugas di sesi yang sama, atau ruangan sudah terisi.'}
+        return { error: err.message }
+    }
 }
 
 export async function deleteAssignment(jpId: number) {
+    await ensurePengawasSchema()
+
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
     await execute(`DELETE FROM ehb_jadwal_pengawas WHERE id = ?`, [jpId])
@@ -217,6 +299,8 @@ export async function deleteAssignment(jpId: number) {
 // CETAK KARTU PENGAWAS
 // ──────────────────────────────────────────────────────────────────────────────
 export async function getKartuPengawasData(eventId: number, pengawasId: number) {
+    await ensurePengawasSchema()
+
     const pengawas = await queryOne<any>(`SELECT * FROM ehb_pengawas WHERE id = ?`, [pengawasId])
     if (!pengawas) return null
 
@@ -230,4 +314,37 @@ export async function getKartuPengawasData(eventId: number, pengawasId: number) 
     `, [pengawasId])
 
     return { pengawas, tugas }
+}
+
+export async function getPengawasRuleConfigForEvent(eventId: number) {
+    return getPengawasRuleConfig(eventId)
+}
+
+export async function savePengawasRuleConfigForEvent(eventId: number, data: {
+    senior_allowed_sesi: number[]
+    senior_blocked_sesi: number[]
+    senior_avoid_last_session: boolean
+}) {
+    await ensurePengawasSchema()
+
+    const session = await getSession()
+    if (!session) return { error: 'Unauthorized' }
+
+    const saved = await upsertPengawasRuleConfig(eventId, data)
+    await logActivity({
+        actor: actorFromSession(session),
+        module: 'ehb_pengawas',
+        action: 'update',
+        fiturHref: '/dashboard/ehb/pengawas',
+        logKind: 'update',
+        entityType: 'ehb_pengawas_config',
+        entityId: String(eventId),
+        entityLabel: 'Rule senior pengawas EHB',
+        summary: `Memperbarui rule pengawas senior EHB`,
+        details: saved,
+    })
+
+    revalidatePath('/dashboard/ehb/pengawas')
+    revalidatePath('/dashboard/ehb/pengawas/plotting')
+    return { success: true, config: saved }
 }

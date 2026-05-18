@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { getPlottingPengawasStatus, resetPlottingPengawas, autoPlotPengawas } from './actions'
-import { getActiveEventLight } from '../actions'
+import { getActiveEventLight, getPengawasRuleConfigForEvent, getSesiList, savePengawasRuleConfigForEvent } from '../actions'
 import {
-  Users, RefreshCw, Play, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, Info, CalendarCheck
+  Users, RefreshCw, Play, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, Info, CalendarCheck, Settings, X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -18,6 +18,13 @@ export default function PlottingPengawasPage() {
   const [status, setStatus] = useState<any>({ total: 0, total_senior: 0, total_junior: 0 })
   const [slotDibutuhkan, setSlotDibutuhkan] = useState(0)
   const [terplot, setTerplot] = useState(0)
+  const [sesiList, setSesiList] = useState<any[]>([])
+  const [showRuleModal, setShowRuleModal] = useState(false)
+  const [ruleConfig, setRuleConfig] = useState({
+    senior_allowed_sesi: [] as number[],
+    senior_blocked_sesi: [] as number[],
+    senior_avoid_last_session: true,
+  })
   
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -32,12 +39,42 @@ export default function PlottingPengawasPage() {
     setEvent(evt || null)
     
     if (evt) {
-      const res = await getPlottingPengawasStatus(evt.id)
+      const [res, sesi, config] = await Promise.all([
+        getPlottingPengawasStatus(evt.id),
+        getSesiList(evt.id),
+        getPengawasRuleConfigForEvent(evt.id),
+      ])
       setStatus(res.pengawas)
       setSlotDibutuhkan(res.slotDibutuhkan)
       setTerplot(res.terplot)
+      setSesiList(sesi)
+      setRuleConfig(config)
     }
     setLoading(false)
+  }
+
+  const toggleSesi = (key: 'senior_allowed_sesi' | 'senior_blocked_sesi', nomorSesi: number) => {
+    setRuleConfig(prev => {
+      const exists = prev[key].includes(nomorSesi)
+      const nextList = exists
+        ? prev[key].filter(item => item !== nomorSesi)
+        : [...prev[key], nomorSesi].sort((a, b) => a - b)
+
+      return { ...prev, [key]: nextList }
+    })
+  }
+
+  const handleSaveRules = async () => {
+    if (!event) return
+
+    setProcessing(true)
+    const res = await savePengawasRuleConfigForEvent(event.id, ruleConfig)
+    setProcessing(false)
+
+    if ('error' in res) return toast.error(res.error)
+    setRuleConfig(res.config)
+    setShowRuleModal(false)
+    toast.success('Rule pengawas senior disimpan.')
   }
 
   const handleAutoPlot = async () => {
@@ -54,7 +91,8 @@ export default function PlottingPengawasPage() {
       'Sistem akan menyusun jadwal pengawas dengan aturan:\n' +
       '1. Pemerataan beban tugas\n' +
       '2. Pencegahan jaga berturut-turut (back-to-back)\n' +
-      '3. Pengawas Senior tidak dialokasikan di sesi terakhir\n\n' +
+      '3. Pengawas perempuan hanya di ruangan perempuan dan ditempatkan berurutan\n' +
+      '4. Pengawas senior mengikuti rule sesi yang sedang aktif\n\n' +
       'Perhatian: Tindakan ini akan MENGHAPUS semua jadwal pengawas yang ada saat ini.'
     )) return
 
@@ -118,6 +156,7 @@ export default function PlottingPengawasPage() {
                     <p className="text-xs text-slate-500 font-bold mb-1">Total Pengawas</p>
                     <p className="text-2xl font-black text-slate-800">{status.total} <span className="text-sm font-normal text-slate-500">Orang</span></p>
                     <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{status.total_senior} Senior • {status.total_junior} Junior</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{status.total_laki || 0} Laki-laki • {status.total_perempuan || 0} Perempuan</p>
                 </div>
                 <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center">
                     <Users className="w-6 h-6 text-slate-500"/>
@@ -177,10 +216,21 @@ export default function PlottingPengawasPage() {
                     <ul className="list-disc ml-4 space-y-1 text-xs">
                         <li>Mengurutkan pengawas berdasarkan yang paling sedikit mendapat tugas (Pemerataan).</li>
                         <li>Mencegah pengawas menjaga 2 sesi berturut-turut di hari yang sama.</li>
-                        <li>Mencegah pengawas dengan Tag <b>Senior</b> menjaga di sesi terakhir hari tersebut.</li>
+                        <li>Pengawas perempuan hanya boleh di ruangan perempuan.</li>
+                        <li>Ruangan pengawas perempuan dibuat berurutan agar tidak terpencar.</li>
+                        <li>Pengawas senior mengikuti rule sesi yang diatur dari modal.</li>
                     </ul>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => setShowRuleModal(true)}
+                  disabled={processing}
+                  className="w-full bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Settings className="w-5 h-5"/>
+                  Atur Rule Pengawas Senior
+                </button>
 
                 <button 
                   onClick={handleAutoPlot}
@@ -206,6 +256,104 @@ export default function PlottingPengawasPage() {
           </div>
         </div>
       </div>
+
+      {showRuleModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-800">Rule Pengawas Senior</h3>
+                <p className="text-xs text-slate-500 mt-1">Aturan ini dipakai saat auto plotting dan isi jadwal manual.</p>
+              </div>
+              <button onClick={() => setShowRuleModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5"/>
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ruleConfig.senior_avoid_last_session}
+                  onChange={e => setRuleConfig(prev => ({ ...prev, senior_avoid_last_session: e.target.checked }))}
+                  className="mt-1 accent-indigo-600"
+                />
+                <div>
+                  <p className="font-bold text-slate-800">Hindari sesi terakhir per hari</p>
+                  <p className="text-xs text-slate-500 mt-1">Jika aktif, pengawas senior tidak akan diplot di sesi terakhir pada tanggal ujian tersebut.</p>
+                </div>
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border rounded-xl p-4">
+                  <p className="font-bold text-slate-800">Hanya boleh di sesi</p>
+                  <p className="text-xs text-slate-500 mt-1">Kosongkan bila senior boleh masuk semua sesi.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {sesiList.map(sesi => (
+                      <button
+                        key={`allow-${sesi.id}`}
+                        type="button"
+                        onClick={() => toggleSesi('senior_allowed_sesi', sesi.nomor_sesi)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-bold ${
+                          ruleConfig.senior_allowed_sesi.includes(sesi.nomor_sesi)
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Sesi {sesi.nomor_sesi}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <p className="font-bold text-slate-800">Blok sesi tertentu</p>
+                  <p className="text-xs text-slate-500 mt-1">Centang sesi yang tidak boleh diisi pengawas senior.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {sesiList.map(sesi => (
+                      <button
+                        key={`block-${sesi.id}`}
+                        type="button"
+                        onClick={() => toggleSesi('senior_blocked_sesi', sesi.nomor_sesi)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-bold ${
+                          ruleConfig.senior_blocked_sesi.includes(sesi.nomor_sesi)
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Sesi {sesi.nomor_sesi}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600">
+                Prioritas rule:
+                jika daftar "hanya boleh" diisi, senior hanya bisa masuk sesi tersebut;
+                lalu daftar blokir tetap berlaku;
+                lalu opsi hindari sesi terakhir diterapkan.
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowRuleModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveRules}
+                disabled={processing}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Simpan Rule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

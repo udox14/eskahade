@@ -5,10 +5,53 @@ import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
+type PlotSantri = {
+  santri_id: string
+  marhalah_urutan: number
+  marhalah_nama: string
+}
+
+type PlottingStatusRow = {
+  jenis_kelamin: string
+  jam_group: string
+  total_santri: number
+  terplot: number
+}
+
+type KapasitasRuanganRow = {
+  jenis_kelamin: string
+  total_kapasitas: number
+  total_ruangan: number
+}
+
+type RuanganSeatRow = {
+  id: number
+  nomor_ruangan: number
+  kapasitas: number
+}
+
+type BatchStatement = {
+  sql: string
+  params: unknown[]
+}
+
+type UnplottedSantriRow = {
+  id: string
+  nama_lengkap: string
+  nis: string
+  jenis_kelamin: string
+  nama_kelas: string
+  jam_group: string
+}
+
+function normalizeMarhalahKey(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 export async function getPlottingStatus(eventId: number) {
   // Ambil total santri aktif yang punya kelas dan map ke jam group via ehb_kelas_jam
   // Dikelompokkan per L/P
-  const status = await query<any>(`
+  const status = await query<PlottingStatusRow>(`
     SELECT 
       s.jenis_kelamin,
       kj.jam_group,
@@ -25,7 +68,7 @@ export async function getPlottingStatus(eventId: number) {
   `, [eventId, eventId])
 
   // Ambil total kapasitas ruangan per L/P
-  const kapasitas = await query<any>(`
+  const kapasitas = await query<KapasitasRuanganRow>(`
     SELECT jenis_kelamin, SUM(kapasitas) as total_kapasitas, COUNT(id) as total_ruangan
     FROM ehb_ruangan
     WHERE ehb_event_id = ?
@@ -73,25 +116,25 @@ export async function autoPlotSantri(eventId: number) {
     if (jamGroups.length === 0) return { error: 'Belum ada mapping kelas ke jam group. Atur dulu di menu Jadwal EHB.' }
 
     // 2. Ambil semua ruangan per jenis_kelamin
-    const ruanganL = await query<any>(`SELECT id, nomor_ruangan, kapasitas FROM ehb_ruangan WHERE ehb_event_id = ? AND jenis_kelamin = 'L' ORDER BY nomor_ruangan`, [eventId])
-    const ruanganP = await query<any>(`SELECT id, nomor_ruangan, kapasitas FROM ehb_ruangan WHERE ehb_event_id = ? AND jenis_kelamin = 'P' ORDER BY nomor_ruangan`, [eventId])
+    const ruanganL = await query<RuanganSeatRow>(`SELECT id, nomor_ruangan, kapasitas FROM ehb_ruangan WHERE ehb_event_id = ? AND jenis_kelamin = 'L' ORDER BY nomor_ruangan`, [eventId])
+    const ruanganP = await query<RuanganSeatRow>(`SELECT id, nomor_ruangan, kapasitas FROM ehb_ruangan WHERE ehb_event_id = ? AND jenis_kelamin = 'P' ORDER BY nomor_ruangan`, [eventId])
 
     if (ruanganL.length === 0 && ruanganP.length === 0) return { error: 'Belum ada ruangan yang dikonfigurasi.' }
 
     // Hapus plotting lama untuk event ini
     await execute(`DELETE FROM ehb_plotting_santri WHERE ehb_event_id = ?`, [eventId])
 
-    const insertStmts: {sql: string, params: any[]}[] = []
+    const insertStmts: BatchStatement[] = []
 
     // 3. Proses untuk setiap jenis kelamin dan setiap jam group secara terpisah
-    const processPlotting = async (jk: string, ruanganList: any[]) => {
+    const processPlotting = async (jk: string, ruanganList: RuanganSeatRow[]) => {
       if (ruanganList.length === 0) return
 
       for (const jg of jamGroups) {
         // Ambil santri yang sesuai JK, belum lulus, punya kelas, dan kelasnya masuk ke jam_group ini
         // Kita juga ambil urutan marhalah untuk cross seating
-        const santriList = await query<any>(`
-          SELECT s.id as santri_id, m.urutan as marhalah_urutan
+        const santriList = await query<PlotSantri>(`
+          SELECT s.id as santri_id, m.urutan as marhalah_urutan, m.nama as marhalah_nama
           FROM santri s
           JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
           JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ? AND kj.jam_group = ?
@@ -103,40 +146,61 @@ export async function autoPlotSantri(eventId: number) {
 
         if (santriList.length === 0) continue
 
-        // Bagi marhalah menjadi 2 track (Ganjil/Genap) berdasarkan urutan marhalah
-        const uniqueMarhalahUrutan = Array.from(new Set(santriList.map((s:any) => s.marhalah_urutan))).sort((a:any, b:any) => a - b)
-        
-        const trackA: string[] = [] // Akan mengisi kursi ganjil
-        const trackB: string[] = [] // Akan mengisi kursi genap
-        
-        santriList.forEach((s: any) => {
-          const idx = uniqueMarhalahUrutan.indexOf(s.marhalah_urutan)
-          if (idx % 2 === 0) {
-            trackA.push(s.santri_id)
+        // Bagi marhalah menjadi 2 track (ganjil/genap).
+        // Cari marhalah dengan jumlah peserta terbanyak pada jam_group ini.
+        // Semua peserta marhalah dominan masuk kursi ganjil.
+        // Semua peserta marhalah lain masuk kursi genap.
+        const marhalahCounts = new Map<string, { count: number; urutan: number; nama: string }>()
+        for (const santri of santriList) {
+          const key = `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}`
+          const existing = marhalahCounts.get(key)
+          if (existing) {
+            existing.count += 1
           } else {
-            trackB.push(s.santri_id)
+            marhalahCounts.set(key, {
+              count: 1,
+              urutan: santri.marhalah_urutan,
+              nama: santri.marhalah_nama,
+            })
           }
-        })
+        }
+
+        const dominantMarhalahKey = Array.from(marhalahCounts.entries())
+          .sort((a, b) => {
+            if (b[1].count !== a[1].count) return b[1].count - a[1].count
+            if (a[1].urutan !== b[1].urutan) return a[1].urutan - b[1].urutan
+            return a[1].nama.localeCompare(b[1].nama)
+          })[0]?.[0]
+
+        if (!dominantMarhalahKey) continue
+
+        const trackOdd = santriList.filter(
+          santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` === dominantMarhalahKey
+        )
+        const trackEven = santriList.filter(
+          santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` !== dominantMarhalahKey
+        )
 
         // Mulai masukkan ke ruangan berurutan
         for (const r of ruanganList) {
           let kursi = 1
-          while (kursi <= r.kapasitas && (trackA.length > 0 || trackB.length > 0)) {
-            let sid: string | undefined
-            
+          while (kursi <= r.kapasitas && (trackOdd.length > 0 || trackEven.length > 0)) {
+            let chosenSeat: PlotSantri | undefined
+
             if (kursi % 2 === 1) {
-              // Kursi ganjil prioritas ambil dari trackA
-              sid = trackA.shift() || trackB.shift()
+              chosenSeat = trackOdd.shift()
             } else {
-              // Kursi genap prioritas ambil dari trackB
-              sid = trackB.shift() || trackA.shift()
+              chosenSeat = trackEven.shift()
             }
 
-            if (!sid) break
+            if (!chosenSeat) {
+              kursi++
+              continue
+            }
 
             insertStmts.push({
               sql: `INSERT INTO ehb_plotting_santri (ehb_event_id, ruangan_id, santri_id, nomor_kursi, jam_group) VALUES (?, ?, ?, ?, ?)`,
-              params: [eventId, r.id, sid, kursi, jg]
+              params: [eventId, r.id, chosenSeat.santri_id, kursi, jg]
             })
             kursi++
           }
@@ -171,14 +235,15 @@ export async function autoPlotSantri(eventId: number) {
 
     return { success: true, count: insertStmts.length }
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Auto Plotting Error:", err)
-    return { error: 'Terjadi kesalahan sistem saat plotting: ' + err.message }
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return { error: 'Terjadi kesalahan sistem saat plotting: ' + message }
   }
 }
 
 export async function getUnplottedSantri(eventId: number) {
-   return query<any>(`
+   return query<UnplottedSantriRow>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.jenis_kelamin, k.nama_kelas, kj.jam_group
     FROM santri s
     JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'

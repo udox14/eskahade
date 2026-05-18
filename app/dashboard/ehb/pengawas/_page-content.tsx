@@ -28,7 +28,7 @@ export default function PengawasEhbPage() {
 
   // Form Pengawas (Edit saja - single)
   const [showEditForm, setShowEditForm] = useState(false)
-  const [formData, setFormData] = useState({ id: 0, nama_pengawas: '', tag: 'junior' })
+  const [formData, setFormData] = useState({ id: 0, nama_pengawas: '', tag: 'junior', jenis_kelamin: 'L' })
 
   // Form Tambah Massal
   const [showAddModal, setShowAddModal] = useState(false)
@@ -36,6 +36,7 @@ export default function PengawasEhbPage() {
   const [selectedGurus, setSelectedGurus] = useState<Set<number>>(new Set())
   const [selectedSadesa, setSelectedSadesa] = useState<Set<string>>(new Set())
   const [defaultTag, setDefaultTag] = useState('junior')
+  const [defaultGender, setDefaultGender] = useState<'L' | 'P'>('L')
   const [guruSearch, setGuruSearch] = useState('')
   const [sadesaSearch, setSadesaSearch] = useState('')
 
@@ -108,6 +109,7 @@ export default function PengawasEhbPage() {
     setSelectedGurus(new Set())
     setSelectedSadesa(new Set())
     setDefaultTag('junior')
+    setDefaultGender('L')
     setGuruSearch('')
     setSadesaSearch('')
     setAddTab('guru')
@@ -115,7 +117,7 @@ export default function PengawasEhbPage() {
   }
 
   const handleOpenEdit = (p: any) => {
-    setFormData({ id: p.id, nama_pengawas: p.nama_pengawas, tag: p.tag })
+    setFormData({ id: p.id, nama_pengawas: p.nama_pengawas, tag: p.tag, jenis_kelamin: p.jenis_kelamin || 'L' })
     setShowEditForm(true)
   }
 
@@ -131,7 +133,7 @@ export default function PengawasEhbPage() {
 
     const payload = toAdd.map(gid => {
       const g = guruList.find((x: any) => x.id === gid)
-      return { guru_id: gid, nama_pengawas: g?.nama || '', tag: defaultTag }
+      return { guru_id: gid, nama_pengawas: g?.nama || '', tag: defaultTag, jenis_kelamin: defaultGender }
     })
     const res = await addPengawas(event.id, payload)
     if ('error' in res) return toast.error(res.error)
@@ -154,7 +156,7 @@ export default function PengawasEhbPage() {
 
     const payload = toAdd.map(id => {
       const s = sadesaList.find((x: any) => x.id === id)
-      return { nama_pengawas: s?.nama || '', tag: defaultTag }
+      return { nama_pengawas: s?.nama || '', tag: defaultTag, jenis_kelamin: s?.jenis_kelamin || 'L' }
     })
     const res = await addPengawas(event.id, payload)
     if ('error' in res) return toast.error(res.error)
@@ -167,7 +169,11 @@ export default function PengawasEhbPage() {
   const handleSavePengawas = async () => {
     if (!event) return
     if (!formData.nama_pengawas.trim()) return toast.error('Nama pengawas tidak boleh kosong')
-    const res = await updatePengawas(formData.id, { nama_pengawas: formData.nama_pengawas, tag: formData.tag })
+    const res = await updatePengawas(formData.id, {
+      nama_pengawas: formData.nama_pengawas,
+      tag: formData.tag,
+      jenis_kelamin: formData.jenis_kelamin,
+    })
     if ('error' in res) return toast.error(res.error)
     toast.success('Data pengawas disimpan')
     setShowEditForm(false)
@@ -271,6 +277,7 @@ export default function PengawasEhbPage() {
                          <tr>
                              <th className="px-5 py-3 font-bold text-slate-500 text-xs uppercase w-10">No</th>
                              <th className="px-5 py-3 font-bold text-slate-500 text-xs uppercase">Nama Pengawas</th>
+                             <th className="px-5 py-3 font-bold text-slate-500 text-xs uppercase text-center">JK</th>
                              <th className="px-5 py-3 font-bold text-slate-500 text-xs uppercase text-center">Status</th>
                              <th className="px-5 py-3 font-bold text-slate-500 text-xs uppercase text-center">Total Tugas</th>
                              <th className="px-5 py-3 w-32"></th>
@@ -284,6 +291,11 @@ export default function PengawasEhbPage() {
                                      <p className="font-bold text-slate-800">{p.nama_pengawas}</p>
                                      {p.guru_id && <span className="text-[10px] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Guru Terdaftar</span>}
                                      {!p.guru_id && <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">SADESA</span>}
+                                 </td>
+                                 <td className="px-5 py-3 text-center">
+                                     <span className={`px-2 py-1 rounded text-xs font-bold border ${p.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                         {p.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'}
+                                     </span>
                                  </td>
                                  <td className="px-5 py-3 text-center">
                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${p.tag === 'senior' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
@@ -358,6 +370,7 @@ export default function PengawasEhbPage() {
                                                         {ruanganList.map(r => {
                                                             const cell = getCellData(tgl, sesi.id, r.id)
                                                             const isEditing = editCell?.tgl === tgl && editCell?.sesiId === sesi.id && editCell?.ruanganId === r.id
+                                                            const availablePengawas = pengawasList.filter(p => r.jenis_kelamin === 'P' || p.jenis_kelamin !== 'P')
                                                             
                                                             return (
                                                                 <td key={r.id} className="border p-2 relative">
@@ -371,8 +384,8 @@ export default function PengawasEhbPage() {
                                                                                 onBlur={() => setEditCell(null)}
                                                                             >
                                                                                 <option value={0}>-- KOSONG --</option>
-                                                                                {pengawasList.map(p => (
-                                                                                    <option key={p.id} value={p.id}>{p.nama_pengawas} ({p.tag})</option>
+                                                                                {availablePengawas.map(p => (
+                                                                                    <option key={p.id} value={p.id}>{p.nama_pengawas} ({p.tag} • {p.jenis_kelamin === 'P' ? 'P' : 'L'})</option>
                                                                                 ))}
                                                                             </select>
                                                                         </div>
@@ -384,7 +397,12 @@ export default function PengawasEhbPage() {
                                                                             {cell ? (
                                                                                 <div className="text-center">
                                                                                     <p className="text-xs font-bold text-indigo-900 leading-tight">{cell.nama_pengawas}</p>
-                                                                                    <span className={`text-[9px] uppercase font-bold px-1 rounded ${cell.tag==='senior' ? 'bg-amber-100 text-amber-700' : 'text-slate-400'}`}>{cell.tag}</span>
+                                                                                    <div className="mt-1 flex items-center justify-center gap-1">
+                                                                                      <span className={`text-[9px] uppercase font-bold px-1 rounded ${cell.tag==='senior' ? 'bg-amber-100 text-amber-700' : 'text-slate-400'}`}>{cell.tag}</span>
+                                                                                      <span className={`text-[9px] font-bold px-1 rounded ${cell.pengawas_jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                                        {cell.pengawas_jenis_kelamin === 'P' ? 'P' : 'L'}
+                                                                                      </span>
+                                                                                    </div>
                                                                                 </div>
                                                                             ) : (
                                                                                 <span className="text-slate-300 text-xs">-</span>
@@ -442,6 +460,21 @@ export default function PengawasEhbPage() {
                   <span className="text-xs text-slate-700">Senior</span>
                 </label>
               </div>
+              {addTab === 'guru' ? (
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-500">JK Default:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="defaultGender" value="L" checked={defaultGender === 'L'} onChange={() => setDefaultGender('L')} className="accent-indigo-600"/>
+                    <span className="text-xs text-slate-700">Laki-laki</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="defaultGender" value="P" checked={defaultGender === 'P'} onChange={() => setDefaultGender('P')} className="accent-indigo-600"/>
+                    <span className="text-xs text-slate-700">Perempuan</span>
+                  </label>
+                </div>
+              ) : (
+                <p className="mt-3 text-[11px] text-slate-500">Jenis kelamin pengawas SADESA mengikuti data santri.</p>
+              )}
             </div>
 
             {addTab === 'guru' && (
@@ -624,6 +657,17 @@ export default function PengawasEhbPage() {
                 >
                   <option value="junior">Junior</option>
                   <option value="senior">Senior</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500">Jenis Kelamin</label>
+                <select
+                  value={formData.jenis_kelamin}
+                  onChange={e => setFormData({...formData, jenis_kelamin: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                >
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
                 </select>
               </div>
               <button
