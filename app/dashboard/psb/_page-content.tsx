@@ -563,33 +563,15 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
         <StatCard label="Over Kuota" value={Math.max(0, totalTerisi - totalKuotaBaru)} tone="rose" />
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <TableTitle icon={<Building2 className="h-4 w-4" />} title="Kuota Asrama" description="Jika penuh, penempatan tetap bisa disimpan dan akan diberi status over." />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Asrama</th>
-                <th className="px-4 py-3 text-right">Kuota Baru</th>
-                <th className="px-4 py-3 text-right">Terisi Baru</th>
-                <th className="px-4 py-3 text-right">Sisa</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {stats.map((item: any) => (
-                <tr key={item.asrama} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-bold text-slate-900">{item.asrama}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.kuota_baru}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.terisi_baru}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.sisa}</td>
-                  <td className="px-4 py-3"><AsramaStatusBadge status={item.status} over={item.over} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <QuotaAccordion
+        icon={<Building2 className="h-4 w-4" />}
+        title="Kuota Asrama"
+        description="Ringkasan kuota. Buka kalau perlu cek detail, penempatan tetap fokus di tabel bawah."
+      >
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((item: any) => <AsramaQuotaCard key={item.asrama} item={item} />)}
         </div>
-      </div>
+      </QuotaAccordion>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Home className="h-4 w-4" />} title="Antrean Penempatan Asrama" description="Data verifikasi sekretariat tampil di sini otomatis tanpa refresh browser." />
@@ -670,33 +652,21 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
         <StatCard label="Over" value={roomStats.over} tone="rose" />
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <TableTitle icon={<DoorOpen className="h-4 w-4" />} title="Kuota Kamar" description="Kamar penuh tetap bisa dipilih, tetapi ditandai over." />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Kamar</th>
-                <th className="px-4 py-3 text-right">Kuota</th>
-                <th className="px-4 py-3 text-right">Terisi</th>
-                <th className="px-4 py-3 text-right">Sisa</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {roomOptions.length ? roomOptions.map((room: any) => (
-                <tr key={room.nomor_kamar} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-bold text-slate-900">Kamar {room.nomor_kamar}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{room.kuota}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{room.terisi}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-700">{Number(room.kuota ?? 0) - Number(room.terisi ?? 0)}</td>
-                  <td className="px-4 py-3"><KamarStatusBadge terisi={Number(room.terisi ?? 0)} kuota={Number(room.kuota ?? 0)} /></td>
-                </tr>
-              )) : <EmptyRow colSpan={5} text="Belum ada konfigurasi kamar untuk asrama ini." />}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <QuotaAccordion
+        icon={<DoorOpen className="h-4 w-4" />}
+        title="Kuota Kamar"
+        description="Ringkasan kamar dibuat compact. Kamar penuh tetap bisa dipilih dan akan ditandai over."
+      >
+        {roomOptions.length ? (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {roomOptions.map((room: any) => <KamarQuotaCard key={room.nomor_kamar} room={room} />)}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+            Belum ada konfigurasi kamar untuk asrama ini.
+          </div>
+        )}
+      </QuotaAccordion>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah ditempatkan ke asrama aktif yang muncul di tabel ini." />
@@ -745,6 +715,92 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
           </table>
         </div>
       </div>
+    </div>
+  )
+}
+
+function QuotaAccordion({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="rounded-xl bg-slate-100 p-2 text-slate-700">{icon}</span>
+          <div className="min-w-0">
+            <h3 className="font-black text-slate-900">{title}</h3>
+            <p className="truncate text-xs text-slate-500">{description}</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-slate-500 group-open:bg-blue-50 group-open:text-blue-700">
+          <span className="group-open:hidden">Buka</span>
+          <span className="hidden group-open:inline">Tutup</span>
+        </span>
+      </summary>
+      <div className="border-t border-slate-100 bg-slate-50/60 p-3">{children}</div>
+    </details>
+  )
+}
+
+function AsramaQuotaCard({ item }: { item: any }) {
+  const sisa = Number(item.sisa ?? 0)
+  const sisaClass = sisa < 0 ? 'text-rose-700' : 'text-emerald-700'
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-slate-900">{item.asrama}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Santri baru</p>
+        </div>
+        <AsramaStatusBadge status={item.status} over={item.over} />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <MiniMetric label="Kuota" value={item.kuota_baru} />
+        <MiniMetric label="Terisi" value={item.terisi_baru} />
+        <MiniMetric label="Sisa" value={item.sisa} className={sisaClass} />
+      </div>
+    </div>
+  )
+}
+
+function KamarQuotaCard({ room }: { room: any }) {
+  const kuota = Number(room.kuota ?? 0)
+  const terisi = Number(room.terisi ?? 0)
+  const sisa = kuota - terisi
+  const sisaClass = sisa < 0 ? 'text-rose-700' : 'text-emerald-700'
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-black text-slate-900">Kamar {room.nomor_kamar}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{room.blok ? `Blok ${room.blok}` : 'Tanpa blok'}</p>
+        </div>
+        <KamarStatusBadge terisi={terisi} kuota={kuota} />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <MiniMetric label="Kuota" value={kuota} />
+        <MiniMetric label="Terisi" value={terisi} />
+        <MiniMetric label="Sisa" value={sisa} className={sisaClass} />
+      </div>
+    </div>
+  )
+}
+
+function MiniMetric({ label, value, className = 'text-slate-900' }: { label: string; value: number; className?: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+      <p className={`text-sm font-black ${className}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
     </div>
   )
 }

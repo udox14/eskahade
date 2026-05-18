@@ -251,24 +251,24 @@ export default async function PsbReceiptPage({ params }: Props) {
         .receipt-copy {
           position: relative;
           width: 210mm;
-          height: 139mm;
+          height: 147.5mm;
           margin: 0 auto;
           box-sizing: border-box;
           background: #fff;
-          padding: 4mm 17mm 0;
+          padding: 3mm 10mm 5.5mm;
           overflow: hidden;
         }
         .receipt-header {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 9px;
-          height: 20mm;
+          gap: 7px;
+          height: 14mm;
           text-align: left;
         }
         .receipt-header img {
-          width: 19mm;
-          height: 19mm;
+          width: 13mm;
+          height: 13mm;
           object-fit: contain;
         }
         .school-heading {
@@ -281,60 +281,60 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .school-heading h1 {
           font-family: Arial, sans-serif;
-          font-size: 15px;
+          font-size: 12px;
           font-weight: 900;
           line-height: 1.05;
         }
         .school-heading h2 {
           font-family: Arial, sans-serif;
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 900;
           line-height: 1.1;
         }
         .school-heading p {
-          margin-top: 2px;
+          margin-top: 1px;
           font-family: Arial, sans-serif;
-          font-size: 9px;
-          line-height: 1.25;
+          font-size: 7.8px;
+          line-height: 1.15;
         }
         .header-rule {
           height: 0;
-          margin: 1mm 0 4mm;
-          border-top: 2.4px solid #111;
+          margin: 1mm 0 1.5mm;
+          border-top: 2px solid #111;
         }
         .copy-label {
           display: inline-block;
-          margin-left: 1mm;
-          margin-bottom: 7mm;
+          margin-left: 0;
+          margin-bottom: 2mm;
           border: 1px solid #b7b7b7;
           border-radius: 999px;
-          padding: 2px 10px;
-          font-size: 8px;
+          padding: 1px 8px;
+          font-size: 7px;
           color: #777;
           background: #fff;
         }
         .intro-grid {
           display: grid;
-          grid-template-columns: 43% 1fr 32%;
-          column-gap: 10px;
+          grid-template-columns: 42% 1fr 32%;
+          column-gap: 7px;
           align-items: start;
-          margin-bottom: 8mm;
+          margin-bottom: 2mm;
         }
         .student-info,
         .receipt-info {
-          padding-top: 2px;
+          padding-top: 0;
         }
         .info-row {
           display: grid;
-          grid-template-columns: 29mm 5px 1fr;
-          column-gap: 3px;
-          min-height: 4mm;
+          grid-template-columns: 25mm 4px 1fr;
+          column-gap: 2px;
+          min-height: 3.2mm;
           align-items: baseline;
-          font-size: 9px;
-          line-height: 1.2;
+          font-size: 8px;
+          line-height: 1.12;
         }
         .receipt-info .info-row {
-          grid-template-columns: 20mm 5px 1fr;
+          grid-template-columns: 17mm 4px 1fr;
         }
         .info-row span,
         .info-row b {
@@ -357,30 +357,30 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .payment-title h3 {
           margin: 0;
-          font-size: 17px;
+          font-size: 12px;
           font-weight: 900;
           letter-spacing: .08em;
           line-height: 1;
         }
         .payment-title p {
-          margin: 5px 0 0;
+          margin: 3px 0 0;
           color: #777;
-          font-size: 8px;
+          font-size: 7px;
         }
         .terbilang {
           display: flex;
           align-items: center;
-          gap: 8px;
-          height: 6.8mm;
+          gap: 5px;
+          min-height: 4.8mm;
           border: 1px solid #9a9a9a;
-          padding: 0 7px;
+          padding: 1px 5px;
           box-sizing: border-box;
-          font-size: 9px;
+          font-size: 7.8px;
           color: #555;
         }
         .terbilang strong {
           color: #111;
-          font-size: 9px;
+          font-size: 7.8px;
           font-style: italic;
           font-weight: 800;
         }
@@ -389,13 +389,13 @@ export default async function PsbReceiptPage({ params }: Props) {
           border-collapse: collapse;
         }
         .main-table {
-          margin-top: 3mm;
-          font-size: 8.8px;
+          margin-top: 1.6mm;
+          font-size: 7.8px;
         }
         .main-table th {
           background: #111;
           color: #fff;
-          padding: 2px 5px;
+          padding: 1.5px 4px;
           border-right: 1px solid #555;
           text-align: left;
           font-weight: 800;
@@ -404,7 +404,7 @@ export default async function PsbReceiptPage({ params }: Props) {
           border-right: 0;
         }
         .main-table td {
-          padding: 2px 5px;
+          padding: 1.5px 4px;
           border-bottom: 1px solid #ddd;
         }
         .main-table tfoot td {
@@ -415,34 +415,34 @@ export default async function PsbReceiptPage({ params }: Props) {
           text-align: center;
         }
         .no-col {
-          width: 10mm;
+          width: 8mm;
           text-align: center !important;
         }
         .amount-col {
-          width: 36mm;
+          width: 32mm;
           text-align: right !important;
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
         .arrears-caption {
-          margin: 6mm 0 1mm;
-          font-size: 8px;
+          margin: 2mm 0 .8mm;
+          font-size: 7.2px;
           font-style: italic;
           color: #666;
         }
         .arrears-table {
-          font-size: 8px;
+          font-size: 7.2px;
           color: #111;
         }
         .arrears-table th {
-          padding: 2px 5px;
+          padding: 1.4px 4px;
           border: 1px solid #ddd;
           background: #f3f3f3;
           text-align: left;
           font-weight: 800;
         }
         .arrears-table td {
-          padding: 2px 5px;
+          padding: 1.4px 4px;
           border: 1px solid #eee;
         }
         .total-arrears td {
@@ -454,19 +454,19 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 48mm;
-          margin-top: 4mm;
-          font-size: 9px;
+          grid-template-columns: 1fr 44mm;
+          margin-top: 1.7mm;
+          font-size: 7.8px;
         }
         .summary-block table td {
-          padding: 1px 0;
+          padding: .5px 0;
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 20mm;
+          width: 18mm;
         }
         .summary-block table td:nth-child(2) {
-          width: 4mm;
+          width: 3mm;
           text-align: center;
         }
         .summary-block table td:nth-child(3) {
@@ -477,37 +477,41 @@ export default async function PsbReceiptPage({ params }: Props) {
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 18mm;
-          margin-top: 5mm;
-          padding: 0 8mm;
+          gap: 14mm;
+          margin-top: 2mm;
+          padding: 0 12mm;
           text-align: center;
-          font-size: 8.7px;
+          font-size: 7.7px;
         }
         .signature-box p {
-          height: 15mm;
+          height: 8.5mm;
           margin: 0;
           line-height: 1.25;
         }
         .signature-line {
           border-top: 1px solid #111;
           height: 0;
-          margin: 0 auto 2mm;
+          margin: 0 auto 1mm;
         }
         .signature-box strong {
-          font-size: 8.5px;
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 7.4px;
           font-weight: 800;
         }
         .receipt-footer {
           position: absolute;
-          left: 17mm;
-          right: 17mm;
-          bottom: 3mm;
+          left: 10mm;
+          right: 10mm;
+          bottom: 2mm;
           display: grid;
           grid-template-columns: 1fr 1.4fr 1fr;
-          gap: 6mm;
+          gap: 4mm;
           border-top: 1px solid #ddd;
-          padding-top: 1mm;
-          font-size: 7px;
+          padding-top: .7mm;
+          font-size: 6.4px;
           color: #999;
         }
         .receipt-footer span:nth-child(2) {
@@ -520,22 +524,23 @@ export default async function PsbReceiptPage({ params }: Props) {
           width: 210mm;
           height: 0;
           margin: 0 auto;
-          border-top: 1px dashed #9b9b9b;
+          border-top: .5px dashed #9b9b9b;
         }
         .paid-stamp {
           position: absolute;
-          right: 43mm;
-          bottom: 43mm;
+          right: 34mm;
+          bottom: 40mm;
           z-index: 0;
           transform: rotate(-13deg);
-          border: 4px double rgba(10, 120, 56, .20);
+          border: 3px double rgba(10, 120, 56, .16);
           border-radius: 7px;
-          padding: 5px 18px;
-          color: rgba(10, 120, 56, .18);
+          padding: 4px 16px;
+          color: rgba(10, 120, 56, .14);
           font-family: Arial, sans-serif;
-          font-size: 32px;
+          font-size: 28px;
           font-weight: 900;
           letter-spacing: .10em;
+          pointer-events: none;
         }
         @page {
           size: A4 portrait;
