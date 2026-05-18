@@ -2,7 +2,7 @@
 
 import { query, execute } from '@/lib/db'
 import { getCachedBiayaSettings } from '@/lib/cache/master'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 
 export async function getDaftarTarif() {
   const data = await getCachedBiayaSettings()
@@ -27,21 +27,32 @@ export async function getTarifByTahun(tahun: number) {
 }
 
 export async function simpanTarif(tahun: number, tarifData: any): Promise<{ success: boolean } | { error: string }> {
-  const items = [
-    { jenis: 'BANGUNAN', nominal: tarifData.BANGUNAN },
-    { jenis: 'KESEHATAN', nominal: tarifData.KESEHATAN },
-    { jenis: 'EHB', nominal: tarifData.EHB },
-    { jenis: 'EKSKUL', nominal: tarifData.EKSKUL },
-  ]
-
-  for (const item of items) {
-    await execute(`
-      INSERT INTO biaya_settings (tahun_angkatan, jenis_biaya, nominal)
-      VALUES (?, ?, ?)
-      ON CONFLICT(tahun_angkatan, jenis_biaya) DO UPDATE SET nominal = excluded.nominal
-    `, [tahun, item.jenis, item.nominal])
+  const tahunAngkatan = Number(tahun)
+  if (!Number.isInteger(tahunAngkatan) || tahunAngkatan <= 0) {
+    return { error: 'Tahun angkatan tidak valid.' }
   }
 
-  revalidatePath('/dashboard/keuangan/tarif')
-  return { success: true }
+  const items = [
+    { jenis: 'BANGUNAN', nominal: Number(tarifData.BANGUNAN) || 0 },
+    { jenis: 'KESEHATAN', nominal: Number(tarifData.KESEHATAN) || 0 },
+    { jenis: 'EHB', nominal: Number(tarifData.EHB) || 0 },
+    { jenis: 'EKSKUL', nominal: Number(tarifData.EKSKUL) || 0 },
+  ]
+
+  try {
+    for (const item of items) {
+      await execute(`
+        INSERT INTO biaya_settings (tahun_angkatan, jenis_biaya, nominal)
+        VALUES (?, ?, ?)
+        ON CONFLICT(tahun_angkatan, jenis_biaya) DO UPDATE SET nominal = excluded.nominal
+      `, [tahunAngkatan, item.jenis, item.nominal])
+    }
+
+    revalidateTag('biaya-settings', 'everything')
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true }
+  } catch (error) {
+    console.error('Gagal menyimpan tarif:', error)
+    return { error: 'Tarif gagal disimpan.' }
+  }
 }

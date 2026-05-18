@@ -75,6 +75,29 @@ function normalizeStatus(status: string | null | undefined): PsbStatus {
   return STATUS_ORDER.includes(status as PsbStatus) ? status as PsbStatus : 'VERIFICATION'
 }
 
+function hasCompletedPsbPayment(params: {
+  bangunanTarget: number
+  bangunanPaid: number
+  tahunTagihan: number
+  payments: Array<{ jenis_biaya: string; tahun_tagihan: number | null }>
+}) {
+  const bangunanLunas = params.bangunanTarget <= 0 || params.bangunanPaid >= params.bangunanTarget
+  const tahunanLunas = BIAYA_TAHUNAN.every((jenis) =>
+    params.payments.some((row) => row.jenis_biaya === jenis && Number(row.tahun_tagihan) === params.tahunTagihan)
+  )
+  return bangunanLunas && tahunanLunas
+}
+
+function deriveFlowStatusFromPayments(params: {
+  bangunanTarget: number
+  bangunanPaid: number
+  tahunTagihan: number
+  payments: Array<{ jenis_biaya: string; tahun_tagihan: number | null }>
+}): PsbStatus {
+  if (hasCompletedPsbPayment(params)) return 'DONE'
+  return params.payments.length > 0 ? 'PAID' : 'PLACED_KAMAR'
+}
+
 function yearFromSantri(row: { tahun_masuk: number | null; created_at: string | null }) {
   if (row.tahun_masuk) return Number(row.tahun_masuk)
   const parsed = row.created_at ? new Date(row.created_at).getFullYear() : new Date().getFullYear()
@@ -190,6 +213,13 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
     ids
   )
   const tarif = await query<any>('SELECT tahun_angkatan, jenis_biaya, nominal FROM biaya_settings')
+  const receipts = await query<any>(
+    `SELECT id, santri_id, receipt_no, total, created_at
+     FROM psb_payment_receipt
+     WHERE santri_id IN (${placeholders})
+     ORDER BY datetime(created_at) DESC, created_at DESC`,
+    ids
+  )
   const tarifMap = new Map<string, number>()
   tarif.forEach((row) => tarifMap.set(`${row.tahun_angkatan}:${row.jenis_biaya}`, Number(row.nominal ?? 0)))
 
@@ -201,6 +231,7 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
       .filter((p) => p.jenis_biaya === 'BANGUNAN')
       .reduce((sum, p) => sum + Number(p.nominal_bayar ?? 0), 0)
     const bangunanTarget = tarifMap.get(`${tahunMasuk}:BANGUNAN`) ?? 0
+    const latestReceipt = receipts.find((receipt) => receipt.santri_id === row.id) ?? null
     const tahunan = Object.fromEntries(BIAYA_TAHUNAN.map((jenis) => {
       const nominal = tarifMap.get(`${tahunMasuk}:${jenis}`) ?? 0
       const lunas = paySantri.some((p) => p.jenis_biaya === jenis && Number(p.tahun_tagihan) === tahunTagihan)
@@ -215,6 +246,7 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
         sisa: Math.max(0, bangunanTarget - bangunanPaid),
       },
       tahunan,
+      latestReceipt,
     })
   })
   return result
@@ -588,6 +620,16 @@ export async function bayarPsbBatch(input: {
   const receiptId = generateId()
   const receiptNo = await nextReceiptNo()
   const total = normalized.reduce((sum, item) => sum + item.nominal, 0)
+  const completedPayments = [
+    ...existing.map((row) => ({ jenis_biaya: row.jenis_biaya, tahun_tagihan: row.tahun_tagihan })),
+    ...normalized.map((item) => ({ jenis_biaya: item.jenis, tahun_tagihan: item.tahunTagihan })),
+  ]
+  const statusAfterPayment: PsbStatus = hasCompletedPsbPayment({
+    bangunanTarget: tarif.get('BANGUNAN') ?? 0,
+    bangunanPaid: totalBangunanPaid + normalized.filter((item) => item.jenis === 'BANGUNAN').reduce((sum, item) => sum + item.nominal, 0),
+    tahunTagihan,
+    payments: completedPayments,
+  }) ? 'DONE' : 'PAID'
   const db = await getDB()
   await db.batch([
     db.prepare(`
@@ -602,31 +644,45 @@ export async function bayarPsbBatch(input: {
       `).bind(generateId(), input.santriId, item.jenis, item.tahunTagihan, item.nominal, access.id, item.keterangan, receiptId)
     ),
     db.prepare(`
-      INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, created_by, created_at, updated_at)
-      VALUES (?, ?, 'PAID', ?, datetime('now'), ?, datetime('now'), datetime('now'))
+      INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, done_by, done_at, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'), ?, CASE WHEN ? = 'DONE' THEN datetime('now') ELSE NULL END, ?, datetime('now'), datetime('now'))
       ON CONFLICT(santri_id) DO UPDATE SET
-        status = CASE WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PLACED_KAMAR','PAID') THEN 'PAID' ELSE psb_flow.status END,
+        status = CASE
+          WHEN ? = 'DONE' THEN 'DONE'
+          WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PLACED_KAMAR','PAID') THEN 'PAID'
+          ELSE psb_flow.status
+        END,
         paid_by = excluded.paid_by,
         paid_at = excluded.paid_at,
+        done_by = CASE WHEN ? = 'DONE' THEN excluded.done_by ELSE psb_flow.done_by END,
+        done_at = CASE WHEN ? = 'DONE' THEN excluded.done_at ELSE psb_flow.done_at END,
         updated_at = excluded.updated_at
-    `).bind(generateId(), input.santriId, access.id, access.id),
+    `).bind(generateId(), input.santriId, statusAfterPayment, access.id, access.id, statusAfterPayment, access.id, statusAfterPayment, statusAfterPayment, statusAfterPayment),
   ])
 
-  await logActivity({
-    actor: actorFromSession(access),
-    module: 'psb',
-    action: 'payment',
-    fiturHref: PSB_PATH,
-    logKind: 'create',
-    entityType: 'psb_payment_receipt',
-    entityId: receiptId,
-    entityLabel: receiptNo,
-    summary: `Pembayaran PSB ${santri.nama_lengkap}: ${receiptNo}`,
-    details: { santri_id: input.santriId, receipt_no: receiptNo, total, items: normalized },
-  })
-  revalidatePath(PSB_PATH)
-  revalidatePath(MONITORING_PATH)
-  return { success: true, receiptId, receiptNo, total }
+  try {
+    await logActivity({
+      actor: actorFromSession(access),
+      module: 'psb',
+      action: 'payment',
+      fiturHref: PSB_PATH,
+      logKind: 'create',
+      entityType: 'psb_payment_receipt',
+      entityId: receiptId,
+      entityLabel: receiptNo,
+      summary: `Pembayaran PSB ${santri.nama_lengkap}: ${receiptNo}`,
+      details: { santri_id: input.santriId, receipt_no: receiptNo, total, items: normalized, status_after_payment: statusAfterPayment },
+    })
+  } catch (error) {
+    console.error('Failed to write PSB payment activity log', error)
+  }
+  try {
+    revalidatePath(PSB_PATH)
+    revalidatePath(MONITORING_PATH)
+  } catch (error) {
+    console.error('Failed to revalidate PSB pages after payment', error)
+  }
+  return { success: true, receiptId, receiptNo, total, status: statusAfterPayment }
 }
 
 export async function selesaikanPsb(santriId: string) {
@@ -643,6 +699,101 @@ export async function selesaikanPsb(santriId: string) {
   revalidatePath(PSB_PATH)
   revalidatePath(MONITORING_PATH)
   return { success: true }
+}
+
+export async function batalkanPembayaranPsb(input: { santriId: string; receiptId: string }) {
+  const access = await assertFeature(PSB_PATH, 'update')
+  if ('error' in access) return access
+  if (!isAdmin(access) && !hasRole(access, 'bendahara')) return { error: 'Akses ditolak' }
+  await ensureSchema()
+
+  const receipt = await queryOne<{
+    id: string
+    santri_id: string
+    receipt_no: string
+    tahun_tagihan: number | null
+    nama_lengkap: string
+    tahun_masuk: number | null
+    created_at: string | null
+  }>(`
+    SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.created_at
+    FROM psb_payment_receipt r
+    JOIN santri s ON s.id = r.santri_id
+    WHERE r.id = ?
+  `, [input.receiptId])
+  if (!receipt) return { error: 'Kuitansi pembayaran tidak ditemukan' }
+  if (receipt.santri_id !== input.santriId) return { error: 'Kuitansi tidak cocok dengan santri' }
+
+  const latestReceipt = await queryOne<{ id: string }>(
+    `SELECT id
+     FROM psb_payment_receipt
+     WHERE santri_id = ?
+     ORDER BY datetime(created_at) DESC, created_at DESC
+     LIMIT 1`,
+    [input.santriId]
+  )
+  if (!latestReceipt || latestReceipt.id !== input.receiptId) {
+    return { error: 'Hanya pembayaran terakhir yang bisa dibatalkan' }
+  }
+
+  await execute('DELETE FROM pembayaran_tahunan WHERE psb_receipt_id = ?', [input.receiptId])
+  await execute('DELETE FROM psb_payment_receipt WHERE id = ?', [input.receiptId])
+
+  const remainingPayments = await query<{ jenis_biaya: string; tahun_tagihan: number | null; nominal_bayar: number }>(
+    'SELECT jenis_biaya, tahun_tagihan, nominal_bayar FROM pembayaran_tahunan WHERE santri_id = ?',
+    [input.santriId]
+  )
+  const tahunMasuk = yearFromSantri(receipt)
+  const tarifRows = await query<{ jenis_biaya: string; nominal: number }>(
+    'SELECT jenis_biaya, nominal FROM biaya_settings WHERE tahun_angkatan = ?',
+    [tahunMasuk]
+  )
+  const tarif = new Map(tarifRows.map((row) => [row.jenis_biaya, Number(row.nominal ?? 0)]))
+  const nextStatus = deriveFlowStatusFromPayments({
+    bangunanTarget: tarif.get('BANGUNAN') ?? 0,
+    bangunanPaid: remainingPayments
+      .filter((row) => row.jenis_biaya === 'BANGUNAN')
+      .reduce((sum, row) => sum + Number(row.nominal_bayar ?? 0), 0),
+    tahunTagihan: Number(receipt.tahun_tagihan ?? new Date().getFullYear()),
+    payments: remainingPayments.map((row) => ({ jenis_biaya: row.jenis_biaya, tahun_tagihan: row.tahun_tagihan })),
+  })
+
+  await execute(`
+    UPDATE psb_flow
+    SET status = ?,
+        paid_by = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE paid_by END,
+        paid_at = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE paid_at END,
+        done_by = CASE WHEN ? = 'DONE' THEN done_by ELSE NULL END,
+        done_at = CASE WHEN ? = 'DONE' THEN done_at ELSE NULL END,
+        updated_at = datetime('now')
+    WHERE santri_id = ?
+  `, [nextStatus, nextStatus, nextStatus, nextStatus, nextStatus, input.santriId])
+
+  try {
+    await logActivity({
+      actor: actorFromSession(access),
+      module: 'psb',
+      action: 'payment_cancel',
+      fiturHref: PSB_PATH,
+      logKind: 'delete',
+      entityType: 'psb_payment_receipt',
+      entityId: input.receiptId,
+      entityLabel: receipt.receipt_no,
+      summary: `Pembayaran PSB dibatalkan ${receipt.nama_lengkap}: ${receipt.receipt_no}`,
+      details: { santri_id: input.santriId, receipt_no: receipt.receipt_no, status_after_cancel: nextStatus },
+    })
+  } catch (error) {
+    console.error('Failed to write PSB payment cancellation log', error)
+  }
+
+  try {
+    revalidatePath(PSB_PATH)
+    revalidatePath(MONITORING_PATH)
+  } catch (error) {
+    console.error('Failed to revalidate PSB pages after cancellation', error)
+  }
+
+  return { success: true, status: nextStatus }
 }
 
 export async function getPsbReceipt(receiptId: string) {

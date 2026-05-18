@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner'
 
 import {
+  batalkanPembayaranPsb,
   bayarPsbBatch,
   getKamarPsb,
   getPsbDashboard,
@@ -44,6 +45,16 @@ const SEKOLAH_LIST = ['MTSU', 'MTSN', 'MAN', 'SMK', 'SMA', 'SMP', 'LAINNYA']
 
 function rupiah(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+}
+
+function paymentLabel(value: string) {
+  const labels: Record<string, string> = {
+    BANGUNAN: 'Dana Bangunan',
+    KESEHATAN: 'Biaya Kesehatan',
+    EHB: 'Biaya EHB',
+    EKSKUL: 'Biaya Ekstrakurikuler',
+  }
+  return labels[value] ?? value
 }
 
 export default function PsbPageContent() {
@@ -89,15 +100,25 @@ export default function PsbPageContent() {
 
   const run = async (id: string, fn: () => Promise<any>, success: string) => {
     setBusyId(id)
-    const result = await fn()
-    setBusyId(null)
-    if (result?.error) {
-      toast.error(result.error)
+    try {
+      const result = await fn()
+      if (result?.error) {
+        toast.error(result.error)
+        return null
+      }
+      toast.success(success)
+      try {
+        await load()
+      } catch (error: any) {
+        console.error('Failed to refresh PSB dashboard after action', error)
+      }
+      return result
+    } catch (error: any) {
+      toast.error(error?.message || 'Proses gagal diselesaikan.')
       return null
+    } finally {
+      setBusyId(null)
     }
-    toast.success(success)
-    await load()
-    return result
   }
 
   const handleDadakan = async (e: React.FormEvent) => {
@@ -137,11 +158,26 @@ export default function PsbPageContent() {
     })
     const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items }), 'Pembayaran PSB tersimpan')
     if (result?.receiptId) {
-      window.open(`/dashboard/psb/kuitansi/${result.receiptId}`, '_blank')
+      window.open(`/dashboard/psb/kuitansi/${result.receiptId}`, '_blank', 'noopener,noreferrer')
       setPaymentItems(prev => ({ ...prev, [row.id]: {} }))
       setBangunanNominal(prev => ({ ...prev, [row.id]: '' }))
       setPaymentModalRow(null)
     }
+  }
+
+  const handleCancelPayment = async (row: any) => {
+    const latestReceipt = row.pembayaran?.latestReceipt
+    if (!latestReceipt?.id) {
+      toast.error('Belum ada pembayaran yang bisa dibatalkan.')
+      return
+    }
+    const ok = window.confirm(`Batalkan pembayaran terakhir ${latestReceipt.receipt_no} untuk ${row.nama_lengkap}?`)
+    if (!ok) return
+    await run(
+      row.id,
+      () => batalkanPembayaranPsb({ santriId: row.id, receiptId: latestReceipt.id }),
+      'Pembayaran terakhir berhasil dibatalkan'
+    )
   }
 
   const getPreviewItems = (row: any) => {
@@ -149,11 +185,11 @@ export default function PsbPageContent() {
     const payment = row.pembayaran
     const items: Array<{ label: string; tahun: string; nominal: number }> = []
     if (picks.BANGUNAN) {
-      items.push({ label: 'BANGUNAN', tahun: '-', nominal: Number(bangunanNominal[row.id] || 0) })
+      items.push({ label: paymentLabel('BANGUNAN'), tahun: '-', nominal: Number(bangunanNominal[row.id] || 0) })
     }
     ;(['KESEHATAN', 'EHB', 'EKSKUL'] as const).forEach(jenis => {
       if (picks[jenis]) {
-        items.push({ label: jenis, tahun: String(tahunTagihan), nominal: Number(payment?.tahunan?.[jenis]?.nominal ?? 0) })
+        items.push({ label: paymentLabel(jenis), tahun: String(tahunTagihan), nominal: Number(payment?.tahunan?.[jenis]?.nominal ?? 0) })
       }
     })
     return items
@@ -327,6 +363,15 @@ export default function PsbPageContent() {
                         >
                           <Banknote className="h-4 w-4" /> Input Pembayaran
                         </button>
+                        {data?.user?.canBayar && payment?.latestReceipt?.id ? (
+                          <button
+                            disabled={busyId === row.id}
+                            onClick={() => handleCancelPayment(row)}
+                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            <Printer className="h-4 w-4" /> Batalkan Pembayaran Terakhir
+                          </button>
+                        ) : null}
                         {row.status === 'PAID' && data?.user?.canBayar ? (
                           <button
                             disabled={busyId === row.id}
@@ -566,48 +611,88 @@ function ReceiptPreview({
           <p className="text-xs font-bold uppercase text-slate-500">Live Preview</p>
           <h3 className="text-sm font-bold text-slate-900">Kuitansi PSB</h3>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">A4 · 2 Salinan</span>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">A4 - 2 Salinan</span>
       </div>
 
       <div className="space-y-3">
         {[1, 2].map(copy => (
-          <div key={copy} className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm">
-            <div className="flex justify-between gap-3 border-b-2 border-slate-900 pb-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pondok Pesantren Sukahideng</p>
-                <p className="mt-1 text-base font-black text-slate-900">Kuitansi Pembayaran PSB</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-slate-500">{copy === 1 ? 'Untuk Panitia' : 'Untuk Pembayar'}</p>
-                <p className="mt-1 text-xs font-bold text-slate-800">Nomor otomatis</p>
+          <div key={copy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-sm">
+            <div className="border-b-[3px] border-slate-900 pb-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-900">Kuitansi Pembayaran</p>
+                  <p className="mt-0.5 text-sm font-black text-slate-900">Pondok Pesantren Sukahideng</p>
+                  <p className="text-[9px] text-slate-500">Desa Sukarapih Kec. Sukarame Kabupaten Tasikmalaya Jawa Barat 46461</p>
+                </div>
+                <span className="rounded-full border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                  {copy === 1 ? 'Lembar Pembayar' : 'Arsip Pondok'}
+                </span>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border border-slate-200 p-2">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Nama</p>
-                <p className="font-bold text-slate-900">{row.nama_lengkap}</p>
+            <div className="mt-3 grid grid-cols-[1.1fr_auto_0.9fr] gap-3">
+              <div className="space-y-1 text-[11px]">
+                <div className="grid grid-cols-[78px_8px_1fr]">
+                  <span className="text-slate-500">Nama Santri</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="font-bold text-slate-900">{row.nama_lengkap}</span>
+                </div>
+                <div className="grid grid-cols-[78px_8px_1fr]">
+                  <span className="text-slate-500">NIS</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">{row.nis || '-'}</span>
+                </div>
+                <div className="grid grid-cols-[78px_8px_1fr]">
+                  <span className="text-slate-500">Kelas</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">{row.sekolah || '-'}</span>
+                </div>
+                <div className="grid grid-cols-[78px_8px_1fr]">
+                  <span className="text-slate-500">Asrama</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</span>
+                </div>
               </div>
-              <div className="rounded-lg border border-slate-200 p-2">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Tahun</p>
-                <p className="font-bold text-slate-900">{tahunTagihan}</p>
+
+              <div className="pt-1 text-center">
+                <p className="text-sm font-black tracking-[0.2em] text-slate-900">BUKTI PEMBAYARAN</p>
+                <p className="mt-1 text-[9px] text-slate-500">Pembayaran PSB - Tahun Tagihan {tahunTagihan}</p>
               </div>
-              <div className="rounded-lg border border-slate-200 p-2">
-                <p className="text-[10px] font-bold uppercase text-slate-500">NIS</p>
-                <p className="font-bold text-slate-900">{row.nis}</p>
+
+              <div className="space-y-1 text-[11px]">
+                <div className="grid grid-cols-[68px_8px_1fr]">
+                  <span className="text-slate-500">No. Bukti</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="font-bold text-slate-900">Nomor otomatis</span>
+                </div>
+                <div className="grid grid-cols-[68px_8px_1fr]">
+                  <span className="text-slate-500">Tanggal</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">Tanggal transaksi</span>
+                </div>
+                <div className="grid grid-cols-[68px_8px_1fr]">
+                  <span className="text-slate-500">Metode</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">Tunai</span>
+                </div>
+                <div className="grid grid-cols-[68px_8px_1fr]">
+                  <span className="text-slate-500">Petugas</span>
+                  <span className="text-slate-400">:</span>
+                  <span className="text-slate-900">Bendahara</span>
+                </div>
               </div>
-              <div className="rounded-lg border border-slate-200 p-2">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Asrama/Kamar</p>
-                <p className="font-bold text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</p>
-              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-[11px]">
+              <span className="text-slate-500">Terbilang:</span>
+              <span className="font-semibold italic text-slate-900">{total ? `${rupiah(total)} dibayarkan` : 'Belum ada item dipilih'}</span>
             </div>
 
             <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-500">
+                <thead className="bg-slate-900 text-left text-[10px] uppercase text-white">
                   <tr>
-                    <th className="px-2 py-1.5">Rincian</th>
-                    <th className="px-2 py-1.5">Tahun</th>
+                    <th className="px-2 py-1.5">Uraian Pembayaran</th>
                     <th className="px-2 py-1.5 text-right">Nominal</th>
                   </tr>
                 </thead>
@@ -615,32 +700,31 @@ function ReceiptPreview({
                   {items.length ? items.map(item => (
                     <tr key={`${item.label}-${item.tahun}`} className="border-t border-slate-100">
                       <td className="px-2 py-1.5 font-medium">{item.label}</td>
-                      <td className="px-2 py-1.5">{item.tahun}</td>
                       <td className="px-2 py-1.5 text-right">{rupiah(item.nominal)}</td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={3} className="px-2 py-5 text-center text-slate-400">Centang item pembayaran untuk melihat preview.</td>
+                      <td colSpan={2} className="px-2 py-5 text-center text-slate-400">Centang item pembayaran untuk melihat preview.</td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot className="border-t bg-slate-50 font-black">
+                <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-black">
                   <tr>
-                    <td colSpan={2} className="px-2 py-1.5">Total</td>
+                    <td className="px-2 py-1.5">TOTAL PEMBAYARAN INI</td>
                     <td className="px-2 py-1.5 text-right">{rupiah(total)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
 
-            <div className="mt-3 flex justify-end gap-10 text-center text-[10px] text-slate-500">
+            <div className="mt-3 grid grid-cols-2 gap-8 px-4 text-center text-[10px] text-slate-500">
               <div>
-                <p>Pembayar</p>
-                <p className="mt-6 font-bold text-slate-700">____________</p>
+                <p>Penyetor / Santri</p>
+                <p className="mt-6 font-bold text-slate-700">( {row.nama_lengkap || '________________'} )</p>
               </div>
               <div>
-                <p>Penerima</p>
-                <p className="mt-6 font-bold text-slate-700">____________</p>
+                <p>Tasikmalaya, Tanggal transaksi<br />Bendahara</p>
+                <p className="mt-6 font-bold text-slate-700">( Bendahara )</p>
               </div>
             </div>
           </div>

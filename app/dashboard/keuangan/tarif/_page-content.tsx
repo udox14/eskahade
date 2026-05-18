@@ -183,6 +183,8 @@ export default function TarifPage() {
 
 // Sub Component: Input Duit
 function InputDuit({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) {
+    const displayValue = Number(value || 0).toLocaleString('id-ID')
+
     return (
         <div>
             <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
@@ -191,10 +193,14 @@ function InputDuit({ label, value, onChange }: { label: string, value: number, o
                     <span className="text-slate-400 font-bold">Rp</span>
                 </div>
                 <input 
-                    type="text" // Text biar bisa format ribuan kalau mau (tapi raw number dulu biar simpel)
+                    type="text"
+                    inputMode="numeric"
                     className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
-                    value={value}
-                    onChange={(e) => onChange(Number(e.target.value))}
+                    value={displayValue}
+                    onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '')
+                        onChange(digits ? Number(digits) : 0)
+                    }}
                     onFocus={(e) => e.target.select()}
                 />
             </div>
