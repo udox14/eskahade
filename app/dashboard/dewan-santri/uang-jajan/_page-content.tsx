@@ -72,6 +72,7 @@ type SantriRow = {
   nis: string
   asrama: string
   kamar: string
+  foto_url: string | null
   saldo: number
   saldo_tabungan: number
   masuk_bulan_ini: number
