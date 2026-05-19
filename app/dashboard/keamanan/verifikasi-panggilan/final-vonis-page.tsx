@@ -11,6 +11,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getFinalVonisQueue,
   simpanFinalVonis,
+  type FinalVonisMode,
   type FinalFilterStatus,
   type FinalStatus,
   type FinalVonisItem,
@@ -156,13 +157,16 @@ export default function FinalVonisPage({
   source,
   title,
   description,
+  allowLegacyAbsen = false,
 }: {
   source: SourceType
   title: string
   description: string
+  allowLegacyAbsen?: boolean
 }) {
   const confirm = useConfirm()
   const [tanggalRef, setTanggalRef] = useState(todayYmd())
+  const [mode, setMode] = useState<FinalVonisMode>('panggilan')
   const [status, setStatus] = useState<FinalFilterStatus>('BELUM')
   const [search, setSearch] = useState('')
   const [asrama, setAsrama] = useState('')
@@ -178,7 +182,8 @@ export default function FinalVonisPage({
     setLoading(true)
     setDrafts({})
     try {
-      const res = await getFinalVonisQueue(source, tanggalRef, { status, search, asrama })
+      const activeMode = allowLegacyAbsen && source === 'pengajian' ? mode : 'panggilan'
+      const res = await getFinalVonisQueue(source, tanggalRef, { status, search, asrama, mode: activeMode })
       setRows(res.rows)
       setPeriode(res.periode)
       setHasLoaded(true)
@@ -188,7 +193,7 @@ export default function FinalVonisPage({
     } finally {
       setLoading(false)
     }
-  }, [source, tanggalRef, status, search, asrama])
+  }, [source, tanggalRef, status, search, asrama, mode, allowLegacyAbsen])
 
   const asramaList = useMemo(() => Array.from(new Set(rows.map((item) => item.asrama).filter(Boolean) as string[])).sort(), [rows])
   const totalPages = Math.ceil(rows.length / 20)
@@ -235,6 +240,8 @@ export default function FinalVonisPage({
           sesi: item.sesi,
           status: drafts[key].status,
           catatan: drafts[key].catatan,
+          legacyAbsenId: item.legacy_absen_id ?? null,
+          mode: item.mode ?? 'panggilan',
         }
       })
       const res = await simpanFinalVonis(payload)
@@ -273,6 +280,24 @@ export default function FinalVonisPage({
         <div className="flex items-center gap-2 text-sm font-black text-slate-700">
           <Filter className="w-4 h-4" /> Filter Vonis
         </div>
+        {allowLegacyAbsen && source === 'pengajian' && (
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => { setMode('panggilan'); setRows([]); setDrafts({}); setHasLoaded(false) }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${mode === 'panggilan' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Data Panggilan
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('legacy_absen'); setRows([]); setDrafts({}); setHasLoaded(false) }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${mode === 'legacy_absen' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Data Lama
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <label className="block">
             <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Referensi</span>

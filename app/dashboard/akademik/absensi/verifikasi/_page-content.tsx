@@ -8,6 +8,7 @@ export default function VerifikasiAbsenPage() {
       source="pengajian"
       title="Vonis Final Pengajian"
       description="Proses status final hasil blanko eksekutor untuk alfa pengajian."
+      allowLegacyAbsen
     />
   )
 }
