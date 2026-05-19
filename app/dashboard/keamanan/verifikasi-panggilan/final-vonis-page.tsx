@@ -47,6 +47,12 @@ function todayYmd() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function addDays(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 function fmtDate(dateStr: string) {
   return new Date(`${dateStr}T12:00:00Z`).toLocaleDateString('id-ID', {
     weekday: 'short',
@@ -166,6 +172,8 @@ export default function FinalVonisPage({
 }) {
   const confirm = useConfirm()
   const [tanggalRef, setTanggalRef] = useState(todayYmd())
+  const [legacyStart, setLegacyStart] = useState(addDays(todayYmd(), -7))
+  const [legacyEnd, setLegacyEnd] = useState(todayYmd())
   const [mode, setMode] = useState<FinalVonisMode>('panggilan')
   const [status, setStatus] = useState<FinalFilterStatus>('BELUM')
   const [search, setSearch] = useState('')
@@ -183,7 +191,14 @@ export default function FinalVonisPage({
     setDrafts({})
     try {
       const activeMode = allowLegacyAbsen && source === 'pengajian' ? mode : 'panggilan'
-      const res = await getFinalVonisQueue(source, tanggalRef, { status, search, asrama, mode: activeMode })
+      const res = await getFinalVonisQueue(source, tanggalRef, {
+        status,
+        search,
+        asrama,
+        mode: activeMode,
+        legacyStart: activeMode === 'legacy_absen' ? legacyStart : undefined,
+        legacyEnd: activeMode === 'legacy_absen' ? legacyEnd : undefined,
+      })
       setRows(res.rows)
       setPeriode(res.periode)
       setHasLoaded(true)
@@ -193,7 +208,7 @@ export default function FinalVonisPage({
     } finally {
       setLoading(false)
     }
-  }, [source, tanggalRef, status, search, asrama, mode, allowLegacyAbsen])
+  }, [source, tanggalRef, status, search, asrama, mode, allowLegacyAbsen, legacyStart, legacyEnd])
 
   const asramaList = useMemo(() => Array.from(new Set(rows.map((item) => item.asrama).filter(Boolean) as string[])).sort(), [rows])
   const totalPages = Math.ceil(rows.length / 20)
@@ -300,9 +315,25 @@ export default function FinalVonisPage({
         )}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <label className="block">
-            <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Referensi</span>
-            <input type="date" value={tanggalRef} onChange={(e) => setTanggalRef(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            <span className="text-[10px] font-black uppercase text-slate-400">
+              {mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' ? 'Tanggal Awal' : 'Tanggal Referensi'}
+            </span>
+            <input
+              type="date"
+              value={mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' ? legacyStart : tanggalRef}
+              onChange={(e) => {
+                if (mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian') setLegacyStart(e.target.value)
+                else setTanggalRef(e.target.value)
+              }}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </label>
+          {mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' && (
+            <label className="block">
+              <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Akhir</span>
+              <input type="date" value={legacyEnd} onChange={(e) => setLegacyEnd(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            </label>
+          )}
           <label className="block">
             <span className="text-[10px] font-black uppercase text-slate-400">Status</span>
             <select value={status} onChange={(e) => setStatus(e.target.value as FinalFilterStatus)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">

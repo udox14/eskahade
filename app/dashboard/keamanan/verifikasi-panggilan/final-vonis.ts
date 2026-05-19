@@ -242,12 +242,16 @@ async function createPelanggaranIfNeeded(payload: SaveFinalPayload, existingPela
 export async function getFinalVonisQueue(
   source: SourceType,
   tanggalRef: string,
-  filters: { status?: FinalFilterStatus; search?: string; asrama?: string; mode?: FinalVonisMode } = {}
+  filters: { status?: FinalFilterStatus; search?: string; asrama?: string; mode?: FinalVonisMode; legacyStart?: string; legacyEnd?: string } = {}
 ) {
   await ensureFinalVonisTable()
   const { start, end } = getWeekRangeFromRef(tanggalRef)
   if (source === 'pengajian' && filters.mode === 'legacy_absen') {
-    return getLegacyPengajianQueue(start, end, filters)
+    const legacyStart = isYmd(filters.legacyStart) ? filters.legacyStart! : start
+    const legacyEnd = isYmd(filters.legacyEnd) ? filters.legacyEnd! : end
+    const rangeStart = legacyStart <= legacyEnd ? legacyStart : legacyEnd
+    const rangeEnd = legacyStart <= legacyEnd ? legacyEnd : legacyStart
+    return getLegacyPengajianQueue(rangeStart, rangeEnd, filters)
   }
 
   const rows = await query<any>(`
@@ -312,6 +316,10 @@ export async function getFinalVonisQueue(
   })
 
   return { periode: { start, end }, rows: filtered }
+}
+
+function isYmd(value: string | undefined) {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 async function getLegacyPengajianQueue(
