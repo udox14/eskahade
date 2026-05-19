@@ -6,7 +6,6 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 type SourceType = 'pengajian' | 'berjamaah'
-export type FinalVonisMode = 'panggilan' | 'legacy_absen'
 export type FinalStatus = 'ALFA' | 'IZIN' | 'SAKIT' | 'HADIR' | 'MANGKIR'
 export type FinalFilterStatus = 'BELUM' | 'MANGKIR' | 'SELESAI' | 'SEMUA'
 
@@ -26,17 +25,13 @@ export type FinalVonisItem = {
   catatan_panggilan: string | null
   final_status: FinalStatus | null
   final_catatan: string | null
-  legacy_absen_id?: string | null
-  mode?: FinalVonisMode
 }
 
 type SnapshotEvent = {
   source: SourceType
   tanggal: string
   sesi: string
-  label?: string
   counted?: boolean
-  legacy_absen_id?: string | null
 }
 
 type SaveFinalPayload = {
@@ -49,8 +44,6 @@ type SaveFinalPayload = {
   sesi: string
   status: FinalStatus
   catatan?: string
-  legacyAbsenId?: string | null
-  mode?: FinalVonisMode
 }
 
 const SOURCE_PATH: Record<SourceType, string> = {
@@ -85,29 +78,6 @@ function getWeekRangeFromRef(tanggalRef: string) {
 }
 
 async function ensureFinalVonisTable() {
-  await execute(`
-    CREATE TABLE IF NOT EXISTS verifikasi_panggilan (
-      id TEXT PRIMARY KEY,
-      periode_awal TEXT NOT NULL,
-      periode_akhir TEXT NOT NULL,
-      santri_id TEXT NOT NULL REFERENCES santri(id),
-      keputusan TEXT NOT NULL,
-      jumlah_alfa_pengajian INTEGER NOT NULL DEFAULT 0,
-      jumlah_alfa_berjamaah INTEGER NOT NULL DEFAULT 0,
-      total_alfa INTEGER NOT NULL DEFAULT 0,
-      snapshot_json TEXT NOT NULL,
-      catatan TEXT,
-      verified_by TEXT REFERENCES users(id),
-      verified_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(periode_awal, periode_akhir, santri_id)
-    )
-  `)
-  await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_periode ON verifikasi_panggilan(periode_awal, periode_akhir)`)
-  await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_keputusan ON verifikasi_panggilan(keputusan)`)
-  await execute(`CREATE INDEX IF NOT EXISTS idx_verifikasi_panggilan_santri ON verifikasi_panggilan(santri_id)`)
-
   await execute(`
     CREATE TABLE IF NOT EXISTS verifikasi_panggilan_vonis (
       id TEXT PRIMARY KEY,
@@ -168,11 +138,6 @@ async function getPengajianAbsensiId(santriId: string, tanggal: string) {
   return row?.id || null
 }
 
-async function getPengajianAbsensiIdForPayload(payload: SaveFinalPayload) {
-  if (payload.legacyAbsenId) return payload.legacyAbsenId
-  return getPengajianAbsensiId(payload.santriId, payload.tanggal)
-}
-
 function pengajianColumns(sesi: string) {
   if (!PENGAJIAN_SESI.includes(sesi as any)) throw new Error(`Sesi pengajian tidak valid: ${sesi}`)
   return { statusColumn: sesi, verifColumn: `verif_${sesi}` }
@@ -184,7 +149,7 @@ function berjamaahColumn(sesi: string) {
 }
 
 async function applyPengajianStatus(payload: SaveFinalPayload) {
-  const absenId = await getPengajianAbsensiIdForPayload(payload)
+  const absenId = await getPengajianAbsensiId(payload.santriId, payload.tanggal)
   if (!absenId) return
 
   const { statusColumn, verifColumn } = pengajianColumns(payload.sesi)
@@ -242,18 +207,10 @@ async function createPelanggaranIfNeeded(payload: SaveFinalPayload, existingPela
 export async function getFinalVonisQueue(
   source: SourceType,
   tanggalRef: string,
-  filters: { status?: FinalFilterStatus; search?: string; asrama?: string; mode?: FinalVonisMode; legacyStart?: string; legacyEnd?: string } = {}
+  filters: { status?: FinalFilterStatus; search?: string; asrama?: string } = {}
 ) {
   await ensureFinalVonisTable()
   const { start, end } = getWeekRangeFromRef(tanggalRef)
-  if (source === 'pengajian' && filters.mode === 'legacy_absen') {
-    const legacyStart = isYmd(filters.legacyStart) ? filters.legacyStart! : start
-    const legacyEnd = isYmd(filters.legacyEnd) ? filters.legacyEnd! : end
-    const rangeStart = legacyStart <= legacyEnd ? legacyStart : legacyEnd
-    const rangeEnd = legacyStart <= legacyEnd ? legacyEnd : legacyStart
-    return getLegacyPengajianQueue(rangeStart, rangeEnd, filters)
-  }
-
   const rows = await query<any>(`
     SELECT vp.id AS panggilan_id, vp.periode_awal, vp.periode_akhir, vp.santri_id,
            vp.snapshot_json, vp.catatan AS catatan_panggilan,
@@ -292,14 +249,12 @@ export async function getFinalVonisQueue(
         kamar: snapshot.kamar ?? row.kamar ?? null,
         periode_awal: row.periode_awal,
         periode_akhir: row.periode_akhir,
-      source,
-      tanggal: event.tanggal,
-      sesi: event.sesi,
-      catatan_panggilan: row.catatan_panggilan ?? null,
-      final_status: final?.status_final ?? null,
-      final_catatan: final?.catatan ?? null,
-      legacy_absen_id: event.legacy_absen_id ?? null,
-      mode: 'panggilan',
+        source,
+        tanggal: event.tanggal,
+        sesi: event.sesi,
+        catatan_panggilan: row.catatan_panggilan ?? null,
+        final_status: final?.status_final ?? null,
+        final_catatan: final?.catatan ?? null,
       })
     }
   }
@@ -318,213 +273,11 @@ export async function getFinalVonisQueue(
   return { periode: { start, end }, rows: filtered }
 }
 
-function isYmd(value: string | undefined) {
-  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-}
-
-async function getLegacyPengajianQueue(
-  start: string,
-  end: string,
-  filters: { status?: FinalFilterStatus; search?: string; asrama?: string } = {}
-) {
-  const rawRows = await query<any>(`
-    SELECT ah.id AS absen_id, ah.tanggal,
-           ah.shubuh, ah.ashar, ah.maghrib,
-           ah.verif_shubuh, ah.verif_ashar, ah.verif_maghrib,
-           s.id AS santri_id, s.nama_lengkap, s.nis, s.asrama, s.kamar
-    FROM absensi_harian ah
-    JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id AND rp.status_riwayat = 'aktif'
-    JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
-    LEFT JOIN verifikasi_panggilan vp
-      ON vp.periode_awal = ? AND vp.periode_akhir = ? AND vp.santri_id = s.id
-    WHERE ah.tanggal >= ? AND ah.tanggal <= ?
-      AND (vp.id IS NULL OR vp.id LIKE 'legacy-pengajian-%')
-      AND (
-        (ah.shubuh = 'A' AND (ah.verif_shubuh IS NULL OR ah.verif_shubuh = 'BELUM'))
-        OR (ah.ashar = 'A' AND (ah.verif_ashar IS NULL OR ah.verif_ashar = 'BELUM'))
-        OR (ah.maghrib = 'A' AND (ah.verif_maghrib IS NULL OR ah.verif_maghrib = 'BELUM'))
-      )
-    ORDER BY s.asrama, CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap, ah.tanggal
-    LIMIT 3000
-  `, [start, end, start, end])
-
-  const legacyEvents: FinalVonisItem[] = []
-  for (const row of rawRows) {
-    for (const sesi of PENGAJIAN_SESI) {
-      const verif = row[`verif_${sesi}`]
-      if (row[sesi] !== 'A' || (verif !== null && verif !== undefined && verif !== 'BELUM')) continue
-      const syntheticId = legacyPanggilanId(row.santri_id, start, end)
-      const key = eventKey(syntheticId, 'pengajian', row.tanggal, sesi)
-      legacyEvents.push({
-        key,
-        panggilan_id: syntheticId,
-        santri_id: row.santri_id,
-        nama: row.nama_lengkap,
-        nis: row.nis ?? null,
-        asrama: row.asrama ?? null,
-        kamar: row.kamar ?? null,
-        periode_awal: start,
-        periode_akhir: end,
-        source: 'pengajian',
-        tanggal: row.tanggal,
-        sesi,
-        catatan_panggilan: 'Data lama langsung dari absensi pengajian',
-        final_status: null,
-        final_catatan: null,
-        legacy_absen_id: row.absen_id,
-        mode: 'legacy_absen',
-      })
-    }
-  }
-
-  const existingRows = legacyEvents.length
-    ? await query<any>(`
-        SELECT panggilan_id, source, tanggal, sesi, status_final, catatan
-        FROM verifikasi_panggilan_vonis
-        WHERE panggilan_id IN (${Array.from(new Set(legacyEvents.map((item) => item.panggilan_id))).map(() => '?').join(',')})
-          AND source = 'pengajian'
-      `, Array.from(new Set(legacyEvents.map((item) => item.panggilan_id))))
-    : []
-  const existingMap = new Map(existingRows.map((row: any) => [eventKey(row.panggilan_id, row.source, row.tanggal, row.sesi), row]))
-
-  const status = filters.status || 'BELUM'
-  const search = (filters.search || '').trim().toLowerCase()
-  return {
-    periode: { start, end },
-    rows: legacyEvents
-      .map((item) => {
-        const final = existingMap.get(item.key)
-        return {
-          ...item,
-          final_status: final?.status_final ?? item.final_status,
-          final_catatan: final?.catatan ?? item.final_catatan,
-        }
-      })
-      .filter((item) => {
-        if (filters.asrama && item.asrama !== filters.asrama) return false
-        if (search && !item.nama.toLowerCase().includes(search) && !(item.nis || '').includes(search)) return false
-        if (status === 'BELUM') return !item.final_status
-        if (status === 'MANGKIR') return item.final_status === 'MANGKIR'
-        if (status === 'SELESAI') return !!item.final_status && item.final_status !== 'MANGKIR'
-        return true
-      }),
-  }
-}
-
-function legacyPanggilanId(santriId: string, start: string, end: string) {
-  return `legacy-pengajian-${start}-${end}-${santriId}`
-}
-
-async function ensureLegacyPanggilanRows(items: SaveFinalPayload[]) {
-  const legacyItems = items.filter((item) => item.mode === 'legacy_absen' && item.source === 'pengajian')
-  if (!legacyItems.length) return
-
-  const session = await getSession()
-  const verifiedAt = now()
-  const byPanggilan = new Map<string, SaveFinalPayload[]>()
-  for (const item of legacyItems) {
-    const legacyId = legacyPanggilanId(item.santriId, item.periodeAwal, item.periodeAkhir)
-    const existingPanggilan = await queryOne<{ id: string }>(`
-      SELECT id
-      FROM verifikasi_panggilan
-      WHERE id = ?
-      LIMIT 1
-    `, [legacyId])
-    const id = existingPanggilan?.id || legacyId
-    item.panggilanId = id
-    byPanggilan.set(id, [...(byPanggilan.get(id) || []), item])
-  }
-
-  for (const [panggilanId, group] of byPanggilan) {
-    const first = group[0]
-    const santri = await queryOne<any>(`
-      SELECT nama_lengkap, nis, asrama, kamar
-      FROM santri
-      WHERE id = ?
-      LIMIT 1
-    `, [first.santriId])
-
-    const existing = await queryOne<{ snapshot_json: string | null }>(`
-      SELECT snapshot_json
-      FROM verifikasi_panggilan
-      WHERE id = ?
-      LIMIT 1
-    `, [panggilanId])
-    const snapshot = existing?.snapshot_json ? parseSnapshot(existing.snapshot_json) : {}
-    const eventMap = new Map<string, SnapshotEvent>()
-    for (const event of snapshot.events || []) {
-      if (event.source === 'pengajian') eventMap.set(`${event.tanggal}|${event.sesi}`, event)
-    }
-    for (const item of group) {
-      eventMap.set(`${item.tanggal}|${item.sesi}`, {
-        source: 'pengajian',
-        tanggal: item.tanggal,
-        sesi: item.sesi,
-        label: item.sesi,
-        counted: true,
-        legacy_absen_id: item.legacyAbsenId ?? null,
-      })
-    }
-
-    const events = Array.from(eventMap.values()).sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.sesi.localeCompare(b.sesi))
-    const snapshotJson = JSON.stringify({
-      santri_id: first.santriId,
-      nama: santri?.nama_lengkap ?? null,
-      nis: santri?.nis ?? null,
-      asrama: santri?.asrama ?? null,
-      kamar: santri?.kamar ?? null,
-      kelas: null,
-      suggested: 'DIPANGGIL',
-      existing_decision: 'DIPANGGIL',
-      existing_catatan: 'Data lama langsung dari absensi pengajian',
-      jumlah_alfa_pengajian: events.length,
-      jumlah_alfa_berjamaah: 0,
-      total_alfa: events.length,
-      total_mentah: events.length,
-      events,
-      izin: [],
-      sakit: [],
-      legacy_source: 'absensi_harian',
-    })
-
-    await execute(`
-      INSERT INTO verifikasi_panggilan
-        (id, periode_awal, periode_akhir, santri_id, keputusan,
-         jumlah_alfa_pengajian, jumlah_alfa_berjamaah, total_alfa,
-         snapshot_json, catatan, verified_by, verified_at, updated_at)
-      VALUES (?, ?, ?, ?, 'DIPANGGIL', ?, 0, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(periode_awal, periode_akhir, santri_id) DO UPDATE SET
-        keputusan = 'DIPANGGIL',
-        jumlah_alfa_pengajian = excluded.jumlah_alfa_pengajian,
-        jumlah_alfa_berjamaah = excluded.jumlah_alfa_berjamaah,
-        total_alfa = excluded.total_alfa,
-        snapshot_json = excluded.snapshot_json,
-        catatan = excluded.catatan,
-        verified_by = excluded.verified_by,
-        verified_at = excluded.verified_at,
-        updated_at = excluded.updated_at
-    `, [
-      panggilanId,
-      first.periodeAwal,
-      first.periodeAkhir,
-      first.santriId,
-      events.length,
-      events.length,
-      snapshotJson,
-      'Data lama langsung dari absensi pengajian',
-      session?.id ?? null,
-      verifiedAt,
-      verifiedAt,
-    ])
-  }
-}
-
 export async function simpanFinalVonis(daftar: SaveFinalPayload[]) {
   await ensureFinalVonisTable()
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
   if (!daftar.length) return { error: 'Tidak ada vonis untuk disimpan.' }
-  await ensureLegacyPanggilanRows(daftar)
 
   const savedAt = now()
   const statements: { sql: string; params: unknown[] }[] = []

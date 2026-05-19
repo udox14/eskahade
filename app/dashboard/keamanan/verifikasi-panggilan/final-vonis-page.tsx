@@ -11,7 +11,6 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getFinalVonisQueue,
   simpanFinalVonis,
-  type FinalVonisMode,
   type FinalFilterStatus,
   type FinalStatus,
   type FinalVonisItem,
@@ -45,12 +44,6 @@ const FINAL_BADGE: Record<FinalStatus, string> = {
 
 function todayYmd() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function addDays(dateStr: string, days: number) {
-  const d = new Date(`${dateStr}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 function fmtDate(dateStr: string) {
@@ -163,18 +156,13 @@ export default function FinalVonisPage({
   source,
   title,
   description,
-  allowLegacyAbsen = false,
 }: {
   source: SourceType
   title: string
   description: string
-  allowLegacyAbsen?: boolean
 }) {
   const confirm = useConfirm()
   const [tanggalRef, setTanggalRef] = useState(todayYmd())
-  const [legacyStart, setLegacyStart] = useState(addDays(todayYmd(), -7))
-  const [legacyEnd, setLegacyEnd] = useState(todayYmd())
-  const [mode, setMode] = useState<FinalVonisMode>('panggilan')
   const [status, setStatus] = useState<FinalFilterStatus>('BELUM')
   const [search, setSearch] = useState('')
   const [asrama, setAsrama] = useState('')
@@ -190,15 +178,7 @@ export default function FinalVonisPage({
     setLoading(true)
     setDrafts({})
     try {
-      const activeMode = allowLegacyAbsen && source === 'pengajian' ? mode : 'panggilan'
-      const res = await getFinalVonisQueue(source, tanggalRef, {
-        status,
-        search,
-        asrama,
-        mode: activeMode,
-        legacyStart: activeMode === 'legacy_absen' ? legacyStart : undefined,
-        legacyEnd: activeMode === 'legacy_absen' ? legacyEnd : undefined,
-      })
+      const res = await getFinalVonisQueue(source, tanggalRef, { status, search, asrama })
       setRows(res.rows)
       setPeriode(res.periode)
       setHasLoaded(true)
@@ -208,7 +188,7 @@ export default function FinalVonisPage({
     } finally {
       setLoading(false)
     }
-  }, [source, tanggalRef, status, search, asrama, mode, allowLegacyAbsen, legacyStart, legacyEnd])
+  }, [source, tanggalRef, status, search, asrama])
 
   const asramaList = useMemo(() => Array.from(new Set(rows.map((item) => item.asrama).filter(Boolean) as string[])).sort(), [rows])
   const totalPages = Math.ceil(rows.length / 20)
@@ -255,8 +235,6 @@ export default function FinalVonisPage({
           sesi: item.sesi,
           status: drafts[key].status,
           catatan: drafts[key].catatan,
-          legacyAbsenId: item.legacy_absen_id ?? null,
-          mode: item.mode ?? 'panggilan',
         }
       })
       const res = await simpanFinalVonis(payload)
@@ -295,45 +273,11 @@ export default function FinalVonisPage({
         <div className="flex items-center gap-2 text-sm font-black text-slate-700">
           <Filter className="w-4 h-4" /> Filter Vonis
         </div>
-        {allowLegacyAbsen && source === 'pengajian' && (
-          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-            <button
-              type="button"
-              onClick={() => { setMode('panggilan'); setRows([]); setDrafts({}); setHasLoaded(false) }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${mode === 'panggilan' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Data Panggilan
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('legacy_absen'); setRows([]); setDrafts({}); setHasLoaded(false) }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${mode === 'legacy_absen' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Data Lama
-            </button>
-          </div>
-        )}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <label className="block">
-            <span className="text-[10px] font-black uppercase text-slate-400">
-              {mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' ? 'Tanggal Awal' : 'Tanggal Referensi'}
-            </span>
-            <input
-              type="date"
-              value={mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' ? legacyStart : tanggalRef}
-              onChange={(e) => {
-                if (mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian') setLegacyStart(e.target.value)
-                else setTanggalRef(e.target.value)
-              }}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Referensi</span>
+            <input type="date" value={tanggalRef} onChange={(e) => setTanggalRef(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           </label>
-          {mode === 'legacy_absen' && allowLegacyAbsen && source === 'pengajian' && (
-            <label className="block">
-              <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Akhir</span>
-              <input type="date" value={legacyEnd} onChange={(e) => setLegacyEnd(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-            </label>
-          )}
           <label className="block">
             <span className="text-[10px] font-black uppercase text-slate-400">Status</span>
             <select value={status} onChange={(e) => setStatus(e.target.value as FinalFilterStatus)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
