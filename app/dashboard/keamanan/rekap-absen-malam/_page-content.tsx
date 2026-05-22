@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam } from '../rekap-asrama/actions'
-import { History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -33,6 +33,7 @@ export default function RekapAbsenMalamPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [asrama, setAsrama] = useState<string>(ASRAMA_LIST[0] || '')
   const [bulan, setBulan] = useState(bulanIni())
+  const [tanggal, setTanggal] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [activeTab, setActiveTab] = useState<'bulan' | 'riwayat'>('bulan')
@@ -48,6 +49,7 @@ export default function RekapAbsenMalamPage() {
   const sessionInfoRef = useRef<any>(null)
   const asramaRef = useRef(asrama)
   const bulanRef = useRef(bulan)
+  const tanggalRef = useRef(tanggal)
 
   useEffect(() => {
     asramaRef.current = asrama
@@ -55,6 +57,7 @@ export default function RekapAbsenMalamPage() {
     getKamarList(asrama).then(k => setAvailableKamars(k))
   }, [asrama])
   useEffect(() => { bulanRef.current = bulan }, [bulan])
+  useEffect(() => { tanggalRef.current = tanggal }, [tanggal])
 
   const [sessionReady, setSessionReady] = useState(false)
 
@@ -81,7 +84,7 @@ export default function RekapAbsenMalamPage() {
     setLoading(true)
     try {
       const [malam, riwayat] = await Promise.all([
-        getRekapAbsenMalam(asramaRef.current, bulanRef.current),
+        getRekapAbsenMalam(asramaRef.current, bulanRef.current, tanggalRef.current || undefined),
         getRiwayatAlfaAbsenMalam(asramaRef.current),
       ])
       setMalamSantri(malam.santriList)
@@ -98,10 +101,22 @@ export default function RekapAbsenMalamPage() {
   }
 
   const days = getDaysInMonth(bulan)
-  const daysArr = Array.from({ length: days }, (_, i) => {
-    const d = String(i + 1).padStart(2, '0')
-    return `${bulan}-${d}`
-  })
+  const daysArr = tanggal
+    ? [tanggal]
+    : Array.from({ length: days }, (_, i) => {
+        const d = String(i + 1).padStart(2, '0')
+        return `${bulan}-${d}`
+      })
+
+  const handleTanggalChange = (value: string) => {
+    setTanggal(value)
+    if (value) setBulan(value.slice(0, 7))
+  }
+
+  const handleBulanChange = (next: string) => {
+    setBulan(next)
+    setTanggal('')
+  }
 
   const grouped = (list: any[]) => list.reduce((acc, s) => {
     const k = s.kamar || 'Tanpa Kamar'
@@ -137,11 +152,11 @@ export default function RekapAbsenMalamPage() {
         />
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+            <button onClick={() => handleBulanChange(prevBulan(bulan))} className="p-1.5 hover:bg-slate-100 rounded-lg">
               <ChevronLeft className="w-4 h-4"/>
             </button>
             <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <button onClick={() => setBulan(b => nextBulan(b))} disabled={bulan >= bulanIni()}
+            <button onClick={() => handleBulanChange(nextBulan(bulan))} disabled={bulan >= bulanIni()}
               className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
               <ChevronRight className="w-4 h-4"/>
             </button>
@@ -156,6 +171,27 @@ export default function RekapAbsenMalamPage() {
                 {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
           }
+
+          <div className="flex items-center gap-1 bg-white border rounded-xl px-3 py-2 shadow-sm">
+            <CalendarDays className="h-4 w-4 text-slate-400" />
+            <input
+              type="date"
+              value={tanggal}
+              onChange={e => handleTanggalChange(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+              title="Filter tanggal"
+            />
+            {tanggal ? (
+              <button
+                type="button"
+                onClick={() => setTanggal('')}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title="Tampilkan semua tanggal bulan ini"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
 
           <select
             value={filterKamar}
@@ -226,7 +262,7 @@ export default function RekapAbsenMalamPage() {
           </div>
           <div>
             <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
-            <p className="text-sm text-slate-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih asrama, bulan atau tanggal, lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
           <button onClick={load}
             className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow">
@@ -315,7 +351,9 @@ export default function RekapAbsenMalamPage() {
               <div key={kamar} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                 <div className="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center">
                   <span className="font-bold">{kamar === 'Tanpa Kamar' ? kamar : `Kamar ${kamar}`}</span>
-                  <span className="text-xs text-slate-400">{santriKamar.length} santri alfa</span>
+                  <span className="text-xs text-slate-400">
+                    {santriKamar.length} santri alfa{tanggal ? ` pada ${formatTanggal(tanggal)}` : ''}
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs min-w-[500px]">

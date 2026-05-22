@@ -26,12 +26,12 @@ export async function getKamarList(asrama: string) {
 }
 
 // Rekap Absen Malam: per santri, jumlah alfa per bulan
-export async function getRekapAbsenMalam(asrama: string, bulan: string) {
+export async function getRekapAbsenMalam(asrama: string, bulan: string, tanggal?: string) {
   if (isAsramaTanpaKamar(asrama)) return { santriList: [], alfaPerSantri: {}, detailPerSantri: {} }
   // bulan format: YYYY-MM
   const [tahun, bln] = bulan.split('-')
-  const startDate = `${tahun}-${bln}-01`
-  const endDate = `${tahun}-${bln}-31`
+  const startDate = tanggal || `${tahun}-${bln}-01`
+  const endDate = tanggal || `${tahun}-${bln}-31`
 
   const absenList = await query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.kamar, a.santri_id, a.tanggal, a.status FROM absen_malam_v2 a

@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -8,6 +8,24 @@ import { revalidatePath } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 
 const PAGE_SIZE = 30
+const VALID_KATEGORI = new Set(['RINGAN', 'SEDANG', 'BERAT'])
+
+type ImportMasterPelanggaranRow = {
+  kategori?: unknown
+  nama?: unknown
+  nama_pelanggaran?: unknown
+  poin?: unknown
+  deskripsi?: unknown
+  urutan?: unknown
+}
+
+function cleanText(value: unknown) {
+  return String(value ?? '').trim()
+}
+
+function cleanImportKey(kategori: string, nama: string) {
+  return `${kategori}::${nama.trim().toLowerCase().replace(/\s+/g, ' ')}`
+}
 
 // ─── KAMUS PELANGGARAN ────────────────────────────────────────────────────────
 export async function getMasterPelanggaran() {
@@ -125,6 +143,93 @@ export async function hapusMasterPelanggaran(id: number): Promise<{ success: boo
   })
   revalidateTag('master-pelanggaran', 'everything')
   return { success: true }
+}
+
+// ─── IMPORT KAMUS PELANGGARAN ────────────────────────────────────────────────
+export async function importMasterPelanggaranMassal(
+  rows: ImportMasterPelanggaranRow[]
+): Promise<{ success: boolean; inserted: number; updated: number; skipped: number } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+  const session = await getSession()
+
+  if (!Array.isArray(rows) || rows.length === 0) return { error: 'Data import kosong.' }
+
+  const cleanRows = rows.map((row, index) => {
+    const kategori = cleanText(row.kategori).toUpperCase()
+    const nama = cleanText(row.nama_pelanggaran || row.nama)
+    const poin = Number(row.poin)
+    const deskripsi = cleanText(row.deskripsi)
+    const urutanRaw = cleanText(row.urutan)
+    const urutan = urutanRaw ? Number(urutanRaw) : 0
+
+    if (!VALID_KATEGORI.has(kategori)) return { error: `Baris ${index + 2}: kategori harus RINGAN, SEDANG, atau BERAT.` }
+    if (!nama) return { error: `Baris ${index + 2}: nama pelanggaran wajib diisi.` }
+    if (!Number.isFinite(poin) || poin < 0) return { error: `Baris ${index + 2}: poin harus berupa angka minimal 0.` }
+    if (!Number.isFinite(urutan)) return { error: `Baris ${index + 2}: urutan harus berupa angka.` }
+
+    return {
+      kategori,
+      nama,
+      poin: Math.round(poin),
+      deskripsi: deskripsi || null,
+      urutan: Math.round(urutan),
+      key: cleanImportKey(kategori, nama),
+    }
+  })
+
+  const invalid = cleanRows.find((row): row is { error: string } => 'error' in row)
+  if (invalid) return { error: invalid.error }
+
+  const uniqueMap = new Map<string, Exclude<(typeof cleanRows)[number], { error: string }>>()
+  for (const row of cleanRows) {
+    if ('error' in row) continue
+    uniqueMap.set(row.key, row)
+  }
+  const uniqueRows = Array.from(uniqueMap.values())
+  if (uniqueRows.length === 0) return { error: 'Tidak ada baris valid untuk diimport.' }
+
+  const existingRows = await query<{ id: number; kategori: string; nama_pelanggaran: string }>(
+    'SELECT id, kategori, nama_pelanggaran FROM master_pelanggaran'
+  )
+  const existingMap = new Map(existingRows.map(row => [cleanImportKey(row.kategori, row.nama_pelanggaran), row.id]))
+
+  const statements = uniqueRows.map(row => {
+    const existingId = existingMap.get(row.key)
+    if (existingId) {
+      return {
+        mode: 'update' as const,
+        sql: 'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=?, urutan=? WHERE id=?',
+        params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan, existingId],
+      }
+    }
+    return {
+      mode: 'insert' as const,
+      sql: 'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi, urutan) VALUES (?, ?, ?, ?, ?)',
+      params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan],
+    }
+  })
+
+  await batch(statements.map(({ sql, params }) => ({ sql, params })))
+
+  const inserted = statements.filter(statement => statement.mode === 'insert').length
+  const updated = statements.filter(statement => statement.mode === 'update').length
+  const skipped = rows.length - uniqueRows.length
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan',
+    action: 'import',
+    fiturHref: '/dashboard/keamanan',
+    logKind: 'create',
+    entityType: 'master_pelanggaran',
+    summary: `Import kamus pelanggaran ${uniqueRows.length} baris`,
+    details: { inserted, updated, skipped },
+  })
+
+  revalidateTag('master-pelanggaran', 'everything')
+  revalidatePath('/dashboard/keamanan')
+  return { success: true, inserted, updated, skipped }
 }
 
 // ─── CARI SANTRI ──────────────────────────────────────────────────────────────

@@ -583,9 +583,15 @@ export async function getJadwalEhbCetakData(eventId: number) {
         j.tanggal,
         j.sesi_id,
         j.kelas_id,
-        mp.nama as mapel_nama
+        COALESCE(kt.nama_kitab, mp.nama) as mapel_nama
       FROM ehb_jadwal j
+      JOIN ehb_event e ON e.id = j.ehb_event_id
+      JOIN kelas k ON k.id = j.kelas_id
       JOIN mapel mp ON mp.id = j.mapel_id
+      LEFT JOIN kitab kt
+        ON kt.mapel_id = j.mapel_id
+       AND kt.marhalah_id = k.marhalah_id
+       AND kt.tahun_ajaran_id = e.tahun_ajaran_id
       WHERE j.ehb_event_id = ?
       ORDER BY j.tanggal, j.sesi_id, j.kelas_id
     `, [eventId]),

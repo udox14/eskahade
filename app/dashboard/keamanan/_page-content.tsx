@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getMasterPelanggaran, tambahMasterPelanggaran, editMasterPelanggaran,
   hapusMasterPelanggaran, cariSantri, simpanPelanggaran, hapusPelanggaran,
-  getDaftarPelanggar, getDetailSantri,
+  getDaftarPelanggar, getDetailSantri, importMasterPelanggaranMassal,
 } from './actions'
 import {
   ShieldAlert, Plus, Search, Loader2, X, Trash2, Edit2,
   ChevronLeft, ChevronRight, BookOpen, Camera,
   Image as ImageIcon, Filter, Eye, Users, ChevronDown,
-  CheckSquare, Square,
+  CheckSquare, Square, Download, Upload, FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -37,6 +37,14 @@ const SP_COLOR: Record<string, string> = {
   SP2: 'bg-orange-100 text-orange-700 border-orange-200',
   SP3: 'bg-rose-100 text-rose-700 border-rose-200',
   SK:  'bg-red-900 text-white border-red-900',
+}
+
+type ImportKamusRow = {
+  kategori: string
+  nama_pelanggaran: string
+  poin: number
+  deskripsi: string
+  urutan: number
 }
 
 async function kompresGambar(file: File, maxW = 800, quality = 0.7): Promise<string> {
@@ -574,6 +582,74 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [importRows, setImportRows] = useState<ImportKamusRow[]>([])
+  const [importing, setImporting] = useState(false)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  const readImportValue = (row: Record<string, any>, keys: string[]) => {
+    const found = Object.keys(row).find(key => keys.includes(key.trim().toLowerCase()))
+    return found ? row[found] : ''
+  }
+
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
+    const rows: ImportKamusRow[] = [
+      { kategori: 'RINGAN', nama_pelanggaran: 'Terlambat mengikuti kegiatan', poin: 5, deskripsi: 'Tidak hadir tepat waktu pada kegiatan wajib', urutan: 10 },
+      { kategori: 'SEDANG', nama_pelanggaran: 'Meninggalkan asrama tanpa izin', poin: 25, deskripsi: 'Keluar area asrama tanpa izin pengurus', urutan: 20 },
+      { kategori: 'BERAT', nama_pelanggaran: 'Berkelahi', poin: 50, deskripsi: 'Terlibat perkelahian atau kekerasan fisik', urutan: 30 },
+    ]
+    const ws = XLSX.utils.json_to_sheet(rows.map(row => ({
+      KATEGORI: row.kategori,
+      'NAMA PELANGGARAN': row.nama_pelanggaran,
+      POIN: row.poin,
+      DESKRIPSI: row.deskripsi,
+      URUTAN: row.urutan,
+    })))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Kamus Pelanggaran')
+    XLSX.writeFile(wb, 'Template_Kamus_Pelanggaran.xlsx')
+  }
+
+  const handleUploadImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      const XLSX = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' })
+      const rows = rawRows
+        .map(row => ({
+          kategori: String(readImportValue(row, ['kategori']) || '').trim().toUpperCase(),
+          nama_pelanggaran: String(readImportValue(row, ['nama pelanggaran', 'nama_pelanggaran', 'nama']) || '').trim(),
+          poin: Number(readImportValue(row, ['poin']) || 0),
+          deskripsi: String(readImportValue(row, ['deskripsi', 'keterangan']) || '').trim(),
+          urutan: Number(readImportValue(row, ['urutan']) || 0),
+        }))
+        .filter(row => row.kategori || row.nama_pelanggaran || row.poin || row.deskripsi || row.urutan)
+
+      setImportRows(rows)
+      toast.success(`${rows.length} baris terbaca`)
+    } catch {
+      toast.error('Gagal membaca file Excel')
+    } finally {
+      if (importFileRef.current) importFileRef.current.value = ''
+    }
+  }
+
+  const handleSimpanImport = async () => {
+    if (importRows.length === 0) { toast.error('Upload file template dulu'); return }
+    setImporting(true)
+    const res = await importMasterPelanggaranMassal(importRows)
+    setImporting(false)
+    if ('error' in res) { toast.error(res.error); return }
+    const parts = [`${res.inserted} baru`, `${res.updated} diperbarui`]
+    if (res.skipped > 0) parts.push(`${res.skipped} duplikat dilewati`)
+    toast.success(`Import selesai: ${parts.join(', ')}`)
+    setImportRows([])
+    onRefresh()
+  }
 
   const handleSimpan = async () => {
     if (!form.nama.trim()) { toast.error('Nama pelanggaran wajib diisi'); return }
@@ -638,6 +714,87 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
               className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">Batal</button>
           )}
         </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Import Kamus Pelanggaran</p>
+            <p className="mt-1 text-xs text-slate-500">Gunakan template Excel agar kolom kategori, nama pelanggaran, poin, deskripsi, dan urutan terbaca.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={downloadTemplate}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Template
+            </button>
+            <button
+              type="button"
+              onClick={() => importFileRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload Excel
+            </button>
+            <input ref={importFileRef} type="file" accept=".xlsx,.xls" onChange={handleUploadImport} className="hidden" />
+          </div>
+        </div>
+
+        {importRows.length > 0 && (
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+                <FileSpreadsheet className="h-4 w-4" />
+                Preview Import ({importRows.length} baris)
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportRows([])}
+                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSimpanImport}
+                  disabled={importing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                >
+                  {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  {importing ? 'Menyimpan...' : 'Simpan Import'}
+                </button>
+              </div>
+            </div>
+            <div className="max-h-64 overflow-auto rounded-lg border border-emerald-100 bg-white">
+              <table className="w-full min-w-[640px] text-left text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2">Kategori</th>
+                    <th className="px-3 py-2">Nama Pelanggaran</th>
+                    <th className="px-3 py-2 text-right">Poin</th>
+                    <th className="px-3 py-2">Deskripsi</th>
+                    <th className="px-3 py-2 text-right">Urutan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {importRows.slice(0, 50).map((row, index) => (
+                    <tr key={`${row.kategori}-${row.nama_pelanggaran}-${index}`}>
+                      <td className="px-3 py-2 font-bold text-slate-700">{row.kategori || '-'}</td>
+                      <td className="px-3 py-2 text-slate-800">{row.nama_pelanggaran || '-'}</td>
+                      <td className="px-3 py-2 text-right font-bold text-rose-600">{row.poin}</td>
+                      <td className="px-3 py-2 text-slate-500">{row.deskripsi || '-'}</td>
+                      <td className="px-3 py-2 text-right text-slate-500">{row.urutan}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {importRows.length > 50 && <p className="mt-2 text-xs text-emerald-700">Preview hanya menampilkan 50 baris pertama.</p>}
+          </div>
+        )}
       </div>
       {['RINGAN', 'SEDANG', 'BERAT'].map(kat => (
         <div key={kat}>
