@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSPr
 import Link from 'next/link'
 import { useReactToPrint } from 'react-to-print'
 import {
-  AlertTriangle, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
+  AlertTriangle, ArrowDown, ArrowUp, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -1418,6 +1418,37 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     setDrafts(prev => prev.filter(item => item.draft_id !== draftId))
   }
 
+  const moveDraft = (draftId: string, direction: -1 | 1) => {
+    setDrafts(prev => {
+      const current = prev.find(item => item.draft_id === draftId)
+      if (!current) return prev
+
+      const categoryRows = prev.filter(item => item.kategori === current.kategori)
+      const categoryIndex = categoryRows.findIndex(item => item.draft_id === draftId)
+      const targetCategoryIndex = categoryIndex + direction
+      if (categoryIndex < 0 || targetCategoryIndex < 0 || targetCategoryIndex >= categoryRows.length) return prev
+
+      const currentGlobalIndex = prev.findIndex(item => item.draft_id === draftId)
+      const targetGlobalIndex = prev.findIndex(item => item.draft_id === categoryRows[targetCategoryIndex].draft_id)
+      if (currentGlobalIndex < 0 || targetGlobalIndex < 0) return prev
+
+      const next = [...prev]
+      const temp = next[currentGlobalIndex]
+      next[currentGlobalIndex] = next[targetGlobalIndex]
+      next[targetGlobalIndex] = temp
+
+      const orderedCategoryIds = next
+        .filter(item => item.kategori === current.kategori)
+        .map(item => item.draft_id)
+
+      return next.map(item => (
+        item.kategori === current.kategori
+          ? { ...item, urutan: orderedCategoryIds.indexOf(item.draft_id) + 1 }
+          : item
+      ))
+    })
+  }
+
   const updateHonorPanitia = (panitiaId: number, patch: Partial<Pick<HonorPanitiaRow, 'nominal' | 'keterangan'>>) => {
     setHonorPanitiaRows(prev => prev.map(row => row.panitia_id === panitiaId ? { ...row, ...patch } : row))
   }
@@ -2418,7 +2449,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                         <th className="px-4 py-3 text-left font-bold w-40">{kategori.key === 'honorarium' ? 'Nominal' : 'Harga'}</th>
                         <th className="px-4 py-3 text-left font-bold min-w-[260px]">Merek/keterangan</th>
                         <th className="px-4 py-3 text-right font-bold w-36">Total</th>
-                        <th className="px-4 py-3 w-12"></th>
+                        <th className="px-4 py-3 w-36"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -2426,7 +2457,9 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Belum ada item</td>
                         </tr>
-                      ) : items.map(item => {
+                      ) : items.map((item, index) => {
+                        const isFirstItem = index === 0
+                        const isLastItem = index === items.length - 1
                         if (item.system_key === 'honor_pemeriksaan_header') {
                           return (
                             <tr key={item.draft_id} className="bg-slate-100">
@@ -2439,9 +2472,17 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                                 <p className="text-[11px] text-slate-500 font-semibold mt-1">Judul rincian pemeriksaan. Item di bawahnya cukup nama marhalah.</p>
                               </td>
                               <td className="px-4 py-3 align-top">
-                                <button onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <button title="Naikkan row" disabled={isFirstItem} onClick={() => moveDraft(item.draft_id, -1)} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400">
+                                    <ArrowUp className="w-4 h-4" />
+                                  </button>
+                                  <button title="Turunkan row" disabled={isLastItem} onClick={() => moveDraft(item.draft_id, 1)} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400">
+                                    <ArrowDown className="w-4 h-4" />
+                                  </button>
+                                  <button title="Hapus row" onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -2489,9 +2530,17 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                               {rupiah(lineTotal(item))}
                             </td>
                             <td className="px-4 py-3 align-top">
-                              <button onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center justify-end gap-1">
+                                <button title="Naikkan row" disabled={isFirstItem} onClick={() => moveDraft(item.draft_id, -1)} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400">
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                                <button title="Turunkan row" disabled={isLastItem} onClick={() => moveDraft(item.draft_id, 1)} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400">
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                                <button title="Hapus row" onClick={() => deleteItem(item.draft_id)} className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         )
