@@ -47,7 +47,7 @@ type SaveFinalPayload = {
 }
 
 const SOURCE_PATH: Record<SourceType, string> = {
-  pengajian: '/dashboard/akademik/absensi/verifikasi',
+  pengajian: '/dashboard/akademik/absensi/vonis-final',
   berjamaah: '/dashboard/keamanan/verifikasi-berjamaah',
 }
 

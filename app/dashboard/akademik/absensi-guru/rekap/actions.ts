@@ -1,7 +1,7 @@
 'use server'
 
 import { execute, query } from '@/lib/db'
-import { getCachedMarhalahList } from '@/lib/cache/master'
+import { getCachedMarhalahList, getCachedTahunAjaranList } from '@/lib/cache/master'
 import {
   buildGabunganByKelas,
   buildGabunganMembersByGroup,
@@ -42,6 +42,10 @@ type GuruDetailRow = {
   status: GuruStatus
   status_label: string
   catatan: string
+  sumber_guru: 'snapshot' | 'jadwal'
+  snapshot_guru_nama: string | null
+  jadwal_guru_nama: string | null
+  snapshot_berbeda: boolean
 }
 
 function isLibur(dayOfWeek: number, session: GuruSession): boolean {
@@ -66,6 +70,10 @@ export async function getMarhalahList() {
   return getCachedMarhalahList()
 }
 
+export async function getTahunAjaranList() {
+  return getCachedTahunAjaranList()
+}
+
 async function ensureRekapSchema() {
   await ensureGuruJadwalSchema()
   await execute(`
@@ -84,10 +92,16 @@ async function ensureRekapSchema() {
   `)
 }
 
-async function getActiveKelasList(marhalahId: string) {
+async function getKelasListForRekap(
+  marhalahId: string,
+  tahunAjaranId: string = '',
+  startDate?: string,
+  endDate?: string
+) {
   let sql = `
     SELECT
       k.id,
+      k.tahun_ajaran_id,
       k.nama_kelas,
       m.nama AS marhalah_nama,
       gs.id AS guru_shubuh_id,
@@ -97,25 +111,39 @@ async function getActiveKelasList(marhalahId: string) {
       gm.id AS guru_maghrib_id,
       gm.nama_lengkap AS guru_maghrib_nama
     FROM kelas k
-    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
-    WHERE EXISTS (
-      SELECT 1
-      FROM riwayat_pendidikan rp
-      JOIN santri s ON s.id = rp.santri_id
-      WHERE rp.kelas_id = k.id
-        AND rp.status_riwayat = 'aktif'
-        AND s.status_global = 'aktif'
-    )
+    WHERE ${tahunAjaranId ? 'k.tahun_ajaran_id = ?' : 'ta.is_active = 1'}
   `
-  const params: any[] = []
+  const params: any[] = tahunAjaranId ? [tahunAjaranId] : []
   if (marhalahId) {
     sql += ' AND k.marhalah_id = ?'
     params.push(marhalahId)
   }
+  const hasDateRange = Boolean(startDate && endDate)
+  sql += `
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM riwayat_pendidikan rp
+        JOIN santri s ON s.id = rp.santri_id
+        WHERE rp.kelas_id = k.id
+          AND rp.status_riwayat = 'aktif'
+          AND s.status_global = 'aktif'
+      )
+      ${hasDateRange ? `OR EXISTS (
+        SELECT 1
+        FROM absensi_guru ag
+        WHERE ag.kelas_id = k.id
+          AND ag.tanggal >= ?
+          AND ag.tanggal <= ?
+      )` : ''}
+    )
+  `
+  if (hasDateRange) params.push(startDate, endDate)
   sql += ' ORDER BY k.nama_kelas'
   return query<any>(sql, params)
 }
@@ -176,6 +204,17 @@ function snapshotBySession(absen: any, session: GuruSession) {
   }
 }
 
+function hasGuru(guru: { id?: string | number | null; nama?: string | null }) {
+  return Boolean(guru?.id && guru?.nama)
+}
+
+function isDifferentGuru(
+  snapshot: { id?: string | number | null; nama?: string | null },
+  jadwal: { id?: string | number | null; nama?: string | null }
+) {
+  return hasGuru(snapshot) && hasGuru(jadwal) && String(snapshot.id) !== String(jadwal.id)
+}
+
 function emptyBreakdown(): GuruBreakdown {
   return {
     wajib: 0,
@@ -224,14 +263,31 @@ function hariLabel(tanggal: string) {
   return labels[new Date(tanggal).getDay()] || ''
 }
 
-export async function getGuruOptionsForRekap(marhalahId: string = '') {
+export async function getGuruOptionsForRekap(
+  marhalahId: string = '',
+  tahunAjaranId: string = '',
+  startDate: string = '',
+  endDate: string = ''
+) {
   await ensureRekapSchema()
-  const kelasList = await getActiveKelasList(marhalahId)
+  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, startDate, endDate)
   if (!kelasList.length) return []
 
   const kelasIds = kelasList.map((k: any) => String(k.id))
+  const absensiMap = startDate && endDate
+    ? await getAbsensiMap(kelasIds, startDate, endDate)
+    : new Map<string, any>()
   const ruleMap = buildWeeklyGuruRuleMap(await getWeeklyGuruRules(kelasIds))
   const guruMap = new Map<string, { id: string; nama: string }>()
+
+  for (const absen of absensiMap.values()) {
+    for (const session of SESSIONS) {
+      const snapshot = snapshotBySession(absen, session)
+      if (snapshot.id && snapshot.nama) {
+        guruMap.set(String(snapshot.id), { id: String(snapshot.id), nama: snapshot.nama })
+      }
+    }
+  }
 
   for (const kelas of kelasList) {
     for (const dayOfWeek of [0, 1, 2, 3, 4, 5, 6]) {
@@ -265,10 +321,11 @@ export async function getRekapKinerjaGuru(
   startDate: string,
   endDate: string,
   marhalahId: string,
-  badalAsHadir: boolean
+  badalAsHadir: boolean,
+  tahunAjaranId: string = ''
 ) {
   await ensureRekapSchema()
-  const kelasList = await getActiveKelasList(marhalahId)
+  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, startDate, endDate)
   if (!kelasList.length) return []
 
   const kelasIds = kelasList.map((k: any) => String(k.id))
@@ -293,6 +350,7 @@ export async function getRekapKinerjaGuru(
         kosong: 0,
         libur: 0,
         total_wajib: 0,
+        snapshot_berbeda: 0,
       })
     }
     statsGuru.get(guruKey).kelas_ajar.add(`${kelasNama} (${label})`)
@@ -316,12 +374,14 @@ export async function getRekapKinerjaGuru(
         if (representative && representative.kelas_id !== kelas.id) return
 
         const snapshot = snapshotBySession(absen, session)
-        const targetGuru = snapshot.id && snapshot.nama ? snapshot : resolved[session]
+        const jadwalGuru = resolved[session]
+        const targetGuru = hasGuru(snapshot) ? snapshot : jadwalGuru
         const kelasLabel = formatKelasLabel(group, members, kelas.nama_kelas)
         const stat = initGuru(targetGuru.id, targetGuru.nama, kelasLabel, label)
         if (!stat) return
 
         stat.total_wajib += 1
+        if (isDifferentGuru(snapshot, jadwalGuru)) stat.snapshot_berbeda += 1
         const status = String(absen?.[session] || 'H').toUpperCase()
         if (status === 'L') {
           stat.libur += 1
@@ -365,12 +425,13 @@ export async function getRekapDetailGuru(
   endDate: string,
   guruId: string,
   marhalahId: string,
-  badalAsHadir: boolean
+  badalAsHadir: boolean,
+  tahunAjaranId: string = ''
 ) {
   await ensureRekapSchema()
   if (!guruId) return null
 
-  const kelasList = await getActiveKelasList(marhalahId)
+  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, startDate, endDate)
   if (!kelasList.length) return null
 
   const guruRows = await query<{ id: number | string; nama_lengkap: string }>(
@@ -414,7 +475,8 @@ export async function getRekapDetailGuru(
         if (representative && representative.kelas_id !== kelas.id) return
 
         const snapshot = snapshotBySession(absen, session)
-        const targetGuru = snapshot.id && snapshot.nama ? snapshot : resolved[session]
+        const jadwalGuru = resolved[session]
+        const targetGuru = hasGuru(snapshot) ? snapshot : jadwalGuru
         if (String(targetGuru.id || '') !== targetGuruId) return
 
         const status = String(absen?.[session] || 'H').toUpperCase()
@@ -434,6 +496,10 @@ export async function getRekapDetailGuru(
           status: normalizedStatus,
           status_label: statusLabel(normalizedStatus),
           catatan: normalizedStatus === 'B' ? 'Diisi badal' : '-',
+          sumber_guru: hasGuru(snapshot) ? 'snapshot' : 'jadwal',
+          snapshot_guru_nama: snapshot.nama ?? null,
+          jadwal_guru_nama: jadwalGuru.nama ?? null,
+          snapshot_berbeda: isDifferentGuru(snapshot, jadwalGuru),
         })
       })
     })

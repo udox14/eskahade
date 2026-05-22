@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getGuruOptionsForRekap, getMarhalahList, getRekapDetailGuru, getRekapKinerjaGuru } from './actions'
+import { getGuruOptionsForRekap, getMarhalahList, getRekapDetailGuru, getRekapKinerjaGuru, getTahunAjaranList } from './actions'
 import { useReactToPrint } from 'react-to-print'
-import { Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound } from 'lucide-react'
+import { AlertTriangle, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -77,6 +77,11 @@ function statusPrintColor(status: string, isBW: boolean) {
   return { bg: '#f0fdf4', color: '#16a34a' }
 }
 
+function sourceLabel(row: any) {
+  if (row?.sumber_guru === 'snapshot') return 'Snapshot'
+  return 'Jadwal'
+}
+
 function filterDetailRows(detail: any | null, statusFilter: StatusFilter) {
   if (!detail) return null
   if (statusFilter === 'semua') return detail
@@ -93,6 +98,8 @@ export default function RekapAbsensiGuruPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [marhalahList, setMarhalahList] = useState<any[]>([])
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState('')
   const [selectedMarhalah, setSelectedMarhalah] = useState('')
   const [badalAsHadir, setBadalAsHadir] = useState(true)
   const [sortBy, setSortBy] = useState('performa')
@@ -123,12 +130,17 @@ export default function RekapAbsensiGuruPage() {
     const now = new Date()
     setStartDate(format(startOfMonth(now), 'yyyy-MM-dd'))
     setEndDate(format(endOfMonth(now), 'yyyy-MM-dd'))
-    getMarhalahList().then(setMarhalahList)
+    Promise.all([getMarhalahList(), getTahunAjaranList()]).then(([marhalah, tahunAjaran]) => {
+      setMarhalahList(marhalah || [])
+      setTahunAjaranList(tahunAjaran || [])
+      const active = (tahunAjaran || []).find((item: any) => Number(item.is_active) === 1)
+      if (active) setSelectedTahunAjaran(String(active.id))
+    })
   }, [])
 
   useEffect(() => {
     setGuruOptionsLoading(true)
-    getGuruOptionsForRekap(selectedMarhalah)
+    getGuruOptionsForRekap(selectedMarhalah, selectedTahunAjaran, startDate, endDate)
       .then(list => {
         setGuruOptions(list || [])
         setSelectedGuru(current => {
@@ -137,12 +149,12 @@ export default function RekapAbsensiGuruPage() {
         })
       })
       .finally(() => setGuruOptionsLoading(false))
-  }, [selectedMarhalah])
+  }, [selectedMarhalah, selectedTahunAjaran, startDate, endDate])
 
   const handleCariSemua = async () => {
     setLoading(true)
     setHasSearched(true)
-    const res = await getRekapKinerjaGuru(startDate, endDate, selectedMarhalah, badalAsHadir)
+    const res = await getRekapKinerjaGuru(startDate, endDate, selectedMarhalah, badalAsHadir, selectedTahunAjaran)
     setData(res || [])
     setLoading(false)
   }
@@ -151,7 +163,7 @@ export default function RekapAbsensiGuruPage() {
     if (!selectedGuru) return
     setGuruLoading(true)
     setGuruHasSearched(true)
-    const res = await getRekapDetailGuru(startDate, endDate, selectedGuru, selectedMarhalah, badalAsHadir)
+    const res = await getRekapDetailGuru(startDate, endDate, selectedGuru, selectedMarhalah, badalAsHadir, selectedTahunAjaran)
     setGuruDetail(res)
     setGuruLoading(false)
   }
@@ -205,6 +217,9 @@ export default function RekapAbsensiGuruPage() {
   const namaMarhalah = selectedMarhalah
     ? marhalahList.find(m => String(m.id) === String(selectedMarhalah))?.nama || ''
     : 'Semua Tingkat'
+  const namaTahunAjaran = selectedTahunAjaran
+    ? tahunAjaranList.find(ta => String(ta.id) === String(selectedTahunAjaran))?.nama || 'Tahun Ajaran'
+    : 'Tahun Ajaran Aktif'
   const statusFilterLabel = STATUS_FILTER_OPTIONS.find(option => option.value === statusFilter)?.label || 'Semua Status'
   const filteredGuruDetail = useMemo(() => filterDetailRows(guruDetail, statusFilter), [guruDetail, statusFilter])
 
@@ -265,7 +280,7 @@ export default function RekapAbsensiGuruPage() {
       </div>
 
       <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-        <div className={`grid grid-cols-1 gap-4 ${activeTab === 'per_guru' ? 'md:grid-cols-6' : 'md:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 gap-4 ${activeTab === 'per_guru' ? 'md:grid-cols-7' : 'md:grid-cols-5'}`}>
           <div className="md:col-span-2 flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Dari</label>
@@ -275,6 +290,15 @@ export default function RekapAbsensiGuruPage() {
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sampai</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm" />
             </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tahun Ajaran</label>
+            <select value={selectedTahunAjaran} onChange={e => setSelectedTahunAjaran(e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
+              {tahunAjaranList.length === 0 && <option value="">Aktif</option>}
+              {tahunAjaranList.map(ta => (
+                <option key={ta.id} value={ta.id}>{ta.nama}{Number(ta.is_active) === 1 ? ' (Aktif)' : ''}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Tingkat</label>
@@ -389,6 +413,7 @@ export default function RekapAbsensiGuruPage() {
               fmtDate={fmtDate}
               startDate={startDate}
               endDate={endDate}
+              namaTahunAjaran={namaTahunAjaran}
               namaMarhalah={namaMarhalah}
               badalAsHadir={badalAsHadir}
               statusFilterLabel={statusFilterLabel}
@@ -401,6 +426,7 @@ export default function RekapAbsensiGuruPage() {
               fmtDate={fmtDate}
               startDate={startDate}
               endDate={endDate}
+              namaTahunAjaran={namaTahunAjaran}
               namaMarhalah={namaMarhalah}
               filterSesi={filterSesi}
               sortBy={sortBy}
@@ -487,7 +513,15 @@ function SemuaGuruView({
                     <td className="px-4 py-3 text-slate-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-3 font-bold text-slate-800">{row.nama}</td>
                     <td className="px-4 py-3 text-[11px] text-slate-500 max-w-xs">{row.kelas_ajar}</td>
-                    <td className="px-4 py-3 text-center font-bold text-slate-700">{row.total_wajib}</td>
+                    <td className="px-4 py-3 text-center">
+                      <p className="font-bold text-slate-700">{row.total_wajib}</p>
+                      {row.snapshot_berbeda > 0 && (
+                        <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700" title="Ada snapshot guru yang berbeda dari jadwal saat ini">
+                          <AlertTriangle className="h-3 w-3" />
+                          {row.snapshot_berbeda}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-center bg-green-50/30">
                       <p className="font-bold text-green-600">{row.hadir}</p>
                       <p className="text-[10px] text-green-400">{row.pct_hadir}%</p>
@@ -560,9 +594,19 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
   }
 
   const rawDetailCount = rawDetail?.detail?.length ?? detail.detail.length
+  const snapshotMismatchCount = (rawDetail?.detail || detail.detail || []).filter((row: any) => row.snapshot_berbeda).length
 
   return (
     <div className="space-y-4">
+      {snapshotMismatchCount > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" />
+          <div>
+            <p className="font-black">Ada {snapshotMismatchCount} waktu dengan snapshot guru berbeda dari jadwal saat ini.</p>
+            <p className="mt-1 text-xs text-amber-700">Rekap tetap memakai snapshot agar histori lintas tahun ajaran tidak berubah saat jadwal baru dibuat.</p>
+          </div>
+        </div>
+      )}
       <div className="bg-white border rounded-xl shadow-sm p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -623,6 +667,7 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
                   <th className="px-4 py-3">Waktu</th>
                   <th className="px-4 py-3">Kelas/Gabungan</th>
                   <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3">Sumber</th>
                   <th className="px-4 py-3">Catatan</th>
                 </tr>
               </thead>
@@ -639,6 +684,16 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
                     <td className="px-4 py-3 text-slate-600">{row.kelas}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-black ${statusClass(row.status)}`}>{row.status_label}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-black ${row.snapshot_berbeda ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                        {sourceLabel(row)}
+                      </span>
+                      {row.snapshot_berbeda && (
+                        <p className="mt-1 text-[11px] text-amber-700">
+                          Snapshot: {row.snapshot_guru_nama || '-'}; jadwal: {row.jadwal_guru_nama || '-'}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{row.catatan}</td>
                   </tr>
@@ -678,13 +733,13 @@ function MiniStat({ label, value, pct }: { label: string; value: number; pct?: n
   )
 }
 
-function PrintSemuaGuru({ processedData, fmtDate, startDate, endDate, namaMarhalah, filterSesi, sortBy, badalAsHadir, isBW, S }: any) {
+function PrintSemuaGuru({ processedData, fmtDate, startDate, endDate, namaTahunAjaran, namaMarhalah, filterSesi, sortBy, badalAsHadir, isBW, S }: any) {
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
       <PrintHeader
         title="REKAP ABSEN GURU"
         subtitle={`${fmtDate(startDate)} - ${fmtDate(endDate)}`}
-        meta={`Tingkat: ${namaMarhalah} | Sesi: ${SESI_OPTIONS.find(o => o.value === filterSesi)?.label} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Urut: ${SORT_OPTIONS.find(o => o.value === sortBy)?.label}`}
+        meta={`T.A.: ${namaTahunAjaran} | Tingkat: ${namaMarhalah} | Sesi: ${SESI_OPTIONS.find(o => o.value === filterSesi)?.label} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Urut: ${SORT_OPTIONS.find(o => o.value === sortBy)?.label}`}
         S={S}
         isBW={isBW}
       />
@@ -723,13 +778,13 @@ function PrintSemuaGuru({ processedData, fmtDate, startDate, endDate, namaMarhal
   )
 }
 
-function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badalAsHadir, statusFilterLabel, isBW, S }: any) {
+function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaTahunAjaran, namaMarhalah, badalAsHadir, statusFilterLabel, isBW, S }: any) {
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
       <PrintHeader
         title="REKAP ABSEN PER GURU"
         subtitle={`${detail.guru.nama} | ${fmtDate(startDate)} - ${fmtDate(endDate)}`}
-        meta={`Tingkat: ${namaMarhalah} | Status tampil: ${statusFilterLabel} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Jadwal: ${detail.kelas_ajar || '-'}`}
+        meta={`T.A.: ${namaTahunAjaran} | Tingkat: ${namaMarhalah} | Status tampil: ${statusFilterLabel} | Badal: ${badalAsHadir ? 'Hadir' : 'Kosong'} | Jadwal: ${detail.kelas_ajar || '-'}`}
         S={S}
         isBW={isBW}
       />
@@ -777,6 +832,7 @@ function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badal
             <th style={{ padding: '5px', border: `1px solid ${S.headerBorder}` }}>Waktu</th>
             <th style={{ padding: '5px', border: `1px solid ${S.headerBorder}`, textAlign: 'left' }}>Kelas/Gabungan</th>
             <th style={{ padding: '5px', border: `1px solid ${S.headerBorder}` }}>Status</th>
+            <th style={{ padding: '5px', border: `1px solid ${S.headerBorder}` }}>Sumber</th>
             <th style={{ padding: '5px', border: `1px solid ${S.headerBorder}`, textAlign: 'left' }}>Catatan</th>
           </tr>
         </thead>
@@ -789,6 +845,7 @@ function PrintPerGuru({ detail, fmtDate, startDate, endDate, namaMarhalah, badal
                 <td style={{ padding: '4px', border: `1px solid ${S.borderColor}`, textAlign: 'center' }}>{row.sesi_label}</td>
                 <td style={{ padding: '4px', border: `1px solid ${S.borderColor}` }}>{row.kelas}</td>
                 <td style={{ padding: '4px', border: `1px solid ${S.borderColor}`, textAlign: 'center', backgroundColor: statusColor.bg, color: statusColor.color, fontWeight: 'bold' }}>{row.status_label}</td>
+                <td style={{ padding: '4px', border: `1px solid ${S.borderColor}`, textAlign: 'center' }}>{sourceLabel(row)}{row.snapshot_berbeda ? '*' : ''}</td>
                 <td style={{ padding: '4px', border: `1px solid ${S.borderColor}` }}>{row.catatan}</td>
               </tr>
             )

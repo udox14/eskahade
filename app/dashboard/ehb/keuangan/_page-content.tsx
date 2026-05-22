@@ -430,9 +430,8 @@ function RabPrint({
     ...kategori,
     items: items.filter(item => item.kategori === kategori.key),
   }))
-  const rowCount = items.length + KATEGORI.length
-  const fontSize = rowCount > 32 ? '6.2pt' : rowCount > 24 ? '6.8pt' : '7.4pt'
-  const lineHeight = rowCount > 32 ? 1.03 : 1.12
+  const fontSize = '11pt'
+  const lineHeight = 1.15
   const grandTotal = items.reduce((sum, item) => sum + lineTotal(item), 0)
 
   return (
@@ -526,8 +525,8 @@ function RabPrint({
             )
           })}
           <tr>
-            <td colSpan={4} style={{ ...printTdRight, fontWeight: 700, fontSize: '8pt', backgroundColor: '#111827', color: '#fff' }}>TOTAL RAB</td>
-            <td style={{ ...printTdRight, fontWeight: 700, fontSize: '8pt', backgroundColor: '#111827', color: '#fff' }}>{rupiah(grandTotal)}</td>
+            <td colSpan={4} style={{ ...printTdRight, fontWeight: 700, fontSize, backgroundColor: '#111827', color: '#fff' }}>TOTAL RAB</td>
+            <td style={{ ...printTdRight, fontWeight: 700, fontSize, backgroundColor: '#111827', color: '#fff' }}>{rupiah(grandTotal)}</td>
             <td style={{ ...printTd, backgroundColor: '#111827' }} />
           </tr>
         </tbody>
@@ -973,9 +972,9 @@ const printTdRight: CSSProperties = {
 
 function SignatureBox({ title, name }: { title: string; name: string }) {
   return (
-    <div>
-      <div style={{ fontWeight: 700, minHeight: '10mm' }}>{title}</div>
-      <div style={{ height: '19mm' }} />
+    <div style={{ fontSize: '11pt', lineHeight: 1.15 }}>
+      <div style={{ fontWeight: 700, minHeight: '5mm' }}>{title}</div>
+      <div style={{ height: '11mm' }} />
       <div style={{ fontWeight: 700, textDecoration: 'underline' }}>{name || '................................'}</div>
     </div>
   )
@@ -1563,6 +1562,32 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     if (!basis) return
     setDrafts(buildSystemDrafts(basis))
     toast.success('RAB dikembalikan ke rekomendasi sistem')
+  }
+
+  const redetectQtyRecommendation = () => {
+    if (!basis) return
+    const systemQty = new Map(
+      buildSystemDrafts(basis)
+        .filter(item => item.system_key)
+        .map(item => [item.system_key, Number(item.qty || 0)])
+    )
+    let updated = 0
+
+    const nextDrafts = drafts.map(item => {
+      if (!item.system_key || !systemQty.has(item.system_key)) return item
+      const qty = systemQty.get(item.system_key) ?? Number(item.qty || 0)
+      if (Number(item.qty || 0) === qty) return item
+      updated += 1
+      return { ...item, qty }
+    })
+
+    setDrafts(nextDrafts)
+
+    toast.success(
+      updated > 0
+        ? `${updated} qty RAB dideteksi ulang`
+        : 'Qty RAB sudah sesuai deteksi terbaru'
+    )
   }
 
   const submit = async () => {
@@ -2286,6 +2311,9 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
               <p className="text-sm text-indigo-700">Ubah semua item dulu, lalu klik Simpan Semua Perubahan.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button onClick={redetectQtyRecommendation} className="bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                <Calculator className="w-4 h-4" /> Deteksi Ulang Qty
+              </button>
               <button onClick={resetRecommendation} className="bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                 <Calculator className="w-4 h-4" /> Reset Rekomendasi
               </button>
