@@ -511,15 +511,15 @@ function RabPrint({
                       <td style={printTdCenter}>{index + 1}</td>
                       <td style={printTd}>{displayRabName(item)}</td>
                       <td style={printTdCenter}>{Number(item.qty || 0).toLocaleString('id-ID')}</td>
-                      <td style={printTdRight}>{rupiah(Number(item.harga || 0))}</td>
-                      <td style={printTdRight}>{rupiah(lineTotal(item))}</td>
+                      <PrintRupiahCell value={Number(item.harga || 0)} />
+                      <PrintRupiahCell value={lineTotal(item)} />
                       <td style={printTd}>{item.keterangan || '-'}</td>
                     </tr>
                   )
                 })}
                 <tr key={`${category.key}-subtotal`}>
                   <td colSpan={4} style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>Subtotal {category.title}</td>
-                  <td style={{ ...printTdRight, fontWeight: 700, backgroundColor: '#f8fafc' }}>{rupiah(subtotal)}</td>
+                  <PrintRupiahCell value={subtotal} style={{ fontWeight: 700, backgroundColor: '#f8fafc' }} />
                   <td style={{ ...printTd, backgroundColor: '#f8fafc' }} />
                 </tr>
               </Fragment>
@@ -527,7 +527,7 @@ function RabPrint({
           })}
           <tr>
             <td colSpan={4} style={{ ...printTdRight, fontWeight: 700, fontSize, backgroundColor: '#111827', color: '#fff' }}>TOTAL RAB</td>
-            <td style={{ ...printTdRight, fontWeight: 700, fontSize, backgroundColor: '#111827', color: '#fff' }}>{rupiah(grandTotal)}</td>
+            <PrintRupiahCell value={grandTotal} style={{ fontWeight: 700, fontSize, backgroundColor: '#111827', color: '#fff' }} />
             <td style={{ ...printTd, backgroundColor: '#111827' }} />
           </tr>
         </tbody>
@@ -969,6 +969,17 @@ const printTdRight: CSSProperties = {
   ...printTd,
   textAlign: 'right',
   whiteSpace: 'nowrap',
+}
+
+function PrintRupiahCell({ value, style }: { value: number; style?: CSSProperties }) {
+  return (
+    <td style={{ ...printTd, ...style }}>
+      <span style={{ display: 'grid', gridTemplateColumns: '9mm 1fr', columnGap: '2mm', alignItems: 'baseline' }}>
+        <span>Rp</span>
+        <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{angkaRupiah(value)}</span>
+      </span>
+    </td>
+  )
 }
 
 function SignatureBox({ title, name }: { title: string; name: string }) {
