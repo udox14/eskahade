@@ -189,47 +189,53 @@ export async function importMasterPelanggaranMassal(
   const uniqueRows = Array.from(uniqueMap.values())
   if (uniqueRows.length === 0) return { error: 'Tidak ada baris valid untuk diimport.' }
 
-  const existingRows = await query<{ id: number; kategori: string; nama_pelanggaran: string }>(
-    'SELECT id, kategori, nama_pelanggaran FROM master_pelanggaran'
-  )
-  const existingMap = new Map(existingRows.map(row => [cleanImportKey(row.kategori, row.nama_pelanggaran), row.id]))
+  try {
+    const existingRows = await query<{ id: number; kategori: string; nama_pelanggaran: string }>(
+      'SELECT id, kategori, nama_pelanggaran FROM master_pelanggaran'
+    )
+    const existingMap = new Map(existingRows.map(row => [cleanImportKey(row.kategori, row.nama_pelanggaran), row.id]))
 
-  const statements = uniqueRows.map(row => {
-    const existingId = existingMap.get(row.key)
-    if (existingId) {
-      return {
-        mode: 'update' as const,
-        sql: 'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=?, urutan=? WHERE id=?',
-        params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan, existingId],
+    const statements = uniqueRows.map(row => {
+      const existingId = existingMap.get(row.key)
+      if (existingId) {
+        return {
+          mode: 'update' as const,
+          sql: 'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=?, urutan=? WHERE id=?',
+          params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan, existingId],
+        }
       }
+      return {
+        mode: 'insert' as const,
+        sql: 'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi, urutan) VALUES (?, ?, ?, ?, ?)',
+        params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan],
+      }
+    })
+
+    for (let i = 0; i < statements.length; i += 50) {
+      await batch(statements.slice(i, i + 50).map(({ sql, params }) => ({ sql, params })))
     }
-    return {
-      mode: 'insert' as const,
-      sql: 'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi, urutan) VALUES (?, ?, ?, ?, ?)',
-      params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan],
-    }
-  })
 
-  await batch(statements.map(({ sql, params }) => ({ sql, params })))
+    const inserted = statements.filter(statement => statement.mode === 'insert').length
+    const updated = statements.filter(statement => statement.mode === 'update').length
+    const skipped = rows.length - uniqueRows.length
 
-  const inserted = statements.filter(statement => statement.mode === 'insert').length
-  const updated = statements.filter(statement => statement.mode === 'update').length
-  const skipped = rows.length - uniqueRows.length
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'keamanan',
+      action: 'import',
+      fiturHref: '/dashboard/keamanan',
+      logKind: 'create',
+      entityType: 'master_pelanggaran',
+      summary: `Import kamus pelanggaran ${uniqueRows.length} baris`,
+      details: { inserted, updated, skipped },
+    })
 
-  await logActivity({
-    actor: actorFromSession(session),
-    module: 'keamanan',
-    action: 'import',
-    fiturHref: '/dashboard/keamanan',
-    logKind: 'create',
-    entityType: 'master_pelanggaran',
-    summary: `Import kamus pelanggaran ${uniqueRows.length} baris`,
-    details: { inserted, updated, skipped },
-  })
-
-  revalidateTag('master-pelanggaran', 'everything')
-  revalidatePath('/dashboard/keamanan')
-  return { success: true, inserted, updated, skipped }
+    revalidateTag('master-pelanggaran', 'everything')
+    revalidatePath('/dashboard/keamanan')
+    return { success: true, inserted, updated, skipped }
+  } catch (error: any) {
+    return { error: `Import gagal: ${error?.message || 'kesalahan tidak diketahui'}` }
+  }
 }
 
 // ─── CARI SANTRI ──────────────────────────────────────────────────────────────

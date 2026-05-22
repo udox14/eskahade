@@ -641,14 +641,19 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
   const handleSimpanImport = async () => {
     if (importRows.length === 0) { toast.error('Upload file template dulu'); return }
     setImporting(true)
-    const res = await importMasterPelanggaranMassal(importRows)
-    setImporting(false)
-    if ('error' in res) { toast.error(res.error); return }
-    const parts = [`${res.inserted} baru`, `${res.updated} diperbarui`]
-    if (res.skipped > 0) parts.push(`${res.skipped} duplikat dilewati`)
-    toast.success(`Import selesai: ${parts.join(', ')}`)
-    setImportRows([])
-    onRefresh()
+    try {
+      const res = await importMasterPelanggaranMassal(importRows)
+      if ('error' in res) { toast.error(res.error); return }
+      const parts = [`${res.inserted} baru`, `${res.updated} diperbarui`]
+      if (res.skipped > 0) parts.push(`${res.skipped} duplikat dilewati`)
+      toast.success(`Import selesai: ${parts.join(', ')}`)
+      setImportRows([])
+      onRefresh()
+    } catch (error: any) {
+      toast.error(`Import gagal: ${error?.message || 'kesalahan tidak diketahui'}`)
+    } finally {
+      setImporting(false)
+    }
   }
 
   const handleSimpan = async () => {

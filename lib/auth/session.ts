@@ -1,6 +1,7 @@
 // lib/auth/session.ts
 
 import { cookies } from 'next/headers'
+import { queryOne } from '@/lib/db'
 
 const SESSION_COOKIE = 'eskahade_session'
 
@@ -16,6 +17,14 @@ export type SessionUser = {
   full_name: string
   role: string
   roles: string[]
+  asrama_binaan: string | null
+}
+
+type SessionUserRow = {
+  email: string | null
+  full_name: string | null
+  role: string | null
+  roles: string | null
   asrama_binaan: string | null
 }
 
@@ -106,7 +115,9 @@ export async function getSession(): Promise<SessionUser | null> {
     const cookieStore = await cookies()
     const token = cookieStore.get(SESSION_COOKIE)?.value
     if (!token) return null
-    return await verifyJWT(token)
+    const session = await verifyJWT(token)
+    if (!session) return null
+    return await hydrateSessionFromDb(session)
   } catch {
     return null
   }
@@ -132,6 +143,47 @@ function getRoles(session: SessionUser): string[] {
     return session.roles
   }
   return session.role ? [session.role] : []
+}
+
+function parseRoles(rolesJson: string | null | undefined, fallbackRole: string | null | undefined): string[] {
+  try {
+    if (rolesJson) {
+      const parsed = JSON.parse(rolesJson)
+      if (Array.isArray(parsed)) {
+        const roles = parsed.filter((role): role is string => typeof role === 'string' && role.length > 0)
+        if (roles.length > 0) return roles
+      }
+    }
+  } catch {}
+
+  return fallbackRole ? [fallbackRole] : []
+}
+
+async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser | null> {
+  try {
+    const user = await queryOne<SessionUserRow>(
+      'SELECT email, full_name, role, roles, asrama_binaan FROM users WHERE id = ?',
+      [session.id]
+    )
+
+    if (!user) return null
+
+    const roles = parseRoles(user.roles, user.role || session.role)
+    return {
+      ...session,
+      email: user.email || session.email,
+      full_name: user.full_name || session.full_name,
+      role: roles[0] || user.role || session.role,
+      roles,
+      asrama_binaan: user.asrama_binaan ?? null,
+    }
+  } catch (err: any) {
+    console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
+    return {
+      ...session,
+      roles: getRoles(session),
+    }
+  }
 }
 
 export function hasRole(session: SessionUser | null, role: string): boolean {

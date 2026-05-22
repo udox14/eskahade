@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, execute } from '@/lib/db'
+import { batch, query, queryOne, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -45,6 +45,13 @@ type GuruAccountBatchSummary = {
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.or.id`
+}
+
+function normalizePersonName(name: string) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\b(kh|k\.h|ust|ustadz|ustadzah|drs|dr|hj|h)\b\.?/g, '')
+    .replace(/[^a-z0-9]/g, '')
 }
 
 async function getUserById(id: string) {
@@ -205,9 +212,18 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
 export async function createAllGuruAccounts(): Promise<GuruAccountBatchSummary> {
   await ensureUserSourceColumns()
   const session = await getSession()
-  const guruRows = await query<{ id: number; nama_lengkap: string }>(
-    'SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'
-  )
+  const [guruRows, userRows] = await Promise.all([
+    query<{ id: number; nama_lengkap: string }>('SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'),
+    query<{
+      id: string
+      email: string
+      full_name: string | null
+      role: string
+      roles: string | null
+      source_type: string | null
+      source_ref_id: string | null
+    }>('SELECT id, email, full_name, role, roles, source_type, source_ref_id FROM users'),
+  ])
 
   const summary: GuruAccountBatchSummary = {
     success: false,
@@ -220,76 +236,102 @@ export async function createAllGuruAccounts(): Promise<GuruAccountBatchSummary> 
   }
   const errors: string[] = []
   const passwordHash = await hashPassword(DEFAULT_USER_PASSWORD)
+  const now = new Date().toISOString()
+  const statements: { sql: string; params?: unknown[] }[] = []
+  const usedUserIds = new Set<string>()
+  const usersByGuruSource = new Map<string, typeof userRows[number]>()
+  const usersByEmail = new Map<string, typeof userRows[number]>()
+  const usersByName = new Map<string, typeof userRows[number][]>()
+  const plannedEmails = new Set<string>()
+
+  for (const user of userRows) {
+    if (user.source_type === 'guru' && user.source_ref_id) {
+      usersByGuruSource.set(String(user.source_ref_id), user)
+    }
+    usersByEmail.set(String(user.email || '').toLowerCase().trim(), user)
+
+    const nameKey = normalizePersonName(user.full_name || '')
+    if (nameKey) {
+      const existing = usersByName.get(nameKey) || []
+      existing.push(user)
+      usersByName.set(nameKey, existing)
+    }
+  }
+
+  function queueUserUpdate(user: typeof userRows[number], guruId: string, shouldAttachSource: boolean, currentRoles: string[]) {
+    const nextRoles = addRoleUnique(currentRoles, 'guru')
+    const rolesChanged = nextRoles.length > currentRoles.length
+    const sourceChanged = shouldAttachSource && !user.source_type && !user.source_ref_id
+
+    if (!rolesChanged && !sourceChanged) {
+      summary.existing += 1
+      return
+    }
+
+    statements.push({
+      sql: `UPDATE users
+            SET roles = ?,
+                source_type = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN 'guru' ELSE source_type END,
+                source_ref_id = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN ? ELSE source_ref_id END,
+                updated_at = ?
+            WHERE id = ?`,
+      params: [JSON.stringify(nextRoles), guruId, now, user.id],
+    })
+
+    if (sourceChanged) summary.linked += 1
+    else summary.updated += 1
+    usedUserIds.add(user.id)
+  }
 
   for (const guru of guruRows) {
     const guruId = String(guru.id)
     const email = generateEmail(guru.nama_lengkap)
-    const now = new Date().toISOString()
 
     try {
-      const existingBySource = await queryOne<{
-        id: string
-        role: string
-        roles: string | null
-        source_type: string | null
-        source_ref_id: string | null
-      }>(
-        'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
-        ['guru', guruId]
-      )
+      const existingBySource = usersByGuruSource.get(guruId)
 
       if (existingBySource) {
-        const nextRoles = addRoleUnique(parseRoles(existingBySource.roles, existingBySource.role), 'guru')
-        if (nextRoles.length === parseRoles(existingBySource.roles, existingBySource.role).length) {
-          summary.existing += 1
-          continue
-        }
-        await execute(
-          'UPDATE users SET roles = ?, updated_at = ? WHERE id = ?',
-          [JSON.stringify(nextRoles), now, existingBySource.id]
-        )
-        summary.updated += 1
+        queueUserUpdate(existingBySource, guruId, false, parseRoles(existingBySource.roles, existingBySource.role))
         continue
       }
 
-      const existingByEmail = await queryOne<{
-        id: string
-        role: string
-        roles: string | null
-        source_type: string | null
-        source_ref_id: string | null
-      }>(
-        'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1',
-        [email]
-      )
+      const existingByEmail = usersByEmail.get(email.toLowerCase())
 
       if (existingByEmail) {
-        const currentRoles = parseRoles(existingByEmail.roles, existingByEmail.role)
-        const nextRoles = addRoleUnique(currentRoles, 'guru')
-        const canAttachSource = !existingByEmail.source_type && !existingByEmail.source_ref_id
-
-        await execute(
-          `UPDATE users
-           SET roles = ?,
-               source_type = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN 'guru' ELSE source_type END,
-               source_ref_id = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN ? ELSE source_ref_id END,
-               updated_at = ?
-           WHERE id = ?`,
-          [JSON.stringify(nextRoles), guruId, now, existingByEmail.id]
-        )
-
-        if (canAttachSource) summary.linked += 1
-        else if (nextRoles.length > currentRoles.length) summary.updated += 1
-        else summary.existing += 1
+        queueUserUpdate(existingByEmail, guruId, true, parseRoles(existingByEmail.roles, existingByEmail.role))
         continue
       }
 
-      await execute(
-        `INSERT INTO users (
+      const nameMatches = (usersByName.get(normalizePersonName(guru.nama_lengkap)) || [])
+        .filter(user => !usedUserIds.has(user.id))
+
+      if (nameMatches.length === 1) {
+        const existingByName = nameMatches[0]
+        queueUserUpdate(existingByName, guruId, true, parseRoles(existingByName.roles, existingByName.role))
+        usersByGuruSource.set(guruId, existingByName)
+        continue
+      }
+
+      if (nameMatches.length > 1) {
+        summary.failed += 1
+        errors.push(`${guru.nama_lengkap}: ditemukan lebih dari satu user dengan nama sama, perlu digabung manual.`)
+        continue
+      }
+
+      const emailKey = email.toLowerCase()
+      if (plannedEmails.has(emailKey)) {
+        summary.failed += 1
+        errors.push(`${guru.nama_lengkap}: email ${email} bentrok dengan data guru lain, perlu review manual.`)
+        continue
+      }
+      plannedEmails.add(emailKey)
+
+      statements.push({
+        sql: `INSERT INTO users (
           id, email, password_hash, full_name, role, roles, asrama_binaan,
           source_type, source_ref_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, 'guru', ?, NULL, 'guru', ?, ?, ?)`,
-        [
+        params: [
           crypto.randomUUID(),
           email,
           passwordHash,
@@ -298,12 +340,18 @@ export async function createAllGuruAccounts(): Promise<GuruAccountBatchSummary> 
           guruId,
           now,
           now,
-        ]
-      )
+        ],
+      })
       summary.created += 1
     } catch (error: any) {
       summary.failed += 1
       errors.push(`${guru.nama_lengkap}: ${String(error?.message || 'gagal diproses')}`)
+    }
+  }
+
+  if (statements.length > 0) {
+    for (let i = 0; i < statements.length; i += 100) {
+      await batch(statements.slice(i, i + 100))
     }
   }
 
