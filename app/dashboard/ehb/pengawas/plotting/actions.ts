@@ -12,6 +12,60 @@ import {
     normalizePengawasTag,
 } from '../rules'
 
+type ActiveSesiRow = {
+    tanggal: string
+    sesi_id: number
+    nomor_sesi: number
+    jam_group: string
+}
+
+type ActiveRoomRow = {
+    id: number
+    nomor_ruangan: number
+    jenis_kelamin: string
+    jumlah_peserta: number
+}
+
+async function getActiveSesiList(eventId: number) {
+    return query<ActiveSesiRow>(`
+        SELECT j.tanggal, j.sesi_id, s.nomor_sesi, s.jam_group
+        FROM ehb_jadwal j
+        JOIN ehb_sesi s ON s.id = j.sesi_id
+        WHERE j.ehb_event_id = ?
+        GROUP BY j.tanggal, j.sesi_id
+        ORDER BY j.tanggal, s.nomor_sesi
+    `, [eventId])
+}
+
+async function getActiveRoomsForSession(eventId: number, tanggal: string, sesiId: number, jamGroup: string) {
+    return query<ActiveRoomRow>(`
+        SELECT
+            r.id,
+            r.nomor_ruangan,
+            r.jenis_kelamin,
+            COUNT(s.id) as jumlah_peserta
+        FROM ehb_ruangan r
+        JOIN ehb_plotting_santri p
+            ON p.ruangan_id = r.id
+           AND p.ehb_event_id = ?
+           AND p.jam_group = ?
+        JOIN santri s
+            ON s.id = p.santri_id
+        JOIN riwayat_pendidikan rp
+            ON rp.santri_id = s.id
+           AND rp.status_riwayat = 'aktif'
+        JOIN ehb_jadwal j
+            ON j.kelas_id = rp.kelas_id
+           AND j.tanggal = ?
+           AND j.sesi_id = ?
+           AND j.ehb_event_id = ?
+        WHERE r.ehb_event_id = ?
+        GROUP BY r.id, r.nomor_ruangan, r.jenis_kelamin
+        HAVING COUNT(s.id) > 0
+        ORDER BY r.nomor_ruangan
+    `, [eventId, jamGroup, tanggal, sesiId, eventId, eventId])
+}
+
 export async function getPlottingPengawasStatus(eventId: number) {
     await ensurePengawasSchema()
 
@@ -34,18 +88,13 @@ export async function getPlottingPengawasStatus(eventId: number) {
     // Slot dibutuhkan = Jumlah Ruangan x Jumlah Sesi Aktif per Tanggal
     
     // Ambil tanggal & sesi dari jadwal
-    const activeSlots = await query<any>(`
-        SELECT j.tanggal, j.sesi_id, s.nomor_sesi, s.jam_group
-        FROM ehb_jadwal j
-        JOIN ehb_sesi s ON s.id = j.sesi_id
-        WHERE j.ehb_event_id = ?
-        GROUP BY j.tanggal, j.sesi_id
-    `, [eventId])
+    const activeSlots = await getActiveSesiList(eventId)
+    let totalSlotDibutuhkan = 0
 
-    // Ambil ruangan
-    const ruangan = await query<{id: number}>(`SELECT id FROM ehb_ruangan WHERE ehb_event_id = ?`, [eventId])
-    
-    const totalSlotDibutuhkan = activeSlots.length * ruangan.length
+    for (const slot of activeSlots) {
+        const activeRooms = await getActiveRoomsForSession(eventId, slot.tanggal, slot.sesi_id, slot.jam_group)
+        totalSlotDibutuhkan += activeRooms.length
+    }
 
     // Info yang sudah terplot
     const terplot = await queryOne<{total: number}>(`SELECT COUNT(*) as total FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId])
@@ -96,25 +145,9 @@ export async function autoPlotPengawas(eventId: number) {
         if (pengawasObj.length === 0) return { error: 'Belum ada pengawas terdaftar.' }
 
         // 2. Ambil jadwal aktif (tanggal & sesi yang ada ujiannya)
-        const activeSesi = await query<any>(`
-            SELECT j.tanggal, j.sesi_id, s.nomor_sesi
-            FROM ehb_jadwal j
-            JOIN ehb_sesi s ON s.id = j.sesi_id
-            WHERE j.ehb_event_id = ?
-            GROUP BY j.tanggal, j.sesi_id
-            ORDER BY j.tanggal, s.nomor_sesi
-        `, [eventId])
+        const activeSesi = await getActiveSesiList(eventId)
 
         if (activeSesi.length === 0) return { error: 'Belum ada jadwal ujian yang terisi.' }
-
-        // 3. Ambil ruangan (semua ruangan)
-        const ruanganList = await query<{id: number, nomor_ruangan: number, jenis_kelamin: string}>(`
-            SELECT id, nomor_ruangan, jenis_kelamin
-            FROM ehb_ruangan
-            WHERE ehb_event_id = ?
-            ORDER BY nomor_ruangan
-        `, [eventId])
-        if (ruanganList.length === 0) return { error: 'Belum ada ruangan.' }
 
         const seniorConfig = await getPengawasRuleConfig(eventId)
 
@@ -124,7 +157,18 @@ export async function autoPlotPengawas(eventId: number) {
         await execute(`DELETE FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId])
 
         const insertStmts: {sql: string, params: any[]}[] = []
-        const quotaPerPengawas = Math.ceil((activeSesi.length * ruanganList.length) / Math.max(pengawasObj.length, 1))
+        const activeRoomsBySlot = new Map<string, ActiveRoomRow[]>()
+        let totalSlotAktif = 0
+
+        for (const sesi of activeSesi) {
+            const rooms = await getActiveRoomsForSession(eventId, sesi.tanggal, sesi.sesi_id, sesi.jam_group)
+            activeRoomsBySlot.set(`${sesi.tanggal}|${sesi.sesi_id}`, rooms)
+            totalSlotAktif += rooms.length
+        }
+
+        if (totalSlotAktif === 0) return { error: 'Belum ada ruangan yang aktif pada jadwal ujian. Plotting peserta atau jadwal kelas belum sinkron.' }
+
+        const quotaPerPengawas = Math.ceil(totalSlotAktif / Math.max(pengawasObj.length, 1))
         
         // State tracking untuk fairness & constraints
         const tugasCount: Record<number, number> = {} // pengawas_id -> total jaga
@@ -223,10 +267,13 @@ export async function autoPlotPengawas(eventId: number) {
         // Loop setiap slot: (tanggal, sesi, ruangan)
         for (const s of activeSesi) {
             const isLastSession = Math.max(...sesiPerTgl[s.tanggal]) === s.nomor_sesi
-            const femaleRooms = ruanganList
+            const ruanganAktif = activeRoomsBySlot.get(`${s.tanggal}|${s.sesi_id}`) || []
+            if (ruanganAktif.length === 0) continue
+
+            const femaleRooms = ruanganAktif
                 .filter(room => normalizeJenisKelamin(room.jenis_kelamin) === 'P')
                 .sort((a, b) => a.nomor_ruangan - b.nomor_ruangan)
-            const maleRooms = ruanganList
+            const maleRooms = ruanganAktif
                 .filter(room => normalizeJenisKelamin(room.jenis_kelamin) !== 'P')
                 .sort((a, b) => a.nomor_ruangan - b.nomor_ruangan)
 
