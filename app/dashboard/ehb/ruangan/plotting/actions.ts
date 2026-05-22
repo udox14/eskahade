@@ -24,6 +24,12 @@ type KapasitasRuanganRow = {
   total_ruangan: number
 }
 
+type RuanganKapasitasDetailRow = {
+  jenis_kelamin: string
+  kapasitas: number
+  nomor_ruangan: number
+}
+
 type RuanganSeatRow = {
   id: number
   nomor_ruangan: number
@@ -75,12 +81,19 @@ export async function getPlottingStatus(eventId: number) {
     GROUP BY jenis_kelamin
   `, [eventId])
 
+  const kapasitasDetail = await query<RuanganKapasitasDetailRow>(`
+    SELECT jenis_kelamin, kapasitas, nomor_ruangan
+    FROM ehb_ruangan
+    WHERE ehb_event_id = ?
+    ORDER BY jenis_kelamin, kapasitas DESC, nomor_ruangan ASC
+  `, [eventId])
+
   // Get unique jam groups for the event
   const jamGroups = await query<{jam_group: string}>(`
     SELECT DISTINCT jam_group FROM ehb_kelas_jam WHERE ehb_event_id = ?
   `, [eventId])
 
-  return { status, kapasitas, jamGroups: jamGroups.map(j => j.jam_group) }
+  return { status, kapasitas, kapasitasDetail, jamGroups: jamGroups.map(j => j.jam_group) }
 }
 
 export async function resetPlotting(eventId: number) {

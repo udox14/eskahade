@@ -18,6 +18,7 @@ export default function PlottingEhbPage() {
   
   const [status, setStatus] = useState<any[]>([])
   const [kapasitas, setKapasitas] = useState<any[]>([])
+  const [kapasitasDetail, setKapasitasDetail] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
   const [activeJamTab, setActiveJamTab] = useState<string>('')
   
@@ -39,6 +40,7 @@ export default function PlottingEhbPage() {
       const res = await getPlottingStatus(evt.id)
       setStatus(res.status)
       setKapasitas(res.kapasitas)
+      setKapasitasDetail(res.kapasitasDetail || [])
       setJamGroups(res.jamGroups)
       if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
 
@@ -101,6 +103,32 @@ export default function PlottingEhbPage() {
 
   const activeUnplotted = unplotted.filter(u => u.jam_group === activeJamTab)
 
+  const estimateRoomsNeeded = (totalSantri: number, jk: 'L' | 'P') => {
+    const roomCaps = kapasitasDetail
+      .filter((room: any) => room.jenis_kelamin === jk)
+      .map((room: any) => Number(room.kapasitas || 0))
+      .sort((a: number, b: number) => b - a)
+
+    if (totalSantri <= 0) return { needed: 0, covered: true, remaining: 0 }
+    if (roomCaps.length === 0) return { needed: 0, covered: false, remaining: totalSantri }
+
+    let coveredSeats = 0
+    let needed = 0
+
+    for (const cap of roomCaps) {
+      coveredSeats += cap
+      needed += 1
+      if (coveredSeats >= totalSantri) {
+        return { needed, covered: true, remaining: 0 }
+      }
+    }
+
+    return { needed: roomCaps.length, covered: false, remaining: totalSantri - coveredSeats }
+  }
+
+  const estL = estimateRoomsNeeded(Number(L.total_santri || 0), 'L')
+  const estP = estimateRoomsNeeded(Number(P.total_santri || 0), 'P')
+
   const readyToRun = jamGroups.length > 0 && (kapL.total_ruangan > 0 || kapP.total_ruangan > 0)
 
   return (
@@ -150,6 +178,11 @@ export default function PlottingEhbPage() {
                     <p className="text-xs text-blue-600 font-bold mb-1">Peserta / Kapasitas</p>
                     <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > effKapL ? 'text-red-500' : ''}>{effKapL}</span></p>
                     <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan</p>
+                    <p className={`text-[10px] font-bold mt-1 ${estL.covered ? 'text-blue-700' : 'text-red-600'}`}>
+                      Estimasi butuh {estL.needed} ruangan
+                      {kapL.total_ruangan > 0 ? ` dari ${kapL.total_ruangan} tersedia` : ''}
+                      {!estL.covered ? ` • kurang ${estL.remaining} kursi` : ''}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600 font-bold mb-1">Status</p>
@@ -169,6 +202,11 @@ export default function PlottingEhbPage() {
                     <p className="text-xs text-pink-600 font-bold mb-1">Peserta / Kapasitas</p>
                     <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > effKapP ? 'text-red-500' : ''}>{effKapP}</span></p>
                     <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan</p>
+                    <p className={`text-[10px] font-bold mt-1 ${estP.covered ? 'text-pink-700' : 'text-red-600'}`}>
+                      Estimasi butuh {estP.needed} ruangan
+                      {kapP.total_ruangan > 0 ? ` dari ${kapP.total_ruangan} tersedia` : ''}
+                      {!estP.covered ? ` • kurang ${estP.remaining} kursi` : ''}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-pink-600 font-bold mb-1">Status</p>
