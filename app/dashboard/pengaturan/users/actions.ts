@@ -32,6 +32,16 @@ type LinkedUserCreateResult =
   | { success: true; user_id: string; full_name: string; email: string }
   | { error: string }
 
+type GuruAccountBatchSummary = {
+  success: boolean
+  created: number
+  linked: number
+  updated: number
+  existing: number
+  failed: number
+  errors: string[] | null
+}
+
 function generateEmail(name: string) {
   const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${cleanName}@sukahideng.or.id`
@@ -59,6 +69,10 @@ function parseRoles(raw: string | null, fallbackRole: string) {
     }
   } catch {}
   return fallbackRole ? [fallbackRole] : []
+}
+
+function addRoleUnique(roles: string[], role: string) {
+  return roles.includes(role) ? roles : [...roles, role]
 }
 
 async function ensureUserSourceColumns() {
@@ -186,6 +200,132 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
   )
 
   return { success: true, user_id: userId, full_name: sourceProfile.full_name, email: sourceProfile.email } as const
+}
+
+export async function createAllGuruAccounts(): Promise<GuruAccountBatchSummary> {
+  await ensureUserSourceColumns()
+  const session = await getSession()
+  const guruRows = await query<{ id: number; nama_lengkap: string }>(
+    'SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'
+  )
+
+  const summary: GuruAccountBatchSummary = {
+    success: false,
+    created: 0,
+    linked: 0,
+    updated: 0,
+    existing: 0,
+    failed: 0,
+    errors: null,
+  }
+  const errors: string[] = []
+  const passwordHash = await hashPassword(DEFAULT_USER_PASSWORD)
+
+  for (const guru of guruRows) {
+    const guruId = String(guru.id)
+    const email = generateEmail(guru.nama_lengkap)
+    const now = new Date().toISOString()
+
+    try {
+      const existingBySource = await queryOne<{
+        id: string
+        role: string
+        roles: string | null
+        source_type: string | null
+        source_ref_id: string | null
+      }>(
+        'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
+        ['guru', guruId]
+      )
+
+      if (existingBySource) {
+        const nextRoles = addRoleUnique(parseRoles(existingBySource.roles, existingBySource.role), 'guru')
+        if (nextRoles.length === parseRoles(existingBySource.roles, existingBySource.role).length) {
+          summary.existing += 1
+          continue
+        }
+        await execute(
+          'UPDATE users SET roles = ?, updated_at = ? WHERE id = ?',
+          [JSON.stringify(nextRoles), now, existingBySource.id]
+        )
+        summary.updated += 1
+        continue
+      }
+
+      const existingByEmail = await queryOne<{
+        id: string
+        role: string
+        roles: string | null
+        source_type: string | null
+        source_ref_id: string | null
+      }>(
+        'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1',
+        [email]
+      )
+
+      if (existingByEmail) {
+        const currentRoles = parseRoles(existingByEmail.roles, existingByEmail.role)
+        const nextRoles = addRoleUnique(currentRoles, 'guru')
+        const canAttachSource = !existingByEmail.source_type && !existingByEmail.source_ref_id
+
+        await execute(
+          `UPDATE users
+           SET roles = ?,
+               source_type = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN 'guru' ELSE source_type END,
+               source_ref_id = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN ? ELSE source_ref_id END,
+               updated_at = ?
+           WHERE id = ?`,
+          [JSON.stringify(nextRoles), guruId, now, existingByEmail.id]
+        )
+
+        if (canAttachSource) summary.linked += 1
+        else if (nextRoles.length > currentRoles.length) summary.updated += 1
+        else summary.existing += 1
+        continue
+      }
+
+      await execute(
+        `INSERT INTO users (
+          id, email, password_hash, full_name, role, roles, asrama_binaan,
+          source_type, source_ref_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'guru', ?, NULL, 'guru', ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          email,
+          passwordHash,
+          guru.nama_lengkap,
+          JSON.stringify(['guru']),
+          guruId,
+          now,
+          now,
+        ]
+      )
+      summary.created += 1
+    } catch (error: any) {
+      summary.failed += 1
+      errors.push(`${guru.nama_lengkap}: ${String(error?.message || 'gagal diproses')}`)
+    }
+  }
+
+  if (summary.created + summary.linked + summary.updated > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'pengaturan_users',
+      action: 'create',
+      fiturHref: '/dashboard/pengaturan/users',
+      logKind: 'create',
+      entityType: 'user_batch',
+      entityId: 'guru-batch',
+      entityLabel: 'Pembuatan akun guru',
+      summary: `Sinkron akun guru: ${summary.created} dibuat, ${summary.linked} ditautkan, ${summary.updated} diperbarui`,
+      details: summary,
+    })
+  }
+
+  revalidatePath('/dashboard/pengaturan/users')
+  summary.success = summary.created + summary.linked + summary.updated + summary.existing > 0
+  summary.errors = errors.length > 0 ? errors : null
+  return summary
 }
 
 export async function getUsersList() {

@@ -6,6 +6,24 @@ function generateEmail(name: string) {
   return `${cleanName}@sukahideng.or.id`
 }
 
+function parseRoles(raw: string | null, fallbackRole: string) {
+  try {
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[]
+    }
+  } catch {}
+  return fallbackRole ? [fallbackRole] : []
+}
+
+async function addRolesToUser(userId: string, currentRole: string, currentRoles: string | null, rolesToAdd: string[]) {
+  const roles = parseRoles(currentRoles, currentRole)
+  for (const role of rolesToAdd) {
+    if (!roles.includes(role)) roles.push(role)
+  }
+  await query('UPDATE users SET roles = ?, updated_at = datetime(\'now\') WHERE id = ?', [JSON.stringify(roles), userId])
+}
+
 async function getOrCreateWaliUserForGuru(guruId: number) {
   const guru = await queryOne<{ id: number; nama_lengkap: string }>(
     'SELECT id, nama_lengkap FROM data_guru WHERE id = ?',
@@ -13,24 +31,45 @@ async function getOrCreateWaliUserForGuru(guruId: number) {
   )
   if (!guru) return null
 
-  const existingByName = await queryOne<{ id: string }>(
-    "SELECT id FROM users WHERE lower(trim(full_name)) = lower(trim(?)) AND role IN ('wali_kelas', 'sekpen') LIMIT 1",
+  const existingByName = await queryOne<{ id: string; role: string; roles: string | null }>(
+    `SELECT id, role, roles
+     FROM users
+     WHERE lower(trim(full_name)) = lower(trim(?))
+       AND (
+         role IN ('wali_kelas', 'sekpen')
+         OR EXISTS (
+           SELECT 1
+           FROM json_each(COALESCE(users.roles, '[]'))
+           WHERE value IN ('wali_kelas', 'sekpen')
+         )
+       )
+     LIMIT 1`,
     [guru.nama_lengkap]
   )
-  if (existingByName) return existingByName.id
+  if (existingByName) {
+    await addRolesToUser(existingByName.id, existingByName.role, existingByName.roles, ['guru'])
+    return existingByName.id
+  }
 
   const email = generateEmail(guru.nama_lengkap)
-  const existingByEmail = await queryOne<{ id: string }>(
-    'SELECT id FROM users WHERE email = ? LIMIT 1',
+  const existingByEmail = await queryOne<{ id: string; role: string; roles: string | null; source_type: string | null; source_ref_id: string | null }>(
+    'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE email = ? LIMIT 1',
     [email]
   )
-  if (existingByEmail) return existingByEmail.id
+  if (existingByEmail) {
+    await addRolesToUser(existingByEmail.id, existingByEmail.role, existingByEmail.roles, ['wali_kelas', 'guru'])
+    if (!existingByEmail.source_type && !existingByEmail.source_ref_id) {
+      await query('UPDATE users SET source_type = ?, source_ref_id = ?, updated_at = datetime(\'now\') WHERE id = ?', ['guru', String(guru.id), existingByEmail.id])
+    }
+    return existingByEmail.id
+  }
 
   const userId = crypto.randomUUID()
-  const hashed = await hashPassword('sukahideng123')
+  const hashed = await hashPassword('eskahade2026')
   await query(
-    "INSERT INTO users (id, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, 'wali_kelas')",
-    [userId, email, hashed, guru.nama_lengkap]
+    `INSERT INTO users (id, email, password_hash, full_name, role, roles, source_type, source_ref_id)
+     VALUES (?, ?, ?, ?, 'wali_kelas', ?, 'guru', ?)`,
+    [userId, email, hashed, guru.nama_lengkap, JSON.stringify(['wali_kelas', 'guru']), String(guru.id)]
   )
   return userId
 }

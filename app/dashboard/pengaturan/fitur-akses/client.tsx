@@ -6,7 +6,7 @@ import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircl
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
 
-const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
+const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'guru', 'bendahara']
 
 const ROLE_LABEL: Record<string, string> = {
   admin:           'Admin',
@@ -15,6 +15,7 @@ const ROLE_LABEL: Record<string, string> = {
   dewan_santri:    'Dewan Santri',
   pengurus_asrama: 'Asrama',
   wali_kelas:      'Wali Kelas',
+  guru:            'Guru',
   bendahara:       'Bendahara',
 }
 
@@ -25,6 +26,7 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   dewan_santri:    'Dewan Santri',
   pengurus_asrama: 'Pengurus Asrama',
   wali_kelas:      'Wali Kelas',
+  guru:            'Guru',
   bendahara:       'Bendahara',
 }
 
@@ -35,6 +37,7 @@ const ROLE_COLOR: Record<string, string> = {
   dewan_santri:    'bg-purple-100 text-purple-700 border-purple-200',
   pengurus_asrama: 'bg-green-100 text-green-700 border-green-200',
   wali_kelas:      'bg-teal-100 text-teal-700 border-teal-200',
+  guru:            'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
 }
 
@@ -45,6 +48,7 @@ const ROLE_BG_SOFT: Record<string, string> = {
   dewan_santri:    'bg-purple-50 border-purple-200',
   pengurus_asrama: 'bg-green-50 border-green-200',
   wali_kelas:      'bg-teal-50 border-teal-200',
+  guru:            'bg-indigo-50 border-indigo-200',
   bendahara:       'bg-yellow-50 border-yellow-200',
 }
 
@@ -55,6 +59,7 @@ const ROLE_HEADER: Record<string, string> = {
   dewan_santri:    'from-purple-600 to-purple-700',
   pengurus_asrama: 'from-green-600 to-green-700',
   wali_kelas:      'from-teal-600 to-teal-700',
+  guru:            'from-indigo-600 to-indigo-700',
   bendahara:       'from-yellow-500 to-yellow-600',
 }
 

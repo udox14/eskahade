@@ -6,7 +6,7 @@ import { getCrudPermissionsForAdmin, type CrudAction } from '@/lib/auth/crud'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidateTag } from 'next/cache'
 
-const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'bendahara']
+const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'guru', 'bendahara']
 
 type FiturRow = {
   id: number

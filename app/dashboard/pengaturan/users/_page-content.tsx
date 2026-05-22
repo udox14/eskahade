@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -21,6 +21,7 @@ const ROLES = [
   { value: 'dewan_santri', label: 'Dewan Santri' },
   { value: 'pengurus_asrama', label: 'Pengurus Asrama' },
   { value: 'wali_kelas', label: 'Wali Kelas' },
+  { value: 'guru', label: 'Guru' },
 ]
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
@@ -51,7 +52,7 @@ export default function ManajemenUserPage() {
   // Modals
   const [isOpenAdd, setIsOpenAdd] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [newRole, setNewRole] = useState('wali_kelas')
+  const [newRole, setNewRole] = useState('guru')
   const [candidateSource, setCandidateSource] = useState<'guru' | 'sadesa'>('guru')
   const [userCandidates, setUserCandidates] = useState<UserCreationCandidate[]>([])
   const [candidateSearch, setCandidateSearch] = useState('')
@@ -179,7 +180,7 @@ export default function ManajemenUserPage() {
     setCandidateSource('guru')
     setCandidateSearch('')
     setSelectedBatchConfigs({})
-    setNewRole('wali_kelas')
+    setNewRole('guru')
   }
 
   const toggleCandidateSelection = (candidate: UserCreationCandidate) => {
@@ -196,7 +197,7 @@ export default function ManajemenUserPage() {
         [key]: {
           source_type: candidate.source_type,
           source_ref_id: candidate.source_ref_id,
-          role: newRole,
+          role: candidate.source_type === 'guru' ? 'guru' : newRole,
           asrama_binaan: '',
         },
       }
@@ -227,7 +228,7 @@ export default function ManajemenUserPage() {
           next[key] = {
             source_type: candidate.source_type,
             source_ref_id: candidate.source_ref_id,
-            role: newRole,
+            role: candidate.source_type === 'guru' ? 'guru' : newRole,
             asrama_binaan: '',
           }
         }
@@ -364,6 +365,36 @@ export default function ManajemenUserPage() {
       closeAddModal()
       await loadCandidates()
       loadData()
+    }
+  }
+
+  const handleCreateAllGuruAccounts = async () => {
+    if (!await confirm('Buat atau sinkronkan akun untuk semua data guru? Akun yang sudah ada akan ditambahkan role Guru tanpa menghapus role lain.')) return
+
+    setIsCreating(true)
+    const toastId = toast.loading('Menyinkronkan akun guru...')
+    try {
+      const res = await createAllGuruAccounts()
+      toast.dismiss(toastId)
+
+      if (!res.success && res.failed > 0) {
+        toast.error('Gagal menyinkronkan akun guru', { description: res.errors?.slice(0, 3).join(', ') || 'Terjadi kesalahan sistem.' })
+        return
+      }
+
+      toast.success('Sinkron akun guru selesai', {
+        description: `Dibuat ${res.created}, ditautkan ${res.linked}, diperbarui ${res.updated}, sudah ada ${res.existing}, gagal ${res.failed}.`,
+      })
+      if (res.errors?.length) {
+        toast.warning('Sebagian guru gagal diproses', { description: res.errors.slice(0, 3).join(', ') })
+      }
+      await loadCandidates()
+      loadData()
+    } catch (error: any) {
+      toast.dismiss(toastId)
+      toast.error('Gagal menyinkronkan akun guru', { description: String(error?.message || 'Terjadi kesalahan sistem.') })
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -687,6 +718,7 @@ export default function ManajemenUserPage() {
                                 r === 'keamanan' ? 'bg-red-100 text-red-700' :
                                 r === 'dewan_santri' ? 'bg-violet-100 text-violet-700' :
                                 r === 'sekpen' ? 'bg-cyan-100 text-cyan-700' :
+                                r === 'guru' ? 'bg-indigo-100 text-indigo-700' :
                                 'bg-slate-100 text-slate-700'
                               }`}>
                                 {rl?.label || r}
@@ -814,6 +846,24 @@ export default function ManajemenUserPage() {
                     <p className="mt-1 text-[11px] text-emerald-700">Akun baru akan dibuat otomatis dengan password ini.</p>
                   </div>
 
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase text-indigo-800">Akun Guru Massal</p>
+                        <p className="mt-1 text-[11px] text-indigo-700">Buat atau tautkan akun untuk semua data guru tanpa menghapus role lain.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreateAllGuruAccounts}
+                        disabled={isCreating}
+                        className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCog className="w-3.5 h-3.5" />}
+                        Buat Semua Guru
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role Default Saat Memilih</label>
                     <select 
@@ -868,7 +918,7 @@ export default function ManajemenUserPage() {
                                 <div>
                                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Role</label>
                                   <select
-                                    value={config?.role || 'wali_kelas'}
+                                    value={config?.role || (candidate.source_type === 'guru' ? 'guru' : 'wali_kelas')}
                                     onChange={(e) => updateSelectedBatchConfig(key, {
                                       role: e.target.value,
                                       asrama_binaan: e.target.value === 'pengurus_asrama' ? config?.asrama_binaan || '' : '',

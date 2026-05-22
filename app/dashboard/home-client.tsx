@@ -13,7 +13,7 @@ import {
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
-  Download, FileWarning, Shuffle, Home, UserX, DoorOpen
+  Download, FileWarning, Shuffle, Home, UserX, DoorOpen, GraduationCap
 } from 'lucide-react'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
-  FileWarning, Shuffle, Home, UserX, DoorOpen,
+  FileWarning, Shuffle, Home, UserX, DoorOpen, GraduationCap,
 }
 function getIcon(name: string): React.ElementType {
   return ICON_MAP[name] ?? Settings
@@ -80,6 +80,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/absensi/cetak-blanko':        'Cetak blanko absen kosong untuk diisi manual di kelas.',
   '/dashboard/akademik/absensi-guru':                'Catat kehadiran guru pengajar setiap pertemuan.',
   '/dashboard/akademik/absensi-guru/rekap':          'Lihat rekap kinerja kehadiran guru per periode.',
+  '/dashboard/guru':                                  'Lihat identitas guru dan ringkasan jadwal mengajar pribadi.',
   '/dashboard/keuangan/pembayaran':                  'Loket pembayaran — proses tagihan santri.',
   '/dashboard/keuangan/laporan':                     'Laporan arus kas, pemasukan, dan tunggakan keuangan.',
   '/dashboard/asrama/spp':                           'Input dan pantau pembayaran SPP bulanan per asrama.',
@@ -116,6 +117,7 @@ const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; i
   'Data Santri':  { dot: 'bg-sky-400',      line: 'bg-sky-100',      label: 'text-sky-600',     iconHover: 'group-hover:text-sky-600' },
   'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
   'Asrama':       { dot: 'bg-lime-500',     line: 'bg-lime-100',     label: 'text-lime-700',    iconHover: 'group-hover:text-lime-700' },
+  'Guru':         { dot: 'bg-indigo-500',   line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
   'Perizinan & Disiplin': { dot: 'bg-red-400', line: 'bg-red-100',   label: 'text-red-600',     iconHover: 'group-hover:text-red-600' },
   'Akademik':     { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
   'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
@@ -133,7 +135,7 @@ const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; i
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
   dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama',
-  wali_kelas: 'Wali Kelas', bendahara: 'Bendahara',
+  wali_kelas: 'Wali Kelas', guru: 'Guru', bendahara: 'Bendahara',
 }
 
 const ROLE_EMOJI: Record<string, string> = {
@@ -146,6 +148,7 @@ const GROUP_ORDER = [
   'Data Santri',
   'Kesantrian',
   'Asrama',
+  'Guru',
   'Perizinan & Disiplin',
   'Akademik',
   'Pengkelasan',

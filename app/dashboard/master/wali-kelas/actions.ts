@@ -715,13 +715,36 @@ export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: b
   if (!guru) return { error: 'Data guru tidak ditemukan.' }
 
   const email = generateEmail(guru.nama_lengkap)
-  const existing = await queryOne('SELECT id FROM users WHERE email = ?', [email])
-  if (existing) return { error: `Akun dengan email ${email} sudah ada.` }
+  const existing = await queryOne<{ id: string; role: string; roles: string | null; source_type: string | null; source_ref_id: string | null }>(
+    'SELECT id, role, roles, source_type, source_ref_id FROM users WHERE email = ?',
+    [email]
+  )
+  if (existing) {
+    let roles = [existing.role]
+    try {
+      if (existing.roles) {
+        const parsed = JSON.parse(existing.roles)
+        if (Array.isArray(parsed) && parsed.length > 0) roles = parsed
+      }
+    } catch {}
+    if (!roles.includes('guru')) roles.push('guru')
+    await execute(
+      `UPDATE users
+       SET roles = ?,
+           source_type = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN 'guru' ELSE source_type END,
+           source_ref_id = CASE WHEN source_type IS NULL AND source_ref_id IS NULL THEN ? ELSE source_ref_id END,
+           updated_at = datetime('now')
+       WHERE id = ?`,
+      [JSON.stringify(roles), String(guru.id), existing.id]
+    )
+    return { success: true, email }
+  }
 
-  const hashed = await hashPassword('sukahideng123')
+  const hashed = await hashPassword('eskahade2026')
   await execute(
-    "INSERT INTO users (id, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, 'wali_kelas')",
-    [crypto.randomUUID(), email, hashed, guru.nama_lengkap]
+    `INSERT INTO users (id, email, password_hash, full_name, role, roles, source_type, source_ref_id)
+     VALUES (?, ?, ?, ?, 'guru', ?, 'guru', ?)`,
+    [crypto.randomUUID(), email, hashed, guru.nama_lengkap, JSON.stringify(['guru']), String(guru.id)]
   )
 
   await logActivity({

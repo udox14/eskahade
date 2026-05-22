@@ -10,7 +10,7 @@ import {
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', wali_kelas: 'Wali Kelas', pengurus_asrama: 'Pengurus Asrama',
-  akademik: 'Akademik', keamanan: 'Keamanan', dewan_santri: 'Dewan Santri', bendahara: 'Bendahara',
+  akademik: 'Akademik', keamanan: 'Keamanan', dewan_santri: 'Dewan Santri', guru: 'Guru', bendahara: 'Bendahara',
 }
 const ROLE_COLOR: Record<string, string> = {
   admin: 'bg-red-100 text-red-700 border-red-200',
@@ -19,6 +19,7 @@ const ROLE_COLOR: Record<string, string> = {
   akademik: 'bg-purple-100 text-purple-700 border-purple-200',
   wali_kelas: 'bg-amber-100 text-amber-700 border-amber-200',
   dewan_santri: 'bg-teal-100 text-teal-700 border-teal-200',
+  guru: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara: 'bg-orange-100 text-orange-700 border-orange-200',
 }
 
