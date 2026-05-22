@@ -28,6 +28,7 @@ import {
   type HonorPanitiaRow,
   type HonorTarif,
   type HonorWaktu,
+  type KeuanganSigners,
   type RabAutoBasis,
   type RabItem,
   type RabItemInput,
@@ -438,7 +439,7 @@ function RabPrint({
     <div style={{
       width: '210mm',
       height: '330mm',
-      padding: '8mm',
+      padding: '4mm 8mm 8mm',
       boxSizing: 'border-box',
       fontFamily: FONT,
       backgroundColor: '#fff',
@@ -973,9 +974,9 @@ const printTdRight: CSSProperties = {
 function SignatureBox({ title, name }: { title: string; name: string }) {
   return (
     <div style={{ fontSize: '11pt', lineHeight: 1.15 }}>
-      <div style={{ fontWeight: 700, minHeight: '5mm' }}>{title}</div>
-      <div style={{ height: '11mm' }} />
-      <div style={{ fontWeight: 700, textDecoration: 'underline' }}>{name || '................................'}</div>
+      <div style={{ fontWeight: 400, height: '9mm', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>{title}</div>
+      <div style={{ height: '13mm' }} />
+      <div style={{ fontWeight: 700 }}>{name || '................................'}</div>
     </div>
   )
 }
@@ -987,14 +988,14 @@ type LoadedTabData =
       tab: 'rab'
       autoBasis: RabAutoBasis
       rabDrafts: DraftRabItem[]
-      signers: { ketua: string; bendahara: string }
+      signers: KeuanganSigners
     }
   | {
       tab: 'transaksi'
       autoBasis: RabAutoBasis
       rabDrafts: DraftRabItem[]
       transaksiDrafts: DraftTransaksiItem[]
-      signers: { ketua: string; bendahara: string }
+      signers: KeuanganSigners
     }
   | {
       tab: 'honor_detail'
@@ -1179,12 +1180,16 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         setDrafts(data.rabDrafts)
         setKetuaPelaksana(data.signers.ketua)
         setBendahara(data.signers.bendahara)
+        setWakilAkademik(data.signers.wakil_akademik)
+        setWakilKeuangan(data.signers.wakil_keuangan)
       } else if (data.tab === 'transaksi') {
         setBasis(data.autoBasis)
         setDrafts(data.rabDrafts)
         setTransaksiDrafts(data.transaksiDrafts)
         setKetuaPelaksana(data.signers.ketua)
         setBendahara(data.signers.bendahara)
+        setWakilAkademik(data.signers.wakil_akademik)
+        setWakilKeuangan(data.signers.wakil_keuangan)
       } else if (data.tab === 'honor_panitia') {
         setHonorPanitiaBudget(data.honorPanitiaBudget)
         setHonorPanitiaRows(data.honorPanitiaRows)
@@ -1596,7 +1601,12 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     if (invalid) return toast.error('Nama barang/honor tidak boleh kosong')
 
     setSaving(true)
-    const res = await saveRabItems(event.id, drafts)
+    const res = await saveRabItems(event.id, drafts, {
+      ketua: ketuaPelaksana,
+      bendahara,
+      wakil_akademik: wakilAkademik,
+      wakil_keuangan: wakilKeuangan,
+    })
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     clearKeuanganCache(event.id, ['rab', 'transaksi', 'honor_detail', 'honor_panitia'])

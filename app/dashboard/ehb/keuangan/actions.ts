@@ -39,6 +39,13 @@ export type RabItemInput = {
   urutan?: number
 }
 
+export type KeuanganSigners = {
+  ketua: string
+  bendahara: string
+  wakil_akademik: string
+  wakil_keuangan: string
+}
+
 export type TransaksiTipe = 'pemasukan' | 'pengeluaran'
 
 export type TransaksiItem = {
@@ -207,6 +214,17 @@ async function ensureKeuanganSchemaOnce() {
   await execute(`
     CREATE INDEX IF NOT EXISTS idx_ehb_keuangan_transaksi_event
     ON ehb_keuangan_transaksi(ehb_event_id, tanggal, tipe, urutan)
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_keuangan_signer (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id   INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      role           TEXT NOT NULL,
+      nama           TEXT NOT NULL DEFAULT '',
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT,
+      UNIQUE(ehb_event_id, role)
+    )
   `)
   await execute(`
     CREATE TABLE IF NOT EXISTS ehb_honor_mapel_config (
@@ -379,16 +397,29 @@ export async function getKetuaPelaksanaName(eventId: number) {
   return row?.nama || ''
 }
 
-export async function getKeuanganSigners(eventId: number) {
+export async function getKeuanganSigners(eventId: number): Promise<KeuanganSigners> {
   await ensureKeuanganSchema()
-  const rows = await query<{ jabatan_key: string; nama: string }>(`
+  const [panitiaRows, signerRows] = await Promise.all([
+    query<{ jabatan_key: string; nama: string }>(`
     SELECT jabatan_key, nama
     FROM ehb_panitia
     WHERE ehb_event_id = ? AND tipe = 'inti' AND jabatan_key IN ('ketua', 'bendahara')
-  `, [eventId])
+    `, [eventId]),
+    query<{ role: string; nama: string }>(`
+      SELECT role, nama
+      FROM ehb_keuangan_signer
+      WHERE ehb_event_id = ?
+    `, [eventId]),
+  ])
+  const saved = new Map(signerRows.map(row => [row.role, row.nama]))
+  const ketuaPanitia = panitiaRows.find(row => row.jabatan_key === 'ketua')?.nama || ''
+  const bendaharaPanitia = panitiaRows.find(row => row.jabatan_key === 'bendahara')?.nama || ''
+
   return {
-    ketua: rows.find(row => row.jabatan_key === 'ketua')?.nama || '',
-    bendahara: rows.find(row => row.jabatan_key === 'bendahara')?.nama || '',
+    ketua: saved.get('ketua') || ketuaPanitia,
+    bendahara: saved.get('bendahara') || bendaharaPanitia,
+    wakil_akademik: saved.get('wakil_akademik') || '',
+    wakil_keuangan: saved.get('wakil_keuangan') || '',
   }
 }
 
@@ -472,7 +503,27 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
   }
 }
 
-export async function saveRabItems(eventId: number, items: RabItemInput[]) {
+async function saveKeuanganSignersInternal(eventId: number, signers: Partial<KeuanganSigners>) {
+  const entries = ([
+    ['ketua', signers.ketua],
+    ['bendahara', signers.bendahara],
+    ['wakil_akademik', signers.wakil_akademik],
+    ['wakil_keuangan', signers.wakil_keuangan],
+  ] as const).map(([role, nama]) => ({ role, nama: nama?.trim() || '' }))
+
+  await batch(entries.map(item => ({
+    sql: `
+      INSERT INTO ehb_keuangan_signer (ehb_event_id, role, nama, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(ehb_event_id, role) DO UPDATE SET
+        nama = excluded.nama,
+        updated_at = datetime('now')
+    `,
+    params: [eventId, item.role, item.nama],
+  })))
+}
+
+export async function saveRabItems(eventId: number, items: RabItemInput[], signers?: Partial<KeuanganSigners>) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
   await ensureKeuanganSchema()
@@ -511,6 +562,8 @@ export async function saveRabItems(eventId: number, items: RabItemInput[]) {
       ],
     })))
   }
+
+  if (signers) await saveKeuanganSignersInternal(eventId, signers)
 
   revalidatePath('/dashboard/ehb/keuangan')
   await logActivity({
