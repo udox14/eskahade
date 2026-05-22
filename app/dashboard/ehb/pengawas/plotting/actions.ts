@@ -124,6 +124,7 @@ export async function autoPlotPengawas(eventId: number) {
         await execute(`DELETE FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId])
 
         const insertStmts: {sql: string, params: any[]}[] = []
+        const quotaPerPengawas = Math.ceil((activeSesi.length * ruanganList.length) / Math.max(pengawasObj.length, 1))
         
         // State tracking untuk fairness & constraints
         const tugasCount: Record<number, number> = {} // pengawas_id -> total jaga
@@ -131,6 +132,9 @@ export async function autoPlotPengawas(eventId: number) {
 
         const historySesi: Record<number, {tgl: string, sesi: number}[]> = {}
         pengawasObj.forEach(p => historySesi[p.id] = [])
+
+        const tugasHarian: Record<string, number> = {}
+        const parityHarian: Record<string, 0 | 1> = {}
 
         // Group sesi by tanggal untuk mengetahui "last session of the day"
         const sesiPerTgl: Record<string, number[]> = {}
@@ -148,20 +152,41 @@ export async function autoPlotPengawas(eventId: number) {
                 requiredGender?: 'L' | 'P'
                 disallowGender?: 'L' | 'P'
                 ignoreBackToBack?: boolean
+                ignoreFairQuota?: boolean
+                ignoreDayParity?: boolean
             }
         ) => {
+            const sessionParity = nomorSesi % 2 as 0 | 1
             const seeded = pengawasObj
                 .map(p => ({ ...p, seed: Math.random() }))
                 .sort((a, b) => a.seed - b.seed)
-                .sort((a, b) => tugasCount[a.id] - tugasCount[b.id])
+                .sort((a, b) => {
+                    const totalDiff = tugasCount[a.id] - tugasCount[b.id]
+                    if (totalDiff !== 0) return totalDiff
+
+                    const dailyDiff = (tugasHarian[`${tanggal}|${a.id}`] || 0) - (tugasHarian[`${tanggal}|${b.id}`] || 0)
+                    if (dailyDiff !== 0) return dailyDiff
+
+                    const aParity = parityHarian[`${tanggal}|${a.id}`]
+                    const bParity = parityHarian[`${tanggal}|${b.id}`]
+                    const aParityScore = aParity === undefined || aParity === sessionParity ? 0 : 1
+                    const bParityScore = bParity === undefined || bParity === sessionParity ? 0 : 1
+                    if (aParityScore !== bParityScore) return aParityScore - bParityScore
+
+                    return 0
+                })
 
             for (const p of seeded) {
                 const pengawasGender = normalizeJenisKelamin(p.jenis_kelamin)
                 const pengawasTag = normalizePengawasTag(p.tag)
+                const dailyKey = `${tanggal}|${p.id}`
+                const preferredParity = parityHarian[dailyKey]
 
                 if (pengawasGender === 'P' && roomGender !== 'P') continue
                 if (options?.requiredGender && pengawasGender !== options.requiredGender) continue
                 if (options?.disallowGender && pengawasGender === options.disallowGender) continue
+                if (!options?.ignoreFairQuota && tugasCount[p.id] >= quotaPerPengawas) continue
+                if (!options?.ignoreDayParity && preferredParity !== undefined && preferredParity !== sessionParity) continue
 
                 if (pengawasTag === 'senior') {
                     const violation = getSeniorRuleViolation(seniorConfig, nomorSesi, isLastSession)
@@ -184,6 +209,17 @@ export async function autoPlotPengawas(eventId: number) {
             return null
         }
 
+        const assignPengawas = (pengawasId: number, tanggal: string, nomorSesi: number) => {
+            tugasCount[pengawasId]++
+            historySesi[pengawasId].push({ tgl: tanggal, sesi: nomorSesi })
+
+            const dailyKey = `${tanggal}|${pengawasId}`
+            tugasHarian[dailyKey] = (tugasHarian[dailyKey] || 0) + 1
+            if (parityHarian[dailyKey] === undefined) {
+                parityHarian[dailyKey] = nomorSesi % 2 as 0 | 1
+            }
+        }
+
         // Loop setiap slot: (tanggal, sesi, ruangan)
         for (const s of activeSesi) {
             const isLastSession = Math.max(...sesiPerTgl[s.tanggal]) === s.nomor_sesi
@@ -196,7 +232,10 @@ export async function autoPlotPengawas(eventId: number) {
 
             const femaleCandidatesForSession = pengawasObj.filter(p => {
                 if (normalizeJenisKelamin(p.jenis_kelamin) !== 'P') return false
+                if (tugasCount[p.id] >= quotaPerPengawas) return false
                 if (historySesi[p.id].some(h => h.tgl === s.tanggal && h.sesi === s.nomor_sesi)) return false
+                const preferredParity = parityHarian[`${s.tanggal}|${p.id}`]
+                if (preferredParity !== undefined && preferredParity !== (s.nomor_sesi % 2)) return false
                 if (normalizePengawasTag(p.tag) === 'senior') {
                     const violation = getSeniorRuleViolation(seniorConfig, s.nomor_sesi, isLastSession)
                     if (violation) return false
@@ -226,7 +265,26 @@ export async function autoPlotPengawas(eventId: number) {
                     selectedP = pickCandidate(roomGender, s.tanggal, s.nomor_sesi, isLastSession, {
                         requiredGender: isReservedFemaleRoom ? 'P' : undefined,
                         disallowGender: roomGender === 'P' && !isReservedFemaleRoom ? 'P' : undefined,
+                        ignoreFairQuota: true,
+                    })
+                }
+
+                if (!selectedP) {
+                    selectedP = pickCandidate(roomGender, s.tanggal, s.nomor_sesi, isLastSession, {
+                        requiredGender: isReservedFemaleRoom ? 'P' : undefined,
+                        disallowGender: roomGender === 'P' && !isReservedFemaleRoom ? 'P' : undefined,
+                        ignoreDayParity: true,
+                        ignoreFairQuota: true,
+                    })
+                }
+
+                if (!selectedP) {
+                    selectedP = pickCandidate(roomGender, s.tanggal, s.nomor_sesi, isLastSession, {
+                        requiredGender: isReservedFemaleRoom ? 'P' : undefined,
+                        disallowGender: roomGender === 'P' && !isReservedFemaleRoom ? 'P' : undefined,
                         ignoreBackToBack: true,
+                        ignoreDayParity: true,
+                        ignoreFairQuota: true,
                     })
                 }
 
@@ -242,8 +300,7 @@ export async function autoPlotPengawas(eventId: number) {
                     params: [eventId, selectedP.id, r.id, s.tanggal, s.sesi_id]
                 })
 
-                tugasCount[selectedP.id]++
-                historySesi[selectedP.id].push({ tgl: s.tanggal, sesi: s.nomor_sesi })
+                assignPengawas(selectedP.id, s.tanggal, s.nomor_sesi)
             }
         }
 
