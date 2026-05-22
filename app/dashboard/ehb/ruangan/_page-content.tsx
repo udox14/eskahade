@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import {
-  getRuanganList, addRuangan, updateRuangan, deleteRuangan, addRuanganBulk, addRuanganImport,
+  getRuanganList, addRuangan, updateRuangan, deleteRuangan, deleteAllRuangan, getDeleteAllRuanganImpact, addRuanganBulk, addRuanganImport,
   getRuanganDetail, getActiveEventLight, getOtherRuangan, pindahSantri, hapusPeserta,
   cariSantriUnplotted, tambahPesertaManual,
   getJamGroups
@@ -150,7 +150,40 @@ export default function RuanganEhbPage() {
     if (!await confirm('Hapus ruangan ini?')) return
     const res = await deleteRuangan(id)
     if ('error' in res) return toast.error(res.error)
+
+    setRuanganList(prev => prev.filter(r => r.id !== id))
+    if (detailRuangan?.id === id) {
+      setDetailRuangan(null)
+      setPesertaByJam({})
+    }
+
     toast.success('Ruangan dihapus')
+  }
+
+  const handleDeleteAllRuangan = async () => {
+    if (!event) return
+    const impact = await getDeleteAllRuanganImpact(event.id)
+    if (impact.totalRuangan === 0) {
+      toast.error('Belum ada ruangan yang bisa dihapus.')
+      return
+    }
+
+    if (!await confirm(
+      'Hapus semua ruangan?\n\n' +
+      'Tindakan ini akan menghapus:\n' +
+      `- ${impact.totalRuangan} ruangan\n` +
+      `- ${impact.totalPlotting} plotting peserta\n` +
+      `- ${impact.totalJadwalPengawas} jadwal pengawas\n\n` +
+      'Setelah itu konfigurasi ruangan harus dibuat ulang dari awal.'
+    )) return
+
+    const res = await deleteAllRuangan(event.id)
+    if ('error' in res) return toast.error(res.error)
+
+    setRuanganList([])
+    setDetailRuangan(null)
+    setPesertaByJam({})
+    toast.success(`${res.deleted} ruangan berhasil dihapus. Silakan konfigurasi ulang dari awal.`)
     loadData()
   }
 
@@ -250,6 +283,12 @@ export default function RuanganEhbPage() {
             <Link href="/dashboard/ehb/ruangan/plotting" className="flex items-center gap-2 bg-white border text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">
               <MapPin className="w-4 h-4" /> Auto Plotting
             </Link>
+            <button
+              onClick={handleDeleteAllRuangan}
+              className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" /> Hapus Semua Ruangan
+            </button>
             <button
               onClick={handleOpenAdd}
               className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"

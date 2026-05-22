@@ -168,12 +168,40 @@ export async function deleteRuangan(ruanganId: number) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
 
+  const target = await queryOne<{ nama_ruangan: string | null; nomor_ruangan: number | null }>(
+    'SELECT nama_ruangan, nomor_ruangan FROM ehb_ruangan WHERE id = ?',
+    [ruanganId]
+  )
+  if (!target) return { error: 'Ruangan tidak ditemukan atau sudah terhapus.' }
+
+  const roomLabel = target.nama_ruangan?.trim() || `Ruangan ${target.nomor_ruangan ?? ruanganId}`
+
   // Cek apakah ada peserta yang sudah diplot
   const count = await queryOne<{ total: number }>(`SELECT COUNT(*) as total FROM ehb_plotting_santri WHERE ruangan_id = ?`, [ruanganId])
-  if (count && count.total > 0) return { error: 'Ruangan tidak bisa dihapus karena sudah ada peserta. Kosongkan dulu peserta di menu Plotting.' }
+  if (count && count.total > 0) {
+    return {
+      error: `${roomLabel} tidak bisa dihapus karena masih berisi ${count.total} peserta. Keluarkan dulu peserta dari ruangan ini atau kosongkan dari menu Plotting Ruangan.`
+    }
+  }
 
-  const target = await queryOne<{ nama_ruangan: string; nomor_ruangan: number }>('SELECT nama_ruangan, nomor_ruangan FROM ehb_ruangan WHERE id = ?', [ruanganId])
-  await execute(`DELETE FROM ehb_ruangan WHERE id = ?`, [ruanganId])
+  const jadwalPengawas = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total FROM ehb_jadwal_pengawas WHERE ruangan_id = ?`,
+    [ruanganId]
+  )
+
+  // Bersihkan jadwal pengawas yang masih menunjuk ke ruangan ini agar tidak mentok FK.
+  await execute(`DELETE FROM ehb_jadwal_pengawas WHERE ruangan_id = ?`, [ruanganId])
+
+  try {
+    await execute(`DELETE FROM ehb_ruangan WHERE id = ?`, [ruanganId])
+  } catch (err: any) {
+    const message = String(err?.message || '')
+    if (message.includes('FOREIGN KEY')) {
+      return { error: `${roomLabel} belum bisa dihapus karena masih dipakai data lain. Cek lagi plotting, absensi, atau jadwal yang masih terkait.` }
+    }
+    return { error: `Gagal menghapus ${roomLabel}: ${message || 'terjadi kesalahan sistem.'}` }
+  }
+
   await logActivity({
     actor: actorFromSession(session),
     module: 'ehb_ruangan',
@@ -182,11 +210,64 @@ export async function deleteRuangan(ruanganId: number) {
     logKind: 'delete',
     entityType: 'ehb_ruangan',
     entityId: String(ruanganId),
-    entityLabel: target?.nama_ruangan ?? `Ruangan ${target?.nomor_ruangan ?? ruanganId}`,
-    summary: `Menghapus ruangan ${target?.nama_ruangan ?? ruanganId}`,
+    entityLabel: roomLabel,
+    summary: `Menghapus ruangan ${roomLabel}`,
+    details: { removed_jadwal_pengawas: jadwalPengawas?.total || 0 },
   })
   revalidatePath('/dashboard/ehb/ruangan')
+  revalidatePath('/dashboard/ehb/pengawas')
+  revalidatePath('/dashboard/ehb/pengawas/plotting')
   return { success: true }
+}
+
+export async function deleteAllRuangan(eventId: number) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const totalRuangan = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total FROM ehb_ruangan WHERE ehb_event_id = ?`,
+    [eventId]
+  )
+  if (!totalRuangan || totalRuangan.total === 0) {
+    return { error: 'Belum ada ruangan yang bisa dihapus.' }
+  }
+
+  await execute(`DELETE FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId])
+  await execute(`DELETE FROM ehb_plotting_santri WHERE ehb_event_id = ?`, [eventId])
+  await execute(`DELETE FROM ehb_ruangan WHERE ehb_event_id = ?`, [eventId])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_ruangan',
+    action: 'delete',
+    fiturHref: '/dashboard/ehb/ruangan',
+    logKind: 'delete',
+    entityType: 'ehb_ruangan_batch',
+    entityId: String(eventId),
+    entityLabel: 'Reset ruangan EHB',
+    summary: `Menghapus semua ruangan EHB`,
+    details: { total_ruangan: totalRuangan.total, reset_plotting: true, reset_jadwal_pengawas: true },
+  })
+
+  revalidatePath('/dashboard/ehb/ruangan')
+  revalidatePath('/dashboard/ehb/ruangan/plotting')
+  revalidatePath('/dashboard/ehb/pengawas')
+  revalidatePath('/dashboard/ehb/pengawas/plotting')
+  return { success: true, deleted: totalRuangan.total }
+}
+
+export async function getDeleteAllRuanganImpact(eventId: number) {
+  const [ruangan, plotting, jadwalPengawas] = await Promise.all([
+    queryOne<{ total: number }>(`SELECT COUNT(*) as total FROM ehb_ruangan WHERE ehb_event_id = ?`, [eventId]),
+    queryOne<{ total: number }>(`SELECT COUNT(*) as total FROM ehb_plotting_santri WHERE ehb_event_id = ?`, [eventId]),
+    queryOne<{ total: number }>(`SELECT COUNT(*) as total FROM ehb_jadwal_pengawas WHERE ehb_event_id = ?`, [eventId]),
+  ])
+
+  return {
+    totalRuangan: ruangan?.total || 0,
+    totalPlotting: plotting?.total || 0,
+    totalJadwalPengawas: jadwalPengawas?.total || 0,
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

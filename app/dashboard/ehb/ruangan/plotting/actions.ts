@@ -16,6 +16,7 @@ type PlottingStatusRow = {
   jam_group: string
   total_santri: number
   terplot: number
+  ruangan_terpakai: number
 }
 
 type KapasitasRuanganRow = {
@@ -62,7 +63,8 @@ export async function getPlottingStatus(eventId: number) {
       s.jenis_kelamin,
       kj.jam_group,
       COUNT(s.id) as total_santri,
-      SUM(CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END) as terplot
+      SUM(CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END) as terplot,
+      COUNT(DISTINCT CASE WHEN p.id IS NOT NULL THEN p.ruangan_id END) as ruangan_terpakai
     FROM santri s
     JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ?

@@ -93,8 +93,8 @@ export default function PlottingEhbPage() {
   )
 
   // Calculate totals
-  const L = status.find(s => s.jenis_kelamin === 'L' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0 }
-  const P = status.find(s => s.jenis_kelamin === 'P' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0 }
+  const L = status.find(s => s.jenis_kelamin === 'L' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0, ruangan_terpakai: 0 }
+  const P = status.find(s => s.jenis_kelamin === 'P' && s.jam_group === activeJamTab) || { total_santri: 0, terplot: 0, ruangan_terpakai: 0 }
   const kapL = kapasitas.find(k => k.jenis_kelamin === 'L') || { total_kapasitas: 0, total_ruangan: 0 }
   const kapP = kapasitas.find(k => k.jenis_kelamin === 'P') || { total_kapasitas: 0, total_ruangan: 0 }
 
@@ -177,10 +177,10 @@ export default function PlottingEhbPage() {
                   <div>
                     <p className="text-xs text-blue-600 font-bold mb-1">Peserta / Kapasitas</p>
                     <p className="text-lg font-black text-blue-950">{L.total_santri} / <span className={L.total_santri > effKapL ? 'text-red-500' : ''}>{effKapL}</span></p>
-                    <p className="text-[10px] text-blue-500">dalam {kapL.total_ruangan} ruangan</p>
+                    <p className="text-[10px] text-blue-500">Terpakai {L.ruangan_terpakai || 0} ruangan pada {activeJamTab}</p>
                     <p className={`text-[10px] font-bold mt-1 ${estL.covered ? 'text-blue-700' : 'text-red-600'}`}>
                       Estimasi butuh {estL.needed} ruangan
-                      {kapL.total_ruangan > 0 ? ` dari ${kapL.total_ruangan} tersedia` : ''}
+                      {kapL.total_ruangan > 0 ? ` dari maksimal ${kapL.total_ruangan} tersedia` : ''}
                       {!estL.covered ? ` • kurang ${estL.remaining} kursi` : ''}
                     </p>
                   </div>
@@ -201,10 +201,10 @@ export default function PlottingEhbPage() {
                   <div>
                     <p className="text-xs text-pink-600 font-bold mb-1">Peserta / Kapasitas</p>
                     <p className="text-lg font-black text-pink-950">{P.total_santri} / <span className={P.total_santri > effKapP ? 'text-red-500' : ''}>{effKapP}</span></p>
-                    <p className="text-[10px] text-pink-500">dalam {kapP.total_ruangan} ruangan</p>
+                    <p className="text-[10px] text-pink-500">Terpakai {P.ruangan_terpakai || 0} ruangan pada {activeJamTab}</p>
                     <p className={`text-[10px] font-bold mt-1 ${estP.covered ? 'text-pink-700' : 'text-red-600'}`}>
                       Estimasi butuh {estP.needed} ruangan
-                      {kapP.total_ruangan > 0 ? ` dari ${kapP.total_ruangan} tersedia` : ''}
+                      {kapP.total_ruangan > 0 ? ` dari maksimal ${kapP.total_ruangan} tersedia` : ''}
                       {!estP.covered ? ` • kurang ${estP.remaining} kursi` : ''}
                     </p>
                   </div>
