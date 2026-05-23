@@ -112,6 +112,14 @@ function sesiLabel(value: SesiSakit) {
   return SESI_OPTIONS.find(item => item.value === value)?.label || value
 }
 
+function formatDisplayName(value: string | null | undefined) {
+  const clean = String(value || '').trim()
+  if (!clean) return '-'
+  return clean
+    .toLowerCase()
+    .replace(/(^|[\s.'-])([a-z])/g, (_match, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`)
+}
+
 export default function DataSakitPage() {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [asramaList, setAsramaList] = useState<string[]>([])
@@ -228,7 +236,7 @@ export default function DataSakitPage() {
   const handlePilihSantri = (santri: SantriSakitOption) => {
     setSelectedSantri(santri)
     setHasilCari([])
-    setSantriSearch(santri.nama_lengkap)
+    setSantriSearch(formatDisplayName(santri.nama_lengkap))
 
     const current = rows.find(row => row.santri_id === santri.id)
     if (current) {
@@ -285,7 +293,7 @@ export default function DataSakitPage() {
       }
 
       toast.success(res.updated ? 'Data sakit diperbarui' : 'Data sakit dicatat', {
-        description: selectedSantri.nama_lengkap,
+        description: formatDisplayName(selectedSantri.nama_lengkap),
       })
       closeCatatModal()
       await loadData()
@@ -314,7 +322,7 @@ export default function DataSakitPage() {
         return
       }
 
-      toast.success('Santri ditandai sembuh', { description: row.nama_lengkap })
+      toast.success('Santri ditandai sembuh', { description: formatDisplayName(row.nama_lengkap) })
       await loadData()
     })
   }
@@ -390,13 +398,13 @@ export default function DataSakitPage() {
                     <button onClick={() => openDetail(row)} className="flex min-w-0 items-start gap-3 text-left">
                       <SantriPhotoAvatar
                         src={row.foto_url}
-                        name={row.nama_lengkap}
-                        alt={`Foto ${row.nama_lengkap}`}
+                        name={formatDisplayName(row.nama_lengkap)}
+                        alt={`Foto ${formatDisplayName(row.nama_lengkap)}`}
                         size="sm"
                         className="shrink-0"
                       />
                       <div className="min-w-0">
-                        <p className="font-bold text-slate-800 leading-snug">{row.nama_lengkap}</p>
+                        <p className="font-bold text-slate-800 leading-snug">{formatDisplayName(row.nama_lengkap)}</p>
                         <p className="mt-1 text-[11px] text-slate-500">{row.nis || '-'} · Kamar {row.kamar || '-'}</p>
                       </div>
                     </button>
@@ -469,13 +477,13 @@ export default function DataSakitPage() {
                     <button onClick={() => openDetail(row)} className="flex items-start gap-3 text-left">
                       <SantriPhotoAvatar
                         src={row.foto_url}
-                        name={row.nama_lengkap}
-                        alt={`Foto ${row.nama_lengkap}`}
+                        name={formatDisplayName(row.nama_lengkap)}
+                        alt={`Foto ${formatDisplayName(row.nama_lengkap)}`}
                         size="sm"
                         className="shrink-0"
                       />
                       <div>
-                        <p className="font-bold text-slate-800 hover:text-emerald-700">{row.nama_lengkap}</p>
+                        <p className="font-bold text-slate-800 hover:text-emerald-700">{formatDisplayName(row.nama_lengkap)}</p>
                         <p className="text-xs text-slate-400">{row.nis || '-'} - Kamar {row.kamar || '-'}</p>
                       </div>
                     </button>
@@ -659,13 +667,13 @@ export default function DataSakitPage() {
                         <div className="flex items-start gap-3">
                           <SantriPhotoAvatar
                             src={santri.foto_url}
-                            name={santri.nama_lengkap}
-                            alt={`Foto ${santri.nama_lengkap}`}
+                            name={formatDisplayName(santri.nama_lengkap)}
+                            alt={`Foto ${formatDisplayName(santri.nama_lengkap)}`}
                             size="sm"
                             className="shrink-0"
                           />
                           <div className="min-w-0">
-                            <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
+                            <p className="font-bold text-sm text-slate-800">{formatDisplayName(santri.nama_lengkap)}</p>
                             <p className="text-xs text-slate-500">{santri.asrama || '-'} / Kamar {santri.kamar || '-'}</p>
                           </div>
                         </div>
@@ -682,14 +690,14 @@ export default function DataSakitPage() {
                       <div className="flex min-w-0 items-center gap-3">
                         <SantriPhotoAvatar
                           src={selectedSantri.foto_url}
-                          name={selectedSantri.nama_lengkap}
-                          alt={`Foto ${selectedSantri.nama_lengkap}`}
+                          name={formatDisplayName(selectedSantri.nama_lengkap)}
+                          alt={`Foto ${formatDisplayName(selectedSantri.nama_lengkap)}`}
                           size="sm"
                           className="shrink-0"
                         />
                         <div>
                           <p className="text-xs font-bold uppercase text-emerald-700">Santri Dipilih</p>
-                          <p className="mt-0.5 font-bold text-slate-900">{selectedSantri.nama_lengkap}</p>
+                          <p className="mt-0.5 font-bold text-slate-900">{formatDisplayName(selectedSantri.nama_lengkap)}</p>
                           <p className="text-xs text-slate-500">{selectedSantri.asrama || '-'} / Kamar {selectedSantri.kamar || '-'}</p>
                         </div>
                       </div>
@@ -774,13 +782,13 @@ export default function DataSakitPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <SantriPhotoAvatar
                   src={detailSantri.foto_url}
-                  name={detailSantri.nama_lengkap}
-                  alt={`Foto ${detailSantri.nama_lengkap}`}
+                  name={formatDisplayName(detailSantri.nama_lengkap)}
+                  alt={`Foto ${formatDisplayName(detailSantri.nama_lengkap)}`}
                   size="sm"
                   className="shrink-0"
                 />
                 <div>
-                  <h2 className="font-bold text-slate-800">{detailSantri.nama_lengkap}</h2>
+                  <h2 className="font-bold text-slate-800">{formatDisplayName(detailSantri.nama_lengkap)}</h2>
                   <p className="text-sm text-slate-500">{detailSantri.asrama || '-'} / Kamar {detailSantri.kamar || '-'}</p>
                 </div>
               </div>
@@ -819,7 +827,7 @@ export default function DataSakitPage() {
                         </div>
                         <p className="font-bold text-slate-800 mt-2">{item.sakit_apa}</p>
                         <p className="text-xs text-slate-500 mt-1">
-                          {formatDate(item.tanggal)} - dicatat oleh {item.pencatat_nama || '-'}
+                          {formatDate(item.tanggal)} - dicatat oleh {formatDisplayName(item.pencatat_nama)}
                         </p>
                         {item.sembuh_at ? (
                           <p className="text-xs text-sky-600 mt-1">Sembuh: {formatDateTime(item.sembuh_at)}</p>

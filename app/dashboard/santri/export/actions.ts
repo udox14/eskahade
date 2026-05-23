@@ -21,7 +21,7 @@ export async function getFilterOptions() {
     ? `WHERE status_global = 'aktif' AND asrama = '${asramaBinaan}'`
     : `WHERE status_global = 'aktif' AND asrama IS NOT NULL`
 
-  const [asramaList, sekolahList, kelasSekolahList, tahunList, kelasMarhalahList] = await Promise.all([
+  const [asramaList, sekolahList, kelasSekolahList, tahunList, kelasMarhalahList, jasaList] = await Promise.all([
     // 1. Daftar asrama
     asramaBinaan
       ? Promise.resolve([asramaBinaan])
@@ -57,10 +57,17 @@ export async function getFilterOptions() {
       )
       ORDER BY m.urutan, k.nama_kelas
     `),
+
+    // 6. Daftar master jasa katering/laundry
+    query<{ id: string; nama_jasa: string; jenis: 'Makan' | 'Cuci' }>(
+      `SELECT id, nama_jasa, jenis FROM master_jasa ORDER BY jenis, nama_jasa`
+    ),
   ])
 
   const marhalahUnik = [...new Set(kelasMarhalahList.map(r => r.marhalah))]
   const kelasList    = kelasMarhalahList.map(r => r.nama_kelas)
+  const jasaMakanList = jasaList.filter(j => j.jenis === 'Makan')
+  const jasaCuciList = jasaList.filter(j => j.jenis === 'Cuci')
 
   return {
     asramaList,
@@ -69,6 +76,8 @@ export async function getFilterOptions() {
     tahunList,
     marhalahUnik,
     kelasList,
+    jasaMakanList,
+    jasaCuciList,
     asramaBinaan, // kirim ke client agar dropdown kamar tahu
   }
 }
@@ -115,6 +124,22 @@ export async function getDataExport(
     params.push(...arr)
   }
 
+  const addJasaClause = (col: string, arr: string[] | undefined | null) => {
+    if (!arr || arr.length === 0) return
+
+    const realIds = arr.filter(v => v !== '__NULL__')
+    const allowEmpty = arr.includes('__NULL__')
+    const parts: string[] = []
+
+    if (realIds.length > 0) {
+      parts.push(`${col} IN (${realIds.map(() => '?').join(', ')})`)
+      params.push(...realIds)
+    }
+    if (allowEmpty) parts.push(`${col} IS NULL`)
+
+    if (parts.length > 0) clauses.push(`(${parts.join(' OR ')})`)
+  }
+
   // Effective asrama: kalau pengurus_asrama, paksa asrama binaannya saja
   const effectiveAsrama: string[] | null = forceAsrama
     ? [forceAsrama]
@@ -124,12 +149,17 @@ export async function getDataExport(
   const needKelas = kolom.includes('nama_kelas') || kolom.includes('marhalah')
     || (!!filter.nama_kelas && filter.nama_kelas.length > 0)
     || (!!filter.marhalah && filter.marhalah.length > 0)
+  const needJasa = kolom.includes('tempat_makan') || kolom.includes('tempat_mencuci')
+    || (!!filter.tempat_makan_id && filter.tempat_makan_id.length > 0)
+    || (!!filter.tempat_mencuci_id && filter.tempat_mencuci_id.length > 0)
 
   const clauses: string[] = ["s.status_global = 'aktif'"]
   const params: any[]     = []
 
   addInClause('s.asrama', effectiveAsrama)
   addInClause('s.kamar', filter.kamar)
+  addJasaClause('s.tempat_makan_id', filter.tempat_makan_id)
+  addJasaClause('s.tempat_mencuci_id', filter.tempat_mencuci_id)
   if (filter.jenis_kelamin) { clauses.push('s.jenis_kelamin = ?');   params.push(filter.jenis_kelamin) }
   addInClause('s.sekolah', filter.sekolah)
   addInClause('s.kelas_sekolah', filter.kelas_sekolah)
@@ -144,6 +174,10 @@ export async function getDataExport(
     ? `LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
        LEFT JOIN kelas k ON k.id = rp.kelas_id
        LEFT JOIN marhalah m ON m.id = k.marhalah_id`
+    : ''
+  const joinJasa = needJasa
+    ? `LEFT JOIN master_jasa jm ON jm.id = s.tempat_makan_id
+       LEFT JOIN master_jasa jc ON jc.id = s.tempat_mencuci_id`
     : ''
 
   const orderMap: Record<SortBy, string> = {
@@ -173,6 +207,16 @@ export async function getDataExport(
     kolom.includes('kamar')         ? 's.kamar'         : null,
     kolom.includes('tahun_masuk')   ? 's.tahun_masuk'   : null,
     kolom.includes('kategori_santri') ? `${kategoriEfektifSql} AS kategori_santri` : null,
+    needJasa && kolom.includes('tempat_makan') ? `CASE
+      WHEN s.tempat_makan_id IS NULL THEN 'Belum diatur'
+      WHEN jm.id IS NULL THEN 'Penyedia terhapus'
+      ELSE jm.nama_jasa
+    END AS tempat_makan` : null,
+    needJasa && kolom.includes('tempat_mencuci') ? `CASE
+      WHEN s.tempat_mencuci_id IS NULL THEN 'Belum diatur'
+      WHEN jc.id IS NULL THEN 'Penyedia terhapus'
+      ELSE jc.nama_jasa
+    END AS tempat_mencuci` : null,
     kolom.includes('sekolah')       ? 's.sekolah'       : null,
     kolom.includes('kelas_sekolah') ? 's.kelas_sekolah' : null,
     needKelas && kolom.includes('nama_kelas') ? 'k.nama_kelas' : null,
@@ -183,6 +227,7 @@ export async function getDataExport(
     `SELECT ${selectCols}
      FROM santri s
      ${joinKelas}
+     ${joinJasa}
      WHERE ${where}
      ORDER BY ${orderBy}
      LIMIT 5000`,

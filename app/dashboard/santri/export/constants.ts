@@ -4,6 +4,8 @@ export type ExportFilter = {
   jenis_kelamin?: 'L' | 'P'
   asrama?:        string[]   // multi-select
   kamar?:         string[]
+  tempat_makan_id?: string[]
+  tempat_mencuci_id?: string[]
   sekolah?:       string[]
   kelas_sekolah?: string[]
   nama_kelas?:    string[]
@@ -17,7 +19,8 @@ export type SortBy = 'nama_lengkap' | 'asrama' | 'kamar' | 'kelas_pesantren' | '
 export type KolomExport = (
   'nis' | 'nama_lengkap' | 'jenis_kelamin' | 'tempat_lahir' | 'tanggal_lahir' |
   'nama_ayah' | 'nama_ibu' | 'alamat' | 'asrama' | 'kamar' | 'tahun_masuk' |
-  'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik' | 'kategori_santri'
+  'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik' | 'kategori_santri' |
+  'tempat_makan' | 'tempat_mencuci'
 )
 
 export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[] = [
@@ -34,6 +37,8 @@ export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[
   { key: 'kamar',         label: 'Kamar',          group: 'Pesantren' },
   { key: 'tahun_masuk',   label: 'Tahun Masuk',    group: 'Pesantren' },
   { key: 'kategori_santri', label: 'Kategori Santri', group: 'Pesantren' },
+  { key: 'tempat_makan',  label: 'Katering / Tempat Makan', group: 'Layanan' },
+  { key: 'tempat_mencuci', label: 'Laundry / Tempat Cuci',   group: 'Layanan' },
   { key: 'nama_kelas',    label: 'Kelas Pesantren',group: 'Pesantren' },
   { key: 'marhalah',      label: 'Marhalah',       group: 'Pesantren' },
   { key: 'sekolah',       label: 'Sekolah',        group: 'Sekolah'   },
@@ -60,6 +65,8 @@ export const HEADER_MAP: Record<KolomExport, string> = {
   nama_ayah: 'Nama Ayah', nama_ibu: 'Nama Ibu', alamat: 'Alamat',
   asrama: 'Asrama', kamar: 'Kamar', tahun_masuk: 'Tahun Masuk',
   kategori_santri: 'Kategori Santri',
+  tempat_makan: 'Katering / Tempat Makan',
+  tempat_mencuci: 'Laundry / Tempat Cuci',
   sekolah: 'Sekolah', kelas_sekolah: 'Kelas Sekolah',
   nama_kelas: 'Kelas Pesantren', marhalah: 'Marhalah',
 }

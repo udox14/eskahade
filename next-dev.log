@@ -3,17 +3,13 @@
 > next dev
 
 ▲ Next.js 16.1.6 (Turbopack)
-- Local:         http://localhost:3000
-- Network:       http://192.168.1.13:3000
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.6:3001
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
-✓ Ready in 4s
+✓ Ready in 6.2s
 [layout] session null → redirect /login
- GET /dashboard/keuangan/tarif 307 in 2.1s (compile: 1787ms, render: 267ms)
- GET /api/version 200 in 194ms
-[layout] session null → redirect /login
- GET /dashboard/keuangan/tarif 307 in 57ms (compile: 4ms, render: 52ms)
- GET /api/version 200 in 9ms
+ GET /dashboard/santri/export 307 in 3.7s (compile: 3.3s, render: 335ms)

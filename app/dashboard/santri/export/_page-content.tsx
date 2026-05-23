@@ -123,6 +123,48 @@ function MultiChip({ label, selected, onChange, options, disabled = false }: {
   )
 }
 
+type ChipOption = { value: string; label: string }
+
+function MultiOptionChip({ label, selected, onChange, options }: {
+  label: string
+  selected: string[]
+  onChange: (v: string[]) => void
+  options: ChipOption[]
+}) {
+  if (options.length === 0) return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
+      <p className="text-xs text-slate-300 italic py-1">Tidak ada opsi</p>
+    </div>
+  )
+
+  const toggle = (v: string) =>
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
+        {selected.length > 0 && (
+          <button onClick={() => onChange([])} className="text-[9px] text-red-400 hover:underline">hapus</button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <button key={o.value} onClick={() => toggle(o.value)}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
+              selected.includes(o.value)
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
+            }`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportSantriPage() {
   const [opts, setOpts]         = useState<any>(null)
@@ -168,6 +210,20 @@ export default function ExportSantriPage() {
   const activeFilters = Object.values(filter).filter(v =>
     v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
   ).length
+  const jasaMakanOptions: ChipOption[] = [
+    { value: '__NULL__', label: 'Belum diatur' },
+    ...((opts?.jasaMakanList ?? []) as Array<{ id: string; nama_jasa: string }>).map(j => ({
+      value: j.id,
+      label: j.nama_jasa,
+    })),
+  ]
+  const jasaCuciOptions: ChipOption[] = [
+    { value: '__NULL__', label: 'Belum diatur' },
+    ...((opts?.jasaCuciList ?? []) as Array<{ id: string; nama_jasa: string }>).map(j => ({
+      value: j.id,
+      label: j.nama_jasa,
+    })),
+  ]
 
   // Preview — ambil 10 baris pertama untuk konfirmasi
   const handlePreview = useCallback(async () => {
@@ -281,6 +337,18 @@ export default function ExportSantriPage() {
               onChange={setArr('kamar')}
               options={filter.asrama?.length === 1 ? kamarList : []}
               disabled={!filter.asrama?.length} />
+          </div>
+
+          <div className="col-span-2 sm:col-span-3">
+            <MultiOptionChip label="Katering / Tempat Makan" selected={filter.tempat_makan_id ?? []}
+              onChange={vals => setF('tempat_makan_id', vals.length ? vals : undefined)}
+              options={jasaMakanOptions} />
+          </div>
+
+          <div className="col-span-2 sm:col-span-3">
+            <MultiOptionChip label="Laundry / Tempat Cuci" selected={filter.tempat_mencuci_id ?? []}
+              onChange={vals => setF('tempat_mencuci_id', vals.length ? vals : undefined)}
+              options={jasaCuciOptions} />
           </div>
 
           <div className="col-span-2 sm:col-span-3">
