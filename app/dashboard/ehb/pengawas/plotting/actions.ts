@@ -26,44 +26,59 @@ type ActiveRoomRow = {
     jumlah_peserta: number
 }
 
+function parseJamGroups(value: string) {
+    return value
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+}
+
 async function getActiveSesiList(eventId: number) {
     return query<ActiveSesiRow>(`
         SELECT j.tanggal, j.sesi_id, s.nomor_sesi, s.jam_group
         FROM ehb_jadwal j
         JOIN ehb_sesi s ON s.id = j.sesi_id
         WHERE j.ehb_event_id = ?
-        GROUP BY j.tanggal, j.sesi_id
+        GROUP BY j.tanggal, j.sesi_id, s.nomor_sesi, s.jam_group
         ORDER BY j.tanggal, s.nomor_sesi
     `, [eventId])
 }
 
 async function getActiveRoomsForSession(eventId: number, tanggal: string, sesiId: number, jamGroup: string) {
+    const jamGroups = parseJamGroups(jamGroup)
+    if (jamGroups.length === 0) return []
+
+    const jamGroupPlaceholders = jamGroups.map(() => '?').join(', ')
+
     return query<ActiveRoomRow>(`
         SELECT
             r.id,
             r.nomor_ruangan,
             r.jenis_kelamin,
-            COUNT(s.id) as jumlah_peserta
+            COUNT(DISTINCT s.id) as jumlah_peserta
         FROM ehb_ruangan r
         JOIN ehb_plotting_santri p
             ON p.ruangan_id = r.id
            AND p.ehb_event_id = ?
-           AND p.jam_group = ?
+           AND p.jam_group IN (${jamGroupPlaceholders})
         JOIN santri s
             ON s.id = p.santri_id
         JOIN riwayat_pendidikan rp
             ON rp.santri_id = s.id
            AND rp.status_riwayat = 'aktif'
-        JOIN ehb_jadwal j
-            ON j.kelas_id = rp.kelas_id
-           AND j.tanggal = ?
-           AND j.sesi_id = ?
-           AND j.ehb_event_id = ?
         WHERE r.ehb_event_id = ?
+          AND EXISTS (
+            SELECT 1
+            FROM ehb_jadwal j
+            WHERE j.kelas_id = rp.kelas_id
+              AND j.tanggal = ?
+              AND j.sesi_id = ?
+              AND j.ehb_event_id = ?
+          )
         GROUP BY r.id, r.nomor_ruangan, r.jenis_kelamin
-        HAVING COUNT(s.id) > 0
+        HAVING COUNT(DISTINCT s.id) > 0
         ORDER BY r.nomor_ruangan
-    `, [eventId, jamGroup, tanggal, sesiId, eventId, eventId])
+    `, [eventId, ...jamGroups, eventId, tanggal, sesiId, eventId])
 }
 
 export async function getPlottingPengawasStatus(eventId: number) {
