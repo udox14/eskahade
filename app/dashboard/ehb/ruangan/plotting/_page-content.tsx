@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri } from './actions'
-import type { PlottingOrderPreference } from './actions'
+import type { MarhalahOrderItem } from './actions'
 import { getActiveEventLight } from '../actions'
 import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
-  UserX, Loader2, ArrowLeft, Info, SlidersHorizontal
+  UserX, Loader2, ArrowLeft, Info, SlidersHorizontal, ArrowUp, ArrowDown
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -22,7 +22,7 @@ export default function PlottingEhbPage() {
   const [kapasitasDetail, setKapasitasDetail] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
   const [activeJamTab, setActiveJamTab] = useState<string>('')
-  const [orderPreferences, setOrderPreferences] = useState<Record<string, PlottingOrderPreference>>({})
+  const [marhalahOrders, setMarhalahOrders] = useState<Record<string, MarhalahOrderItem[]>>({})
   
   const [unplotted, setUnplotted] = useState<any[]>([])
   
@@ -45,10 +45,27 @@ export default function PlottingEhbPage() {
       setKapasitasDetail(res.kapasitasDetail || [])
       setJamGroups(res.jamGroups)
       if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
-      setOrderPreferences(prev => {
-        const next: Record<string, PlottingOrderPreference> = {}
+      setMarhalahOrders(prev => {
+        const byJamGroup = (res.marhalahOrders || []).reduce((acc: Record<string, MarhalahOrderItem[]>, item: MarhalahOrderItem) => {
+          if (!acc[item.jam_group]) acc[item.jam_group] = []
+          acc[item.jam_group].push(item)
+          return acc
+        }, {})
+        const next: Record<string, MarhalahOrderItem[]> = {}
         for (const jamGroup of res.jamGroups) {
-          next[jamGroup] = prev[jamGroup] ?? 'normal'
+          const latest = byJamGroup[jamGroup] || []
+          const prevOrder = prev[jamGroup]?.map(item => item.marhalah_nama) || []
+          next[jamGroup] = latest.sort((a, b) => {
+            const aPrev = prevOrder.indexOf(a.marhalah_nama)
+            const bPrev = prevOrder.indexOf(b.marhalah_nama)
+            if (aPrev !== -1 || bPrev !== -1) {
+              if (aPrev === -1) return 1
+              if (bPrev === -1) return -1
+              return aPrev - bPrev
+            }
+            if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
+            return a.marhalah_nama.localeCompare(b.marhalah_nama)
+          })
         }
         return next
       })
@@ -62,10 +79,10 @@ export default function PlottingEhbPage() {
   const handleAutoPlot = async () => {
     if (!event) return
     const selectedOrder = Object.fromEntries(
-      jamGroups.map(jamGroup => [jamGroup, orderPreferences[jamGroup] ?? 'normal'])
-    ) as Record<string, PlottingOrderPreference>
+      jamGroups.map(jamGroup => [jamGroup, (marhalahOrders[jamGroup] || []).map(item => item.marhalah_nama)])
+    ) as Record<string, string[]>
     const orderSummary = jamGroups
-      .map(jamGroup => `${jamGroup}: ${getOrderLabel(selectedOrder[jamGroup])}`)
+      .map(jamGroup => `${jamGroup}: ${(selectedOrder[jamGroup] || []).join(' > ') || '-'}`)
       .join('\n')
 
     // Check if there's enough capacity
@@ -148,8 +165,16 @@ export default function PlottingEhbPage() {
 
   const readyToRun = jamGroups.length > 0 && (kapL.total_ruangan > 0 || kapP.total_ruangan > 0)
 
-  const updateOrderPreference = (jamGroup: string, preference: PlottingOrderPreference) => {
-    setOrderPreferences(prev => ({ ...prev, [jamGroup]: preference }))
+  const moveMarhalah = (jamGroup: string, index: number, direction: -1 | 1) => {
+    setMarhalahOrders(prev => {
+      const list = [...(prev[jamGroup] || [])]
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= list.length) return prev
+      const current = list[index]
+      list[index] = list[targetIndex]
+      list[targetIndex] = current
+      return { ...prev, [jamGroup]: list }
+    })
   }
 
   return (
@@ -271,21 +296,54 @@ export default function PlottingEhbPage() {
                   </div>
                   <div className="divide-y">
                     {jamGroups.map(jamGroup => (
-                      <div key={jamGroup} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
-                        <div>
+                      <div key={jamGroup} className="px-4 py-3 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-bold text-slate-800">{jamGroup}</p>
-                          <p className="text-xs text-slate-500">{getOrderLabel(orderPreferences[jamGroup] ?? 'normal')}</p>
+                          <button
+                            type="button"
+                            onClick={() => setMarhalahOrders(prev => ({
+                              ...prev,
+                              [jamGroup]: [...(prev[jamGroup] || [])].sort((a, b) => {
+                                if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
+                                return a.marhalah_nama.localeCompare(b.marhalah_nama)
+                              })
+                            }))}
+                            disabled={processing}
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                          >
+                            Reset
+                          </button>
                         </div>
-                        <select
-                          value={orderPreferences[jamGroup] ?? 'normal'}
-                          onChange={event => updateOrderPreference(jamGroup, event.target.value as PlottingOrderPreference)}
-                          disabled={processing}
-                          className="w-full sm:w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
-                        >
-                          <option value="normal">Normal: Tamhidiyah awal</option>
-                          <option value="tamhidiyah_last">Tamhidiyah di akhir</option>
-                          <option value="balanced">Seimbang otomatis</option>
-                        </select>
+                        <div className="space-y-2">
+                          {(marhalahOrders[jamGroup] || []).map((item, index, list) => (
+                            <div key={`${jamGroup}-${item.marhalah_nama}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                              <div className="w-6 text-xs font-black text-slate-400">{index + 1}</div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-bold text-slate-800">{item.marhalah_nama}</p>
+                                <p className="text-[11px] text-slate-500">{item.total_santri} santri</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => moveMarhalah(jamGroup, index, -1)}
+                                disabled={processing || index === 0}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                <ArrowUp className="w-4 h-4"/>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveMarhalah(jamGroup, index, 1)}
+                                disabled={processing || index === list.length - 1}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                <ArrowDown className="w-4 h-4"/>
+                              </button>
+                            </div>
+                          ))}
+                          {(marhalahOrders[jamGroup] || []).length === 0 && (
+                            <p className="text-xs text-slate-400">Belum ada marhalah yang terhubung ke jam group ini.</p>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -374,10 +432,4 @@ export default function PlottingEhbPage() {
 
     </div>
   )
-}
-
-function getOrderLabel(preference: PlottingOrderPreference) {
-  if (preference === 'tamhidiyah_last') return 'Tamhidiyah ditempatkan setelah marhalah lain'
-  if (preference === 'balanced') return 'Marhalah dengan peserta terbanyak diprioritaskan'
-  return 'Mengikuti urutan marhalah dari data master'
 }

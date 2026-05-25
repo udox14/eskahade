@@ -13,10 +13,15 @@ type PlotSantri = {
   marhalah_nama: string
 }
 
-export type PlottingOrderPreference = 'normal' | 'tamhidiyah_last' | 'balanced'
+export type MarhalahOrderItem = {
+  jam_group: string
+  marhalah_nama: string
+  marhalah_urutan: number
+  total_santri: number
+}
 
 type AutoPlotOptions = {
-  orderByJamGroup?: Record<string, PlottingOrderPreference>
+  orderByJamGroup?: Record<string, string[]>
 }
 
 type PlottingStatusRow = {
@@ -63,18 +68,14 @@ function normalizeMarhalahKey(name: string) {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-function isTamhidiyah(name: string) {
-  return normalizeMarhalahKey(name).includes('tamhidiyah')
+function getMarhalahRank(santri: PlotSantri, customOrder: string[]) {
+  const rank = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(santri.marhalah_nama))
+  return rank === -1 ? customOrder.length + santri.marhalah_urutan : rank
 }
 
-function getMarhalahRank(santri: PlotSantri, preference: PlottingOrderPreference) {
-  if (preference === 'tamhidiyah_last' && isTamhidiyah(santri.marhalah_nama)) return 9999
-  return santri.marhalah_urutan
-}
-
-function sortByPlottingPreference(a: PlotSantri, b: PlotSantri, preference: PlottingOrderPreference) {
-  const rankA = getMarhalahRank(a, preference)
-  const rankB = getMarhalahRank(b, preference)
+function sortByPlottingOrder(a: PlotSantri, b: PlotSantri, customOrder: string[]) {
+  const rankA = getMarhalahRank(a, customOrder)
+  const rankB = getMarhalahRank(b, customOrder)
   if (rankA !== rankB) return rankA - rankB
   const kelasCompare = a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   if (kelasCompare !== 0) return kelasCompare
@@ -124,7 +125,28 @@ export async function getPlottingStatus(eventId: number) {
     SELECT DISTINCT jam_group FROM ehb_kelas_jam WHERE ehb_event_id = ?
   `, [eventId])
 
-  return { status, kapasitas, kapasitasDetail, jamGroups: jamGroups.map(j => j.jam_group) }
+  const marhalahOrders = await query<MarhalahOrderItem>(`
+    SELECT
+      kj.jam_group,
+      m.nama AS marhalah_nama,
+      m.urutan AS marhalah_urutan,
+      COUNT(DISTINCT s.id) AS total_santri
+    FROM ehb_kelas_jam kj
+    JOIN kelas k ON k.id = kj.kelas_id
+    JOIN marhalah m ON m.id = k.marhalah_id
+    JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
+    JOIN santri s ON s.id = rp.santri_id
+    WHERE kj.ehb_event_id = ?
+      AND (
+        s.status_global = 'aktif'
+        OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+      )
+      AND m.nama NOT LIKE '%Mutaqaddimah%'
+    GROUP BY kj.jam_group, m.nama, m.urutan
+    ORDER BY kj.jam_group, m.urutan, m.nama
+  `, [eventId])
+
+  return { status, kapasitas, kapasitasDetail, jamGroups: jamGroups.map(j => j.jam_group), marhalahOrders }
 }
 
 export async function resetPlotting(eventId: number) {
@@ -175,7 +197,7 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
       if (ruanganList.length === 0) return
 
       for (const jg of jamGroups) {
-        const orderPreference = options.orderByJamGroup?.[jg] ?? 'normal'
+        const customOrder = options.orderByJamGroup?.[jg] ?? []
         // Ambil santri yang sesuai JK, belum lulus, punya kelas, dan kelasnya masuk ke jam_group ini
         // Kita juga ambil urutan marhalah untuk cross seating
         const santriList = await query<PlotSantri>(`
@@ -200,12 +222,11 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
         `, [eventId, jg, jk])
 
         if (santriList.length === 0) continue
-        const orderedSantriList = [...santriList].sort((a, b) => sortByPlottingPreference(a, b, orderPreference))
+        const orderedSantriList = [...santriList].sort((a, b) => sortByPlottingOrder(a, b, customOrder))
 
         // Bagi marhalah menjadi 2 track (ganjil/genap).
-        // Cari marhalah dengan jumlah peserta terbanyak pada jam_group ini.
-        // Semua peserta marhalah dominan masuk kursi ganjil.
-        // Semua peserta marhalah lain masuk kursi genap.
+        // Marhalah pertama sesuai urutan pilihan masuk kursi ganjil.
+        // Semua peserta marhalah lain masuk kursi genap, tetap mengikuti urutan pilihan.
         const marhalahCounts = new Map<string, { count: number; urutan: number; nama: string }>()
         for (const santri of orderedSantriList) {
           const key = `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}`
@@ -223,14 +244,11 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
 
         const dominantMarhalahKey = Array.from(marhalahCounts.entries())
           .sort((a, b) => {
-            if (orderPreference !== 'balanced') {
-              const rankA = a[1].nama && isTamhidiyah(a[1].nama) && orderPreference === 'tamhidiyah_last' ? 9999 : a[1].urutan
-              const rankB = b[1].nama && isTamhidiyah(b[1].nama) && orderPreference === 'tamhidiyah_last' ? 9999 : b[1].urutan
-              if (rankA !== rankB) return rankA - rankB
-              return a[1].nama.localeCompare(b[1].nama)
-            }
-            if (b[1].count !== a[1].count) return b[1].count - a[1].count
-            if (a[1].urutan !== b[1].urutan) return a[1].urutan - b[1].urutan
+            const rankA = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(a[1].nama))
+            const rankB = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(b[1].nama))
+            const finalRankA = rankA === -1 ? customOrder.length + a[1].urutan : rankA
+            const finalRankB = rankB === -1 ? customOrder.length + b[1].urutan : rankB
+            if (finalRankA !== finalRankB) return finalRankA - finalRankB
             return a[1].nama.localeCompare(b[1].nama)
           })[0]?.[0]
 
