@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri } from './actions'
+import type { PlottingOrderPreference } from './actions'
 import { getActiveEventLight } from '../actions'
 import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
-  Users, UserX, Loader2, ArrowLeft, Info
+  UserX, Loader2, ArrowLeft, Info, SlidersHorizontal
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -21,6 +22,7 @@ export default function PlottingEhbPage() {
   const [kapasitasDetail, setKapasitasDetail] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
   const [activeJamTab, setActiveJamTab] = useState<string>('')
+  const [orderPreferences, setOrderPreferences] = useState<Record<string, PlottingOrderPreference>>({})
   
   const [unplotted, setUnplotted] = useState<any[]>([])
   
@@ -43,6 +45,13 @@ export default function PlottingEhbPage() {
       setKapasitasDetail(res.kapasitasDetail || [])
       setJamGroups(res.jamGroups)
       if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
+      setOrderPreferences(prev => {
+        const next: Record<string, PlottingOrderPreference> = {}
+        for (const jamGroup of res.jamGroups) {
+          next[jamGroup] = prev[jamGroup] ?? 'normal'
+        }
+        return next
+      })
 
       const unp = await getUnplottedSantri(evt.id)
       setUnplotted(unp)
@@ -52,16 +61,24 @@ export default function PlottingEhbPage() {
 
   const handleAutoPlot = async () => {
     if (!event) return
+    const selectedOrder = Object.fromEntries(
+      jamGroups.map(jamGroup => [jamGroup, orderPreferences[jamGroup] ?? 'normal'])
+    ) as Record<string, PlottingOrderPreference>
+    const orderSummary = jamGroups
+      .map(jamGroup => `${jamGroup}: ${getOrderLabel(selectedOrder[jamGroup])}`)
+      .join('\n')
+
     // Check if there's enough capacity
     // It's checked during the process, but we warn anyway
     if (!await confirm(
       'Mulai Auto Plotting?\n\n' +
+      `Preferensi urutan:\n${orderSummary}\n\n` +
       'Sistem akan mengelompokkan santri berdasarkan Marhalah, lalu diurutkan secara Abjad. Santri dari marhalah yang berbeda kemudian akan disilang (Cross Seating) ke dalam kursi ruangan secara berurutan.\n\n' +
       'Perhatian: Tindakan ini akan MENGHAPUS semua plotting ruangan yang ada saat ini.'
     )) return
 
     setProcessing(true)
-    const res = await autoPlotSantri(event.id)
+    const res = await autoPlotSantri(event.id, { orderByJamGroup: selectedOrder })
     setProcessing(false)
 
     if ('error' in res) return toast.error(res.error)
@@ -130,6 +147,10 @@ export default function PlottingEhbPage() {
   const estP = estimateRoomsNeeded(Number(P.total_santri || 0), 'P')
 
   const readyToRun = jamGroups.length > 0 && (kapL.total_ruangan > 0 || kapP.total_ruangan > 0)
+
+  const updateOrderPreference = (jamGroup: string, preference: PlottingOrderPreference) => {
+    setOrderPreferences(prev => ({ ...prev, [jamGroup]: preference }))
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-6">
@@ -241,6 +262,35 @@ export default function PlottingEhbPage() {
               </div>
             ) : (
               <>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-3 border-b">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-indigo-600"/>
+                      Preferensi Urutan Plotting
+                    </h4>
+                  </div>
+                  <div className="divide-y">
+                    {jamGroups.map(jamGroup => (
+                      <div key={jamGroup} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{jamGroup}</p>
+                          <p className="text-xs text-slate-500">{getOrderLabel(orderPreferences[jamGroup] ?? 'normal')}</p>
+                        </div>
+                        <select
+                          value={orderPreferences[jamGroup] ?? 'normal'}
+                          onChange={event => updateOrderPreference(jamGroup, event.target.value as PlottingOrderPreference)}
+                          disabled={processing}
+                          className="w-full sm:w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
+                        >
+                          <option value="normal">Normal: Tamhidiyah awal</option>
+                          <option value="tamhidiyah_last">Tamhidiyah di akhir</option>
+                          <option value="balanced">Seimbang otomatis</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-sm">
                   <Info className="w-5 h-5 shrink-0 mt-0.5"/> 
                   <p>
@@ -324,4 +374,10 @@ export default function PlottingEhbPage() {
 
     </div>
   )
+}
+
+function getOrderLabel(preference: PlottingOrderPreference) {
+  if (preference === 'tamhidiyah_last') return 'Tamhidiyah ditempatkan setelah marhalah lain'
+  if (preference === 'balanced') return 'Marhalah dengan peserta terbanyak diprioritaskan'
+  return 'Mengikuti urutan marhalah dari data master'
 }

@@ -371,7 +371,10 @@ export async function cariSantriUnplotted(eventId: number, jk: string, keyword: 
         FROM santri s
         JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
         JOIN kelas k ON k.id = rp.kelas_id
-        WHERE s.status_global IN ('aktif', 'nonaktif_sementara') 
+        WHERE (
+            s.status_global = 'aktif'
+            OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+          )
           AND s.jenis_kelamin = ? 
           AND s.nama_lengkap LIKE ?
           AND s.id NOT IN (SELECT santri_id FROM ehb_plotting_santri WHERE ehb_event_id = ?)

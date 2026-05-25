@@ -217,7 +217,17 @@ export async function getKelasJamMapping(eventId: number) {
 export async function getKelasAktifList() {
   return query<any>(`
     SELECT k.id, k.nama_kelas, k.jenis_kelamin, m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan,
-           (SELECT COUNT(*) FROM riwayat_pendidikan rp WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif') as jml_santri
+           (
+             SELECT COUNT(DISTINCT s.id)
+             FROM riwayat_pendidikan rp
+             JOIN santri s ON s.id = rp.santri_id
+             WHERE rp.kelas_id = k.id
+               AND rp.status_riwayat = 'aktif'
+               AND (
+                 s.status_global = 'aktif'
+                 OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+               )
+           ) as jml_santri
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     JOIN marhalah m ON m.id = k.marhalah_id

@@ -7,8 +7,16 @@ import { revalidatePath } from 'next/cache'
 
 type PlotSantri = {
   santri_id: string
+  nama_lengkap: string
+  nama_kelas: string
   marhalah_urutan: number
   marhalah_nama: string
+}
+
+export type PlottingOrderPreference = 'normal' | 'tamhidiyah_last' | 'balanced'
+
+type AutoPlotOptions = {
+  orderByJamGroup?: Record<string, PlottingOrderPreference>
 }
 
 type PlottingStatusRow = {
@@ -55,6 +63,24 @@ function normalizeMarhalahKey(name: string) {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+function isTamhidiyah(name: string) {
+  return normalizeMarhalahKey(name).includes('tamhidiyah')
+}
+
+function getMarhalahRank(santri: PlotSantri, preference: PlottingOrderPreference) {
+  if (preference === 'tamhidiyah_last' && isTamhidiyah(santri.marhalah_nama)) return 9999
+  return santri.marhalah_urutan
+}
+
+function sortByPlottingPreference(a: PlotSantri, b: PlotSantri, preference: PlottingOrderPreference) {
+  const rankA = getMarhalahRank(a, preference)
+  const rankB = getMarhalahRank(b, preference)
+  if (rankA !== rankB) return rankA - rankB
+  const kelasCompare = a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  if (kelasCompare !== 0) return kelasCompare
+  return a.nama_lengkap.localeCompare(b.nama_lengkap)
+}
+
 export async function getPlottingStatus(eventId: number) {
   // Ambil total santri aktif yang punya kelas dan map ke jam group via ehb_kelas_jam
   // Dikelompokkan per L/P
@@ -71,7 +97,10 @@ export async function getPlottingStatus(eventId: number) {
     JOIN kelas k ON k.id = rp.kelas_id
     JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ? AND p.jam_group = kj.jam_group
-    WHERE s.status_global IN ('aktif', 'nonaktif_sementara') AND m.nama NOT LIKE '%Mutaqaddimah%'
+    WHERE (
+      s.status_global = 'aktif'
+      OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+    ) AND m.nama NOT LIKE '%Mutaqaddimah%'
     GROUP BY s.jenis_kelamin, kj.jam_group
   `, [eventId, eventId])
 
@@ -119,7 +148,7 @@ export async function resetPlotting(eventId: number) {
   return { success: true }
 }
 
-export async function autoPlotSantri(eventId: number) {
+export async function autoPlotSantri(eventId: number, options: AutoPlotOptions = {}) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
 
@@ -146,27 +175,39 @@ export async function autoPlotSantri(eventId: number) {
       if (ruanganList.length === 0) return
 
       for (const jg of jamGroups) {
+        const orderPreference = options.orderByJamGroup?.[jg] ?? 'normal'
         // Ambil santri yang sesuai JK, belum lulus, punya kelas, dan kelasnya masuk ke jam_group ini
         // Kita juga ambil urutan marhalah untuk cross seating
         const santriList = await query<PlotSantri>(`
-          SELECT s.id as santri_id, m.urutan as marhalah_urutan, m.nama as marhalah_nama
+          SELECT
+            s.id as santri_id,
+            s.nama_lengkap,
+            k.nama_kelas,
+            m.urutan as marhalah_urutan,
+            m.nama as marhalah_nama
           FROM santri s
           JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
           JOIN ehb_kelas_jam kj ON kj.kelas_id = rp.kelas_id AND kj.ehb_event_id = ? AND kj.jam_group = ?
           JOIN kelas k ON k.id = rp.kelas_id
           JOIN marhalah m ON m.id = k.marhalah_id
-          WHERE s.status_global IN ('aktif', 'nonaktif_sementara') AND s.jenis_kelamin = ? AND m.nama NOT LIKE '%Mutaqaddimah%'
+          WHERE (
+              s.status_global = 'aktif'
+              OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+            )
+            AND s.jenis_kelamin = ?
+            AND m.nama NOT LIKE '%Mutaqaddimah%'
           ORDER BY m.urutan ASC, k.nama_kelas ASC, s.nama_lengkap ASC
         `, [eventId, jg, jk])
 
         if (santriList.length === 0) continue
+        const orderedSantriList = [...santriList].sort((a, b) => sortByPlottingPreference(a, b, orderPreference))
 
         // Bagi marhalah menjadi 2 track (ganjil/genap).
         // Cari marhalah dengan jumlah peserta terbanyak pada jam_group ini.
         // Semua peserta marhalah dominan masuk kursi ganjil.
         // Semua peserta marhalah lain masuk kursi genap.
         const marhalahCounts = new Map<string, { count: number; urutan: number; nama: string }>()
-        for (const santri of santriList) {
+        for (const santri of orderedSantriList) {
           const key = `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}`
           const existing = marhalahCounts.get(key)
           if (existing) {
@@ -182,6 +223,12 @@ export async function autoPlotSantri(eventId: number) {
 
         const dominantMarhalahKey = Array.from(marhalahCounts.entries())
           .sort((a, b) => {
+            if (orderPreference !== 'balanced') {
+              const rankA = a[1].nama && isTamhidiyah(a[1].nama) && orderPreference === 'tamhidiyah_last' ? 9999 : a[1].urutan
+              const rankB = b[1].nama && isTamhidiyah(b[1].nama) && orderPreference === 'tamhidiyah_last' ? 9999 : b[1].urutan
+              if (rankA !== rankB) return rankA - rankB
+              return a[1].nama.localeCompare(b[1].nama)
+            }
             if (b[1].count !== a[1].count) return b[1].count - a[1].count
             if (a[1].urutan !== b[1].urutan) return a[1].urutan - b[1].urutan
             return a[1].nama.localeCompare(b[1].nama)
@@ -189,10 +236,10 @@ export async function autoPlotSantri(eventId: number) {
 
         if (!dominantMarhalahKey) continue
 
-        const trackOdd = santriList.filter(
+        const trackOdd = orderedSantriList.filter(
           santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` === dominantMarhalahKey
         )
-        const trackEven = santriList.filter(
+        const trackEven = orderedSantriList.filter(
           santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` !== dominantMarhalahKey
         )
 
@@ -203,9 +250,9 @@ export async function autoPlotSantri(eventId: number) {
             let chosenSeat: PlotSantri | undefined
 
             if (kursi % 2 === 1) {
-              chosenSeat = trackOdd.shift()
+              chosenSeat = trackOdd.shift() ?? trackEven.shift()
             } else {
-              chosenSeat = trackEven.shift()
+              chosenSeat = trackEven.shift() ?? trackOdd.shift()
             }
 
             if (!chosenSeat) {
@@ -242,7 +289,7 @@ export async function autoPlotSantri(eventId: number) {
       entityId: String(eventId),
       entityLabel: 'Plotting ruangan EHB',
       summary: `Melakukan auto plotting peserta EHB`,
-      details: { total_assignment: insertStmts.length, jam_groups: jamGroups.length },
+      details: { total_assignment: insertStmts.length, jam_groups: jamGroups.length, order_by_jam_group: options.orderByJamGroup ?? {} },
     })
 
     revalidatePath('/dashboard/ehb/ruangan/plotting')
@@ -266,7 +313,10 @@ export async function getUnplottedSantri(eventId: number) {
     JOIN kelas k ON k.id = rp.kelas_id
     JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN ehb_plotting_santri p ON p.santri_id = s.id AND p.ehb_event_id = ?
-    WHERE s.status_global IN ('aktif', 'nonaktif_sementara') AND p.id IS NULL AND m.nama NOT LIKE '%Mutaqaddimah%'
+    WHERE (
+      s.status_global = 'aktif'
+      OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
+    ) AND p.id IS NULL AND m.nama NOT LIKE '%Mutaqaddimah%'
     ORDER BY s.jenis_kelamin, k.nama_kelas, s.nama_lengkap
   `, [eventId, eventId])
 }
