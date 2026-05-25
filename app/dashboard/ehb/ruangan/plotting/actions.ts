@@ -20,8 +20,15 @@ export type MarhalahOrderItem = {
   total_santri: number
 }
 
+export type SeatParity = 'odd' | 'even'
+
+export type MarhalahPlottingConfig = {
+  marhalah_nama: string
+  seat_parity: SeatParity
+}
+
 type AutoPlotOptions = {
-  orderByJamGroup?: Record<string, string[]>
+  orderByJamGroup?: Record<string, Array<string | MarhalahPlottingConfig>>
 }
 
 type PlottingStatusRow = {
@@ -68,18 +75,36 @@ function normalizeMarhalahKey(name: string) {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-function getMarhalahRank(santri: PlotSantri, customOrder: string[]) {
-  const rank = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(santri.marhalah_nama))
+function normalizeOrderConfig(items: Array<string | MarhalahPlottingConfig> = []): MarhalahPlottingConfig[] {
+  return items.map((item, index) => {
+    if (typeof item === 'string') {
+      return { marhalah_nama: item, seat_parity: index % 2 === 0 ? 'odd' : 'even' }
+    }
+
+    return {
+      marhalah_nama: item.marhalah_nama,
+      seat_parity: item.seat_parity === 'even' ? 'even' : 'odd',
+    }
+  })
+}
+
+function getMarhalahRank(santri: PlotSantri, customOrder: MarhalahPlottingConfig[]) {
+  const rank = customOrder.findIndex(item => normalizeMarhalahKey(item.marhalah_nama) === normalizeMarhalahKey(santri.marhalah_nama))
   return rank === -1 ? customOrder.length + santri.marhalah_urutan : rank
 }
 
-function sortByPlottingOrder(a: PlotSantri, b: PlotSantri, customOrder: string[]) {
+function sortByPlottingOrder(a: PlotSantri, b: PlotSantri, customOrder: MarhalahPlottingConfig[]) {
   const rankA = getMarhalahRank(a, customOrder)
   const rankB = getMarhalahRank(b, customOrder)
   if (rankA !== rankB) return rankA - rankB
   const kelasCompare = a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   if (kelasCompare !== 0) return kelasCompare
   return a.nama_lengkap.localeCompare(b.nama_lengkap)
+}
+
+function getSeatParityForMarhalah(marhalahName: string, customOrder: MarhalahPlottingConfig[]): SeatParity {
+  const configured = customOrder.find(item => normalizeMarhalahKey(item.marhalah_nama) === normalizeMarhalahKey(marhalahName))
+  return configured?.seat_parity ?? 'even'
 }
 
 export async function getPlottingStatus(eventId: number) {
@@ -197,7 +222,7 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
       if (ruanganList.length === 0) return
 
       for (const jg of jamGroups) {
-        const customOrder = options.orderByJamGroup?.[jg] ?? []
+        const customOrder = normalizeOrderConfig(options.orderByJamGroup?.[jg] ?? [])
         // Ambil santri yang sesuai JK, belum lulus, punya kelas, dan kelasnya masuk ke jam_group ini
         // Kita juga ambil urutan marhalah untuk cross seating
         const santriList = await query<PlotSantri>(`
@@ -224,42 +249,8 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
         if (santriList.length === 0) continue
         const orderedSantriList = [...santriList].sort((a, b) => sortByPlottingOrder(a, b, customOrder))
 
-        // Bagi marhalah menjadi 2 track (ganjil/genap).
-        // Marhalah pertama sesuai urutan pilihan masuk kursi ganjil.
-        // Semua peserta marhalah lain masuk kursi genap, tetap mengikuti urutan pilihan.
-        const marhalahCounts = new Map<string, { count: number; urutan: number; nama: string }>()
-        for (const santri of orderedSantriList) {
-          const key = `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}`
-          const existing = marhalahCounts.get(key)
-          if (existing) {
-            existing.count += 1
-          } else {
-            marhalahCounts.set(key, {
-              count: 1,
-              urutan: santri.marhalah_urutan,
-              nama: santri.marhalah_nama,
-            })
-          }
-        }
-
-        const dominantMarhalahKey = Array.from(marhalahCounts.entries())
-          .sort((a, b) => {
-            const rankA = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(a[1].nama))
-            const rankB = customOrder.findIndex(item => normalizeMarhalahKey(item) === normalizeMarhalahKey(b[1].nama))
-            const finalRankA = rankA === -1 ? customOrder.length + a[1].urutan : rankA
-            const finalRankB = rankB === -1 ? customOrder.length + b[1].urutan : rankB
-            if (finalRankA !== finalRankB) return finalRankA - finalRankB
-            return a[1].nama.localeCompare(b[1].nama)
-          })[0]?.[0]
-
-        if (!dominantMarhalahKey) continue
-
-        const trackOdd = orderedSantriList.filter(
-          santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` === dominantMarhalahKey
-        )
-        const trackEven = orderedSantriList.filter(
-          santri => `${santri.marhalah_urutan}|||${normalizeMarhalahKey(santri.marhalah_nama)}` !== dominantMarhalahKey
-        )
+        const trackOdd = orderedSantriList.filter(santri => getSeatParityForMarhalah(santri.marhalah_nama, customOrder) === 'odd')
+        const trackEven = orderedSantriList.filter(santri => getSeatParityForMarhalah(santri.marhalah_nama, customOrder) === 'even')
 
         // Mulai masukkan ke ruangan berurutan
         for (const r of ruanganList) {
@@ -268,9 +259,9 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
             let chosenSeat: PlotSantri | undefined
 
             if (kursi % 2 === 1) {
-              chosenSeat = trackOdd.shift() ?? trackEven.shift()
+              chosenSeat = trackOdd.shift()
             } else {
-              chosenSeat = trackEven.shift() ?? trackOdd.shift()
+              chosenSeat = trackEven.shift()
             }
 
             if (!chosenSeat) {

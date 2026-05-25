@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri } from './actions'
-import type { MarhalahOrderItem } from './actions'
+import type { MarhalahOrderItem, SeatParity } from './actions'
 import { getActiveEventLight } from '../actions'
 import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
@@ -13,6 +13,10 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
+type MarhalahOrderConfig = MarhalahOrderItem & {
+  seat_parity: SeatParity
+}
+
 export default function PlottingEhbPage() {
   const confirm = useConfirm()
   const [event, setEvent] = useState<{id: number, nama: string} | null>(null)
@@ -22,7 +26,7 @@ export default function PlottingEhbPage() {
   const [kapasitasDetail, setKapasitasDetail] = useState<any[]>([])
   const [jamGroups, setJamGroups] = useState<string[]>([])
   const [activeJamTab, setActiveJamTab] = useState<string>('')
-  const [marhalahOrders, setMarhalahOrders] = useState<Record<string, MarhalahOrderItem[]>>({})
+  const [marhalahOrders, setMarhalahOrders] = useState<Record<string, MarhalahOrderConfig[]>>({})
   
   const [unplotted, setUnplotted] = useState<any[]>([])
   
@@ -51,10 +55,11 @@ export default function PlottingEhbPage() {
           acc[item.jam_group].push(item)
           return acc
         }, {})
-        const next: Record<string, MarhalahOrderItem[]> = {}
+        const next: Record<string, MarhalahOrderConfig[]> = {}
         for (const jamGroup of res.jamGroups) {
           const latest = byJamGroup[jamGroup] || []
-          const prevOrder = prev[jamGroup]?.map(item => item.marhalah_nama) || []
+          const previous = prev[jamGroup] || []
+          const prevOrder = previous.map(item => item.marhalah_nama)
           next[jamGroup] = latest.sort((a, b) => {
             const aPrev = prevOrder.indexOf(a.marhalah_nama)
             const bPrev = prevOrder.indexOf(b.marhalah_nama)
@@ -65,7 +70,10 @@ export default function PlottingEhbPage() {
             }
             if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
             return a.marhalah_nama.localeCompare(b.marhalah_nama)
-          })
+          }).map((item, index) => ({
+            ...item,
+            seat_parity: previous.find(prevItem => prevItem.marhalah_nama === item.marhalah_nama)?.seat_parity ?? (index % 2 === 0 ? 'odd' : 'even'),
+          }))
         }
         return next
       })
@@ -79,10 +87,16 @@ export default function PlottingEhbPage() {
   const handleAutoPlot = async () => {
     if (!event) return
     const selectedOrder = Object.fromEntries(
-      jamGroups.map(jamGroup => [jamGroup, (marhalahOrders[jamGroup] || []).map(item => item.marhalah_nama)])
-    ) as Record<string, string[]>
+      jamGroups.map(jamGroup => [
+        jamGroup,
+        (marhalahOrders[jamGroup] || []).map(item => ({
+          marhalah_nama: item.marhalah_nama,
+          seat_parity: item.seat_parity,
+        }))
+      ])
+    )
     const orderSummary = jamGroups
-      .map(jamGroup => `${jamGroup}: ${(selectedOrder[jamGroup] || []).join(' > ') || '-'}`)
+      .map(jamGroup => `${jamGroup}: ${(selectedOrder[jamGroup] || []).map(item => `${item.marhalah_nama} (${item.seat_parity === 'odd' ? 'ganjil' : 'genap'})`).join(' > ') || '-'}`)
       .join('\n')
 
     // Check if there's enough capacity
@@ -175,6 +189,27 @@ export default function PlottingEhbPage() {
       list[targetIndex] = current
       return { ...prev, [jamGroup]: list }
     })
+  }
+
+  const updateSeatParity = (jamGroup: string, index: number, seatParity: SeatParity) => {
+    setMarhalahOrders(prev => {
+      const list = [...(prev[jamGroup] || [])]
+      if (!list[index]) return prev
+      list[index] = { ...list[index], seat_parity: seatParity }
+      return { ...prev, [jamGroup]: list }
+    })
+  }
+
+  const resetMarhalahOrder = (jamGroup: string) => {
+    setMarhalahOrders(prev => ({
+      ...prev,
+      [jamGroup]: [...(prev[jamGroup] || [])]
+        .sort((a, b) => {
+          if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
+          return a.marhalah_nama.localeCompare(b.marhalah_nama)
+        })
+        .map((item, index) => ({ ...item, seat_parity: index % 2 === 0 ? 'odd' : 'even' })),
+    }))
   }
 
   return (
@@ -301,13 +336,7 @@ export default function PlottingEhbPage() {
                           <p className="text-sm font-bold text-slate-800">{jamGroup}</p>
                           <button
                             type="button"
-                            onClick={() => setMarhalahOrders(prev => ({
-                              ...prev,
-                              [jamGroup]: [...(prev[jamGroup] || [])].sort((a, b) => {
-                                if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
-                                return a.marhalah_nama.localeCompare(b.marhalah_nama)
-                              })
-                            }))}
+                            onClick={() => resetMarhalahOrder(jamGroup)}
                             disabled={processing}
                             className="text-xs font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
                           >
@@ -322,6 +351,15 @@ export default function PlottingEhbPage() {
                                 <p className="truncate text-sm font-bold text-slate-800">{item.marhalah_nama}</p>
                                 <p className="text-[11px] text-slate-500">{item.total_santri} santri</p>
                               </div>
+                              <select
+                                value={item.seat_parity}
+                                onChange={event => updateSeatParity(jamGroup, index, event.target.value as SeatParity)}
+                                disabled={processing}
+                                className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 disabled:opacity-50"
+                              >
+                                <option value="odd">Ganjil</option>
+                                <option value="even">Genap</option>
+                              </select>
                               <button
                                 type="button"
                                 onClick={() => moveMarhalah(jamGroup, index, -1)}
