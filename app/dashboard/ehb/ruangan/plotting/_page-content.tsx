@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri } from './actions'
-import type { MarhalahOrderItem, SeatParity } from './actions'
+import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri, savePlottingPreferences } from './actions'
+import type { MarhalahOrderItem, PlottingPreferenceMap, SeatParity } from './actions'
 import { getActiveEventLight } from '../actions'
 import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
@@ -50,6 +50,7 @@ export default function PlottingEhbPage() {
       setJamGroups(res.jamGroups)
       if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
       setMarhalahOrders(prev => {
+        const savedPreferences = (res.plottingPreferences || {}) as PlottingPreferenceMap
         const byJamGroup = (res.marhalahOrders || []).reduce((acc: Record<string, MarhalahOrderItem[]>, item: MarhalahOrderItem) => {
           if (!acc[item.jam_group]) acc[item.jam_group] = []
           acc[item.jam_group].push(item)
@@ -58,7 +59,8 @@ export default function PlottingEhbPage() {
         const next: Record<string, MarhalahOrderConfig[]> = {}
         for (const jamGroup of res.jamGroups) {
           const latest = byJamGroup[jamGroup] || []
-          const previous = prev[jamGroup] || []
+          const saved = savedPreferences[jamGroup] || []
+          const previous = saved.length > 0 ? saved : (prev[jamGroup] || [])
           const prevOrder = previous.map(item => item.marhalah_nama)
           next[jamGroup] = latest.sort((a, b) => {
             const aPrev = prevOrder.indexOf(a.marhalah_nama)
@@ -84,17 +86,27 @@ export default function PlottingEhbPage() {
     setLoading(false)
   }
 
-  const handleAutoPlot = async () => {
-    if (!event) return
-    const selectedOrder = Object.fromEntries(
-      jamGroups.map(jamGroup => [
+  const buildPreferencePayload = (orders: Record<string, MarhalahOrderConfig[]>): PlottingPreferenceMap => {
+    return Object.fromEntries(
+      Object.entries(orders).map(([jamGroup, items]) => [
         jamGroup,
-        (marhalahOrders[jamGroup] || []).map(item => ({
+        items.map(item => ({
           marhalah_nama: item.marhalah_nama,
           seat_parity: item.seat_parity,
-        }))
+        })),
       ])
     )
+  }
+
+  const persistPreference = async (nextOrders: Record<string, MarhalahOrderConfig[]>) => {
+    if (!event) return
+    const res = await savePlottingPreferences(event.id, buildPreferencePayload(nextOrders))
+    if ('error' in res) toast.error(res.error)
+  }
+
+  const handleAutoPlot = async () => {
+    if (!event) return
+    const selectedOrder = buildPreferencePayload(marhalahOrders)
     const orderSummary = jamGroups
       .map(jamGroup => `${jamGroup}: ${(selectedOrder[jamGroup] || []).map(item => `${item.marhalah_nama} (${item.seat_parity === 'odd' ? 'ganjil' : 'genap'})`).join(' > ') || '-'}`)
       .join('\n')
@@ -187,7 +199,9 @@ export default function PlottingEhbPage() {
       const current = list[index]
       list[index] = list[targetIndex]
       list[targetIndex] = current
-      return { ...prev, [jamGroup]: list }
+      const next = { ...prev, [jamGroup]: list }
+      void persistPreference(next)
+      return next
     })
   }
 
@@ -196,20 +210,26 @@ export default function PlottingEhbPage() {
       const list = [...(prev[jamGroup] || [])]
       if (!list[index]) return prev
       list[index] = { ...list[index], seat_parity: seatParity }
-      return { ...prev, [jamGroup]: list }
+      const next = { ...prev, [jamGroup]: list }
+      void persistPreference(next)
+      return next
     })
   }
 
   const resetMarhalahOrder = (jamGroup: string) => {
-    setMarhalahOrders(prev => ({
-      ...prev,
-      [jamGroup]: [...(prev[jamGroup] || [])]
+    setMarhalahOrders(prev => {
+      const next = {
+        ...prev,
+        [jamGroup]: [...(prev[jamGroup] || [])]
         .sort((a, b) => {
           if (a.marhalah_urutan !== b.marhalah_urutan) return a.marhalah_urutan - b.marhalah_urutan
           return a.marhalah_nama.localeCompare(b.marhalah_nama)
         })
-        .map((item, index) => ({ ...item, seat_parity: index % 2 === 0 ? 'odd' : 'even' })),
-    }))
+        .map((item, index) => ({ ...item, seat_parity: (index % 2 === 0 ? 'odd' : 'even') as SeatParity })),
+      }
+      void persistPreference(next)
+      return next
+    })
   }
 
   return (

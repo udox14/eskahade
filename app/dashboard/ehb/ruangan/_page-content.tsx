@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import {
   getRuanganList, addRuangan, updateRuangan, deleteRuangan, deleteAllRuangan, getDeleteAllRuanganImpact, addRuanganBulk, addRuanganImport,
-  getRuanganDetail, getActiveEventLight, getOtherRuangan, pindahSantri, hapusPeserta,
+  getRuanganDetail, getActiveEventLight, getOtherRuanganByJamGroup, pindahSantri, hapusPeserta,
   cariSantriUnplotted, tambahPesertaManual,
   getJamGroups
 } from './actions'
@@ -198,6 +198,7 @@ export default function RuanganEhbPage() {
       setDetailRuangan(res.ruangan)
 
       const grouped: Record<string, any[]> = {}
+      if (activeJamTab) grouped[activeJamTab] = []
       res.peserta.forEach((p: any) => {
         if (activeJamTab && p.jam_group !== activeJamTab) return // Filter modal based on active tab
         if (!grouped[p.jam_group]) grouped[p.jam_group] = []
@@ -225,7 +226,7 @@ export default function RuanganEhbPage() {
     if (!event || !detailRuangan) return
     setShowPindah(peserta)
     setTargetRuanganId(0)
-    const list = await getOtherRuangan(event.id, detailRuangan.id, detailRuangan.jenis_kelamin)
+    const list = await getOtherRuanganByJamGroup(event.id, detailRuangan.id, detailRuangan.jenis_kelamin, peserta.jam_group)
     setOtherRuangan(list)
   }
 
@@ -247,7 +248,7 @@ export default function RuanganEhbPage() {
     e.preventDefault()
     if (!event || !showTambah || !searchKeyword) return
     setSearching(true)
-    const res = await cariSantriUnplotted(event.id, showTambah.jenis_kelamin, searchKeyword)
+    const res = await cariSantriUnplotted(event.id, showTambah.jenis_kelamin, searchKeyword, showTambah.jam_group)
     setSearchResults(res)
     setSearching(false)
   }

@@ -347,6 +347,47 @@ export async function getTempelanPengepakanData(eventId: number, ruanganId?: num
     ORDER BY r.nomor_ruangan, ps.jam_group, COALESCE(m.urutan, 999), k.nama_kelas
   `, params)
 }
+
+export type SensusRuanganItem = {
+  ruangan_id: number
+  nomor_ruangan: number
+  kapasitas: number | null
+  jam_group: string
+  kelas_id: string | null
+  nama_kelas: string | null
+  marhalah_nama: string | null
+  marhalah_urutan: number | null
+  jumlah: number
+  semester: number
+  tahun_ajaran_nama: string
+}
+
+export async function getSensusRuanganData(eventId: number) {
+  return query<SensusRuanganItem>(`
+    SELECT
+      r.id as ruangan_id,
+      r.nomor_ruangan,
+      r.kapasitas,
+      ps.jam_group,
+      k.id as kelas_id,
+      k.nama_kelas,
+      m.nama as marhalah_nama,
+      m.urutan as marhalah_urutan,
+      COUNT(ps.id) as jumlah,
+      e.semester,
+      ta.nama as tahun_ajaran_nama
+    FROM ehb_plotting_santri ps
+    JOIN ehb_ruangan r ON r.id = ps.ruangan_id
+    JOIN ehb_event e ON e.id = ps.ehb_event_id
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE ps.ehb_event_id = ?
+    GROUP BY r.id, r.nomor_ruangan, r.kapasitas, ps.jam_group, k.id, k.nama_kelas, m.nama, m.urutan, e.semester, ta.nama
+    ORDER BY ps.jam_group, r.nomor_ruangan, COALESCE(m.urutan, 999), k.nama_kelas
+  `, [eventId])
+}
 export type DaftarHadirSesi = {
   tanggal: string
   label: string

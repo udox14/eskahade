@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, batch } from '@/lib/db'
+import { query, queryOne, execute, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
@@ -30,6 +30,8 @@ export type MarhalahPlottingConfig = {
 type AutoPlotOptions = {
   orderByJamGroup?: Record<string, Array<string | MarhalahPlottingConfig>>
 }
+
+export type PlottingPreferenceMap = Record<string, MarhalahPlottingConfig[]>
 
 type PlottingStatusRow = {
   jenis_kelamin: string
@@ -107,6 +109,56 @@ function getSeatParityForMarhalah(marhalahName: string, customOrder: MarhalahPlo
   return configured?.seat_parity ?? 'even'
 }
 
+async function ensurePlottingPreferenceSchema() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS ehb_plotting_preference (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ehb_event_id INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
+      order_json TEXT NOT NULL DEFAULT '{}',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(ehb_event_id)
+    )
+  `)
+}
+
+function normalizePreferenceMap(value: unknown): PlottingPreferenceMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: PlottingPreferenceMap = {}
+
+  for (const [jamGroup, items] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(items)) continue
+    result[jamGroup] = normalizeOrderConfig(items.filter(Boolean) as Array<string | MarhalahPlottingConfig>)
+  }
+
+  return result
+}
+
+async function getSavedPlottingPreference(eventId: number): Promise<PlottingPreferenceMap> {
+  await ensurePlottingPreferenceSchema()
+  const row = await queryOne<{ order_json: string }>(
+    `SELECT order_json FROM ehb_plotting_preference WHERE ehb_event_id = ?`,
+    [eventId]
+  )
+  if (!row?.order_json) return {}
+
+  try {
+    return normalizePreferenceMap(JSON.parse(row.order_json))
+  } catch {
+    return {}
+  }
+}
+
+async function persistPlottingPreference(eventId: number, orderByJamGroup: PlottingPreferenceMap) {
+  await ensurePlottingPreferenceSchema()
+  await execute(`
+    INSERT INTO ehb_plotting_preference (ehb_event_id, order_json, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(ehb_event_id) DO UPDATE SET
+      order_json = excluded.order_json,
+      updated_at = datetime('now')
+  `, [eventId, JSON.stringify(normalizePreferenceMap(orderByJamGroup))])
+}
+
 export async function getPlottingStatus(eventId: number) {
   // Ambil total santri aktif yang punya kelas dan map ke jam group via ehb_kelas_jam
   // Dikelompokkan per L/P
@@ -171,7 +223,30 @@ export async function getPlottingStatus(eventId: number) {
     ORDER BY kj.jam_group, m.urutan, m.nama
   `, [eventId])
 
-  return { status, kapasitas, kapasitasDetail, jamGroups: jamGroups.map(j => j.jam_group), marhalahOrders }
+  const plottingPreferences = await getSavedPlottingPreference(eventId)
+
+  return { status, kapasitas, kapasitasDetail, jamGroups: jamGroups.map(j => j.jam_group), marhalahOrders, plottingPreferences }
+}
+
+export async function savePlottingPreferences(eventId: number, orderByJamGroup: PlottingPreferenceMap) {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  await persistPlottingPreference(eventId, orderByJamGroup)
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'ehb_ruangan_plotting',
+    action: 'update',
+    fiturHref: '/dashboard/ehb/ruangan/plotting',
+    logKind: 'update',
+    entityType: 'ehb_plotting_preference',
+    entityId: String(eventId),
+    entityLabel: 'Preferensi plotting EHB',
+    summary: 'Menyimpan preferensi urutan plotting EHB',
+    details: { order_by_jam_group: orderByJamGroup },
+  })
+  revalidatePath('/dashboard/ehb/ruangan/plotting')
+  return { success: true }
 }
 
 export async function resetPlotting(eventId: number) {
@@ -205,6 +280,9 @@ export async function autoPlotSantri(eventId: number, options: AutoPlotOptions =
     const jamGroups = jamGroupsObj.map(j => j.jam_group)
 
     if (jamGroups.length === 0) return { error: 'Belum ada mapping kelas ke jam group. Atur dulu di menu Jadwal EHB.' }
+    if (options.orderByJamGroup) {
+      await persistPlottingPreference(eventId, normalizePreferenceMap(options.orderByJamGroup))
+    }
 
     // 2. Ambil semua ruangan per jenis_kelamin
     const ruanganL = await query<RuanganSeatRow>(`SELECT id, nomor_ruangan, kapasitas FROM ehb_ruangan WHERE ehb_event_id = ? AND jenis_kelamin = 'L' ORDER BY nomor_ruangan`, [eventId])
