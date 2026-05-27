@@ -408,8 +408,6 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
     </div>
   )
 }
-)
-}
 
 function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
   const jam1 = card.jamGroups.find(j => j.jamGroup.toLowerCase().includes('1')) || { jamGroup: 'JAM 1', rows: [], total: 0 }
