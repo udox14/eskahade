@@ -407,6 +407,7 @@ export async function importHafalanMassal(payload: {
   let insertedBab = 0
   let insertedBlok = 0
   let skipped = 0
+  const blockOps: { sql: string; params: any[] }[] = []
 
   for (const row of payload.rows) {
     const bagian = cell(row, ['BAGIAN', 'Bagian', 'bagian'])
@@ -491,10 +492,10 @@ export async function importHafalanMassal(payload: {
         skipped += 1
         continue
       }
-      await execute(
-        'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
-        [targetBabId, blockLabel, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0]
-      )
+        blockOps.push({
+          sql: 'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+          params: [targetBabId, blockLabel, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0],
+        })
       blockKeys.add(blockKey)
       insertedBlok += 1
       continue
@@ -503,10 +504,10 @@ export async function importHafalanMassal(payload: {
     if (isJurumiyahSimple) {
       const blockKey = `${babId}:Status`.toLowerCase().trim()
       if (!blockKeys.has(blockKey)) {
-        await execute(
-          'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
-          [babId, 'Status', 'Progress bab', 1]
-        )
+        blockOps.push({
+          sql: 'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+          params: [babId, 'Status', 'Progress bab', 1],
+        })
         blockKeys.add(blockKey)
         insertedBlok += 1
       }
@@ -534,10 +535,10 @@ export async function importHafalanMassal(payload: {
           continue
         }
 
-        await execute(
-          'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
-          [babId, `${prefix} ${bait}`, `${judulBab} ${prefix.toLowerCase()} ${bait}`, bait]
-        )
+        blockOps.push({
+          sql: 'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+          params: [babId, `${prefix} ${bait}`, `${judulBab} ${prefix.toLowerCase()} ${bait}`, bait],
+        })
         blockKeys.add(blockKey)
         insertedBlok += 1
       }
@@ -555,16 +556,20 @@ export async function importHafalanMassal(payload: {
       continue
     }
 
-    await execute(
-      'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
-      [babId, labelBlok, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0]
-    )
+    blockOps.push({
+      sql: 'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+      params: [babId, labelBlok, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0],
+    })
     blockKeys.add(blockKey)
     insertedBlok += 1
   }
 
   if (insertedBab === 0 && insertedBlok === 0) {
     return { error: `Tidak ada data baru yang diimport. ${skipped} baris dilewati.` }
+  }
+
+  if (blockOps.length > 0) {
+    await batch(blockOps)
   }
 
   await logActivity({

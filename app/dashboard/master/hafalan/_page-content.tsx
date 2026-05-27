@@ -130,14 +130,19 @@ export default function MasterHafalanContent() {
   }
 
   const saveImport = async () => {
-    if (!importRows.length) return
+    if (!importRows.length || importing) return
     setImporting(true)
-    const res = await importHafalanMassal({ jenis, marhalahId: Number(marhalahId), rows: importRows })
-    setImporting(false)
-    if ('error' in res) return toast.error(res.error)
-    toast.success(`Import selesai: ${res.insertedBab} bab, ${res.insertedBlok} blok, ${res.skipped} dilewati`)
-    setImportRows([])
-    load()
+    try {
+      const res = await importHafalanMassal({ jenis, marhalahId: Number(marhalahId), rows: importRows })
+      if ('error' in res) return toast.error(res.error)
+      toast.success(`Import selesai: ${res.insertedBab} bab, ${res.insertedBlok} blok, ${res.skipped} dilewati`)
+      setImportRows([])
+      await load()
+    } catch (error: any) {
+      toast.error(error?.message || 'Import gagal diproses.')
+    } finally {
+      setImporting(false)
+    }
   }
 
   const addBlok = async (babId: number) => {
