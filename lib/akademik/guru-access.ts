@@ -180,10 +180,32 @@ async function ensureGuruFeatureSchemaOnce() {
     )
   `)
   await execute(`
+    CREATE TABLE IF NOT EXISTS hafalan_paket (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jenis TEXT NOT NULL,
+      nama TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(jenis, nama)
+    )
+  `)
+  await execute(`
+    CREATE TABLE IF NOT EXISTS hafalan_paket_marhalah (
+      paket_id INTEGER NOT NULL REFERENCES hafalan_paket(id) ON DELETE CASCADE,
+      marhalah_id INTEGER NOT NULL REFERENCES marhalah(id) ON DELETE CASCADE,
+      jenis TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (paket_id, marhalah_id),
+      UNIQUE(jenis, marhalah_id)
+    )
+  `)
+  await execute(`
     CREATE TABLE IF NOT EXISTS hafalan_bab (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       jenis TEXT NOT NULL,
       marhalah_id INTEGER NOT NULL REFERENCES marhalah(id),
+      paket_id INTEGER REFERENCES hafalan_paket(id),
       parent_id INTEGER REFERENCES hafalan_bab(id) ON DELETE CASCADE,
       judul TEXT NOT NULL,
       urutan INTEGER NOT NULL DEFAULT 0,
@@ -209,6 +231,9 @@ async function ensureGuruFeatureSchemaOnce() {
       id TEXT PRIMARY KEY,
       blok_id INTEGER NOT NULL REFERENCES hafalan_blok(id) ON DELETE CASCADE,
       riwayat_pendidikan_id TEXT NOT NULL REFERENCES riwayat_pendidikan(id) ON DELETE CASCADE,
+      santri_id TEXT REFERENCES santri(id),
+      kelas_id TEXT REFERENCES kelas(id),
+      marhalah_id INTEGER REFERENCES marhalah(id),
       guru_id INTEGER REFERENCES data_guru(id),
       status TEXT NOT NULL DEFAULT 'hafal',
       tanggal_setor TEXT NOT NULL DEFAULT (date('now')),
@@ -227,10 +252,86 @@ async function ensureGuruFeatureSchemaOnce() {
       throw error
     }
   }
+  try {
+    await execute('ALTER TABLE hafalan_bab ADD COLUMN paket_id INTEGER REFERENCES hafalan_paket(id)')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+  for (const alterSql of [
+    'ALTER TABLE hafalan_progress ADD COLUMN santri_id TEXT REFERENCES santri(id)',
+    'ALTER TABLE hafalan_progress ADD COLUMN kelas_id TEXT REFERENCES kelas(id)',
+    'ALTER TABLE hafalan_progress ADD COLUMN marhalah_id INTEGER REFERENCES marhalah(id)',
+  ]) {
+    try {
+      await execute(alterSql)
+    } catch (error: any) {
+      if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+        throw error
+      }
+    }
+  }
+  await execute(`
+    UPDATE hafalan_progress
+    SET santri_id = (
+        SELECT rp.santri_id
+        FROM riwayat_pendidikan rp
+        WHERE rp.id = hafalan_progress.riwayat_pendidikan_id
+        LIMIT 1
+      ),
+      kelas_id = (
+        SELECT rp.kelas_id
+        FROM riwayat_pendidikan rp
+        WHERE rp.id = hafalan_progress.riwayat_pendidikan_id
+        LIMIT 1
+      ),
+      marhalah_id = (
+        SELECT k.marhalah_id
+        FROM riwayat_pendidikan rp
+        JOIN kelas k ON k.id = rp.kelas_id
+        WHERE rp.id = hafalan_progress.riwayat_pendidikan_id
+        LIMIT 1
+      )
+    WHERE santri_id IS NULL
+  `)
+  await execute(`
+    INSERT OR IGNORE INTO hafalan_paket (jenis, nama)
+    SELECT DISTINCT hb.jenis, COALESCE(m.nama, 'Marhalah ' || hb.marhalah_id)
+    FROM hafalan_bab hb
+    LEFT JOIN marhalah m ON m.id = hb.marhalah_id
+    WHERE hb.paket_id IS NULL
+  `)
+  await execute(`
+    INSERT OR IGNORE INTO hafalan_paket_marhalah (paket_id, marhalah_id, jenis)
+    SELECT hp.id, hb.marhalah_id, hb.jenis
+    FROM hafalan_bab hb
+    JOIN marhalah m ON m.id = hb.marhalah_id
+    JOIN hafalan_paket hp ON hp.jenis = hb.jenis AND hp.nama = m.nama
+    WHERE hb.paket_id IS NULL
+    GROUP BY hp.id, hb.marhalah_id, hb.jenis
+  `)
+  await execute(`
+    UPDATE hafalan_bab
+    SET paket_id = (
+      SELECT hp.id
+      FROM hafalan_paket hp
+      JOIN marhalah m ON m.id = hafalan_bab.marhalah_id
+      WHERE hp.jenis = hafalan_bab.jenis
+        AND hp.nama = m.nama
+      LIMIT 1
+    )
+    WHERE paket_id IS NULL
+  `)
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_paket_lookup ON hafalan_paket(jenis, is_active, nama)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_paket_marhalah_lookup ON hafalan_paket_marhalah(jenis, marhalah_id)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_bab_lookup ON hafalan_bab(jenis, marhalah_id, is_active, urutan)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_bab_paket ON hafalan_bab(paket_id, jenis, is_active, urutan)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_bab_parent ON hafalan_bab(parent_id)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_blok_bab ON hafalan_blok(bab_id, is_active, urutan)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_progress_riwayat ON hafalan_progress(riwayat_pendidikan_id)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_progress_santri ON hafalan_progress(santri_id, blok_id)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_progress_scope ON hafalan_progress(marhalah_id, kelas_id)')
   await execute(`
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan)
     VALUES

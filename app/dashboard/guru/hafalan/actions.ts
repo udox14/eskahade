@@ -22,6 +22,23 @@ export async function getHafalanInitialData() {
   return { kelas, types: HAFALAN_TYPES }
 }
 
+async function getHafalanPaketForKelas(kelasId: string, jenis: string) {
+  const kelas = await queryOne<{ marhalah_id: number | null }>('SELECT marhalah_id FROM kelas WHERE id = ?', [kelasId])
+  if (!kelas?.marhalah_id) return null
+
+  const paket = await queryOne<{ id: number; marhalah_id: number }>(`
+    SELECT hp.id, hpm.marhalah_id
+    FROM hafalan_paket_marhalah hpm
+    JOIN hafalan_paket hp ON hp.id = hpm.paket_id AND hp.is_active = 1
+    WHERE hpm.marhalah_id = ?
+      AND hpm.jenis = ?
+      AND hp.jenis = ?
+    LIMIT 1
+  `, [kelas.marhalah_id, jenis, jenis])
+
+  return paket ? { paketId: paket.id, marhalahId: kelas.marhalah_id } : null
+}
+
 export async function getAvailableHafalanTypes(kelasId: string) {
   const session = await getSession()
   if (!session || !(await canAccessKelas(session, kelasId))) return []
@@ -31,11 +48,13 @@ export async function getAvailableHafalanTypes(kelasId: string) {
   if (!kelas?.marhalah_id) return []
 
   const rows = await query<{ jenis: string; total_bab: number; total_blok: number }>(`
-    SELECT hb.jenis, COUNT(DISTINCT hb.id) AS total_bab, COUNT(hblk.id) AS total_blok
-    FROM hafalan_bab hb
+    SELECT hp.jenis, COUNT(DISTINCT hb.id) AS total_bab, COUNT(hblk.id) AS total_blok
+    FROM hafalan_paket_marhalah hpm
+    JOIN hafalan_paket hp ON hp.id = hpm.paket_id AND hp.is_active = 1
+    JOIN hafalan_bab hb ON hb.paket_id = hp.id AND hb.is_active = 1
     JOIN hafalan_blok hblk ON hblk.bab_id = hb.id AND hblk.is_active = 1
-    WHERE hb.marhalah_id = ? AND hb.is_active = 1
-    GROUP BY hb.jenis
+    WHERE hpm.marhalah_id = ?
+    GROUP BY hp.jenis
   `, [kelas.marhalah_id])
 
   return HAFALAN_TYPES
@@ -52,24 +71,48 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   if (!isHafalanType(jenis)) return { santri: [], bab: [], progress: {} }
   await ensureGuruFeatureSchema()
 
-  const kelas = await queryOne<{ marhalah_id: number | null }>('SELECT marhalah_id FROM kelas WHERE id = ?', [kelasId])
+  const paket = await getHafalanPaketForKelas(kelasId, jenis)
+  if (!paket) return { santri: [], bab: [], progress: {}, progressStatus: {} }
+  const kelas = await queryOne<{ marhalah_id: number; marhalah_urutan: number | null }>(`
+    SELECT k.marhalah_id, m.urutan AS marhalah_urutan
+    FROM kelas k
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE k.id = ?
+  `, [kelasId])
   if (!kelas?.marhalah_id) return { santri: [], bab: [], progress: {}, progressStatus: {} }
+  const maxUrutan = kelas.marhalah_urutan ?? 999999
 
   const [santri, babRows] = await Promise.all([
     getSantriForKelas(kelasId),
     query<any>(`
+      WITH visible_paket AS (
+        SELECT hp.id AS paket_id,
+               MIN(COALESCE(m.urutan, 999999)) AS paket_urutan,
+               MAX(CASE WHEN hpm.marhalah_id = ? THEN 1 ELSE 0 END) AS is_editable,
+               GROUP_CONCAT(m.nama, ', ') AS source_marhalah_nama
+        FROM hafalan_paket_marhalah hpm
+        JOIN hafalan_paket hp ON hp.id = hpm.paket_id AND hp.is_active = 1
+        LEFT JOIN marhalah m ON m.id = hpm.marhalah_id
+        WHERE hpm.jenis = ?
+          AND hp.jenis = ?
+          AND (COALESCE(m.urutan, 999999) <= ? OR hpm.marhalah_id = ?)
+        GROUP BY hp.id
+      )
       SELECT hb.id AS bab_id, hb.judul, hb.urutan AS bab_urutan, hb.parent_id,
              parent.judul AS parent_judul, parent.urutan AS parent_urutan,
-             hblk.id AS blok_id, hblk.label, hblk.deskripsi, hblk.urutan AS blok_urutan
+             hblk.id AS blok_id, hblk.label, hblk.deskripsi, hblk.urutan AS blok_urutan,
+             vp.is_editable, vp.source_marhalah_nama, vp.paket_urutan
       FROM hafalan_bab hb
+      JOIN visible_paket vp ON vp.paket_id = hb.paket_id
       LEFT JOIN hafalan_bab parent ON parent.id = hb.parent_id
       LEFT JOIN hafalan_blok hblk ON hblk.bab_id = hb.id AND hblk.is_active = 1
-      WHERE hb.jenis = ? AND hb.marhalah_id = ? AND hb.is_active = 1
-      ORDER BY COALESCE(parent.urutan, hb.urutan), COALESCE(parent.id, hb.id), hb.urutan, hb.id, hblk.urutan, hblk.id
-    `, [jenis, kelas.marhalah_id]),
+      WHERE hb.jenis = ? AND hb.is_active = 1
+      ORDER BY vp.is_editable DESC, vp.paket_urutan, COALESCE(parent.urutan, hb.urutan), COALESCE(parent.id, hb.id), hb.urutan, hb.id, hblk.urutan, hblk.id
+    `, [kelas.marhalah_id, jenis, jenis, maxUrutan, kelas.marhalah_id, jenis]),
   ])
 
   const babMap = new Map<number, any>()
+  const editableBlokIds: number[] = []
   for (const row of babRows) {
     if (!babMap.has(row.bab_id)) {
       babMap.set(row.bab_id, {
@@ -77,41 +120,49 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
         judul: row.parent_judul ? `${row.parent_judul} / ${row.judul}` : row.judul,
         urutan: row.bab_urutan,
         parent_id: row.parent_id,
+        is_editable: row.is_editable === 1,
+        source_marhalah_nama: row.source_marhalah_nama,
         blok: [],
       })
     }
     if (row.blok_id) {
+      if (row.is_editable === 1) editableBlokIds.push(Number(row.blok_id))
       babMap.get(row.bab_id).blok.push({
         id: row.blok_id,
         label: row.label,
         deskripsi: row.deskripsi,
         urutan: row.blok_urutan,
+        is_editable: row.is_editable === 1,
       })
     }
   }
 
   const bab = Array.from(babMap.values()).filter(item => item.blok.length > 0)
-  if (santri.length === 0) return { santri, bab, progress: {}, progressStatus: {} }
-  const riwayatIds = santri.map(row => row.riwayat_id)
-  const placeholders = riwayatIds.map(() => '?').join(',')
-  const progressRows = await query<{ blok_id: number; riwayat_pendidikan_id: string; status: string }>(`
-    SELECT hp.blok_id, hp.riwayat_pendidikan_id, hp.status
+  if (santri.length === 0) return { santri, bab, progress: {}, progressStatus: {}, editableBlokIds }
+  const santriIds = santri.map(row => row.santri_id)
+  const riwayatBySantri = new Map(santri.map(row => [row.santri_id, row.riwayat_id]))
+  const placeholders = santriIds.map(() => '?').join(',')
+  const progressRows = await query<{ blok_id: number; santri_id: string; status: string; marhalah_id: number | null }>(`
+    SELECT hp.blok_id, hp.santri_id, hp.status, hp.marhalah_id
     FROM hafalan_progress hp
     JOIN hafalan_blok hblk ON hblk.id = hp.blok_id
     JOIN hafalan_bab hb ON hb.id = hblk.bab_id
-    WHERE hp.status = 'hafal'
-      AND hb.jenis = ?
-      AND hb.marhalah_id = ?
-      AND hp.riwayat_pendidikan_id IN (${placeholders})
-  `, [jenis, kelas.marhalah_id, ...riwayatIds])
+    WHERE hb.jenis = ?
+      AND hp.santri_id IN (${placeholders})
+  `, [jenis, ...santriIds])
 
   const progress: Record<string, boolean> = {}
   const progressStatus: Record<string, string> = {}
+  const progressEditable: Record<string, boolean> = {}
   for (const row of progressRows) {
-    progress[`${row.riwayat_pendidikan_id}:${row.blok_id}`] = true
-    progressStatus[`${row.riwayat_pendidikan_id}:${row.blok_id}`] = row.status
+    const riwayatId = riwayatBySantri.get(row.santri_id)
+    if (!riwayatId) continue
+    progress[`${riwayatId}:${row.blok_id}`] = true
+    progressStatus[`${riwayatId}:${row.blok_id}`] = row.status
+    const key = `${riwayatId}:${row.blok_id}`
+    progressEditable[key] = !!progressEditable[key] || row.marhalah_id === kelas.marhalah_id
   }
-  return { santri, bab, progress, progressStatus }
+  return { santri, bab, progress, progressStatus, progressEditable, editableBlokIds }
 }
 
 export async function toggleHafalanProgress(payload: { kelasId: string; jenis: string; riwayatId: string; blokId: number }) {
@@ -121,11 +172,12 @@ export async function toggleHafalanProgress(payload: { kelasId: string; jenis: s
   if (!isHafalanType(payload.jenis)) return { error: 'Jenis hafalan tidak valid.' }
   await ensureGuruFeatureSchema()
 
-  const valid = await queryOne<{ id: number }>(`
-    SELECT hblk.id
+  const valid = await queryOne<{ id: number; santri_id: string; marhalah_id: number | null }>(`
+    SELECT hblk.id, rp.santri_id, k.marhalah_id
     FROM hafalan_blok hblk
     JOIN hafalan_bab hb ON hb.id = hblk.bab_id
-    JOIN kelas k ON k.marhalah_id = hb.marhalah_id
+    JOIN hafalan_paket_marhalah hpm ON hpm.paket_id = hb.paket_id AND hpm.jenis = hb.jenis
+    JOIN kelas k ON k.marhalah_id = hpm.marhalah_id
     JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.id = ?
     WHERE k.id = ?
       AND hblk.id = ?
@@ -136,23 +188,17 @@ export async function toggleHafalanProgress(payload: { kelasId: string; jenis: s
   if (!valid) return { error: 'Blok hafalan tidak tersedia untuk kelas ini.' }
 
   const existing = await queryOne<{ id: string }>(
-    "SELECT id FROM hafalan_progress WHERE blok_id = ? AND riwayat_pendidikan_id = ? AND status = 'hafal'",
-    [payload.blokId, payload.riwayatId]
+    "SELECT id FROM hafalan_progress WHERE blok_id = ? AND santri_id = ? AND marhalah_id = ? AND status = 'hafal'",
+    [payload.blokId, valid.santri_id, valid.marhalah_id]
   )
 
   if (existing) {
     await execute('DELETE FROM hafalan_progress WHERE id = ?', [existing.id])
   } else {
     await execute(`
-      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, guru_id, status, tanggal_setor, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, 'hafal', date('now'), ?, datetime('now'))
-      ON CONFLICT(blok_id, riwayat_pendidikan_id) DO UPDATE SET
-        guru_id = excluded.guru_id,
-        status = 'hafal',
-        tanggal_setor = excluded.tanggal_setor,
-        updated_by = excluded.updated_by,
-        updated_at = excluded.updated_at
-    `, [generateId(), payload.blokId, payload.riwayatId, await getGuruIdForSession(session), session.id])
+      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, santri_id, kelas_id, marhalah_id, guru_id, status, tanggal_setor, updated_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'hafal', date('now'), ?, datetime('now'))
+    `, [generateId(), payload.blokId, payload.riwayatId, valid.santri_id, payload.kelasId, valid.marhalah_id, await getGuruIdForSession(session), session.id])
   }
 
   await logActivity({
@@ -184,11 +230,12 @@ export async function simpanHafalanProgressBatch(payload: {
   if (!isHafalanType(payload.jenis)) return { error: 'Jenis hafalan tidak valid.' }
   await ensureGuruFeatureSchema()
 
-  const validRows = await query<{ id: number }>(`
-    SELECT hblk.id
+  const validRows = await query<{ id: number; santri_id: string; marhalah_id: number | null }>(`
+    SELECT hblk.id, rp.santri_id, k.marhalah_id
     FROM hafalan_blok hblk
     JOIN hafalan_bab hb ON hb.id = hblk.bab_id
-    JOIN kelas k ON k.marhalah_id = hb.marhalah_id
+    JOIN hafalan_paket_marhalah hpm ON hpm.paket_id = hb.paket_id AND hpm.jenis = hb.jenis
+    JOIN kelas k ON k.marhalah_id = hpm.marhalah_id
     JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.id = ?
     WHERE k.id = ?
       AND hb.jenis = ?
@@ -200,22 +247,32 @@ export async function simpanHafalanProgressBatch(payload: {
   const checkedIds = Array.from(new Set((payload.checkedBlokIds || []).map(Number).filter(id => validIds.has(id))))
   const guruId = await getGuruIdForSession(session)
   if (validIds.size === 0) return { error: 'Belum ada blok hafalan aktif untuk kelas ini.' }
+  const scope = validRows[0]
+  if (!scope?.santri_id || !scope.marhalah_id) return { error: 'Data santri atau marhalah tidak valid.' }
 
   const validPlaceholders = Array.from(validIds).map(() => '?').join(',')
   await execute(
     `DELETE FROM hafalan_progress
-     WHERE riwayat_pendidikan_id = ?
+     WHERE santri_id = ?
+       AND marhalah_id = ?
        AND blok_id IN (${validPlaceholders})`,
-    [payload.riwayatId, ...Array.from(validIds)]
+    [scope.santri_id, scope.marhalah_id, ...Array.from(validIds)]
   )
 
   for (const blokId of checkedIds) {
+    const existingAnyScope = await queryOne<{ id: string; marhalah_id: number | null }>(
+      'SELECT id, marhalah_id FROM hafalan_progress WHERE blok_id = ? AND santri_id = ? LIMIT 1',
+      [blokId, scope.santri_id]
+    )
+    if (existingAnyScope && existingAnyScope.marhalah_id !== scope.marhalah_id) {
+      continue
+    }
     const requestedStatus = payload.statusByBlokId?.[String(blokId)]
     const status = requestedStatus === 'proses' ? 'proses' : 'hafal'
     await execute(`
-      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, guru_id, status, tanggal_setor, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, date('now'), ?, datetime('now'))
-    `, [generateId(), blokId, payload.riwayatId, guruId, status, session.id])
+      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, santri_id, kelas_id, marhalah_id, guru_id, status, tanggal_setor, updated_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, datetime('now'))
+    `, [generateId(), blokId, payload.riwayatId, scope.santri_id, payload.kelasId, scope.marhalah_id, guruId, status, session.id])
   }
 
   await logActivity({
