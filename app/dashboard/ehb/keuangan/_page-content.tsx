@@ -1021,6 +1021,15 @@ type LoadedTabData =
     }
 
 const tabDataCache = new Map<string, Promise<LoadedTabData>>()
+let activeEventCache: Promise<ActiveEvent | null> | null = null
+
+function getCachedActiveEvent() {
+  activeEventCache ??= getActiveEventForKeuangan().catch(error => {
+    activeEventCache = null
+    throw error
+  })
+  return activeEventCache
+}
 
 function tabCacheKey(eventId: number, tab: KeuanganTab) {
   return `${eventId}:${tab}`
@@ -1091,11 +1100,31 @@ function clearKeuanganCache(eventId: number, tabs: KeuanganTab[]) {
   for (const tab of tabs) tabDataCache.delete(tabCacheKey(eventId, tab))
 }
 
+function TabLoadingPanel() {
+  return (
+    <div className="bg-white border rounded-2xl p-5 space-y-4 animate-pulse">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="h-5 w-44 bg-slate-200 rounded" />
+          <div className="h-4 w-72 bg-slate-100 rounded mt-2" />
+        </div>
+        <div className="h-10 w-36 bg-slate-200 rounded-xl" />
+      </div>
+      <div className="space-y-2">
+        {[1, 2, 3, 4, 5].map(item => (
+          <div key={item} className="h-11 bg-slate-50 rounded-lg" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTab?: KeuanganTab }) {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [basis, setBasis] = useState<RabAutoBasis | null>(null)
   const [drafts, setDrafts] = useState<DraftRabItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [tabLoading, setTabLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [ketuaPelaksana, setKetuaPelaksana] = useState('')
   const [bendahara, setBendahara] = useState('')
@@ -1182,35 +1211,45 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const evt = await getActiveEventForKeuangan()
-    setEvent(evt || null)
-    if (evt) {
-      const data = await getCachedTabData(evt.id, activeTab)
-      if (data.tab === 'rab') {
-        setBasis(data.autoBasis)
-        setDrafts(data.rabDrafts)
-        setKetuaPelaksana(data.signers.ketua)
-        setBendahara(data.signers.bendahara)
-        setWakilAkademik(data.signers.wakil_akademik)
-        setWakilKeuangan(data.signers.wakil_keuangan)
-      } else if (data.tab === 'transaksi') {
-        setBasis(data.autoBasis)
-        setDrafts(data.rabDrafts)
-        setTransaksiDrafts(data.transaksiDrafts)
-        setKetuaPelaksana(data.signers.ketua)
-        setBendahara(data.signers.bendahara)
-        setWakilAkademik(data.signers.wakil_akademik)
-        setWakilKeuangan(data.signers.wakil_keuangan)
-      } else if (data.tab === 'honor_panitia') {
-        setHonorPanitiaBudget(data.honorPanitiaBudget)
-        setHonorPanitiaRows(data.honorPanitiaRows)
-      } else {
-        setHonorTarif(data.tarifRows)
-        setMapelConfigs(data.configRows)
-        setHonorItems(data.honorRows)
+    setTabLoading(false)
+    try {
+      const evt = await getCachedActiveEvent()
+      setEvent(evt || null)
+      setLoading(false)
+      if (evt) {
+        setTabLoading(true)
+        const data = await getCachedTabData(evt.id, activeTab)
+        if (data.tab === 'rab') {
+          setBasis(data.autoBasis)
+          setDrafts(data.rabDrafts)
+          setKetuaPelaksana(data.signers.ketua)
+          setBendahara(data.signers.bendahara)
+          setWakilAkademik(data.signers.wakil_akademik)
+          setWakilKeuangan(data.signers.wakil_keuangan)
+        } else if (data.tab === 'transaksi') {
+          setBasis(data.autoBasis)
+          setDrafts(data.rabDrafts)
+          setTransaksiDrafts(data.transaksiDrafts)
+          setKetuaPelaksana(data.signers.ketua)
+          setBendahara(data.signers.bendahara)
+          setWakilAkademik(data.signers.wakil_akademik)
+          setWakilKeuangan(data.signers.wakil_keuangan)
+        } else if (data.tab === 'honor_panitia') {
+          setHonorPanitiaBudget(data.honorPanitiaBudget)
+          setHonorPanitiaRows(data.honorPanitiaRows)
+        } else {
+          setHonorTarif(data.tarifRows)
+          setMapelConfigs(data.configRows)
+          setHonorItems(data.honorRows)
+        }
       }
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal memuat data Keuangan EHB')
+    } finally {
+      setLoading(false)
+      setTabLoading(false)
     }
-    setLoading(false)
   }, [activeTab])
 
   useEffect(() => {
@@ -1752,6 +1791,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         })}
       </div>
 
+      {tabLoading ? (
+        <TabLoadingPanel />
+      ) : (
+        <>
       {activeTab === 'rab' ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white border rounded-2xl p-4">
@@ -2564,6 +2607,8 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

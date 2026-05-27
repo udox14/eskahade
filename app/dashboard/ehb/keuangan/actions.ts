@@ -852,23 +852,144 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
 }
 
 export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
-  await ensureHonorMapelDefaults(eventId)
-  await backfillManualWaliKelasFromGuruMaghrib()
-  const tarif = await getHonorTarif(eventId)
+  await Promise.all([
+    ensureHonorMapelDefaults(eventId),
+    backfillManualWaliKelasFromGuruMaghrib(),
+  ])
 
-  const pembuatSoalRows = await query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
-    SELECT
-      ps.guru_id,
-      COALESCE(dg.nama_lengkap, ps.nama_guru, 'Pembuat soal belum diatur') as nama,
-      COUNT(*) as qty,
-      GROUP_CONCAT(ps.scope_nama || ' - ' || mp.nama, ', ') as detail
-    FROM ehb_pembuat_soal_scope ps
-    JOIN mapel mp ON mp.id = ps.mapel_id
-    LEFT JOIN data_guru dg ON dg.id = ps.guru_id
-    WHERE ps.ehb_event_id = ? AND (ps.guru_id IS NOT NULL OR COALESCE(ps.nama_guru, '') <> '')
-    GROUP BY ps.guru_id, dg.nama_lengkap, ps.nama_guru
-    ORDER BY nama
-  `, [eventId])
+  const [tarif, pembuatSoalRows, raporRows, pemeriksaanRows, pengawasanRows] = await Promise.all([
+    getHonorTarif(eventId),
+    query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
+      SELECT
+        ps.guru_id,
+        COALESCE(dg.nama_lengkap, ps.nama_guru, 'Pembuat soal belum diatur') as nama,
+        COUNT(*) as qty,
+        GROUP_CONCAT(ps.scope_nama || ' - ' || mp.nama, ', ') as detail
+      FROM ehb_pembuat_soal_scope ps
+      JOIN mapel mp ON mp.id = ps.mapel_id
+      LEFT JOIN data_guru dg ON dg.id = ps.guru_id
+      WHERE ps.ehb_event_id = ? AND (ps.guru_id IS NOT NULL OR COALESCE(ps.nama_guru, '') <> '')
+      GROUP BY ps.guru_id, dg.nama_lengkap, ps.nama_guru
+      ORDER BY nama
+    `, [eventId]),
+    query<{ wali_id: string | null; nama: string; qty: number; detail: string }>(`
+      SELECT
+        k.wali_kelas_id as wali_id,
+        COALESCE(u.full_name, 'Wali kelas belum diatur') as nama,
+        COUNT(rp.santri_id) as qty,
+        GROUP_CONCAT(k.nama_kelas, ', ') as detail
+      FROM kelas k
+      JOIN marhalah m ON m.id = k.marhalah_id
+      JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
+      LEFT JOIN users u ON u.id = k.wali_kelas_id
+      JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
+      WHERE m.nama NOT LIKE '%Mutawassithah%'
+      GROUP BY k.wali_kelas_id, u.full_name
+      ORDER BY u.full_name
+    `, [eventId]),
+    query<{
+      guru_id: number
+      nama: string
+      waktu: HonorWaktu
+      nama_kelas: string
+      jumlah_santri: number
+      jumlah_mapel: number
+    }>(`
+      SELECT
+        dg.id as guru_id,
+        dg.nama_lengkap as nama,
+        src.waktu,
+        k.nama_kelas,
+        COUNT(DISTINCT ps.santri_id) as jumlah_santri,
+        COALESCE(cfg.jumlah_mapel, 0) as jumlah_mapel
+      FROM (
+        SELECT id as kelas_id, guru_shubuh_id as guru_id, 'shubuh' as waktu FROM kelas WHERE guru_shubuh_id IS NOT NULL
+        UNION ALL
+        SELECT id as kelas_id, guru_ashar_id as guru_id, 'ashar' as waktu FROM kelas WHERE guru_ashar_id IS NOT NULL
+        UNION ALL
+        SELECT id as kelas_id, guru_maghrib_id as guru_id, 'maghrib' as waktu FROM kelas WHERE guru_maghrib_id IS NOT NULL
+      ) src
+      JOIN kelas k ON k.id = src.kelas_id
+      JOIN data_guru dg ON dg.id = src.guru_id
+      JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
+      JOIN ehb_plotting_santri ps ON ps.ehb_event_id = kj.ehb_event_id AND ps.santri_id IN (
+        SELECT rp.santri_id FROM riwayat_pendidikan rp WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
+      )
+      LEFT JOIN ehb_honor_mapel_config cfg
+        ON cfg.ehb_event_id = kj.ehb_event_id AND cfg.marhalah_id = k.marhalah_id AND cfg.waktu = src.waktu
+      GROUP BY dg.id, dg.nama_lengkap, src.waktu, k.id, k.nama_kelas, cfg.jumlah_mapel
+      HAVING jumlah_mapel > 0
+      ORDER BY dg.nama_lengkap, k.nama_kelas, src.waktu
+    `, [eventId]),
+    query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
+      WITH hadir AS (
+        SELECT
+          p.id as pengawas_id,
+          p.guru_id,
+          p.nama_pengawas as nama,
+          r.nomor_ruangan || ' / ' || s.label as detail
+        FROM ehb_absensi_pengawas ap
+        JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
+        JOIN ehb_pengawas p ON p.id = jp.pengawas_id
+        JOIN ehb_ruangan r ON r.id = jp.ruangan_id
+        JOIN ehb_sesi s ON s.id = jp.sesi_id
+        WHERE ap.ehb_event_id = ? AND ap.status = 'HADIR'
+      ),
+      badal_pengawas AS (
+        SELECT
+          bp.id as pengawas_id,
+          bp.guru_id,
+          bp.nama_pengawas as nama,
+          r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
+        FROM ehb_absensi_pengawas ap
+        JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
+        JOIN ehb_pengawas bp ON bp.id = ap.badal_pengawas_id
+        JOIN ehb_ruangan r ON r.id = jp.ruangan_id
+        JOIN ehb_sesi s ON s.id = jp.sesi_id
+        WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'pengawas'
+      ),
+      badal_panitia AS (
+        SELECT
+          NULL as pengawas_id,
+          ep.guru_id,
+          ep.nama as nama,
+          r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
+        FROM ehb_absensi_pengawas ap
+        JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
+        JOIN ehb_panitia ep ON ep.id = ap.badal_panitia_id
+        JOIN ehb_ruangan r ON r.id = jp.ruangan_id
+        JOIN ehb_sesi s ON s.id = jp.sesi_id
+        WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'panitia'
+      ),
+      badal_sadesa AS (
+        SELECT
+          NULL as pengawas_id,
+          NULL as guru_id,
+          ap.badal_nama as nama,
+          r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
+        FROM ehb_absensi_pengawas ap
+        JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
+        JOIN ehb_ruangan r ON r.id = jp.ruangan_id
+        JOIN ehb_sesi s ON s.id = jp.sesi_id
+        WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source IN ('sadesa', 'manual') AND COALESCE(ap.badal_nama, '') <> ''
+      ),
+      merged AS (
+        SELECT * FROM hadir
+        UNION ALL SELECT * FROM badal_pengawas
+        UNION ALL SELECT * FROM badal_panitia
+        UNION ALL SELECT * FROM badal_sadesa
+      )
+      SELECT
+        pengawas_id,
+        guru_id,
+        nama,
+        COUNT(*) as qty,
+        GROUP_CONCAT(detail, ', ') as detail
+      FROM merged
+      GROUP BY COALESCE(CAST(pengawas_id AS TEXT), 'sadesa:' || nama), guru_id, nama
+      ORDER BY nama
+    `, [eventId, eventId, eventId, eventId]),
+  ])
 
   const soalItems: HonorItem[] = pembuatSoalRows
     .filter(row => Number(row.qty || 0) > 0)
@@ -886,21 +1007,6 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       editable: false,
     }))
 
-  const raporRows = await query<{ wali_id: string | null; nama: string; qty: number; detail: string }>(`
-    SELECT
-      k.wali_kelas_id as wali_id,
-      COALESCE(u.full_name, 'Wali kelas belum diatur') as nama,
-      COUNT(rp.santri_id) as qty,
-      GROUP_CONCAT(k.nama_kelas, ', ') as detail
-    FROM kelas k
-    JOIN marhalah m ON m.id = k.marhalah_id
-    JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
-    LEFT JOIN users u ON u.id = k.wali_kelas_id
-    JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
-    WHERE m.nama NOT LIKE '%Mutawassithah%'
-    GROUP BY k.wali_kelas_id, u.full_name
-    ORDER BY u.full_name
-  `, [eventId])
   const raporItems: HonorItem[] = raporRows
     .filter(row => row.wali_id)
     .map(row => ({
@@ -914,41 +1020,6 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       detail: row.detail || 'Wali kelas',
       editable: false,
     }))
-
-  const pemeriksaanRows = await query<{
-    guru_id: number
-    nama: string
-    waktu: HonorWaktu
-    nama_kelas: string
-    jumlah_santri: number
-    jumlah_mapel: number
-  }>(`
-    SELECT
-      dg.id as guru_id,
-      dg.nama_lengkap as nama,
-      src.waktu,
-      k.nama_kelas,
-      COUNT(DISTINCT ps.santri_id) as jumlah_santri,
-      COALESCE(cfg.jumlah_mapel, 0) as jumlah_mapel
-    FROM (
-      SELECT id as kelas_id, guru_shubuh_id as guru_id, 'shubuh' as waktu FROM kelas WHERE guru_shubuh_id IS NOT NULL
-      UNION ALL
-      SELECT id as kelas_id, guru_ashar_id as guru_id, 'ashar' as waktu FROM kelas WHERE guru_ashar_id IS NOT NULL
-      UNION ALL
-      SELECT id as kelas_id, guru_maghrib_id as guru_id, 'maghrib' as waktu FROM kelas WHERE guru_maghrib_id IS NOT NULL
-    ) src
-    JOIN kelas k ON k.id = src.kelas_id
-    JOIN data_guru dg ON dg.id = src.guru_id
-    JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
-    JOIN ehb_plotting_santri ps ON ps.ehb_event_id = kj.ehb_event_id AND ps.santri_id IN (
-      SELECT rp.santri_id FROM riwayat_pendidikan rp WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
-    )
-    LEFT JOIN ehb_honor_mapel_config cfg
-      ON cfg.ehb_event_id = kj.ehb_event_id AND cfg.marhalah_id = k.marhalah_id AND cfg.waktu = src.waktu
-    GROUP BY dg.id, dg.nama_lengkap, src.waktu, k.id, k.nama_kelas, cfg.jumlah_mapel
-    HAVING jumlah_mapel > 0
-    ORDER BY dg.nama_lengkap, k.nama_kelas, src.waktu
-  `, [eventId])
 
   const pemeriksaanMap = new Map<number, HonorItem & { details: string[] }>()
   for (const row of pemeriksaanRows) {
@@ -977,74 +1048,6 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     detail: details.join('; '),
   }))
 
-  const pengawasanRows = await query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
-    WITH hadir AS (
-      SELECT
-        p.id as pengawas_id,
-        p.guru_id,
-        p.nama_pengawas as nama,
-        r.nomor_ruangan || ' / ' || s.label as detail
-      FROM ehb_absensi_pengawas ap
-      JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
-      JOIN ehb_pengawas p ON p.id = jp.pengawas_id
-      JOIN ehb_ruangan r ON r.id = jp.ruangan_id
-      JOIN ehb_sesi s ON s.id = jp.sesi_id
-      WHERE ap.ehb_event_id = ? AND ap.status = 'HADIR'
-    ),
-    badal_pengawas AS (
-      SELECT
-        bp.id as pengawas_id,
-        bp.guru_id,
-        bp.nama_pengawas as nama,
-        r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
-      FROM ehb_absensi_pengawas ap
-      JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
-      JOIN ehb_pengawas bp ON bp.id = ap.badal_pengawas_id
-      JOIN ehb_ruangan r ON r.id = jp.ruangan_id
-      JOIN ehb_sesi s ON s.id = jp.sesi_id
-      WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'pengawas'
-    ),
-    badal_panitia AS (
-      SELECT
-        NULL as pengawas_id,
-        ep.guru_id,
-        ep.nama as nama,
-        r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
-      FROM ehb_absensi_pengawas ap
-      JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
-      JOIN ehb_panitia ep ON ep.id = ap.badal_panitia_id
-      JOIN ehb_ruangan r ON r.id = jp.ruangan_id
-      JOIN ehb_sesi s ON s.id = jp.sesi_id
-      WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source = 'panitia'
-    ),
-    badal_sadesa AS (
-      SELECT
-        NULL as pengawas_id,
-        NULL as guru_id,
-        ap.badal_nama as nama,
-        r.nomor_ruangan || ' / ' || s.label || ' (badal)' as detail
-      FROM ehb_absensi_pengawas ap
-      JOIN ehb_jadwal_pengawas jp ON jp.id = ap.jadwal_pengawas_id
-      JOIN ehb_ruangan r ON r.id = jp.ruangan_id
-      JOIN ehb_sesi s ON s.id = jp.sesi_id
-      WHERE ap.ehb_event_id = ? AND ap.status = 'BADAL' AND ap.badal_source IN ('sadesa', 'manual') AND COALESCE(ap.badal_nama, '') <> ''
-    ),
-    merged AS (
-      SELECT * FROM hadir
-      UNION ALL SELECT * FROM badal_pengawas
-      UNION ALL SELECT * FROM badal_panitia
-      UNION ALL SELECT * FROM badal_sadesa
-    )
-    SELECT
-      pengawas_id,
-      guru_id,
-      nama,
-      COUNT(*) as qty,
-      GROUP_CONCAT(detail, ', ') as detail
-    FROM merged
-    GROUP BY COALESCE(CAST(pengawas_id AS TEXT), 'sadesa:' || nama), guru_id, nama
-    ORDER BY nama
-  `, [eventId, eventId, eventId, eventId])
   const pengawasanItems: HonorItem[] = pengawasanRows.map(row => ({
     id: `pengawas-${row.pengawas_id ?? row.nama}`,
     jenis: 'pengawasan',
