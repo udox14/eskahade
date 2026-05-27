@@ -73,8 +73,17 @@ async function getAutoPaketForMarhalah(jenis: string, marhalahId: number) {
   )
   if (!marhalah) return { error: 'Marhalah tidak ditemukan.' } as const
 
-  const isMutawassithah = marhalah.nama.toLowerCase().includes('mutawassithah')
-  const paketNama = isMutawassithah ? 'Mutawassithah' : marhalah.nama
+  const marhalahName = marhalah.nama.toLowerCase()
+  const isMutawassithah = marhalahName.includes('mutawassithah')
+  const isJurumiyahIbtidaiyah12 =
+    jenis === 'jurumiyah' &&
+    /ibtidaiy+y?ah/.test(marhalahName) &&
+    /\b(1|2)\b/.test(marhalahName)
+  const paketNama = isMutawassithah
+    ? 'Mutawassithah'
+    : isJurumiyahIbtidaiyah12
+      ? 'Jurumiyah Ibtidaiyah 1-2'
+      : marhalah.nama
 
   await execute(
     'INSERT OR IGNORE INTO hafalan_paket (jenis, nama) VALUES (?, ?)',
@@ -89,7 +98,10 @@ async function getAutoPaketForMarhalah(jenis: string, marhalahId: number) {
 
   const targetMarhalah = isMutawassithah
     ? await query<{ id: number }>("SELECT id FROM marhalah WHERE lower(nama) LIKE '%mutawassithah%'")
-    : [{ id: marhalah.id }]
+    : isJurumiyahIbtidaiyah12
+      ? (await query<{ id: number; nama: string }>("SELECT id, nama FROM marhalah WHERE lower(nama) LIKE '%ibtidai%'"))
+          .filter(item => /\b(1|2)\b/.test(item.nama.toLowerCase()))
+      : [{ id: marhalah.id }]
 
   for (const target of targetMarhalah) {
     await execute(
@@ -100,7 +112,7 @@ async function getAutoPaketForMarhalah(jenis: string, marhalahId: number) {
     )
   }
 
-  if (isMutawassithah && targetMarhalah.length > 0) {
+  if ((isMutawassithah || isJurumiyahIbtidaiyah12) && targetMarhalah.length > 0) {
     const placeholders = targetMarhalah.map(() => '?').join(',')
     await execute(
       `UPDATE hafalan_bab

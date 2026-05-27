@@ -139,7 +139,7 @@ export default function MasterHafalanContent() {
       if ('error' in res) return toast.error(res.error)
       toast.success(`Import selesai: ${res.insertedBab} bab, ${res.insertedBlok} blok, ${res.skipped} dilewati`)
       setImportRows([])
-      await load()
+      load()
     } catch (error: any) {
       toast.error(error?.message || 'Import gagal diproses.')
     } finally {
