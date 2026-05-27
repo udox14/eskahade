@@ -281,7 +281,7 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
               alt="" 
               style={{ width: '13mm', height: '13mm', objectFit: 'contain', flexShrink: 0 }} 
             />
-            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '85mm', color: '#000' }}>
+            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '68mm', color: '#000' }}>
               <div style={{ fontSize: '13pt', fontWeight: 900, lineHeight: 0.95 }}>
                 PANITIA
               </div>
@@ -460,7 +460,7 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
               alt="" 
               style={{ width: '13mm', height: '13mm', objectFit: 'contain', flexShrink: 0 }} 
             />
-            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '85mm', color: '#000' }}>
+            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '68mm', color: '#000' }}>
               <div style={{ fontSize: '13pt', fontWeight: 900, lineHeight: 0.95 }}>
                 PANITIA
               </div>
