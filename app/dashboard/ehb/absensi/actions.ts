@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, batch } from '@/lib/db'
+import { execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
@@ -63,7 +63,7 @@ export async function getPesertaForAbsensi(eventId: number, ruanganId: number, t
         SELECT 
             p.nomor_kursi, s.id as santri_id, s.nama_lengkap, s.nis, 
             k.nama_kelas, m.nama as marhalah_nama,
-            a.status_absen
+            COALESCE(a.status_absen, 'H') as status_absen
         FROM ehb_plotting_santri p
         JOIN santri s ON s.id = p.santri_id
         JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
@@ -76,51 +76,40 @@ export async function getPesertaForAbsensi(eventId: number, ruanganId: number, t
     `, [tanggal, sesiId, tanggal, sesiId, eventId, ruanganId, jamGroup, eventId])
 }
 
-// 4. Save Absensi (Array of updates)
-export async function saveAbsensiBatch(eventId: number, tanggal: string, sesiId: number, absensiUpdates: { santri_id: string, status: string | null }[]) {
+// 4. Save one absensi input immediately
+export async function saveAbsensiInput(
+    eventId: number,
+    tanggal: string,
+    sesiId: number,
+    santriId: string,
+    status: string
+) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
     try {
-        const stmts = []
-        
-        for (const update of absensiUpdates) {
-            if (update.status) {
-                // Insert or Update (A/I/S)
-                stmts.push({
-                    sql: `
-                        INSERT INTO ehb_absensi (ehb_event_id, santri_id, tanggal, sesi_id, status_absen) 
-                        VALUES (?, ?, ?, ?, ?)
-                        ON CONFLICT(ehb_event_id, santri_id, tanggal, sesi_id) 
-                        DO UPDATE SET status_absen = excluded.status_absen
-                    `,
-                    params: [eventId, update.santri_id, tanggal, sesiId, update.status]
-                })
-            } else {
-                // Remove (Hadir)
-                stmts.push({
-                    sql: `DELETE FROM ehb_absensi WHERE ehb_event_id = ? AND santri_id = ? AND tanggal = ? AND sesi_id = ?`,
-                    params: [eventId, update.santri_id, tanggal, sesiId]
-                })
-            }
-        }
+        const cleanStatus = ['H', 'A', 'I', 'S'].includes(status) ? status : 'H'
+        await execute(`
+            INSERT INTO ehb_absensi (ehb_event_id, santri_id, tanggal, sesi_id, status_absen)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(ehb_event_id, santri_id, tanggal, sesi_id)
+            DO UPDATE SET status_absen = excluded.status_absen
+        `, [eventId, santriId, tanggal, sesiId, cleanStatus])
 
-        if (stmts.length > 0) {
-            await batch(stmts)
-        }
         await logActivity({
             actor: actorFromSession(session),
             module: 'ehb_absensi',
             action: 'update',
             fiturHref: '/dashboard/ehb/absensi',
             logKind: 'update',
-            entityType: 'ehb_absensi_batch',
-            entityId: `${eventId}:${tanggal}:${sesiId}`,
+            entityType: 'ehb_absensi',
+            entityId: `${eventId}:${tanggal}:${sesiId}:${santriId}`,
             entityLabel: 'Absensi peserta EHB',
-            summary: `Menyimpan absensi EHB untuk ${absensiUpdates.length} peserta`,
-            details: { event_id: eventId, tanggal, sesi_id: sesiId, total_updates: absensiUpdates.length },
+            summary: `Menyimpan absensi peserta EHB: ${cleanStatus}`,
+            details: { event_id: eventId, tanggal, sesi_id: sesiId, santri_id: santriId, status: cleanStatus },
         })
         revalidatePath('/dashboard/ehb/absensi')
+        revalidatePath('/dashboard/ehb/susulan')
         return { success: true }
     } catch (err: any) {
         return { error: err.message }

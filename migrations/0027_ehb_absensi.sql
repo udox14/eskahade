@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS ehb_absensi (
   santri_id      TEXT NOT NULL REFERENCES santri(id),
   tanggal        TEXT NOT NULL,
   sesi_id        INTEGER NOT NULL REFERENCES ehb_sesi(id),
-  status_absen   TEXT NOT NULL, -- 'A', 'I', 'S'
+  status_absen   TEXT NOT NULL, -- 'H', 'A', 'I', 'S'
   is_susulan_done INTEGER NOT NULL DEFAULT 0, -- 0 = Belum Susulan, 1 = Sudah Selesai Susulan
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(ehb_event_id, santri_id, tanggal, sesi_id)

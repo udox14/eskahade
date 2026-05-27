@@ -2,11 +2,11 @@
 
 import { useCallback, useState, useEffect } from 'react'
 import {
-  getActiveEventLight, getJadwalAktifList, getRuanganForJadwal, getPesertaForAbsensi, saveAbsensiBatch
+  getActiveEventLight, getJadwalAktifList, getRuanganForJadwal, getPesertaForAbsensi, saveAbsensiInput
 } from './actions'
 import { 
   Calendar, MapPin, Users, Loader2, ChevronLeft, ChevronRight, 
-  CheckCircle2, AlertTriangle, Search,
+  AlertTriangle, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { fullDateWib, shortDateWib } from '../_date-utils'
@@ -56,8 +56,8 @@ export default function AbsensiEhbPage() {
   const [selectedRuangan, setSelectedRuangan] = useState<RuanganAbsensi | null>(null)
   
   // Input State
-  const [absensiMap, setAbsensiMap] = useState<Record<string, string | null>>({})
-  const [saving, setSaving] = useState(false)
+  const [absensiMap, setAbsensiMap] = useState<Record<string, string>>({})
+  const [savingIds, setSavingIds] = useState<Record<string, boolean>>({})
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -95,19 +95,33 @@ export default function AbsensiEhbPage() {
     setPesertaList(pList)
     
     // Set initial absensi map
-    const initialMap: Record<string, string | null> = {}
+    const initialMap: Record<string, string> = {}
     pList.forEach((p: PesertaAbsensi) => {
-        initialMap[p.santri_id] = p.status_absen || null // null = Hadir
+        initialMap[p.santri_id] = p.status_absen || 'H'
     })
     setAbsensiMap(initialMap)
     
     setLoading(false)
   }
 
-  const handleSetAbsen = (santriId: string, status: string | null) => {
+  const handleSetAbsen = async (santriId: string, status: string) => {
+    if (!event || !selectedSesi) return
+    const previous = absensiMap[santriId] || 'H'
     setAbsensiMap(prev => ({ ...prev, [santriId]: status }))
-  }
+    setSavingIds(prev => ({ ...prev, [santriId]: true }))
 
+    const res = await saveAbsensiInput(event.id, selectedSesi.tanggal, selectedSesi.sesi_id, santriId, status)
+    setSavingIds(prev => {
+      const next = { ...prev }
+      delete next[santriId]
+      return next
+    })
+
+    if (res.error) {
+      setAbsensiMap(prev => ({ ...prev, [santriId]: previous }))
+      toast.error(res.error)
+    }
+  }
   const filteredPesertaList = pesertaList.filter(p => {
     const needle = pesertaSearch.trim().toLowerCase()
     if (!needle) return true
@@ -124,26 +138,6 @@ export default function AbsensiEhbPage() {
       statusLabel,
     ].some(value => String(value || '').toLowerCase().includes(needle))
   })
-
-  const handleSaveAbsensi = async () => {
-    if (!event || !selectedSesi || !selectedRuangan) return
-    setSaving(true)
-    
-    const updates = Object.keys(absensiMap).map(santri_id => ({
-        santri_id,
-        status: absensiMap[santri_id]
-    }))
-
-    const res = await saveAbsensiBatch(event.id, selectedSesi.tanggal, selectedSesi.sesi_id, updates)
-    setSaving(false)
-
-    if (res.error) {
-        toast.error(res.error)
-    } else {
-        toast.success('Absensi berhasil disimpan')
-        setView('list-ruangan') // Back to ruangan list after save
-    }
-  }
 
   // Helper for grouping Sesi by Tanggal
   const groupedSesi: Record<string, SesiAktif[]> = {}
@@ -312,7 +306,8 @@ export default function AbsensiEhbPage() {
                             const isAlpha = val === 'A'
                             const isIzin = val === 'I'
                             const isSakit = val === 'S'
-                            const isHadir = val === null
+                            const isHadir = val === 'H' || !val
+                            const isSaving = Boolean(savingIds[p.santri_id])
 
                             return (
                                 <div key={p.santri_id} className={`bg-white border rounded-2xl p-3 shadow-sm transition-colors ${!isHadir ? 'border-red-200 bg-red-50/30' : ''}`}>
@@ -330,25 +325,29 @@ export default function AbsensiEhbPage() {
                                     
                                     <div className="grid grid-cols-4 gap-2 h-10">
                                         <button 
-                                            onClick={() => handleSetAbsen(p.santri_id, null)}
+                                            onClick={() => handleSetAbsen(p.santri_id, 'H')}
+                                            disabled={isSaving}
                                             className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center ${isHadir ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             Hadir
                                         </button>
                                         <button 
                                             onClick={() => handleSetAbsen(p.santri_id, 'S')}
+                                            disabled={isSaving}
                                             className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center ${isSakit ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             Sakit
                                         </button>
                                         <button 
                                             onClick={() => handleSetAbsen(p.santri_id, 'I')}
+                                            disabled={isSaving}
                                             className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center ${isIzin ? 'bg-blue-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             Izin
                                         </button>
                                         <button 
                                             onClick={() => handleSetAbsen(p.santri_id, 'A')}
+                                            disabled={isSaving}
                                             className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center ${isAlpha ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             Alpha
@@ -361,16 +360,10 @@ export default function AbsensiEhbPage() {
                 )}
             </div>
 
-            {/* Float Action Button */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t max-w-md mx-auto flex gap-3 z-20">
-                <button 
-                    onClick={handleSaveAbsensi}
-                    disabled={saving}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                >
-                    {saving ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5"/>}
-                    Simpan Absensi
-                </button>
+            <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/80 backdrop-blur-md border-t max-w-md mx-auto z-20">
+                <p className="text-center text-xs font-bold text-slate-500">
+                    Setiap perubahan langsung tersimpan
+                </p>
             </div>
         </div>
       )}

@@ -28,7 +28,7 @@ export async function getSusulanList(eventId: number) {
         JOIN kelas k ON k.id = rp.kelas_id
         JOIN ehb_jadwal j ON j.kelas_id = k.id AND j.tanggal = a.tanggal AND j.sesi_id = a.sesi_id
         JOIN mapel m ON m.id = j.mapel_id
-        WHERE a.ehb_event_id = ?
+        WHERE a.ehb_event_id = ? AND a.status_absen IN ('A', 'I', 'S')
         ORDER BY a.is_susulan_done ASC, a.tanggal DESC, k.nama_kelas ASC, s.nama_lengkap ASC
     `, [eventId])
 }

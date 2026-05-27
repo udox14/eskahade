@@ -236,142 +236,378 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
       width: '108mm',
       height: '330mm',
       display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
       boxSizing: 'border-box',
-      overflow: 'hidden',
       backgroundColor: '#fff',
     }}>
-      <VerticalHeader semester={card.semester} tahunAjaranNama={card.tahunAjaranNama} />
       <div style={{
-        flex: 1,
-        paddingTop: '140mm',
-        paddingLeft: '4mm',
-        paddingRight: '9mm',
+        width: '96mm',
+        height: '142mm',
+        border: '0.8pt solid #000',
+        display: 'flex',
+        flexDirection: 'row',
         boxSizing: 'border-box',
       }}>
+        {/* Left Column - Vertical Header */}
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '16pt',
-          fontWeight: 500,
-          textAlign: 'center',
-          lineHeight: 1,
-          marginBottom: '13mm',
-          whiteSpace: 'nowrap',
+          width: '21mm',
+          height: '100%',
+          borderRight: '0.8pt solid #000',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '4mm 0',
+          boxSizing: 'border-box',
+          position: 'relative',
         }}>
-          {formatTempelanClassName(card.namaKelas, card.marhalahNama)}
+          {/* Rotated text centered vertically in upper area */}
+          <div style={{
+            position: 'absolute',
+            top: '52mm',
+            left: '10.5mm',
+            width: '100mm',
+            height: '21mm',
+            transform: 'translate(-50%, -50%) rotate(-90deg)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+          }}>
+            <div style={{ fontSize: '14pt', fontWeight: 900, lineHeight: 1, letterSpacing: '0.8px', color: '#000' }}>
+              PANITIA
+            </div>
+            <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 1, marginTop: '2.5mm', letterSpacing: '0.5px', color: '#000' }}>
+              EVALUASI HASIL BELAJAR
+            </div>
+            <div style={{ fontSize: '6.2pt', fontWeight: 'bold', lineHeight: 1, marginTop: '2mm', letterSpacing: '0.2px', color: '#000' }}>
+              LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
+            </div>
+          </div>
+
+          {/* Logo at the bottom */}
+          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logohitam.png" 
+              alt="" 
+              style={{ width: '13mm', height: '13mm', objectFit: 'contain' }} 
+            />
+          </div>
         </div>
 
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '11pt',
-          color: '#000',
+        {/* Right Column - Main Details */}
+        <div style={{
+          flex: 1,
+          height: '100%',
+          padding: '4mm',
+          boxSizing: 'border-box',
         }}>
-          <colgroup>
-            <col style={{ width: '62%' }} />
-            <col style={{ width: '38%' }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th style={humasThStyle}>RUANG</th>
-              <th style={humasThStyle}>JML</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 7 }).map((_, index) => {
-              const row = rows[index]
-              return (
-                <tr key={index}>
-                  <td style={humasTdStyle}>{row ? formatRoomNumber(row.nomorRuangan) : ''}</td>
-                  <td style={humasTdStyle}>{row?.jumlah ?? ''}</td>
+          <fieldset style={{
+            border: '0.8pt solid #000',
+            borderRadius: '0px',
+            padding: '3mm 4mm',
+            height: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
+            <legend style={{
+              padding: '0 2.5mm',
+              fontSize: '11.5pt',
+              fontWeight: 500,
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              letterSpacing: '1px',
+              textAlign: 'center',
+            }}>
+              MARHALAH
+            </legend>
+
+            {/* Class Name */}
+            <div style={{
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '22pt',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              lineHeight: 1,
+              marginTop: '1mm',
+              marginBottom: '5mm',
+              color: '#000',
+            }}>
+              {formatTempelanClassName(card.namaKelas, card.marhalahNama)}
+            </div>
+
+            {/* Table */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '10.5pt',
+              color: '#000',
+            }}>
+              <colgroup>
+                <col style={{ width: '60%' }} />
+                <col style={{ width: '40%' }} />
+              </colgroup>
+              <thead>
+                <tr style={{ backgroundColor: '#e5e5e5' }}>
+                  <th style={{ ...humasThStyle, border: '0.8pt solid #000' }}>RUANG</th>
+                  <th style={{ ...humasThStyle, border: '0.8pt solid #000' }}>JML</th>
                 </tr>
-              )
-            })}
-            <tr>
-              <td style={{ ...humasTdStyle, fontWeight: 700, paddingTop: '8mm' }}>JUMLAH</td>
-              <td style={{ ...humasTdStyle, fontWeight: 700, paddingTop: '8mm' }}>{card.total}</td>
-            </tr>
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {Array.from({ length: 7 }).map((_, index) => {
+                  const row = rows[index]
+                  return (
+                    <tr key={index}>
+                      <td style={{ ...humasTdStyle, border: '0.8pt solid #000' }}>
+                        {row ? formatRoomNumber(row.nomorRuangan) : ''}
+                      </td>
+                      <td style={{ ...humasTdStyle, border: '0.8pt solid #000' }}>
+                        {row?.jumlah ?? ''}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {/* Total Footer Box - Separated */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '10.5pt',
+              color: '#000',
+              marginTop: '4mm',
+            }}>
+              <colgroup>
+                <col style={{ width: '60%' }} />
+                <col style={{ width: '40%' }} />
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td style={{ ...humasTdStyle, fontWeight: 'bold', border: '0.8pt solid #000', backgroundColor: '#fff' }}>
+                    JUMLAH
+                  </td>
+                  <td style={{ ...humasTdStyle, fontWeight: 'bold', border: '0.8pt solid #000', backgroundColor: '#fff' }}>
+                    {card.total}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </fieldset>
+        </div>
       </div>
     </div>
   )
 }
+)
+}
 
 function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
-  const jamGroups = card.jamGroups.slice(0, 3)
+  const jam1 = card.jamGroups.find(j => j.jamGroup.toLowerCase().includes('1')) || { jamGroup: 'JAM 1', rows: [], total: 0 }
+  const jam2 = card.jamGroups.find(j => j.jamGroup.toLowerCase().includes('2')) || { jamGroup: 'JAM 2', rows: [], total: 0 }
 
   return (
     <div style={{
       width: '108mm',
       height: '330mm',
       display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
       boxSizing: 'border-box',
-      overflow: 'hidden',
       backgroundColor: '#fff',
     }}>
-      <VerticalHeader semester={card.semester} tahunAjaranNama={card.tahunAjaranNama} />
       <div style={{
-        flex: 1,
-        paddingTop: '127mm',
-        paddingLeft: '4mm',
-        paddingRight: '8mm',
+        width: '96mm',
+        height: '142mm',
+        border: '0.8pt solid #000',
+        display: 'flex',
+        flexDirection: 'row',
         boxSizing: 'border-box',
-        fontFamily: 'Arial, Helvetica, sans-serif',
       }}>
+        {/* Left Column - Vertical Header (Identical to Humas) */}
         <div style={{
-          fontSize: '19pt',
-          lineHeight: 1,
-          fontWeight: 500,
-          textAlign: 'center',
-          marginBottom: '7mm',
+          width: '21mm',
+          height: '100%',
+          borderRight: '0.8pt solid #000',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '4mm 0',
+          boxSizing: 'border-box',
+          position: 'relative',
         }}>
-          {card.nomorRuangan}
+          {/* Rotated text centered vertically in upper area */}
+          <div style={{
+            position: 'absolute',
+            top: '52mm',
+            left: '10.5mm',
+            width: '100mm',
+            height: '21mm',
+            transform: 'translate(-50%, -50%) rotate(-90deg)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+          }}>
+            <div style={{ fontSize: '14pt', fontWeight: 900, lineHeight: 1, letterSpacing: '0.8px', color: '#000' }}>
+              PANITIA
+            </div>
+            <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 1, marginTop: '2.5mm', letterSpacing: '0.5px', color: '#000' }}>
+              EVALUASI HASIL BELAJAR
+            </div>
+            <div style={{ fontSize: '6.2pt', fontWeight: 'bold', lineHeight: 1, marginTop: '2mm', letterSpacing: '0.2px', color: '#000' }}>
+              LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
+            </div>
+          </div>
+
+          {/* Logo at the bottom */}
+          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logohitam.png" 
+              alt="" 
+              style={{ width: '13mm', height: '13mm', objectFit: 'contain' }} 
+            />
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5mm' }}>
-          {jamGroups.map(jam => (
-            <div key={jam.jamGroup}>
-              <div style={{
-                fontSize: '11pt',
-                lineHeight: 1,
-                textAlign: 'center',
-                fontWeight: 500,
-                marginBottom: '2mm',
-              }}>
-                {jam.jamGroup.toUpperCase().replace(/KE-/g, '')}
-              </div>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                tableLayout: 'fixed',
-                fontSize: '10.5pt',
-              }}>
-                <colgroup>
-                  <col style={{ width: '70%' }} />
-                  <col style={{ width: '30%' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th style={packingThStyle}>MARHALAH</th>
-                    <th style={packingThStyle}>Peserta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: 7 }).map((_, index) => {
-                    const row = jam.rows[index]
-                    return (
-                      <tr key={index}>
-                        <td style={packingTdStyle}>{row?.kelas ?? ''}</td>
-                        <td style={packingTdStyle}>{row?.jumlah ?? ''}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+        {/* Right Column - Main Details */}
+        <div style={{
+          flex: 1,
+          height: '100%',
+          padding: '4mm',
+          boxSizing: 'border-box',
+        }}>
+          <fieldset style={{
+            border: '0.8pt solid #000',
+            borderRadius: '0px',
+            padding: '2mm 3.5mm 3.5mm 3.5mm',
+            height: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
+            <legend style={{
+              padding: '0 2.5mm',
+              fontSize: '11.5pt',
+              fontWeight: 500,
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              letterSpacing: '1px',
+              textAlign: 'center',
+            }}>
+              RUANG
+            </legend>
+
+            {/* Room Number */}
+            <div style={{
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '22pt',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              lineHeight: 1,
+              marginTop: '0.5mm',
+              marginBottom: '3.5mm',
+              color: '#000',
+            }}>
+              {formatRoomNumber(card.nomorRuangan)}
             </div>
-          ))}
+
+            {/* Table JAM 1 - 6 rows */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '9pt',
+              color: '#000',
+              marginBottom: '3mm',
+            }}>
+              <colgroup>
+                <col style={{ width: '70%' }} />
+                <col style={{ width: '30%' }} />
+              </colgroup>
+              <thead>
+                <tr style={{ backgroundColor: '#e5e5e5' }}>
+                  <th colSpan={2} style={{ ...packingThStyle, height: '5.2mm', border: '0.8pt solid #000', fontWeight: 'bold' }}>
+                    JAM 1
+                  </th>
+                </tr>
+                <tr style={{ backgroundColor: '#e5e5e5' }}>
+                  <th style={{ ...packingThStyle, height: '4.8mm', border: '0.8pt solid #000' }}>MARHALAH</th>
+                  <th style={{ ...packingThStyle, height: '4.8mm', border: '0.8pt solid #000' }}>JP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 6 }).map((_, index) => {
+                  const row = jam1.rows[index]
+                  return (
+                    <tr key={index}>
+                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                        {row?.kelas ?? ''}
+                      </td>
+                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                        {row?.jumlah ?? ''}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {/* Table JAM 2 - 5 rows */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '9pt',
+              color: '#000',
+            }}>
+              <colgroup>
+                <col style={{ width: '70%' }} />
+                <col style={{ width: '30%' }} />
+              </colgroup>
+              <thead>
+                <tr style={{ backgroundColor: '#e5e5e5' }}>
+                  <th colSpan={2} style={{ ...packingThStyle, height: '5.2mm', border: '0.8pt solid #000', fontWeight: 'bold' }}>
+                    JAM 2
+                  </th>
+                </tr>
+                <tr style={{ backgroundColor: '#e5e5e5' }}>
+                  <th style={{ ...packingThStyle, height: '4.8mm', border: '0.8pt solid #000' }}>MARHALAH</th>
+                  <th style={{ ...packingThStyle, height: '4.8mm', border: '0.8pt solid #000' }}>JP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const row = jam2.rows[index]
+                  return (
+                    <tr key={index}>
+                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                        {row?.kelas ?? ''}
+                      </td>
+                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                        {row?.jumlah ?? ''}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </fieldset>
         </div>
       </div>
     </div>

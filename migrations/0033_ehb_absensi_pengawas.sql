@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS ehb_absensi_pengawas (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,
   ehb_event_id        INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
   jadwal_pengawas_id  INTEGER NOT NULL REFERENCES ehb_jadwal_pengawas(id) ON DELETE CASCADE,
-  status              TEXT NOT NULL DEFAULT 'HADIR',
+  status              TEXT NOT NULL DEFAULT 'TIDAK_HADIR',
   badal_source        TEXT,
   badal_pengawas_id   INTEGER REFERENCES ehb_pengawas(id),
   badal_panitia_id    INTEGER REFERENCES ehb_panitia(id),
@@ -21,4 +21,3 @@ CREATE INDEX IF NOT EXISTS idx_ehb_absensi_pengawas_event
 
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan) VALUES
 ('EHB', 'Absensi Pengawas', '/dashboard/ehb/absensi-pengawas', 'ClipboardCheck', '["admin"]', 1, 13);
-

@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   Loader2,
-  Save,
   Search,
   UserMinus,
   Users,
@@ -24,7 +23,7 @@ import {
   getBadalOptions,
   getSesiPengawasList,
   getTanggalPengawasList,
-  saveAbsensiPengawasBatch,
+  saveAbsensiPengawasInput,
   type AbsensiPengawasRow,
   type AbsensiStatus,
   type ActiveEvent,
@@ -50,7 +49,7 @@ type SelectedSchedule = {
 
 function makeDraft(row?: AbsensiPengawasRow): DraftAbsensi {
   return {
-    status: row?.status || 'HADIR',
+    status: row?.status || 'TIDAK_HADIR',
     badal_source: row?.badal_source === 'sadesa' ? 'sadesa' : row?.badal_source === 'panitia' ? 'panitia' : 'pengawas',
     badal_pengawas_id: row?.badal_pengawas_id ?? '',
     badal_panitia_id: row?.badal_panitia_id ?? '',
@@ -175,9 +174,10 @@ export default function AbsensiPengawasPageContent() {
   const [selected, setSelected] = useState<SelectedSchedule | null>(null)
   const [drafts, setDrafts] = useState<Record<number, DraftAbsensi>>({})
   const [badalModalId, setBadalModalId] = useState<number | null>(null)
+  const [badalModalPrevious, setBadalModalPrevious] = useState<DraftAbsensi | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingRows, setLoadingRows] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
   const [rowSearch, setRowSearch] = useState('')
 
   useEffect(() => {
@@ -218,6 +218,9 @@ export default function AbsensiPengawasPageContent() {
     setSelected(schedule)
     setRows([])
     setDrafts({})
+    setSavingIds({})
+    setBadalModalId(null)
+    setBadalModalPrevious(null)
     setRowSearch('')
     setLoadingRows(true)
     const list = await getAbsensiPengawasRows(event.id, schedule.tanggal, schedule.sesi.id)
@@ -243,6 +246,23 @@ export default function AbsensiPengawasPageContent() {
   const selectedBadalDraft = selectedBadalRow
     ? drafts[selectedBadalRow.jadwal_pengawas_id] || makeDraft(selectedBadalRow)
     : null
+
+  const openBadalModal = (row: AbsensiPengawasRow, nextDraft?: DraftAbsensi) => {
+    const currentDraft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
+    setBadalModalPrevious(currentDraft)
+    if (nextDraft) {
+      setDrafts(prev => ({ ...prev, [row.jadwal_pengawas_id]: nextDraft }))
+    }
+    setBadalModalId(row.jadwal_pengawas_id)
+  }
+
+  const closeBadalModal = () => {
+    if (badalModalId && badalModalPrevious) {
+      setDrafts(prev => ({ ...prev, [badalModalId]: badalModalPrevious }))
+    }
+    setBadalModalId(null)
+    setBadalModalPrevious(null)
+  }
 
   const filteredRows = useMemo(() => {
     const needle = rowSearch.trim().toLowerCase()
@@ -291,9 +311,45 @@ export default function AbsensiPengawasPageContent() {
     })
   }
 
+  const buildPayload = (row: AbsensiPengawasRow, draft: DraftAbsensi) => ({
+    jadwal_pengawas_id: row.jadwal_pengawas_id,
+    status: draft.status,
+    badal_source: draft.status === 'BADAL' ? draft.badal_source : null,
+    badal_pengawas_id: draft.status === 'BADAL' && draft.badal_source === 'pengawas' && draft.badal_pengawas_id ? Number(draft.badal_pengawas_id) : null,
+    badal_panitia_id: draft.status === 'BADAL' && draft.badal_source === 'panitia' && draft.badal_panitia_id ? Number(draft.badal_panitia_id) : null,
+    badal_nama: draft.status === 'BADAL' ? draft.badal_nama : null,
+  })
+
+  const persistDraft = async (row: AbsensiPengawasRow, draft: DraftAbsensi, previousDraft: DraftAbsensi) => {
+    if (!event) return
+    setSavingIds(prev => ({ ...prev, [row.jadwal_pengawas_id]: true }))
+    const res = await saveAbsensiPengawasInput(event.id, buildPayload(row, draft))
+    setSavingIds(prev => {
+      const next = { ...prev }
+      delete next[row.jadwal_pengawas_id]
+      return next
+    })
+    if ('error' in res) {
+      setDrafts(prev => ({ ...prev, [row.jadwal_pengawas_id]: previousDraft }))
+      toast.error(res.error)
+    }
+  }
+
   const setStatus = (row: AbsensiPengawasRow, status: AbsensiStatus) => {
+    const previousDraft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
+    const nextDraft = {
+      ...previousDraft,
+      status,
+      ...(status !== 'BADAL' ? { badal_pengawas_id: '', badal_panitia_id: '', badal_nama: '' } : {}),
+    } as DraftAbsensi
+
     updateDraft(row.jadwal_pengawas_id, { status })
-    if (status === 'BADAL') setBadalModalId(row.jadwal_pengawas_id)
+    if (status === 'BADAL') {
+      openBadalModal(row, nextDraft)
+      return
+    }
+
+    void persistDraft(row, nextDraft, previousDraft)
   }
 
   const getBadalLabel = (draft: DraftAbsensi) => {
@@ -308,25 +364,27 @@ export default function AbsensiPengawasPageContent() {
     return null
   }
 
-  const save = async () => {
-    if (!event) return
-    const payload = rows.map(row => {
-      const draft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
-      return {
-        jadwal_pengawas_id: row.jadwal_pengawas_id,
-        status: draft.status,
-        badal_source: draft.status === 'BADAL' ? draft.badal_source : null,
-        badal_pengawas_id: draft.status === 'BADAL' && draft.badal_source === 'pengawas' && draft.badal_pengawas_id ? Number(draft.badal_pengawas_id) : null,
-        badal_panitia_id: draft.status === 'BADAL' && draft.badal_source === 'panitia' && draft.badal_panitia_id ? Number(draft.badal_panitia_id) : null,
-        badal_nama: draft.status === 'BADAL' ? draft.badal_nama : null,
-      }
+  const saveBadal = async () => {
+    if (!selectedBadalRow || !selectedBadalDraft) return
+    const previousDraft = drafts[selectedBadalRow.jadwal_pengawas_id] || makeDraft(selectedBadalRow)
+    const nextDraft = { ...selectedBadalDraft, status: 'BADAL' as AbsensiStatus }
+    setDrafts(prev => ({ ...prev, [selectedBadalRow.jadwal_pengawas_id]: nextDraft }))
+    setSavingIds(prev => ({ ...prev, [selectedBadalRow.jadwal_pengawas_id]: true }))
+    const res = event
+      ? await saveAbsensiPengawasInput(event.id, buildPayload(selectedBadalRow, nextDraft))
+      : { error: 'Event tidak ditemukan' }
+    setSavingIds(prev => {
+      const next = { ...prev }
+      delete next[selectedBadalRow.jadwal_pengawas_id]
+      return next
     })
-
-    setSaving(true)
-    const res = await saveAbsensiPengawasBatch(event.id, payload)
-    setSaving(false)
-    if ('error' in res) return toast.error(res.error)
-    toast.success(`${res.saved} absensi pengawas disimpan`)
+    if ('error' in res) {
+      setDrafts(prev => ({ ...prev, [selectedBadalRow.jadwal_pengawas_id]: previousDraft }))
+      toast.error(res.error)
+      return
+    }
+    setBadalModalId(null)
+    setBadalModalPrevious(null)
   }
 
   if (loading) {
@@ -408,6 +466,9 @@ export default function AbsensiPengawasPageContent() {
                   setSelected(null)
                   setRows([])
                   setDrafts({})
+                  setSavingIds({})
+                  setBadalModalId(null)
+                  setBadalModalPrevious(null)
                   setRowSearch('')
                 }}
                 className="p-2 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200"
@@ -469,6 +530,7 @@ export default function AbsensiPengawasPageContent() {
                 {filteredRows.map(row => {
                   const draft = drafts[row.jadwal_pengawas_id] || makeDraft(row)
                   const badalLabel = getBadalLabel(draft)
+                  const isSaving = Boolean(savingIds[row.jadwal_pengawas_id])
                   return (
                     <div
                       key={row.jadwal_pengawas_id}
@@ -492,7 +554,7 @@ export default function AbsensiPengawasPageContent() {
                           </div>
                           {draft.status === 'BADAL' ? (
                             <button
-                              onClick={() => setBadalModalId(row.jadwal_pengawas_id)}
+                              onClick={() => openBadalModal(row)}
                               className="mt-2 text-xs font-bold text-amber-700 bg-white/80 border border-amber-200 rounded-lg px-2.5 py-1.5"
                             >
                               {badalLabel ? `Badal: ${badalLabel}` : 'Atur badal'}
@@ -504,6 +566,7 @@ export default function AbsensiPengawasPageContent() {
                       <div className="grid grid-cols-3 gap-2 h-10">
                         <button
                           onClick={() => setStatus(row, 'HADIR')}
+                          disabled={isSaving}
                           className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${draft.status === 'HADIR' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200'}`}
                         >
                           <CheckCircle2 className="w-4 h-4" />
@@ -511,6 +574,7 @@ export default function AbsensiPengawasPageContent() {
                         </button>
                         <button
                           onClick={() => setStatus(row, 'TIDAK_HADIR')}
+                          disabled={isSaving}
                           className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${draft.status === 'TIDAK_HADIR' ? 'bg-red-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200'}`}
                         >
                           <XCircle className="w-4 h-4" />
@@ -518,6 +582,7 @@ export default function AbsensiPengawasPageContent() {
                         </button>
                         <button
                           onClick={() => setStatus(row, 'BADAL')}
+                          disabled={isSaving}
                           className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${draft.status === 'BADAL' ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200'}`}
                         >
                           <UserMinus className="w-4 h-4" />
@@ -531,15 +596,10 @@ export default function AbsensiPengawasPageContent() {
             )}
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/85 backdrop-blur-md border-t max-w-md mx-auto flex gap-3 z-20">
-            <button
-              onClick={save}
-              disabled={saving || rows.length === 0}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              Simpan Absensi
-            </button>
+          <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/85 backdrop-blur-md border-t max-w-md mx-auto z-20">
+            <p className="text-center text-xs font-bold text-slate-500">
+              Setiap perubahan langsung tersimpan
+            </p>
           </div>
         </div>
       )}
@@ -554,7 +614,7 @@ export default function AbsensiPengawasPageContent() {
                 <p className="text-xs text-slate-500">Ruangan {selectedBadalRow.nomor_ruangan}</p>
               </div>
               <button
-                onClick={() => setBadalModalId(null)}
+                onClick={closeBadalModal}
                 className="p-2 rounded-full hover:bg-slate-100"
                 aria-label="Tutup"
               >
@@ -613,10 +673,11 @@ export default function AbsensiPengawasPageContent() {
               )}
 
               <button
-                onClick={() => setBadalModalId(null)}
+                onClick={saveBadal}
+                disabled={Boolean(savingIds[selectedBadalRow.jadwal_pengawas_id])}
                 className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl"
               >
-                Simpan Badal
+                {savingIds[selectedBadalRow.jadwal_pengawas_id] ? 'Menyimpan...' : 'Simpan Badal'}
               </button>
             </div>
           </div>

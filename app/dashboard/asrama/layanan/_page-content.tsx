@@ -10,7 +10,6 @@ import {
   Filter,
   Loader2,
   Plus,
-  Save,
   Settings,
   Shirt,
   Trash2,
@@ -31,7 +30,7 @@ import {
   getSantriSebaranDetail,
   getSebaranLayanan,
   hapusMasterJasa,
-  simpanBatchLayanan,
+  simpanLayananSantri,
   tambahMasterJasa,
   tambahMasterJasaBatch,
 } from "./actions";
@@ -77,6 +76,8 @@ type DetailModalState = {
   jasaNama: string;
 };
 
+type LayananField = "tempat_makan_id" | "tempat_mencuci_id";
+
 const DEFAULT_PAGE_SIZE = 20;
 const DETAIL_PAGE_SIZE = 20;
 
@@ -120,10 +121,7 @@ export default function LayananAsramaPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const detailLoaderRef = useRef<HTMLDivElement>(null);
 
-  const [pendingChanges, setPendingChanges] = useState<
-    Record<string, { tempat_makan_id?: string | null; tempat_mencuci_id?: string | null }>
-  >({});
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingFields, setSavingFields] = useState<Record<string, boolean>>({});
   const [toastMsg, setToastMsg] = useState("");
 
   useEffect(() => {
@@ -151,7 +149,7 @@ export default function LayananAsramaPage() {
 
     getDaftarKamar(selectedAsrama).then(setKamarList).catch(console.error);
     setPage(1);
-    setPendingChanges({});
+    setSavingFields({});
   }, [selectedAsrama]);
 
   useEffect(() => {
@@ -278,32 +276,45 @@ export default function LayananAsramaPage() {
     await loadDetailPage(modalState, 1, true);
   };
 
-  const handleSelectChange = (
+  const getFieldKey = (santriId: string, field: LayananField) => `${santriId}:${field}`;
+  const isFieldSaving = (santriId: string, field: LayananField) => !!savingFields[getFieldKey(santriId, field)];
+
+  const handleSelectChange = async (
     santriId: string,
-    type: "tempat_makan_id" | "tempat_mencuci_id",
+    type: LayananField,
     value: string
   ) => {
-    setPendingChanges((prev) => {
-      const updated = { ...prev };
-      if (!updated[santriId]) updated[santriId] = {};
-      updated[santriId][type] = value === "null" ? null : value;
-      return updated;
-    });
-  };
+    const normalizedValue = value === "null" ? null : value;
+    const fieldKey = getFieldKey(santriId, type);
+    const currentRow = santriData.find((item) => item.id === santriId);
+    const previousValue = currentRow?.[type] ?? null;
+    if (previousValue === normalizedValue || savingFields[fieldKey]) return;
 
-  const handleSimpanBatch = async () => {
-    setIsSaving(true);
+    setSavingFields((prev) => ({ ...prev, [fieldKey]: true }));
+    setSantriData((prev) =>
+      prev.map((item) => (item.id === santriId ? { ...item, [type]: normalizedValue } : item))
+    );
     try {
-      await simpanBatchLayanan(pendingChanges);
-      setToastMsg(`${Object.keys(pendingChanges).length} data berhasil disimpan.`);
-      setPendingChanges({});
-      await Promise.all([loadSantriPage(page, pageSize), loadSebaran(), getMasterJasa().then((rows) => setMasterJasa(rows as MasterJasaRow[]))]);
+      const res = await simpanLayananSantri(santriId, type, normalizedValue);
+      if ("error" in res) throw new Error(res.error);
+      setToastMsg("Perubahan tersimpan.");
+      await Promise.all([
+        loadSantriPage(page, getEffectivePageSize(pageSize, totalSantri)),
+        loadSebaran(),
+      ]);
       setTimeout(() => setToastMsg(""), 3000);
     } catch (error) {
       console.error(error);
-      alert("Gagal menyimpan data.");
+      setSantriData((prev) =>
+        prev.map((item) => (item.id === santriId ? { ...item, [type]: previousValue } : item))
+      );
+      alert("Gagal menyimpan data. Perubahan dikembalikan.");
     } finally {
-      setIsSaving(false);
+      setSavingFields((prev) => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
     }
   };
 
@@ -411,18 +422,15 @@ export default function LayananAsramaPage() {
 
   const getDisplayValue = (
     santriId: string,
-    type: "tempat_makan_id" | "tempat_mencuci_id",
+    type: LayananField,
     originalValue: string | null
   ) => {
-    if (pendingChanges[santriId] && pendingChanges[santriId][type] !== undefined) {
-      return pendingChanges[santriId][type] === null ? "null" : pendingChanges[santriId][type];
-    }
     return originalValue || "null";
   };
 
   const jasaMakan = masterJasa.filter((item) => item.jenis === "Makan");
   const jasaCuci = masterJasa.filter((item) => item.jenis === "Cuci");
-  const totalChanges = Object.keys(pendingChanges).length;
+  const isAnyFieldSaving = Object.keys(savingFields).length > 0;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 pb-24">
@@ -618,9 +626,7 @@ export default function LayananAsramaPage() {
                   santriData.map((santri) => (
                     <tr
                       key={santri.id}
-                      className={`border-b border-slate-100 hover:bg-slate-50 transition ${
-                        pendingChanges[santri.id] ? "bg-amber-50/40" : ""
-                      }`}
+                      className="border-b border-slate-100 hover:bg-slate-50 transition"
                     >
                       <td className="p-4">
                         <div className="font-bold text-slate-800">{santri.nama_lengkap}</div>
@@ -632,12 +638,13 @@ export default function LayananAsramaPage() {
                       <td className="p-4">
                         <select
                           className={`w-full border rounded-xl p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${
-                            pendingChanges[santri.id]?.tempat_makan_id !== undefined
-                              ? "border-amber-400 bg-amber-50"
+                            isFieldSaving(santri.id, "tempat_makan_id")
+                              ? "border-emerald-400 bg-emerald-50"
                               : "border-slate-200"
                           }`}
                           value={getDisplayValue(santri.id, "tempat_makan_id", santri.tempat_makan_id)}
                           onChange={(e) => handleSelectChange(santri.id, "tempat_makan_id", e.target.value)}
+                          disabled={isFieldSaving(santri.id, "tempat_makan_id")}
                         >
                           <option value="null">- Belum Ada -</option>
                           {jasaMakan.map((jasa) => (
@@ -650,12 +657,13 @@ export default function LayananAsramaPage() {
                       <td className="p-4">
                         <select
                           className={`w-full border rounded-xl p-2 text-sm focus:ring-2 focus:ring-emerald-500 ${
-                            pendingChanges[santri.id]?.tempat_mencuci_id !== undefined
-                              ? "border-amber-400 bg-amber-50"
+                            isFieldSaving(santri.id, "tempat_mencuci_id")
+                              ? "border-emerald-400 bg-emerald-50"
                               : "border-slate-200"
                           }`}
                           value={getDisplayValue(santri.id, "tempat_mencuci_id", santri.tempat_mencuci_id)}
                           onChange={(e) => handleSelectChange(santri.id, "tempat_mencuci_id", e.target.value)}
+                          disabled={isFieldSaving(santri.id, "tempat_mencuci_id")}
                         >
                           <option value="null">- Belum Ada -</option>
                           {jasaCuci.map((jasa) => (
@@ -698,11 +706,13 @@ export default function LayananAsramaPage() {
                 <div
                   key={santri.id}
                   className={`bg-white border rounded-xl p-4 shadow-sm relative ${
-                    pendingChanges[santri.id] ? "border-amber-300 ring-2 ring-amber-100" : "border-slate-200"
+                    isFieldSaving(santri.id, "tempat_makan_id") || isFieldSaving(santri.id, "tempat_mencuci_id")
+                      ? "border-emerald-300 ring-2 ring-emerald-100"
+                      : "border-slate-200"
                   }`}
                 >
-                  {pendingChanges[santri.id] && (
-                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  {(isFieldSaving(santri.id, "tempat_makan_id") || isFieldSaving(santri.id, "tempat_mencuci_id")) && (
+                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   )}
 
                   <h3 className="font-bold text-slate-800 text-lg leading-tight">{santri.nama_lengkap}</h3>
@@ -720,9 +730,10 @@ export default function LayananAsramaPage() {
                         Makan Di
                       </label>
                       <select
-                        className="w-full border border-slate-200 rounded-lg p-2.5 text-sm bg-slate-50"
+                        className="w-full border border-slate-200 rounded-lg p-2.5 text-sm bg-slate-50 disabled:opacity-70"
                         value={getDisplayValue(santri.id, "tempat_makan_id", santri.tempat_makan_id)}
                         onChange={(e) => handleSelectChange(santri.id, "tempat_makan_id", e.target.value)}
+                        disabled={isFieldSaving(santri.id, "tempat_makan_id")}
                       >
                         <option value="null">- Belum Ada -</option>
                         {jasaMakan.map((jasa) => (
@@ -739,9 +750,10 @@ export default function LayananAsramaPage() {
                         Nyuci Di
                       </label>
                       <select
-                        className="w-full border border-slate-200 rounded-lg p-2.5 text-sm bg-slate-50"
+                        className="w-full border border-slate-200 rounded-lg p-2.5 text-sm bg-slate-50 disabled:opacity-70"
                         value={getDisplayValue(santri.id, "tempat_mencuci_id", santri.tempat_mencuci_id)}
                         onChange={(e) => handleSelectChange(santri.id, "tempat_mencuci_id", e.target.value)}
+                        disabled={isFieldSaving(santri.id, "tempat_mencuci_id")}
                       >
                         <option value="null">- Belum Ada -</option>
                         {jasaCuci.map((jasa) => (
@@ -794,31 +806,10 @@ export default function LayananAsramaPage() {
         </div>
       )}
 
-      {totalChanges > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] md:w-auto md:min-w-[420px] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between z-40">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-500 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-900">
-              {totalChanges}
-            </div>
-            <span className="font-medium text-sm md:text-base">Perubahan belum disimpan</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPendingChanges({})}
-              disabled={isSaving}
-              className="text-slate-300 hover:text-white px-3 py-2 text-sm font-medium transition"
-            >
-              Batal
-            </button>
-            <button
-              onClick={handleSimpanBatch}
-              disabled={isSaving}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>Simpan</span>
-            </button>
-          </div>
+      {isAnyFieldSaving && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-40">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-300" />
+          <span className="font-medium text-sm">Menyimpan perubahan...</span>
         </div>
       )}
 

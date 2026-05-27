@@ -1,6 +1,6 @@
 'use server'
 
-import { batch, execute, query, queryOne } from '@/lib/db'
+import { execute, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
@@ -85,7 +85,7 @@ export async function ensureAbsensiPengawasSchema() {
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       ehb_event_id        INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
       jadwal_pengawas_id  INTEGER NOT NULL REFERENCES ehb_jadwal_pengawas(id) ON DELETE CASCADE,
-      status              TEXT NOT NULL DEFAULT 'HADIR',
+      status              TEXT NOT NULL DEFAULT 'TIDAK_HADIR',
       badal_source        TEXT,
       badal_pengawas_id   INTEGER REFERENCES ehb_pengawas(id),
       badal_panitia_id    INTEGER REFERENCES ehb_panitia(id),
@@ -144,7 +144,7 @@ export async function getAbsensiPengawasRows(eventId: number, tanggal: string, s
       r.nomor_ruangan,
       r.nama_ruangan,
       r.jenis_kelamin,
-      ap.status,
+      COALESCE(ap.status, 'TIDAK_HADIR') as status,
       ap.badal_source,
       ap.badal_pengawas_id,
       ap.badal_panitia_id,
@@ -193,55 +193,53 @@ export async function getBadalOptions(eventId: number): Promise<BadalOptions> {
   return { pengawas, panitia, sadesa }
 }
 
-export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiPengawasInput[]) {
+export async function saveAbsensiPengawasInput(eventId: number, input: AbsensiPengawasInput) {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
   await ensureAbsensiPengawasSchema()
 
-  const cleanInputs = inputs
-    .map(input => ({
-      jadwal_pengawas_id: Number(input.jadwal_pengawas_id),
-      status: input.status,
-      badal_source: input.status === 'BADAL' ? input.badal_source ?? null : null,
-      badal_pengawas_id: input.status === 'BADAL' && input.badal_source === 'pengawas' ? input.badal_pengawas_id ?? null : null,
-      badal_panitia_id: input.status === 'BADAL' && input.badal_source === 'panitia' ? input.badal_panitia_id ?? null : null,
-      badal_nama: input.status === 'BADAL' ? input.badal_nama?.trim().replace(/\s+/g, ' ') || null : null,
-    }))
-    .filter(input => input.jadwal_pengawas_id && ['HADIR', 'TIDAK_HADIR', 'BADAL'].includes(input.status))
-
-  const invalidBadal = cleanInputs.find(input => (
-    input.status === 'BADAL'
-    && !input.badal_pengawas_id
-    && !input.badal_panitia_id
-    && !input.badal_nama
-  ))
-  if (invalidBadal) return { error: 'Setiap status BADAL wajib memilih atau mengisi nama badal' }
-
-  if (cleanInputs.length > 0) {
-    await batch(cleanInputs.map(input => ({
-      sql: `
-        INSERT INTO ehb_absensi_pengawas
-          (ehb_event_id, jadwal_pengawas_id, status, badal_source, badal_pengawas_id, badal_panitia_id, badal_nama)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(ehb_event_id, jadwal_pengawas_id) DO UPDATE SET
-          status = excluded.status,
-          badal_source = excluded.badal_source,
-          badal_pengawas_id = excluded.badal_pengawas_id,
-          badal_panitia_id = excluded.badal_panitia_id,
-          badal_nama = excluded.badal_nama,
-          updated_at = datetime('now')
-      `,
-      params: [
-        eventId,
-        input.jadwal_pengawas_id,
-        input.status,
-        input.badal_source,
-        input.badal_pengawas_id,
-        input.badal_panitia_id,
-        input.badal_nama,
-      ],
-    })))
+  const cleanInput = {
+    jadwal_pengawas_id: Number(input.jadwal_pengawas_id),
+    status: input.status,
+    badal_source: input.status === 'BADAL' ? input.badal_source ?? null : null,
+    badal_pengawas_id: input.status === 'BADAL' && input.badal_source === 'pengawas' ? input.badal_pengawas_id ?? null : null,
+    badal_panitia_id: input.status === 'BADAL' && input.badal_source === 'panitia' ? input.badal_panitia_id ?? null : null,
+    badal_nama: input.status === 'BADAL' ? input.badal_nama?.trim().replace(/\s+/g, ' ') || null : null,
   }
+
+  if (!cleanInput.jadwal_pengawas_id || !['HADIR', 'TIDAK_HADIR', 'BADAL'].includes(cleanInput.status)) {
+    return { error: 'Data absensi pengawas tidak valid' }
+  }
+
+  if (
+    cleanInput.status === 'BADAL'
+    && !cleanInput.badal_pengawas_id
+    && !cleanInput.badal_panitia_id
+    && !cleanInput.badal_nama
+  ) {
+    return { error: 'Status BADAL wajib memilih atau mengisi nama badal' }
+  }
+
+  await execute(`
+    INSERT INTO ehb_absensi_pengawas
+      (ehb_event_id, jadwal_pengawas_id, status, badal_source, badal_pengawas_id, badal_panitia_id, badal_nama)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(ehb_event_id, jadwal_pengawas_id) DO UPDATE SET
+      status = excluded.status,
+      badal_source = excluded.badal_source,
+      badal_pengawas_id = excluded.badal_pengawas_id,
+      badal_panitia_id = excluded.badal_panitia_id,
+      badal_nama = excluded.badal_nama,
+      updated_at = datetime('now')
+  `, [
+    eventId,
+    cleanInput.jadwal_pengawas_id,
+    cleanInput.status,
+    cleanInput.badal_source,
+    cleanInput.badal_pengawas_id,
+    cleanInput.badal_panitia_id,
+    cleanInput.badal_nama,
+  ])
 
   await logActivity({
     actor: actorFromSession(session),
@@ -249,19 +247,14 @@ export async function saveAbsensiPengawasBatch(eventId: number, inputs: AbsensiP
     action: 'update',
     fiturHref: '/dashboard/ehb/absensi-pengawas',
     logKind: 'update',
-    entityType: 'ehb_absensi_pengawas_batch',
-    entityId: String(eventId),
+    entityType: 'ehb_absensi_pengawas',
+    entityId: `${eventId}:${cleanInput.jadwal_pengawas_id}`,
     entityLabel: 'Absensi pengawas EHB',
-    summary: `Menyimpan absensi pengawas untuk ${cleanInputs.length} petugas`,
-    details: {
-      event_id: eventId,
-      total_inputs: cleanInputs.length,
-      badal: cleanInputs.filter(input => input.status === 'BADAL').length,
-      tidak_hadir: cleanInputs.filter(input => input.status === 'TIDAK_HADIR').length,
-    },
+    summary: `Menyimpan absensi pengawas: ${cleanInput.status}`,
+    details: { event_id: eventId, ...cleanInput },
   })
 
   revalidatePath('/dashboard/ehb/absensi-pengawas')
   revalidatePath('/dashboard/ehb/keuangan')
-  return { success: true, saved: cleanInputs.length }
+  return { success: true, saved: 1 }
 }

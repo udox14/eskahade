@@ -353,49 +353,53 @@ export async function getSantriSebaranDetail({
   }
 }
 
-export async function simpanBatchLayanan(
-  changes: Record<string, { tempat_makan_id?: string | null; tempat_mencuci_id?: string | null }>
+export async function simpanLayananSantri(
+  santriId: string,
+  field: 'tempat_makan_id' | 'tempat_mencuci_id',
+  value: string | null
 ) {
   const session = await getSession()
   if (!session) throw new Error('Unauthorized')
-
-  const entries = Object.entries(changes)
-  if (!entries.length) return { success: true }
-
-  for (const [id, data] of entries) {
-    const sets: string[] = []
-    const params: unknown[] = []
-
-    if ('tempat_makan_id' in data) {
-      sets.push('tempat_makan_id = ?')
-      params.push(data.tempat_makan_id)
-    }
-    if ('tempat_mencuci_id' in data) {
-      sets.push('tempat_mencuci_id = ?')
-      params.push(data.tempat_mencuci_id)
-    }
-
-    if (sets.length) {
-      params.push(id)
-      await execute(`UPDATE santri SET ${sets.join(', ')} WHERE id = ?`, params)
-    }
+  if (field !== 'tempat_makan_id' && field !== 'tempat_mencuci_id') {
+    return { error: 'Kolom layanan tidak valid' }
   }
 
+  const santri = await query<{ id: string; nama_lengkap: string | null; asrama: string | null }>(
+    'SELECT id, nama_lengkap, asrama FROM santri WHERE id = ? AND status_global = ?',
+    [santriId, 'aktif']
+  )
+  const target = santri[0]
+  if (!target) return { error: 'Santri tidak ditemukan' }
+  if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan !== target.asrama) {
+    return { error: 'Tidak boleh mengubah santri di luar asrama binaan' }
+  }
+
+  if (value) {
+    const expectedJenis = field === 'tempat_makan_id' ? 'Makan' : 'Cuci'
+    const jasa = await query<{ id: string }>(
+      'SELECT id FROM master_jasa WHERE id = ? AND jenis = ?',
+      [value, expectedJenis]
+    )
+    if (!jasa[0]) return { error: 'Penyedia jasa tidak valid' }
+  }
+
+  await execute(`UPDATE santri SET ${field} = ? WHERE id = ?`, [value, santriId])
   await logActivity({
     actor: actorFromSession(session),
     module: 'asrama_layanan',
     action: 'update',
     fiturHref: '/dashboard/asrama/layanan',
     logKind: 'update',
-    entityType: 'santri_layanan_batch',
-    entityId: 'batch',
-    entityLabel: 'Pengaturan layanan santri',
-    summary: `Memperbarui penempatan layanan untuk ${entries.length} santri`,
+    entityType: 'santri_layanan',
+    entityId: santriId,
+    entityLabel: target.nama_lengkap || santriId,
+    summary: `Memperbarui ${field === 'tempat_makan_id' ? 'tempat makan' : 'tempat cuci'} ${target.nama_lengkap || santriId}`,
     details: {
-      count: entries.length,
+      field,
+      value,
     },
   })
 
   revalidatePath('/dashboard/asrama/layanan')
-  return { success: true, count: entries.length }
+  return { success: true }
 }

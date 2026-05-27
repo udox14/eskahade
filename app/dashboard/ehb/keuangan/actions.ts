@@ -316,7 +316,7 @@ async function ensureKeuanganSchemaOnce() {
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       ehb_event_id        INTEGER NOT NULL REFERENCES ehb_event(id) ON DELETE CASCADE,
       jadwal_pengawas_id  INTEGER NOT NULL REFERENCES ehb_jadwal_pengawas(id) ON DELETE CASCADE,
-      status              TEXT NOT NULL DEFAULT 'HADIR',
+      status              TEXT NOT NULL DEFAULT 'TIDAK_HADIR',
       badal_source        TEXT,
       badal_pengawas_id   INTEGER REFERENCES ehb_pengawas(id),
       badal_panitia_id    INTEGER REFERENCES ehb_panitia(id),
