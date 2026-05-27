@@ -62,22 +62,47 @@ export default function MasterHafalanContent() {
 
   const downloadTemplate = async () => {
     const XLSX = await import('xlsx')
-    const rows = [
-      {
-        BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
-        'URUTAN BAB': 1,
-        BLOK: jenis === 'quran' ? 'Ayat 1' : 'Definisi Kalam',
-        DESKRIPSI: jenis === 'quran' ? 'Al-Fatihah:1' : 'Bagian awal bab',
-        'URUTAN BLOK': 1,
-      },
-      {
-        BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
-        'URUTAN BAB': 1,
-        BLOK: jenis === 'quran' ? 'Ayat 2' : 'Pembagian Kalam',
-        DESKRIPSI: '',
-        'URUTAN BLOK': 2,
-      },
-    ]
+    const rows = jenis === 'alfiyah'
+      ? [
+          { 'Nama Bab (Arab)': 'المقدمة', 'Jumlah Bait': 7, 'Bait Ke-': '1 - 7' },
+          { 'Nama Bab (Arab)': 'الكلام وما يتألف منه', 'Jumlah Bait': 7, 'Bait Ke-': '8 - 14' },
+          { 'Nama Bab (Arab)': 'المعرب والمبني', 'Jumlah Bait': 28, 'Bait Ke-': '15 - 42' },
+        ]
+      : jenis === 'hadits'
+        ? [
+            { 'Nama Bab (Arab)': 'باب النية', 'Jumlah Hadits': 3, 'Hadits Ke-': '1 - 3' },
+            { 'Nama Bab (Arab)': 'باب الإيمان', 'Jumlah Hadits': 5, 'Hadits Ke-': '4 - 8' },
+            { 'Nama Bab (Arab)': 'باب الطهارة', 'Jumlah Hadits': 4, 'Hadits Ke-': '9 - 12' },
+          ]
+        : jenis === 'jurumiyah'
+          ? [
+              { BAB: 'Bab Kalam', 'URUTAN BAB': 1 },
+              { BAB: 'Bab I’rab', 'URUTAN BAB': 2 },
+              { BAB: 'Bab Marfu’atul Asma', 'URUTAN BAB': 3 },
+            ]
+          : jenis === 'amtsilah'
+            ? [
+                { BAGIAN: 'Tasrif Istilahi', BAB: '', WAZAN: "Fa'ala - Yaf'ulu", 'URUTAN BLOK': 1 },
+                { BAGIAN: 'Tasrif Istilahi', BAB: '', WAZAN: "Fa'ala - Yaf'ilu", 'URUTAN BLOK': 2 },
+                { BAGIAN: 'Tasrif Lughawi', BAB: 'Fi’il Madhi', WAZAN: 'فَعَلَ', 'URUTAN BLOK': 1 },
+                { BAGIAN: 'Tasrif Lughawi', BAB: 'Fi’il Mudhari', WAZAN: 'يَفْعُلُ', 'URUTAN BLOK': 2 },
+              ]
+      : [
+          {
+            BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
+            'URUTAN BAB': 1,
+            BLOK: jenis === 'quran' ? 'Ayat 1' : 'Definisi Kalam',
+            DESKRIPSI: jenis === 'quran' ? 'Al-Fatihah:1' : 'Bagian awal bab',
+            'URUTAN BLOK': 1,
+          },
+          {
+            BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
+            'URUTAN BAB': 1,
+            BLOK: jenis === 'quran' ? 'Ayat 2' : 'Pembagian Kalam',
+            DESKRIPSI: '',
+            'URUTAN BLOK': 2,
+          },
+        ]
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Template Hafalan')
@@ -211,9 +236,9 @@ export default function MasterHafalanContent() {
                 <tbody className="divide-y">
                   {importRows.slice(0, 20).map((row, index) => (
                     <tr key={index}>
-                      <td className="p-2 font-semibold">{row.BAB || row.bab || row['JUDUL BAB'] || '-'}</td>
-                      <td className="p-2">{row.BLOK || row.blok || row['LABEL BLOK'] || '-'}</td>
-                      <td className="p-2 text-slate-500">{row.DESKRIPSI || row.deskripsi || row.KETERANGAN || '-'}</td>
+                      <td className="p-2 font-semibold">{row.BAGIAN || row.Bab || row.BAB || row.bab || row['JUDUL BAB'] || row['Nama Bab (Arab)'] || row['NAMA BAB (ARAB)'] || '-'}</td>
+                      <td className="p-2">{row.WAZAN || row.wazan || row.BLOK || row.blok || row['LABEL BLOK'] || row['Bait Ke-'] || row['BAIT KE-'] || row['Hadits Ke-'] || row['HADITS KE-'] || '-'}</td>
+                      <td className="p-2 text-slate-500">{row.DESKRIPSI || row.deskripsi || row.KETERANGAN || row['Jumlah Bait'] || row['JUMLAH BAIT'] || row['Jumlah Hadits'] || row['JUMLAH HADITS'] || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

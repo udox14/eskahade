@@ -184,6 +184,7 @@ async function ensureGuruFeatureSchemaOnce() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       jenis TEXT NOT NULL,
       marhalah_id INTEGER NOT NULL REFERENCES marhalah(id),
+      parent_id INTEGER REFERENCES hafalan_bab(id) ON DELETE CASCADE,
       judul TEXT NOT NULL,
       urutan INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1,
@@ -219,7 +220,15 @@ async function ensureGuruFeatureSchemaOnce() {
   `)
   await execute('CREATE INDEX IF NOT EXISTS idx_nilai_harian_sesi_kelas ON nilai_harian_sesi(kelas_id, mapel_id, tanggal)')
   await execute('CREATE INDEX IF NOT EXISTS idx_nilai_harian_detail_sesi ON nilai_harian_detail(sesi_id)')
+  try {
+    await execute('ALTER TABLE hafalan_bab ADD COLUMN parent_id INTEGER REFERENCES hafalan_bab(id) ON DELETE CASCADE')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_bab_lookup ON hafalan_bab(jenis, marhalah_id, is_active, urutan)')
+  await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_bab_parent ON hafalan_bab(parent_id)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_blok_bab ON hafalan_blok(bab_id, is_active, urutan)')
   await execute('CREATE INDEX IF NOT EXISTS idx_hafalan_progress_riwayat ON hafalan_progress(riwayat_pendidikan_id)')
   await execute(`

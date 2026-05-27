@@ -190,6 +190,20 @@ function cell(row: ImportHafalanRow, keys: string[]) {
   return ''
 }
 
+function parseRange(value: string) {
+  const normalized = value.replace(/[–—]/g, '-').replace(/\s+/g, '')
+  const match = normalized.match(/^(\d+)-(\d+)$/)
+  if (match) {
+    const start = Number(match[1])
+    const end = Number(match[2])
+    if (Number.isFinite(start) && Number.isFinite(end) && start > 0 && end >= start) return { start, end }
+  }
+
+  const single = Number(normalized)
+  if (Number.isFinite(single) && single > 0) return { start: single, end: single }
+  return null
+}
+
 export async function importHafalanMassal(payload: {
   jenis: string
   marhalahId: number
@@ -202,10 +216,15 @@ export async function importHafalanMassal(payload: {
   if (!payload.rows.length) return { error: 'Data import kosong.' }
 
   const existingBabRows = await query<{ id: number; judul: string }>(
-    'SELECT id, judul FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ?',
+    'SELECT id, judul FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND parent_id IS NULL',
     [payload.jenis, payload.marhalahId]
   )
   const babMap = new Map(existingBabRows.map(row => [row.judul.toLowerCase().trim(), row.id]))
+  const childBabRows = await query<{ id: number; judul: string; parent_id: number | null }>(
+    'SELECT id, judul, parent_id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND parent_id IS NOT NULL',
+    [payload.jenis, payload.marhalahId]
+  )
+  const childBabMap = new Map(childBabRows.map(row => [`${row.parent_id}:${row.judul.toLowerCase().trim()}`, row.id]))
   const blockRows = await query<{ bab_id: number; label: string }>(`
     SELECT hblk.bab_id, hblk.label
     FROM hafalan_blok hblk
@@ -219,13 +238,29 @@ export async function importHafalanMassal(payload: {
   let skipped = 0
 
   for (const row of payload.rows) {
-    const judulBab = cell(row, ['BAB', 'Bab', 'bab', 'JUDUL BAB', 'Judul Bab', 'judul_bab'])
+    const bagian = cell(row, ['BAGIAN', 'Bagian', 'bagian'])
+    const explicitBab = cell(row, ['BAB', 'Bab', 'bab', 'JUDUL BAB', 'Judul Bab', 'judul_bab', 'NAMA BAB (ARAB)', 'Nama Bab (Arab)', 'nama bab (arab)', 'NAMA BAB', 'Nama Bab'])
+    const judulBab = payload.jenis === 'amtsilah'
+      ? (bagian || explicitBab)
+      : explicitBab
     const labelBlok = cell(row, ['BLOK', 'Blok', 'blok', 'LABEL BLOK', 'Label Blok', 'label_blok'])
+    const wazan = cell(row, ['WAZAN', 'Wazan', 'wazan'])
     const deskripsi = cell(row, ['DESKRIPSI', 'Deskripsi', 'deskripsi', 'KETERANGAN', 'Keterangan'])
     const urutanBab = Number(cell(row, ['URUTAN BAB', 'Urutan Bab', 'urutan_bab', 'URUTAN']) || 0)
     const urutanBlok = Number(cell(row, ['URUTAN BLOK', 'Urutan Blok', 'urutan_blok']) || 0)
+    const rangeValue = cell(row, [
+      'BAIT KE-', 'Bait Ke-', 'bait ke-', 'BAIT KE', 'Bait Ke', 'bait_ke',
+      'HADITS KE-', 'Hadits Ke-', 'hadits ke-', 'HADITS KE', 'Hadits Ke', 'hadits_ke',
+    ])
+    const jumlahRange = Number(cell(row, [
+      'JUMLAH BAIT', 'Jumlah Bait', 'jumlah bait', 'jumlah_bait',
+      'JUMLAH HADITS', 'Jumlah Hadits', 'jumlah hadits', 'jumlah_hadits',
+    ]) || 0)
+    const isRangeImport = payload.jenis === 'alfiyah' || payload.jenis === 'hadits'
+    const parsedRangeImport = isRangeImport && rangeValue ? parseRange(rangeValue) : null
+    const isJurumiyahSimple = payload.jenis === 'jurumiyah' && judulBab && !labelBlok
 
-    if (!judulBab || !labelBlok) {
+    if (!judulBab) {
       skipped += 1
       continue
     }
@@ -235,7 +270,7 @@ export async function importHafalanMassal(payload: {
     if (!babId) {
       await execute(
         'INSERT INTO hafalan_bab (jenis, marhalah_id, judul, urutan) VALUES (?, ?, ?, ?)',
-        [payload.jenis, payload.marhalahId, judulBab, Number.isFinite(urutanBab) ? urutanBab : 0]
+        [payload.jenis, payload.marhalahId, judulBab, Number.isFinite(urutanBab) && urutanBab > 0 ? urutanBab : parsedRangeImport?.start || 0]
       )
       const inserted = await queryOne<{ id: number }>(
         'SELECT id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND judul = ? ORDER BY id DESC LIMIT 1',
@@ -248,6 +283,99 @@ export async function importHafalanMassal(payload: {
       babId = inserted.id
       babMap.set(babKey, babId)
       insertedBab += 1
+    }
+
+    if (payload.jenis === 'amtsilah') {
+      const blockLabel = wazan || labelBlok
+      if (!blockLabel) {
+        skipped += 1
+        continue
+      }
+
+      let targetBabId: number = babId
+      if (bagian && explicitBab) {
+        const childKey = `${babId}:${explicitBab.toLowerCase().trim()}`
+        targetBabId = childBabMap.get(childKey) || 0
+        if (!targetBabId) {
+          await execute(
+            'INSERT INTO hafalan_bab (jenis, marhalah_id, parent_id, judul, urutan) VALUES (?, ?, ?, ?, ?)',
+            [payload.jenis, payload.marhalahId, babId, explicitBab, Number.isFinite(urutanBab) && urutanBab > 0 ? urutanBab : 0]
+          )
+          const child = await queryOne<{ id: number }>(
+            'SELECT id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND parent_id = ? AND judul = ? ORDER BY id DESC LIMIT 1',
+            [payload.jenis, payload.marhalahId, babId, explicitBab]
+          )
+          if (!child) {
+            skipped += 1
+            continue
+          }
+          targetBabId = child.id
+          childBabMap.set(childKey, targetBabId)
+          insertedBab += 1
+        }
+      }
+
+      const blockKey = `${targetBabId}:${blockLabel.toLowerCase().trim()}`
+      if (blockKeys.has(blockKey)) {
+        skipped += 1
+        continue
+      }
+      await execute(
+        'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+        [targetBabId, blockLabel, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0]
+      )
+      blockKeys.add(blockKey)
+      insertedBlok += 1
+      continue
+    }
+
+    if (isJurumiyahSimple) {
+      const blockKey = `${babId}:Status`.toLowerCase().trim()
+      if (!blockKeys.has(blockKey)) {
+        await execute(
+          'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+          [babId, 'Status', 'Progress bab', 1]
+        )
+        blockKeys.add(blockKey)
+        insertedBlok += 1
+      }
+      continue
+    }
+
+    if (isRangeImport && rangeValue) {
+      const parsedRange = parsedRangeImport
+      if (!parsedRange) {
+        skipped += 1
+        continue
+      }
+
+      const count = parsedRange.end - parsedRange.start + 1
+      if (Number.isFinite(jumlahRange) && jumlahRange > 0 && jumlahRange !== count) {
+        skipped += 1
+        continue
+      }
+
+      const prefix = payload.jenis === 'hadits' ? 'Hadits' : 'Bait'
+      for (let bait = parsedRange.start; bait <= parsedRange.end; bait += 1) {
+        const blockKey = `${babId}:${prefix} ${bait}`.toLowerCase().trim()
+        if (blockKeys.has(blockKey)) {
+          skipped += 1
+          continue
+        }
+
+        await execute(
+          'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+          [babId, `${prefix} ${bait}`, `${judulBab} ${prefix.toLowerCase()} ${bait}`, bait]
+        )
+        blockKeys.add(blockKey)
+        insertedBlok += 1
+      }
+      continue
+    }
+
+    if (!labelBlok) {
+      skipped += 1
+      continue
     }
 
     const blockKey = `${babId}:${labelBlok.toLowerCase().trim()}`

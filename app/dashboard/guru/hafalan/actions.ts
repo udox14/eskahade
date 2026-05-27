@@ -53,24 +53,32 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   await ensureGuruFeatureSchema()
 
   const kelas = await queryOne<{ marhalah_id: number | null }>('SELECT marhalah_id FROM kelas WHERE id = ?', [kelasId])
-  if (!kelas?.marhalah_id) return { santri: [], bab: [], progress: {} }
+  if (!kelas?.marhalah_id) return { santri: [], bab: [], progress: {}, progressStatus: {} }
 
   const [santri, babRows] = await Promise.all([
     getSantriForKelas(kelasId),
     query<any>(`
-      SELECT hb.id AS bab_id, hb.judul, hb.urutan AS bab_urutan,
+      SELECT hb.id AS bab_id, hb.judul, hb.urutan AS bab_urutan, hb.parent_id,
+             parent.judul AS parent_judul, parent.urutan AS parent_urutan,
              hblk.id AS blok_id, hblk.label, hblk.deskripsi, hblk.urutan AS blok_urutan
       FROM hafalan_bab hb
+      LEFT JOIN hafalan_bab parent ON parent.id = hb.parent_id
       LEFT JOIN hafalan_blok hblk ON hblk.bab_id = hb.id AND hblk.is_active = 1
       WHERE hb.jenis = ? AND hb.marhalah_id = ? AND hb.is_active = 1
-      ORDER BY hb.urutan, hb.id, hblk.urutan, hblk.id
+      ORDER BY COALESCE(parent.urutan, hb.urutan), COALESCE(parent.id, hb.id), hb.urutan, hb.id, hblk.urutan, hblk.id
     `, [jenis, kelas.marhalah_id]),
   ])
 
   const babMap = new Map<number, any>()
   for (const row of babRows) {
     if (!babMap.has(row.bab_id)) {
-      babMap.set(row.bab_id, { id: row.bab_id, judul: row.judul, urutan: row.bab_urutan, blok: [] })
+      babMap.set(row.bab_id, {
+        id: row.bab_id,
+        judul: row.parent_judul ? `${row.parent_judul} / ${row.judul}` : row.judul,
+        urutan: row.bab_urutan,
+        parent_id: row.parent_id,
+        blok: [],
+      })
     }
     if (row.blok_id) {
       babMap.get(row.bab_id).blok.push({
@@ -82,11 +90,12 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
     }
   }
 
-  if (santri.length === 0) return { santri, bab: Array.from(babMap.values()), progress: {} }
+  const bab = Array.from(babMap.values()).filter(item => item.blok.length > 0)
+  if (santri.length === 0) return { santri, bab, progress: {}, progressStatus: {} }
   const riwayatIds = santri.map(row => row.riwayat_id)
   const placeholders = riwayatIds.map(() => '?').join(',')
-  const progressRows = await query<{ blok_id: number; riwayat_pendidikan_id: string }>(`
-    SELECT hp.blok_id, hp.riwayat_pendidikan_id
+  const progressRows = await query<{ blok_id: number; riwayat_pendidikan_id: string; status: string }>(`
+    SELECT hp.blok_id, hp.riwayat_pendidikan_id, hp.status
     FROM hafalan_progress hp
     JOIN hafalan_blok hblk ON hblk.id = hp.blok_id
     JOIN hafalan_bab hb ON hb.id = hblk.bab_id
@@ -97,8 +106,12 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   `, [jenis, kelas.marhalah_id, ...riwayatIds])
 
   const progress: Record<string, boolean> = {}
-  for (const row of progressRows) progress[`${row.riwayat_pendidikan_id}:${row.blok_id}`] = true
-  return { santri, bab: Array.from(babMap.values()), progress }
+  const progressStatus: Record<string, string> = {}
+  for (const row of progressRows) {
+    progress[`${row.riwayat_pendidikan_id}:${row.blok_id}`] = true
+    progressStatus[`${row.riwayat_pendidikan_id}:${row.blok_id}`] = row.status
+  }
+  return { santri, bab, progress, progressStatus }
 }
 
 export async function toggleHafalanProgress(payload: { kelasId: string; jenis: string; riwayatId: string; blokId: number }) {
@@ -163,6 +176,7 @@ export async function simpanHafalanProgressBatch(payload: {
   jenis: string
   riwayatId: string
   checkedBlokIds: number[]
+  statusByBlokId?: Record<string, string>
 }) {
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi.' }
@@ -196,10 +210,12 @@ export async function simpanHafalanProgressBatch(payload: {
   )
 
   for (const blokId of checkedIds) {
+    const requestedStatus = payload.statusByBlokId?.[String(blokId)]
+    const status = requestedStatus === 'proses' ? 'proses' : 'hafal'
     await execute(`
       INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, guru_id, status, tanggal_setor, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, 'hafal', date('now'), ?, datetime('now'))
-    `, [generateId(), blokId, payload.riwayatId, guruId, session.id])
+      VALUES (?, ?, ?, ?, ?, date('now'), ?, datetime('now'))
+    `, [generateId(), blokId, payload.riwayatId, guruId, status, session.id])
   }
 
   await logActivity({

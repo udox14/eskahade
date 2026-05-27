@@ -21,6 +21,8 @@ export default function HafalanPageContent() {
   const [selectedBabId, setSelectedBabId] = useState<number | null>(null)
   const [santriSearch, setSantriSearch] = useState('')
   const [localChecked, setLocalChecked] = useState<Set<number>>(new Set())
+  const [localStatus, setLocalStatus] = useState<Record<number, string>>({})
+  const [rangeAnchor, setRangeAnchor] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -54,6 +56,8 @@ export default function HafalanPageContent() {
       setSelectedSantriId('')
       setSelectedBabId(null)
       setLocalChecked(new Set())
+      setLocalStatus({})
+      setRangeAnchor(null)
       setDirty(false)
     })
   }, [kelasId, selectedType])
@@ -85,6 +89,7 @@ export default function HafalanPageContent() {
         const parsed = JSON.parse(rawDraft)
         if (Array.isArray(parsed?.checkedBlokIds)) {
           setLocalChecked(new Set(parsed.checkedBlokIds.map(Number)))
+          setLocalStatus(parsed.statusByBlokId || {})
           setDirty(true)
           setSelectedBabId(null)
           toast.info('Draft hafalan yang belum disimpan dipulihkan')
@@ -96,21 +101,63 @@ export default function HafalanPageContent() {
     const ids = data.bab.flatMap((bab: any) => bab.blok.map((blok: any) => blok.id))
       .filter((blokId: number) => data.progress[`${riwayatId}:${blokId}`])
     setLocalChecked(new Set(ids))
+    setLocalStatus(Object.fromEntries(
+      ids.map((blokId: number) => [blokId, data.progressStatus?.[`${riwayatId}:${blokId}`] || 'hafal'])
+    ))
     setDirty(false)
     setSelectedBabId(null)
+    setRangeAnchor(null)
     window.setTimeout(() => babSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }
 
   const selectBab = (babId: number) => {
     setSelectedBabId(babId)
+    setRangeAnchor(null)
     window.setTimeout(() => blockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }
 
   const toggleLocal = (blokId: number) => {
     setLocalChecked(prev => {
       const next = new Set(prev)
-      if (next.has(blokId)) next.delete(blokId)
+      const selectedBabBlocks = selectedBab?.blok || []
+      const anchorIndex = rangeAnchor == null ? -1 : selectedBabBlocks.findIndex((blok: any) => blok.id === rangeAnchor)
+      const currentIndex = selectedBabBlocks.findIndex((blok: any) => blok.id === blokId)
+
+      if (anchorIndex >= 0 && currentIndex >= 0 && rangeAnchor !== blokId) {
+        const [start, end] = anchorIndex < currentIndex ? [anchorIndex, currentIndex] : [currentIndex, anchorIndex]
+        for (const blok of selectedBabBlocks.slice(start, end + 1)) next.add(blok.id)
+      } else if (next.has(blokId)) {
+        next.delete(blokId)
+      } else {
+        next.add(blokId)
+      }
+      return next
+    })
+    setRangeAnchor(blokId)
+    setDirty(true)
+  }
+
+  const setJurumiyahStatus = (blokId: number, status: 'belum' | 'proses' | 'hafal') => {
+    setLocalChecked(prev => {
+      const next = new Set(prev)
+      if (status === 'belum') next.delete(blokId)
       else next.add(blokId)
+      return next
+    })
+    setLocalStatus(prev => {
+      const next = { ...prev }
+      if (status === 'belum') delete next[blokId]
+      else next[blokId] = status
+      return next
+    })
+    setDirty(true)
+  }
+
+  const markSelectedBabComplete = () => {
+    if (!selectedBab) return
+    setLocalChecked(prev => {
+      const next = new Set(prev)
+      for (const blok of selectedBab.blok) next.add(blok.id)
       return next
     })
     setDirty(true)
@@ -121,6 +168,7 @@ export default function HafalanPageContent() {
     try {
       sessionStorage.setItem(draftKey, JSON.stringify({
         checkedBlokIds: Array.from(localChecked),
+        statusByBlokId: localStatus,
         updatedAt: new Date().toISOString(),
       }))
     } catch {}
@@ -145,6 +193,9 @@ export default function HafalanPageContent() {
       jenis: selectedType.key,
       riwayatId: selectedSantriId,
       checkedBlokIds: Array.from(localChecked),
+      statusByBlokId: selectedType.key === 'jurumiyah'
+        ? Object.fromEntries(Object.entries(localStatus).map(([key, value]) => [key, value]))
+        : undefined,
     })
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
@@ -159,7 +210,15 @@ export default function HafalanPageContent() {
           else delete nextProgress[key]
         }
       }
-      return { ...prev, progress: nextProgress }
+      const nextProgressStatus = { ...(prev.progressStatus || {}) }
+      for (const bab of prev.bab) {
+        for (const blok of bab.blok) {
+          const key = `${selectedSantriId}:${blok.id}`
+          if (checkedSet.has(blok.id)) nextProgressStatus[key] = selectedType.key === 'jurumiyah' ? localStatus[blok.id] || 'hafal' : 'hafal'
+          else delete nextProgressStatus[key]
+        }
+      }
+      return { ...prev, progress: nextProgress, progressStatus: nextProgressStatus }
     })
     setDirty(false)
     try {
@@ -277,6 +336,34 @@ export default function HafalanPageContent() {
                       {data.bab.map((bab: any) => {
                         const active = selectedBabId === bab.id
                         const babDone = bab.blok.filter((blok: any) => localChecked.has(blok.id)).length
+                        if (selectedType?.key === 'jurumiyah') {
+                          const statusBlok = bab.blok[0]
+                          const status = statusBlok ? localStatus[statusBlok.id] || 'belum' : 'belum'
+                          return (
+                            <div key={bab.id} className="min-h-24 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                              <p className="line-clamp-2 text-sm font-bold leading-tight text-slate-900">{bab.judul}</p>
+                              <div className="mt-2 grid grid-cols-3 gap-1 text-[10px] font-bold">
+                                {(['belum', 'proses', 'hafal'] as const).map(option => (
+                                  <button
+                                    key={option}
+                                    onClick={() => statusBlok && setJurumiyahStatus(statusBlok.id, option)}
+                                    className={`rounded-md px-1 py-1.5 ${
+                                      status === option
+                                        ? option === 'hafal'
+                                          ? 'bg-emerald-600 text-white'
+                                          : option === 'proses'
+                                            ? 'bg-amber-500 text-white'
+                                            : 'bg-slate-700 text-white'
+                                        : 'bg-white text-slate-500'
+                                    }`}
+                                  >
+                                    {option === 'belum' ? 'Belum' : option === 'proses' ? 'Proses' : 'Selesai'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        }
                         return (
                           <button
                             key={bab.id}
@@ -289,16 +376,31 @@ export default function HafalanPageContent() {
                         )
                       })}
                     </div>
+                    {selectedType?.key === 'jurumiyah' && (
+                      <button
+                        onClick={saveProgress}
+                        disabled={saving}
+                        className="sticky bottom-16 z-30 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50 md:static md:w-auto"
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Simpan Hafalan
+                      </button>
+                    )}
                   </div>
 
-                  {selectedBab && (
+                  {selectedBab && selectedType?.key !== 'jurumiyah' && (
                     <div ref={blockRef} className="min-w-0 rounded-xl border bg-white p-3 shadow-sm sm:p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase text-slate-500">Input Blok</p>
                           <h3 className="font-bold text-slate-900">{selectedBab.judul}</h3>
                         </div>
-                        {dirty && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Draft lokal</span>}
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button onClick={markSelectedBabComplete} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                            Hafal semua
+                          </button>
+                          {dirty && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Draft lokal</span>}
+                        </div>
                       </div>
                       {dirty && (
                         <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS hafalan_bab (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   jenis        TEXT NOT NULL,
   marhalah_id  INTEGER NOT NULL REFERENCES marhalah(id),
+  parent_id    INTEGER REFERENCES hafalan_bab(id) ON DELETE CASCADE,
   judul        TEXT NOT NULL,
   urutan       INTEGER NOT NULL DEFAULT 0,
   is_active    INTEGER NOT NULL DEFAULT 1,
@@ -68,6 +69,8 @@ CREATE INDEX IF NOT EXISTS idx_nilai_harian_detail_sesi
   ON nilai_harian_detail(sesi_id);
 CREATE INDEX IF NOT EXISTS idx_hafalan_bab_lookup
   ON hafalan_bab(jenis, marhalah_id, is_active, urutan);
+CREATE INDEX IF NOT EXISTS idx_hafalan_bab_parent
+  ON hafalan_bab(parent_id);
 CREATE INDEX IF NOT EXISTS idx_hafalan_blok_bab
   ON hafalan_blok(bab_id, is_active, urutan);
 CREATE INDEX IF NOT EXISTS idx_hafalan_progress_riwayat
