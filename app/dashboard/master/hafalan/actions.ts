@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { getSession, isAdmin } from '@/lib/auth/session'
-import { execute, query, queryOne } from '@/lib/db'
-import { ensureGuruFeatureSchema, HAFALAN_TYPES, isHafalanType } from '@/lib/akademik/guru-access'
+import { batch, execute, query, queryOne } from '@/lib/db'
+import { ensureGuruFeatureSchema, HAFALAN_TYPES, isHafalanType, QURAN_SURAHS } from '@/lib/akademik/guru-access'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 
 async function requireAdmin() {
@@ -16,8 +16,8 @@ async function requireAdmin() {
 
 export async function getMasterHafalanInitialData() {
   const session = await requireAdmin()
-  if (!session) return { marhalah: [], types: HAFALAN_TYPES }
-  return { marhalah: await getCachedMarhalahList(), types: HAFALAN_TYPES }
+  if (!session) return { marhalah: [], types: HAFALAN_TYPES, quranSurahs: QURAN_SURAHS }
+  return { marhalah: await getCachedMarhalahList(), types: HAFALAN_TYPES, quranSurahs: QURAN_SURAHS }
 }
 
 export async function getMasterHafalanList(jenis: string, marhalahId: number) {
@@ -83,6 +83,56 @@ export async function tambahHafalanBab(payload: { jenis: string; marhalahId: num
   return { success: true }
 }
 
+export async function tambahSuratQuran(payload: { marhalahId: number; surahNumber: number }) {
+  const session = await requireAdmin()
+  if (!session) return { error: 'Akses ditolak.' }
+
+  const surah = QURAN_SURAHS.find(item => item.number === Number(payload.surahNumber))
+  if (!surah) return { error: 'Surat tidak valid.' }
+  if (!payload.marhalahId) return { error: 'Marhalah wajib dipilih.' }
+
+  const existing = await queryOne<{ id: number }>(
+    'SELECT id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND judul = ? LIMIT 1',
+    ['quran', payload.marhalahId, surah.name]
+  )
+  if (existing) return { error: 'Surat ini sudah ada untuk marhalah tersebut.' }
+
+  await execute(
+    'INSERT INTO hafalan_bab (jenis, marhalah_id, judul, urutan) VALUES (?, ?, ?, ?)',
+    ['quran', payload.marhalahId, surah.name, surah.number]
+  )
+
+  const bab = await queryOne<{ id: number }>(
+    'SELECT id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND judul = ? ORDER BY id DESC LIMIT 1',
+    ['quran', payload.marhalahId, surah.name]
+  )
+  if (!bab) return { error: 'Gagal membuat surat.' }
+
+  await batch(Array.from({ length: surah.ayahCount }, (_, index) => {
+    const ayahNumber = index + 1
+    return {
+      sql: 'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+      params: [bab.id, `Ayat ${ayahNumber}`, `${surah.name}:${ayahNumber}`, ayahNumber],
+    }
+  }))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_hafalan',
+    action: 'create',
+    fiturHref: '/dashboard/master/hafalan',
+    logKind: 'create',
+    entityType: 'hafalan_quran_surat',
+    entityId: String(bab.id),
+    entityLabel: surah.name,
+    summary: `Menambahkan surat ${surah.name} dengan ${surah.ayahCount} ayat`,
+    details: { marhalah_id: payload.marhalahId, surah_number: surah.number, ayah_count: surah.ayahCount },
+  })
+
+  revalidatePath('/dashboard/master/hafalan')
+  return { success: true, count: surah.ayahCount }
+}
+
 export async function tambahHafalanBlok(payload: { babId: number; label: string; deskripsi?: string; urutan: number }) {
   const session = await requireAdmin()
   if (!session) return { error: 'Akses ditolak.' }
@@ -128,4 +178,108 @@ export async function setHafalanActive(target: 'bab' | 'blok', id: number, activ
   })
   revalidatePath('/dashboard/master/hafalan')
   return { success: true }
+}
+
+type ImportHafalanRow = Record<string, unknown>
+
+function cell(row: ImportHafalanRow, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key]
+    if (value != null && String(value).trim()) return String(value).trim()
+  }
+  return ''
+}
+
+export async function importHafalanMassal(payload: {
+  jenis: string
+  marhalahId: number
+  rows: ImportHafalanRow[]
+}) {
+  const session = await requireAdmin()
+  if (!session) return { error: 'Akses ditolak.' }
+  if (!isHafalanType(payload.jenis)) return { error: 'Jenis hafalan tidak valid.' }
+  if (!payload.marhalahId) return { error: 'Marhalah wajib dipilih.' }
+  if (!payload.rows.length) return { error: 'Data import kosong.' }
+
+  const existingBabRows = await query<{ id: number; judul: string }>(
+    'SELECT id, judul FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ?',
+    [payload.jenis, payload.marhalahId]
+  )
+  const babMap = new Map(existingBabRows.map(row => [row.judul.toLowerCase().trim(), row.id]))
+  const blockRows = await query<{ bab_id: number; label: string }>(`
+    SELECT hblk.bab_id, hblk.label
+    FROM hafalan_blok hblk
+    JOIN hafalan_bab hb ON hb.id = hblk.bab_id
+    WHERE hb.jenis = ? AND hb.marhalah_id = ?
+  `, [payload.jenis, payload.marhalahId])
+  const blockKeys = new Set(blockRows.map(row => `${row.bab_id}:${row.label.toLowerCase().trim()}`))
+
+  let insertedBab = 0
+  let insertedBlok = 0
+  let skipped = 0
+
+  for (const row of payload.rows) {
+    const judulBab = cell(row, ['BAB', 'Bab', 'bab', 'JUDUL BAB', 'Judul Bab', 'judul_bab'])
+    const labelBlok = cell(row, ['BLOK', 'Blok', 'blok', 'LABEL BLOK', 'Label Blok', 'label_blok'])
+    const deskripsi = cell(row, ['DESKRIPSI', 'Deskripsi', 'deskripsi', 'KETERANGAN', 'Keterangan'])
+    const urutanBab = Number(cell(row, ['URUTAN BAB', 'Urutan Bab', 'urutan_bab', 'URUTAN']) || 0)
+    const urutanBlok = Number(cell(row, ['URUTAN BLOK', 'Urutan Blok', 'urutan_blok']) || 0)
+
+    if (!judulBab || !labelBlok) {
+      skipped += 1
+      continue
+    }
+
+    const babKey = judulBab.toLowerCase().trim()
+    let babId = babMap.get(babKey)
+    if (!babId) {
+      await execute(
+        'INSERT INTO hafalan_bab (jenis, marhalah_id, judul, urutan) VALUES (?, ?, ?, ?)',
+        [payload.jenis, payload.marhalahId, judulBab, Number.isFinite(urutanBab) ? urutanBab : 0]
+      )
+      const inserted = await queryOne<{ id: number }>(
+        'SELECT id FROM hafalan_bab WHERE jenis = ? AND marhalah_id = ? AND judul = ? ORDER BY id DESC LIMIT 1',
+        [payload.jenis, payload.marhalahId, judulBab]
+      )
+      if (!inserted) {
+        skipped += 1
+        continue
+      }
+      babId = inserted.id
+      babMap.set(babKey, babId)
+      insertedBab += 1
+    }
+
+    const blockKey = `${babId}:${labelBlok.toLowerCase().trim()}`
+    if (blockKeys.has(blockKey)) {
+      skipped += 1
+      continue
+    }
+
+    await execute(
+      'INSERT INTO hafalan_blok (bab_id, label, deskripsi, urutan) VALUES (?, ?, ?, ?)',
+      [babId, labelBlok, deskripsi || null, Number.isFinite(urutanBlok) ? urutanBlok : 0]
+    )
+    blockKeys.add(blockKey)
+    insertedBlok += 1
+  }
+
+  if (insertedBab === 0 && insertedBlok === 0) {
+    return { error: `Tidak ada data baru yang diimport. ${skipped} baris dilewati.` }
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_hafalan',
+    action: 'create',
+    fiturHref: '/dashboard/master/hafalan',
+    logKind: 'create',
+    entityType: 'hafalan_import',
+    entityLabel: 'Import hafalan massal',
+    summary: `Import hafalan: ${insertedBab} bab, ${insertedBlok} blok`,
+    details: { jenis: payload.jenis, marhalah_id: payload.marhalahId, inserted_bab: insertedBab, inserted_blok: insertedBlok, skipped },
+  })
+
+  revalidatePath('/dashboard/master/hafalan')
+  return { success: true, insertedBab, insertedBlok, skipped }
 }

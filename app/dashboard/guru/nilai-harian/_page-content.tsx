@@ -176,7 +176,35 @@ export default function NilaiHarianContent() {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="space-y-3 p-3 md:hidden">
+              {santri.map((row, idx) => (
+                <div key={row.riwayat_id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase text-slate-400">No. {idx + 1}</p>
+                      <p className="truncate font-semibold text-slate-800">{row.nama}</p>
+                      <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      inputMode="numeric"
+                      value={nilai[row.riwayat_id] ?? 0}
+                      onChange={e => setNilai(prev => ({ ...prev, [row.riwayat_id]: Number(e.target.value || 0) }))}
+                      className="h-12 w-24 shrink-0 rounded-lg border border-slate-200 text-center text-lg font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              ))}
+              {santri.length > 0 && (
+                <button onClick={handleSave} disabled={saving || !mapelId} className="sticky bottom-16 z-10 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Nilai
+                </button>
+              )}
+              {santri.length === 0 && <div className="py-12 text-center text-slate-400">Belum ada santri aktif.</div>}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead className="bg-white text-xs text-slate-500">
                   <tr><th className="w-14 px-3 py-2 text-center">No</th><th className="px-3 py-2 text-left">Santri</th><th className="w-32 px-3 py-2 text-center">Nilai</th></tr>
@@ -187,7 +215,7 @@ export default function NilaiHarianContent() {
                       <td className="px-3 py-2 text-center text-xs text-slate-400">{idx + 1}</td>
                       <td className="px-3 py-2"><p className="font-semibold text-slate-800">{row.nama}</p><p className="text-xs text-slate-400">{row.nis || '-'}</p></td>
                       <td className="px-3 py-2">
-                        <input type="number" min={0} max={100} value={nilai[row.riwayat_id] ?? 0} onChange={e => setNilai(prev => ({ ...prev, [row.riwayat_id]: Number(e.target.value || 0) }))} className="h-10 w-full rounded-lg border border-slate-200 text-center font-bold text-emerald-700" />
+                        <input type="number" min={0} max={100} inputMode="numeric" value={nilai[row.riwayat_id] ?? 0} onChange={e => setNilai(prev => ({ ...prev, [row.riwayat_id]: Number(e.target.value || 0) }))} className="h-10 w-full rounded-lg border border-slate-200 text-center font-bold text-emerald-700" />
                       </td>
                     </tr>
                   ))}
@@ -202,7 +230,27 @@ export default function NilaiHarianContent() {
           <div className="flex items-center gap-2 border-b bg-slate-50 px-4 py-3 font-bold text-slate-800">
             <Table2 className="h-4 w-4 text-emerald-600" /> Rekap Nilai Harian
           </div>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 p-3 md:hidden">
+            {rekap.santri.map((row: any) => (
+              <div key={row.riwayat_id} className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-3">
+                  <p className="font-semibold text-slate-900">{row.nama}</p>
+                  <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {rekap.sesi.map((s: any) => (
+                    <div key={s.id} className="rounded-lg bg-slate-50 p-2">
+                      <p className="truncate text-xs font-bold text-slate-700">{s.nama_sesi}</p>
+                      <p className="text-[10px] text-slate-400">{s.tanggal}</p>
+                      <p className="mt-1 text-lg font-black text-emerald-700">{rekap.nilai[`${row.riwayat_id}:${s.id}`] ?? '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {rekap.sesi.length === 0 && <div className="p-12 text-center text-slate-400">Belum ada sesi nilai harian.</div>}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-xs">
               <thead className="bg-white text-slate-500">
                 <tr>

@@ -1,24 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BookOpenCheck, Loader2, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
+import { BookOpenCheck, Download, FileSpreadsheet, Loader2, Plus, ToggleLeft, ToggleRight, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getMasterHafalanInitialData,
   getMasterHafalanList,
+  importHafalanMassal,
   setHafalanActive,
   tambahHafalanBab,
   tambahHafalanBlok,
+  tambahSuratQuran,
 } from './actions'
 
 export default function MasterHafalanContent() {
   const [types, setTypes] = useState<any[]>([])
   const [marhalah, setMarhalah] = useState<any[]>([])
+  const [quranSurahs, setQuranSurahs] = useState<any[]>([])
   const [jenis, setJenis] = useState('quran')
   const [marhalahId, setMarhalahId] = useState('')
+  const [surahNumber, setSurahNumber] = useState('1')
   const [bab, setBab] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [importRows, setImportRows] = useState<any[]>([])
+  const [importing, setImporting] = useState(false)
   const [newBab, setNewBab] = useState({ judul: '', urutan: 0 })
   const [newBlok, setNewBlok] = useState<Record<number, { label: string; deskripsi: string; urutan: number }>>({})
 
@@ -26,6 +32,7 @@ export default function MasterHafalanContent() {
     getMasterHafalanInitialData().then(data => {
       setTypes([...data.types])
       setMarhalah(data.marhalah)
+      setQuranSurahs([...data.quranSurahs])
       if (data.marhalah[0]) setMarhalahId(String(data.marhalah[0].id))
       setLoading(false)
     })
@@ -43,6 +50,65 @@ export default function MasterHafalanContent() {
     if ('error' in res) return toast.error(res.error)
     toast.success('Bab ditambahkan')
     setNewBab({ judul: '', urutan: 0 })
+    load()
+  }
+
+  const addSuratQuran = async () => {
+    const res = await tambahSuratQuran({ marhalahId: Number(marhalahId), surahNumber: Number(surahNumber) })
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`Surat ditambahkan dengan ${res.count} ayat`)
+    load()
+  }
+
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
+    const rows = [
+      {
+        BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
+        'URUTAN BAB': 1,
+        BLOK: jenis === 'quran' ? 'Ayat 1' : 'Definisi Kalam',
+        DESKRIPSI: jenis === 'quran' ? 'Al-Fatihah:1' : 'Bagian awal bab',
+        'URUTAN BLOK': 1,
+      },
+      {
+        BAB: jenis === 'quran' ? 'Al-Fatihah' : 'Bab Kalam',
+        'URUTAN BAB': 1,
+        BLOK: jenis === 'quran' ? 'Ayat 2' : 'Pembagian Kalam',
+        DESKRIPSI: '',
+        'URUTAN BLOK': 2,
+      },
+    ]
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Hafalan')
+    XLSX.writeFile(wb, `Template_Hafalan_${jenis}.xlsx`)
+  }
+
+  const handleUploadImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      const XLSX = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
+      setImportRows(JSON.parse(JSON.stringify(data)))
+      toast.success(`${data.length} baris terbaca`)
+    } catch {
+      toast.error('Gagal membaca file Excel')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  const saveImport = async () => {
+    if (!importRows.length) return
+    setImporting(true)
+    const res = await importHafalanMassal({ jenis, marhalahId: Number(marhalahId), rows: importRows })
+    setImporting(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`Import selesai: ${res.insertedBab} bab, ${res.insertedBlok} blok, ${res.skipped} dilewati`)
+    setImportRows([])
     load()
   }
 
@@ -85,13 +151,76 @@ export default function MasterHafalanContent() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><Plus className="h-4 w-4 text-emerald-600" /> Tambah Bab</h2>
-        <div className="grid gap-3 md:grid-cols-[1fr_120px_auto]">
-          <input value={newBab.judul} onChange={e => setNewBab(prev => ({ ...prev, judul: e.target.value }))} className="h-10 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Contoh: Juz 30 / Bab Kalam" />
-          <input type="number" value={newBab.urutan} onChange={e => setNewBab(prev => ({ ...prev, urutan: Number(e.target.value || 0) }))} className="h-10 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Urutan" />
-          <button onClick={addBab} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">Simpan Bab</button>
+      {jenis === 'quran' ? (
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><Plus className="h-4 w-4 text-emerald-600" /> Tambah Surat Al-Qur'an</h2>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <select value={surahNumber} onChange={e => setSurahNumber(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold">
+              {quranSurahs.map(surah => (
+                <option key={surah.number} value={surah.number}>
+                  {surah.number}. {surah.name} ({surah.ayahCount} ayat)
+                </option>
+              ))}
+            </select>
+            <button onClick={addSuratQuran} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">Buat Blok Ayat</button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Surat akan dibuat sebagai bab, dan setiap ayat otomatis menjadi blok hafalan.</p>
         </div>
+      ) : (
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><Plus className="h-4 w-4 text-emerald-600" /> Tambah Bab</h2>
+          <div className="grid gap-3 md:grid-cols-[1fr_120px_auto]">
+            <input value={newBab.judul} onChange={e => setNewBab(prev => ({ ...prev, judul: e.target.value }))} className="h-10 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Contoh: Bab Kalam" />
+            <input type="number" value={newBab.urutan} onChange={e => setNewBab(prev => ({ ...prev, urutan: Number(e.target.value || 0) }))} className="h-10 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Urutan" />
+            <button onClick={addBab} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">Simpan Bab</button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border bg-white p-4 shadow-sm">
+        <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><FileSpreadsheet className="h-4 w-4 text-blue-600" /> Import Excel</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          <button onClick={downloadTemplate} className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100">
+            <Download className="h-4 w-4" /> Download Template
+          </button>
+          <div className="relative">
+            <input type="file" accept=".xlsx,.xls" onChange={handleUploadImport} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+            <button className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+              <Upload className="h-4 w-4" /> Upload Excel
+            </button>
+          </div>
+        </div>
+        {importRows.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-lg border">
+            <div className="flex flex-col gap-3 border-b bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm font-bold text-slate-700">Preview {importRows.length} baris</p>
+              <button onClick={saveImport} disabled={importing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Simpan Import
+              </button>
+            </div>
+            <div className="max-h-64 overflow-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-white text-slate-500">
+                  <tr>
+                    <th className="p-2">BAB</th>
+                    <th className="p-2">BLOK</th>
+                    <th className="p-2">DESKRIPSI</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {importRows.slice(0, 20).map((row, index) => (
+                    <tr key={index}>
+                      <td className="p-2 font-semibold">{row.BAB || row.bab || row['JUDUL BAB'] || '-'}</td>
+                      <td className="p-2">{row.BLOK || row.blok || row['LABEL BLOK'] || '-'}</td>
+                      <td className="p-2 text-slate-500">{row.DESKRIPSI || row.deskripsi || row.KETERANGAN || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
