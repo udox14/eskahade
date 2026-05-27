@@ -543,19 +543,16 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: 6 }).map((_, index) => {
-                  const row = jam1.rows[index]
-                  return (
-                    <tr key={index}>
-                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
-                        {row?.kelas ?? ''}
-                      </td>
-                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
-                        {row?.jumlah ?? ''}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {jam1.rows.map((row, index) => (
+                  <tr key={index}>
+                    <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                      {row.kelas}
+                    </td>
+                    <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                      {row.jumlah}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
@@ -584,19 +581,16 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: 5 }).map((_, index) => {
-                  const row = jam2.rows[index]
-                  return (
-                    <tr key={index}>
-                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
-                        {row?.kelas ?? ''}
-                      </td>
-                      <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
-                        {row?.jumlah ?? ''}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {jam2.rows.map((row, index) => (
+                  <tr key={index}>
+                    <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                      {row.kelas}
+                    </td>
+                    <td style={{ ...packingTdStyle, height: '4.5mm', fontSize: '9pt', border: '0.8pt solid #000', textAlign: 'center' }}>
+                      {row.jumlah}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </fieldset>
