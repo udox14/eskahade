@@ -8,9 +8,7 @@ import {
   getMasterHafalanInitialData,
   getMasterHafalanList,
   importHafalanMassal,
-  setHafalanPaketMarhalah,
   setHafalanActive,
-  tambahHafalanPaket,
   tambahHafalanBab,
   tambahHafalanBlok,
   tambahSuratQuran,
@@ -19,72 +17,39 @@ import {
 export default function MasterHafalanContent() {
   const [types, setTypes] = useState<any[]>([])
   const [marhalah, setMarhalah] = useState<any[]>([])
-  const [paket, setPaket] = useState<any[]>([])
   const [quranSurahs, setQuranSurahs] = useState<any[]>([])
   const [jenis, setJenis] = useState('quran')
-  const [paketId, setPaketId] = useState('')
+  const [marhalahId, setMarhalahId] = useState('')
   const [surahNumber, setSurahNumber] = useState('1')
   const [bab, setBab] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [importRows, setImportRows] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
-  const [newPaketName, setNewPaketName] = useState('')
   const [newBab, setNewBab] = useState({ judul: '', urutan: 0 })
   const [newBlok, setNewBlok] = useState<Record<number, { label: string; deskripsi: string; urutan: number }>>({})
-
-  const paketByJenis = paket.filter(item => item.jenis === jenis)
-  const selectedPaket = paket.find(item => String(item.id) === paketId)
 
   useEffect(() => {
     getMasterHafalanInitialData().then(data => {
       setTypes([...data.types])
       setMarhalah(data.marhalah)
-      setPaket(data.paket)
       setQuranSurahs([...data.quranSurahs])
-      const firstPaket = data.paket.find((item: any) => item.jenis === 'quran') || data.paket[0]
-      if (firstPaket) setPaketId(String(firstPaket.id))
+      if (data.marhalah[0]) setMarhalahId(String(data.marhalah[0].id))
       setLoading(false)
     })
   }, [])
 
-  useEffect(() => {
-    const available = paket.filter(item => item.jenis === jenis)
-    if (!available.some(item => String(item.id) === paketId)) {
-      setPaketId(available[0] ? String(available[0].id) : '')
-      setBab([])
-    }
-  }, [jenis, paket, paketId])
-
   const load = async () => {
-    if (!jenis || !paketId) {
+    if (!jenis || !marhalahId) {
       setBab([])
       return
     }
-    setBab(await getMasterHafalanList(jenis, Number(paketId)))
+    setBab(await getMasterHafalanList(jenis, Number(marhalahId)))
   }
 
-  useEffect(() => { load() }, [jenis, paketId])
-
-  const addPaket = async () => {
-    const res = await tambahHafalanPaket({ jenis, nama: newPaketName })
-    if ('error' in res) return toast.error(res.error)
-    toast.success('Paket ditambahkan')
-    setPaket(res.paket)
-    const created = res.paket.find((item: any) => item.jenis === jenis && item.nama.toLowerCase() === newPaketName.trim().toLowerCase())
-    if (created) setPaketId(String(created.id))
-    setNewPaketName('')
-  }
-
-  const togglePaketMarhalah = async (marhalahId: number, assigned: boolean) => {
-    if (!paketId) return
-    const res = await setHafalanPaketMarhalah({ paketId: Number(paketId), marhalahId, assigned })
-    if ('error' in res) return toast.error(res.error)
-    setPaket(res.paket)
-    toast.success(assigned ? 'Marhalah diassign ke paket' : 'Marhalah dilepas dari paket')
-  }
+  useEffect(() => { load() }, [jenis, marhalahId])
 
   const addBab = async () => {
-    const res = await tambahHafalanBab({ jenis, paketId: Number(paketId), judul: newBab.judul, urutan: newBab.urutan })
+    const res = await tambahHafalanBab({ jenis, marhalahId: Number(marhalahId), judul: newBab.judul, urutan: newBab.urutan })
     if ('error' in res) return toast.error(res.error)
     toast.success('Bab ditambahkan')
     setNewBab({ judul: '', urutan: 0 })
@@ -92,7 +57,7 @@ export default function MasterHafalanContent() {
   }
 
   const addSuratQuran = async () => {
-    const res = await tambahSuratQuran({ paketId: Number(paketId), surahNumber: Number(surahNumber) })
+    const res = await tambahSuratQuran({ marhalahId: Number(marhalahId), surahNumber: Number(surahNumber) })
     if ('error' in res) return toast.error(res.error)
     toast.success(`Surat ditambahkan dengan ${res.count} ayat`)
     load()
@@ -167,7 +132,7 @@ export default function MasterHafalanContent() {
   const saveImport = async () => {
     if (!importRows.length) return
     setImporting(true)
-    const res = await importHafalanMassal({ jenis, paketId: Number(paketId), rows: importRows })
+    const res = await importHafalanMassal({ jenis, marhalahId: Number(marhalahId), rows: importRows })
     setImporting(false)
     if ('error' in res) return toast.error(res.error)
     toast.success(`Import selesai: ${res.insertedBab} bab, ${res.insertedBlok} blok, ${res.skipped} dilewati`)
@@ -194,7 +159,7 @@ export default function MasterHafalanContent() {
     <div className="mx-auto max-w-6xl space-y-5 pb-20">
       <DashboardPageHeader
         title="Master Hafalan"
-        description="Atur paket, assignment marhalah, bab, dan blok hafalan."
+        description="Atur bab dan blok hafalan per jenis dan marhalah."
       />
 
       <div className="rounded-xl border bg-white p-4 shadow-sm">
@@ -206,38 +171,21 @@ export default function MasterHafalanContent() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Paket Hafalan</label>
-            <select value={paketId} onChange={e => setPaketId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold">
-              <option value="">Pilih paket</option>
-              {paketByJenis.map(item => <option key={item.id} value={item.id}>{item.nama}</option>)}
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Marhalah</label>
+            <select value={marhalahId} onChange={e => setMarhalahId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold">
+              {marhalah.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
             </select>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-          <input value={newPaketName} onChange={e => setNewPaketName(e.target.value)} className="h-10 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Nama paket baru, contoh: Mutawassithah" />
-          <button onClick={addPaket} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Tambah Paket</button>
-        </div>
-        {selectedPaket && (
-          <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-3">
-            <p className="mb-2 text-xs font-bold uppercase text-emerald-700">Assign Marhalah ke Paket {selectedPaket.nama}</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {marhalah.map(m => {
-                const assigned = selectedPaket.marhalah.some((item: any) => item.id === m.id)
-                return (
-                  <label key={m.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" checked={assigned} onChange={e => togglePaketMarhalah(m.id, e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
-                    {m.nama}
-                  </label>
-                )
-              })}
-            </div>
-            <p className="mt-2 text-xs text-emerald-700">Satu marhalah hanya memakai satu paket untuk jenis hafalan ini. Kalau dicentang di paket ini, assignment lama akan pindah ke sini.</p>
-          </div>
+        {marhalah.find(m => String(m.id) === marhalahId)?.nama?.toLowerCase().includes('mutawassithah') && (
+          <p className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+            Mutawassithah otomatis memakai satu materi bersama untuk semua tingkat Mutawassithah.
+          </p>
         )}
       </div>
 
-      {!paketId ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-sm font-semibold text-slate-400">Buat atau pilih paket hafalan dulu.</div>
+      {!marhalahId ? (
+        <div className="rounded-xl border bg-white p-8 text-center text-sm font-semibold text-slate-400">Pilih marhalah dulu.</div>
       ) : jenis === 'quran' ? (
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><Plus className="h-4 w-4 text-emerald-600" /> Tambah Surat Al-Qur'an</h2>
