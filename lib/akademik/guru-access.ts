@@ -434,7 +434,17 @@ export async function getSantriForKelas(kelasId: string) {
     SELECT rp.id AS riwayat_id, s.id AS santri_id, s.nis, s.nama_lengkap AS nama
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
+    WHERE rp.kelas_id = ?
+      AND lower(COALESCE(s.status_global, 'aktif')) = 'aktif'
+      AND (
+        lower(COALESCE(rp.status_riwayat, 'aktif')) = 'aktif'
+        OR NOT EXISTS (
+          SELECT 1
+          FROM riwayat_pendidikan active_rp
+          WHERE active_rp.kelas_id = rp.kelas_id
+            AND lower(COALESCE(active_rp.status_riwayat, 'aktif')) = 'aktif'
+        )
+      )
     ORDER BY s.nama_lengkap
   `, [kelasId])
 }

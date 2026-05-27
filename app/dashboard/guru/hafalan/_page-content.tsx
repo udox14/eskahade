@@ -562,7 +562,11 @@ export default function HafalanPageContent() {
                               key={blok.id}
                               onClick={() => toggleLocal(blok.id)}
                               title={blok.deskripsi || blok.label}
-                              className={`relative flex aspect-square h-11 w-11 items-center justify-center rounded-lg border text-sm font-black transition sm:h-12 sm:w-12 ${
+                              className={`relative flex items-center justify-center rounded-lg border text-sm font-black leading-tight transition ${
+                                selectedType?.key === 'quran'
+                                  ? 'aspect-square h-11 w-11 sm:h-12 sm:w-12'
+                                  : 'min-h-14 min-w-20 px-3 py-2 sm:min-w-24'
+                              } ${
                                 readonly
                                   ? 'cursor-not-allowed border-blue-200 bg-blue-50 text-blue-700'
                                   : changed && checked
