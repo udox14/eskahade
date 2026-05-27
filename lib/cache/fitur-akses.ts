@@ -69,10 +69,28 @@ async function ensureFiturAksesReady() {
       ('Asrama', 'Kamar', '/dashboard/asrama/kamar', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 5),
       ('Asrama', 'Perpindahan Kamar', '/dashboard/asrama/perpindahan-kamar', 'ArrowLeftRight', '["admin","pengurus_asrama"]', 1, 6),
       ('Asrama', 'Plotting Kamar Manual', '/dashboard/asrama/plotting-kamar-manual', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 7),
+      ('Akademik', 'Nilai Harian', '/dashboard/guru/nilai-harian', 'BookOpen', '["admin","sekpen","akademik","guru"]', 1, 8),
+      ('Akademik', 'Hafalan', '/dashboard/guru/hafalan', 'ClipboardCheck', '["admin","sekpen","akademik","guru"]', 1, 9),
       ('Master Data', 'Setup Tahun Ajaran', '/dashboard/setup-tahun-ajaran', 'ClipboardList', '["admin"]', 1, 2),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
-      ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8)
+      ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8),
+      ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11)
   `)
+
+  try {
+    await execute(`
+      UPDATE fitur_akses
+      SET is_bottomnav = 1, bottomnav_urutan = 3
+      WHERE href = '/dashboard/guru/nilai-harian'
+    `)
+    await execute(`
+      UPDATE fitur_akses
+      SET is_bottomnav = 1, bottomnav_urutan = 4
+      WHERE href = '/dashboard/guru/hafalan'
+    `)
+  } catch {
+    // Abaikan jika kolom bottomnav belum tersedia di database lama.
+  }
 
   fiturSchemaReady = true
 }
