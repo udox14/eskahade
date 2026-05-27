@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth/session'
 import { execute, generateId, query, queryOne } from '@/lib/db'
 import {
   canAccessKelas,
+  displayQuranSurahTitle,
   ensureGuruFeatureSchema,
   getAccessibleKelasForSession,
   getGuruIdForSession,
@@ -117,7 +118,11 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
     if (!babMap.has(row.bab_id)) {
       babMap.set(row.bab_id, {
         id: row.bab_id,
-        judul: row.parent_judul ? `${row.parent_judul} / ${row.judul}` : row.judul,
+        judul: row.parent_judul
+          ? `${row.parent_judul} / ${row.judul}`
+          : jenis === 'quran'
+            ? displayQuranSurahTitle(row.judul)
+            : row.judul,
         urutan: row.bab_urutan,
         parent_id: row.parent_id,
         is_editable: row.is_editable === 1,

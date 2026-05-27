@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BookOpenCheck, Download, FileSpreadsheet, Loader2, Plus, ToggleLeft, ToggleRight, Upload } from 'lucide-react'
+import { BookOpenCheck, Download, FileSpreadsheet, Loader2, Plus, Trash2, ToggleLeft, ToggleRight, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getMasterHafalanInitialData,
   getMasterHafalanList,
+  hapusSemuaHafalan,
   importHafalanMassal,
   setHafalanActive,
   tambahHafalanBab,
@@ -25,6 +26,7 @@ export default function MasterHafalanContent() {
   const [loading, setLoading] = useState(true)
   const [importRows, setImportRows] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
   const [newBab, setNewBab] = useState({ judul: '', urutan: 0 })
   const [newBlok, setNewBlok] = useState<Record<number, { label: string; deskripsi: string; urutan: number }>>({})
 
@@ -160,6 +162,26 @@ export default function MasterHafalanContent() {
     load()
   }
 
+  const deleteAll = async () => {
+    if (!marhalahId || deletingAll) return
+    const selectedMarhalah = marhalah.find(m => String(m.id) === marhalahId)
+    const confirmText = window.prompt(`Ketik HAPUS untuk menghapus semua materi ${jenis} pada ${selectedMarhalah?.nama || 'marhalah ini'}. Progress santri pada blok ini juga akan terhapus.`)
+    if (confirmText !== 'HAPUS') return
+
+    setDeletingAll(true)
+    try {
+      const res = await hapusSemuaHafalan({ jenis, marhalahId: Number(marhalahId) })
+      if ('error' in res) return toast.error(res.error)
+      toast.success(`Terhapus: ${res.deletedBab} bab, ${res.deletedBlok} blok`)
+      setImportRows([])
+      await load()
+    } catch (error: any) {
+      toast.error(error?.message || 'Gagal menghapus materi hafalan.')
+    } finally {
+      setDeletingAll(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-20">
       <DashboardPageHeader
@@ -189,6 +211,23 @@ export default function MasterHafalanContent() {
         )}
       </div>
 
+      <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-rose-900"><Trash2 className="h-4 w-4" /> Hapus Batch</h2>
+            <p className="text-xs font-semibold text-rose-700">Menghapus semua bab, blok, dan progress terkait pada filter jenis + marhalah saat ini.</p>
+          </div>
+          <button
+            onClick={deleteAll}
+            disabled={deletingAll || !bab.length}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {deletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Hapus Semua
+          </button>
+        </div>
+      </div>
+
       {!marhalahId ? (
         <div className="rounded-xl border bg-white p-8 text-center text-sm font-semibold text-slate-400">Pilih marhalah dulu.</div>
       ) : jenis === 'quran' ? (
@@ -198,7 +237,7 @@ export default function MasterHafalanContent() {
             <select value={surahNumber} onChange={e => setSurahNumber(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold">
               {quranSurahs.map(surah => (
                 <option key={surah.number} value={surah.number}>
-                  {surah.number}. {surah.name} ({surah.ayahCount} ayat)
+                  {surah.number}. {surah.arabicName || surah.name} ({surah.ayahCount} ayat)
                 </option>
               ))}
             </select>
