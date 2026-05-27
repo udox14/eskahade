@@ -170,7 +170,7 @@ export default function HafalanPageContent() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden px-4 pb-20 sm:px-6 lg:px-0">
+    <div className="mx-auto w-full max-w-7xl space-y-5 px-2 pb-20 sm:px-4 lg:px-0">
       <DashboardPageHeader
         title="Hafalan"
         description="Pilih jenis hafalan yang tersedia untuk marhalah kelas, lalu tandai blok yang sudah dihafal santri."
@@ -272,14 +272,6 @@ export default function HafalanPageContent() {
                       </div>
                       <p className="text-sm font-bold text-emerald-700">{localChecked.size}/{totalBlok} blok</p>
                     </div>
-                    {dirty && (
-                      <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p className="text-xs font-semibold leading-5">
-                          Perubahan ini baru tersimpan sementara di perangkat ini. Tekan <span className="font-black">Simpan Hafalan</span> agar masuk ke database.
-                        </p>
-                      </div>
-                    )}
                     <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Pilih Bab / Surat</p>
                     <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
                       {data.bab.map((bab: any) => {
@@ -300,7 +292,7 @@ export default function HafalanPageContent() {
                   </div>
 
                   {selectedBab && (
-                    <div ref={blockRef} className="min-w-0 rounded-xl border bg-white p-4 shadow-sm">
+                    <div ref={blockRef} className="min-w-0 rounded-xl border bg-white p-3 shadow-sm sm:p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase text-slate-500">Input Blok</p>
@@ -311,12 +303,10 @@ export default function HafalanPageContent() {
                       {dirty && (
                         <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <p className="text-xs font-semibold leading-5">
-                            Belum tersimpan ke database. Refresh masih aman selama session browser sama, tapi tetap tekan Simpan Hafalan untuk menyimpan final.
-                          </p>
+                          <p className="text-xs font-semibold leading-5">Belum tersimpan. Tekan Simpan Hafalan agar masuk ke database.</p>
                         </div>
                       )}
-                      <div className="grid grid-cols-5 justify-items-center gap-2 sm:grid-cols-8 md:grid-cols-10">
+                      <div className="grid grid-cols-5 justify-items-center gap-1.5 sm:grid-cols-8 sm:gap-2 md:grid-cols-10">
                         {selectedBab.blok.map((blok: any) => {
                           const checked = localChecked.has(blok.id)
                           const persisted = getPersistedChecked(blok.id)
@@ -342,15 +332,15 @@ export default function HafalanPageContent() {
                           )
                         })}
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" /> Tersimpan</span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500" /> Draft tambah</span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" /> Draft batal</span>
+                      <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px] font-semibold text-slate-600 sm:flex sm:flex-wrap sm:gap-2 sm:text-[11px]">
+                        <span className="inline-flex items-center justify-center gap-1 rounded-full bg-emerald-50 px-1.5 py-1 text-emerald-700 sm:justify-start sm:px-2"><span className="h-2 w-2 rounded-full bg-emerald-600" /> DB</span>
+                        <span className="inline-flex items-center justify-center gap-1 rounded-full bg-amber-50 px-1.5 py-1 text-amber-700 sm:justify-start sm:px-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> + Draft</span>
+                        <span className="inline-flex items-center justify-center gap-1 rounded-full bg-rose-50 px-1.5 py-1 text-rose-700 sm:justify-start sm:px-2"><span className="h-2 w-2 rounded-full bg-rose-500" /> - Draft</span>
                       </div>
                       <button
                         onClick={saveProgress}
                         disabled={saving}
-                        className="sticky bottom-16 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50 md:static md:w-auto"
+                        className="sticky bottom-16 z-30 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50 md:static md:w-auto"
                       >
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Simpan Hafalan
