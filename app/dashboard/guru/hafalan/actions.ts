@@ -157,3 +157,63 @@ export async function toggleHafalanProgress(payload: { kelasId: string; jenis: s
   revalidatePath('/dashboard/guru/hafalan')
   return { success: true, checked: !existing }
 }
+
+export async function simpanHafalanProgressBatch(payload: {
+  kelasId: string
+  jenis: string
+  riwayatId: string
+  checkedBlokIds: number[]
+}) {
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi.' }
+  if (!(await canAccessKelas(session, payload.kelasId))) return { error: 'Akses kelas ditolak.' }
+  if (!isHafalanType(payload.jenis)) return { error: 'Jenis hafalan tidak valid.' }
+  await ensureGuruFeatureSchema()
+
+  const validRows = await query<{ id: number }>(`
+    SELECT hblk.id
+    FROM hafalan_blok hblk
+    JOIN hafalan_bab hb ON hb.id = hblk.bab_id
+    JOIN kelas k ON k.marhalah_id = hb.marhalah_id
+    JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.id = ?
+    WHERE k.id = ?
+      AND hb.jenis = ?
+      AND hb.is_active = 1
+      AND hblk.is_active = 1
+  `, [payload.riwayatId, payload.kelasId, payload.jenis])
+
+  const validIds = new Set(validRows.map(row => Number(row.id)))
+  const checkedIds = Array.from(new Set((payload.checkedBlokIds || []).map(Number).filter(id => validIds.has(id))))
+  const guruId = await getGuruIdForSession(session)
+  if (validIds.size === 0) return { error: 'Belum ada blok hafalan aktif untuk kelas ini.' }
+
+  const validPlaceholders = Array.from(validIds).map(() => '?').join(',')
+  await execute(
+    `DELETE FROM hafalan_progress
+     WHERE riwayat_pendidikan_id = ?
+       AND blok_id IN (${validPlaceholders})`,
+    [payload.riwayatId, ...Array.from(validIds)]
+  )
+
+  for (const blokId of checkedIds) {
+    await execute(`
+      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, guru_id, status, tanggal_setor, updated_by, updated_at)
+      VALUES (?, ?, ?, ?, 'hafal', date('now'), ?, datetime('now'))
+    `, [generateId(), blokId, payload.riwayatId, guruId, session.id])
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'guru_hafalan',
+    action: 'update',
+    fiturHref: '/dashboard/guru/hafalan',
+    logKind: 'update',
+    entityType: 'hafalan_progress_batch',
+    entityId: `${payload.riwayatId}:${payload.jenis}`,
+    summary: `Menyimpan hafalan ${payload.jenis} untuk ${checkedIds.length} blok`,
+    details: { kelas_id: payload.kelasId, jenis: payload.jenis, total_blok: checkedIds.length },
+  })
+
+  revalidatePath('/dashboard/guru/hafalan')
+  return { success: true, checkedBlokIds: checkedIds }
+}

@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BookOpenCheck, Check, ChevronRight, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, ArrowLeft, BookOpenCheck, Check, ChevronRight, Loader2, Save, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getAvailableHafalanTypes,
   getHafalanInitialData,
   getHafalanInputData,
-  toggleHafalanProgress,
+  simpanHafalanProgressBatch,
 } from './actions'
 
 export default function HafalanPageContent() {
@@ -17,8 +17,20 @@ export default function HafalanPageContent() {
   const [types, setTypes] = useState<any[]>([])
   const [selectedType, setSelectedType] = useState<any>(null)
   const [data, setData] = useState<any>({ santri: [], bab: [], progress: {} })
+  const [selectedSantriId, setSelectedSantriId] = useState('')
+  const [selectedBabId, setSelectedBabId] = useState<number | null>(null)
+  const [santriSearch, setSantriSearch] = useState('')
+  const [localChecked, setLocalChecked] = useState<Set<number>>(new Set())
+  const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [busyKey, setBusyKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const santriListRef = useRef<HTMLDivElement>(null)
+  const blockRef = useRef<HTMLDivElement>(null)
+
+  const draftKey = useMemo(() => {
+    if (!kelasId || !selectedType?.key || !selectedSantriId) return ''
+    return `hafalan-draft:${kelasId}:${selectedType.key}:${selectedSantriId}`
+  }, [kelasId, selectedType?.key, selectedSantriId])
 
   useEffect(() => {
     getHafalanInitialData().then(res => {
@@ -36,18 +48,123 @@ export default function HafalanPageContent() {
 
   useEffect(() => {
     if (!kelasId || !selectedType) return
-    getHafalanInputData(kelasId, selectedType.key).then(setData)
+    getHafalanInputData(kelasId, selectedType.key).then(res => {
+      setData(res)
+      setSelectedSantriId('')
+      setSelectedBabId(null)
+      setLocalChecked(new Set())
+      setDirty(false)
+    })
   }, [kelasId, selectedType])
 
   const totalBlok = useMemo(() => data.bab.reduce((sum: number, bab: any) => sum + bab.blok.length, 0), [data.bab])
+  const selectedSantri = useMemo(
+    () => data.santri.find((item: any) => item.riwayat_id === selectedSantriId),
+    [data.santri, selectedSantriId]
+  )
+  const selectedBab = useMemo(
+    () => data.bab.find((item: any) => item.id === selectedBabId),
+    [data.bab, selectedBabId]
+  )
+  const filteredSantri = useMemo(() => {
+    const needle = santriSearch.trim().toLowerCase()
+    if (!needle) return data.santri
+    return data.santri.filter((item: any) =>
+      String(item.nama || '').toLowerCase().includes(needle) ||
+      String(item.nis || '').toLowerCase().includes(needle)
+    )
+  }, [data.santri, santriSearch])
 
-  const toggle = async (riwayatId: string, blokId: number) => {
-    const key = `${riwayatId}:${blokId}`
-    setBusyKey(key)
-    const res = await toggleHafalanProgress({ kelasId, jenis: selectedType.key, riwayatId, blokId })
-    setBusyKey('')
+  const selectSantri = (riwayatId: string) => {
+    setSelectedSantriId(riwayatId)
+    const nextDraftKey = `hafalan-draft:${kelasId}:${selectedType.key}:${riwayatId}`
+    try {
+      const rawDraft = sessionStorage.getItem(nextDraftKey)
+      if (rawDraft) {
+        const parsed = JSON.parse(rawDraft)
+        if (Array.isArray(parsed?.checkedBlokIds)) {
+          setLocalChecked(new Set(parsed.checkedBlokIds.map(Number)))
+          setDirty(true)
+          setSelectedBabId(null)
+          toast.info('Draft hafalan yang belum disimpan dipulihkan')
+          return
+        }
+      }
+    } catch {}
+
+    const ids = data.bab.flatMap((bab: any) => bab.blok.map((blok: any) => blok.id))
+      .filter((blokId: number) => data.progress[`${riwayatId}:${blokId}`])
+    setLocalChecked(new Set(ids))
+    setDirty(false)
+    setSelectedBabId(null)
+  }
+
+  const selectBab = (babId: number) => {
+    setSelectedBabId(babId)
+    window.setTimeout(() => blockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
+  const toggleLocal = (blokId: number) => {
+    setLocalChecked(prev => {
+      const next = new Set(prev)
+      if (next.has(blokId)) next.delete(blokId)
+      else next.add(blokId)
+      return next
+    })
+    setDirty(true)
+  }
+
+  useEffect(() => {
+    if (!draftKey || !dirty) return
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({
+        checkedBlokIds: Array.from(localChecked),
+        updatedAt: new Date().toISOString(),
+      }))
+    } catch {}
+  }, [draftKey, dirty, localChecked])
+
+  const displayBlokLabel = (label: string) => {
+    if (selectedType?.key !== 'quran') return label
+    const match = String(label).match(/\d+/)
+    return match ? match[0] : label
+  }
+
+  const getPersistedChecked = (blokId: number) => {
+    if (!selectedSantriId) return false
+    return !!data.progress[`${selectedSantriId}:${blokId}`]
+  }
+
+  const saveProgress = async () => {
+    if (!selectedSantriId) return
+    setSaving(true)
+    const res = await simpanHafalanProgressBatch({
+      kelasId,
+      jenis: selectedType.key,
+      riwayatId: selectedSantriId,
+      checkedBlokIds: Array.from(localChecked),
+    })
+    setSaving(false)
     if ('error' in res) return toast.error(res.error)
-    setData((prev: any) => ({ ...prev, progress: { ...prev.progress, [key]: res.checked } }))
+
+    const checkedSet = new Set(res.checkedBlokIds)
+    setData((prev: any) => {
+      const nextProgress = { ...prev.progress }
+      for (const bab of prev.bab) {
+        for (const blok of bab.blok) {
+          const key = `${selectedSantriId}:${blok.id}`
+          if (checkedSet.has(blok.id)) nextProgress[key] = true
+          else delete nextProgress[key]
+        }
+      }
+      return { ...prev, progress: nextProgress }
+    })
+    setDirty(false)
+    try {
+      if (draftKey) sessionStorage.removeItem(draftKey)
+    } catch {}
+    toast.success('Hafalan disimpan')
+    window.setTimeout(() => santriListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
   }
 
   return (
@@ -102,46 +219,145 @@ export default function HafalanPageContent() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            {data.santri.map((santri: any) => {
-              const done = Object.keys(data.progress).filter(key => key.startsWith(`${santri.riwayat_id}:`) && data.progress[key]).length
-              return (
-                <div key={santri.riwayat_id} className="rounded-xl border bg-white p-4 shadow-sm">
-                  <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="font-bold text-slate-900">{santri.nama}</h3>
-                      <p className="text-xs text-slate-400">{santri.nis || '-'}</p>
-                    </div>
-                    <p className="text-sm font-bold text-emerald-700">{done}/{totalBlok} blok</p>
-                  </div>
-                  <div className="space-y-3">
-                    {data.bab.map((bab: any) => (
-                      <div key={bab.id}>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{bab.judul}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {bab.blok.map((blok: any) => {
-                            const key = `${santri.riwayat_id}:${blok.id}`
-                            const checked = !!data.progress[key]
-                            return (
-                              <button
-                                key={blok.id}
-                                onClick={() => toggle(santri.riwayat_id, blok.id)}
-                                disabled={busyKey === key}
-                                title={blok.deskripsi || blok.label}
-                                className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition ${checked ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50'}`}
-                              >
-                                {busyKey === key ? <Loader2 className="h-4 w-4 animate-spin" /> : checked ? <Check className="h-4 w-4" /> : null}
-                                {blok.label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+          <div ref={santriListRef} className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <div className="rounded-xl border bg-white shadow-sm">
+              <div className="border-b p-3">
+                <p className="mb-2 text-sm font-bold text-slate-800">Pilih Santri</p>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={santriSearch}
+                    onChange={e => setSantriSearch(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Cari nama / NIS"
+                  />
                 </div>
-              )
-            })}
+              </div>
+              <div className="max-h-[420px] overflow-y-auto p-2">
+                {filteredSantri.map((santri: any) => {
+                  const done = Object.keys(data.progress).filter(key => key.startsWith(`${santri.riwayat_id}:`) && data.progress[key]).length
+                  const active = selectedSantriId === santri.riwayat_id
+                  return (
+                    <button
+                      key={santri.riwayat_id}
+                      onClick={() => selectSantri(santri.riwayat_id)}
+                      className={`mb-2 w-full rounded-lg border p-3 text-left transition ${active ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-900">{santri.nama}</p>
+                          <p className="text-xs text-slate-400">{santri.nis || '-'}</p>
+                        </div>
+                        <p className="shrink-0 text-xs font-bold text-emerald-700">{done}/{totalBlok}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+                {filteredSantri.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Santri tidak ditemukan.</p>}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {!selectedSantri ? (
+                <div className="rounded-xl border bg-white p-12 text-center text-slate-400">Pilih santri terlebih dahulu.</div>
+              ) : (
+                <>
+                  <div className="rounded-xl border bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase text-emerald-600">Santri Terpilih</p>
+                        <h3 className="font-bold text-slate-900">{selectedSantri.nama}</h3>
+                      </div>
+                      <p className="text-sm font-bold text-emerald-700">{localChecked.size}/{totalBlok} blok</p>
+                    </div>
+                    {dirty && (
+                      <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p className="text-xs font-semibold leading-5">
+                          Perubahan ini baru tersimpan sementara di perangkat ini. Tekan <span className="font-black">Simpan Hafalan</span> agar masuk ke database.
+                        </p>
+                      </div>
+                    )}
+                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Pilih Bab / Surat</p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {data.bab.map((bab: any) => {
+                        const active = selectedBabId === bab.id
+                        const babDone = bab.blok.filter((blok: any) => localChecked.has(blok.id)).length
+                        return (
+                          <button
+                            key={bab.id}
+                            onClick={() => selectBab(bab.id)}
+                            className={`min-h-16 rounded-lg border p-2 text-left transition ${active ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-emerald-300'}`}
+                          >
+                            <p className="line-clamp-2 text-sm font-bold leading-tight">{bab.judul}</p>
+                            <p className={`mt-1 text-xs ${active ? 'text-white/80' : 'text-slate-500'}`}>{babDone}/{bab.blok.length}</p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {selectedBab && (
+                    <div ref={blockRef} className="rounded-xl border bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-slate-500">Input Blok</p>
+                          <h3 className="font-bold text-slate-900">{selectedBab.judul}</h3>
+                        </div>
+                        {dirty && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Draft lokal</span>}
+                      </div>
+                      {dirty && (
+                        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <p className="text-xs font-semibold leading-5">
+                            Belum tersimpan ke database. Refresh masih aman selama session browser sama, tapi tetap tekan Simpan Hafalan untuk menyimpan final.
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+                        {selectedBab.blok.map((blok: any) => {
+                          const checked = localChecked.has(blok.id)
+                          const persisted = getPersistedChecked(blok.id)
+                          const changed = checked !== persisted
+                          return (
+                            <button
+                              key={blok.id}
+                              onClick={() => toggleLocal(blok.id)}
+                              title={blok.deskripsi || blok.label}
+                              className={`relative flex aspect-square h-11 w-11 items-center justify-center rounded-lg border text-sm font-black transition sm:h-12 sm:w-12 ${
+                                changed && checked
+                                  ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200'
+                                  : changed && !checked
+                                    ? 'border-rose-300 bg-rose-50 text-rose-700 ring-2 ring-rose-100'
+                                    : checked
+                                      ? 'border-emerald-500 bg-emerald-600 text-white'
+                                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50'
+                              }`}
+                            >
+                              {checked && selectedType?.key !== 'quran' ? <Check className="h-4 w-4" /> : displayBlokLabel(blok.label)}
+                              {changed && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" /> Tersimpan</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500" /> Draft tambah</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" /> Draft batal</span>
+                      </div>
+                      <button
+                        onClick={saveProgress}
+                        disabled={saving}
+                        className="sticky bottom-16 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50 md:static md:w-auto"
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Simpan Hafalan
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
