@@ -551,7 +551,10 @@ export default function HafalanPageContent() {
                           <p className="text-xs font-semibold leading-5">Belum tersimpan. Tekan Simpan Hafalan agar masuk ke database.</p>
                         </div>
                       )}
-                      <div className="grid grid-cols-5 justify-items-center gap-1.5 sm:grid-cols-8 sm:gap-2 md:grid-cols-10">
+                      <div className={selectedType?.key === 'quran'
+                        ? 'grid grid-cols-5 justify-items-center gap-1.5 sm:grid-cols-8 sm:gap-2 md:grid-cols-10'
+                        : 'flex flex-wrap gap-2'
+                      }>
                         {selectedBab.blok.map((blok: any) => {
                           const checked = localChecked.has(blok.id)
                           const persisted = getPersistedChecked(blok.id)
@@ -565,7 +568,7 @@ export default function HafalanPageContent() {
                               className={`relative flex items-center justify-center rounded-lg border text-sm font-black leading-tight transition ${
                                 selectedType?.key === 'quran'
                                   ? 'aspect-square h-11 w-11 sm:h-12 sm:w-12'
-                                  : 'min-h-14 min-w-20 px-3 py-2 sm:min-w-24'
+                                  : 'min-h-12 min-w-[88px] max-w-full px-3 py-2 sm:min-w-24'
                               } ${
                                 readonly
                                   ? 'cursor-not-allowed border-blue-200 bg-blue-50 text-blue-700'
