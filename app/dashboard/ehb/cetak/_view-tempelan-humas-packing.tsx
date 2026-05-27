@@ -244,7 +244,7 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
     }}>
       <div style={{
         width: '96mm',
-        height: '142mm',
+        height: '116mm',
         border: '0.8pt solid #000',
         display: 'flex',
         flexDirection: 'row',
@@ -264,7 +264,7 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
           <div style={{
             position: 'absolute',
             left: '10.5mm',
-            top: '71mm',
+            top: '58mm',
             width: '140mm',
             height: '21mm',
             transform: 'translate(-50%, -50%) rotate(-90deg)',
@@ -423,7 +423,7 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
     }}>
       <div style={{
         width: '96mm',
-        height: '142mm',
+        height: '118mm',
         border: '0.8pt solid #000',
         display: 'flex',
         flexDirection: 'row',
@@ -443,7 +443,7 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
           <div style={{
             position: 'absolute',
             left: '10.5mm',
-            top: '71mm',
+            top: '59mm',
             width: '140mm',
             height: '21mm',
             transform: 'translate(-50%, -50%) rotate(-90deg)',
