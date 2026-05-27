@@ -255,47 +255,44 @@ function HumasPrintItem({ card }: { card: HumasCard }) {
           width: '21mm',
           height: '100%',
           borderRight: '0.8pt solid #000',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '4mm 0',
-          boxSizing: 'border-box',
           position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+          backgroundColor: '#fff',
         }}>
-          {/* Rotated text centered vertically in upper area */}
+          {/* Rotated text & logo matching official EHB card header */}
           <div style={{
             position: 'absolute',
-            top: '52mm',
             left: '10.5mm',
-            width: '100mm',
+            top: '71mm',
+            width: '140mm',
             height: '21mm',
             transform: 'translate(-50%, -50%) rotate(-90deg)',
+            transformOrigin: 'center',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: 'Arial, Helvetica, sans-serif',
+            gap: '3.5mm',
+            fontFamily: FONT,
           }}>
-            <div style={{ fontSize: '14pt', fontWeight: 900, lineHeight: 1, letterSpacing: '0.8px', color: '#000' }}>
-              PANITIA
-            </div>
-            <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 1, marginTop: '2.5mm', letterSpacing: '0.5px', color: '#000' }}>
-              EVALUASI HASIL BELAJAR
-            </div>
-            <div style={{ fontSize: '6.2pt', fontWeight: 'bold', lineHeight: 1, marginTop: '2mm', letterSpacing: '0.2px', color: '#000' }}>
-              LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
-            </div>
-          </div>
-
-          {/* Logo at the bottom */}
-          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'center' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/logohitam.png" 
               alt="" 
-              style={{ width: '13mm', height: '13mm', objectFit: 'contain' }} 
+              style={{ width: '13mm', height: '13mm', objectFit: 'contain', flexShrink: 0 }} 
             />
+            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '85mm', color: '#000' }}>
+              <div style={{ fontSize: '13pt', fontWeight: 900, lineHeight: 0.95 }}>
+                PANITIA
+              </div>
+              <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 0.95, marginTop: '1.2mm' }}>
+                EVALUASI HASIL BELAJAR
+              </div>
+              <div style={{ fontSize: '5.8pt', fontWeight: 'bold', lineHeight: 1.1, marginTop: '1mm', textTransform: 'uppercase' }}>
+                LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
+              </div>
+              <div style={{ borderBottom: '0.8pt solid #000', marginTop: '1.5mm', width: '100%' }} />
+            </div>
           </div>
         </div>
 
@@ -437,47 +434,44 @@ function PengepakanPrintItem({ card }: { card: PengepakanCard }) {
           width: '21mm',
           height: '100%',
           borderRight: '0.8pt solid #000',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '4mm 0',
-          boxSizing: 'border-box',
           position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+          backgroundColor: '#fff',
         }}>
-          {/* Rotated text centered vertically in upper area */}
+          {/* Rotated text & logo matching official EHB card header */}
           <div style={{
             position: 'absolute',
-            top: '52mm',
             left: '10.5mm',
-            width: '100mm',
+            top: '71mm',
+            width: '140mm',
             height: '21mm',
             transform: 'translate(-50%, -50%) rotate(-90deg)',
+            transformOrigin: 'center',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: 'Arial, Helvetica, sans-serif',
+            gap: '3.5mm',
+            fontFamily: FONT,
           }}>
-            <div style={{ fontSize: '14pt', fontWeight: 900, lineHeight: 1, letterSpacing: '0.8px', color: '#000' }}>
-              PANITIA
-            </div>
-            <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 1, marginTop: '2.5mm', letterSpacing: '0.5px', color: '#000' }}>
-              EVALUASI HASIL BELAJAR
-            </div>
-            <div style={{ fontSize: '6.2pt', fontWeight: 'bold', lineHeight: 1, marginTop: '2mm', letterSpacing: '0.2px', color: '#000' }}>
-              LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
-            </div>
-          </div>
-
-          {/* Logo at the bottom */}
-          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'center' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/logohitam.png" 
               alt="" 
-              style={{ width: '13mm', height: '13mm', objectFit: 'contain' }} 
+              style={{ width: '13mm', height: '13mm', objectFit: 'contain', flexShrink: 0 }} 
             />
+            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '85mm', color: '#000' }}>
+              <div style={{ fontSize: '13pt', fontWeight: 900, lineHeight: 0.95 }}>
+                PANITIA
+              </div>
+              <div style={{ fontSize: '10.5pt', fontWeight: 900, lineHeight: 0.95, marginTop: '1.2mm' }}>
+                EVALUASI HASIL BELAJAR
+              </div>
+              <div style={{ fontSize: '5.8pt', fontWeight: 'bold', lineHeight: 1.1, marginTop: '1mm', textTransform: 'uppercase' }}>
+                LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
+              </div>
+              <div style={{ borderBottom: '0.8pt solid #000', marginTop: '1.5mm', width: '100%' }} />
+            </div>
           </div>
         </div>
 
