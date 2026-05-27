@@ -25,6 +25,7 @@ export default function HafalanPageContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const santriListRef = useRef<HTMLDivElement>(null)
+  const babSelectorRef = useRef<HTMLDivElement>(null)
   const blockRef = useRef<HTMLDivElement>(null)
 
   const draftKey = useMemo(() => {
@@ -97,6 +98,7 @@ export default function HafalanPageContent() {
     setLocalChecked(new Set(ids))
     setDirty(false)
     setSelectedBabId(null)
+    window.setTimeout(() => babSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }
 
   const selectBab = (babId: number) => {
@@ -168,7 +170,7 @@ export default function HafalanPageContent() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden px-4 pb-20 sm:px-6 lg:px-0">
       <DashboardPageHeader
         title="Hafalan"
         description="Pilih jenis hafalan yang tersedia untuk marhalah kelas, lalu tandai blok yang sudah dihafal santri."
@@ -180,13 +182,13 @@ export default function HafalanPageContent() {
             <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kelas</label>
             <select value={kelasId} onChange={e => setKelasId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
               <option value="">Pilih kelas</option>
-              {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas} - {k.marhalah_nama || '-'}</option>)}
+              {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
             </select>
           </div>
         ) : kelasList.length === 1 ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
             <p className="text-xs font-bold uppercase text-emerald-600">Kelas</p>
-            <p className="font-semibold text-emerald-900">{kelasList[0].nama_kelas} - {kelasList[0].marhalah_nama || '-'}</p>
+            <p className="font-semibold text-emerald-900">{kelasList[0].nama_kelas}</p>
           </div>
         ) : null}
       </div>
@@ -219,8 +221,8 @@ export default function HafalanPageContent() {
             </div>
           </div>
 
-          <div ref={santriListRef} className="grid gap-4 lg:grid-cols-[320px_1fr]">
-            <div className="rounded-xl border bg-white shadow-sm">
+          <div ref={santriListRef} className="grid min-w-0 gap-4 lg:grid-cols-[320px_1fr]">
+            <div className="min-w-0 rounded-xl border bg-white shadow-sm">
               <div className="border-b p-3">
                 <p className="mb-2 text-sm font-bold text-slate-800">Pilih Santri</p>
                 <div className="relative">
@@ -257,12 +259,12 @@ export default function HafalanPageContent() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {!selectedSantri ? (
                 <div className="rounded-xl border bg-white p-12 text-center text-slate-400">Pilih santri terlebih dahulu.</div>
               ) : (
                 <>
-                  <div className="rounded-xl border bg-white p-4 shadow-sm">
+                  <div ref={babSelectorRef} className="min-w-0 rounded-xl border bg-white p-4 shadow-sm">
                     <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-xs font-bold uppercase text-emerald-600">Santri Terpilih</p>
@@ -279,7 +281,7 @@ export default function HafalanPageContent() {
                       </div>
                     )}
                     <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Pilih Bab / Surat</p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
                       {data.bab.map((bab: any) => {
                         const active = selectedBabId === bab.id
                         const babDone = bab.blok.filter((blok: any) => localChecked.has(blok.id)).length
@@ -298,7 +300,7 @@ export default function HafalanPageContent() {
                   </div>
 
                   {selectedBab && (
-                    <div ref={blockRef} className="rounded-xl border bg-white p-4 shadow-sm">
+                    <div ref={blockRef} className="min-w-0 rounded-xl border bg-white p-4 shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase text-slate-500">Input Blok</p>
@@ -314,7 +316,7 @@ export default function HafalanPageContent() {
                           </p>
                         </div>
                       )}
-                      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+                      <div className="grid grid-cols-5 justify-items-center gap-2 sm:grid-cols-8 md:grid-cols-10">
                         {selectedBab.blok.map((blok: any) => {
                           const checked = localChecked.has(blok.id)
                           const persisted = getPersistedChecked(blok.id)

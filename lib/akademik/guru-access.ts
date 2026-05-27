@@ -249,14 +249,14 @@ export async function getAccessibleKelasForSession(session?: SessionUser | null)
 
   const unrestricted = isAdmin(activeSession) || hasAnyRole(activeSession, ['sekpen', 'akademik'])
   if (unrestricted) {
-    return query<GuruKelasAccessRow>(`
+    const rows = await query<GuruKelasAccessRow>(`
       SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
              k.tahun_ajaran_id, ta.nama AS tahun_ajaran_nama
       FROM kelas k
       JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
       LEFT JOIN marhalah m ON m.id = k.marhalah_id
-      ORDER BY k.nama_kelas
     `)
+    return sortKelasNaturally(rows)
   }
 
   const guruId = await getGuruIdForSession(activeSession)
@@ -276,7 +276,13 @@ export async function getAccessibleKelasForSession(session?: SessionUser | null)
     ORDER BY k.nama_kelas
   `, [guruId, guruId, guruId, guruId])
 
-  return rows
+  return sortKelasNaturally(rows)
+}
+
+function sortKelasNaturally(rows: GuruKelasAccessRow[]) {
+  return [...rows].sort((a, b) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
 }
 
 export async function canAccessKelas(session: SessionUser | null, kelasId: string) {
