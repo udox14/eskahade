@@ -615,8 +615,10 @@ export async function getJadwalEhbCetakData(eventId: number) {
         kj.jam_group
       FROM ehb_kelas_jam kj
       JOIN kelas k ON k.id = kj.kelas_id
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
       JOIN marhalah m ON m.id = k.marhalah_id
       WHERE kj.ehb_event_id = ?
+        AND m.nama NOT LIKE '%Mutaqaddimah%'
       ORDER BY m.urutan, k.nama_kelas
     `, [eventId]),
     query<JadwalEhbCetakItem>(`
@@ -627,14 +629,22 @@ export async function getJadwalEhbCetakData(eventId: number) {
         COALESCE(kt.nama_kitab, mp.nama) as mapel_nama
       FROM ehb_jadwal j
       JOIN ehb_event e ON e.id = j.ehb_event_id
+      JOIN ehb_sesi s ON s.id = j.sesi_id AND s.ehb_event_id = j.ehb_event_id
+      JOIN ehb_kelas_jam kj
+        ON kj.ehb_event_id = j.ehb_event_id
+       AND kj.kelas_id = j.kelas_id
+       AND INSTR(',' || REPLACE(s.jam_group, ' ', '') || ',', ',' || REPLACE(kj.jam_group, ' ', '') || ',') > 0
       JOIN kelas k ON k.id = j.kelas_id
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      JOIN marhalah m ON m.id = k.marhalah_id
       JOIN mapel mp ON mp.id = j.mapel_id
       LEFT JOIN kitab kt
         ON kt.mapel_id = j.mapel_id
        AND kt.marhalah_id = k.marhalah_id
        AND kt.tahun_ajaran_id = e.tahun_ajaran_id
       WHERE j.ehb_event_id = ?
-      ORDER BY j.tanggal, j.sesi_id, j.kelas_id
+        AND m.nama NOT LIKE '%Mutaqaddimah%'
+      ORDER BY j.tanggal, s.nomor_sesi, m.urutan, k.nama_kelas
     `, [eventId]),
   ])
 
