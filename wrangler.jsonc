@@ -3,19 +3,6 @@
 	"name": "eskahade",
 	"account_id": "a170ed4144c00927988a828aa9a41896",
 	"main": ".open-next/worker.js",
-	"no_bundle": true,
-	"base_dir": ".open-next",
-	"rules": [
-		{
-			"type": "ESModule",
-			"globs": [
-				"cloudflare/*.js",
-				"cloudflare/*.mjs",
-				"middleware/*.mjs",
-				".build/durable-objects/*.js"
-			]
-		}
-	],
 	"compatibility_date": "2025-04-01",
 	"compatibility_flags": [
 		"nodejs_compat"

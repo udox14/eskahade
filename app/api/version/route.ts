@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 // Fallback ke timestamp server start (cukup untuk deteksi deploy baru)
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || process.env.BUILD_TIMESTAMP || String(Date.now())
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 export const revalidate = 0  // tidak di-cache
 
 export function GET() {

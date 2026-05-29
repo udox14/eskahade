@@ -1,0 +1,54 @@
+"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[513],{48386:(e,a,t)=>{t.d(a,{u:()=>d});var n=t(95155),s=t(12115),i=t(35341),r=t(89998);let l=["","Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"],d=s.forwardRef(({ledger:e,preferences:a,bulan:t,tahun:s,subtitle:d,preview:h=!1},p)=>{let x=(0,i.GP)(new Date,"dd MMMM yyyy",{locale:r.id}),u=`${l[t]} ${s}`;return(0,n.jsxs)("div",{ref:p,className:`bg-white text-black ${h?"operasional-print-preview":""}`,children:[(0,n.jsx)("style",{dangerouslySetInnerHTML:{__html:`
+            .operasional-print-sheet {
+              width: 190mm;
+              min-height: 277mm;
+              padding: 10mm 12mm;
+              color: #111827;
+              background: #ffffff;
+              font-family: Arial, Helvetica, sans-serif;
+            }
+            .operasional-print-sheet * { box-sizing: border-box; }
+            .operasional-print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            .operasional-print-sheet th,
+            .operasional-print-sheet td { border: 1px solid #0f172a; padding: 5px 6px; vertical-align: top; }
+            .operasional-print-sheet th { background: #e2e8f0; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+            .operasional-print-sheet td { font-size: 10px; }
+            .operasional-print-sheet .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 14px; }
+            .operasional-print-sheet .summary-card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px; background: #f8fafc; }
+            .operasional-print-sheet .summary-card-label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #475569; }
+            .operasional-print-sheet .summary-card-value { margin-top: 4px; font-size: 17px; font-weight: 700; }
+            .operasional-print-sheet .signature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+            .operasional-print-sheet .signature-box { text-align: center; font-size: 11px; }
+            .operasional-print-sheet .signature-space { height: 64px; }
+            .operasional-print-sheet .muted { color: #64748b; }
+            .operasional-print-preview {
+              width: 100%;
+              min-width: 760px;
+            }
+            .operasional-print-preview .operasional-print-sheet {
+              width: 100%;
+              min-width: 760px;
+              min-height: auto;
+              padding: 10mm;
+              margin: 0 auto;
+            }
+            @page { size: F4 portrait; margin: 10mm; }
+            @media print {
+              html, body { background: white !important; }
+              .operasional-print-sheet { width: 100%; min-height: auto; padding: 0; }
+            }
+          `}}),(0,n.jsxs)("div",{className:"operasional-print-sheet",children:[(0,n.jsxs)("div",{className:"text-center",children:[(0,n.jsx)("div",{className:"text-[22px] font-bold uppercase tracking-wide",children:"Laporan Kas Operasional"}),(0,n.jsx)("div",{className:"mt-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-600",children:d}),(0,n.jsx)("div",{className:"mt-2 text-[14px] font-semibold uppercase",children:e.unit.name})]}),(0,n.jsxs)("div",{className:"mt-4 flex items-start justify-between gap-6",children:[(0,n.jsxs)("div",{className:"space-y-1 text-[11px] font-semibold",children:[(0,n.jsxs)("div",{className:"flex gap-2",children:[(0,n.jsx)("span",{className:"w-20",children:"Periode"}),(0,n.jsx)("span",{children:":"}),(0,n.jsx)("span",{children:u})]}),(0,n.jsxs)("div",{className:"flex gap-2",children:[(0,n.jsx)("span",{className:"w-20",children:"Unit"}),(0,n.jsx)("span",{children:":"}),(0,n.jsx)("span",{children:e.unit.name})]})]}),(0,n.jsx)("div",{className:"text-right text-[10px] text-slate-600",children:(0,n.jsxs)("div",{children:["Dicetak pada ",x]})})]}),(0,n.jsxs)("div",{className:"summary-grid",children:[(0,n.jsx)(o,{label:"Saldo Awal",value:m(e.saldoAwal)}),(0,n.jsx)(o,{label:"Total Pemasukan",value:m(e.totals.alokasi_bendahara+e.totals.pemasukan_lain+Math.max(0,e.totals.penyesuaian))}),(0,n.jsx)(o,{label:"Total Pengeluaran",value:m(e.totals.pengeluaran+Math.abs(Math.min(0,e.totals.penyesuaian)))}),(0,n.jsx)(o,{label:"Saldo Akhir",value:m(e.saldoAkhir)})]}),(0,n.jsxs)("table",{children:[(0,n.jsx)("thead",{children:(0,n.jsxs)("tr",{children:[(0,n.jsx)("th",{style:{width:"30px"},children:"No"}),(0,n.jsx)("th",{style:{width:"70px"},children:"Tanggal"}),(0,n.jsx)("th",{style:{width:"74px"},children:"Tipe"}),(0,n.jsx)("th",{style:{width:"80px"},children:"Kategori"}),(0,n.jsx)("th",{children:"Uraian"}),(0,n.jsx)("th",{style:{width:"54px"},children:"Qty"}),(0,n.jsx)("th",{style:{width:"88px"},children:"Harga"}),(0,n.jsx)("th",{style:{width:"102px"},children:"Nominal"})]})}),(0,n.jsxs)("tbody",{children:[0===e.transactions.length?(0,n.jsx)("tr",{children:(0,n.jsx)("td",{colSpan:8,className:"text-center muted",children:"Belum ada transaksi pada periode ini."})}):e.transactions.map((e,a)=>{var t,s;let r;return(0,n.jsxs)("tr",{children:[(0,n.jsx)("td",{className:"text-center",children:a+1}),(0,n.jsx)("td",{children:Number.isNaN((r=new Date(t=e.tanggal)).getTime())?t:(0,i.GP)(r,"dd/MM/yyyy")}),(0,n.jsx)("td",{children:e.tipe}),(0,n.jsx)("td",{children:e.kategori||("ALOKASI_BENDAHARA"===e.sumber_pemasukan?"Alokasi Bendahara":"-")}),(0,n.jsxs)("td",{children:[(0,n.jsx)("div",{className:"font-medium",children:e.uraian}),e.partner_name?(0,n.jsx)("div",{className:"muted",children:e.partner_name}):null,e.catatan?(0,n.jsx)("div",{className:"muted",children:e.catatan}):null]}),(0,n.jsx)("td",{className:"text-center",children:(s=e.qty,new Intl.NumberFormat("id-ID",{maximumFractionDigits:2*(s%1!=0)}).format(s))}),(0,n.jsx)("td",{className:"text-right",children:m(e.harga_satuan)}),(0,n.jsx)("td",{className:"text-right",children:m(e.nominal)})]},e.id)}),(0,n.jsxs)("tr",{children:[(0,n.jsx)("td",{colSpan:7,className:"text-right font-bold",children:"Saldo Awal"}),(0,n.jsx)("td",{className:"text-right font-bold",children:m(e.saldoAwal)})]}),(0,n.jsxs)("tr",{children:[(0,n.jsx)("td",{colSpan:7,className:"text-right font-bold",children:"Saldo Akhir"}),(0,n.jsx)("td",{className:"text-right font-bold",children:m(e.saldoAkhir)})]})]})]}),(0,n.jsxs)("div",{className:"signature-grid",children:[(0,n.jsx)(c,{label:a.slot1_label,nama:a.slot1_nama,jabatan:a.slot1_jabatan}),(0,n.jsx)(c,{label:a.slot2_label,nama:a.slot2_nama,jabatan:a.slot2_jabatan}),(0,n.jsx)(c,{label:a.slot3_label,nama:a.slot3_nama,jabatan:a.slot3_jabatan})]})]})]})});function o({label:e,value:a}){return(0,n.jsxs)("div",{className:"summary-card",children:[(0,n.jsx)("div",{className:"summary-card-label",children:e}),(0,n.jsx)("div",{className:"summary-card-value",children:a})]})}function c({label:e,nama:a,jabatan:t}){return(0,n.jsxs)("div",{className:"signature-box",children:[(0,n.jsx)("div",{children:e||"...................."}),(0,n.jsx)("div",{className:"signature-space"}),(0,n.jsx)("div",{className:"font-medium",children:a||"........................................"}),(0,n.jsx)("div",{className:"muted",children:t||"........................................"})]})}function m(e){return`Rp ${new Intl.NumberFormat("id-ID").format(e)}`}d.displayName="OperasionalPrintSheet"},67387:(e,a,t)=>{t.d(a,{DashboardPageHeader:()=>i});var n=t(95155),s=t(91337);function i({title:e,description:a,action:t,className:i}){return(0,n.jsxs)("div",{className:(0,s.cn)("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between",i),children:[(0,n.jsxs)("div",{className:"min-w-0",children:[(0,n.jsx)("h1",{className:"text-2xl font-bold leading-tight text-slate-900 sm:text-[1.75rem]",children:e}),(0,n.jsx)("p",{className:"mt-1 text-sm leading-5 text-slate-500",children:a})]}),t?(0,n.jsx)("div",{className:"w-full sm:w-auto sm:shrink-0",children:t}):null]})}},76715:(e,a,t)=>{t.d(a,{S:()=>o}),t(95155);var n=t(12115),s=t(68459),i=t(41585),r=t(52484),l=t(68822);let d=(0,n.createContext)(null);function o(){let e=(0,n.useContext)(d);return(0,n.useCallback)((a,t={})=>e?e(a,t):window.__confirmDialog?window.__confirmDialog(a,t):Promise.resolve(window.confirm(a)),[e])}s.A,i.A,r.A,l.A},80776:(e,a,t)=>{t.d(a,{R8:()=>l});var n=t(12115),s=t(4183);function i(e,a){let t=e||a||"dokumen";return((t.endsWith(".pdf")?t.slice(0,-4):t).replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"dokumen")+".pdf"}async function r({contentRef:e,documentTitle:a,filename:t,pageStyle:n,pdfOptions:s}){var r,l,d;let o,c,m,h,p=e?.current;if(!p)throw Error("Area cetak belum siap.");let x=a||t||document.title||"Dokumen",u=(r=function(e){if(e instanceof Element)return e.outerHTML;let a=document.createElement("div");return a.textContent=e.textContent||"",a.outerHTML}(p),o=n?`<style>${n}</style>`:"",`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${x.replace(/[<>&"]/g,"")}</title>
+  ${c=[],document.querySelectorAll('link[rel="stylesheet"][href]').forEach(e=>{let a=e.href;a&&c.push(`<link rel="stylesheet" href="${a}">`)}),document.querySelectorAll("style").forEach(e=>{c.push(`<style>${e.textContent||""}</style>`)}),c.join("\n")}
+  ${o}
+</head>
+<body>
+  ${r}
+</body>
+</html>`);if(u.length>0x2d00000)throw Error("Dokumen terlalu besar untuk dibuat PDF dari perangkat ini.");let f=await fetch("/api/pdf/from-html",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({html:u,title:x,filename:i(t,a),pageStyle:n,pdfOptions:s})});if(!f.ok){let e="Gagal membuat PDF.";try{let a=await f.json();a?.error&&(e=a.error)}catch{}throw Error(e)}l=await f.blob(),d=i(t,a),m=URL.createObjectURL(l),(h=document.createElement("a")).href=m,h.download=d,document.body.appendChild(h),h.click(),h.remove(),window.setTimeout(()=>URL.revokeObjectURL(m),1e3)}function l(e){let a=(0,s.useReactToPrint)(e),t=(0,n.useCallback)(async()=>{await r({contentRef:e.contentRef,documentTitle:e.documentTitle,filename:e.filename,pageStyle:e.pageStyle,pdfOptions:e.pdfOptions})},[e.contentRef,e.documentTitle,e.filename,e.pageStyle,e.pdfOptions]);return(0,n.useCallback)(async()=>{let n,s;if(n=window.matchMedia?.("(pointer: coarse)").matches??!1,s=window.matchMedia?.("(max-width: 767px)").matches??window.innerWidth<768,!n&&!s)return void a();try{await e.onBeforePrint?.(),await t(),e.onAfterPrint?.()}catch(t){if(e.onPrintError?.("mobile-pdf",t),!e.onPrintError){let e=t instanceof Error?t.message:"Gagal membuat PDF.";window.alert(`${e}
+
+Membuka dialog cetak biasa sebagai cadangan.`)}a()}},[t,a,e])}},91337:(e,a,t)=>{t.d(a,{cn:()=>i});var n=t(29722),s=t(622);function i(...e){return(0,s.QP)((0,n.$)(e))}}}]);

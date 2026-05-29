@@ -4,20 +4,11 @@
 
 ▲ Next.js 16.1.6 (Turbopack)
 - Local:         http://localhost:3000
-- Network:       http://192.168.88.251:3000
+- Network:       http://10.180.151.67:3000
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
-✓ Ready in 6.2s
-[layout] session null → redirect /login
- GET /dashboard/dewan-santri/sensus/laporan 307 in 3.1s (compile: 2.8s, render: 280ms)
- GET /login 200 in 264ms (compile: 171ms, render: 93ms)
-✓ Compiled in 320ms
-[layout] session null → redirect /login
- GET /dashboard/dewan-santri/sensus/laporan 307 in 242ms (compile: 123ms, render: 119ms)
- GET /login 200 in 81ms (compile: 5ms, render: 76ms)
-  Reload env: .env.local
-  Reload env: .env.local
-  Reload env: .env.local
+⎔ Establishing remote connection...
+✓ Ready in 3.5s
