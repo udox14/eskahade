@@ -23,6 +23,25 @@ function sanitizeHtml(html: string) {
     .replace(/\s+on[a-z]+\s*=\s*[^\s>]+/gi, '')
 }
 
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function withBaseHref(html: string, origin: string) {
+  if (/<base\b/i.test(html)) return html
+
+  const baseTag = `<base href="${escapeHtmlAttribute(origin.replace(/\/$/, ''))}/">`
+  if (/<head\b[^>]*>/i.test(html)) {
+    return html.replace(/<head\b[^>]*>/i, match => `${match}\n  ${baseTag}`)
+  }
+
+  return `<!doctype html><html><head>${baseTag}</head><body>${html}</body></html>`
+}
+
 function cleanFilename(input: unknown) {
   const value = typeof input === 'string' ? input : 'dokumen.pdf'
   const cleaned = value
@@ -82,7 +101,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const html = sanitizeHtml(body.html)
+  const html = withBaseHref(sanitizeHtml(body.html), new URL(request.url).origin)
   const filename = cleanFilename(body.filename)
 
   const upstream = await fetch(`${PDF_ENDPOINT_BASE}/${accountId}/browser-rendering/pdf`, {

@@ -14,6 +14,7 @@ see more here https://nextjs.org/docs/messages/app-static-to-dynamic-error`),"__
 <html>
 <head>
   <meta charset="utf-8">
+  <base href="${"/".replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${o.replace(/[<>&"]/g,"")}</title>
   ${k=[],document.querySelectorAll('link[rel="stylesheet"][href]').forEach(a=>{let b=a.href;b&&k.push(`<link rel="stylesheet" href="${b}">`)}),document.querySelectorAll("style").forEach(a=>{k.push(`<style>${a.textContent||""}</style>`)}),k.join("\n")}

@@ -62,13 +62,23 @@ function collectCurrentPageStyles() {
   return parts.join('\n')
 }
 
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 function buildPdfHtml(contentHtml: string, title: string, pageStyle?: string) {
   const style = pageStyle ? `<style>${pageStyle}</style>` : ''
+  const baseHref = typeof window !== 'undefined' ? `${window.location.origin}/` : '/'
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
+  <base href="${escapeHtmlAttribute(baseHref)}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${title.replace(/[<>&"]/g, '')}</title>
   ${collectCurrentPageStyles()}
