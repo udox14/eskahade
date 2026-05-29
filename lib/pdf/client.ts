@@ -186,7 +186,11 @@ export function useReactToPrint(options: ReactToPrintCompatOptions) {
       options.onAfterPrint?.()
     } catch (error) {
       options.onPrintError?.('mobile-pdf', error)
-      if (!options.onPrintError) throw error
+      if (!options.onPrintError) {
+        const message = error instanceof Error ? error.message : 'Gagal membuat PDF.'
+        window.alert(`${message}\n\nMembuka dialog cetak biasa sebagai cadangan.`)
+      }
+      nativePrint()
     }
   }, [downloadPdf, nativePrint, options])
 }
