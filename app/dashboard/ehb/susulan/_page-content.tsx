@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getActiveEventLight, getSusulanList, markSusulanDone } from './actions'
 import { 
-  ClipboardList, CheckCircle2, AlertTriangle, Loader2, Search, CheckSquare
+  CheckCircle2, AlertTriangle, Loader2, Search, CheckSquare, ClipboardList, BarChart3, BookOpen
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -16,6 +16,7 @@ export default function SusulanEhbPage() {
   const [susulanList, setSusulanList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
+  const [activeTab, setActiveTab] = useState<'daftar' | 'rekap'>('daftar')
 
   // Multi-select for bulk action
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -60,7 +61,9 @@ export default function SusulanEhbPage() {
   const filteredList = susulanList.filter(s => 
     s.nama_lengkap.toLowerCase().includes(keyword.toLowerCase()) || 
     s.nama_kelas.toLowerCase().includes(keyword.toLowerCase()) ||
-    s.mapel_nama.toLowerCase().includes(keyword.toLowerCase())
+    s.mapel_nama.toLowerCase().includes(keyword.toLowerCase()) ||
+    (s.marhalah_nama || '').toLowerCase().includes(keyword.toLowerCase()) ||
+    (s.nama_kitab || '').toLowerCase().includes(keyword.toLowerCase())
   )
 
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
@@ -74,6 +77,19 @@ export default function SusulanEhbPage() {
   )
 
   const pendingCount = susulanList.filter(s => s.is_susulan_done === 0).length
+  const rekapGroups = buildRekapGroups(susulanList)
+  const filteredRekapGroups = rekapGroups
+    .map(group => {
+      const q = keyword.toLowerCase()
+      const items = group.items.filter(item => (
+        group.marhalahNama.toLowerCase().includes(q) ||
+        item.mapelNama.toLowerCase().includes(q) ||
+        item.namaKitab.toLowerCase().includes(q)
+      ))
+      return { ...group, items }
+    })
+    .filter(group => group.items.length > 0)
+  const totalMapelRekap = rekapGroups.reduce((sum, group) => sum + group.items.length, 0)
 
   return (
     <div className="max-w-6xl mx-auto pb-20 space-y-6">
@@ -83,13 +99,28 @@ export default function SusulanEhbPage() {
         className="border-b pb-4"
       />
 
+      <div className="inline-flex w-full rounded-xl bg-slate-100 p-1 sm:w-auto">
+        <button
+          onClick={() => setActiveTab('daftar')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition sm:flex-none ${activeTab === 'daftar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <ClipboardList className="h-4 w-4" /> Daftar Susulan
+        </button>
+        <button
+          onClick={() => setActiveTab('rekap')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition sm:flex-none ${activeTab === 'rekap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <BarChart3 className="h-4 w-4" /> Rekap Soal
+        </button>
+      </div>
+
       <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b bg-slate-50 flex justify-between items-center gap-4">
           <div className="relative max-w-sm w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Cari santri, kelas, mapel..." 
+              placeholder={activeTab === 'daftar' ? 'Cari santri, kelas, mapel...' : 'Cari marhalah, mapel, kitab...'} 
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -100,7 +131,12 @@ export default function SusulanEhbPage() {
             <div className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4"/> {pendingCount} Tunggakan
             </div>
-            {selectedIds.length > 0 && (
+            {activeTab === 'rekap' && (
+              <div className="hidden bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-lg text-sm font-bold sm:flex items-center gap-2">
+                <BookOpen className="w-4 h-4"/> {totalMapelRekap} Mapel
+              </div>
+            )}
+            {activeTab === 'daftar' && selectedIds.length > 0 && (
                 <button 
                     onClick={handleBulkMarkDone}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-md transition-all"
@@ -111,6 +147,7 @@ export default function SusulanEhbPage() {
           </div>
         </div>
 
+        {activeTab === 'daftar' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
@@ -202,7 +239,124 @@ export default function SusulanEhbPage() {
             </tbody>
           </table>
         </div>
+        ) : (
+          <div className="divide-y">
+            {filteredRekapGroups.length === 0 ? (
+              <div className="px-4 py-10 text-center text-slate-400">Tidak ada data rekap susulan</div>
+            ) : filteredRekapGroups.map(group => {
+              return (
+                <section key={group.key} className="p-4">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="font-bold text-slate-900">{group.marhalahNama}</h2>
+                      <p className="text-xs text-slate-500">{group.pendingTotal} lembar perlu disiapkan dari {group.total} total data susulan</p>
+                    </div>
+                    <div className="w-fit rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-bold text-indigo-700">
+                      {group.items.length} mapel
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3 font-bold">Mata Pelajaran</th>
+                          <th className="px-4 py-3 font-bold">Nama Kitab</th>
+                          <th className="px-4 py-3 text-center font-bold">Perlu Lembar</th>
+                          <th className="px-4 py-3 text-center font-bold">Total Susulan</th>
+                          <th className="px-4 py-3 text-center font-bold">Selesai</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {group.items.map(item => (
+                          <tr key={item.key} className="hover:bg-slate-50">
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-slate-800">{item.mapelNama}</p>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">{item.namaKitab}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex min-w-12 justify-center rounded-lg bg-amber-100 px-3 py-1 font-black text-amber-800">
+                                {item.pending}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-slate-700">{item.total}</td>
+                            <td className="px-4 py-3 text-center font-semibold text-emerald-700">{item.done}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+function buildRekapGroups(list: any[]) {
+  const groupMap = new Map<string, {
+    key: string
+    marhalahNama: string
+    marhalahUrutan: number
+    total: number
+    pendingTotal: number
+    itemsMap: Map<string, {
+      key: string
+      mapelNama: string
+      namaKitab: string
+      total: number
+      pending: number
+      done: number
+    }>
+  }>()
+
+  for (const row of list) {
+    const marhalahNama = row.marhalah_nama || 'Tanpa Marhalah'
+    const marhalahKey = String(row.marhalah_id || marhalahNama)
+    const mapelKey = String(row.mapel_id || row.mapel_nama)
+    const isDone = row.is_susulan_done === 1
+
+    if (!groupMap.has(marhalahKey)) {
+      groupMap.set(marhalahKey, {
+        key: marhalahKey,
+        marhalahNama,
+        marhalahUrutan: Number(row.marhalah_urutan ?? 999999),
+        total: 0,
+        pendingTotal: 0,
+        itemsMap: new Map(),
+      })
+    }
+
+    const group = groupMap.get(marhalahKey)!
+    group.total += 1
+    if (!isDone) group.pendingTotal += 1
+
+    if (!group.itemsMap.has(mapelKey)) {
+      group.itemsMap.set(mapelKey, {
+        key: mapelKey,
+        mapelNama: row.mapel_nama || '-',
+        namaKitab: row.nama_kitab || '-',
+        total: 0,
+        pending: 0,
+        done: 0,
+      })
+    }
+
+    const item = group.itemsMap.get(mapelKey)!
+    item.total += 1
+    if (isDone) item.done += 1
+    else item.pending += 1
+  }
+
+  return Array.from(groupMap.values())
+    .sort((a, b) => a.marhalahUrutan - b.marhalahUrutan || a.marhalahNama.localeCompare(b.marhalahNama))
+    .map(group => ({
+      key: group.key,
+      marhalahNama: group.marhalahNama,
+      total: group.total,
+      pendingTotal: group.pendingTotal,
+      items: Array.from(group.itemsMap.values()).sort((a, b) => a.mapelNama.localeCompare(b.mapelNama)),
+    }))
 }
