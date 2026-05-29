@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import {
   bayarHutangBelanja,
   getBelanjaList,

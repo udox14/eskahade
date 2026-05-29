@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import {
   AlertTriangle, Filter, Loader2, MapPinned, Printer,
 } from 'lucide-react'

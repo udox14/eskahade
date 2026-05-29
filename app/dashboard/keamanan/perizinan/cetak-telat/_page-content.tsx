@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { getSantriTelat } from './actions'
 import { PemanggilanTelatView } from './pemanggilan-telat-view'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, ArrowLeft, Loader2, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'

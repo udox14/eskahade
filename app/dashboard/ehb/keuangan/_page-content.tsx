@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import {
   AlertTriangle, ArrowDown, ArrowUp, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
 } from 'lucide-react'

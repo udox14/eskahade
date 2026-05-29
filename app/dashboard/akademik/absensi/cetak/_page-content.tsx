@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { getRekapAlfaMingguan } from './actions'
 import { PemanggilanView } from './pemanggilan-view'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, Search, Loader2 } from 'lucide-react'
 
 export default function CetakPemanggilanPage() {

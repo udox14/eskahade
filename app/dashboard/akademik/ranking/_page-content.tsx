@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { getJuaraUmum } from './actions'
 import { Trophy, Loader2, Printer, Search, Medal } from 'lucide-react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function JuaraUmumPage() {

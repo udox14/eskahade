@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { getGuruOptionsForRekap, getMarhalahList, getRekapDetailGuru, getRekapKinerjaGuru, getTahunAjaranList } from './actions'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { AlertTriangle, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'

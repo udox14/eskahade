@@ -5,7 +5,7 @@ import { getLaporanSensus } from './actions'
 import { CheckSquare, Filter, Loader2, Printer, RotateCcw, Square, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]

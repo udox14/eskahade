@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getKelasList, getDataRapor, getTahunAjaranList } from './actions'
 import { Printer, Loader2, Search, FileText, CalendarDays } from 'lucide-react'
 import { RaporSatuHalaman } from './rapor-view'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { toast } from 'sonner' 
 
 export default function CetakRaporPage() {

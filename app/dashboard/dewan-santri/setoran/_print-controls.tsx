@@ -4,7 +4,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { Printer } from 'lucide-react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 
 const BULAN_NAMA = [
   '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',

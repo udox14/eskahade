@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getUserScope, getRekapAbsensi, getDetailAbsensiSantri, getReferensiFilter } from './actions'
 import { Search, Filter, Loader2, Home, BookOpen, X, Calendar, Printer, Palette, Circle } from 'lucide-react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 

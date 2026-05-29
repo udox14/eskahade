@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { ArrowLeft, Eye, Loader2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'

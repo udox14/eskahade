@@ -5,7 +5,7 @@ import { getKelasForCetak, getDataBlanko, getMarhalahForCetak, getDataBlankoMass
 import { Printer, Loader2, Search, FileText, Layers, List } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 
 // --- KOMPONEN KERTAS ABSENSI (REUSABLE) ---
 function BlankoSheet({ data }: { data: any }) {

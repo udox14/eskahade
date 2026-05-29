@@ -5,7 +5,7 @@ import {
   Filter, RefreshCw, Search, Save, Loader2, CheckCircle, AlertTriangle,
   LayoutGrid, Table2, Printer, FileText, Users, ChevronDown, CalendarDays
 } from 'lucide-react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'

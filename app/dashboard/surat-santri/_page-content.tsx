@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useReactToPrint } from 'react-to-print'
+import { useReactToPrint } from '@/lib/pdf/client'
 import {
   cariSantriSurat, getPelanggaranSantri, getSuggestLevel,
   simpanSuratPernyataan, simpanSuratPerjanjian,
