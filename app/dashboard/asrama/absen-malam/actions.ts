@@ -22,6 +22,13 @@ async function ensureAbsenMalamSchema() {
   }
 }
 
+function getTanggalWindowIso(tanggal: string) {
+  return {
+    start: parseWibDate(tanggal, 'start').toISOString(),
+    end: parseWibDate(tanggal, 'end').toISOString(),
+  }
+}
+
 // Hanya ambil daftar kamar — ringan, dipanggil saat halaman pertama dibuka
 export async function getKamarsMalam(asrama: string) {
   if (isAsramaTanpaKamar(asrama)) return []
@@ -54,6 +61,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 
   const ids = santriList.map((s: any) => s.id)
   const ph = ids.map(() => '?').join(',')
+  const tanggalWindow = getTanggalWindowIso(tanggal)
 
   let absenList: any[] = []
   let izinList: any[] = []
@@ -73,7 +81,7 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
          AND p.tgl_mulai <= ?
          AND p.tgl_selesai_rencana >= ?
          AND p.santri_id IN (${ph})`,
-      [tanggal, tanggal, ...ids]
+      [tanggalWindow.end, tanggalWindow.start, ...ids]
     )
   } catch {}
 
@@ -105,6 +113,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
 
   const actual = parseWibDate(tanggal, 'start')
   if (Number.isNaN(actual.getTime())) return { error: 'Tanggal kembali tidak valid.' }
+  const tanggalWindow = getTanggalWindowIso(tanggal)
 
   const izin = await query<any>(`
     SELECT
@@ -124,7 +133,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
       AND p.tgl_selesai_rencana >= ?
     ORDER BY p.tgl_selesai_rencana ASC
     LIMIT 1
-  `, [santriId, tanggal, tanggal])
+  `, [santriId, tanggalWindow.end, tanggalWindow.start])
 
   const row = izin[0]
   if (!row) return { error: 'Izin aktif santri ini tidak ditemukan atau sudah ditandai kembali.' }
@@ -203,8 +212,22 @@ export async function batchSaveAbsenMalam(
     status: record.status === 'ALFA' ? 'ALFA' : 'HADIR',
     keterangan: (record.keterangan || '').trim(),
   }))
-  const toSave = normalized.filter(r => r.status === 'ALFA' || r.keterangan)
-  const toDelete = normalized.filter(r => r.status !== 'ALFA' && !r.keterangan).map(r => r.santri_id)
+  const tanggalWindow = getTanggalWindowIso(tanggal)
+  const activeIzinIds = santriIds.length
+    ? new Set((await query<{ santri_id: string }>(
+        `SELECT DISTINCT santri_id
+         FROM perizinan
+         WHERE status = 'AKTIF'
+           AND tgl_kembali_aktual IS NULL
+           AND tgl_mulai <= ?
+           AND tgl_selesai_rencana >= ?
+           AND santri_id IN (${santriIds.map(() => '?').join(',')})`,
+        [tanggalWindow.end, tanggalWindow.start, ...santriIds]
+      )).map(row => row.santri_id))
+    : new Set<string>()
+  const writableRecords = normalized.filter(r => !activeIzinIds.has(r.santri_id))
+  const toSave = writableRecords.filter(r => r.status === 'ALFA' || r.keterangan)
+  const toDelete = writableRecords.filter(r => r.status !== 'ALFA' && !r.keterangan).map(r => r.santri_id)
 
   const db = await getDB()
   const stmts: any[] = []

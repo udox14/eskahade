@@ -363,6 +363,7 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
   })
 
   revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/asrama/absen-malam')
   return { success: true }
 }
 
@@ -411,6 +412,7 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   })
 
   revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/asrama/absen-malam')
   return { success: true }
 }
 
@@ -460,6 +462,7 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   })
 
   revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/asrama/absen-malam')
 
   if (isTelat) return { success: true, message: 'Terlambat! Masuk antrian verifikasi.' }
   return { success: true, message: 'Tepat waktu. Izin selesai.' }
@@ -508,5 +511,6 @@ export async function hapusIzin(id: string): Promise<{ success: boolean } | { er
     },
   })
   revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/asrama/absen-malam')
   return { success: true }
 }

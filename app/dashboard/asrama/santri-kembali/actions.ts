@@ -197,6 +197,7 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
   })
 
   revalidatePath(FEATURE_PATH)
+  revalidatePath('/dashboard/asrama/absen-malam')
   revalidatePath('/dashboard/keamanan/perizinan')
   revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
 
