@@ -164,7 +164,16 @@ export async function getDataExport(
   addInClause('s.sekolah', filter.sekolah)
   addInClause('s.kelas_sekolah', filter.kelas_sekolah)
   addInClause('s.tahun_masuk', filter.tahun_masuk)
-  if (filter.alamat_kata)   { clauses.push('s.alamat LIKE ?');       params.push(`%${filter.alamat_kata}%`) }
+  if (filter.alamat_kata) {
+    clauses.push('(s.alamat LIKE ? OR s.alamat_lengkap LIKE ? OR s.kecamatan LIKE ? OR s.kab_kota LIKE ? OR s.provinsi LIKE ?)')
+    params.push(
+      `%${filter.alamat_kata}%`,
+      `%${filter.alamat_kata}%`,
+      `%${filter.alamat_kata}%`,
+      `%${filter.alamat_kata}%`,
+      `%${filter.alamat_kata}%`
+    )
+  }
   addInClause('k.nama_kelas', filter.nama_kelas)
   addInClause('m.nama', filter.marhalah)
 
@@ -202,7 +211,11 @@ export async function getDataExport(
     kolom.includes('tanggal_lahir') ? 's.tanggal_lahir' : null,
     kolom.includes('nama_ayah')     ? 's.nama_ayah'     : null,
     kolom.includes('nama_ibu')      ? 's.nama_ibu'      : null,
-    kolom.includes('alamat')        ? 's.alamat'        : null,
+    kolom.includes('alamat')        ? 'COALESCE(NULLIF(s.alamat, \'\'), s.alamat_lengkap) AS alamat' : null,
+    kolom.includes('alamat_lengkap') ? 's.alamat_lengkap' : null,
+    kolom.includes('kecamatan')     ? 's.kecamatan'     : null,
+    kolom.includes('kab_kota')      ? 's.kab_kota'      : null,
+    kolom.includes('provinsi')      ? 's.provinsi'      : null,
     kolom.includes('asrama')        ? 's.asrama'        : null,
     kolom.includes('kamar')         ? 's.kamar'         : null,
     kolom.includes('tahun_masuk')   ? 's.tahun_masuk'   : null,

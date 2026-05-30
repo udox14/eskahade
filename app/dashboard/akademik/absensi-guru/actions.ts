@@ -19,6 +19,54 @@ import {
 
 const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
 type SessionType = typeof VALID_SESI[number]
+type GuruStatusImport = 'H' | 'A' | 'B' | 'L'
+
+export type AbsensiGuruImportCell = {
+  sheet: string
+  row: number
+  kelasName: string
+  guruName: string
+  waktu: string
+  tanggal: string
+  sesi: SessionType
+  status: GuruStatusImport
+}
+
+type ImportIssue = {
+  sheet?: string
+  row?: number
+  kelasName?: string
+  guruName?: string
+  tanggal?: string
+  sesi?: SessionType
+  message: string
+}
+
+type ImportGroup = {
+  kelasId: string
+  kelasName: string
+  tanggal: string
+  shubuh: GuruStatusImport
+  ashar: GuruStatusImport
+  maghrib: GuruStatusImport
+  guru_shubuh_id_snapshot: number | null
+  guru_shubuh_nama_snapshot: string | null
+  guru_ashar_id_snapshot: number | null
+  guru_ashar_nama_snapshot: string | null
+  guru_maghrib_id_snapshot: number | null
+  guru_maghrib_nama_snapshot: string | null
+}
+
+type ImportBuildResult = {
+  groups: ImportGroup[]
+  statusCounts: Record<GuruStatusImport, number>
+  matchedGuruCells: number
+  unmatchedGuruCells: number
+  unmatchedKelas: ImportIssue[]
+  unmatchedGuru: ImportIssue[]
+  conflicts: ImportIssue[]
+  duplicateKelas: string[]
+}
 
 function emptyResolvedGuru() {
   return {
@@ -55,6 +103,199 @@ async function ensureLiburPengajianTable() {
     `)
   } catch {
     // noop
+  }
+}
+
+function normalizeLookupKey(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[`\u2018\u2019']/g, '')
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+function normalizeImportStatus(value: unknown): GuruStatusImport {
+  const status = String(value || 'H').trim().toUpperCase()
+  return status === 'A' || status === 'B' || status === 'L' ? status : 'H'
+}
+
+function sessionSnapshotFields(sessionName: SessionType) {
+  if (sessionName === 'shubuh') {
+    return {
+      idField: 'guru_shubuh_id_snapshot' as const,
+      nameField: 'guru_shubuh_nama_snapshot' as const,
+    }
+  }
+  if (sessionName === 'ashar') {
+    return {
+      idField: 'guru_ashar_id_snapshot' as const,
+      nameField: 'guru_ashar_nama_snapshot' as const,
+    }
+  }
+  return {
+    idField: 'guru_maghrib_id_snapshot' as const,
+    nameField: 'guru_maghrib_nama_snapshot' as const,
+  }
+}
+
+async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<ImportBuildResult> {
+  await ensureLiburPengajianTable()
+
+  const cleanCells = cells
+    .map(cell => ({
+      ...cell,
+      kelasName: String(cell.kelasName || '').trim(),
+      guruName: String(cell.guruName || '').trim(),
+      waktu: String(cell.waktu || '').trim(),
+      status: normalizeImportStatus(cell.status),
+    }))
+    .filter(cell =>
+      cell.kelasName &&
+      cell.guruName &&
+      cell.tanggal &&
+      VALID_SESI.includes(cell.sesi)
+    )
+
+  const kelasRows = await query<any>(`
+    SELECT k.id, k.nama_kelas, COALESCE(ta.is_active, 0) AS is_active
+    FROM kelas k
+    LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
+    ORDER BY COALESCE(ta.is_active, 0) DESC, k.nama_kelas
+  `)
+  const guruRows = await query<any>(`
+    SELECT id, nama_lengkap
+    FROM data_guru
+    ORDER BY nama_lengkap
+  `)
+
+  const kelasMap = new Map<string, any[]>()
+  kelasRows.forEach(row => {
+    const key = normalizeLookupKey(row.nama_kelas)
+    if (!key) return
+    kelasMap.set(key, [...(kelasMap.get(key) || []), row])
+  })
+
+  const guruMap = new Map<string, any>()
+  guruRows.forEach(row => {
+    const key = normalizeLookupKey(row.nama_lengkap)
+    if (!key || guruMap.has(key)) return
+    guruMap.set(key, row)
+  })
+
+  const statusCounts: Record<GuruStatusImport, number> = { H: 0, A: 0, B: 0, L: 0 }
+  const unmatchedKelasMap = new Map<string, ImportIssue>()
+  const unmatchedGuruMap = new Map<string, ImportIssue>()
+  const conflicts: ImportIssue[] = []
+  const duplicateKelas = Array.from(kelasMap.entries())
+    .filter(([, rows]) => rows.length > 1)
+    .map(([, rows]) => rows.map(row => row.nama_kelas).join(' / '))
+    .slice(0, 30)
+
+  const groups = new Map<string, ImportGroup>()
+  const assignedStatus = new Map<string, GuruStatusImport>()
+  const assignedTeacher = new Map<string, string>()
+  let matchedGuruCells = 0
+  let unmatchedGuruCells = 0
+
+  for (const cell of cleanCells) {
+    statusCounts[cell.status] += 1
+    const kelasMatches = kelasMap.get(normalizeLookupKey(cell.kelasName)) || []
+    const kelas = kelasMatches[0]
+    if (!kelas) {
+      const key = cell.kelasName
+      if (!unmatchedKelasMap.has(key)) {
+        unmatchedKelasMap.set(key, {
+          sheet: cell.sheet,
+          row: cell.row,
+          kelasName: cell.kelasName,
+          message: `Kelas "${cell.kelasName}" tidak ditemukan di Master Kelas.`,
+        })
+      }
+      continue
+    }
+
+    const groupKey = `${kelas.id}|${cell.tanggal}`
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        kelasId: String(kelas.id),
+        kelasName: String(kelas.nama_kelas || cell.kelasName),
+        tanggal: cell.tanggal,
+        shubuh: 'H',
+        ashar: 'H',
+        maghrib: 'H',
+        guru_shubuh_id_snapshot: null,
+        guru_shubuh_nama_snapshot: null,
+        guru_ashar_id_snapshot: null,
+        guru_ashar_nama_snapshot: null,
+        guru_maghrib_id_snapshot: null,
+        guru_maghrib_nama_snapshot: null,
+      })
+    }
+
+    const group = groups.get(groupKey)!
+    const statusKey = `${groupKey}|${cell.sesi}`
+    const existingStatus = assignedStatus.get(statusKey)
+    if (existingStatus && existingStatus !== cell.status) {
+      conflicts.push({
+        sheet: cell.sheet,
+        row: cell.row,
+        kelasName: cell.kelasName,
+        guruName: cell.guruName,
+        tanggal: cell.tanggal,
+        sesi: cell.sesi,
+        message: `Konflik status ${cell.sesi} ${cell.tanggal} untuk ${cell.kelasName}: ${existingStatus} vs ${cell.status}.`,
+      })
+      continue
+    }
+    const existingTeacher = assignedTeacher.get(statusKey)
+    if (existingTeacher && normalizeLookupKey(existingTeacher) !== normalizeLookupKey(cell.guruName)) {
+      conflicts.push({
+        sheet: cell.sheet,
+        row: cell.row,
+        kelasName: cell.kelasName,
+        guruName: cell.guruName,
+        tanggal: cell.tanggal,
+        sesi: cell.sesi,
+        message: `Konflik guru ${cell.sesi} ${cell.tanggal} untuk ${cell.kelasName}: ${existingTeacher} vs ${cell.guruName}.`,
+      })
+      continue
+    }
+    assignedStatus.set(statusKey, cell.status)
+    assignedTeacher.set(statusKey, cell.guruName)
+    group[cell.sesi] = cell.status
+
+    const guru = guruMap.get(normalizeLookupKey(cell.guruName))
+    const fields = sessionSnapshotFields(cell.sesi)
+    if (guru?.id) {
+      matchedGuruCells += 1
+      group[fields.idField] = Number(guru.id)
+      group[fields.nameField] = String(guru.nama_lengkap || cell.guruName)
+    } else {
+      unmatchedGuruCells += 1
+      group[fields.nameField] = cell.guruName
+      const key = cell.guruName
+      if (!unmatchedGuruMap.has(key)) {
+        unmatchedGuruMap.set(key, {
+          sheet: cell.sheet,
+          row: cell.row,
+          guruName: cell.guruName,
+          kelasName: cell.kelasName,
+          message: `Guru "${cell.guruName}" belum cocok dengan Data Guru.`,
+        })
+      }
+    }
+  }
+
+  return {
+    groups: Array.from(groups.values()),
+    statusCounts,
+    matchedGuruCells,
+    unmatchedGuruCells,
+    unmatchedKelas: Array.from(unmatchedKelasMap.values()),
+    unmatchedGuru: Array.from(unmatchedGuruMap.values()),
+    conflicts: conflicts.slice(0, 50),
+    duplicateKelas,
   }
 }
 
@@ -324,4 +565,132 @@ export async function simpanAbsensiGuru(
   revalidatePath('/dashboard/akademik/absensi-guru')
   revalidatePath('/dashboard/akademik/absensi-guru/rekap')
   return { success: true, saved: payload.length }
+}
+
+export async function previewImportAbsensiGuru(cells: AbsensiGuruImportCell[]) {
+  if (!Array.isArray(cells) || cells.length === 0) return { error: 'Tidak ada data absensi yang terbaca dari Excel.' }
+
+  const result = await buildAbsensiGuruImport(cells)
+  const dates = Array.from(new Set(result.groups.map(group => group.tanggal))).sort()
+  const kelas = Array.from(new Set(result.groups.map(group => group.kelasName))).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
+  return {
+    success: true as const,
+    canImport: result.groups.length > 0 && result.unmatchedKelas.length === 0 && result.conflicts.length === 0,
+    summary: {
+      sourceCells: cells.length,
+      importRows: result.groups.length,
+      kelasCount: kelas.length,
+      dateStart: dates[0] || '',
+      dateEnd: dates[dates.length - 1] || '',
+      statusCounts: result.statusCounts,
+      matchedGuruCells: result.matchedGuruCells,
+      unmatchedGuruCells: result.unmatchedGuruCells,
+    },
+    samples: result.groups.slice(0, 20).map(group => ({
+      kelasName: group.kelasName,
+      tanggal: group.tanggal,
+      shubuh: group.shubuh,
+      ashar: group.ashar,
+      maghrib: group.maghrib,
+      guruShubuh: group.guru_shubuh_nama_snapshot,
+      guruAshar: group.guru_ashar_nama_snapshot,
+      guruMaghrib: group.guru_maghrib_nama_snapshot,
+    })),
+    issues: {
+      unmatchedKelas: result.unmatchedKelas,
+      unmatchedGuru: result.unmatchedGuru.slice(0, 50),
+      conflicts: result.conflicts,
+      duplicateKelas: result.duplicateKelas,
+    },
+  }
+}
+
+export async function importAbsensiGuruHistoris(cells: AbsensiGuruImportCell[]) {
+  await ensureLiburPengajianTable()
+  const session = await getSession()
+  if (!Array.isArray(cells) || cells.length === 0) return { error: 'Tidak ada data absensi yang terbaca dari Excel.' }
+
+  const result = await buildAbsensiGuruImport(cells)
+  if (result.groups.length === 0) return { error: 'Tidak ada baris yang bisa diimpor.' }
+  if (result.unmatchedKelas.length > 0) {
+    return { error: `Ada ${result.unmatchedKelas.length} kelas yang belum cocok. Perbaiki Master Kelas atau file Excel terlebih dahulu.` }
+  }
+  if (result.conflicts.length > 0) {
+    return { error: `Ada ${result.conflicts.length} konflik status dalam file Excel. Periksa preview sebelum import.` }
+  }
+
+  const statements = result.groups.map(group => ({
+    sql: `
+      INSERT INTO absensi_guru (
+        id, kelas_id, guru_id, tanggal, shubuh, ashar, maghrib, updated_by,
+        guru_shubuh_id_snapshot, guru_shubuh_nama_snapshot,
+        guru_ashar_id_snapshot, guru_ashar_nama_snapshot,
+        guru_maghrib_id_snapshot, guru_maghrib_nama_snapshot
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(kelas_id, tanggal) DO UPDATE SET
+        guru_id = excluded.guru_id,
+        shubuh = excluded.shubuh,
+        ashar = excluded.ashar,
+        maghrib = excluded.maghrib,
+        updated_by = excluded.updated_by,
+        guru_shubuh_id_snapshot = excluded.guru_shubuh_id_snapshot,
+        guru_shubuh_nama_snapshot = excluded.guru_shubuh_nama_snapshot,
+        guru_ashar_id_snapshot = excluded.guru_ashar_id_snapshot,
+        guru_ashar_nama_snapshot = excluded.guru_ashar_nama_snapshot,
+        guru_maghrib_id_snapshot = excluded.guru_maghrib_id_snapshot,
+        guru_maghrib_nama_snapshot = excluded.guru_maghrib_nama_snapshot
+    `,
+    params: [
+      generateId(),
+      group.kelasId,
+      group.guru_maghrib_id_snapshot || group.guru_ashar_id_snapshot || group.guru_shubuh_id_snapshot || null,
+      group.tanggal,
+      group.shubuh,
+      group.ashar,
+      group.maghrib,
+      session?.id ?? null,
+      group.guru_shubuh_id_snapshot,
+      group.guru_shubuh_nama_snapshot,
+      group.guru_ashar_id_snapshot,
+      group.guru_ashar_nama_snapshot,
+      group.guru_maghrib_id_snapshot,
+      group.guru_maghrib_nama_snapshot,
+    ],
+  }))
+
+  const chunkSize = 50
+  for (let i = 0; i < statements.length; i += chunkSize) {
+    await batch(statements.slice(i, i + chunkSize))
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_absensi_guru',
+    action: 'import',
+    fiturHref: '/dashboard/akademik/absensi-guru',
+    logKind: 'create',
+    entityType: 'absensi_guru_import',
+    entityId: 'import-absensi-guru-historis',
+    entityLabel: 'Import absensi guru historis',
+    summary: `Import absensi guru historis (${result.groups.length} baris)`,
+    details: {
+      source_cells: cells.length,
+      saved_rows: result.groups.length,
+      status_counts: result.statusCounts,
+      guru_unmatched_cells: result.unmatchedGuruCells,
+    },
+  })
+
+  revalidatePath('/dashboard/akademik/absensi-guru')
+  revalidatePath('/dashboard/akademik/absensi-guru/rekap')
+  return {
+    success: true as const,
+    saved: result.groups.length,
+    statusCounts: result.statusCounts,
+    unmatchedGuruCells: result.unmatchedGuruCells,
+  }
 }

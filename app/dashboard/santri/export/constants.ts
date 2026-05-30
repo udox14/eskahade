@@ -18,7 +18,8 @@ export type SortBy = 'nama_lengkap' | 'asrama' | 'kamar' | 'kelas_pesantren' | '
 
 export type KolomExport = (
   'nis' | 'nama_lengkap' | 'jenis_kelamin' | 'tempat_lahir' | 'tanggal_lahir' |
-  'nama_ayah' | 'nama_ibu' | 'alamat' | 'asrama' | 'kamar' | 'tahun_masuk' |
+  'nama_ayah' | 'nama_ibu' | 'alamat' | 'alamat_lengkap' | 'kecamatan' | 'kab_kota' | 'provinsi' |
+  'asrama' | 'kamar' | 'tahun_masuk' |
   'sekolah' | 'kelas_sekolah' | 'nama_kelas' | 'marhalah' | 'nik' | 'kategori_santri' |
   'tempat_makan' | 'tempat_mencuci'
 )
@@ -33,6 +34,10 @@ export const KOLOM_TERSEDIA: { key: KolomExport; label: string; group: string }[
   { key: 'nama_ayah',     label: 'Nama Ayah',      group: 'Keluarga'  },
   { key: 'nama_ibu',      label: 'Nama Ibu',       group: 'Keluarga'  },
   { key: 'alamat',        label: 'Alamat',         group: 'Keluarga'  },
+  { key: 'alamat_lengkap', label: 'Alamat Lengkap', group: 'Keluarga' },
+  { key: 'kecamatan',     label: 'Kecamatan',      group: 'Keluarga'  },
+  { key: 'kab_kota',      label: 'Kab/Kota',       group: 'Keluarga'  },
+  { key: 'provinsi',      label: 'Provinsi',       group: 'Keluarga'  },
   { key: 'asrama',        label: 'Asrama',         group: 'Pesantren' },
   { key: 'kamar',         label: 'Kamar',          group: 'Pesantren' },
   { key: 'tahun_masuk',   label: 'Tahun Masuk',    group: 'Pesantren' },
@@ -63,6 +68,7 @@ export const HEADER_MAP: Record<KolomExport, string> = {
   nis: 'NIS', nama_lengkap: 'Nama Lengkap', jenis_kelamin: 'JK',
   nik: 'NIK', tempat_lahir: 'Tempat Lahir', tanggal_lahir: 'Tgl Lahir',
   nama_ayah: 'Nama Ayah', nama_ibu: 'Nama Ibu', alamat: 'Alamat',
+  alamat_lengkap: 'Alamat Lengkap', kecamatan: 'Kecamatan', kab_kota: 'Kab/Kota', provinsi: 'Provinsi',
   asrama: 'Asrama', kamar: 'Kamar', tahun_masuk: 'Tahun Masuk',
   kategori_santri: 'Kategori Santri',
   tempat_makan: 'Katering / Tempat Makan',

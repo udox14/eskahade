@@ -1,8 +1,15 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { getJurnalGuru, simpanAbsensiGuru, getMarhalahList } from './actions'
-import { Save, Loader2, User, Filter, Search, Smartphone, Table2 } from 'lucide-react'
+import {
+  getJurnalGuru,
+  simpanAbsensiGuru,
+  getMarhalahList,
+  previewImportAbsensiGuru,
+  importAbsensiGuruHistoris,
+  type AbsensiGuruImportCell,
+} from './actions'
+import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Save, Search, Smartphone, Table2, Upload, User, Filter } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -11,6 +18,37 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'
 const SESSIONS: SessionType[] = ['shubuh', 'ashar', 'maghrib']
 type InputMode = 'table' | 'mobile'
+type ImportPreviewSuccess = {
+  success: true
+  canImport: boolean
+  summary: {
+    sourceCells: number
+    importRows: number
+    kelasCount: number
+    dateStart: string
+    dateEnd: string
+    statusCounts: Record<'H' | 'A' | 'B' | 'L', number>
+    matchedGuruCells: number
+    unmatchedGuruCells: number
+  }
+  samples: {
+    kelasName: string
+    tanggal: string
+    shubuh: string
+    ashar: string
+    maghrib: string
+    guruShubuh: string | null
+    guruAshar: string | null
+    guruMaghrib: string | null
+  }[]
+  issues: {
+    unmatchedKelas: { message: string }[]
+    unmatchedGuru: { message: string }[]
+    conflicts: { message: string }[]
+    duplicateKelas: string[]
+  }
+}
+type ImportPreview = ImportPreviewSuccess | { error: string }
 
 const STATUS_CYCLE = ['H', 'A', 'B'] as const
 const SESSION_LABEL: Record<SessionType, string> = { shubuh: 'S', ashar: 'A', maghrib: 'M' }
@@ -34,6 +72,13 @@ export default function AbsensiGuruPage() {
   const [hasLiburChanges, setHasLiburChanges] = useState(false)
   const [inputMode, setInputMode] = useState<InputMode>('table')
   const [mobileSearch, setMobileSearch] = useState('')
+  const [showImportPanel, setShowImportPanel] = useState(false)
+  const [importFileName, setImportFileName] = useState('')
+  const [importCells, setImportCells] = useState<AbsensiGuruImportCell[]>([])
+  const [importSheetPeriods, setImportSheetPeriods] = useState<{ sheetName: string; label: string; source: string }[]>([])
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [readingImport, setReadingImport] = useState(false)
+  const [savingImport, setSavingImport] = useState(false)
 
   // Init Marhalah
   useEffect(() => {
@@ -332,6 +377,79 @@ export default function AbsensiGuruPage() {
     }
   }
 
+  const handleUploadImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setReadingImport(true)
+    const loadToast = toast.loading('Membaca Excel absensi guru...')
+    try {
+      const parsed = await parseAbsensiGuruWorkbook(file, selectedDate)
+      if (!parsed.cells.length) {
+        toast.error('Tidak ada data absensi guru yang terbaca.', {
+          description: 'Pastikan sheet punya header NO, MARHALAH, NAMA, KETERANGAN WAKTU dan kolom SB/AS/MG.',
+        })
+        setImportFileName(file.name)
+        setImportCells([])
+        setImportSheetPeriods([])
+        setImportPreview(null)
+        return
+      }
+
+      const preview = await previewImportAbsensiGuru(parsed.cells)
+      setImportFileName(file.name)
+      setImportCells(parsed.cells)
+      setImportSheetPeriods(parsed.sheetPeriods)
+      setImportPreview(preview)
+
+      if ('error' in preview) {
+        toast.error('Gagal membuat preview import', { description: preview.error })
+      } else {
+        toast.success(`${parsed.cells.length} sel absensi terbaca dari ${parsed.sheetNames.length} sheet`)
+      }
+    } catch (err: any) {
+      toast.error('Gagal membaca file Excel', { description: err?.message ?? 'Format file tidak valid.' })
+    } finally {
+      toast.dismiss(loadToast)
+      setReadingImport(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleImportHistoris = async () => {
+    if (!importCells.length) return toast.warning('Upload file Excel dulu.')
+    if (!importPreview || 'error' in importPreview || !importPreview.canImport) {
+      toast.warning('Preview import masih punya masalah yang perlu dibereskan dulu.')
+      return
+    }
+    if (!window.confirm(`Import ${importPreview.summary.importRows} baris absensi guru historis dari ${importFileName}? Data kelas-tanggal yang sama akan diperbarui.`)) return
+
+    setSavingImport(true)
+    const loadToast = toast.loading('Mengimpor absensi guru historis...')
+    try {
+      const result = await importAbsensiGuruHistoris(importCells)
+      if ('error' in result) {
+        toast.error('Import gagal', { description: result.error })
+        return
+      }
+      toast.success(`Import selesai: ${result.saved} baris tersimpan`)
+      if (result.unmatchedGuruCells > 0) {
+        toast.warning(`${result.unmatchedGuruCells} sel guru belum cocok; rekap dapat memakai jadwal guru sebagai fallback.`)
+      }
+      setImportCells([])
+      setImportPreview(null)
+      setImportFileName('')
+      setImportSheetPeriods([])
+      setShowImportPanel(false)
+      if (hasLoaded) await loadData()
+    } catch (err: any) {
+      toast.error('Import gagal', { description: err?.message ?? 'Terjadi kesalahan saat menyimpan.' })
+    } finally {
+      toast.dismiss(loadToast)
+      setSavingImport(false)
+    }
+  }
+
   // --- KEYBOARD NAVIGATION (MEMOIZED) ---
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number, totalRows: number) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -372,6 +490,8 @@ export default function AbsensiGuruPage() {
     }
   }, [days]) 
 
+  const canRunImport = Boolean(importPreview && isImportPreviewSuccess(importPreview) && importPreview.canImport)
+
   return (
     <div className="space-y-6 max-w-[95vw] mx-auto pb-20">
       
@@ -382,7 +502,7 @@ export default function AbsensiGuruPage() {
           description="Input kehadiran mengajar mingguan."
         />
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[auto_minmax(0,1fr)_220px_auto_auto] xl:items-center">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[auto_minmax(0,1fr)_220px_auto_auto_auto] xl:items-center">
           <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full sm:w-fit">
             <button
               onClick={() => changeInputMode('table')}
@@ -434,6 +554,15 @@ export default function AbsensiGuruPage() {
             Tampilkan
           </button>
 
+          <button
+            type="button"
+            onClick={() => setShowImportPanel(prev => !prev)}
+            className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-3 rounded-xl font-bold shadow-sm hover:bg-emerald-100 flex items-center justify-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Import Excel
+          </button>
+
           {hasLoaded && (
             <button
               onClick={handleSimpan}
@@ -457,6 +586,133 @@ export default function AbsensiGuruPage() {
       <div className="text-[11px] text-slate-500 -mt-2">
         Keterangan tambahan: `L` berarti libur pengajian pada sesi itu, jadi tidak dihitung sebagai kewajiban mengajar.
       </div>
+
+      {showImportPanel && (
+        <div className="bg-white border border-emerald-200 rounded-2xl shadow-sm p-4 space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-black text-slate-900">Import Absensi Guru Historis</p>
+              <p className="text-xs text-slate-500">
+                Tahun mengikuti filter tanggal. Bulan dibaca dari nama/header sheet; fallback: <b>{format(new Date(selectedDate), 'MMMM yyyy', { locale: id })}</b>.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="relative inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+                {readingImport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Upload Excel
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleUploadImport}
+                  disabled={readingImport || savingImport}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleImportHistoris}
+                disabled={savingImport || !canRunImport}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingImport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Jalankan Import
+              </button>
+            </div>
+          </div>
+
+          {importFileName && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              File: <b>{importFileName}</b>
+            </div>
+          )}
+
+          {importSheetPeriods.length > 0 && (
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {importSheetPeriods.map(item => (
+                <div key={`${item.sheetName}-${item.label}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                  <p className="font-black text-slate-800">{item.sheetName}</p>
+                  <p className="text-slate-500">{item.label} <span className="text-slate-400">({item.source})</span></p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {importPreview && !isImportPreviewSuccess(importPreview) && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{importPreview.error}</span>
+            </div>
+          )}
+
+          {importPreview && isImportPreviewSuccess(importPreview) && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+                <ImportStat label="Sel terbaca" value={importPreview.summary.sourceCells} />
+                <ImportStat label="Baris DB" value={importPreview.summary.importRows} />
+                <ImportStat label="Kelas" value={importPreview.summary.kelasCount} />
+                <ImportStat label="Hadir" value={importPreview.summary.statusCounts.H} />
+                <ImportStat label="Kosong" value={importPreview.summary.statusCounts.A} />
+                <ImportStat label="Badal" value={importPreview.summary.statusCounts.B} />
+                <ImportStat label="Libur" value={importPreview.summary.statusCounts.L} />
+              </div>
+
+              <div className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${
+                importPreview.canImport ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}>
+                {importPreview.canImport ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
+                <div>
+                  <p className="font-bold">
+                    {importPreview.canImport ? 'Preview siap diimpor.' : 'Preview belum bisa diimpor.'}
+                  </p>
+                  <p className="text-xs opacity-80">
+                    Rentang tanggal: {importPreview.summary.dateStart || '-'} sampai {importPreview.summary.dateEnd || '-'}.
+                    {importPreview.summary.unmatchedGuruCells > 0 ? ` ${importPreview.summary.unmatchedGuruCells} sel guru belum cocok dengan Data Guru.` : ''}
+                  </p>
+                </div>
+              </div>
+
+              {(importPreview.issues.unmatchedKelas.length > 0 || importPreview.issues.conflicts.length > 0 || importPreview.issues.unmatchedGuru.length > 0) && (
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <ImportIssueList title="Kelas belum cocok" items={importPreview.issues.unmatchedKelas.map(item => item.message)} tone="red" />
+                  <ImportIssueList title="Konflik data" items={importPreview.issues.conflicts.map(item => item.message)} tone="red" />
+                  <ImportIssueList title="Guru belum cocok" items={importPreview.issues.unmatchedGuru.map(item => item.message)} tone="amber" />
+                </div>
+              )}
+
+              {importPreview.samples.length > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full min-w-[760px] text-xs">
+                    <thead className="bg-slate-50 text-left text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Tanggal</th>
+                        <th className="px-3 py-2">Kelas</th>
+                        <th className="px-3 py-2">SB</th>
+                        <th className="px-3 py-2">AS</th>
+                        <th className="px-3 py-2">MG</th>
+                        <th className="px-3 py-2">Guru Snapshot</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {importPreview.samples.map((row, idx) => (
+                        <tr key={`${row.kelasName}-${row.tanggal}-${idx}`}>
+                          <td className="px-3 py-2 font-semibold text-slate-700">{row.tanggal}</td>
+                          <td className="px-3 py-2 text-slate-700">{row.kelasName}</td>
+                          <td className="px-3 py-2 font-black">{row.shubuh}</td>
+                          <td className="px-3 py-2 font-black">{row.ashar}</td>
+                          <td className="px-3 py-2 font-black">{row.maghrib}</td>
+                          <td className="px-3 py-2 text-slate-500">
+                            {[row.guruShubuh, row.guruAshar, row.guruMaghrib].filter(Boolean).join(' / ') || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {hasLoaded && (
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
@@ -774,6 +1030,283 @@ function guruStatusButtonClass(value: string) {
   if (value === 'B') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
   if (value === 'L') return 'bg-slate-100 text-slate-500 border-slate-200'
   return 'bg-green-50 text-green-700 border-green-200'
+}
+
+function isImportPreviewSuccess(preview: ImportPreview): preview is ImportPreviewSuccess {
+  return 'success' in preview && preview.success === true
+}
+
+function ImportStat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
+  )
+}
+
+function ImportIssueList({ title, items, tone }: { title: string; items: string[]; tone: 'red' | 'amber' }) {
+  const color = tone === 'red'
+    ? 'border-red-200 bg-red-50 text-red-800'
+    : 'border-amber-200 bg-amber-50 text-amber-800'
+  return (
+    <div className={`rounded-xl border p-3 ${color}`}>
+      <p className="text-xs font-black">{title}</p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-xs opacity-70">Tidak ada.</p>
+      ) : (
+        <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs">
+          {items.slice(0, 20).map((item, idx) => <li key={`${item}-${idx}`}>{item}</li>)}
+          {items.length > 20 && <li>...dan {items.length - 20} lagi</li>}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+async function parseAbsensiGuruWorkbook(file: File, selectedDate: string) {
+  const XLSX = await import('xlsx')
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
+  const period = parseDateKey(selectedDate)
+  const cells: AbsensiGuruImportCell[] = []
+  const sheetNames: string[] = []
+  const sheetPeriods: { sheetName: string; label: string; source: string }[] = []
+  let previousPeriod: { year: number; month: number } | null = null
+
+  workbook.SheetNames.forEach(sheetName => {
+    const sheet = workbook.Sheets[sheetName]
+    if (!sheet?.['!ref']) return
+    const range = XLSX.utils.decode_range(sheet['!ref'])
+    const headerRow = findImportHeaderRow(sheet, range, XLSX)
+    if (headerRow === -1) return
+
+    const identity = findIdentityColumns(sheet, range, headerRow, XLSX)
+    if (identity.kelasCol == null || identity.guruCol == null) return
+
+    const sheetPeriod = detectSheetPeriod(sheet, range, sheetName, period, previousPeriod, XLSX)
+    const sourceColumns = findSourceColumns(sheet, range, headerRow, sheetPeriod.year, sheetPeriod.month, XLSX)
+    if (sourceColumns.length === 0) return
+
+    previousPeriod = { year: sheetPeriod.year, month: sheetPeriod.month }
+    sheetNames.push(sheetName)
+    sheetPeriods.push({
+      sheetName,
+      label: formatMonthYear(sheetPeriod.year, sheetPeriod.month),
+      source: sheetPeriod.source,
+    })
+    for (let row = headerRow + 2; row <= range.e.r; row++) {
+      const kelasName = cleanCellText(readCell(sheet, row, identity.kelasCol, XLSX))
+      const guruName = cleanCellText(readCell(sheet, row, identity.guruCol, XLSX))
+      const waktu = identity.waktuCol != null ? cleanCellText(readCell(sheet, row, identity.waktuCol, XLSX)) : ''
+      if (!kelasName || !guruName) continue
+
+      sourceColumns.forEach(column => {
+        const status = normalizeExcelStatus(readCell(sheet, row, column.col, XLSX))
+        if (!status) return
+        cells.push({
+          sheet: sheetName,
+          row: row + 1,
+          kelasName,
+          guruName,
+          waktu,
+          tanggal: column.date,
+          sesi: column.session,
+          status,
+        })
+      })
+    }
+  })
+
+  return { cells, sheetNames, sheetPeriods }
+}
+
+function findImportHeaderRow(sheet: any, range: any, XLSX: any) {
+  const maxRow = Math.min(range.e.r, range.s.r + 30)
+  for (let row = range.s.r; row <= maxRow; row++) {
+    const values: string[] = []
+    for (let col = range.s.c; col <= Math.min(range.e.c, range.s.c + 14); col++) {
+      values.push(normalizeHeader(readCell(sheet, row, col, XLSX)))
+    }
+    if (
+      values.includes('no') &&
+      values.includes('marhalah') &&
+      values.includes('nama') &&
+      values.some(value => value.includes('keterangan waktu'))
+    ) {
+      return row
+    }
+  }
+  return -1
+}
+
+function findIdentityColumns(sheet: any, range: any, headerRow: number, XLSX: any) {
+  const result: { kelasCol: number | null; guruCol: number | null; waktuCol: number | null } = {
+    kelasCol: null,
+    guruCol: null,
+    waktuCol: null,
+  }
+  for (let col = range.s.c; col <= Math.min(range.e.c, range.s.c + 14); col++) {
+    const header = normalizeHeader(readCell(sheet, headerRow, col, XLSX))
+    if (header === 'marhalah') result.kelasCol = col
+    if (header === 'nama') result.guruCol = col
+    if (header.includes('keterangan waktu')) result.waktuCol = col
+  }
+  return result
+}
+
+function findSourceColumns(sheet: any, range: any, headerRow: number, year: number, month: number, XLSX: any) {
+  const result: { col: number; date: string; session: SessionType }[] = []
+  let activeDay = ''
+  let currentDate: Date | null = null
+  let lastDay = ''
+
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const dayHeader = normalizeDayLabel(readCell(sheet, headerRow, col, XLSX))
+    const session = sessionFromCode(readCell(sheet, headerRow + 1, col, XLSX))
+    if (dayHeader && dayHeader !== 'jumlah') activeDay = dayHeader
+    if (!session || !activeDay) continue
+
+    if (activeDay !== lastDay) {
+      currentDate = findNextDateForDay(year, month, activeDay, currentDate)
+      lastDay = activeDay
+    }
+    if (!currentDate || currentDate.getMonth() !== month) continue
+    result.push({ col, date: formatDateKey(currentDate), session })
+  }
+
+  return result
+}
+
+function readCell(sheet: any, row: number, col: number, XLSX: any) {
+  const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })]
+  return cell?.v ?? ''
+}
+
+function cleanCellText(value: unknown) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ')
+}
+
+function normalizeHeader(value: unknown) {
+  return cleanCellText(value).toLowerCase()
+}
+
+function normalizeDayLabel(value: unknown) {
+  const text = normalizeHeader(value)
+    .replace(/'/g, '')
+    .replace(/\./g, '')
+  if (text.includes('jml') || text.includes('jumlah')) return 'jumlah'
+  if (text === 'minggu') return 'ahad'
+  if (text === 'jumat') return 'jumat'
+  if (['senin', 'selasa', 'rabu', 'kamis', 'sabtu', 'ahad'].includes(text)) return text
+  return ''
+}
+
+function sessionFromCode(value: unknown): SessionType | null {
+  const text = cleanCellText(value).toUpperCase()
+  if (text === 'SB') return 'shubuh'
+  if (text === 'AS') return 'ashar'
+  if (text === 'MG') return 'maghrib'
+  return null
+}
+
+function normalizeExcelStatus(value: unknown): 'H' | 'A' | 'B' | 'L' | null {
+  if (value === null || value === undefined || value === '') return null
+  const text = cleanCellText(value).toUpperCase()
+  if (text === '1' || text === 'H') return 'H'
+  if (text === '0' || text === 'A') return 'A'
+  if (text === 'B') return 'B'
+  if (text === 'L') return 'L'
+  return null
+}
+
+function detectSheetPeriod(
+  sheet: any,
+  range: any,
+  sheetName: string,
+  fallback: { year: number; month: number },
+  previous: { year: number; month: number } | null,
+  XLSX: any
+) {
+  const topText: string[] = [sheetName]
+  for (let row = range.s.r; row <= Math.min(range.e.r, range.s.r + 5); row++) {
+    for (let col = range.s.c; col <= Math.min(range.e.c, range.s.c + 12); col++) {
+      const value = cleanCellText(readCell(sheet, row, col, XLSX))
+      if (value) topText.push(value)
+    }
+  }
+
+  const detectedMonth = detectMonthIndex(topText.join(' '))
+  if (detectedMonth == null) {
+    return { ...fallback, source: 'fallback filter' }
+  }
+
+  let year = fallback.year
+  if (previous) {
+    year = previous.year
+    if (previous.month >= 9 && detectedMonth <= 2) year += 1
+    if (previous.month <= 2 && detectedMonth >= 9) year -= 1
+  }
+
+  return { year, month: detectedMonth, source: 'otomatis dari sheet' }
+}
+
+function detectMonthIndex(value: string) {
+  const text = normalizeHeader(value)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+  const monthAliases: [number, string[]][] = [
+    [0, ['januari', 'jan']],
+    [1, ['februari', 'pebruari', 'feb']],
+    [2, ['maret', 'mar']],
+    [3, ['april', 'apr']],
+    [4, ['mei', 'may']],
+    [5, ['juni', 'jun']],
+    [6, ['juli', 'jul']],
+    [7, ['agustus', 'agu', 'ags', 'aug']],
+    [8, ['september', 'sept', 'sep']],
+    [9, ['oktober', 'october', 'okt', 'oct']],
+    [10, ['november', 'nov']],
+    [11, ['desember', 'december', 'des', 'dec']],
+  ]
+  for (const [month, aliases] of monthAliases) {
+    if (aliases.some(alias => new RegExp(`(^|\\s)${alias}(\\s|$)`).test(text))) return month
+  }
+  return null
+}
+
+function parseDateKey(value: string) {
+  const [year, month] = value.split('-').map(Number)
+  return {
+    year: Number.isFinite(year) ? year : new Date().getFullYear(),
+    month: Number.isFinite(month) ? month - 1 : new Date().getMonth(),
+  }
+}
+
+function formatMonthYear(year: number, month: number) {
+  return format(new Date(year, month, 1), 'MMMM yyyy', { locale: id })
+}
+
+function findNextDateForDay(year: number, month: number, dayLabel: string, previous: Date | null) {
+  const startDay = previous ? previous.getDate() + 1 : 1
+  for (let day = startDay; day <= 31; day++) {
+    const candidate = new Date(year, month, day)
+    if (candidate.getMonth() !== month) return null
+    if (indonesianDayLabel(candidate) === dayLabel) return candidate
+  }
+  return null
+}
+
+function indonesianDayLabel(date: Date) {
+  const labels = ['ahad', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu']
+  return labels[date.getDay()]
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 // --- OPTIMASI KOMPONEN (React.memo) ---
