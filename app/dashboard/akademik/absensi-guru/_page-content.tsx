@@ -1369,7 +1369,12 @@ function detectSheetPeriod(
   previous: { year: number; month: number } | null,
   XLSX: any
 ) {
-  const topText: string[] = [sheetName]
+  const sheetNameMonth = detectMonthIndex(sheetName)
+  if (sheetNameMonth != null) {
+    return { year: fallback.year, month: sheetNameMonth, source: 'otomatis dari nama sheet' }
+  }
+
+  const topText: string[] = []
   for (let row = range.s.r; row <= Math.min(range.e.r, range.s.r + 5); row++) {
     for (let col = range.s.c; col <= Math.min(range.e.c, range.s.c + 12); col++) {
       const value = cleanCellText(readCell(sheet, row, col, XLSX))
@@ -1410,10 +1415,16 @@ function detectMonthIndex(value: string) {
     [10, ['november', 'nov']],
     [11, ['desember', 'december', 'des', 'dec']],
   ]
+  let best: { month: number; index: number } | null = null
   for (const [month, aliases] of monthAliases) {
-    if (aliases.some(alias => new RegExp(`(^|\\s)${alias}(\\s|$)`).test(text))) return month
+    for (const alias of aliases) {
+      const match = new RegExp(`(^|\\s)${alias}(\\s|$)`).exec(text)
+      if (!match) continue
+      const index = match.index + (match[1] ? match[1].length : 0)
+      if (!best || index < best.index) best = { month, index }
+    }
   }
-  return null
+  return best?.month ?? null
 }
 
 function parseDateKey(value: string) {

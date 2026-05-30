@@ -20,6 +20,7 @@ type SantriKamarRow = {
   kamar: string | null
   sekolah: string | null
   kelas_sekolah: string | null
+  no_wa_ortu: string | null
   kab_kota: string | null
   nama_kelas: string | null
   kategori_santri: string
@@ -302,7 +303,7 @@ export async function getKamarOverview(asrama?: string | null) {
       [currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama, currentAsrama]
     ),
     query<SantriKamarRow>(
-      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.no_wa_ortu, s.kab_kota,
               k.nama_kelas,
               (
                 SELECT sk.id
@@ -412,7 +413,7 @@ export async function getKamarDetail(asrama: string, nomorKamar: string) {
       [targetKamar, targetAsrama, targetKamar, targetAsrama, targetAsrama, targetAsrama, targetAsrama]
     ),
     query<SantriKamarRow>(
-      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kab_kota,
+      `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.no_wa_ortu, s.kab_kota,
               COALESCE(NULLIF(s.kategori_santri, ''), 'REGULER') AS kategori_santri,
               ${kategoriEfektifSql} AS kategori_efektif,
               k.nama_kelas
@@ -619,6 +620,76 @@ export async function mutasiKamarDalamAsrama(params: {
   revalidatePath(KAMAR_PATH)
   revalidatePath(PERPINDAHAN_PATH)
   return { success: true, kamarAsal: kamarAsal || null }
+}
+
+export async function updateNomorWaOrtuBatchKamar(params: {
+  asrama: string
+  nomorKamar: string
+  items: Array<{ santriId: string; noWaOrtu: string }>
+}) {
+  const access = await getAccess(params.asrama)
+  if ('error' in access) return access
+
+  const asrama = access.requestedAsrama
+  const nomorKamar = String(params.nomorKamar ?? '').trim()
+  if (!nomorKamar) return { error: 'Nomor kamar wajib diisi' }
+
+  const items = (params.items ?? [])
+    .map((item) => ({
+      santriId: String(item.santriId ?? '').trim(),
+      noWaOrtu: String(item.noWaOrtu ?? '').trim() || null,
+    }))
+    .filter((item) => item.santriId)
+
+  if (items.length === 0) return { error: 'Tidak ada nomor WA yang dikirim' }
+
+  const members = await query<{ id: string; nama_lengkap: string; no_wa_ortu: string | null }>(
+    `SELECT id, nama_lengkap, no_wa_ortu
+     FROM santri
+     WHERE status_global = 'aktif'
+       AND asrama = ?
+       AND TRIM(COALESCE(kamar, '')) = ?`,
+    [asrama, nomorKamar]
+  )
+  const memberIds = new Set(members.map((member) => member.id))
+  const allowedItems = items.filter((item) => memberIds.has(item.santriId))
+  if (allowedItems.length === 0) return { error: 'Tidak ada santri yang cocok di kamar ini' }
+
+  const db = await getDB()
+  await db.batch(
+    allowedItems.map((item) =>
+      db.prepare(
+        `UPDATE santri
+         SET no_wa_ortu = ?,
+             updated_at = datetime('now')
+         WHERE id = ?
+           AND status_global = 'aktif'
+           AND asrama = ?
+           AND TRIM(COALESCE(kamar, '')) = ?`
+      ).bind(item.noWaOrtu, item.santriId, asrama, nomorKamar)
+    )
+  )
+
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_kamar',
+    action: 'update',
+    fiturHref: KAMAR_PATH,
+    logKind: 'update',
+    entityType: 'kamar',
+    entityId: `${asrama}/${nomorKamar}`,
+    entityLabel: `Kamar ${nomorKamar}`,
+    summary: `Memperbarui nomor WA orang tua kamar ${nomorKamar}`,
+    details: {
+      asrama,
+      kamar: nomorKamar,
+      total: allowedItems.length,
+      santri_ids: allowedItems.map((item) => item.santriId),
+    },
+  })
+
+  revalidatePath(KAMAR_PATH)
+  return { success: true, total: allowedItems.length }
 }
 
 export async function tandaiSantriKeluarDariKamar(params: {

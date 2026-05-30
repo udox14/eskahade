@@ -147,9 +147,71 @@ function kelasLookupKeys(value: unknown) {
   return Array.from(keys)
 }
 
+function uniqueById(rows: any[]) {
+  const map = new Map<string, any>()
+  rows.forEach(row => {
+    if (row?.id == null) return
+    map.set(String(row.id), row)
+  })
+  return Array.from(map.values())
+}
+
+function resolveKelasForImport(
+  kelasName: string,
+  kelasById: Map<string, any>,
+  kelasMap: Map<string, any[]>,
+  mappings: AbsensiGuruImportMappings
+) {
+  const mappedKelasId = mappings.kelas?.[kelasName]
+  if (mappedKelasId) {
+    const mapped = kelasById.get(String(mappedKelasId))
+    if (mapped) return { kelas: mapped }
+  }
+
+  const baseKey = normalizeLookupKey(kelasName)
+  const exactMatches = uniqueById(kelasMap.get(baseKey) || [])
+  if (exactMatches.length === 1) return { kelas: exactMatches[0] }
+  if (exactMatches.length > 1) {
+    return {
+      issue: `Kelas "${kelasName}" cocok ke beberapa Master Kelas: ${exactMatches.map(row => row.nama_kelas).join(', ')}. Pilih padanan manual.`,
+    }
+  }
+
+  const aliasMatches = uniqueById(kelasLookupKeys(kelasName).flatMap(key => kelasMap.get(key) || []))
+  if (aliasMatches.length === 1) return { kelas: aliasMatches[0] }
+  if (aliasMatches.length > 1) {
+    return {
+      issue: `Kelas "${kelasName}" masih ambigu: ${aliasMatches.map(row => row.nama_kelas).join(', ')}. Pilih padanan manual.`,
+    }
+  }
+
+  return { issue: `Kelas "${kelasName}" tidak ditemukan di Master Kelas.` }
+}
+
 function normalizeImportStatus(value: unknown): GuruStatusImport {
   const status = String(value || 'H').trim().toUpperCase()
   return status === 'A' || status === 'B' || status === 'L' ? status : 'H'
+}
+
+function mergeImportStatus(current: GuruStatusImport, incoming: GuruStatusImport): GuruStatusImport {
+  const priority: Record<GuruStatusImport, number> = { L: 0, H: 1, A: 2, B: 3 }
+  return priority[incoming] > priority[current] ? incoming : current
+}
+
+function importTeacherPriority(waktu: unknown, sessionName: SessionType) {
+  const text = normalizeLookupKey(waktu)
+    .replace(/subuh/g, 'shubuh')
+    .replace(/maghrib/g, 'malam')
+  if (!text || text.includes('semua')) return 1
+
+  const mentions = {
+    shubuh: text.includes('shubuh'),
+    ashar: text.includes('ashar'),
+    maghrib: text.includes('malam'),
+  }
+  if (!mentions[sessionName]) return 0
+  const count = Object.values(mentions).filter(Boolean).length
+  return count <= 1 ? 3 : 2
 }
 
 function sessionSnapshotFields(sessionName: SessionType) {
@@ -233,18 +295,14 @@ async function buildAbsensiGuruImport(
 
   const groups = new Map<string, ImportGroup>()
   const assignedStatus = new Map<string, GuruStatusImport>()
-  const assignedTeacher = new Map<string, string>()
+  const assignedTeacher = new Map<string, { name: string; priority: number }>()
   let matchedGuruCells = 0
   let unmatchedGuruCells = 0
 
   for (const cell of cleanCells) {
     statusCounts[cell.status] += 1
-    const mappedKelasId = mappings.kelas?.[cell.kelasName]
-    const kelas = mappedKelasId
-      ? kelasById.get(String(mappedKelasId))
-      : kelasLookupKeys(cell.kelasName)
-          .flatMap(key => kelasMap.get(key) || [])
-          .find(Boolean)
+    const kelasResult = resolveKelasForImport(cell.kelasName, kelasById, kelasMap, mappings)
+    const kelas = kelasResult.kelas
     if (!kelas) {
       const key = cell.kelasName
       if (!unmatchedKelasMap.has(key)) {
@@ -252,7 +310,7 @@ async function buildAbsensiGuruImport(
           sheet: cell.sheet,
           row: cell.row,
           kelasName: cell.kelasName,
-          message: `Kelas "${cell.kelasName}" tidak ditemukan di Master Kelas.`,
+          message: kelasResult.issue || `Kelas "${cell.kelasName}" tidak ditemukan di Master Kelas.`,
         })
       }
       continue
@@ -279,34 +337,13 @@ async function buildAbsensiGuruImport(
     const group = groups.get(groupKey)!
     const statusKey = `${groupKey}|${cell.sesi}`
     const existingStatus = assignedStatus.get(statusKey)
-    if (existingStatus && existingStatus !== cell.status) {
-      conflicts.push({
-        sheet: cell.sheet,
-        row: cell.row,
-        kelasName: cell.kelasName,
-        guruName: cell.guruName,
-        tanggal: cell.tanggal,
-        sesi: cell.sesi,
-        message: `Konflik status ${cell.sesi} ${cell.tanggal} untuk ${cell.kelasName}: ${existingStatus} vs ${cell.status}.`,
-      })
-      continue
-    }
+    const mergedStatus = existingStatus ? mergeImportStatus(existingStatus, cell.status) : cell.status
+    const teacherPriority = importTeacherPriority(cell.waktu, cell.sesi)
     const existingTeacher = assignedTeacher.get(statusKey)
-    if (existingTeacher && normalizeLookupKey(existingTeacher) !== normalizeLookupKey(cell.guruName)) {
-      conflicts.push({
-        sheet: cell.sheet,
-        row: cell.row,
-        kelasName: cell.kelasName,
-        guruName: cell.guruName,
-        tanggal: cell.tanggal,
-        sesi: cell.sesi,
-        message: `Konflik guru ${cell.sesi} ${cell.tanggal} untuk ${cell.kelasName}: ${existingTeacher} vs ${cell.guruName}.`,
-      })
-      continue
-    }
-    assignedStatus.set(statusKey, cell.status)
-    assignedTeacher.set(statusKey, cell.guruName)
-    group[cell.sesi] = cell.status
+    const shouldUseTeacher = !existingTeacher || teacherPriority >= existingTeacher.priority
+    assignedStatus.set(statusKey, mergedStatus)
+    if (shouldUseTeacher) assignedTeacher.set(statusKey, { name: cell.guruName, priority: teacherPriority })
+    group[cell.sesi] = mergedStatus
 
     const mappedGuruId = mappings.guru?.[cell.guruName]
     const guru = mappedGuruId
@@ -315,11 +352,13 @@ async function buildAbsensiGuruImport(
     const fields = sessionSnapshotFields(cell.sesi)
     if (guru?.id) {
       matchedGuruCells += 1
-      group[fields.idField] = Number(guru.id)
-      group[fields.nameField] = String(guru.nama_lengkap || cell.guruName)
+      if (shouldUseTeacher) {
+        group[fields.idField] = Number(guru.id)
+        group[fields.nameField] = String(guru.nama_lengkap || cell.guruName)
+      }
     } else {
       unmatchedGuruCells += 1
-      group[fields.nameField] = cell.guruName
+      if (shouldUseTeacher) group[fields.nameField] = cell.guruName
       const key = cell.guruName
       if (!unmatchedGuruMap.has(key)) {
         unmatchedGuruMap.set(key, {
