@@ -620,7 +620,7 @@ export default function AbsensiGuruPage() {
             <div>
               <p className="text-sm font-black text-slate-900">Import Absensi Guru Historis</p>
               <p className="text-xs text-slate-500">
-                Tahun mengikuti filter tanggal. Bulan dibaca dari nama/header sheet; fallback: <b>{format(new Date(selectedDate), 'MMMM yyyy', { locale: id })}</b>.
+                Bulan dibaca dari nama/header sheet. Tahun ajaran dibaca dari nama file seperti <b>2526</b>; fallback: <b>{format(new Date(selectedDate), 'MMMM yyyy', { locale: id })}</b>.
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -1189,7 +1189,7 @@ async function parseAbsensiGuruWorkbook(file: File, selectedDate: string) {
   const XLSX = await import('xlsx')
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
-  const period = parseDateKey(selectedDate)
+  const period = buildImportPeriodContext(file.name, selectedDate)
   const cells: AbsensiGuruImportCell[] = []
   const sheetNames: string[] = []
   const sheetPeriods: { sheetName: string; label: string; source: string }[] = []
@@ -1365,13 +1365,17 @@ function detectSheetPeriod(
   sheet: any,
   range: any,
   sheetName: string,
-  fallback: { year: number; month: number },
+  fallback: ImportPeriodContext,
   previous: { year: number; month: number } | null,
   XLSX: any
 ) {
   const sheetNameMonth = detectMonthIndex(sheetName)
   if (sheetNameMonth != null) {
-    return { year: fallback.year, month: sheetNameMonth, source: 'otomatis dari nama sheet' }
+    return {
+      year: resolveImportYearForMonth(sheetNameMonth, fallback, previous),
+      month: sheetNameMonth,
+      source: fallback.academicStartYear ? 'nama sheet + tahun ajaran file' : 'otomatis dari nama sheet',
+    }
   }
 
   const topText: string[] = []
@@ -1387,14 +1391,11 @@ function detectSheetPeriod(
     return { ...fallback, source: 'fallback filter' }
   }
 
-  let year = fallback.year
-  if (previous) {
-    year = previous.year
-    if (previous.month >= 9 && detectedMonth <= 2) year += 1
-    if (previous.month <= 2 && detectedMonth >= 9) year -= 1
+  return {
+    year: resolveImportYearForMonth(detectedMonth, fallback, previous),
+    month: detectedMonth,
+    source: fallback.academicStartYear ? 'header sheet + tahun ajaran file' : 'otomatis dari sheet',
   }
-
-  return { year, month: detectedMonth, source: 'otomatis dari sheet' }
 }
 
 function detectMonthIndex(value: string) {
@@ -1433,6 +1434,48 @@ function parseDateKey(value: string) {
     year: Number.isFinite(year) ? year : new Date().getFullYear(),
     month: Number.isFinite(month) ? month - 1 : new Date().getMonth(),
   }
+}
+
+type ImportPeriodContext = {
+  year: number
+  month: number
+  academicStartYear?: number
+  academicEndYear?: number
+}
+
+function buildImportPeriodContext(fileName: string, selectedDate: string): ImportPeriodContext {
+  const fallback = parseDateKey(selectedDate)
+  const academicYear = parseAcademicYearFromFileName(fileName)
+  return academicYear ? { ...fallback, ...academicYear } : fallback
+}
+
+function parseAcademicYearFromFileName(fileName: string) {
+  const match = fileName.match(/(?:^|[^0-9])(\d{2})\s*[-_/]?\s*(\d{2})(?:[^0-9]|$)/)
+  if (!match) return null
+
+  const start = Number(match[1])
+  const end = Number(match[2])
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+
+  return {
+    academicStartYear: 2000 + start,
+    academicEndYear: 2000 + end,
+  }
+}
+
+function resolveImportYearForMonth(
+  month: number,
+  fallback: ImportPeriodContext,
+  previous: { year: number; month: number } | null
+) {
+  if (fallback.academicStartYear && fallback.academicEndYear) {
+    return month >= 6 ? fallback.academicStartYear : fallback.academicEndYear
+  }
+
+  if (!previous) return fallback.year
+  if (previous.month >= 9 && month <= 2) return previous.year + 1
+  if (previous.month <= 2 && month >= 9) return previous.year - 1
+  return previous.year
 }
 
 function formatMonthYear(year: number, month: number) {

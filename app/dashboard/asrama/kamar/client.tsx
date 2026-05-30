@@ -154,6 +154,7 @@ export default function KamarClient({
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [catatanKeluar, setCatatanKeluar] = useState('')
+  const [keluarModalMember, setKeluarModalMember] = useState<RoomMember | null>(null)
   const [waModalOpen, setWaModalOpen] = useState(false)
   const [waDraftById, setWaDraftById] = useState<Record<string, string>>({})
   const [pending, startTransition] = useTransition()
@@ -326,6 +327,8 @@ export default function KamarClient({
       }
 
       toast.success('Santri ditandai untuk diverifikasi dewan santri')
+      setKeluarModalMember(null)
+      setCatatanKeluar('')
       await refreshCurrentRoom()
     })
   }
@@ -343,8 +346,15 @@ export default function KamarClient({
       }
 
       toast.success('Tanda keluar dibatalkan')
+      setKeluarModalMember(null)
       await refreshCurrentRoom()
     })
+  }
+
+  const openKeluarModal = (member: RoomMember) => {
+    setSelectedMemberId(member.id)
+    setCatatanKeluar(member.pending_keluar?.catatan || '')
+    setKeluarModalMember(member)
   }
 
   const handleSaveWaBatch = () => {
@@ -448,7 +458,7 @@ export default function KamarClient({
             </div>
 
             <div className="overflow-x-auto rounded-2xl border bg-white shadow-sm">
-              <table className="w-full min-w-[1340px] text-sm">
+              <table className="w-full min-w-[1220px] text-sm">
                 <thead className="border-b bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="w-20 px-4 py-3 text-center">Ketua</th>
@@ -458,14 +468,13 @@ export default function KamarClient({
                     <th className="px-4 py-3 text-left">WA Orang Tua</th>
                     <th className="px-4 py-3 text-left">Kab/Kota</th>
                     <th className="w-44 px-4 py-3 text-left">Mutasi</th>
-                    <th className="w-72 px-4 py-3 text-left">Tandai Keluar</th>
-                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="w-48 px-4 py-3 text-left">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {selectedRoom.members.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-16 text-center text-slate-400">Belum ada anggota di kamar ini.</td>
+                      <td colSpan={8} className="px-4 py-16 text-center text-slate-400">Belum ada anggota di kamar ini.</td>
                     </tr>
                   ) : (
                     selectedRoom.members.map((member) => {
@@ -549,65 +558,33 @@ export default function KamarClient({
                             </select>
                           </td>
                           <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                            {isSelected ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={catatanKeluar}
-                                  onChange={(event) => setCatatanKeluar(event.target.value)}
-                                  rows={2}
-                                  placeholder="Catatan singkat"
-                                  className="w-full resize-none rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 outline-none transition focus:ring-2 focus:ring-rose-500"
-                                />
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => openKeluarModal(member)}
+                                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                                >
+                                  <LogOut className="h-3.5 w-3.5" />
+                                  {member.pending_keluar ? 'Perbarui' : 'Tandai'}
+                                </button>
                                 {member.pending_keluar ? (
-                                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">
-                                    Menunggu ACC dewan santri.
-                                  </p>
-                                ) : null}
-                                <div className="flex gap-2">
                                   <button
                                     type="button"
                                     disabled={pending}
-                                    onClick={() => handleTandaiKeluar(member)}
-                                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-2.5 py-2 text-[11px] font-bold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                                    onClick={() => handleBatalTandaiKeluar(member)}
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:bg-slate-100"
                                   >
-                                    <LogOut className="h-3.5 w-3.5" />
-                                    {member.pending_keluar ? 'Perbarui' : 'Tandai'}
+                                    Batal
                                   </button>
-                                  {member.pending_keluar ? (
-                                    <button
-                                      type="button"
-                                      disabled={pending}
-                                      onClick={() => handleBatalTandaiKeluar(member)}
-                                      className="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:bg-slate-100"
-                                    >
-                                      Batal
-                                    </button>
-                                  ) : null}
-                                </div>
+                                ) : null}
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedMemberId(member.id)}
-                                className="text-xs font-semibold text-slate-400 transition hover:text-rose-600"
-                              >
-                                Pilih baris
-                              </button>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {isKetua ? (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">Ketua</span>
-                              ) : null}
                               {member.pending_keluar ? (
-                                <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-rose-700">Tandai Keluar</span>
+                                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-rose-700">
+                                  Menunggu ACC
+                                </span>
                               ) : null}
-                              {isSelected ? (
-                                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold text-indigo-700">Dipilih</span>
-                              ) : (
-                                <span className="text-xs text-slate-400">Klik baris untuk sorot</span>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -617,6 +594,65 @@ export default function KamarClient({
                 </tbody>
               </table>
             </div>
+
+            {keluarModalMember ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+                <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+                  <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">
+                        {keluarModalMember.pending_keluar ? 'Perbarui Tanda Keluar' : 'Tandai Santri Keluar'}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-slate-500">{keluarModalMember.nama_lengkap}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKeluarModalMember(null)}
+                      className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Tutup modal tandai keluar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-2 px-5 py-4">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Alasan / Catatan Keluar
+                    </label>
+                    <textarea
+                      value={catatanKeluar}
+                      onChange={(event) => setCatatanKeluar(event.target.value)}
+                      rows={5}
+                      placeholder="Contoh: pindah pesantren, ikut orang tua, atau keterangan wali."
+                      className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-rose-500"
+                    />
+                    {keluarModalMember.pending_keluar ? (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                        Santri ini sudah ditandai keluar dan masih menunggu ACC dewan santri.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setKeluarModalMember(null)}
+                      disabled={pending}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:bg-slate-100"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTandaiKeluar(keluarModalMember)}
+                      disabled={pending}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {keluarModalMember.pending_keluar ? 'Perbarui Tanda' : 'Tandai Keluar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {waModalOpen ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
