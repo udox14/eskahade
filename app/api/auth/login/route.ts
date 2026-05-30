@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
-import { createJWTToken } from '@/lib/auth/session'
+import { createJWTToken, ensureUserStructuralJabatanColumn } from '@/lib/auth/session'
 import { logActivity } from '@/lib/activity-log'
 
 export async function POST(request: NextRequest) {
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim()
+    await ensureUserStructuralJabatanColumn()
     const user = await queryOne<{
       id: string
       email: string
@@ -31,8 +32,9 @@ export async function POST(request: NextRequest) {
       role: string
       roles: string | null
       asrama_binaan: string | null
+      structural_jabatan: string | null
     }>(
-      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?',
       [normalizedEmail]
     )
 
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
       role: rolesArray[0],
       roles: rolesArray,
       asrama_binaan: user.asrama_binaan,
+      structural_jabatan: user.structural_jabatan,
     })
 
     const response = NextResponse.json({ success: true })

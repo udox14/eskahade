@@ -1,9 +1,12 @@
 // lib/auth/session.ts
 
 import { cookies } from 'next/headers'
-import { queryOne } from '@/lib/db'
+import { execute, queryOne } from '@/lib/db'
 
 const SESSION_COOKIE = 'eskahade_session'
+let structuralJabatanColumnReady = false
+const STRUCTURAL_ROLE_VALUES = ['pengurus_asrama', 'sekpen', 'dewan_santri', 'keamanan']
+const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
 
 function getJWTSecret(): string {
   const secret = process.env.JWT_SECRET
@@ -18,6 +21,7 @@ export type SessionUser = {
   role: string
   roles: string[]
   asrama_binaan: string | null
+  structural_jabatan?: string | null
 }
 
 type SessionUserRow = {
@@ -26,6 +30,19 @@ type SessionUserRow = {
   role: string | null
   roles: string | null
   asrama_binaan: string | null
+  structural_jabatan: string | null
+}
+
+export async function ensureUserStructuralJabatanColumn() {
+  if (structuralJabatanColumnReady) return
+  try {
+    await execute('ALTER TABLE users ADD COLUMN structural_jabatan TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+  structuralJabatanColumnReady = true
 }
 
 function base64urlEncode(data: string): string {
@@ -161,8 +178,9 @@ function parseRoles(rolesJson: string | null | undefined, fallbackRole: string |
 
 async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser | null> {
   try {
+    await ensureUserStructuralJabatanColumn()
     const user = await queryOne<SessionUserRow>(
-      'SELECT email, full_name, role, roles, asrama_binaan FROM users WHERE id = ?',
+      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE id = ?',
       [session.id]
     )
 
@@ -176,12 +194,14 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       role: roles[0] || user.role || session.role,
       roles,
       asrama_binaan: user.asrama_binaan ?? null,
+      structural_jabatan: user.structural_jabatan ?? null,
     }
   } catch (err: any) {
     console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
     return {
       ...session,
       roles: getRoles(session),
+      structural_jabatan: session.structural_jabatan ?? null,
     }
   }
 }
@@ -203,5 +223,14 @@ export function isAdmin(session: SessionUser | null): boolean {
 
 export function getEffectiveRoles(session: SessionUser | null): string[] {
   if (!session) return []
-  return getRoles(session)
+  const roles = getRoles(session)
+  const needsStructuralJabatan = roles.some(role => STRUCTURAL_ROLE_VALUES.includes(role))
+  const structuralJabatan = needsStructuralJabatan ? (session.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : session.structural_jabatan
+  if (!structuralJabatan) return roles
+
+  return Array.from(new Set([
+    ...roles,
+    `jabatan:${structuralJabatan}`,
+    ...roles.map(role => `${role}:${structuralJabatan}`),
+  ]))
 }

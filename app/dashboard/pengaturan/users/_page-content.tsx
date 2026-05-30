@@ -26,12 +26,21 @@ const ROLES = [
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]
 const DEFAULT_USER_PASSWORD = 'eskahade2026'
+const STRUCTURAL_ROLE_VALUES = ['pengurus_asrama', 'sekpen', 'dewan_santri', 'keamanan']
+const STRUCTURAL_JABATAN = [
+  { value: 'anggota', label: 'Anggota' },
+  { value: 'ketua', label: 'Ketua' },
+  { value: 'sekretaris', label: 'Sekretaris' },
+  { value: 'bendahara', label: 'Bendahara' },
+]
+const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
 
 type SelectedBatchConfig = {
   source_type: 'guru' | 'sadesa'
   source_ref_id: string
   role: string
   asrama_binaan: string
+  structural_jabatan: string
 }
 
 export default function ManajemenUserPage() {
@@ -44,6 +53,8 @@ export default function ManajemenUserPage() {
   
   // Filter State
   const [filterRole, setFilterRole] = useState('SEMUA')
+  const [filterAsrama, setFilterAsrama] = useState('SEMUA')
+  const [filterJabatan, setFilterJabatan] = useState('SEMUA')
   const [searchQuery, setSearchQuery] = useState('')
 
   // Selection State
@@ -66,6 +77,7 @@ export default function ManajemenUserPage() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
   const [roleEditUser, setRoleEditUser] = useState<any>(null)
   const [roleEditSelected, setRoleEditSelected] = useState<string[]>([])
+  const [roleEditJabatan, setRoleEditJabatan] = useState('')
 
   // Grant/Revoke modal
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false)
@@ -142,11 +154,28 @@ export default function ManajemenUserPage() {
     return [u.role]
   }
 
+  const needsStructuralJabatan = (roles: string[]) => roles.some(role => STRUCTURAL_ROLE_VALUES.includes(role))
+  const getJabatanLabel = (value: string | null | undefined) => STRUCTURAL_JABATAN.find(j => j.value === value)?.label || ''
+  const getStructuralJabatan = (u: any) => needsStructuralJabatan(parseRoles(u)) ? (u.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : ''
+  const getEffectiveUserRoles = (u: any) => {
+    const roles = parseRoles(u)
+    const structuralJabatan = needsStructuralJabatan(roles) ? (u.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : ''
+    if (!structuralJabatan) return roles
+    return Array.from(new Set([
+      ...roles,
+      `jabatan:${structuralJabatan}`,
+      ...roles.map(role => `${role}:${structuralJabatan}`),
+    ]))
+  }
+
   const filteredUsers = users.filter(u => {
     let matchRole = true
     if (filterRole !== 'SEMUA') {
       matchRole = parseRoles(u).includes(filterRole)
     }
+
+    const matchAsrama = filterAsrama === 'SEMUA' || u.asrama_binaan === filterAsrama
+    const matchJabatan = filterJabatan === 'SEMUA' || getStructuralJabatan(u) === filterJabatan
 
     let matchSearch = true
     if (searchQuery.trim() !== '') {
@@ -156,7 +185,7 @@ export default function ManajemenUserPage() {
                      u.nip?.toLowerCase().includes(qs))
     }
 
-    return matchRole && matchSearch
+    return matchRole && matchAsrama && matchJabatan && matchSearch
   })
 
   const filteredCandidates = userCandidates.filter(candidate => {
@@ -199,6 +228,7 @@ export default function ManajemenUserPage() {
           source_ref_id: candidate.source_ref_id,
           role: candidate.source_type === 'guru' ? 'guru' : newRole,
           asrama_binaan: '',
+          structural_jabatan: needsStructuralJabatan([candidate.source_type === 'guru' ? 'guru' : newRole]) ? DEFAULT_STRUCTURAL_JABATAN : '',
         },
       }
     })
@@ -230,6 +260,7 @@ export default function ManajemenUserPage() {
             source_ref_id: candidate.source_ref_id,
             role: candidate.source_type === 'guru' ? 'guru' : newRole,
             asrama_binaan: '',
+            structural_jabatan: needsStructuralJabatan([candidate.source_type === 'guru' ? 'guru' : newRole]) ? DEFAULT_STRUCTURAL_JABATAN : '',
           }
         }
       })
@@ -240,13 +271,19 @@ export default function ManajemenUserPage() {
   // --- HANDLERS MULTI-ROLE ---
   const openRoleModal = (user: any) => {
     setRoleEditUser(user)
-    setRoleEditSelected(parseRoles(user))
+    const roles = parseRoles(user)
+    setRoleEditSelected(roles)
+    setRoleEditJabatan(needsStructuralJabatan(roles) ? (user.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : '')
     setIsRoleModalOpen(true)
   }
 
   const handleSaveRoles = async () => {
     if (!roleEditUser || roleEditSelected.length === 0) {
       toast.error('Pilih minimal satu role')
+      return
+    }
+    if (needsStructuralJabatan(roleEditSelected) && !roleEditJabatan) {
+      toast.error('Pilih jabatan struktural')
       return
     }
     // Jika ada pengurus_asrama, tanya asrama
@@ -258,14 +295,14 @@ export default function ManajemenUserPage() {
     }
     setProcessingId(roleEditUser.id)
     const toastId = toast.loading('Menyimpan role...')
-    const res = await updateUserRoles(roleEditUser.id, roleEditSelected, roleEditUser.asrama_binaan)
+    const res = await updateUserRoles(roleEditUser.id, roleEditSelected, roleEditUser.asrama_binaan, roleEditJabatan)
     toast.dismiss(toastId)
     setProcessingId(null)
     if ('error' in res) {
       toast.error('Gagal update', { description: (res as any).error })
     } else {
       const rolesJson = JSON.stringify(roleEditSelected)
-      setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson } : u))
+      setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson, structural_jabatan: needsStructuralJabatan(roleEditSelected) ? roleEditJabatan : null } : u))
       toast.success('Role diperbarui', { description: roleEditSelected.map(r => ROLES.find(x=>x.value===r)?.label||r).join(', ') })
       setIsRoleModalOpen(false)
     }
@@ -276,14 +313,16 @@ export default function ManajemenUserPage() {
       setIsAsramaModalOpen(false)
       setProcessingId(pendingRoleUpdate.userId)
       const toastId = toast.loading('Menyimpan role...')
-      const res = await updateUserRoles(pendingRoleUpdate.userId, pendingRoleUpdate.roles, asrama)
+      const currentUser = users.find(u => u.id === pendingRoleUpdate.userId)
+      const structuralJabatan = needsStructuralJabatan(pendingRoleUpdate.roles) ? (currentUser?.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : ''
+      const res = await updateUserRoles(pendingRoleUpdate.userId, pendingRoleUpdate.roles, asrama, structuralJabatan)
       toast.dismiss(toastId)
       setProcessingId(null)
       if ('error' in res) {
         toast.error('Gagal update', { description: (res as any).error })
       } else {
         const rolesJson = JSON.stringify(pendingRoleUpdate.roles)
-        setUsers(prev => prev.map(u => u.id === pendingRoleUpdate!.userId ? { ...u, role: pendingRoleUpdate!.roles[0], roles: rolesJson, asrama_binaan: asrama } : u))
+        setUsers(prev => prev.map(u => u.id === pendingRoleUpdate!.userId ? { ...u, role: pendingRoleUpdate!.roles[0], roles: rolesJson, asrama_binaan: asrama, structural_jabatan: structuralJabatan || null } : u))
         toast.success('Role & Asrama diperbarui')
       }
       setPendingRoleUpdate(null)
@@ -484,12 +523,12 @@ export default function ManajemenUserPage() {
     const XLSX = await import('xlsx')
 
     const rows = [
-      { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "wali_kelas", "ASRAMA": "" },
-      { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "keamanan", "ASRAMA": "" },
-      { "NAMA LENGKAP": "Siti Bendahara", "EMAIL": "siti@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "bendahara", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Budi Santoso", "EMAIL": "budi@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "wali_kelas", "JABATAN": "", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Ahmad Keamanan", "EMAIL": "ahmad@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "keamanan", "JABATAN": "anggota", "ASRAMA": "" },
+      { "NAMA LENGKAP": "Siti Pengurus", "EMAIL": "siti@sukahideng.or.id", "PASSWORD": "password123", "ROLE": "pengurus_asrama", "JABATAN": "bendahara", "ASRAMA": "BAHAGIA" },
     ]
     const worksheet = XLSX.utils.json_to_sheet(rows)
-    worksheet['!cols'] = [{wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:15}]
+    worksheet['!cols'] = [{wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:15}, {wch:15}]
     
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template User")
@@ -517,6 +556,7 @@ export default function ManajemenUserPage() {
           email: row['EMAIL'],
           password: row['PASSWORD'],
           role: row['ROLE']?.toLowerCase(),
+          structural_jabatan: row['JABATAN']?.toLowerCase(),
           asrama_binaan: row['ASRAMA']?.toUpperCase(),
           isValid: row['NAMA LENGKAP'] && row['EMAIL'] && row['PASSWORD'] && row['ROLE']
           }))
@@ -568,12 +608,13 @@ export default function ManajemenUserPage() {
         "NAMA LENGKAP": u.full_name || "-",
         "EMAIL": u.email,
         "ROLE": ROLES.find(r => r.value === u.role)?.label || u.role,
+        "JABATAN": getJabatanLabel(getStructuralJabatan(u)) || "-",
         "ASRAMA BINAAN": u.asrama_binaan || "-",
         "KELAS BINAAN": u.kelas_binaan || "-"
       }))
       
       const ws = XLSX.utils.json_to_sheet(rows)
-      ws['!cols'] = [{wch: 30}, {wch: 35}, {wch: 25}, {wch: 20}, {wch: 24}]
+      ws['!cols'] = [{wch: 30}, {wch: 35}, {wch: 25}, {wch: 16}, {wch: 20}, {wch: 24}]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Data User Terpilih")
       XLSX.writeFile(wb, `Export_Akun_User_${new Date().getTime()}.xlsx`)
@@ -621,6 +662,30 @@ export default function ManajemenUserPage() {
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
               <Filter className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
+            </div>
+
+            <div className="relative sm:w-[190px] xl:w-[200px]">
+              <select
+                value={filterAsrama}
+                onChange={(e) => setFilterAsrama(e.target.value)}
+                className="appearance-none w-full bg-white border border-slate-300 text-slate-700 py-2.5 pl-3 pr-8 rounded-xl font-medium focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer"
+              >
+                <option value="SEMUA">Semua Asrama</option>
+                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <Home className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
+            </div>
+
+            <div className="relative sm:w-[190px] xl:w-[200px]">
+              <select
+                value={filterJabatan}
+                onChange={(e) => setFilterJabatan(e.target.value)}
+                className="appearance-none w-full bg-white border border-slate-300 text-slate-700 py-2.5 pl-3 pr-8 rounded-xl font-medium focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+              >
+                <option value="SEMUA">Semua Jabatan</option>
+                {STRUCTURAL_JABATAN.map(j => <option key={j.value} value={j.value}>{j.label}</option>)}
+              </select>
+              <Shield className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"/>
             </div>
           </div>
 
@@ -735,6 +800,13 @@ export default function ManajemenUserPage() {
                         </button>
                         {processingId === u.id && <Loader2 className="w-4 h-4 animate-spin text-blue-600"/>}
                       </div>
+                      {needsStructuralJabatan(parseRoles(u)) && (
+                        <div className="mt-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-white">
+                            {getJabatanLabel(getStructuralJabatan(u)) || 'Anggota'}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {parseRoles(u).includes('pengurus_asrama') ? (
@@ -914,7 +986,7 @@ export default function ManajemenUserPage() {
                                 </button>
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Role</label>
                                   <select
@@ -922,11 +994,27 @@ export default function ManajemenUserPage() {
                                     onChange={(e) => updateSelectedBatchConfig(key, {
                                       role: e.target.value,
                                       asrama_binaan: e.target.value === 'pengurus_asrama' ? config?.asrama_binaan || '' : '',
+                                      structural_jabatan: needsStructuralJabatan([e.target.value]) ? (config?.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : '',
                                     })}
                                     className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
                                   >
                                     {ROLES.map(r => (
                                       <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan</label>
+                                  <select
+                                    value={config?.structural_jabatan || ''}
+                                    disabled={!needsStructuralJabatan([config?.role || ''])}
+                                    onChange={(e) => updateSelectedBatchConfig(key, { structural_jabatan: e.target.value })}
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    <option value="">-- Pilih Jabatan --</option>
+                                    {STRUCTURAL_JABATAN.map(j => (
+                                      <option key={j.value} value={j.value}>{j.label}</option>
                                     ))}
                                   </select>
                                 </div>
@@ -1287,9 +1375,17 @@ export default function ManajemenUserPage() {
                       checked={checked}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setRoleEditSelected(prev => [...prev, r.value])
+                          setRoleEditSelected(prev => {
+                            const next = [...prev, r.value]
+                            if (needsStructuralJabatan(next) && !roleEditJabatan) setRoleEditJabatan(roleEditUser.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN)
+                            return next
+                          })
                         } else {
-                          setRoleEditSelected(prev => prev.filter(x => x !== r.value))
+                          setRoleEditSelected(prev => {
+                            const next = prev.filter(x => x !== r.value)
+                            if (!needsStructuralJabatan(next)) setRoleEditJabatan('')
+                            return next
+                          })
                         }
                       }}
                     />
@@ -1297,6 +1393,20 @@ export default function ManajemenUserPage() {
                   </label>
                 )
               })}
+              {needsStructuralJabatan(roleEditSelected) && (
+                <div className="pt-3">
+                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan Struktural</label>
+                  <select
+                    value={roleEditJabatan}
+                    onChange={(e) => setRoleEditJabatan(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {STRUCTURAL_JABATAN.map(j => (
+                      <option key={j.value} value={j.value}>{j.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
               <button onClick={() => setIsRoleModalOpen(false)} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 font-medium">Batal</button>
@@ -1325,7 +1435,7 @@ export default function ManajemenUserPage() {
               ) : (
                 <div className="space-y-1">
                   {allFitur.filter(f => f.href !== '/dashboard').map(f => {
-                    const userRoles = parseRoles(overrideUser)
+                    const userRoles = getEffectiveUserRoles(overrideUser)
                     const hasViaRole = f.roles.some(r => userRoles.includes(r))
                     const override = overrideList.find(o => o.fitur_id === f.id)
                     const effectiveAccess = override ? override.action === 'grant' : hasViaRole

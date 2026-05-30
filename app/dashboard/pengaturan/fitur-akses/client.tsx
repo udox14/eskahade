@@ -6,7 +6,20 @@ import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircl
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
 
-const ALL_ROLES = ['admin', 'keamanan', 'sekpen', 'dewan_santri', 'pengurus_asrama', 'wali_kelas', 'guru', 'bendahara']
+const ALL_ROLES = [
+  'admin',
+  'keamanan',
+  'sekpen',
+  'dewan_santri',
+  'pengurus_asrama',
+  'wali_kelas',
+  'guru',
+  'bendahara',
+  'jabatan:anggota',
+  'jabatan:ketua',
+  'jabatan:sekretaris',
+  'jabatan:bendahara',
+]
 
 const ROLE_LABEL: Record<string, string> = {
   admin:           'Admin',
@@ -17,6 +30,10 @@ const ROLE_LABEL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
+  'jabatan:anggota':   'Anggota',
+  'jabatan:ketua':      'Ketua',
+  'jabatan:sekretaris': 'Sekretaris',
+  'jabatan:bendahara':  'Bendahara',
 }
 
 const ROLE_LABEL_FULL: Record<string, string> = {
@@ -28,6 +45,10 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
+  'jabatan:anggota':   'Jabatan Anggota',
+  'jabatan:ketua':      'Jabatan Ketua',
+  'jabatan:sekretaris': 'Jabatan Sekretaris',
+  'jabatan:bendahara':  'Jabatan Bendahara',
 }
 
 const ROLE_COLOR: Record<string, string> = {
@@ -39,6 +60,10 @@ const ROLE_COLOR: Record<string, string> = {
   wali_kelas:      'bg-teal-100 text-teal-700 border-teal-200',
   guru:            'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'jabatan:anggota':   'bg-zinc-100 text-zinc-700 border-zinc-200',
+  'jabatan:ketua':      'bg-slate-900 text-white border-slate-900',
+  'jabatan:sekretaris': 'bg-sky-100 text-sky-700 border-sky-200',
+  'jabatan:bendahara':  'bg-emerald-100 text-emerald-700 border-emerald-200',
 }
 
 const ROLE_BG_SOFT: Record<string, string> = {
@@ -50,6 +75,10 @@ const ROLE_BG_SOFT: Record<string, string> = {
   wali_kelas:      'bg-teal-50 border-teal-200',
   guru:            'bg-indigo-50 border-indigo-200',
   bendahara:       'bg-yellow-50 border-yellow-200',
+  'jabatan:anggota':   'bg-zinc-50 border-zinc-200',
+  'jabatan:ketua':      'bg-slate-50 border-slate-300',
+  'jabatan:sekretaris': 'bg-sky-50 border-sky-200',
+  'jabatan:bendahara':  'bg-emerald-50 border-emerald-200',
 }
 
 const ROLE_HEADER: Record<string, string> = {
@@ -61,6 +90,10 @@ const ROLE_HEADER: Record<string, string> = {
   wali_kelas:      'from-teal-600 to-teal-700',
   guru:            'from-indigo-600 to-indigo-700',
   bendahara:       'from-yellow-500 to-yellow-600',
+  'jabatan:anggota':   'from-zinc-500 to-zinc-600',
+  'jabatan:ketua':      'from-slate-700 to-slate-900',
+  'jabatan:sekretaris': 'from-sky-500 to-sky-600',
+  'jabatan:bendahara':  'from-emerald-500 to-emerald-600',
 }
 
 const GROUP_ORDER = [

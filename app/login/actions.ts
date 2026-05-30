@@ -2,7 +2,7 @@
 
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
-import { setSession } from '@/lib/auth/session'
+import { ensureUserStructuralJabatanColumn, setSession } from '@/lib/auth/session'
 import { getRequestAuditContext, logActivity } from '@/lib/activity-log'
 import { redirect } from 'next/navigation'
 
@@ -26,11 +26,13 @@ export async function login(formData: FormData) {
     role: string
     roles: string | null
     asrama_binaan: string | null
+    structural_jabatan: string | null
   } | null = null
 
   try {
+    await ensureUserStructuralJabatanColumn()
     user = await queryOne(
-      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?',
       [normalizedEmail]
     )
     console.log('[LOGIN] Step 2: user found=', !!user, 'role=', user?.role)
@@ -106,6 +108,7 @@ export async function login(formData: FormData) {
       role: rolesArray[0],        // role utama = elemen pertama
       roles: rolesArray,          // semua role
       asrama_binaan: user.asrama_binaan,
+      structural_jabatan: user.structural_jabatan,
     })
     console.log('[LOGIN] Step 4: session set OK')
   } catch (err: any) {

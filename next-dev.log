@@ -15,3 +15,9 @@
 [layout] session null → redirect /login
  GET /dashboard/asrama/uang-jajan 307 in 2.8s (compile: 2.6s, render: 180ms)
  GET /login 200 in 110ms (compile: 56ms, render: 54ms)
+✓ Compiled in 784ms
+✓ Compiled in 564ms
+✓ Compiled in 971ms
+✓ Compiled in 376ms
+✓ Compiled in 334ms
+✓ Compiled in 319ms

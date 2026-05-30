@@ -26,6 +26,7 @@ type BatchSourceUserInput = {
   source_ref_id: string
   role: string
   asrama_binaan?: string | null
+  structural_jabatan?: string | null
 }
 
 type LinkedUserCreateResult =
@@ -55,6 +56,8 @@ function normalizePersonName(name: string) {
 }
 
 async function getUserById(id: string) {
+  await ensureUserManagementColumns()
+
   return queryOne<{
     id: string
     full_name: string
@@ -62,8 +65,9 @@ async function getUserById(id: string) {
     role: string
     roles: string | null
     asrama_binaan: string | null
+    structural_jabatan: string | null
   }>(
-    'SELECT id, full_name, email, role, roles, asrama_binaan FROM users WHERE id = ?',
+    'SELECT id, full_name, email, role, roles, asrama_binaan, structural_jabatan FROM users WHERE id = ?',
     [id]
   )
 }
@@ -83,8 +87,20 @@ function addRoleUnique(roles: string[], role: string) {
 }
 
 async function ensureUserSourceColumns() {
+  await ensureUserManagementColumns()
+}
+
+async function ensureUserManagementColumns() {
   try {
     await execute('ALTER TABLE users ADD COLUMN source_type TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+
+  try {
+    await execute('ALTER TABLE users ADD COLUMN structural_jabatan TEXT')
   } catch (error: any) {
     if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
       throw error
@@ -165,6 +181,9 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
     return { error: `Asrama binaan untuk ${sourceProfile.full_name} belum dipilih.` } as const
   }
 
+  const needsStructuralJabatan = roleNeedsStructuralJabatan([input.role])
+  const structuralJabatan = needsStructuralJabatan ? normalizeStructuralJabatan(input.structural_jabatan) : null
+
   const existingSourceUser = await queryOne<{ id: string }>(
     'SELECT id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
     [input.source_type, input.source_ref_id]
@@ -189,8 +208,8 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
   await execute(
     `INSERT INTO users (
       id, email, password_hash, full_name, role, roles, asrama_binaan,
-      source_type, source_ref_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      structural_jabatan, source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       sourceProfile.email,
@@ -199,6 +218,7 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
       input.role,
       rolesJson,
       input.role === 'pengurus_asrama' ? String(input.asrama_binaan || '').trim() : null,
+      needsStructuralJabatan ? structuralJabatan : null,
       input.source_type,
       input.source_ref_id,
       now,
@@ -387,6 +407,7 @@ export async function getUsersList() {
       u.role,
       u.roles,
       u.asrama_binaan,
+      u.structural_jabatan,
       u.source_type,
       u.source_ref_id,
       u.created_at,
@@ -395,7 +416,7 @@ export async function getUsersList() {
     LEFT JOIN kelas k ON k.wali_kelas_id = u.id
     GROUP BY
       u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
-      u.source_type, u.source_ref_id, u.created_at
+      u.structural_jabatan, u.source_type, u.source_ref_id, u.created_at
     ORDER BY u.created_at DESC`
   )
 }
@@ -474,9 +495,11 @@ export async function getUserCreationCandidates(): Promise<UserCreationCandidate
 export async function updateUserRoles(
   id: string,
   newRoles: string[],
-  asrama?: string
+  asrama?: string,
+  structuralJabatanInput?: string
 ): Promise<{ success: boolean } | { error: string }> {
   if (!newRoles || newRoles.length === 0) return { error: 'Minimal satu role harus dipilih.' }
+  await ensureUserManagementColumns()
 
   const session = await getSession()
   const beforeUser = await getUserById(id)
@@ -484,11 +507,13 @@ export async function updateUserRoles(
 
   const primaryRole = newRoles[0]
   const asramaBinaan = newRoles.includes('pengurus_asrama') ? (asrama || null) : null
+  const needsStructuralJabatan = roleNeedsStructuralJabatan(newRoles)
+  const structuralJabatan = needsStructuralJabatan ? normalizeStructuralJabatan(structuralJabatanInput) : null
   const rolesJson = JSON.stringify(newRoles)
 
   await execute(
-    'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, updated_at = ? WHERE id = ?',
-    [primaryRole, rolesJson, asramaBinaan, new Date().toISOString(), id]
+    'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, structural_jabatan = ?, updated_at = ? WHERE id = ?',
+    [primaryRole, rolesJson, asramaBinaan, structuralJabatan, new Date().toISOString(), id]
   )
 
     await logActivity({
@@ -507,13 +532,15 @@ export async function updateUserRoles(
           role: beforeUser.role,
           roles: parseRoles(beforeUser.roles, beforeUser.role),
           asrama_binaan: beforeUser.asrama_binaan,
+          structural_jabatan: beforeUser.structural_jabatan,
         },
         {
           role: primaryRole,
           roles: newRoles,
           asrama_binaan: asramaBinaan,
+          structural_jabatan: structuralJabatan,
         },
-        ['role', 'roles', 'asrama_binaan']
+        ['role', 'roles', 'asrama_binaan', 'structural_jabatan']
       ),
     },
   })
@@ -535,6 +562,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   const fullNameInput = String(formData.get('full_name') || '').trim()
   const role = String(formData.get('role') || '')
   const asrama = String(formData.get('asrama_binaan') || '')
+  const structuralJabatan = normalizeStructuralJabatan(String(formData.get('structural_jabatan') || ''))
   const sourceTypeRaw = String(formData.get('source_type') || '').trim().toLowerCase()
   const sourceRefId = String(formData.get('source_ref_id') || '').trim()
   const sourceType = sourceTypeRaw === 'guru' || sourceTypeRaw === 'sadesa' ? sourceTypeRaw : null
@@ -545,6 +573,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       source_ref_id: sourceRefId,
       role,
       asrama_binaan: asrama || null,
+      structural_jabatan: structuralJabatan,
     })
     if ('error' in result) return { error: result.error }
 
@@ -564,6 +593,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
         source_type: sourceType,
         source_ref_id: sourceRefId,
         asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
+        structural_jabatan: roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
       },
     })
 
@@ -592,8 +622,8 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   await execute(
     `INSERT INTO users (
       id, email, password_hash, full_name, role, roles, asrama_binaan,
-      source_type, source_ref_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      structural_jabatan, source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       email,
@@ -602,6 +632,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       role,
       rolesJson,
       role === 'pengurus_asrama' ? asrama : null,
+      roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
       sourceType,
       sourceRefId || null,
       now,
@@ -623,6 +654,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       email,
       role,
       asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
+      structural_jabatan: roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
       source_type: sourceType,
       source_ref_id: sourceRefId || null,
     },
@@ -679,6 +711,7 @@ export async function createUsersFromSourcesBatch(items: BatchSourceUserInput[])
 }
 
 export async function createUsersBatch(usersData: any[]) {
+  await ensureUserManagementColumns()
   const session = await getSession()
   let successCount = 0
   const errors: string[] = []
@@ -700,13 +733,14 @@ export async function createUsersBatch(usersData: any[]) {
       const passwordHash = await hashPassword(String(u.password))
       const now = new Date().toISOString()
       const userRole = u.role || 'wali_kelas'
+      const structuralJabatan = normalizeStructuralJabatan(u.structural_jabatan)
       const rolesJson = JSON.stringify([userRole])
 
       await execute(
         `INSERT INTO users (
           id, email, password_hash, full_name, role, roles, asrama_binaan,
-          source_type, source_ref_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          structural_jabatan, source_type, source_ref_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(),
           email,
@@ -715,6 +749,7 @@ export async function createUsersBatch(usersData: any[]) {
           userRole,
           rolesJson,
           userRole === 'pengurus_asrama' ? (u.asrama_binaan || null) : null,
+          roleNeedsStructuralJabatan([userRole]) ? structuralJabatan : null,
           null,
           null,
           now,
@@ -878,6 +913,7 @@ export async function deleteUser(userId: string): Promise<{ success: boolean } |
         email: targetUser.email,
         role: targetUser.role,
         roles: parseRoles(targetUser.roles, targetUser.role),
+        structural_jabatan: targetUser.structural_jabatan,
       },
     })
     revalidatePath('/dashboard/pengaturan/users')
@@ -977,4 +1013,17 @@ export async function removeUserFiturOverride(
 export async function getAllActiveFitur() {
   const all = await getCachedFiturAkses()
   return all.filter(f => f.is_active)
+}
+
+const STRUCTURAL_ROLE_VALUES = ['pengurus_asrama', 'sekpen', 'dewan_santri', 'keamanan']
+const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
+const STRUCTURAL_JABATAN_VALUES = [DEFAULT_STRUCTURAL_JABATAN, 'ketua', 'sekretaris', 'bendahara']
+
+function roleNeedsStructuralJabatan(roles: string[]) {
+  return roles.some(role => STRUCTURAL_ROLE_VALUES.includes(role))
+}
+
+function normalizeStructuralJabatan(value: unknown) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/\s+/g, '_')
+  return STRUCTURAL_JABATAN_VALUES.includes(normalized) ? normalized : DEFAULT_STRUCTURAL_JABATAN
 }
