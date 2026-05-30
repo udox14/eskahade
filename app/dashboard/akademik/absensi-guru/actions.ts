@@ -32,6 +32,11 @@ export type AbsensiGuruImportCell = {
   status: GuruStatusImport
 }
 
+export type AbsensiGuruImportMappings = {
+  kelas?: Record<string, string>
+  guru?: Record<string, number | string>
+}
+
 type ImportIssue = {
   sheet?: string
   row?: number
@@ -40,6 +45,11 @@ type ImportIssue = {
   tanggal?: string
   sesi?: SessionType
   message: string
+}
+
+type ImportOption = {
+  id: string
+  label: string
 }
 
 type ImportGroup = {
@@ -66,6 +76,8 @@ type ImportBuildResult = {
   unmatchedGuru: ImportIssue[]
   conflicts: ImportIssue[]
   duplicateKelas: string[]
+  kelasOptions: ImportOption[]
+  guruOptions: ImportOption[]
 }
 
 function emptyResolvedGuru() {
@@ -115,6 +127,26 @@ function normalizeLookupKey(value: unknown) {
     .replace(/\s+/g, ' ')
 }
 
+function kelasLookupKeys(value: unknown) {
+  const base = normalizeLookupKey(value)
+  const keys = new Set<string>()
+  if (base) keys.add(base)
+
+  const match = base.match(/(?:^|\s)(\d+)\s*-\s*0*(\d+)\s*$/)
+  if (match) {
+    const tingkat = Number(match[1])
+    const rombel = Number(match[2])
+    if (Number.isFinite(tingkat) && Number.isFinite(rombel)) {
+      keys.add(`${tingkat}-${rombel}`)
+      keys.add(`${tingkat}-${String(rombel).padStart(2, '0')}`)
+      keys.add(`ibtidaiyyah ${tingkat}-${rombel}`)
+      keys.add(`ibtidaiyyah ${tingkat}-${String(rombel).padStart(2, '0')}`)
+    }
+  }
+
+  return Array.from(keys)
+}
+
 function normalizeImportStatus(value: unknown): GuruStatusImport {
   const status = String(value || 'H').trim().toUpperCase()
   return status === 'A' || status === 'B' || status === 'L' ? status : 'H'
@@ -139,7 +171,10 @@ function sessionSnapshotFields(sessionName: SessionType) {
   }
 }
 
-async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<ImportBuildResult> {
+async function buildAbsensiGuruImport(
+  cells: AbsensiGuruImportCell[],
+  mappings: AbsensiGuruImportMappings = {}
+): Promise<ImportBuildResult> {
   await ensureLiburPengajianTable()
 
   const cleanCells = cells
@@ -169,15 +204,19 @@ async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<I
     ORDER BY nama_lengkap
   `)
 
+  const kelasById = new Map<string, any>()
   const kelasMap = new Map<string, any[]>()
   kelasRows.forEach(row => {
-    const key = normalizeLookupKey(row.nama_kelas)
-    if (!key) return
-    kelasMap.set(key, [...(kelasMap.get(key) || []), row])
+    kelasById.set(String(row.id), row)
+    kelasLookupKeys(row.nama_kelas).forEach(key => {
+      kelasMap.set(key, [...(kelasMap.get(key) || []), row])
+    })
   })
 
+  const guruById = new Map<string, any>()
   const guruMap = new Map<string, any>()
   guruRows.forEach(row => {
+    guruById.set(String(row.id), row)
     const key = normalizeLookupKey(row.nama_lengkap)
     if (!key || guruMap.has(key)) return
     guruMap.set(key, row)
@@ -200,8 +239,12 @@ async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<I
 
   for (const cell of cleanCells) {
     statusCounts[cell.status] += 1
-    const kelasMatches = kelasMap.get(normalizeLookupKey(cell.kelasName)) || []
-    const kelas = kelasMatches[0]
+    const mappedKelasId = mappings.kelas?.[cell.kelasName]
+    const kelas = mappedKelasId
+      ? kelasById.get(String(mappedKelasId))
+      : kelasLookupKeys(cell.kelasName)
+          .flatMap(key => kelasMap.get(key) || [])
+          .find(Boolean)
     if (!kelas) {
       const key = cell.kelasName
       if (!unmatchedKelasMap.has(key)) {
@@ -265,7 +308,10 @@ async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<I
     assignedTeacher.set(statusKey, cell.guruName)
     group[cell.sesi] = cell.status
 
-    const guru = guruMap.get(normalizeLookupKey(cell.guruName))
+    const mappedGuruId = mappings.guru?.[cell.guruName]
+    const guru = mappedGuruId
+      ? guruById.get(String(mappedGuruId))
+      : guruMap.get(normalizeLookupKey(cell.guruName))
     const fields = sessionSnapshotFields(cell.sesi)
     if (guru?.id) {
       matchedGuruCells += 1
@@ -296,6 +342,14 @@ async function buildAbsensiGuruImport(cells: AbsensiGuruImportCell[]): Promise<I
     unmatchedGuru: Array.from(unmatchedGuruMap.values()),
     conflicts: conflicts.slice(0, 50),
     duplicateKelas,
+    kelasOptions: kelasRows.map(row => ({
+      id: String(row.id),
+      label: String(row.nama_kelas || row.id),
+    })),
+    guruOptions: guruRows.map(row => ({
+      id: String(row.id),
+      label: String(row.nama_lengkap || row.id),
+    })),
   }
 }
 
@@ -567,10 +621,13 @@ export async function simpanAbsensiGuru(
   return { success: true, saved: payload.length }
 }
 
-export async function previewImportAbsensiGuru(cells: AbsensiGuruImportCell[]) {
+export async function previewImportAbsensiGuru(
+  cells: AbsensiGuruImportCell[],
+  mappings: AbsensiGuruImportMappings = {}
+) {
   if (!Array.isArray(cells) || cells.length === 0) return { error: 'Tidak ada data absensi yang terbaca dari Excel.' }
 
-  const result = await buildAbsensiGuruImport(cells)
+  const result = await buildAbsensiGuruImport(cells, mappings)
   const dates = Array.from(new Set(result.groups.map(group => group.tanggal))).sort()
   const kelas = Array.from(new Set(result.groups.map(group => group.kelasName))).sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
@@ -605,15 +662,22 @@ export async function previewImportAbsensiGuru(cells: AbsensiGuruImportCell[]) {
       conflicts: result.conflicts,
       duplicateKelas: result.duplicateKelas,
     },
+    options: {
+      kelas: result.kelasOptions,
+      guru: result.guruOptions,
+    },
   }
 }
 
-export async function importAbsensiGuruHistoris(cells: AbsensiGuruImportCell[]) {
+export async function importAbsensiGuruHistoris(
+  cells: AbsensiGuruImportCell[],
+  mappings: AbsensiGuruImportMappings = {}
+) {
   await ensureLiburPengajianTable()
   const session = await getSession()
   if (!Array.isArray(cells) || cells.length === 0) return { error: 'Tidak ada data absensi yang terbaca dari Excel.' }
 
-  const result = await buildAbsensiGuruImport(cells)
+  const result = await buildAbsensiGuruImport(cells, mappings)
   if (result.groups.length === 0) return { error: 'Tidak ada baris yang bisa diimpor.' }
   if (result.unmatchedKelas.length > 0) {
     return { error: `Ada ${result.unmatchedKelas.length} kelas yang belum cocok. Perbaiki Master Kelas atau file Excel terlebih dahulu.` }

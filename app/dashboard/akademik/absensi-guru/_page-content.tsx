@@ -8,6 +8,7 @@ import {
   previewImportAbsensiGuru,
   importAbsensiGuruHistoris,
   type AbsensiGuruImportCell,
+  type AbsensiGuruImportMappings,
 } from './actions'
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Save, Search, Smartphone, Table2, Upload, User, Filter } from 'lucide-react'
 import { format } from 'date-fns'
@@ -42,10 +43,14 @@ type ImportPreviewSuccess = {
     guruMaghrib: string | null
   }[]
   issues: {
-    unmatchedKelas: { message: string }[]
-    unmatchedGuru: { message: string }[]
+    unmatchedKelas: { message: string; kelasName?: string }[]
+    unmatchedGuru: { message: string; guruName?: string }[]
     conflicts: { message: string }[]
     duplicateKelas: string[]
+  }
+  options: {
+    kelas: { id: string; label: string }[]
+    guru: { id: string; label: string }[]
   }
 }
 type ImportPreview = ImportPreviewSuccess | { error: string }
@@ -76,6 +81,7 @@ export default function AbsensiGuruPage() {
   const [importFileName, setImportFileName] = useState('')
   const [importCells, setImportCells] = useState<AbsensiGuruImportCell[]>([])
   const [importSheetPeriods, setImportSheetPeriods] = useState<{ sheetName: string; label: string; source: string }[]>([])
+  const [importMappings, setImportMappings] = useState<AbsensiGuruImportMappings>({ kelas: {}, guru: {} })
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [readingImport, setReadingImport] = useState(false)
   const [savingImport, setSavingImport] = useState(false)
@@ -392,14 +398,17 @@ export default function AbsensiGuruPage() {
         setImportFileName(file.name)
         setImportCells([])
         setImportSheetPeriods([])
+        setImportMappings({ kelas: {}, guru: {} })
         setImportPreview(null)
         return
       }
 
-      const preview = await previewImportAbsensiGuru(parsed.cells)
+      const nextMappings: AbsensiGuruImportMappings = { kelas: {}, guru: {} }
+      const preview = await previewImportAbsensiGuru(parsed.cells, nextMappings)
       setImportFileName(file.name)
       setImportCells(parsed.cells)
       setImportSheetPeriods(parsed.sheetPeriods)
+      setImportMappings(nextMappings)
       setImportPreview(preview)
 
       if ('error' in preview) {
@@ -427,7 +436,7 @@ export default function AbsensiGuruPage() {
     setSavingImport(true)
     const loadToast = toast.loading('Mengimpor absensi guru historis...')
     try {
-      const result = await importAbsensiGuruHistoris(importCells)
+      const result = await importAbsensiGuruHistoris(importCells, importMappings)
       if ('error' in result) {
         toast.error('Import gagal', { description: result.error })
         return
@@ -440,6 +449,7 @@ export default function AbsensiGuruPage() {
       setImportPreview(null)
       setImportFileName('')
       setImportSheetPeriods([])
+      setImportMappings({ kelas: {}, guru: {} })
       setShowImportPanel(false)
       if (hasLoaded) await loadData()
     } catch (err: any) {
@@ -447,6 +457,23 @@ export default function AbsensiGuruPage() {
     } finally {
       toast.dismiss(loadToast)
       setSavingImport(false)
+    }
+  }
+
+  const handleRefreshImportPreview = async () => {
+    if (!importCells.length) return toast.warning('Upload file Excel dulu.')
+    setReadingImport(true)
+    const loadToast = toast.loading('Menerapkan mapping import...')
+    try {
+      const preview = await previewImportAbsensiGuru(importCells, importMappings)
+      setImportPreview(preview)
+      if ('error' in preview) toast.error('Gagal membuat preview import', { description: preview.error })
+      else toast.success('Preview diperbarui')
+    } catch (err: any) {
+      toast.error('Gagal memperbarui preview', { description: err?.message ?? 'Terjadi kesalahan.' })
+    } finally {
+      toast.dismiss(loadToast)
+      setReadingImport(false)
     }
   }
 
@@ -671,11 +698,60 @@ export default function AbsensiGuruPage() {
                 </div>
               </div>
 
-              {(importPreview.issues.unmatchedKelas.length > 0 || importPreview.issues.conflicts.length > 0 || importPreview.issues.unmatchedGuru.length > 0) && (
-                <div className="grid gap-3 lg:grid-cols-3">
-                  <ImportIssueList title="Kelas belum cocok" items={importPreview.issues.unmatchedKelas.map(item => item.message)} tone="red" />
+              {(importPreview.issues.unmatchedKelas.length > 0 || importPreview.issues.unmatchedGuru.length > 0) && (
+                <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-amber-900">Cocokkan Data Import</p>
+                      <p className="text-xs text-amber-700">Pilih padanan dari master data, lalu terapkan mapping tanpa mengubah Excel.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRefreshImportPreview}
+                      disabled={readingImport}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-black text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {readingImport ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Terapkan Mapping
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <ImportMappingList
+                      title="Kelas belum cocok"
+                      emptyText="Semua kelas sudah cocok."
+                      items={importPreview.issues.unmatchedKelas.map(item => ({
+                        key: item.kelasName || '',
+                        label: item.kelasName || item.message,
+                      })).filter(item => item.key)}
+                      options={importPreview.options.kelas}
+                      valueMap={importMappings.kelas || {}}
+                      onChange={(key, value) => setImportMappings(prev => ({
+                        ...prev,
+                        kelas: { ...(prev.kelas || {}), [key]: value },
+                      }))}
+                    />
+                    <ImportMappingList
+                      title="Guru belum cocok"
+                      emptyText="Semua guru sudah cocok."
+                      items={importPreview.issues.unmatchedGuru.map(item => ({
+                        key: item.guruName || '',
+                        label: item.guruName || item.message,
+                      })).filter(item => item.key)}
+                      options={importPreview.options.guru}
+                      valueMap={importMappings.guru || {}}
+                      onChange={(key, value) => setImportMappings(prev => ({
+                        ...prev,
+                        guru: { ...(prev.guru || {}), [key]: value },
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {importPreview.issues.conflicts.length > 0 && (
+                <div className="grid gap-3">
                   <ImportIssueList title="Konflik data" items={importPreview.issues.conflicts.map(item => item.message)} tone="red" />
-                  <ImportIssueList title="Guru belum cocok" items={importPreview.issues.unmatchedGuru.map(item => item.message)} tone="amber" />
                 </div>
               )}
 
@@ -1059,6 +1135,51 @@ function ImportIssueList({ title, items, tone }: { title: string; items: string[
           {items.slice(0, 20).map((item, idx) => <li key={`${item}-${idx}`}>{item}</li>)}
           {items.length > 20 && <li>...dan {items.length - 20} lagi</li>}
         </ul>
+      )}
+    </div>
+  )
+}
+
+function ImportMappingList({
+  title,
+  emptyText,
+  items,
+  options,
+  valueMap,
+  onChange,
+}: {
+  title: string
+  emptyText: string
+  items: { key: string; label: string }[]
+  options: { id: string; label: string }[]
+  valueMap: Record<string, string | number>
+  onChange: (key: string, value: string) => void
+}) {
+  const uniqueItems = Array.from(new Map(items.map(item => [item.key, item])).values())
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-white p-3">
+      <p className="text-xs font-black text-slate-800">{title}</p>
+      {uniqueItems.length === 0 ? (
+        <p className="mt-2 text-xs text-slate-500">{emptyText}</p>
+      ) : (
+        <div className="mt-2 max-h-56 space-y-2 overflow-y-auto pr-1">
+          {uniqueItems.map(item => (
+            <div key={item.key} className="grid gap-1">
+              <label className="text-[11px] font-bold text-slate-600">{item.label}</label>
+              <select
+                value={String(valueMap[item.key] || '')}
+                onChange={event => onChange(item.key, event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                <option value="">Pilih padanan...</option>
+                {options.map(option => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

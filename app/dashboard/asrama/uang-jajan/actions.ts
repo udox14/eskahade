@@ -14,6 +14,7 @@ const MONITORING_PATH = '/dashboard/dewan-santri/uang-jajan'
 export type DompetType = 'JAJAN' | 'TABUNGAN'
 export type TransaksiJenis = 'MASUK' | 'KELUAR'
 export type AutoRuleScope = 'ASRAMA' | 'KAMAR' | 'SANTRI'
+export type AutoMode = 'MANUAL' | 'AUTO'
 
 type SantriRow = {
   id: string
@@ -43,6 +44,8 @@ type SantriKamarRow = {
   foto_url: string | null
   saldo_jajan: number
   saldo_tabungan: number
+  auto_nominal: number | null
+  auto_excluded: number
 }
 
 type RiwayatTabunganRow = {
@@ -73,7 +76,16 @@ export type AutoRuleRow = {
   is_active: number
 }
 
+export type AutoSettingRow = {
+  asrama: string
+  mode: AutoMode
+  jam: string
+  days: string
+  is_active: number
+}
+
 type ActionResult = { success: true } | { error: string }
+const DEFAULT_AUTO_SETTING = { mode: 'MANUAL' as AutoMode, jam: '06:00', days: '[1,2,3,4,5,6]', is_active: 1 }
 
 async function getUserRestriction() {
   const session = await getSession()
@@ -237,7 +249,23 @@ export async function getSantriKamarTabungan(asramaRequest: string, kamar: strin
   return query<SantriKamarRow>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama, s.foto_url,
             COALESCE(s.saldo_uang_jajan, 0) AS saldo_jajan,
-            COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan
+            COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan,
+            (
+              SELECT r.nominal
+              FROM uang_jajan_auto_rule r
+              WHERE r.scope_type = 'SANTRI'
+                AND r.santri_id = s.id
+                AND r.is_active = 1
+              ORDER BY r.updated_at DESC, r.created_at DESC
+              LIMIT 1
+            ) AS auto_nominal,
+            CASE WHEN EXISTS (
+              SELECT 1
+              FROM uang_jajan_auto_skip sk
+              WHERE sk.santri_id = s.id
+                AND sk.skip_date = 'PERMANENT'
+                AND COALESCE(sk.is_active, 1) = 1
+            ) THEN 1 ELSE 0 END AS auto_excluded
      FROM santri s
      WHERE s.asrama = ? AND s.kamar = ? AND s.status_global = 'aktif'
      ORDER BY s.nama_lengkap`,
@@ -253,7 +281,23 @@ export async function searchSantriTabungan(asramaRequest: string, search: string
   return query<SantriKamarRow>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.kamar, s.asrama, s.foto_url,
             COALESCE(s.saldo_uang_jajan, 0) AS saldo_jajan,
-            COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan
+            COALESCE(s.saldo_tabungan, 0) AS saldo_tabungan,
+            (
+              SELECT r.nominal
+              FROM uang_jajan_auto_rule r
+              WHERE r.scope_type = 'SANTRI'
+                AND r.santri_id = s.id
+                AND r.is_active = 1
+              ORDER BY r.updated_at DESC, r.created_at DESC
+              LIMIT 1
+            ) AS auto_nominal,
+            CASE WHEN EXISTS (
+              SELECT 1
+              FROM uang_jajan_auto_skip sk
+              WHERE sk.santri_id = s.id
+                AND sk.skip_date = 'PERMANENT'
+                AND COALESCE(sk.is_active, 1) = 1
+            ) THEN 1 ELSE 0 END AS auto_excluded
      FROM santri s
      WHERE s.asrama = ? AND s.status_global = 'aktif'
        AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)
@@ -518,6 +562,105 @@ export async function getAutoRules(asramaRequest: string) {
   )
 }
 
+export async function getAutoSetting(asramaRequest: string): Promise<AutoSettingRow> {
+  const restrictedAsrama = await getUserRestriction()
+  const targetAsrama = restrictedAsrama || asramaRequest
+  const row = await queryOne<AutoSettingRow>(
+    `SELECT asrama, mode, jam, days, is_active
+     FROM uang_jajan_auto_setting
+     WHERE asrama = ?`,
+    [targetAsrama]
+  )
+  return row ?? { asrama: targetAsrama, ...DEFAULT_AUTO_SETTING }
+}
+
+export async function saveAutoSetting(input: {
+  asrama: string
+  mode: AutoMode
+  jam: string
+  days: number[]
+  is_active: boolean
+}): Promise<ActionResult> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const restrictedAsrama = await getUserRestriction()
+  const targetAsrama = restrictedAsrama || input.asrama
+  if (input.mode !== 'MANUAL' && input.mode !== 'AUTO') return { error: 'Mode auto tidak valid.' }
+  if (!/^\d{2}:\d{2}$/.test(input.jam)) return { error: 'Jam auto tidak valid.' }
+  const days = input.days.filter(day => Number.isInteger(day) && day >= 0 && day <= 6)
+  if (!days.length) return { error: 'Pilih minimal satu hari.' }
+
+  const now = new Date().toISOString()
+  await batch([
+    {
+      sql: `INSERT INTO uang_jajan_auto_setting
+            (asrama, mode, jam, days, is_active, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(asrama) DO UPDATE SET
+              mode = excluded.mode,
+              jam = excluded.jam,
+              days = excluded.days,
+              is_active = excluded.is_active,
+              updated_at = excluded.updated_at`,
+      params: [targetAsrama, input.mode, input.jam, JSON.stringify([...new Set(days)].sort()), input.is_active ? 1 : 0, session.id, now, now],
+    },
+  ])
+
+  revalidatePath(UANG_JAJAN_PATH)
+  return { success: true }
+}
+
+export async function saveSantriAutoNominal(santriId: string, nominal: number, asramaRequest: string): Promise<ActionResult> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const nominalValid = normalizePositiveNominal(nominal)
+  if (!nominalValid) return { error: 'Nominal auto tidak valid.' }
+
+  const santriMap = await getAllowedSantriRows([santriId])
+  const santri = santriMap.get(santriId)
+  if (!santri) return { error: 'Santri tidak ditemukan atau tidak boleh diakses.' }
+
+  const restrictedAsrama = await getUserRestriction()
+  const targetAsrama = restrictedAsrama || santri.asrama || asramaRequest
+  const setting = await getAutoSetting(targetAsrama)
+  const existing = await query<{ id: string }>(
+    `SELECT id
+     FROM uang_jajan_auto_rule
+     WHERE scope_type = 'SANTRI' AND santri_id = ?
+     ORDER BY updated_at DESC, created_at DESC`,
+    [santriId]
+  )
+  const id = existing[0]?.id ?? generateId()
+  const now = new Date().toISOString()
+
+  await batch([
+    {
+      sql: `INSERT INTO uang_jajan_auto_rule
+            (id, scope_type, asrama, kamar, santri_id, nominal, jam, days, is_active, created_by, created_at, updated_at)
+            VALUES (?, 'SANTRI', ?, NULL, ?, ?, ?, ?, 1, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              asrama = excluded.asrama,
+              kamar = NULL,
+              santri_id = excluded.santri_id,
+              nominal = excluded.nominal,
+              jam = excluded.jam,
+              days = excluded.days,
+              is_active = 1,
+              updated_at = excluded.updated_at`,
+      params: [id, targetAsrama, santriId, nominalValid, setting.jam, setting.days, session.id, now, now],
+    },
+    ...existing.slice(1).map(row => ({
+      sql: `UPDATE uang_jajan_auto_rule SET is_active = 0, updated_at = ? WHERE id = ?`,
+      params: [now, row.id],
+    })),
+  ])
+
+  revalidatePath(UANG_JAJAN_PATH)
+  return { success: true }
+}
+
 export async function saveAutoRule(input: {
   id?: string
   scope_type: AutoRuleScope
@@ -583,6 +726,34 @@ export async function saveAutoRule(input: {
     },
   ])
 
+  revalidatePath(UANG_JAJAN_PATH)
+  return { success: true }
+}
+
+export async function setSantriAutoExcluded(santriId: string, excluded: boolean, reason: string): Promise<ActionResult> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  const santriMap = await getAllowedSantriRows([santriId])
+  if (!santriMap.has(santriId)) return { error: 'Santri tidak ditemukan atau tidak boleh diakses.' }
+
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM uang_jajan_auto_skip WHERE santri_id = ? AND skip_date = 'PERMANENT'`,
+    [santriId]
+  )
+  const now = new Date().toISOString()
+  await batch([
+    {
+      sql: `INSERT INTO uang_jajan_auto_skip
+            (id, santri_id, skip_date, reason, created_by, created_at, is_active, updated_at)
+            VALUES (?, ?, 'PERMANENT', ?, ?, ?, ?, ?)
+            ON CONFLICT(santri_id, skip_date) DO UPDATE SET
+              reason = excluded.reason,
+              created_by = excluded.created_by,
+              is_active = excluded.is_active,
+              updated_at = excluded.updated_at`,
+      params: [existing?.id ?? generateId(), santriId, reason || (excluded ? 'Skip auto permanen' : 'Aktifkan auto'), session.id, now, excluded ? 1 : 0, now],
+    },
+  ])
   revalidatePath(UANG_JAJAN_PATH)
   return { success: true }
 }

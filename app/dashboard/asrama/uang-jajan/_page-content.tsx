@@ -13,14 +13,14 @@ import {
   searchSantriTabungan,
   simpanTransaksiDompet,
   transferSaldo,
-  getAutoRules,
-  saveAutoRule,
-  deleteAutoRule,
-  skipAutoPotongToday,
+  getAutoSetting,
+  saveAutoSetting,
+  saveSantriAutoNominal,
+  setSantriAutoExcluded,
   runAutoPotongNow,
   type DompetType,
   type TransaksiJenis,
-  type AutoRuleScope,
+  type AutoMode,
 } from './actions'
 import {
   TrendingUp,
@@ -65,12 +65,15 @@ const DAY_OPTIONS = [
 type StatsTabungan = Awaited<ReturnType<typeof getStatsTabungan>>
 type SantriKamarRow = Awaited<ReturnType<typeof getSantriKamarTabungan>>[number]
 type RiwayatTabunganRow = Awaited<ReturnType<typeof getRiwayatTabunganSantri>>[number]
-type AutoRuleRow = Awaited<ReturnType<typeof getAutoRules>>[number]
+type AutoSettingRow = Awaited<ReturnType<typeof getAutoSetting>>
 type ActionResult =
   | Awaited<ReturnType<typeof simpanTopup>>
   | Awaited<ReturnType<typeof simpanJajanMassal>>
   | Awaited<ReturnType<typeof simpanTransaksiDompet>>
   | Awaited<ReturnType<typeof transferSaldo>>
+  | Awaited<ReturnType<typeof saveAutoSetting>>
+  | Awaited<ReturnType<typeof saveSantriAutoNominal>>
+  | Awaited<ReturnType<typeof setSantriAutoExcluded>>
 
 function getActionError(res: ActionResult) {
   return 'error' in res ? res.error : null
@@ -84,13 +87,12 @@ function parseNominal(value: string) {
   return parseInt(value.replace(/\D/g, ''), 10) || 0
 }
 
-function describeDays(days: string) {
+function parseDaysValue(days: string) {
   try {
     const parsed = JSON.parse(days) as number[]
-    if (parsed.length === 7) return 'Setiap hari'
-    return DAY_OPTIONS.filter(day => parsed.includes(day.value)).map(day => day.label).join(', ')
+    return parsed.filter(day => Number.isInteger(day) && day >= 0 && day <= 6)
   } catch {
-    return '-'
+    return [1, 2, 3, 4, 5, 6]
   }
 }
 
@@ -116,6 +118,8 @@ export default function UangJajanPage() {
   const [draftJajan, setDraftJajan] = useState<Record<string, number>>({})
   const [manualMode, setManualMode] = useState<Record<string, boolean>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [autoNominalInput, setAutoNominalInput] = useState<Record<string, string>>({})
+  const [savingAutoSantri, setSavingAutoSantri] = useState<Record<string, boolean>>({})
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSantri, setSelectedSantri] = useState<SantriKamarRow | null>(null)
@@ -127,15 +131,12 @@ export default function UangJajanPage() {
   const [history, setHistory] = useState<RiwayatTabunganRow[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
-  const [autoRules, setAutoRules] = useState<AutoRuleRow[]>([])
+  const [autoSetting, setAutoSetting] = useState<AutoSettingRow | null>(null)
   const [isAutoModalOpen, setIsAutoModalOpen] = useState(false)
-  const [ruleScope, setRuleScope] = useState<AutoRuleScope>('ASRAMA')
-  const [ruleKamar, setRuleKamar] = useState('')
-  const [ruleSantriId, setRuleSantriId] = useState('')
-  const [ruleNominal, setRuleNominal] = useState('10000')
-  const [ruleJam, setRuleJam] = useState('06:00')
-  const [ruleDays, setRuleDays] = useState<number[]>([1, 2, 3, 4, 5, 6])
-  const [ruleActive, setRuleActive] = useState(true)
+  const [settingMode, setSettingMode] = useState<AutoMode>('MANUAL')
+  const [settingJam, setSettingJam] = useState('06:00')
+  const [settingDays, setSettingDays] = useState<number[]>([1, 2, 3, 4, 5, 6])
+  const [settingActive, setSettingActive] = useState(true)
 
   const setDrafts = (val: SetStateAction<Record<string, number>>) => setDraftJajan(val)
 
@@ -161,13 +162,18 @@ export default function UangJajanPage() {
     getKamarsTabungan(asrama).then(res => {
       setKamars(res.kamars)
       setLoadingKamars(false)
-      setRuleKamar(res.kamars[0] ?? '')
     })
     getStatsTabungan(asrama).then(res => {
       setStats(res)
       setLoadingStats(false)
     })
-    getAutoRules(asrama).then(setAutoRules)
+    getAutoSetting(asrama).then(setting => {
+      setAutoSetting(setting)
+      setSettingMode(setting.mode)
+      setSettingJam(setting.jam)
+      setSettingDays(parseDaysValue(setting.days))
+      setSettingActive(Boolean(setting.is_active))
+    })
   }, [asrama])
 
   useEffect(() => {
@@ -212,7 +218,7 @@ export default function UangJajanPage() {
   const roomFeatureBlocked = isAsramaTanpaKamar(userAsrama ?? asrama)
   const listMode = searchText.trim() ? 'search' : 'kamar'
   const visibleSantri = listMode === 'search' ? searchRows : santriKamar
-  const allRuleSantriOptions = [...searchRows, ...santriKamar].filter((row, index, arr) => arr.findIndex(item => item.id === row.id) === index)
+  const isAutoMode = autoSetting?.mode === 'AUTO'
 
   const refreshAfterMutasi = (kamar?: string) => {
     const targetKamar = kamar || activeKamar
@@ -233,7 +239,13 @@ export default function UangJajanPage() {
       })
     }
     getStatsTabungan(asrama).then(setStats)
-    getAutoRules(asrama).then(setAutoRules)
+    getAutoSetting(asrama).then(setting => {
+      setAutoSetting(setting)
+      setSettingMode(setting.mode)
+      setSettingJam(setting.jam)
+      setSettingDays(parseDaysValue(setting.days))
+      setSettingActive(Boolean(setting.is_active))
+    })
   }
 
   const handleSelectJajan = (santriId: string, nominal: number, saldo: number) => {
@@ -242,6 +254,18 @@ export default function UangJajanPage() {
       if (prev[santriId] === nominal) { const n = { ...prev }; delete n[santriId]; return n }
       return { ...prev, [santriId]: nominal }
     })
+  }
+
+  const handleSaveAutoNominal = async (santri: SantriKamarRow, nominal: number) => {
+    if (!nominal) return toast.warning('Nominal auto tidak valid')
+    setSavingAutoSantri(prev => ({ ...prev, [santri.id]: true }))
+    const res = await saveSantriAutoNominal(santri.id, nominal, asrama)
+    setSavingAutoSantri(prev => ({ ...prev, [santri.id]: false }))
+    const error = getActionError(res)
+    if (error) return toast.error('Gagal', { description: error })
+    toast.success('Nominal auto tersimpan', { description: `${santri.nama_lengkap}: ${fmtRp(nominal)}` })
+    setAutoNominalInput(prev => { const n = { ...prev }; delete n[santri.id]; return n })
+    refreshAfterMutasi(santri.kamar ?? activeKamar)
   }
 
   const handleManualInput = (santriId: string, value: string, saldo: number) => {
@@ -278,8 +302,13 @@ export default function UangJajanPage() {
     }
   }
 
-  const openModal = async (santri: SantriKamarRow) => {
+  const openModal = async (santri: SantriKamarRow, intent: 'history' | 'topup' = 'history') => {
     setSelectedSantri(santri)
+    if (intent === 'topup') {
+      setWalletDompet('JAJAN')
+      setWalletJenis('MASUK')
+      setWalletNominal('')
+    }
     setIsModalOpen(true)
     setLoadingHistory(true)
     setHistory(await getRiwayatTabunganSantri(santri.id))
@@ -343,33 +372,40 @@ export default function UangJajanPage() {
     }
   }
 
-  const handleSkipToday = async (santri: SantriKamarRow) => {
-    if (!await confirm(`Lewati auto-potong hari ini untuk ${santri.nama_lengkap}?`)) return
-    const res = await skipAutoPotongToday(santri.id, 'Pulang / tidak membawa uang jajan')
+  const handleToggleSkipAuto = async (santri: SantriKamarRow) => {
+    const willExclude = !santri.auto_excluded
+    const label = willExclude ? 'Skip auto-potong' : 'Aktifkan auto-potong'
+    if (!await confirm(`${label} untuk ${santri.nama_lengkap}?`)) return
+    const res = await setSantriAutoExcluded(santri.id, willExclude, willExclude ? 'Pulang / tidak berada di pesantren' : 'Diaktifkan kembali oleh user')
     if ('error' in res) toast.error('Gagal', { description: res.error })
-    else toast.success('Auto-potong hari ini dilewati')
+    else {
+      toast.success(willExclude ? 'Santri masuk Skip Auto' : 'Auto santri aktif kembali')
+      refreshAfterMutasi(santri.kamar ?? activeKamar)
+    }
   }
 
-  const toggleRuleDay = (day: number) => {
-    setRuleDays(prev => prev.includes(day) ? prev.filter(item => item !== day) : [...prev, day])
+  const toggleSettingDay = (day: number) => {
+    setSettingDays(prev => prev.includes(day) ? prev.filter(item => item !== day) : [...prev, day])
   }
 
-  const handleSaveRule = async (e: FormEvent) => {
+  const handleSaveAutoSetting = async (e: FormEvent) => {
     e.preventDefault()
-    const res = await saveAutoRule({
-      scope_type: ruleScope,
+    const res = await saveAutoSetting({
       asrama,
-      kamar: ruleScope === 'KAMAR' ? ruleKamar : null,
-      santri_id: ruleScope === 'SANTRI' ? ruleSantriId : null,
-      nominal: parseNominal(ruleNominal),
-      jam: ruleJam,
-      days: ruleDays,
-      is_active: ruleActive,
+      mode: settingMode,
+      jam: settingJam,
+      days: settingDays,
+      is_active: settingActive,
     })
     if ('error' in res) toast.error('Gagal', { description: res.error })
     else {
-      toast.success('Rule auto-potong tersimpan')
-      getAutoRules(asrama).then(setAutoRules)
+      toast.success('Pengaturan auto tersimpan')
+      const setting = await getAutoSetting(asrama)
+      setAutoSetting(setting)
+      setSettingMode(setting.mode)
+      setSettingJam(setting.jam)
+      setSettingDays(parseDaysValue(setting.days))
+      setSettingActive(Boolean(setting.is_active))
     }
   }
 
@@ -511,13 +547,31 @@ export default function UangJajanPage() {
                         {fmtRp(finalSaldo)}
                       </p>
                       <p className="text-xs font-semibold text-blue-700">Tabungan {fmtRp(s.saldo_tabungan)}</p>
-                      <div className="mt-1 flex justify-end gap-2">
-                        <button onClick={() => handleSkipToday(s)} className="text-[10px] font-bold text-amber-600 hover:underline">
-                          Skip auto
+                      {isAutoMode && (
+                        <p className={`text-xs font-bold ${s.auto_excluded ? 'text-amber-600' : s.auto_nominal ? 'text-orange-600' : 'text-slate-400'}`}>
+                          {s.auto_excluded ? 'Skip Auto aktif' : s.auto_nominal ? `Auto ${fmtRp(s.auto_nominal)}` : 'Auto belum diatur'}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap justify-end gap-1.5">
+                        {isAutoMode && (
+                          <button
+                            onClick={() => handleToggleSkipAuto(s)}
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition-colors ${
+                              s.auto_excluded
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            }`}
+                          >
+                            <Ban className="h-3 w-3"/> {s.auto_excluded ? 'Aktifkan Auto' : 'Skip Auto'}
+                          </button>
+                        )}
+                        <button onClick={() => openModal(s, 'topup')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                          <Plus className="h-3 w-3"/> Isi Saldo
                         </button>
-                        <button onClick={() => openModal(s)}
-                          className="flex items-center justify-end gap-1 text-[10px] font-bold text-blue-600 hover:underline">
-                          <Plus className="h-3 w-3"/> Detail
+                        <button onClick={() => openModal(s, 'history')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100">
+                          <History className="h-3 w-3"/> Riwayat
                         </button>
                       </div>
                     </div>
@@ -537,10 +591,10 @@ export default function UangJajanPage() {
                       <>
                         <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
                           {JAJAN_OPTS.map(opt => (
-                            <button key={opt} onClick={() => handleSelectJajan(s.id, opt, s.saldo_jajan)}
-                              disabled={s.saldo_jajan < opt}
+                            <button key={opt} onClick={() => isAutoMode ? handleSaveAutoNominal(s, opt) : handleSelectJajan(s.id, opt, s.saldo_jajan)}
+                              disabled={savingAutoSantri[s.id] || (!isAutoMode && s.saldo_jajan < opt)}
                               className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
-                                draftVal === opt
+                                (isAutoMode ? s.auto_nominal === opt : draftVal === opt)
                                   ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
                                   : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
                               }`}>
@@ -555,6 +609,24 @@ export default function UangJajanPage() {
                       </>
                     )}
                   </div>
+                  {isAutoMode && !isManual && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        value={autoNominalInput[s.id] ?? ''}
+                        onChange={e => setAutoNominalInput(prev => ({ ...prev, [s.id]: e.target.value }))}
+                        inputMode="numeric"
+                        placeholder="Nominal auto custom..."
+                        className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      <button
+                        onClick={() => handleSaveAutoNominal(s, parseNominal(autoNominalInput[s.id] ?? ''))}
+                        disabled={savingAutoSantri[s.id] || !parseNominal(autoNominalInput[s.id] ?? '')}
+                        className="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white hover:bg-orange-700 disabled:opacity-40"
+                      >
+                        {savingAutoSantri[s.id] ? '...' : 'Set Auto'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -580,78 +652,67 @@ export default function UangJajanPage() {
 
       {isAutoModalOpen && (
         <div className="fixed inset-0 z-50 flex animate-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm fade-in">
-          <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b bg-slate-50 p-5">
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
                   <Settings className="h-5 w-5 text-emerald-700"/> Auto Potong Uang Jajan
                 </h3>
-                <p className="mt-1 text-sm text-slate-500">Atur rule massal, override santri, dan jadwal potong otomatis.</p>
+                <p className="mt-1 text-sm text-slate-500">Atur cara pakai, jadwal, dan status auto untuk asrama ini.</p>
               </div>
               <button onClick={() => setIsAutoModalOpen(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold text-slate-500 hover:bg-white hover:text-slate-800">
                 Tutup
               </button>
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
-              <form onSubmit={handleSaveRule} className="space-y-3 border-b p-5 lg:border-b-0 lg:border-r">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Cakupan</label>
-                    <select value={ruleScope} onChange={e => setRuleScope(e.target.value as AutoRuleScope)} className="w-full rounded-lg border px-2 py-2 text-sm">
-                      <option value="ASRAMA">Semua asrama</option>
-                      <option value="KAMAR">Per kamar</option>
-                      <option value="SANTRI">Override santri</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jam WIB</label>
-                    <input value={ruleJam} onChange={e => setRuleJam(e.target.value)} type="time" className="w-full rounded-lg border px-2 py-2 text-sm"/>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <form onSubmit={handleSaveAutoSetting} className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Cara pakai</label>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                    {(['MANUAL', 'AUTO'] as AutoMode[]).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setSettingMode(mode)}
+                        className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${
+                          settingMode === mode ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {ruleScope === 'KAMAR' && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Kamar</label>
-                    <select value={ruleKamar} onChange={e => setRuleKamar(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
-                      {kamars.map(kamar => <option key={kamar} value={kamar}>Kamar {kamar}</option>)}
-                    </select>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jam WIB</label>
+                    <input value={settingJam} onChange={e => setSettingJam(e.target.value)} type="time" className="w-full rounded-lg border px-2 py-2 text-sm"/>
                   </div>
-                )}
-
-                {ruleScope === 'SANTRI' && (
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Santri</label>
-                    <select value={ruleSantriId} onChange={e => setRuleSantriId(e.target.value)} className="w-full rounded-lg border px-2 py-2 text-sm">
-                      <option value="">Pilih dari daftar/search...</option>
-                      {allRuleSantriOptions.map(s => <option key={s.id} value={s.id}>{s.nama_lengkap} - {s.nis}</option>)}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Nominal</label>
-                  <input value={ruleNominal} onChange={e => setRuleNominal(e.target.value)} inputMode="numeric" placeholder="Nominal" className="w-full rounded-lg border px-2 py-2 text-sm"/>
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">
+                    <input type="checkbox" checked={settingActive} onChange={e => setSettingActive(e.target.checked)} />
+                    Auto aktif
+                  </label>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hari Aktif</label>
                   <div className="flex flex-wrap gap-1">
                     {DAY_OPTIONS.map(day => (
-                      <button key={day.value} type="button" onClick={() => toggleRuleDay(day.value)}
-                        className={`rounded-lg border px-2 py-1 text-xs font-bold ${ruleDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
+                      <button key={day.value} type="button" onClick={() => toggleSettingDay(day.value)}
+                        className={`rounded-lg border px-2 py-1 text-xs font-bold ${settingDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
                         {day.label}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 text-xs text-slate-600">
-                  <input type="checkbox" checked={ruleActive} onChange={e => setRuleActive(e.target.checked)} />
-                  Rule aktif
-                </label>
+                <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 text-xs text-orange-800">
+                  Nominal AUTO diatur per santri dari tombol nominal atau input custom pada kartu santri.
+                </div>
 
-                <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Simpan Rule</button>
+                <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Simpan Pengaturan</button>
                 <button
                   type="button"
                   onClick={async () => {
@@ -666,24 +727,7 @@ export default function UangJajanPage() {
                 </button>
               </form>
 
-              <div className="min-h-0 p-5">
-                <h4 className="mb-3 text-sm font-bold text-slate-700">Rule Aktif</h4>
-                <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
-                  {autoRules.length === 0 ? <p className="text-xs text-slate-400">Belum ada rule.</p> : autoRules.map(rule => (
-                    <div key={rule.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-xs">
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-700 whitespace-normal break-words leading-snug">
-                          {rule.scope_type === 'ASRAMA' ? 'Semua asrama' : rule.scope_type === 'KAMAR' ? `Kamar ${rule.kamar}` : rule.santri_nama}
-                        </p>
-                        <p className="text-slate-500">{fmtRp(rule.nominal)} · {rule.jam} · {describeDays(rule.days)}</p>
-                      </div>
-                      <button onClick={() => deleteAutoRule(rule.id).then(() => getAutoRules(asrama).then(setAutoRules))} className="p-1 text-slate-300 hover:text-red-500">
-                        <Trash2 className="h-4 w-4"/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                        
             </div>
           </div>
         </div>
@@ -793,8 +837,8 @@ export default function UangJajanPage() {
             </div>
 
             <div className="flex items-center justify-between border-t bg-slate-50 p-4">
-              <button onClick={() => selectedSantri && handleSkipToday(selectedSantri)} className="flex items-center gap-1 text-sm font-bold text-amber-600 hover:underline">
-                <Ban className="h-4 w-4"/> Skip auto hari ini
+              <button onClick={() => selectedSantri && handleToggleSkipAuto(selectedSantri)} className="flex items-center gap-1 text-sm font-bold text-amber-600 hover:underline">
+                <Ban className="h-4 w-4"/> {selectedSantri.auto_excluded ? 'Aktifkan auto' : 'Skip auto'}
               </button>
               <button onClick={() => setIsModalOpen(false)} className="text-sm font-bold text-slate-500 hover:text-slate-800">Tutup</button>
             </div>

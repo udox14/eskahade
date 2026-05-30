@@ -4,11 +4,14 @@
 
 ▲ Next.js 16.1.6 (Turbopack)
 - Local:         http://localhost:3000
-- Network:       http://10.180.151.67:3000
+- Network:       http://192.168.1.10:3000
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
 ⎔ Establishing remote connection...
-✓ Ready in 3.6s
+✓ Ready in 2.9s
+[layout] session null → redirect /login
+ GET /dashboard/asrama/uang-jajan 307 in 2.8s (compile: 2.6s, render: 180ms)
+ GET /login 200 in 110ms (compile: 56ms, render: 54ms)

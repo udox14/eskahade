@@ -9,14 +9,18 @@ export type AutoPotongResult = {
 
 type RuleRow = {
   id: string
-  scope_type: 'ASRAMA' | 'KAMAR' | 'SANTRI'
   asrama: string | null
-  kamar: string | null
   santri_id: string | null
   nominal: number
+  updated_at: string | null
+}
+
+type SettingRow = {
+  asrama: string
+  mode: 'MANUAL' | 'AUTO'
   jam: string
   days: string
-  updated_at: string | null
+  is_active: number
 }
 
 type SantriRow = {
@@ -73,18 +77,6 @@ function parseDays(days: string) {
   }
 }
 
-function rulePriority(rule: RuleRow) {
-  if (rule.scope_type === 'SANTRI') return 3
-  if (rule.scope_type === 'KAMAR') return 2
-  return 1
-}
-
-function ruleMatchesSantri(rule: RuleRow, santri: SantriRow) {
-  if (rule.scope_type === 'SANTRI') return rule.santri_id === santri.id
-  if (rule.scope_type === 'KAMAR') return rule.asrama === santri.asrama && rule.kamar === santri.kamar
-  return rule.scope_type === 'ASRAMA' && rule.asrama === santri.asrama
-}
-
 async function queryAll<T>(db: D1Database, sql: string, params: unknown[] = []) {
   const { results } = await db.prepare(sql).bind(...params).all<T>()
   return results ?? []
@@ -101,32 +93,56 @@ async function runBatch(db: D1Database, statements: Statement[]) {
 export async function runUangJajanAutoPotong(db: D1Database, now = new Date()): Promise<AutoPotongResult> {
   const wib = getWibSnapshot(now)
 
-  const rules = await queryAll<RuleRow>(
+  const settings = await queryAll<SettingRow>(
     db,
-    `SELECT id, scope_type, asrama, kamar, santri_id, nominal, jam, days, updated_at
-     FROM uang_jajan_auto_rule
-     WHERE is_active = 1 AND nominal > 0 AND jam <= ?
-     ORDER BY updated_at DESC, created_at DESC`,
+    `SELECT asrama, mode, jam, days, is_active
+     FROM uang_jajan_auto_setting
+     WHERE mode = 'AUTO' AND is_active = 1 AND jam <= ?`,
     [wib.time]
   )
 
-  const activeRules = rules
-    .filter(rule => parseDays(rule.days).includes(wib.day))
-    .sort((a, b) => rulePriority(b) - rulePriority(a) || String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')))
+  const activeSettings = settings.filter(setting => parseDays(setting.days).includes(wib.day))
+  const activeAsramas = new Set(activeSettings.map(setting => setting.asrama))
 
-  if (!activeRules.length) {
-    return { date: wib.date, checkedRules: rules.length, eligibleSantri: 0, skipped: 0, deducted: 0, totalNominal: 0 }
+  if (!activeAsramas.size) {
+    return { date: wib.date, checkedRules: 0, eligibleSantri: 0, skipped: 0, deducted: 0, totalNominal: 0 }
   }
 
+  const placeholders = Array.from(activeAsramas).map(() => '?').join(',')
   const santriRows = await queryAll<SantriRow>(
     db,
     `SELECT id, nama_lengkap, asrama, kamar, COALESCE(saldo_uang_jajan, 0) AS saldo_uang_jajan
      FROM santri
-     WHERE status_global = 'aktif' AND asrama IS NOT NULL AND asrama != 'AL-BAGHORY'`
+     WHERE status_global = 'aktif'
+       AND asrama IN (${placeholders})`,
+    Array.from(activeAsramas)
   )
 
+  const rules = await queryAll<RuleRow>(
+    db,
+    `SELECT id, asrama, santri_id, nominal, updated_at
+     FROM uang_jajan_auto_rule
+     WHERE is_active = 1
+       AND scope_type = 'SANTRI'
+       AND nominal > 0
+       AND asrama IN (${placeholders})
+     ORDER BY updated_at DESC, created_at DESC`,
+    Array.from(activeAsramas)
+  )
+  const ruleBySantri = new Map<string, RuleRow>()
+  for (const rule of rules) {
+    if (rule.santri_id && !ruleBySantri.has(rule.santri_id)) ruleBySantri.set(rule.santri_id, rule)
+  }
+
   const skips = new Set(
-    (await queryAll<SkipRow>(db, 'SELECT santri_id FROM uang_jajan_auto_skip WHERE skip_date = ?', [wib.date]))
+    (await queryAll<SkipRow>(
+      db,
+      `SELECT santri_id
+       FROM uang_jajan_auto_skip
+       WHERE (skip_date = ? OR skip_date = 'PERMANENT')
+         AND COALESCE(is_active, 1) = 1`,
+      [wib.date]
+    ))
       .map(row => row.santri_id)
   )
   const existingLogs = new Set(
@@ -146,7 +162,7 @@ export async function runUangJajanAutoPotong(db: D1Database, now = new Date()): 
   const nowIso = now.toISOString()
 
   for (const santri of santriRows) {
-    const rule = activeRules.find(item => ruleMatchesSantri(item, santri))
+    const rule = ruleBySantri.get(santri.id)
     if (!rule) continue
     eligibleSantri += 1
 
