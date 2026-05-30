@@ -1220,9 +1220,11 @@ async function parseAbsensiGuruWorkbook(file: File, selectedDate: string) {
       const kelasName = cleanCellText(readCell(sheet, row, identity.kelasCol, XLSX))
       const guruName = cleanCellText(readCell(sheet, row, identity.guruCol, XLSX))
       const waktu = identity.waktuCol != null ? cleanCellText(readCell(sheet, row, identity.waktuCol, XLSX)) : ''
+      const allowedSessions = sessionsFromWaktu(waktu)
       if (!kelasName || !guruName) continue
 
       sourceColumns.forEach(column => {
+        if (!allowedSessions.has(column.session)) return
         const status = normalizeExcelStatus(readCell(sheet, row, column.col, XLSX))
         if (!status) return
         cells.push({
@@ -1339,6 +1341,24 @@ function normalizeExcelStatus(value: unknown): 'H' | 'A' | 'B' | 'L' | null {
   if (text === 'B') return 'B'
   if (text === 'L') return 'L'
   return null
+}
+
+function sessionsFromWaktu(value: unknown) {
+  const text = normalizeHeader(value)
+    .replace(/subuh/g, 'shubuh')
+    .replace(/maghrib/g, 'malam')
+  const sessions = new Set<SessionType>()
+
+  if (!text || text.includes('semua')) {
+    SESSIONS.forEach(session => sessions.add(session))
+    return sessions
+  }
+  if (text.includes('shubuh')) sessions.add('shubuh')
+  if (text.includes('ashar')) sessions.add('ashar')
+  if (text.includes('malam')) sessions.add('maghrib')
+
+  if (sessions.size === 0) SESSIONS.forEach(session => sessions.add(session))
+  return sessions
 }
 
 function detectSheetPeriod(
