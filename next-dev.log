@@ -44,3 +44,8 @@
  POST /dashboard/master/wali-kelas 200 in 1934ms (compile: 15ms, render: 1920ms)
 ✓ Compiled in 392ms
  GET /api/version 200 in 19ms (compile: 6ms, render: 13ms)
+ GET /api/version 200 in 12ms (compile: 4ms, render: 7ms)
+ GET /api/version 200 in 65ms (compile: 23ms, render: 42ms)
+ GET /api/version 200 in 22ms (compile: 8ms, render: 14ms)
+ GET /api/version 200 in 12ms (compile: 4ms, render: 8ms)
+ GET /api/version 200 in 10ms (compile: 4ms, render: 7ms)

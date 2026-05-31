@@ -37,6 +37,7 @@ export default async function SantriDetailPage({ params }: Props) {
 
   const canUpdateSantri = await canCrud('/dashboard/santri', 'update')
   const isReadOnly = hasRole(session, 'pengurus_asrama') || !canUpdateSantri
+  const isAdmin = hasRole(session, 'admin')
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
@@ -62,6 +63,7 @@ export default async function SantriDetailPage({ params }: Props) {
           santriId={id}
           santri={santri}
           isReadOnly={isReadOnly}
+          isAdmin={isAdmin}
         />
       </Suspense>
     </div>

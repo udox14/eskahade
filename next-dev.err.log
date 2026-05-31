@@ -13,3 +13,17 @@ Error: Failed to start the remote proxy session. Error reloading remote server: 
     at ignore-listed frames {
   [cause]: [Object]
 }
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\DATA\\eskahade\\.wrangler\\tmp\\bundle-M13LgC\\middleware-loader.entry.ts"[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\DATA\\eskahade\\.wrangler\\tmp\\bundle-cAMY9I\\middleware-loader.entry.ts"[0m
+  
+  
+
+
