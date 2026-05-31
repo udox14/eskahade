@@ -21,3 +21,26 @@
 ✓ Compiled in 376ms
 ✓ Compiled in 334ms
 ✓ Compiled in 319ms
+ GET / 200 in 721ms (compile: 343ms, render: 378ms)
+ GET / 200 in 832ms (compile: 499ms, render: 332ms)
+ GET /api/version 200 in 2.2s (compile: 2.2s, render: 22ms)
+ GET /login 200 in 370ms (compile: 318ms, render: 52ms)
+[LOGIN] Step 1: email= udox@***
+⎔ Establishing remote connection...
+[LOGIN] Step 2: user found= true role= admin
+[LOGIN] Step 3: hash preview= 265ae2b4db
+[LOGIN] Step 3: password valid= true
+[LOGIN] Step 4: setting session for roles= [ 'admin' ]
+[LOGIN] Step 4: session set OK
+[LOGIN] Step 5: redirecting to /dashboard
+[layout] session OK, roles: [ 'admin', 'jabatan:anggota', 'admin:anggota' ] id: 2b4d47cd
+[layout] userRoles: [ 'admin' ]
+[layout] fiturAkses count: 86
+ GET /dashboard 200 in 6.8s (compile: 431ms, render: 6.4s)
+ POST /login 303 in 25.4s (compile: 8ms, render: 25.3s)
+ GET /dashboard/master/wali-kelas 200 in 1549ms (compile: 798ms, render: 751ms)
+ POST /dashboard/master/wali-kelas 200 in 5.7s (compile: 5ms, render: 5.7s)
+ POST /dashboard/master/wali-kelas 200 in 956ms (compile: 5ms, render: 951ms)
+ POST /dashboard/master/wali-kelas 200 in 1934ms (compile: 15ms, render: 1920ms)
+✓ Compiled in 392ms
+ GET /api/version 200 in 19ms (compile: 6ms, render: 13ms)

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays } from 'lucide-react'
+import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -13,6 +13,7 @@ type SessionKey = 's' | 'a' | 'm'
 type WeeklySessionKey = 'shubuh' | 'ashar' | 'maghrib'
 type WeeklyMap = Record<WeeklySessionKey, Record<number, string>>
 type GabunganMap = Record<WeeklySessionKey, { groupKey: string; tempat: string }>
+type ScheduleModalTab = 'gabungan' | 'override'
 
 const HARI_LIST = [
   { index: 1, label: 'Senin' },
@@ -83,6 +84,7 @@ export default function ManajemenGuruPage() {
   const [waliUserList, setWaliUserList] = useState<any[]>([])
   const [selectedMarhalah, setSelectedMarhalah] = useState('')
   const [jadwalLoaded, setJadwalLoaded] = useState(false)
+  const [scheduleModal, setScheduleModal] = useState<{ kelasId: string; tab: ScheduleModalTab } | null>(null)
 
   const [guruList, setGuruList] = useState<any[]>([])
   const [page, setPage] = useState(1)
@@ -368,6 +370,17 @@ export default function ManajemenGuruPage() {
     : guruList, [guruList, guruSearch])
 
   const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
+  const activeScheduleClass = useMemo(
+    () => scheduleModal ? localKelasList.find(k => k.id === scheduleModal.kelasId) : null,
+    [localKelasList, scheduleModal]
+  )
+  const countGabunganFilled = (k: any) => SESSION_META.filter(session => {
+    const item = k.gabungan?.[session.serverKey]
+    return String(item?.groupKey || '').trim() || String(item?.tempat || '').trim()
+  }).length
+  const countOverrideFilled = (k: any) => SESSION_META.reduce((total, session) => (
+    total + HARI_LIST.filter(day => !isStructuralLibur(day.index, session.serverKey) && k.weekly?.[session.serverKey]?.[day.index]).length
+  ), 0)
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -499,8 +512,95 @@ export default function ManajemenGuruPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 px-4 py-4">
-                  <div className="mb-3">
+                <div className="border-t border-slate-100 px-4 py-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModal({ kelasId: k.id, tab: 'gabungan' })}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <UsersRound className="h-4 w-4 shrink-0 text-indigo-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-800">Kelas Gabungan</span>
+                          <span className="block truncate text-xs text-slate-500">{countGabunganFilled(k)} sesi terisi</span>
+                        </span>
+                      </span>
+                      <Settings2 className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModal({ kelasId: k.id, tab: 'override' })}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <CalendarDays className="h-4 w-4 shrink-0 text-indigo-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-800">Override Harian</span>
+                          <span className="block truncate text-xs text-slate-500">{countOverrideFilled(k)} sel diubah</span>
+                        </span>
+                      </span>
+                      <Settings2 className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {scheduleModal && activeScheduleClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">{activeScheduleClass.marhalah_nama || 'Tanpa tingkat'}</p>
+                <h3 className="truncate text-lg font-black text-slate-900">{activeScheduleClass.nama_kelas}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModal(null)}
+                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                title="Tutup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="border-b border-slate-100 px-5 pt-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModal(prev => prev ? { ...prev, tab: 'gabungan' } : prev)}
+                  className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2 text-sm font-bold ${
+                    scheduleModal.tab === 'gabungan'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  <UsersRound className="h-4 w-4" />
+                  Kelas Gabungan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModal(prev => prev ? { ...prev, tab: 'override' } : prev)}
+                  className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2 text-sm font-bold ${
+                    scheduleModal.tab === 'override'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Override Harian
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              {scheduleModal.tab === 'gabungan' ? (
+                <div className="space-y-4">
+                  <div>
                     <p className="text-sm font-bold text-slate-700">Kelas Gabungan per Sesi</p>
                     <p className="text-xs text-slate-500">Isi kode yang sama pada beberapa kelas jika kelas itu digabung pada sesi tertentu. Jadwal gabungan mengikuti kelas pertama dalam kelompok.</p>
                   </div>
@@ -509,14 +609,14 @@ export default function ManajemenGuruPage() {
                       <div key={session.serverKey} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                         <div className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{session.label}</div>
                         <input
-                          value={k.gabungan?.[session.serverKey]?.groupKey || ''}
-                          onChange={e => handleChangeGabungan(k.id, session.serverKey, 'groupKey', e.target.value)}
+                          value={activeScheduleClass.gabungan?.[session.serverKey]?.groupKey || ''}
+                          onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'groupKey', e.target.value)}
                           placeholder="Kode gabungan"
                           className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                         <input
-                          value={k.gabungan?.[session.serverKey]?.tempat || ''}
-                          onChange={e => handleChangeGabungan(k.id, session.serverKey, 'tempat', e.target.value)}
+                          value={activeScheduleClass.gabungan?.[session.serverKey]?.tempat || ''}
+                          onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'tempat', e.target.value)}
                           placeholder="Tempat"
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                         />
@@ -524,9 +624,9 @@ export default function ManajemenGuruPage() {
                     ))}
                   </div>
                 </div>
-
-                <div className="border-t border-slate-100 px-4 py-4">
-                  <div className="mb-3">
+              ) : (
+                <div className="space-y-4">
+                  <div>
                     <p className="text-sm font-bold text-slate-700">Override Harian</p>
                     <p className="text-xs text-slate-500">Kosongkan sel untuk memakai guru default sesi. Sel abu-abu berarti sesi itu memang libur pengajian.</p>
                   </div>
@@ -551,15 +651,15 @@ export default function ManajemenGuruPage() {
                                 <td key={`${session.serverKey}-${day.index}`} className="border-b border-slate-100 px-2 py-2">
                                   <select
                                     disabled={disabled}
-                                    value={k.weekly[session.serverKey]?.[day.index] || ''}
-                                    onChange={e => handleChangeWeekly(k.id, session.serverKey, day.index, e.target.value)}
+                                    value={activeScheduleClass.weekly[session.serverKey]?.[day.index] || ''}
+                                    onChange={e => handleChangeWeekly(activeScheduleClass.id, session.serverKey, day.index, e.target.value)}
                                     className={`w-full rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 ${
                                       disabled
                                         ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
                                         : 'border-slate-200 bg-white focus:ring-indigo-500'
                                     }`}
                                   >
-                                    <option value="">{disabled ? 'Libur' : 'Gunakan default'}</option>
+                                    <option value="">{disabled ? 'Libur' : 'Default'}</option>
                                     {!disabled && filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                                   </select>
                                 </td>
@@ -571,8 +671,8 @@ export default function ManajemenGuruPage() {
                     </table>
                   </div>
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
         </div>
       )}
