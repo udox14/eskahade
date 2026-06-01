@@ -5,11 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   Download,
+  Edit3,
   Eye,
   FileSpreadsheet,
   Filter,
   Loader2,
   Plus,
+  Save,
+  Search,
   Settings,
   Shirt,
   Trash2,
@@ -33,6 +36,7 @@ import {
   simpanLayananSantri,
   tambahMasterJasa,
   tambahMasterJasaBatch,
+  updateMasterJasa,
 } from "./actions";
 
 type TabKey = "plotting" | "sebaran";
@@ -81,7 +85,11 @@ type LayananField = "tempat_makan_id" | "tempat_mencuci_id";
 const DEFAULT_PAGE_SIZE = 20;
 const DETAIL_PAGE_SIZE = 20;
 
-export default function LayananAsramaPage() {
+export default function LayananAsramaPage({
+  canManageMasterJasa,
+}: {
+  canManageMasterJasa: boolean;
+}) {
   const confirm = useConfirm();
 
   const [activeTab, setActiveTab] = useState<TabKey>("plotting");
@@ -93,11 +101,13 @@ export default function LayananAsramaPage() {
   const [selectedKamar, setSelectedKamar] = useState<string>("");
   const [belumDitempatkan, setBelumDitempatkan] = useState<boolean>(false);
   const [santriBaruOnly, setSantriBaruOnly] = useState<boolean>(false);
+  const [searchSantri, setSearchSantri] = useState("");
 
   const [masterJasa, setMasterJasa] = useState<MasterJasaRow[]>([]);
   const [showModalJasa, setShowModalJasa] = useState(false);
   const [inputNamaJasa, setInputNamaJasa] = useState("");
   const [inputJenisJasa, setInputJenisJasa] = useState<"Makan" | "Cuci">("Makan");
+  const [editingJasa, setEditingJasa] = useState<MasterJasaRow | null>(null);
   const [isSubmittingJasa, setIsSubmittingJasa] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -155,12 +165,12 @@ export default function LayananAsramaPage() {
   useEffect(() => {
     if (!selectedAsrama) return;
     loadSantriPage(page, getEffectivePageSize(pageSize, totalSantri));
-  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly, page, pageSize]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly, searchSantri, page, pageSize]);
 
   useEffect(() => {
     if (!selectedAsrama) return;
     loadSebaran();
-  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly, searchSantri]);
 
   useEffect(() => {
     setDetailModal(null);
@@ -168,7 +178,7 @@ export default function LayananAsramaPage() {
     setDetailPage(1);
     setDetailHasMore(false);
     setDetailTotal(0);
-  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly]);
+  }, [selectedAsrama, selectedKamar, belumDitempatkan, santriBaruOnly, searchSantri]);
 
   useEffect(() => {
     if (!detailModal || !detailHasMore || detailLoading) return;
@@ -197,6 +207,7 @@ export default function LayananAsramaPage() {
         kamar: selectedKamar,
         belumDitempatkan,
         santriBaruOnly,
+        search: searchSantri,
         page: targetPage,
         limit: targetPageSize,
       });
@@ -224,6 +235,7 @@ export default function LayananAsramaPage() {
         kamar: selectedKamar,
         belumDitempatkan,
         santriBaruOnly,
+        search: searchSantri,
       });
 
       setSebaranMakan((res.makan || []) as SebaranRow[]);
@@ -249,6 +261,7 @@ export default function LayananAsramaPage() {
         kamar: selectedKamar,
         belumDitempatkan,
         santriBaruOnly,
+        search: searchSantri,
         jenis: modal.jenis,
         jasaId: modal.jasaId,
         page: targetPage,
@@ -324,11 +337,16 @@ export default function LayananAsramaPage() {
 
     setIsSubmittingJasa(true);
     try {
-      await tambahMasterJasa(inputNamaJasa, inputJenisJasa);
+      const result = editingJasa
+        ? await updateMasterJasa(editingJasa.id, inputNamaJasa, inputJenisJasa)
+        : await tambahMasterJasa(inputNamaJasa, inputJenisJasa);
+      if ("error" in result) throw new Error(result.error);
       const freshMaster = await getMasterJasa();
       setMasterJasa(freshMaster as MasterJasaRow[]);
       setInputNamaJasa("");
-      setToastMsg("Penyedia jasa berhasil ditambahkan.");
+      setInputJenisJasa("Makan");
+      setEditingJasa(null);
+      setToastMsg(editingJasa ? "Penyedia jasa berhasil diperbarui." : "Penyedia jasa berhasil ditambahkan.");
       setTimeout(() => setToastMsg(""), 3000);
     } catch (error) {
       console.error(error);
@@ -336,6 +354,18 @@ export default function LayananAsramaPage() {
     } finally {
       setIsSubmittingJasa(false);
     }
+  };
+
+  const startEditJasa = (jasa: MasterJasaRow) => {
+    setEditingJasa(jasa);
+    setInputNamaJasa(jasa.nama_jasa);
+    setInputJenisJasa(jasa.jenis);
+  };
+
+  const resetFormJasa = () => {
+    setEditingJasa(null);
+    setInputNamaJasa("");
+    setInputJenisJasa("Makan");
   };
 
   const downloadTemplateExcel = async () => {
@@ -372,7 +402,7 @@ export default function LayananAsramaPage() {
 
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
       const dataBatch: { nama_jasa: string; jenis: string }[] = [];
 
       jsonData.forEach((row) => {
@@ -433,26 +463,26 @@ export default function LayananAsramaPage() {
   const isAnyFieldSaving = Object.keys(savingFields).length > 0;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 pb-24">
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
       <DashboardPageHeader
         title="Katering & Laundry"
         description="Pemetaan layanan makan dan laundry santri, lengkap dengan sebaran per penyedia."
-        action={
+        action={canManageMasterJasa ? (
           <button
             onClick={() => setShowModalJasa(true)}
-            className="flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-lg hover:bg-slate-700 transition"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
           >
             <Settings className="w-4 h-4" />
-            <span className="font-semibold text-sm">Penyedia Jasa</span>
+            <span>Penyedia Jasa</span>
           </button>
-        }
+        ) : undefined}
       />
 
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-[1fr_1fr_1.2fr] xl:grid-cols-[1fr_1fr_1.4fr_auto_auto]">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pilih Asrama</label>
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">Asrama</label>
           <select
-            className="w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-2 focus:ring-emerald-500 disabled:opacity-70"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:opacity-70"
             value={selectedAsrama}
             onChange={(e) => {
               setSelectedKamar("");
@@ -476,9 +506,9 @@ export default function LayananAsramaPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pilih Kamar</label>
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">Kamar</label>
           <select
-            className="w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:opacity-50"
             value={selectedKamar}
             onChange={(e) => {
               setPage(1);
@@ -495,53 +525,54 @@ export default function LayananAsramaPage() {
           </select>
         </div>
 
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-200 w-full transition">
+        <div>
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">Cari Santri</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchSantri}
+              onChange={(e) => {
+                setSearchSantri(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Nama atau NIS"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-end">
+          <label className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-600 transition hover:bg-white">
             <input
               type="checkbox"
-              className="w-5 h-5 text-emerald-600 rounded"
+              className="h-4 w-4 rounded text-emerald-600"
               checked={belumDitempatkan}
               onChange={(e) => {
                 setPage(1);
                 setBelumDitempatkan(e.target.checked);
               }}
             />
-            <span className="text-sm font-medium text-slate-700">Tampilkan yang belum ditempatkan</span>
+            <span>Belum ditempatkan</span>
           </label>
         </div>
 
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-indigo-50 rounded-lg border border-transparent hover:border-indigo-200 w-full transition">
+        <div className="flex items-end">
+          <label className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-600 transition hover:bg-white">
             <input
               type="checkbox"
-              className="w-5 h-5 text-indigo-600 rounded"
+              className="h-4 w-4 rounded text-indigo-600"
               checked={santriBaruOnly}
               onChange={(e) => {
                 setPage(1);
                 setSantriBaruOnly(e.target.checked);
               }}
             />
-            <span className="text-sm font-medium text-slate-700">Santri BARU saja</span>
+            <span>Santri baru</span>
           </label>
         </div>
       </div>
 
-      {selectedAsrama && (
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 text-sm text-emerald-800">
-          Data layanan dibaca langsung dari tabel <span className="font-semibold">santri</span> aktif pada asrama{" "}
-          <span className="font-semibold">{selectedAsrama}</span>
-          {selectedKamar ? (
-            <>
-              {" "}
-              kamar <span className="font-semibold">{selectedKamar}</span>
-            </>
-          ) : null}
-          . Sebaran menghitung relasi ke kolom <span className="font-semibold">tempat_makan_id</span> dan{" "}
-          <span className="font-semibold">tempat_mencuci_id</span>.
-        </div>
-      )}
-
-      <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 w-full md:w-fit">
+      <div className="flex w-full gap-1 rounded-xl bg-slate-100 p-1 md:w-fit">
         <button
           onClick={() => setActiveTab("plotting")}
           className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
@@ -569,7 +600,7 @@ export default function LayananAsramaPage() {
         </div>
       ) : activeTab === "plotting" ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <SummaryCard
               title="Total Santri Terfilter"
               value={totalSantri}
@@ -784,8 +815,8 @@ export default function LayananAsramaPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <SebaranSection
               title="Sebaran Katering"
               icon={<Utensils className="w-5 h-5 text-amber-600" />}
@@ -820,7 +851,7 @@ export default function LayananAsramaPage() {
         </div>
       )}
 
-      {showModalJasa && (
+      {showModalJasa && canManageMasterJasa && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
             <div className="p-5 border-b border-slate-100 flex justify-between items-center rounded-t-2xl">
@@ -829,7 +860,10 @@ export default function LayananAsramaPage() {
                 <p className="text-sm text-slate-500">Kelola daftar tempat makan dan mencuci.</p>
               </div>
               <button
-                onClick={() => setShowModalJasa(false)}
+                onClick={() => {
+                  setShowModalJasa(false);
+                  resetFormJasa();
+                }}
                 className="text-slate-400 hover:text-rose-500 transition p-2 rounded-full hover:bg-rose-50"
               >
                 <X className="w-6 h-6" />
@@ -840,8 +874,12 @@ export default function LayananAsramaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-emerald-600" />
-                    Input Manual
+                    {editingJasa ? (
+                      <Edit3 className="w-4 h-4 text-indigo-600" />
+                    ) : (
+                      <Plus className="w-4 h-4 text-emerald-600" />
+                    )}
+                    {editingJasa ? "Edit Penyedia" : "Input Manual"}
                   </h3>
                   <form onSubmit={handleTambahCepat} className="space-y-3">
                     <input
@@ -853,9 +891,10 @@ export default function LayananAsramaPage() {
                       required
                     />
                     <select
-                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-slate-100 disabled:text-slate-400"
                       value={inputJenisJasa}
                       onChange={(e) => setInputJenisJasa(e.target.value as "Makan" | "Cuci")}
+                      disabled={!!editingJasa}
                     >
                       <option value="Makan">Jasa Katering / Makan</option>
                       <option value="Cuci">Jasa Laundry / Cuci</option>
@@ -865,8 +904,24 @@ export default function LayananAsramaPage() {
                       disabled={isSubmittingJasa}
                       className="w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition disabled:opacity-50 flex justify-center items-center"
                     >
-                      {isSubmittingJasa ? <Loader2 className="w-4 h-4 animate-spin" /> : "Simpan Data"}
+                      {isSubmittingJasa ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          {editingJasa ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                          {editingJasa ? "Simpan Perubahan" : "Simpan Data"}
+                        </span>
+                      )}
                     </button>
+                    {editingJasa ? (
+                      <button
+                        type="button"
+                        onClick={resetFormJasa}
+                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Batal Edit
+                      </button>
+                    ) : null}
                   </form>
                 </div>
 
@@ -941,13 +996,22 @@ export default function LayananAsramaPage() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleHapusJasa(jasa.id)}
-                        className="text-slate-300 hover:text-rose-500 p-2 hover:bg-rose-50 rounded-md transition"
-                        title="Hapus Data"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEditJasa(jasa)}
+                          className="rounded-md p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                          title="Edit Data"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleHapusJasa(jasa.id)}
+                          className="text-slate-300 hover:text-rose-500 p-2 hover:bg-rose-50 rounded-md transition"
+                          title="Hapus Data"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1029,14 +1093,14 @@ function SummaryCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-500">{title}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-2">{value}</p>
-          <p className="text-xs text-slate-400 mt-2">{subtitle}</p>
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-slate-400">{title}</p>
+          <p className="mt-1 text-2xl font-black text-slate-800">{value}</p>
+          <p className="mt-1 truncate text-[11px] text-slate-400">{subtitle}</p>
         </div>
-        <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-slate-50">
           {icon}
         </div>
       </div>
@@ -1078,46 +1142,44 @@ function SebaranSection({
       : "bg-sky-50 border-sky-100 text-sky-700";
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`w-11 h-11 rounded-xl border flex items-center justify-center ${tone}`}>{icon}</div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-            <p className="text-sm text-slate-500">Klik penyedia untuk melihat daftar santri.</p>
+    <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${tone}`}>{icon}</div>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-black uppercase tracking-wide text-slate-800">{title}</h3>
+            <p className="text-xs text-slate-500">Klik penyedia untuk melihat santri.</p>
           </div>
         </div>
-        <span className="text-xs font-semibold text-slate-400">{rows.length} penyedia</span>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
+          {rows.length}
+        </span>
       </div>
 
-      <div className="p-4 space-y-3 bg-slate-50/50 min-h-[240px]">
+      <div className="min-h-40 divide-y bg-white">
         {isLoading ? (
-          <div className="py-16 text-center">
+          <div className="py-12 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto" />
           </div>
         ) : rows.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 font-medium">Belum ada data sebaran.</div>
+          <div className="py-12 text-center text-sm font-medium text-slate-400">Belum ada data sebaran.</div>
         ) : (
           rows.map((row) => (
-            <div key={`${title}-${row.jasa_id ?? "null"}`} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-bold text-slate-800">{row.nama_jasa}</p>
-                  <p className="text-sm text-slate-500 mt-1">{row.total} santri terhubung</p>
+            <button
+              key={`${title}-${row.jasa_id ?? "null"}`}
+              type="button"
+              onClick={() => onOpen(row)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-800">{row.nama_jasa}</p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                  <span>{row.total} santri</span>
+                  <span className={`rounded-full border px-2 py-0.5 font-bold ${tone}`}>{row.total}</span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${tone}`}>{row.total}</span>
               </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={() => onOpen(row)}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  <Eye className="w-4 h-4" />
-                  Lihat Santri
-                </button>
-              </div>
-            </div>
+              <Eye className="h-4 w-4 shrink-0 text-slate-400" />
+            </button>
           ))
         )}
       </div>
