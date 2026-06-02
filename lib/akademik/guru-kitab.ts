@@ -46,14 +46,14 @@ export type GuruKitabResolvedRow = {
 
 const DEFAULT_MAPEL: Record<'ibtidaiyyah' | 'mutawassithah', Record<GuruKitabSession, string[]>> = {
   ibtidaiyyah: {
-    maghrib: ['nahwu', 'sharaf'],
-    ashar: ['fikih', 'akidah', 'bahasa arab'],
-    shubuh: ['al-quran', 'hadits', 'tarikh'],
+    maghrib: ['Nahwu', 'Sharaf'],
+    ashar: ['Fikih', 'Akidah', 'Bahasa Arab'],
+    shubuh: ['Al-Quran', 'Hadits', 'Tarikh'],
   },
   mutawassithah: {
-    maghrib: ['nahwu', 'balaghah', 'bahasa arab'],
-    ashar: ['fikih', 'akidah', 'akhlak'],
-    shubuh: ['al-quran', 'hadits'],
+    maghrib: ['Nahwu', 'Balaghah', 'Bahasa Arab'],
+    ashar: ['Fikih', 'Akidah', 'Akhlak'],
+    shubuh: ['Al-Quran', 'Hadits'],
   },
 }
 
@@ -108,24 +108,39 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/['`]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\bal\s+qur\s*an\b/g, 'al quran')
+    .replace(/\bal\s+quran\b/g, 'al quran')
+    .replace(/\bqur\s*an\b/g, 'al quran')
+    .replace(/\bquran\b/g, 'al quran')
     .replace(/\bshorof\b/g, 'sharaf')
     .replace(/\bshorf\b/g, 'sharaf')
     .replace(/\bfiqih\b/g, 'fikih')
     .replace(/\baqidah\b/g, 'akidah')
-    .replace(/\bquran\b/g, 'al quran')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
 function mapelKey(value: string) {
-  return normalizeText(value).replace(/\s+/g, '-')
+  const normalized = normalizeText(value)
+  const aliases: Record<string, string> = {
+    'al quran': 'al-quran',
+    'alquran': 'al-quran',
+    'bahasa arab': 'bahasa-arab',
+    shorof: 'sharaf',
+    sharaf: 'sharaf',
+    fiqih: 'fikih',
+    fikih: 'fikih',
+    aqidah: 'akidah',
+    akidah: 'akidah',
+  }
+  return aliases[normalized] || normalized.replace(/\s+/g, '-')
 }
 
 export function getDefaultMapelKeys(marhalahName: string, sesi: GuruKitabSession) {
   const normalized = normalizeText(marhalahName)
   if (normalized.includes('tamhidiyah') || normalized.includes('tamhidiyyah')) return []
-  if (normalized.includes('ibtidaiyyah') || normalized.includes('ibtidaiyah')) return DEFAULT_MAPEL.ibtidaiyyah[sesi]
-  if (normalized.includes('mutawassithah') || normalized.includes('mutawasit')) return DEFAULT_MAPEL.mutawassithah[sesi]
+  if (normalized.includes('ibtidaiyyah') || normalized.includes('ibtidaiyah')) return DEFAULT_MAPEL.ibtidaiyyah[sesi].map(mapelKey)
+  if (normalized.includes('mutawassithah') || normalized.includes('mutawasit')) return DEFAULT_MAPEL.mutawassithah[sesi].map(mapelKey)
   return []
 }
 
