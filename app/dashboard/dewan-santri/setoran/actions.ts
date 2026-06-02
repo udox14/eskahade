@@ -34,7 +34,7 @@ export async function getSppBillingStart() {
   const row = await queryOne<{ value: string }>(
     `SELECT value FROM app_settings WHERE key = 'spp_tagihan_mulai'`
   )
-  const value = row?.value ?? '2026-01'
+  const value = row?.value ?? '2026-06'
   const [tahunMulai, bulanMulai] = value.split('-').map(Number)
   return {
     tahun: Number.isFinite(tahunMulai) ? tahunMulai : 2026,
@@ -169,20 +169,47 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     [tahun, bulan]
   )
   const setoranMap = new Map(setoranRows.map(r => [r.effective_unit_setor || '', r]))
+  const historisPaidRows = await query<{
+    unit_setor: string
+    jumlah_bayar: number
+    total_nominal: number
+  }>(
+    `SELECT
+        CASE
+          WHEN s.kategori_santri = ? THEN ?
+          ELSE COALESCE(s.asrama, 'LAINNYA')
+        END AS unit_setor,
+        COUNT(*) AS jumlah_bayar,
+        COALESCE(SUM(th.nominal_tagihan), 0) AS total_nominal
+     FROM spp_tunggakan_historis th
+     JOIN santri s ON s.id = th.santri_id
+     WHERE th.status = 'LUNAS'
+       AND th.tanggal_lunas IS NOT NULL
+       AND CAST(strftime('%Y', th.tanggal_lunas) AS INTEGER) = ?
+       AND CAST(strftime('%m', th.tanggal_lunas) AS INTEGER) = ?
+       AND s.status_global = 'aktif'
+       ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
+     GROUP BY unit_setor`,
+    [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan]
+  )
+  const historisPaidMap = new Map(historisPaidRows.map(r => [r.unit_setor, r]))
 
   return baseRows.map(r => {
     const setoran = setoranMap.get(r.unit_setor)
+    const historisPaid = historisPaidMap.get(r.unit_setor)
     const penunggak = isBeforeBillingStart ? 0 : Math.max(0, r.wajib_bayar - r.bayar_bulan_ini)
     const persentase = isBeforeBillingStart || r.wajib_bayar <= 0 ? 0 : Math.round((r.bayar_bulan_ini / r.wajib_bayar) * 100)
+    const bayarTunggakan = (isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu) + (historisPaid?.jumlah_bayar ?? 0)
+    const totalNominal = (isBeforeBillingStart ? 0 : r.total_nominal) + (historisPaid?.total_nominal ?? 0)
     return {
       unit_setor: r.unit_setor,
       total_santri: r.total_santri,
       bebas_spp: r.bebas_spp,
       wajib_bayar: isBeforeBillingStart ? 0 : r.wajib_bayar,
       bayar_bulan_ini: isBeforeBillingStart ? 0 : r.bayar_bulan_ini,
-      bayar_tunggakan_lalu: isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu,
+      bayar_tunggakan_lalu: bayarTunggakan,
       penunggak,
-      total_nominal: isBeforeBillingStart ? 0 : r.total_nominal,
+      total_nominal: totalNominal,
       persentase,
       tanggal_setor: setoran?.tanggal_terima ?? null,
       nama_penyetor: setoran?.nama_penyetor ?? null,

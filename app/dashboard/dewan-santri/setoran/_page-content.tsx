@@ -43,8 +43,8 @@ export default function MonitoringSetoranPage() {
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [userAsrama, setUserAsrama] = useState<string | null>(null)
-  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 1, value: '2026-01' })
-  const [billingStartInput, setBillingStartInput] = useState('2026-01')
+  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 6, value: '2026-06' })
+  const [billingStartInput, setBillingStartInput] = useState('2026-06')
   const [savingBillingStart, setSavingBillingStart] = useState(false)
   const [tahunAjaranNama, setTahunAjaranNama] = useState<string | null>(null)
   

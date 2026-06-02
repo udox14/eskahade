@@ -25,6 +25,12 @@ interface SuratProps {
   dataTunggakan?: {
     listBulan?: string
     total?: number
+    totalBulan?: number
+    totalHistoris?: number
+    totalBerjalan?: number
+    historis?: Array<{ label: string; nominal: number }>
+    berjalan?: Array<{ label: string; nominal: number }>
+    items?: Array<{ label: string; nominal: number; source: 'BERJALAN' | 'HISTORIS' }>
   };
 }
 
@@ -76,6 +82,7 @@ function TandaTanganSection({
 export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: SuratProps) {
   const tglCetak = format(new Date(), 'dd MMMM yyyy', { locale: id })
   const tahunIni = new Date().getFullYear()
+  const tunggakanItems = dataTunggakan?.items ?? []
   
   // Helper: Jika data kosong, ganti dengan titik-titik panjang untuk tulis manual
   const chk = (val: string | null | undefined) => val || "......................................................"
@@ -220,9 +227,35 @@ export function SuratView({ jenis, dataSantri, dataTambahan, dataTunggakan }: Su
 
                 <p className="mb-4">masih mempunyai tunggakan Uang SPP bulanan sebagai berikut:</p>
 
-                <div className="border-2 border-black p-4 mb-4 bg-gray-50">
-                    <p className="mb-2 text-base font-mono whitespace-pre-wrap">{dataTunggakan?.listBulan || "Data Lunas / Tidak Tersedia"}</p>
-                    <hr className="border-black mb-2"/>
+                <table className="w-full mb-3 border-collapse text-[13px]">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="border border-black px-2 py-1 w-10">No</th>
+                            <th className="border border-black px-2 py-1 text-left">Periode</th>
+                            <th className="border border-black px-2 py-1 text-left">Jenis</th>
+                            <th className="border border-black px-2 py-1 text-right">Nominal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tunggakanItems.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="border border-black px-2 py-3 text-center">Data Lunas / Tidak Tersedia</td>
+                            </tr>
+                        ) : tunggakanItems.map((item, index) => (
+                            <tr key={`${item.source}-${item.label}-${index}`}>
+                                <td className="border border-black px-2 py-1 text-center">{index + 1}</td>
+                                <td className="border border-black px-2 py-1">{item.label}</td>
+                                <td className="border border-black px-2 py-1">{item.source === 'HISTORIS' ? 'Tunggakan terdahulu' : 'Tagihan berjalan'}</td>
+                                <td className="border border-black px-2 py-1 text-right">Rp {item.nominal.toLocaleString('id-ID')}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <div className="border-2 border-black p-3 mb-4 bg-gray-50 text-[13px]">
+                    <div className="flex justify-between"><span>Subtotal tunggakan terdahulu</span><b>Rp {(dataTunggakan?.totalHistoris || 0).toLocaleString('id-ID')}</b></div>
+                    <div className="flex justify-between"><span>Subtotal tagihan berjalan</span><b>Rp {(dataTunggakan?.totalBerjalan || 0).toLocaleString('id-ID')}</b></div>
+                    <hr className="border-black my-2"/>
                     <p className="text-right font-bold text-lg">Total: Rp {dataTunggakan?.total?.toLocaleString('id-ID') || 0}</p>
                 </div>
 

@@ -6,6 +6,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { getJumlahTunggakanHistorisBySantri, getSppBillingStartSetting } from '@/lib/spp/tunggakan'
 
 type SppClientScope = {
   kind: 'ASRAMA' | 'SADESA' | 'ADMIN'
@@ -88,16 +89,7 @@ export async function getNominalSPP() {
 }
 
 export async function getSppBillingStart() {
-  const row = await queryOne<{ value: string }>(
-    `SELECT value FROM app_settings WHERE key = 'spp_tagihan_mulai'`
-  )
-  const value = row?.value ?? '2026-01'
-  const [tahunMulai, bulanMulai] = value.split('-').map(Number)
-  return {
-    tahun: Number.isFinite(tahunMulai) ? tahunMulai : 2026,
-    bulan: Number.isFinite(bulanMulai) ? bulanMulai : 1,
-    value,
-  }
+  return getSppBillingStartSetting()
 }
 
 export async function getKamarsSPP(_tahun: number, unitSetor: string) {
@@ -121,11 +113,14 @@ export async function getKamarsSPP(_tahun: number, unitSetor: string) {
   return rows.map(r => r.kamar).filter(Boolean)
 }
 
-function mapBillingRows(rows: any[], billableCount: number) {
+async function mapBillingRows(rows: any[], billableCount: number) {
+  const historisMap = await getJumlahTunggakanHistorisBySantri(rows.map((s: any) => s.id))
   return rows.map((s: any) => ({
     ...s,
     bulan_ini_lunas: s.bulan_ini_lunas === 1,
-    jumlah_tunggakan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)),
+    jumlah_tunggakan_berjalan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)),
+    jumlah_tunggakan_historis: historisMap.get(s.id) ?? 0,
+    jumlah_tunggakan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)) + (historisMap.get(s.id) ?? 0),
   }))
 }
 
@@ -289,6 +284,137 @@ export async function getStatusSPP(santriId: string, tahun: number) {
      FROM spp_log WHERE santri_id = ? AND tahun = ?`,
     [santriId, tahun]
   )
+}
+
+export async function getTunggakanHistorisSPP(santriId: string) {
+  await assertSantriAccess(await getSession(), santriId)
+  return query<any>(
+    `SELECT id, bulan, tahun, nominal_tagihan, status, tanggal_lunas, catatan, created_at, updated_at
+     FROM spp_tunggakan_historis
+     WHERE santri_id = ?
+     ORDER BY tahun DESC, bulan DESC`,
+    [santriId]
+  )
+}
+
+export async function simpanTunggakanHistorisSPP(
+  santriId: string,
+  tahun: number,
+  bulans: number[],
+  nominalPerBulan: number,
+  catatan?: string
+): Promise<{ success: boolean; count: number } | { error: string }> {
+  try {
+    const session = await getSession()
+    const santri = await assertSantriAccess(session, santriId)
+    const billingStart = await getSppBillingStart()
+    const cleanBulans = Array.from(new Set(bulans.map(Number))).filter(b => Number.isInteger(b) && b >= 1 && b <= 12).sort((a, b) => a - b)
+    if (cleanBulans.length === 0) return { error: 'Pilih minimal satu bulan tunggakan.' }
+    if (!Number.isFinite(nominalPerBulan) || nominalPerBulan <= 0) return { error: 'Nominal tunggakan tidak valid.' }
+    if (cleanBulans.some(b => (tahun * 100 + b) >= (billingStart.tahun * 100 + billingStart.bulan))) {
+      return { error: 'Tunggakan historis hanya boleh sebelum awal tagihan SPP sistem.' }
+    }
+
+    const ph = cleanBulans.map(() => '?').join(',')
+    const existingLogs = await query<{ bulan: number }>(
+      `SELECT bulan FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan IN (${ph})`,
+      [santriId, tahun, ...cleanBulans]
+    )
+    if (existingLogs.length > 0) {
+      return { error: `Bulan ${existingLogs.map(row => row.bulan).join(', ')} sudah tercatat lunas di pembayaran SPP.` }
+    }
+
+    const existingHistoris = await query<{ bulan: number }>(
+      `SELECT bulan FROM spp_tunggakan_historis WHERE santri_id = ? AND tahun = ? AND bulan IN (${ph})`,
+      [santriId, tahun, ...cleanBulans]
+    )
+    if (existingHistoris.length > 0) {
+      return { error: `Bulan ${existingHistoris.map(row => row.bulan).join(', ')} sudah ada di tunggakan historis.` }
+    }
+
+    await batch(cleanBulans.map(b => ({
+      sql: `INSERT INTO spp_tunggakan_historis
+              (id, santri_id, tahun, bulan, nominal_tagihan, status, catatan, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'BELUM_LUNAS', ?, datetime('now'), datetime('now'))`,
+      params: [generateId(), santriId, tahun, b, nominalPerBulan, catatan?.trim() || null],
+    })))
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'create_historical_arrears',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'create',
+      entityType: 'santri',
+      entityId: santriId,
+      entityLabel: santri.nama_lengkap || santri.nis || santriId,
+      summary: `Menambahkan ${cleanBulans.length} bulan tunggakan SPP historis`,
+      details: {
+        tahun,
+        bulan: cleanBulans,
+        nominal_per_bulan: nominalPerBulan,
+        total_nominal: nominalPerBulan * cleanBulans.length,
+        catatan: catatan?.trim() || null,
+      },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/dewan-santri/surat')
+    return { success: true, count: cleanBulans.length }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal menyimpan tunggakan historis.' }
+  }
+}
+
+export async function bayarTunggakanHistorisSPP(id: string): Promise<{ success: boolean } | { error: string }> {
+  if (!id) return { error: 'Data tunggakan tidak valid.' }
+  try {
+    const session = await getSession()
+    const current = await queryOne<any>(
+      `SELECT th.id, th.santri_id, th.tahun, th.bulan, th.nominal_tagihan, th.status,
+              s.nama_lengkap, s.nis
+       FROM spp_tunggakan_historis th
+       LEFT JOIN santri s ON s.id = th.santri_id
+       WHERE th.id = ?`,
+      [id]
+    )
+    if (!current) return { error: 'Data tunggakan tidak ditemukan.' }
+    await assertSantriAccess(session, current.santri_id)
+    if (current.status === 'LUNAS') return { error: 'Tunggakan ini sudah lunas.' }
+
+    await execute(
+      `UPDATE spp_tunggakan_historis
+       SET status = 'LUNAS', tanggal_lunas = date('now'), penerima_id = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+      [session?.id ?? null, id]
+    )
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'pay_historical_arrears',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'update',
+      entityType: 'santri',
+      entityId: current.santri_id,
+      entityLabel: current.nama_lengkap || current.nis || current.santri_id,
+      summary: `Melunasi tunggakan SPP historis ${current.nama_lengkap || current.nis || current.santri_id}`,
+      details: {
+        tahun: current.tahun,
+        bulan: current.bulan,
+        nominal: current.nominal_tagihan,
+        tunggakan_id: id,
+      },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/dewan-santri/surat')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal melunasi tunggakan historis.' }
+  }
 }
 
 export async function bayarSPP(santriId: string, tahun: number, bulans: number[], nominalPerBulan: number): Promise<{ success: boolean } | { error: string }> {

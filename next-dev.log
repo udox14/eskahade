@@ -21,3 +21,14 @@
  HEAD /dashboard/ehb/absensi-menghafal 307 in 62ms (compile: 7ms, render: 56ms)
 [layout] session null → redirect /login
  HEAD /dashboard/ehb/absensi-menghafal/rekap 307 in 52ms (compile: 3ms, render: 49ms)
+✓ Compiled in 619ms
+✓ Compiled in 210ms
+✓ Compiled in 174ms
+[layout] session null → redirect /login
+ GET /dashboard/asrama/spp 307 in 1321ms (compile: 1106ms, render: 215ms)
+[layout] session null → redirect /login
+ GET /dashboard/dewan-santri/surat 307 in 385ms (compile: 327ms, render: 59ms)
+[layout] session null → redirect /login
+ HEAD /dashboard/dewan-santri/surat 307 in 53ms (compile: 4ms, render: 49ms)
+[layout] session null → redirect /login
+ HEAD /dashboard/asrama/spp 307 in 48ms (compile: 3ms, render: 45ms)

@@ -194,48 +194,52 @@ export async function nonaktifkanSantri(params: {
   if (!params.alasan.trim()) return { error: 'Alasan wajib diisi' }
 
   try {
-    const placeholders = ids.map(() => '?').join(',')
-    const activeRows = await query<{ id: string }>(
-      `SELECT id FROM santri WHERE status_global = 'aktif' AND id IN (${placeholders})`,
-      ids
-    )
+    const activeRows: { id: string }[] = []
+    for (const chunk of chunkArray(ids)) {
+      const placeholders = chunk.map(() => '?').join(',')
+      activeRows.push(...await query<{ id: string }>(
+        `SELECT id FROM santri WHERE status_global = 'aktif' AND id IN (${placeholders})`,
+        chunk
+      ))
+    }
     if (activeRows.length === 0) return { error: 'Tidak ada santri aktif yang valid untuk dinonaktifkan' }
 
     const activeIds = activeRows.map(r => r.id)
     const timestamp = now()
-    const statements = [
-      {
-        sql: `UPDATE santri SET status_global = 'nonaktif_sementara', updated_at = ? WHERE id IN (${activeIds.map(() => '?').join(',')})`,
-        params: [timestamp, ...activeIds],
-      },
-      ...activeIds.map(id => ({
-        sql: `UPDATE santri_nonaktif_log
-              SET status = 'SELESAI',
-                  tanggal_aktif_aktual = COALESCE(tanggal_aktif_aktual, ?),
-                  closed_by = ?,
-                  updated_at = ?
-              WHERE santri_id = ? AND status = 'AKTIF'`,
-        params: [params.tanggalMulai, session.id, timestamp, id],
-      })),
-      ...activeIds.map(id => ({
-        sql: `INSERT INTO santri_nonaktif_log
-              (id, santri_id, tanggal_mulai, tanggal_rencana_aktif, alasan, catatan, status, created_by, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, 'AKTIF', ?, ?, ?)`,
-        params: [
-          generateId(),
-          id,
-          params.tanggalMulai,
-          params.tanggalRencanaAktif || null,
-          params.alasan.trim(),
-          params.catatan?.trim() || null,
-          session.id,
-          timestamp,
-          timestamp,
-        ],
-      })),
-    ]
-
-    await batch(statements)
+    for (const chunk of chunkArray(activeIds)) {
+      const placeholders = chunk.map(() => '?').join(',')
+      await batch([
+        {
+          sql: `UPDATE santri SET status_global = 'nonaktif_sementara', updated_at = ? WHERE id IN (${placeholders})`,
+          params: [timestamp, ...chunk],
+        },
+        ...chunk.map(id => ({
+          sql: `UPDATE santri_nonaktif_log
+                SET status = 'SELESAI',
+                    tanggal_aktif_aktual = COALESCE(tanggal_aktif_aktual, ?),
+                    closed_by = ?,
+                    updated_at = ?
+                WHERE santri_id = ? AND status = 'AKTIF'`,
+          params: [params.tanggalMulai, session.id, timestamp, id],
+        })),
+        ...chunk.map(id => ({
+          sql: `INSERT INTO santri_nonaktif_log
+                (id, santri_id, tanggal_mulai, tanggal_rencana_aktif, alasan, catatan, status, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'AKTIF', ?, ?, ?)`,
+          params: [
+            generateId(),
+            id,
+            params.tanggalMulai,
+            params.tanggalRencanaAktif || null,
+            params.alasan.trim(),
+            params.catatan?.trim() || null,
+            session.id,
+            timestamp,
+            timestamp,
+          ],
+        })),
+      ])
+    }
     try {
       await logActivity({
         actor: actorFromSession(session),

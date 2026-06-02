@@ -42,6 +42,12 @@ type DataTunggakanSurat = {
   listBulan: string
   total: number
   tahun: number
+  totalBulan?: number
+  totalHistoris?: number
+  totalBerjalan?: number
+  historis?: Array<{ label: string; nominal: number }>
+  berjalan?: Array<{ label: string; nominal: number }>
+  items?: Array<{ label: string; nominal: number; source: 'BERJALAN' | 'HISTORIS' }>
 }
 
 type RiwayatSurat = {
@@ -145,7 +151,7 @@ export default function LayananSuratPage() {
     
     // 1. Catat ke Database dulu
     const info = jenisSurat === 'IZIN' ? (dataTambahan.alasan || 'Izin Pulang') :
-                 jenisSurat === 'TAGIHAN' ? `Total Rp ${dataTunggakan?.total?.toLocaleString('id-ID')}` : 
+                 jenisSurat === 'TAGIHAN' ? `Tunggakan: ${dataTunggakan?.totalBulan ?? dataTunggakan?.items?.length ?? 0} bulan, Total Rp ${dataTunggakan?.total?.toLocaleString('id-ID')}` : 
                  jenisSurat === 'BERHENTI' ? "Pengunduran Diri" : "Keterangan Aktif"
 
     try {

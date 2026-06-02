@@ -22,5 +22,9 @@ CREATE INDEX IF NOT EXISTS idx_ehb_absensi_menghafal_status ON ehb_absensi_mengh
 CREATE INDEX IF NOT EXISTS idx_ehb_absensi_menghafal_asrama_kamar ON ehb_absensi_menghafal(asrama, blok, kamar);
 
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan) VALUES
-('EHB', 'Absensi Menghafal', '/dashboard/ehb/absensi-menghafal', 'BookMarked', '["admin"]', 1, 4),
-('EHB', 'Rekap Menghafal', '/dashboard/ehb/absensi-menghafal/rekap', 'ClipboardList', '["admin"]', 1, 5);
+('EHB', 'Absensi Menghafal', '/dashboard/ehb/absensi-menghafal', 'BookMarked', '["admin","pengurus_asrama","keamanan"]', 1, 4),
+('EHB', 'Rekap Menghafal', '/dashboard/ehb/absensi-menghafal/rekap', 'ClipboardList', '["admin","pengurus_asrama","keamanan"]', 1, 5);
+
+UPDATE fitur_akses
+SET roles = '["admin","pengurus_asrama","keamanan"]'
+WHERE href IN ('/dashboard/ehb/absensi-menghafal', '/dashboard/ehb/absensi-menghafal/rekap');

@@ -1,7 +1,7 @@
 'use server'
 
 import { execute, query, queryOne } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
@@ -18,6 +18,13 @@ export type SesiMenghafal = {
   jam_group: string
   waktu_mulai: string | null
   waktu_selesai: string | null
+}
+
+export type AsramaMenghafal = {
+  asrama: string
+  jumlah_blok: number
+  jumlah_kamar: number
+  jumlah_santri: number
 }
 
 export type BlokMenghafal = {
@@ -127,6 +134,55 @@ export async function getActiveEventLight() {
   return queryOne<{ id: number, nama: string }>(`SELECT id, nama FROM ehb_event WHERE is_active = 1 LIMIT 1`)
 }
 
+export async function getAsramaForMenghafal(eventId: number) {
+  await ensureSchema()
+  const session = await getSession()
+  if (!session) return []
+
+  if (hasRole(session, 'pengurus_asrama') && !isAdmin(session)) {
+    if (!session.asrama_binaan) return []
+    const row = await queryOne<AsramaMenghafal>(`
+      SELECT
+        s.asrama,
+        COUNT(DISTINCT COALESCE(NULLIF(TRIM(kc.blok), ''), '${TANPA_BLOK_KEY}')) AS jumlah_blok,
+        COUNT(DISTINCT TRIM(COALESCE(s.kamar, ''))) AS jumlah_kamar,
+        COUNT(DISTINCT s.id) AS jumlah_santri
+      FROM santri s
+      JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      JOIN kelas k ON k.id = rp.kelas_id
+      JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
+      LEFT JOIN kamar_config kc ON kc.asrama = s.asrama AND kc.nomor_kamar = TRIM(COALESCE(s.kamar, ''))
+      WHERE s.status_global = 'aktif'
+        AND s.asrama = ?
+        AND s.kamar IS NOT NULL
+        AND TRIM(s.kamar) <> ''
+      GROUP BY s.asrama
+      LIMIT 1
+    `, [eventId, session.asrama_binaan])
+    return row ? [row] : []
+  }
+
+  return query<AsramaMenghafal>(`
+    SELECT
+      s.asrama,
+      COUNT(DISTINCT COALESCE(NULLIF(TRIM(kc.blok), ''), '${TANPA_BLOK_KEY}')) AS jumlah_blok,
+      COUNT(DISTINCT TRIM(COALESCE(s.kamar, ''))) AS jumlah_kamar,
+      COUNT(DISTINCT s.id) AS jumlah_santri
+    FROM santri s
+    JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    JOIN kelas k ON k.id = rp.kelas_id
+    JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
+    LEFT JOIN kamar_config kc ON kc.asrama = s.asrama AND kc.nomor_kamar = TRIM(COALESCE(s.kamar, ''))
+    WHERE s.status_global = 'aktif'
+      AND s.asrama IS NOT NULL
+      AND TRIM(s.asrama) <> ''
+      AND s.kamar IS NOT NULL
+      AND TRIM(s.kamar) <> ''
+    GROUP BY s.asrama
+    ORDER BY s.asrama
+  `, [eventId])
+}
+
 export async function getJadwalMenghafalList(eventId: number) {
   return query<SesiMenghafal>(`
     SELECT DISTINCT
@@ -145,7 +201,7 @@ export async function getJadwalMenghafalList(eventId: number) {
   `, [eventId])
 }
 
-export async function getBlokForMenghafal(eventId: number, tanggal: string, sesiId: number, jamGroup: string) {
+export async function getBlokForMenghafal(eventId: number, tanggal: string, sesiId: number, jamGroup: string, asrama: string) {
   await ensureSchema()
   const opposite = buildMenghafalWhere(jamGroup, 'AND')
   const rows = await query<{
@@ -163,12 +219,12 @@ export async function getBlokForMenghafal(eventId: number, tanggal: string, sesi
     JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
     LEFT JOIN kamar_config kc ON kc.asrama = s.asrama AND kc.nomor_kamar = TRIM(COALESCE(s.kamar, ''))
     WHERE s.status_global = 'aktif'
-      AND s.asrama IS NOT NULL AND TRIM(s.asrama) <> ''
+      AND s.asrama = ?
       AND s.kamar IS NOT NULL AND TRIM(s.kamar) <> ''
       ${opposite.sql}
     GROUP BY NULLIF(TRIM(kc.blok), '')
     ORDER BY CASE WHEN blok IS NULL THEN 1 ELSE 0 END, blok
-  `, [eventId, ...opposite.params])
+  `, [eventId, asrama, ...opposite.params])
 
   return rows.map(row => ({
     blok_key: normalizeBlokKey(row.blok),
@@ -178,7 +234,7 @@ export async function getBlokForMenghafal(eventId: number, tanggal: string, sesi
   }))
 }
 
-export async function getKamarForMenghafal(eventId: number, tanggal: string, sesiId: number, jamGroup: string, blokKey: string) {
+export async function getKamarForMenghafal(eventId: number, tanggal: string, sesiId: number, jamGroup: string, asrama: string, blokKey: string) {
   await ensureSchema()
   const opposite = buildMenghafalWhere(jamGroup, 'AND')
   const rows = await query<{
@@ -200,13 +256,13 @@ export async function getKamarForMenghafal(eventId: number, tanggal: string, ses
     JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
     LEFT JOIN kamar_config kc ON kc.asrama = s.asrama AND kc.nomor_kamar = TRIM(COALESCE(s.kamar, ''))
     WHERE s.status_global = 'aktif'
-      AND s.asrama IS NOT NULL AND TRIM(s.asrama) <> ''
+      AND s.asrama = ?
       AND s.kamar IS NOT NULL AND TRIM(s.kamar) <> ''
       ${opposite.sql}
       AND ${blokFilterSql(blokKey)}
     GROUP BY s.asrama, TRIM(COALESCE(s.kamar, '')), NULLIF(TRIM(kc.blok), '')
     ORDER BY s.asrama, CAST(TRIM(COALESCE(s.kamar, '')) AS INTEGER), TRIM(COALESCE(s.kamar, ''))
-  `, [eventId, ...opposite.params, ...blokFilterParams(blokKey)])
+  `, [eventId, asrama, ...opposite.params, ...blokFilterParams(blokKey)])
 
   return rows.map(row => ({
     asrama: row.asrama,
@@ -285,6 +341,10 @@ export async function saveAbsensiMenghafalInput(
       LIMIT 1
     `, [santriId])
 
+    if (hasRole(session, 'pengurus_asrama') && !isAdmin(session) && session.asrama_binaan !== santri?.asrama) {
+      return { error: 'Anda hanya boleh mengabsen asrama binaan Anda' }
+    }
+
     await execute(`
       INSERT INTO ehb_absensi_menghafal (ehb_event_id, santri_id, tanggal, sesi_id, status_absen, asrama, blok, kamar, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -335,12 +395,19 @@ export async function getRekapMenghafalTidakHadir(params: {
   status?: string
 }) {
   await ensureSchema()
+  const session = await getSession()
   const where = [
     'a.ehb_event_id = ?',
     "a.status_absen IN ('A', 'I', 'S')",
     'sesi.nomor_sesi BETWEEN 1 AND 4',
   ]
   const queryParams: unknown[] = [params.eventId]
+
+  if (session && hasRole(session, 'pengurus_asrama') && !isAdmin(session)) {
+    if (!session.asrama_binaan) return []
+    where.push('COALESCE(a.asrama, s.asrama) = ?')
+    queryParams.push(session.asrama_binaan)
+  }
 
   if (params.tanggal) {
     where.push('a.tanggal = ?')
@@ -401,6 +468,13 @@ export async function getRekapMenghafalTidakHadir(params: {
 
 export async function getRekapFilterOptions(eventId: number) {
   await ensureSchema()
+  const session = await getSession()
+  const lockedAsrama = session && hasRole(session, 'pengurus_asrama') && !isAdmin(session)
+    ? session.asrama_binaan
+    : null
+  const asramaWhere = lockedAsrama ? 'AND asrama = ?' : ''
+  const asramaParams = lockedAsrama ? [lockedAsrama] : []
+
   const [sesiList, tanggalList, blokList, kamarList] = await Promise.all([
     getJadwalMenghafalList(eventId),
     query<{ tanggal: string }>(`
@@ -415,17 +489,19 @@ export async function getRekapFilterOptions(eventId: number) {
       FROM (
         SELECT DISTINCT NULLIF(TRIM(blok), '') AS blok
         FROM kamar_config
+        WHERE 1 = 1 ${asramaWhere}
       ) daftar_blok
       ORDER BY CASE WHEN blok IS NULL THEN 1 ELSE 0 END, blok
-    `),
+    `, asramaParams),
     query<{ kamar: string }>(`
       SELECT DISTINCT TRIM(kamar) AS kamar
       FROM santri
       WHERE status_global = 'aktif'
         AND kamar IS NOT NULL
         AND TRIM(kamar) <> ''
+        ${lockedAsrama ? 'AND asrama = ?' : ''}
       ORDER BY CAST(TRIM(kamar) AS INTEGER), TRIM(kamar)
-    `),
+    `, asramaParams),
   ])
 
   return {

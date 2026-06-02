@@ -20,18 +20,20 @@ import { toast } from 'sonner'
 import { fullDateWib, shortDateWib } from '../_date-utils'
 import {
   getActiveEventLight,
+  getAsramaForMenghafal,
   getBlokForMenghafal,
   getJadwalMenghafalList,
   getKamarForMenghafal,
   getPesertaForMenghafal,
   saveAbsensiMenghafalInput,
+  type AsramaMenghafal,
   type BlokMenghafal,
   type KamarMenghafal,
   type PesertaMenghafal,
   type SesiMenghafal,
 } from './actions'
 
-type ViewState = 'list-sesi' | 'list-blok' | 'list-kamar' | 'input-absensi'
+type ViewState = 'list-asrama' | 'list-sesi' | 'list-blok' | 'list-kamar' | 'input-absensi'
 
 function statusLabel(status: string | null | undefined) {
   if (status === 'A') return 'alpha tidak hadir'
@@ -46,14 +48,16 @@ export default function AbsensiMenghafalPage() {
   const fromPath = searchParams.get('from')
   const [event, setEvent] = useState<{ id: number, nama: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<ViewState>('list-sesi')
+  const [view, setView] = useState<ViewState>('list-asrama')
 
+  const [asramaList, setAsramaList] = useState<AsramaMenghafal[]>([])
   const [sesiList, setSesiList] = useState<SesiMenghafal[]>([])
   const [blokList, setBlokList] = useState<BlokMenghafal[]>([])
   const [kamarList, setKamarList] = useState<KamarMenghafal[]>([])
   const [pesertaList, setPesertaList] = useState<PesertaMenghafal[]>([])
   const [pesertaSearch, setPesertaSearch] = useState('')
 
+  const [selectedAsrama, setSelectedAsrama] = useState<AsramaMenghafal | null>(null)
   const [selectedSesi, setSelectedSesi] = useState<SesiMenghafal | null>(null)
   const [selectedBlok, setSelectedBlok] = useState<BlokMenghafal | null>(null)
   const [selectedKamar, setSelectedKamar] = useState<KamarMenghafal | null>(null)
@@ -66,7 +70,7 @@ export default function AbsensiMenghafalPage() {
     const evt = await getActiveEventLight()
     setEvent(evt || null)
     if (evt) {
-      setSesiList(await getJadwalMenghafalList(evt.id))
+      setAsramaList(await getAsramaForMenghafal(evt.id))
     }
     setLoading(false)
   }, [])
@@ -75,7 +79,7 @@ export default function AbsensiMenghafalPage() {
     loadInitialData()
   }, [loadInitialData])
 
-  const handleBackFromSesi = () => {
+  const handleBackFromAsrama = () => {
     if (fromPath && fromPath.startsWith('/dashboard')) {
       router.push(fromPath)
       return
@@ -87,24 +91,36 @@ export default function AbsensiMenghafalPage() {
     router.push('/dashboard')
   }
 
-  const handleSelectSesi = async (sesi: SesiMenghafal) => {
+  const handleSelectAsrama = async (asrama: AsramaMenghafal) => {
     if (!event) return
+    setSelectedAsrama(asrama)
+    setSelectedSesi(null)
+    setSelectedBlok(null)
+    setSelectedKamar(null)
+    setLoading(true)
+    setView('list-sesi')
+    setSesiList(await getJadwalMenghafalList(event.id))
+    setLoading(false)
+  }
+
+  const handleSelectSesi = async (sesi: SesiMenghafal) => {
+    if (!event || !selectedAsrama) return
     setSelectedSesi(sesi)
     setSelectedBlok(null)
     setSelectedKamar(null)
     setLoading(true)
     setView('list-blok')
-    setBlokList(await getBlokForMenghafal(event.id, sesi.tanggal, sesi.sesi_id, sesi.jam_group))
+    setBlokList(await getBlokForMenghafal(event.id, sesi.tanggal, sesi.sesi_id, sesi.jam_group, selectedAsrama.asrama))
     setLoading(false)
   }
 
   const handleSelectBlok = async (blok: BlokMenghafal) => {
-    if (!event || !selectedSesi) return
+    if (!event || !selectedSesi || !selectedAsrama) return
     setSelectedBlok(blok)
     setSelectedKamar(null)
     setLoading(true)
     setView('list-kamar')
-    setKamarList(await getKamarForMenghafal(event.id, selectedSesi.tanggal, selectedSesi.sesi_id, selectedSesi.jam_group, blok.blok_key))
+    setKamarList(await getKamarForMenghafal(event.id, selectedSesi.tanggal, selectedSesi.sesi_id, selectedSesi.jam_group, selectedAsrama.asrama, blok.blok_key))
     setLoading(false)
   }
 
@@ -171,7 +187,7 @@ export default function AbsensiMenghafalPage() {
     groupedSesi[sesi.tanggal].push(sesi)
   })
 
-  if (loading && view === 'list-sesi') {
+  if (loading && view === 'list-asrama') {
     return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
   }
 
@@ -188,11 +204,11 @@ export default function AbsensiMenghafalPage() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 border-x">
-      {view === 'list-sesi' && (
+      {view === 'list-asrama' && (
         <div className="flex flex-col h-full">
           <div className="bg-teal-700 px-5 pt-10 pb-6 shadow-md rounded-b-3xl">
             <div className="flex items-start justify-between gap-3">
-              <button onClick={handleBackFromSesi} className="p-2 -ml-2 rounded-full text-white hover:bg-white/10 active:bg-white/15">
+              <button onClick={handleBackFromAsrama} className="p-2 -ml-2 rounded-full text-white hover:bg-white/10 active:bg-white/15">
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <Link href="/dashboard/ehb/absensi-menghafal/rekap?from=/dashboard/ehb/absensi-menghafal" className="p-2 rounded-full text-white hover:bg-white/10 active:bg-white/15">
@@ -200,7 +216,60 @@ export default function AbsensiMenghafalPage() {
               </Link>
             </div>
             <h1 className="text-2xl font-bold text-white mb-1 mt-2">Absensi Menghafal</h1>
-            <p className="text-teal-100 text-sm">Pilih sesi EHB, lalu blok dan kamar asrama.</p>
+            <p className="text-teal-100 text-sm">Pilih asrama yang akan diabsen.</p>
+          </div>
+
+          <div className="p-4 flex-1">
+            {asramaList.length === 0 ? (
+              <div className="text-center py-20 bg-white border border-dashed rounded-2xl">
+                <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="font-bold text-slate-500">Tidak ada asrama tersedia</p>
+                <p className="text-xs text-slate-400">Pastikan santri aktif sudah punya asrama, kamar, dan mapping jam EHB.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {asramaList.map(asrama => (
+                  <button
+                    key={asrama.asrama}
+                    onClick={() => handleSelectAsrama(asrama)}
+                    className="w-full bg-white border p-4 rounded-2xl shadow-sm hover:border-teal-300 cursor-pointer flex justify-between items-center active:scale-95 transition-all"
+                  >
+                    <div className="flex gap-3 items-center text-left min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-cyan-100 text-cyan-800 flex items-center justify-center font-black flex-shrink-0">
+                        <Building2 className="w-6 h-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 truncate">{asrama.asrama}</p>
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
+                          <DoorOpen className="w-3.5 h-3.5" />
+                          <span className="font-bold">{asrama.jumlah_kamar}</span> kamar
+                          <span className="text-slate-300">/</span>
+                          <span className="font-bold">{asrama.jumlah_santri}</span> santri
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'list-sesi' && (
+        <div className="flex flex-col h-full">
+          <div className="bg-teal-700 px-5 pt-10 pb-6 shadow-md rounded-b-3xl">
+            <div className="flex items-start justify-between gap-3">
+              <button onClick={() => setView('list-asrama')} className="p-2 -ml-2 rounded-full text-white hover:bg-white/10 active:bg-white/15">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <Link href="/dashboard/ehb/absensi-menghafal/rekap?from=/dashboard/ehb/absensi-menghafal" className="p-2 rounded-full text-white hover:bg-white/10 active:bg-white/15">
+                <ClipboardList className="w-5 h-5" />
+              </Link>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-1 mt-2">Absensi Menghafal</h1>
+            <p className="text-teal-100 text-sm">{selectedAsrama?.asrama} - pilih jadwal EHB.</p>
           </div>
 
           <div className="p-4 flex-1 space-y-6">
@@ -247,7 +316,7 @@ export default function AbsensiMenghafalPage() {
             </button>
             <div>
               <h2 className="font-bold text-slate-800 text-lg leading-tight">Daftar Blok</h2>
-              <p className="text-xs text-teal-700 font-bold">{selectedSesi?.label} - {selectedSesi ? shortDateWib(selectedSesi.tanggal, false) : ''}</p>
+              <p className="text-xs text-teal-700 font-bold">{selectedAsrama?.asrama} - {selectedSesi?.label} - {selectedSesi ? shortDateWib(selectedSesi.tanggal, false) : ''}</p>
             </div>
           </div>
 
@@ -299,7 +368,7 @@ export default function AbsensiMenghafalPage() {
             </button>
             <div>
               <h2 className="font-bold text-slate-800 text-lg leading-tight">Daftar Kamar</h2>
-              <p className="text-xs text-teal-700 font-bold">Blok {selectedBlok?.blok_label}</p>
+              <p className="text-xs text-teal-700 font-bold">{selectedAsrama?.asrama} - Blok {selectedBlok?.blok_label}</p>
             </div>
           </div>
 
@@ -428,4 +497,3 @@ export default function AbsensiMenghafalPage() {
     </div>
   )
 }
-

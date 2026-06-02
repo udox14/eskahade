@@ -87,6 +87,11 @@ function parseNominal(value: string) {
   return parseInt(value.replace(/\D/g, ''), 10) || 0
 }
 
+function fmtShortNominal(n: number) {
+  if (n >= 1000 && n % 1000 === 0) return `${n / 1000}k`
+  return fmtRp(n)
+}
+
 function parseDaysValue(days: string) {
   try {
     const parsed = JSON.parse(days) as number[]
@@ -118,8 +123,9 @@ export default function UangJajanPage() {
   const [draftJajan, setDraftJajan] = useState<Record<string, number>>({})
   const [manualMode, setManualMode] = useState<Record<string, boolean>>({})
   const [isSaving, setIsSaving] = useState(false)
-  const [autoNominalInput, setAutoNominalInput] = useState<Record<string, string>>({})
   const [savingAutoSantri, setSavingAutoSantri] = useState<Record<string, boolean>>({})
+  const [customAutoSantri, setCustomAutoSantri] = useState<SantriKamarRow | null>(null)
+  const [customAutoNominal, setCustomAutoNominal] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSantri, setSelectedSantri] = useState<SantriKamarRow | null>(null)
@@ -257,15 +263,29 @@ export default function UangJajanPage() {
   }
 
   const handleSaveAutoNominal = async (santri: SantriKamarRow, nominal: number) => {
-    if (!nominal) return toast.warning('Nominal auto tidak valid')
+    if (!nominal) { toast.warning('Nominal auto tidak valid'); return false }
     setSavingAutoSantri(prev => ({ ...prev, [santri.id]: true }))
     const res = await saveSantriAutoNominal(santri.id, nominal, asrama)
     setSavingAutoSantri(prev => ({ ...prev, [santri.id]: false }))
     const error = getActionError(res)
-    if (error) return toast.error('Gagal', { description: error })
+    if (error) { toast.error('Gagal', { description: error }); return false }
     toast.success('Nominal auto tersimpan', { description: `${santri.nama_lengkap}: ${fmtRp(nominal)}` })
-    setAutoNominalInput(prev => { const n = { ...prev }; delete n[santri.id]; return n })
     refreshAfterMutasi(santri.kamar ?? activeKamar)
+    return true
+  }
+
+  const openCustomAutoModal = (santri: SantriKamarRow) => {
+    setCustomAutoSantri(santri)
+    setCustomAutoNominal(santri.auto_nominal ? String(santri.auto_nominal) : '')
+  }
+
+  const handleSaveCustomAutoNominal = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!customAutoSantri) return
+    const nominal = parseNominal(customAutoNominal)
+    if (!nominal) return toast.warning('Nominal auto tidak valid')
+    const ok = await handleSaveAutoNominal(customAutoSantri, nominal)
+    if (ok) setCustomAutoSantri(null)
   }
 
   const handleManualInput = (santriId: string, value: string, saldo: number) => {
@@ -601,6 +621,19 @@ export default function UangJajanPage() {
                               {opt / 1000}k
                             </button>
                           ))}
+                          {isAutoMode && (
+                            <button
+                              onClick={() => openCustomAutoModal(s)}
+                              disabled={savingAutoSantri[s.id]}
+                              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                                s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal)
+                                  ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
+                              }`}
+                            >
+                              {s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal) ? fmtShortNominal(s.auto_nominal) : 'Custom'}
+                            </button>
+                          )}
                         </div>
                         <button onClick={() => toggleManualMode(s.id)}
                           className="rounded-lg border border-dashed border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100">
@@ -609,24 +642,6 @@ export default function UangJajanPage() {
                       </>
                     )}
                   </div>
-                  {isAutoMode && !isManual && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        value={autoNominalInput[s.id] ?? ''}
-                        onChange={e => setAutoNominalInput(prev => ({ ...prev, [s.id]: e.target.value }))}
-                        inputMode="numeric"
-                        placeholder="Nominal auto custom..."
-                        className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                      <button
-                        onClick={() => handleSaveAutoNominal(s, parseNominal(autoNominalInput[s.id] ?? ''))}
-                        disabled={savingAutoSantri[s.id] || !parseNominal(autoNominalInput[s.id] ?? '')}
-                        className="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white hover:bg-orange-700 disabled:opacity-40"
-                      >
-                        {savingAutoSantri[s.id] ? '...' : 'Set Auto'}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )
             })}
@@ -647,6 +662,40 @@ export default function UangJajanPage() {
               {isSaving ? 'Menyimpan...' : 'Simpan'}
             </div>
           </button>
+        </div>
+      )}
+
+      {customAutoSantri && (
+        <div className="fixed inset-0 z-50 flex animate-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm fade-in">
+          <form onSubmit={handleSaveCustomAutoNominal} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4">
+              <p className="text-sm font-bold text-slate-800">Nominal Auto</p>
+              <p className="mt-1 truncate text-xs text-slate-500">{customAutoSantri.nama_lengkap}</p>
+            </div>
+            <input
+              value={customAutoNominal}
+              onChange={e => setCustomAutoNominal(e.target.value)}
+              inputMode="numeric"
+              autoFocus
+              placeholder="Nominal Rp..."
+              className="w-full rounded-xl border border-slate-200 px-3 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-orange-500"
+            />
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCustomAutoSantri(null)}
+                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              <button
+                disabled={savingAutoSantri[customAutoSantri.id] || !parseNominal(customAutoNominal)}
+                className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-40"
+              >
+                {savingAutoSantri[customAutoSantri.id] ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

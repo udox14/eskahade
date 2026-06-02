@@ -231,12 +231,24 @@ export async function getRiwayatSPP(santriId: string) {
     tanggal_bayar: string
     penerima_nama: string | null
   }>(`
-    SELECT sl.id, sl.bulan, sl.tahun, sl.nominal_bayar, sl.tanggal_bayar, u.full_name as penerima_nama
-    FROM spp_log sl
-    LEFT JOIN users u ON sl.penerima_id = u.id
-    WHERE sl.santri_id = ?
-    ORDER BY sl.tahun DESC, sl.bulan DESC
-  `, [santriId])
+    SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar, penerima_nama
+    FROM (
+      SELECT sl.id, sl.bulan, sl.tahun, sl.nominal_bayar, sl.tanggal_bayar, u.full_name as penerima_nama
+      FROM spp_log sl
+      LEFT JOIN users u ON sl.penerima_id = u.id
+      WHERE sl.santri_id = ?
+
+      UNION ALL
+
+      SELECT th.id, th.bulan, th.tahun, th.nominal_tagihan AS nominal_bayar,
+             COALESCE(th.tanggal_lunas, th.updated_at) AS tanggal_bayar,
+             u.full_name as penerima_nama
+      FROM spp_tunggakan_historis th
+      LEFT JOIN users u ON th.penerima_id = u.id
+      WHERE th.santri_id = ? AND th.status = 'LUNAS'
+    )
+    ORDER BY tahun DESC, bulan DESC
+  `, [santriId, santriId])
 }
 
 export async function getRiwayatTabungan(santriId: string) {

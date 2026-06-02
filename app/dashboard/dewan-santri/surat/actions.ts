@@ -3,6 +3,8 @@
 import { query, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
 
 type SantriSuratRow = {
   id: string
@@ -45,33 +47,25 @@ export async function cariSantri(keyword: string) {
 }
 
 export async function cekTunggakanSantri(santriId: string) {
-  const tahun = new Date().getFullYear()
-  const currentMonth = new Date().getMonth() + 1
-
-  const logs = await query<SppLogRow>(
-    'SELECT bulan, nominal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?',
-    [santriId, tahun]
+  const santri = await query<Pick<SantriSuratRow, 'asrama'>>(
+    `SELECT asrama FROM santri WHERE id = ? LIMIT 1`,
+    [santriId]
   )
-
-  const BULAN_NAMA = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-
-  const bulanNunggak: string[] = []
-  let totalHutang = 0
-
-  for (let i = 1; i <= currentMonth; i++) {
-    if (!logs.some((log) => log.bulan === i)) {
-      bulanNunggak.push(BULAN_NAMA[i - 1])
-      totalHutang += 70000
+  if (isAsramaTanpaKamar(santri[0]?.asrama)) {
+    return {
+      adaTunggakan: false,
+      listBulan: '',
+      total: 0,
+      tahun: new Date().getFullYear(),
+      totalBulan: 0,
+      totalHistoris: 0,
+      totalBerjalan: 0,
+      historis: [],
+      berjalan: [],
+      items: [],
     }
   }
-
-  return {
-    adaTunggakan: bulanNunggak.length > 0,
-    listBulan: bulanNunggak.join(', '),
-    total: totalHutang,
-    tahun,
-  }
+  return getTunggakanSppSantri(santriId)
 }
 
 export async function catatSuratKeluar(santriId: string, jenis: string, detail: string): Promise<{ success: boolean } | { error: string }> {
