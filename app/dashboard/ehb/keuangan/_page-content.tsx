@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSPr
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
+  AlertTriangle, ArrowDown, ArrowUp, BookOpen, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -2034,60 +2034,49 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <div className="px-5 py-4 border-b flex items-center justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-slate-800">Konfigurasi Pemeriksaan Hasil</h2>
-                    <p className="text-sm text-slate-500">Atur jumlah mapel per waktu. Mutawassithah default 0 dan bisa diisi manual.</p>
+                    <p className="text-sm text-slate-500">Jumlah pemeriksaan sekarang dihitung dari pembagian kitab guru per tahun ajaran.</p>
                   </div>
                   <button onClick={() => setShowHonorConfigModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
                 <div className="p-5 overflow-y-auto">
-                  <div className="overflow-x-auto border rounded-xl">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-bold min-w-[180px]">Marhalah</th>
-                          {(['shubuh', 'ashar', 'maghrib'] as HonorWaktu[]).map(waktu => (
-                            <th key={waktu} className="px-4 py-3 text-left font-bold w-32">{WAKTU_LABEL[waktu]}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {Array.from(new Map(mapelConfigs.map(config => [config.marhalah_id, config.marhalah_nama])).entries()).map(([marhalahId, marhalahName]) => (
-                          <tr key={marhalahId || marhalahName}>
-                            <td className="px-4 py-3 font-bold text-slate-800">{marhalahName}</td>
-                            {(['shubuh', 'ashar', 'maghrib'] as HonorWaktu[]).map(waktu => {
-                              const config = mapelConfigs.find(item => item.marhalah_id === marhalahId && item.waktu === waktu)
-                              return (
-                                <td key={waktu} className="px-4 py-3">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={config?.jumlah_mapel ?? 0}
-                                    onChange={e => config && updateMapelConfig(config.id, Number(e.target.value))}
-                                    className="w-24 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                                  />
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+                    <div className="flex items-start gap-3">
+                      <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+                      <div>
+                        <p className="font-bold text-indigo-950">Sumber hitungan aktif</p>
+                        <p className="mt-1 text-sm text-indigo-800">
+                          Sistem membaca jadwal EHB, sesi, tanggal, kelas, mapel, lalu mencocokkan guru dari fitur Pembagian Kitab Guru. Override harian dan kelas gabungan ikut terbaca dari data tersebut.
+                        </p>
+                        <Link href="/dashboard/master/guru-kitab" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                          <BookOpen className="h-4 w-4" />
+                          Buka Pembagian Kitab Guru
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-sm font-bold text-slate-800">Ringkasan saat ini</p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Guru terhitung</p>
+                        <p className="mt-1 text-xl font-black text-slate-900">{honorTableRows.filter(row => row.memeriksa > 0).length}</p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Qty memeriksa</p>
+                        <p className="mt-1 text-xl font-black text-slate-900">{honorTableRows.reduce((sum, row) => sum + Number(row.memeriksa || 0), 0).toLocaleString('id-ID')}</p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Nominal</p>
+                        <p className="mt-1 text-xl font-black text-slate-900">{rupiah(honorTableRows.reduce((sum, row) => sum + Number(row.jumlahMemeriksa || 0), 0))}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="px-5 py-4 border-t bg-slate-50 flex justify-end gap-2">
                   <button onClick={() => setShowHonorConfigModal(false)} className="bg-white border hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm">
                     Tutup
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await submitHonorSettings()
-                      setShowHonorConfigModal(false)
-                    }}
-                    disabled={savingHonor}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-60"
-                  >
-                    {savingHonor ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan
                   </button>
                 </div>
               </div>

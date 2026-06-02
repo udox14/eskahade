@@ -5,12 +5,6 @@ import { batch, query, queryOne } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
-type ForeignKeyRow = {
-  table: string
-  from: string
-  to: string | null
-}
-
 type ForeignKeyEdge = {
   childTable: string
   childColumn: string
@@ -65,56 +59,103 @@ function quoteIdentifier(identifier: string) {
   return `"${identifier.replace(/"/g, '""')}"`
 }
 
-async function getTablePrimaryKey(tableName: string) {
-  const columns = await query<{ name: string; pk: number }>(`PRAGMA table_info(${quoteIdentifier(tableName)})`)
-  const pkColumns = columns
-    .filter(column => column.pk > 0)
-    .sort((a, b) => a.pk - b.pk)
-    .map(column => column.name)
+const STATIC_EDGES: ForeignKeyEdge[] = [
+  { childTable: 'riwayat_pendidikan',     childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'absen_sakit',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'pelanggaran',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'perizinan',              childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'spp_log',                childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'spp_setoran_detail',     childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'spp_tunggakan_alasan',   childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'spp_tunggakan_historis', childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'pembayaran_tahunan',     childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'tabungan_log',           childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'upk_transaksi',          childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'riwayat_surat',          childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'hasil_tes_klasifikasi',  childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'absen_asrama',           childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'kamar_draft',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'kamar_ketua',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'mutasi_asrama_log',      childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'perpulangan_log',        childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'surat_pernyataan',       childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'surat_perjanjian',       childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'santri_nonaktif_log',   childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'santri_keluar_tandai',  childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'denda_buku_pribadi',     childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'uang_jajan_auto_rule',   childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'uang_jajan_auto_skip',   childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'verifikasi_panggilan',   childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'verifikasi_panggilan_vonis', childColumn: 'santri_id', parentTable: 'santri',                parentColumn: 'id' },
+  { childTable: 'psb_flow',               childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'psb_payment_receipt',    childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'hafalan_progress',       childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'ehb_plotting_santri',    childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'ehb_absensi',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'ehb_absensi_menghafal',  childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'absen_malam_v2',         childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'absen_berjamaah',        childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'upk_antrian',            childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'absensi_harian',         childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'nilai_akademik',         childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'nilai_akhlak',           childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'ranking',                childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'nilai_harian_detail',    childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'hafalan_progress',       childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
+  { childTable: 'upk_item',               childColumn: 'transaksi_id',  parentTable: 'upk_transaksi',             parentColumn: 'id' },
+]
 
-  return pkColumns.length === 1 ? pkColumns[0] : null
-}
-
-async function getSantriForeignKeyEdges() {
-  const tables = await query<{ name: string }>(
-    `SELECT name
-     FROM sqlite_master
-     WHERE type = 'table'
-       AND name NOT LIKE 'sqlite_%'`
-  )
-
-  const edges: ForeignKeyEdge[] = []
-
-  for (const { name } of tables) {
-    const foreignKeys = await query<ForeignKeyRow>(`PRAGMA foreign_key_list(${quoteIdentifier(name)})`)
-    for (const foreignKey of foreignKeys) {
-      if (!foreignKey.table || !foreignKey.from) continue
-      edges.push({
-        childTable: name,
-        childColumn: foreignKey.from,
-        parentTable: foreignKey.table,
-        parentColumn: foreignKey.to || 'id',
-      })
-    }
-  }
-
-  return edges
-}
+const STATIC_PK: Map<string, string | null> = new Map([
+  ['santri',                   'id'],
+  ['riwayat_pendidikan',       'id'],
+  ['absen_sakit',              'id'],
+  ['pelanggaran',              'id'],
+  ['perizinan',                'id'],
+  ['spp_log',                  'id'],
+  ['spp_setoran_detail',       'id'],
+  ['spp_tunggakan_alasan',     'id'],
+  ['spp_tunggakan_historis',  'id'],
+  ['pembayaran_tahunan',       'id'],
+  ['tabungan_log',             'id'],
+  ['upk_transaksi',            'id'],
+  ['upk_item',                 'id'],
+  ['riwayat_surat',            'id'],
+  ['hasil_tes_klasifikasi',    'id'],
+  ['absen_asrama',             null],
+  ['kamar_draft',              'id'],
+  ['kamar_ketua',              'id'],
+  ['mutasi_asrama_log',        'id'],
+  ['perpulangan_log',          'id'],
+  ['surat_pernyataan',         'id'],
+  ['surat_perjanjian',         'id'],
+  ['santri_nonaktif_log',     'id'],
+  ['santri_keluar_tandai',    'id'],
+  ['denda_buku_pribadi',       'id'],
+  ['uang_jajan_auto_rule',     'id'],
+  ['uang_jajan_auto_skip',     'id'],
+  ['verifikasi_panggilan',     'id'],
+  ['verifikasi_panggilan_vonis', 'id'],
+  ['psb_flow',                 'id'],
+  ['psb_payment_receipt',      'id'],
+  ['hafalan_progress',         'id'],
+  ['ehb_plotting_santri',      'id'],
+  ['ehb_absensi',              'id'],
+  ['ehb_absensi_menghafal',    'id'],
+  ['absen_malam_v2',           'id'],
+  ['absen_berjamaah',          'id'],
+  ['upk_antrian',              'id'],
+  ['absensi_harian',           'id'],
+  ['nilai_akademik',           'id'],
+  ['nilai_akhlak',             'id'],
+  ['ranking',                  'id'],
+  ['nilai_harian_detail',      'id'],
+])
 
 async function buildRelatedDeleteStatements(rootSantriId: string) {
-  const edges = await getSantriForeignKeyEdges()
-  const primaryKeyCache = new Map<string, string | null>()
   const statements: DeleteStatement[] = []
 
-  async function primaryKey(tableName: string) {
-    if (!primaryKeyCache.has(tableName)) {
-      primaryKeyCache.set(tableName, await getTablePrimaryKey(tableName))
-    }
-    return primaryKeyCache.get(tableName) ?? null
-  }
-
-  async function collectChildren(parentTable: string, parentWhereSql: string, parentParams: unknown[], trail: string[]) {
-    const parentEdges = edges.filter(edge => edge.parentTable === parentTable)
+  function collectChildren(parentTable: string, parentWhereSql: string, parentParams: unknown[], trail: string[]) {
+    const parentEdges = STATIC_EDGES.filter(edge => edge.parentTable === parentTable)
 
     for (const edge of parentEdges) {
       if (trail.includes(edge.childTable)) continue
@@ -124,10 +165,10 @@ async function buildRelatedDeleteStatements(rootSantriId: string) {
       const parentTableSql = quoteIdentifier(parentTable)
       const parentColumnSql = quoteIdentifier(edge.parentColumn)
       const childWhereSql = `${childColumnSql} IN (SELECT ${parentColumnSql} FROM ${parentTableSql} WHERE ${parentWhereSql})`
-      const childPk = await primaryKey(edge.childTable)
+      const childPk = STATIC_PK.get(edge.childTable) ?? null
 
       if (childPk) {
-        await collectChildren(edge.childTable, childWhereSql, parentParams, [...trail, edge.childTable])
+        collectChildren(edge.childTable, childWhereSql, parentParams, [...trail, edge.childTable])
       }
 
       statements.push({
@@ -137,7 +178,7 @@ async function buildRelatedDeleteStatements(rootSantriId: string) {
     }
   }
 
-  await collectChildren('santri', `${quoteIdentifier('id')} = ?`, [rootSantriId], ['santri'])
+  collectChildren('santri', `${quoteIdentifier('id')} = ?`, [rootSantriId], ['santri'])
 
   statements.push({
     sql: `DELETE FROM ${quoteIdentifier('santri')} WHERE ${quoteIdentifier('id')} = ?`,

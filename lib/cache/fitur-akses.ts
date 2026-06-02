@@ -74,6 +74,7 @@ async function ensureFiturAksesReady() {
       ('EHB', 'Absensi Menghafal', '/dashboard/ehb/absensi-menghafal', 'BookMarked', '["admin","pengurus_asrama","keamanan"]', 1, 4),
       ('EHB', 'Rekap Menghafal', '/dashboard/ehb/absensi-menghafal/rekap', 'ClipboardList', '["admin","pengurus_asrama","keamanan"]', 1, 5),
       ('Master Data', 'Setup Tahun Ajaran', '/dashboard/setup-tahun-ajaran', 'ClipboardList', '["admin"]', 1, 2),
+      ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
       ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8),
       ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11)

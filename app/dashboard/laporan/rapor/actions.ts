@@ -7,9 +7,110 @@ export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
 }
 
+type RaporMapel = {
+  id: string
+  nama: string
+  nama_kitab: string
+}
+
+async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
+  const tahunAjaranIdKelas = await query<any>(
+    'SELECT tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
+  ).then(r => r[0]?.tahun_ajaran_id ?? null)
+
+  if (marhalahId && tahunAjaranIdKelas) {
+    const listKitab = await query<any>(`
+      SELECT mp.id, mp.nama, kt.nama_kitab
+      FROM kitab kt
+      JOIN mapel mp ON mp.id = kt.mapel_id
+      WHERE kt.marhalah_id = ? AND kt.tahun_ajaran_id = ?
+      ORDER BY mp.nama ASC
+    `, [marhalahId, tahunAjaranIdKelas])
+
+    if (listKitab.length) {
+      return listKitab.map((m: any) => ({
+        id: m.id,
+        nama: m.nama || 'Tanpa Nama',
+        nama_kitab: m.nama_kitab || '-',
+      })) as RaporMapel[]
+    }
+  }
+
+  return query<any>(`
+    SELECT DISTINCT mp.id, mp.nama, '-' AS nama_kitab
+    FROM nilai_akademik na
+    JOIN mapel mp ON mp.id = na.mapel_id
+    JOIN riwayat_pendidikan rp ON rp.id = na.riwayat_pendidikan_id
+    WHERE rp.kelas_id = ?
+    ORDER BY mp.nama ASC
+  `, [kelasId]).then(rows => rows.map((m: any) => ({
+    id: m.id,
+    nama: m.nama || 'Tanpa Nama',
+    nama_kitab: m.nama_kitab || '-',
+  })))
+}
+
+export async function getDaftarCetakRapor(kelasId: string, semester: number) {
+  const listSantri = await query<any>(`
+    SELECT rp.id AS riwayat_id, rp.santri_id,
+           s.nama_lengkap, s.nis,
+           k.id AS kelas_id, k.nama_kelas,
+           m.id AS marhalah_id, m.nama AS marhalah_nama
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [kelasId])
+
+  if (!listSantri.length) return { mapel: [], siswa: [] }
+
+  const mapel = await getRaporMapel(kelasId, listSantri[0]?.marhalah_id)
+  const totalMapel = mapel.length
+  const riwayatIds = listSantri.map((s: any) => s.riwayat_id)
+  const ph = riwayatIds.map(() => '?').join(',')
+  const nilaiRows = await query<any>(`
+    SELECT riwayat_pendidikan_id, mapel_id, nilai
+    FROM nilai_akademik
+    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+  `, [...riwayatIds, semester])
+
+  const nilaiMap = new Map<string, number>()
+  nilaiRows.forEach((n: any) => {
+    nilaiMap.set(`${n.riwayat_pendidikan_id}:${n.mapel_id}`, Number(n.nilai) || 0)
+  })
+
+  return {
+    mapel,
+    siswa: listSantri.map((s: any) => {
+      const terisi = mapel.reduce((total, m) => {
+        return total + ((nilaiMap.get(`${s.riwayat_id}:${m.id}`) ?? 0) > 0 ? 1 : 0)
+      }, 0)
+
+      return {
+        riwayat_id: s.riwayat_id,
+        santri_id: s.santri_id,
+        nis: s.nis || '-',
+        nama: s.nama_lengkap || 'Tanpa Nama',
+        kelas: {
+          id: s.kelas_id,
+          nama_kelas: s.nama_kelas,
+          marhalah: { id: s.marhalah_id, nama: s.marhalah_nama },
+        },
+        status_nilai: {
+          terisi,
+          total: totalMapel,
+          lengkap: totalMapel > 0 && terisi >= totalMapel,
+        },
+      }
+    }),
+  }
+}
+
 export async function getDataRapor(kelasId: string, semester: number) {
   const listSantri = await query<any>(`
-    SELECT rp.id, rp.grade_lanjutan,
+    SELECT rp.id, rp.santri_id, rp.grade_lanjutan,
            s.nama_lengkap, s.nis, s.nama_ayah,
            k.id AS kelas_id, k.nama_kelas,
            m.id AS marhalah_id, m.nama AS marhalah_nama,
@@ -85,20 +186,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
     ])
   })
 
-  const marhalahId = listSantri[0]?.marhalah_id
-  // Ambil tahun_ajaran dari kelas yang dipilih, bukan tahun aktif
-  // Ini penting agar rapor historis menampilkan kitab yang benar untuk tahun ajaran tersebut
-  const tahunAjaranIdKelas = await query<any>(
-    'SELECT tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
-  ).then(r => r[0]?.tahun_ajaran_id ?? null)
-
-  let listKitab: any[] = []
-  if (marhalahId && tahunAjaranIdKelas) {
-    listKitab = await query<any>(
-      'SELECT mapel_id, nama_kitab FROM kitab WHERE marhalah_id = ? AND tahun_ajaran_id = ?',
-      [marhalahId, tahunAjaranIdKelas]
-    )
-  }
+  const raporMapel = await getRaporMapel(kelasId, listSantri[0]?.marhalah_id)
 
   // Ambil rata-rata kelas per mapel untuk kolom "Rata-rata Kelas"
   // Hitung manual dari nilaiAkademik
@@ -121,11 +209,16 @@ export async function getDataRapor(kelasId: string, semester: number) {
   })
 
   return listSantri.map((s: any) => {
-    const nilainya = nilaiAkademik.filter((n: any) => n.riwayat_pendidikan_id === s.id)
+    const nilaiMap = new Map(
+      nilaiAkademik
+        .filter((n: any) => n.riwayat_pendidikan_id === s.id)
+        .map((n: any) => [n.mapel_id, n])
+    )
     const absen = absenMap.get(s.id) ?? { sakit: 0, izin: 0, alfa: 0 }
 
     return {
       id: s.id,
+      santri_id: s.santri_id,
       santri: { nama_lengkap: s.nama_lengkap, nis: s.nis, nama_ayah: s.nama_ayah },
       kelas: { 
         id: s.kelas_id, 
@@ -142,19 +235,107 @@ export async function getDataRapor(kelasId: string, semester: number) {
         jumlah_nilai: s.jumlah_nilai ?? 0,
         catatan_wali_kelas: s.catatan_wali_kelas ?? '',
       },
-      nilai: nilainya.map((n: any) => {
-        const kitabData = listKitab.find((k: any) => k.mapel_id === n.mapel_id)
+      nilai: raporMapel.map((m) => {
+        const n: any = nilaiMap.get(m.id)
         return { 
-          mapel: n.mapel_nama || 'Tanpa Nama', 
-          kitab: kitabData?.nama_kitab || '-', 
-          angka: n.nilai,
-          rata_kelas: mapelRataKelas[n.mapel_id] ?? 0,
+          mapel: m.nama || 'Tanpa Nama',
+          kitab: m.nama_kitab || '-',
+          angka: n?.nilai ?? 0,
+          rata_kelas: mapelRataKelas[m.id] ?? 0,
         }
       }),
       absen: { sakit: absen.sakit, izin: absen.izin, alfa: absen.alfa },
       kepribadian: akhlakMap.get(s.id) || [],
     }
   })
+}
+
+export async function getDataIdentitas(kelasId: string) {
+  const rows = await query<any>(`
+    SELECT rp.id AS riwayat_id, rp.santri_id,
+           s.nama_lengkap, s.nis, s.nik, s.tempat_lahir, s.tanggal_lahir,
+           s.jenis_kelamin, s.nama_ayah, s.nama_ibu, s.alamat, s.alamat_lengkap,
+           s.kecamatan, s.kab_kota, s.provinsi, s.asrama, s.kamar, s.tahun_masuk,
+           k.nama_kelas, ta.nama AS tahun_ajaran
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [kelasId])
+
+  return rows.map((s: any) => ({
+    riwayat_id: s.riwayat_id,
+    santri_id: s.santri_id,
+    nama_lengkap: s.nama_lengkap,
+    nis: s.nis,
+    nik: s.nik,
+    tempat_lahir: s.tempat_lahir,
+    tanggal_lahir: s.tanggal_lahir,
+    jenis_kelamin: s.jenis_kelamin,
+    nama_ayah: s.nama_ayah,
+    nama_ibu: s.nama_ibu,
+    alamat: s.alamat,
+    alamat_lengkap: s.alamat_lengkap,
+    kecamatan: s.kecamatan,
+    kab_kota: s.kab_kota,
+    provinsi: s.provinsi,
+    asrama: s.asrama,
+    kamar: s.kamar,
+    tahun_masuk: s.tahun_masuk,
+    kelas: s.nama_kelas,
+    tahun_ajaran: s.tahun_ajaran,
+  }))
+}
+
+export async function getLegerRaporData(kelasId: string, semester: number) {
+  const daftar = await getDaftarCetakRapor(kelasId, semester)
+  const siswaList = await query<any>(`
+    SELECT rp.id AS riwayat_id,
+           s.nis, s.nama_lengkap,
+           r.jumlah_nilai, r.rata_rata, r.ranking_kelas
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [semester, kelasId])
+
+  if (!siswaList.length) return { mapel: daftar.mapel, siswa: [] }
+
+  const riwayatIds = siswaList.map((s: any) => s.riwayat_id)
+  const ph = riwayatIds.map(() => '?').join(',')
+  const nilaiRows = await query<any>(`
+    SELECT riwayat_pendidikan_id, mapel_id, nilai
+    FROM nilai_akademik
+    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+  `, [...riwayatIds, semester])
+
+  const nilaiMap = new Map<string, number>()
+  nilaiRows.forEach((n: any) => {
+    nilaiMap.set(`${n.riwayat_pendidikan_id}:${n.mapel_id}`, Number(n.nilai) || 0)
+  })
+
+  return {
+    mapel: daftar.mapel,
+    siswa: siswaList.map((s: any) => {
+      const nilai: Record<string, number> = {}
+      daftar.mapel.forEach((m: RaporMapel) => {
+        nilai[m.id] = nilaiMap.get(`${s.riwayat_id}:${m.id}`) ?? 0
+      })
+
+      return {
+        id: s.riwayat_id,
+        nis: s.nis || '-',
+        nama: s.nama_lengkap || 'Tanpa Nama',
+        nilai,
+        jumlah: s.jumlah_nilai || 0,
+        rata: s.rata_rata || 0,
+        rank: s.ranking_kelas || '-',
+      }
+    }),
+  }
 }
 
 function angkaKePredikat(angka: number): string {

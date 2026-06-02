@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { backfillManualWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
+import { getGuruKitabResolvedForEhb } from '@/lib/akademik/guru-kitab'
 
 export type ActiveEvent = {
   id: number
@@ -484,7 +485,10 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
     `, [eventId]),
   ])
 
-  const totalHasilUjian = pemeriksaan.reduce((sum, item) => sum + Number(item.jumlah_hasil || 0), 0)
+  const pemeriksaanResolved = await getGuruKitabResolvedForEhb(eventId)
+  const totalHasilUjianLegacy = pemeriksaan.reduce((sum, item) => sum + Number(item.jumlah_hasil || 0), 0)
+  const totalHasilUjianResolved = pemeriksaanResolved.reduce((sum, item) => sum + Number(item.jumlah_santri || 0), 0)
+  const totalHasilUjian = totalHasilUjianResolved > 0 ? totalHasilUjianResolved : totalHasilUjianLegacy
 
   return {
     totalHasilUjian,
@@ -857,7 +861,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     backfillManualWaliKelasFromGuruMaghrib(),
   ])
 
-  const [tarif, pembuatSoalRows, raporRows, pemeriksaanRows, pengawasanRows] = await Promise.all([
+  const [tarif, pembuatSoalRows, raporRows, pemeriksaanResolvedRows, pengawasanRows] = await Promise.all([
     getHonorTarif(eventId),
     query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
       SELECT
@@ -887,40 +891,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       GROUP BY k.wali_kelas_id, u.full_name
       ORDER BY u.full_name
     `, [eventId]),
-    query<{
-      guru_id: number
-      nama: string
-      waktu: HonorWaktu
-      nama_kelas: string
-      jumlah_santri: number
-      jumlah_mapel: number
-    }>(`
-      SELECT
-        dg.id as guru_id,
-        dg.nama_lengkap as nama,
-        src.waktu,
-        k.nama_kelas,
-        COUNT(DISTINCT ps.santri_id) as jumlah_santri,
-        COALESCE(cfg.jumlah_mapel, 0) as jumlah_mapel
-      FROM (
-        SELECT id as kelas_id, guru_shubuh_id as guru_id, 'shubuh' as waktu FROM kelas WHERE guru_shubuh_id IS NOT NULL
-        UNION ALL
-        SELECT id as kelas_id, guru_ashar_id as guru_id, 'ashar' as waktu FROM kelas WHERE guru_ashar_id IS NOT NULL
-        UNION ALL
-        SELECT id as kelas_id, guru_maghrib_id as guru_id, 'maghrib' as waktu FROM kelas WHERE guru_maghrib_id IS NOT NULL
-      ) src
-      JOIN kelas k ON k.id = src.kelas_id
-      JOIN data_guru dg ON dg.id = src.guru_id
-      JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
-      JOIN ehb_plotting_santri ps ON ps.ehb_event_id = kj.ehb_event_id AND ps.santri_id IN (
-        SELECT rp.santri_id FROM riwayat_pendidikan rp WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
-      )
-      LEFT JOIN ehb_honor_mapel_config cfg
-        ON cfg.ehb_event_id = kj.ehb_event_id AND cfg.marhalah_id = k.marhalah_id AND cfg.waktu = src.waktu
-      GROUP BY dg.id, dg.nama_lengkap, src.waktu, k.id, k.nama_kelas, cfg.jumlah_mapel
-      HAVING jumlah_mapel > 0
-      ORDER BY dg.nama_lengkap, k.nama_kelas, src.waktu
-    `, [eventId]),
+    getGuruKitabResolvedForEhb(eventId),
     query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
       WITH hadir AS (
         SELECT
@@ -1022,14 +993,15 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     }))
 
   const pemeriksaanMap = new Map<number, HonorItem & { details: string[] }>()
-  for (const row of pemeriksaanRows) {
-    const qty = Number(row.jumlah_santri || 0) * Number(row.jumlah_mapel || 0)
+  for (const row of pemeriksaanResolvedRows) {
+    const qty = Number(row.jumlah_santri || 0)
+    if (qty <= 0) continue
     if (!pemeriksaanMap.has(row.guru_id)) {
       pemeriksaanMap.set(row.guru_id, {
         id: `periksa-${row.guru_id}`,
         jenis: 'pemeriksaan_hasil',
         guru_id: row.guru_id,
-        nama: row.nama,
+        nama: row.guru_nama,
         qty: 0,
         tarif: tarif.pemeriksaan_hasil,
         total: 0,
@@ -1041,7 +1013,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     const item = pemeriksaanMap.get(row.guru_id)!
     item.qty += qty
     item.total = item.qty * item.tarif
-    item.details.push(`${row.nama_kelas} ${row.waktu}: ${row.jumlah_santri} x ${row.jumlah_mapel}`)
+    item.details.push(`${row.nama_kelas} ${row.sesi}: ${row.jumlah_santri} x 1 (${row.mapel_nama} - ${row.kitab_nama})`)
   }
   const pemeriksaanItems = Array.from(pemeriksaanMap.values()).map(({ details, ...item }) => ({
     ...item,

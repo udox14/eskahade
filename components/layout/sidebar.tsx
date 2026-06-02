@@ -56,6 +56,7 @@ const MENU_TITLE_MAP: Record<string, string> = {
   'Manajemen Guru & Jadwal': 'Guru & Jadwal',
   'Manajemen Kelas': 'Kelas',
   'Manajemen Kitab': 'Kitab',
+  'Pembagian Kitab Guru': 'Kitab Guru',
   'Manajemen Fitur': 'Fitur Akses',
 };
 
@@ -69,6 +70,7 @@ const GROUP_ITEM_ORDER: Record<string, string[]> = {
     'Setup Tahun Ajaran',
     'Kelas',
     'Kitab',
+    'Kitab Guru',
     'Guru & Jadwal',
     'Tools Santri',
     'Arsip Alumni',

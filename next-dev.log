@@ -32,3 +32,6 @@
  HEAD /dashboard/dewan-santri/surat 307 in 53ms (compile: 4ms, render: 49ms)
 [layout] session null → redirect /login
  HEAD /dashboard/asrama/spp 307 in 48ms (compile: 3ms, render: 45ms)
+[layout] session null → redirect /login
+ GET /dashboard/laporan/rapor 307 in 1843ms (compile: 1646ms, render: 197ms)
+✓ Compiled in 180ms
