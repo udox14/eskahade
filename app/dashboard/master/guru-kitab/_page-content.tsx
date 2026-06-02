@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, CalendarDays, Filter, Loader2, Plus, Save, Search, Sparkles, Trash2, UsersRound, X } from 'lucide-react'
+import { BookOpen, CalendarDays, Filter, Loader2, Plus, Save, Search, Settings2, Sparkles, Trash2, UsersRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -77,14 +77,16 @@ export default function GuruKitabPageContent() {
   const [gabunganList, setGabunganList] = useState<any[]>([])
   const [assignments, setAssignments] = useState<DraftAssignment[]>([])
   const [tahunAjaranId, setTahunAjaranId] = useState('')
-  const [marhalahId, setMarhalahId] = useState('SEMUA')
+  const [marhalahId, setMarhalahId] = useState('')
   const [search, setSearch] = useState('')
   const [guruFilter, setGuruFilter] = useState('')
-  const [overrideModal, setOverrideModal] = useState<{ kelasId: string; sesi: SessionKey; hariIndex: number } | null>(null)
+  const [overrideModal, setOverrideModal] = useState<{ kelasId: string; sesi: SessionKey } | null>(null)
+  const [overrideHariIndex, setOverrideHariIndex] = useState(1)
 
   const loadData = async (tahunId?: string, mrhId?: string) => {
     setLoading(true)
-    const res = await getGuruKitabSetup(Number(tahunId || tahunAjaranId || 0) || null, mrhId || marhalahId)
+    const selectedMarhalah = mrhId ?? marhalahId
+    const res = await getGuruKitabSetup(Number(tahunId || tahunAjaranId || 0) || null, selectedMarhalah || null)
     setTahunAjaranList(res.tahunAjaranList)
     setMarhalahList(res.marhalahList)
     setGuruList(res.guruList)
@@ -98,7 +100,7 @@ export default function GuruKitabPageContent() {
   }
 
   useEffect(() => {
-    loadData('', 'SEMUA')
+    loadData('', '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -223,7 +225,7 @@ export default function GuruKitabPageContent() {
     return rows.map(row => {
       const kitab = kitabById.get(row.kitab_id)
       return (
-        <div key={row.draft_id} className="grid grid-cols-1 gap-2 py-2 md:grid-cols-[1fr_1fr_auto]">
+        <div key={row.draft_id} className="grid grid-cols-1 gap-2 py-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <select
             value={row.kitab_id}
             onChange={e => updateAssignment(row.draft_id, { kitab_id: e.target.value })}
@@ -288,17 +290,17 @@ export default function GuruKitabPageContent() {
         <div className="relative">
           <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <select value={marhalahId} onChange={async e => { setMarhalahId(e.target.value); await loadData(tahunAjaranId, e.target.value) }} className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="SEMUA">Semua marhalah</option>
+            <option value="">Pilih marhalah dulu</option>
             {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
           </select>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari kelas..." className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input disabled={!marhalahId} value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari kelas..." className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400" />
         </div>
         <div className="relative">
           <UsersRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <select value={guruFilter} onChange={e => setGuruFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+          <select disabled={!marhalahId} value={guruFilter} onChange={e => setGuruFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400">
             <option value="">Semua guru</option>
             {guruList.map(guru => <option key={guru.id} value={guru.id}>{guru.nama_lengkap}</option>)}
           </select>
@@ -309,27 +311,32 @@ export default function GuruKitabPageContent() {
         <div className="rounded-2xl border bg-white py-20 text-center text-slate-400">
           <Loader2 className="mx-auto h-8 w-8 animate-spin" />
         </div>
+      ) : !marhalahId ? (
+        <div className="rounded-2xl border border-dashed bg-white py-20 text-center text-slate-400">
+          <p className="font-bold text-slate-600">Pilih marhalah dulu</p>
+          <p className="mt-1 text-sm">Data kelas dan kitab baru dimuat setelah filter marhalah dipilih.</p>
+        </div>
       ) : filteredKelas.length === 0 ? (
-        <div className="rounded-2xl border bg-white py-20 text-center text-slate-400">Tidak ada kelas untuk filter ini.</div>
+        <div className="rounded-2xl border bg-white py-20 text-center text-slate-400">Tidak ada kelas untuk marhalah/filter ini.</div>
       ) : (
         <div className="space-y-4">
           {filteredKelas.map(kelas => (
             <section key={kelas.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
-                <div>
+              <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
                   <p className="text-base font-black text-slate-900">{kelas.nama_kelas}</p>
                   <p className="text-xs font-semibold text-slate-500">{kelas.marhalah_nama}</p>
                 </div>
-                <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
+                <div className="flex max-w-full flex-wrap gap-2 text-[11px] font-bold text-slate-500 md:justify-end">
                   {SESSION_META.map(session => (
-                    <span key={session.key} className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                    <span key={session.key} className="max-w-full truncate rounded-full border border-slate-200 bg-white px-2.5 py-1">
                       {session.label}: {defaultGuruName(kelas, session.key)}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 divide-y divide-slate-100 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+              <div className="grid grid-cols-1 divide-y divide-slate-100 xl:grid-cols-3 xl:divide-x xl:divide-y-0">
                 {SESSION_META.map(session => {
                   const gabungan = gabunganByKelasSesi.get(`${kelas.id}|${session.key}`)
                   return (
@@ -355,25 +362,26 @@ export default function GuruKitabPageContent() {
                           <button type="button" onClick={() => addAssignment(kelas, session.key)} title="Tambah kitab" className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-emerald-600 hover:bg-emerald-100">
                             <Plus className="h-4 w-4" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOverrideHariIndex(1)
+                              setOverrideModal({ kelasId: kelas.id, sesi: session.key })
+                            }}
+                            title="Override harian"
+                            className="relative rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+                          >
+                            <Settings2 className="h-4 w-4" />
+                            {HARI_LIST.reduce((total, day) => total + assignmentsFor(kelas.id, session.key, day.index).length, 0) > 0 ? (
+                              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-black text-white">
+                                {HARI_LIST.reduce((total, day) => total + assignmentsFor(kelas.id, session.key, day.index).length, 0)}
+                              </span>
+                            ) : null}
+                          </button>
                         </div>
                       </div>
                       <div className="divide-y divide-slate-100">
                         {renderAssignmentRows(kelas, session.key)}
-                      </div>
-                      <div className="mt-3 grid grid-cols-4 gap-1">
-                        {HARI_LIST.map(day => {
-                          const count = assignmentsFor(kelas.id, session.key, day.index).length
-                          return (
-                            <button
-                              key={day.index}
-                              type="button"
-                              onClick={() => setOverrideModal({ kelasId: kelas.id, sesi: session.key, hariIndex: day.index })}
-                              className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold ${count ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-                            >
-                              {day.label.slice(0, 3)} {count ? `(${count})` : ''}
-                            </button>
-                          )
-                        })}
                       </div>
                     </div>
                   )
@@ -391,7 +399,7 @@ export default function GuruKitabPageContent() {
               <div>
                 <p className="text-xs font-bold uppercase text-indigo-600">{activeOverrideClass.nama_kelas}</p>
                 <h3 className="text-lg font-black text-slate-900">
-                  Override {SESSION_META.find(item => item.key === overrideModal.sesi)?.label} - {HARI_LIST.find(day => day.index === overrideModal.hariIndex)?.label}
+                  Override Harian {SESSION_META.find(item => item.key === overrideModal.sesi)?.label}
                 </h3>
               </div>
               <button onClick={() => setOverrideModal(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -399,11 +407,32 @@ export default function GuruKitabPageContent() {
               </button>
             </div>
             <div className="overflow-y-auto p-5">
-              <p className="mb-3 text-sm text-slate-500">Kosong berarti memakai pembagian default sesi. Baris di sini hanya berlaku untuk hari yang dipilih.</p>
-              <div className="divide-y divide-slate-100">
-                {renderAssignmentRows(activeOverrideClass, overrideModal.sesi, overrideModal.hariIndex)}
+              <p className="mb-3 text-sm text-slate-500">Pilih hari di bawah. Kosong berarti memakai pembagian default sesi.</p>
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {HARI_LIST.map(day => {
+                  const count = assignmentsFor(activeOverrideClass.id, overrideModal.sesi, day.index).length
+                  return (
+                    <button
+                      key={day.index}
+                      type="button"
+                      onClick={() => setOverrideHariIndex(day.index)}
+                      className={`rounded-xl border px-3 py-2 text-xs font-bold ${
+                        overrideHariIndex === day.index
+                          ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                          : count
+                            ? 'border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {day.label} {count ? `(${count})` : ''}
+                    </button>
+                  )
+                })}
               </div>
-              <button type="button" onClick={() => addAssignment(activeOverrideClass, overrideModal.sesi, overrideModal.hariIndex)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+              <div className="divide-y divide-slate-100">
+                {renderAssignmentRows(activeOverrideClass, overrideModal.sesi, overrideHariIndex)}
+              </div>
+              <button type="button" onClick={() => addAssignment(activeOverrideClass, overrideModal.sesi, overrideHariIndex)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
                 <Plus className="h-4 w-4" />
                 Tambah Override
               </button>

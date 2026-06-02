@@ -57,11 +57,21 @@ export async function getGuruKitabSetup(tahunAjaranId?: number | null, marhalahI
     }
   }
 
-  const params: unknown[] = [tahunId]
-  const marhalahClause =
-    marhalahId && marhalahId !== 'SEMUA'
-      ? (params.push(Number(marhalahId)), 'AND k.marhalah_id = ?')
-      : ''
+  if (!marhalahId) {
+    return {
+      tahunAjaranAktif: aktif,
+      tahunAjaranList,
+      marhalahList,
+      guruList,
+      kelasList: [],
+      kitabList: [],
+      assignments: [],
+      gabunganList: [],
+      defaultMapel: [],
+    }
+  }
+
+  const params: unknown[] = [tahunId, Number(marhalahId)]
 
   const kelasList = await query<any>(`
     SELECT
@@ -80,7 +90,7 @@ export async function getGuruKitabSetup(tahunAjaranId?: number | null, marhalahI
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
-    WHERE k.tahun_ajaran_id = ? ${marhalahClause}
+    WHERE k.tahun_ajaran_id = ? AND k.marhalah_id = ?
     ORDER BY m.urutan, k.nama_kelas
   `, params)
 
