@@ -265,6 +265,22 @@ export function buildAssignmentLookup(rows: GuruKitabAssignmentRow[]) {
   return map
 }
 
+function getAssignmentsForEhbSlot(
+  lookup: Map<string, GuruKitabAssignmentRow[]>,
+  kelasId: string,
+  hariIndex: number,
+  mapelId: number
+) {
+  const harian = GURU_KITAB_SESSIONS.flatMap(sesi => lookup.get(`${kelasId}|${sesi}|${hariIndex}`) || [])
+  const defaults = GURU_KITAB_SESSIONS.flatMap(sesi => lookup.get(`${kelasId}|${sesi}|default`) || [])
+  const rows = (harian.length > 0 ? harian : defaults)
+    .filter(item => Number(item.mapel_id) === Number(mapelId))
+
+  if (rows.length > 0 || harian.length === 0) return rows
+
+  return defaults.filter(item => Number(item.mapel_id) === Number(mapelId))
+}
+
 export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruKitabResolvedRow[]> {
   await ensureGuruKitabSchema()
   const event = await queryOne<{ tahun_ajaran_id: number }>('SELECT tahun_ajaran_id FROM ehb_event WHERE id = ?', [eventId])
@@ -276,14 +292,21 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
       s.label AS sesi_label, s.jam_group,
       k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
       mp.nama AS mapel_nama,
-      (
+      COALESCE(NULLIF((
         SELECT COUNT(DISTINCT ps.santri_id)
         FROM ehb_plotting_santri ps
         JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id
           AND rp.kelas_id = j.kelas_id
           AND rp.status_riwayat = 'aktif'
         WHERE ps.ehb_event_id = j.ehb_event_id
-      ) AS jumlah_santri
+      ), 0), (
+        SELECT COUNT(DISTINCT rp.santri_id)
+        FROM riwayat_pendidikan rp
+        JOIN santri s ON s.id = rp.santri_id
+        WHERE rp.kelas_id = j.kelas_id
+          AND rp.status_riwayat = 'aktif'
+          AND s.status_global IN ('aktif', 'nonaktif_sementara')
+      )) AS jumlah_santri
     FROM ehb_jadwal j
     JOIN ehb_sesi s ON s.id = j.sesi_id
     JOIN kelas k ON k.id = j.kelas_id
@@ -299,13 +322,13 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
   const resolved: GuruKitabResolvedRow[] = []
 
   for (const jadwal of jadwalRows) {
-    const sesi = normalizeEhbSession(jadwal.jam_group)
-    if (!sesi) continue
     const hariIndex = getHariIndexFromDate(jadwal.tanggal)
-    const harian = lookup.get(`${jadwal.kelas_id}|${sesi}|${hariIndex}`) || []
-    const defaults = lookup.get(`${jadwal.kelas_id}|${sesi}|default`) || []
-    const candidates = (harian.length > 0 ? harian : defaults)
-      .filter(item => Number(item.mapel_id) === Number(jadwal.mapel_id))
+    const candidates = getAssignmentsForEhbSlot(
+      lookup,
+      jadwal.kelas_id,
+      hariIndex,
+      Number(jadwal.mapel_id)
+    )
 
     const seenGuru = new Set<number>()
     for (const item of candidates) {
@@ -316,7 +339,7 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
         tanggal: jadwal.tanggal,
         sesi_id: Number(jadwal.sesi_id),
         sesi_label: jadwal.sesi_label || '',
-        sesi,
+        sesi: item.sesi,
         hari_index: hariIndex,
         kelas_id: jadwal.kelas_id,
         nama_kelas: jadwal.nama_kelas,
@@ -329,7 +352,7 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
         guru_id: item.guru_id,
         guru_nama: item.guru_nama,
         jumlah_santri: Number(jadwal.jumlah_santri || 0),
-        source: harian.length > 0 ? 'override' : item.source,
+        source: item.hari_index == null ? item.source : 'override',
       })
     }
   }
