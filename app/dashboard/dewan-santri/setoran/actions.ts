@@ -4,6 +4,9 @@ import { query, queryOne, execute, batch, generateId } from '@/lib/db'
 import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
+
+const EXCLUDE_NON_SPP_ASRAMA_SQL = "AND UPPER(TRIM(COALESCE(asrama, ''))) <> 'AL-BAGHORY'"
 
 function assertMonitoringAccess(session: Awaited<ReturnType<typeof getSession>>) {
   if (!session || !hasAnyRole(session, ['admin', 'dewan_santri'])) {
@@ -109,6 +112,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
           END AS unit_setor
         FROM santri
         WHERE status_global = 'aktif'
+          ${EXCLUDE_NON_SPP_ASRAMA_SQL}
       ),
       bayar_ini AS (
         SELECT DISTINCT santri_id
@@ -160,7 +164,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
             nama_penyetor,
             jumlah_aktual
      FROM spp_setoran
-     WHERE tahun = ? AND bulan = ?`,
+     WHERE tahun = ? AND bulan = ?
+       AND UPPER(TRIM(COALESCE(NULLIF(TRIM(unit_setor), ''), asrama, ''))) <> 'AL-BAGHORY'`,
     [tahun, bulan]
   )
   const setoranMap = new Map(setoranRows.map(r => [r.effective_unit_setor || '', r]))
@@ -200,6 +205,9 @@ export async function simpanSetoran(
     assertMonitoringAccess(session)
     const cleanUnit = String(unitSetor ?? '').trim().toUpperCase()
     if (!cleanUnit) return { error: 'Unit setor tidak valid.' }
+    if (isAsramaTanpaKamar(cleanUnit)) {
+      return { error: 'Asrama ini tidak memiliki kewajiban SPP.' }
+    }
 
     await batch([
       {

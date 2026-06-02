@@ -3,6 +3,7 @@
 import { query } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { getSppScope, SADESA_UNIT } from '@/lib/spp/unit-setor'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 export async function getStatusSetoranSaya(tahun: number) {
   const session = await getSession()
@@ -13,6 +14,10 @@ export async function getStatusSetoranSaya(tahun: number) {
   }
 
   const unitSetor = scope.kind === 'SADESA' ? SADESA_UNIT : scope.defaultUnit
+  if (isAsramaTanpaKamar(unitSetor)) {
+    return { error: 'Asrama ini tidak memiliki kewajiban SPP.' }
+  }
+
   const data = await query<any>(`
     SELECT ss.bulan, ss.tanggal_terima, u.full_name AS penerima_nama
     FROM spp_setoran ss

@@ -5,6 +5,7 @@ import { getSession, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 type SppClientScope = {
   kind: 'ASRAMA' | 'SADESA' | 'ADMIN'
@@ -23,6 +24,9 @@ function assertRequestedUnit(scope: ReturnType<typeof getSppScope>, unitSetor: s
   if (!scope) throw new Error('Akses ditolak')
   const cleanUnit = String(unitSetor ?? '').trim().toUpperCase()
   if (!cleanUnit) throw new Error('Unit setor wajib dipilih')
+  if (isAsramaTanpaKamar(cleanUnit)) {
+    throw new Error('Asrama ini tidak memiliki kewajiban SPP.')
+  }
   if (scope.kind === 'ASRAMA' && cleanUnit !== scope.defaultUnit) {
     throw new Error('Anda hanya boleh mengelola asrama binaan Anda')
   }
@@ -48,6 +52,9 @@ async function assertSantriAccess(session: SessionUser | null, santriId: string)
   )
 
   if (!santri) throw new Error('Santri tidak ditemukan.')
+  if (isAsramaTanpaKamar(santri.asrama)) {
+    throw new Error('Santri asrama ini tidak memiliki kewajiban SPP.')
+  }
 
   const sadesa = isSadesaCategory(santri.kategori_santri)
 
