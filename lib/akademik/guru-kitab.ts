@@ -276,9 +276,23 @@ function getAssignmentsForEhbSlot(
   const rows = (harian.length > 0 ? harian : defaults)
     .filter(item => Number(item.mapel_id) === Number(mapelId))
 
-  if (rows.length > 0 || harian.length === 0) return rows
+  if (rows.length > 0 || harian.length === 0) return dedupeAssignmentsForHonor(rows)
 
-  return defaults.filter(item => Number(item.mapel_id) === Number(mapelId))
+  return dedupeAssignmentsForHonor(defaults.filter(item => Number(item.mapel_id) === Number(mapelId)))
+}
+
+function dedupeAssignmentsForHonor(rows: GuruKitabAssignmentRow[]) {
+  const seen = new Set<string>()
+  const deduped: GuruKitabAssignmentRow[] = []
+
+  for (const row of rows) {
+    const key = `${row.guru_id}|${row.mapel_id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(row)
+  }
+
+  return deduped
 }
 
 export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruKitabResolvedRow[]> {
@@ -320,6 +334,7 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
   const assignments = await getGuruKitabAssignments(event.tahun_ajaran_id, kelasIds)
   const lookup = buildAssignmentLookup(assignments)
   const resolved: GuruKitabResolvedRow[] = []
+  const resolvedPackages = new Set<string>()
 
   for (const jadwal of jadwalRows) {
     const hariIndex = getHariIndexFromDate(jadwal.tanggal)
@@ -333,7 +348,10 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
     const seenGuru = new Set<number>()
     for (const item of candidates) {
       if (seenGuru.has(item.guru_id)) continue
+      const packageKey = `${jadwal.kelas_id}|${jadwal.mapel_id}|${item.guru_id}`
+      if (resolvedPackages.has(packageKey)) continue
       seenGuru.add(item.guru_id)
+      resolvedPackages.add(packageKey)
       resolved.push({
         ehb_event_id: eventId,
         tanggal: jadwal.tanggal,

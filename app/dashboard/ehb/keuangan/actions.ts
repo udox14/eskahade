@@ -993,9 +993,13 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     }))
 
   const pemeriksaanMap = new Map<number, HonorItem & { details: string[] }>()
+  const pemeriksaanPackages = new Set<string>()
   for (const row of pemeriksaanResolvedRows) {
     const qty = Number(row.jumlah_santri || 0)
     if (qty <= 0) continue
+    const packageKey = `${row.kelas_id}|${row.mapel_id}|${row.guru_id}`
+    if (pemeriksaanPackages.has(packageKey)) continue
+    pemeriksaanPackages.add(packageKey)
     if (!pemeriksaanMap.has(row.guru_id)) {
       pemeriksaanMap.set(row.guru_id, {
         id: `periksa-${row.guru_id}`,
