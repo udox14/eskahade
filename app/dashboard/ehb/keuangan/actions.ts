@@ -880,17 +880,19 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       SELECT
         k.wali_kelas_id as wali_id,
         COALESCE(u.full_name, 'Wali kelas belum diatur') as nama,
-        COUNT(rp.santri_id) as qty,
-        GROUP_CONCAT(k.nama_kelas, ', ') as detail
-      FROM kelas k
+        COUNT(DISTINCT ps.santri_id) as qty,
+        GROUP_CONCAT(DISTINCT k.nama_kelas) as detail
+      FROM ehb_plotting_santri ps
+      JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
+      JOIN santri s ON s.id = ps.santri_id AND s.status_global = 'aktif'
+      JOIN kelas k ON k.id = rp.kelas_id
       JOIN marhalah m ON m.id = k.marhalah_id
-      JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
       LEFT JOIN users u ON u.id = k.wali_kelas_id
       JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
-      WHERE m.nama NOT LIKE '%Mutawassithah%'
+      WHERE ps.ehb_event_id = ? AND m.nama NOT LIKE '%Mutawassithah%'
       GROUP BY k.wali_kelas_id, u.full_name
       ORDER BY u.full_name
-    `, [eventId]),
+    `, [eventId, eventId]),
     getGuruKitabResolvedForEhb(eventId),
     query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
       WITH hadir AS (
