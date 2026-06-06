@@ -794,9 +794,17 @@ export async function skipAutoPotongToday(santriId: string, reason: string): Pro
 export async function runAutoPotongNow() {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
-  if (!hasRole(session, 'admin')) return { error: 'Hanya admin yang dapat menjalankan auto-potong manual.' }
+  const isAdmin = hasRole(session, 'admin')
+  const isPengurusAsrama = hasRole(session, 'pengurus_asrama')
+  if (!isAdmin && !isPengurusAsrama) return { error: 'Hanya admin atau pengurus asrama yang dapat menjalankan auto-potong manual.' }
+  if (!isAdmin && !session.asrama_binaan) return { error: 'Pengurus asrama belum memiliki asrama binaan.' }
+
   const db = await getDB()
-  const result = await runUangJajanAutoPotong(db)
+  const result = await runUangJajanAutoPotong(
+    db,
+    new Date(),
+    isAdmin ? undefined : { asrama: session.asrama_binaan ?? undefined }
+  )
   revalidatePath(UANG_JAJAN_PATH)
   revalidatePath(MONITORING_PATH)
   return { success: true, result }

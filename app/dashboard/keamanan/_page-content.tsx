@@ -5,7 +5,9 @@ import {
   getMasterPelanggaran, tambahMasterPelanggaran, editMasterPelanggaran,
   hapusMasterPelanggaran, cariSantri, simpanPelanggaran, hapusPelanggaran,
   getDaftarPelanggar, getDetailSantri, importMasterPelanggaranMassal,
+  getOpsiExportPelanggaran, getDataExportPelanggaran,
 } from './actions'
+import type { ExportPelanggaranFilter } from './actions'
 import {
   ShieldAlert, Plus, Search, Loader2, X, Trash2, Edit2,
   ChevronLeft, ChevronRight, BookOpen, Camera,
@@ -430,6 +432,222 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
   )
 }
 
+type ExportSantriOption = {
+  id: string
+  nama_lengkap: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
+}
+
+function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
+  const [loadingOpts, setLoadingOpts] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [asramas, setAsramas] = useState<string[]>([])
+  const [santri, setSantri] = useState<ExportSantriOption[]>([])
+  const [selectedAsramas, setSelectedAsramas] = useState<string[]>([])
+  const [selectedSantriIds, setSelectedSantriIds] = useState<string[]>([])
+  const [tanggalMulai, setTanggalMulai] = useState('')
+  const [tanggalSelesai, setTanggalSelesai] = useState('')
+  const [keyword, setKeyword] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    getOpsiExportPelanggaran().then(res => {
+      if (!alive) return
+      if ('error' in res) {
+        toast.error(res.error)
+        onClose()
+        return
+      }
+      setAsramas(res.asramas)
+      setSantri(res.santri)
+      setLoadingOpts(false)
+    })
+    return () => { alive = false }
+  }, [onClose])
+
+  const toggleAsrama = (asrama: string) => {
+    setSelectedAsramas(prev => prev.includes(asrama) ? prev.filter(item => item !== asrama) : [...prev, asrama])
+  }
+
+  const toggleSantri = (id: string) => {
+    setSelectedSantriIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
+  }
+
+  const filteredSantri = santri.filter(item => {
+    const q = keyword.trim().toLowerCase()
+    const matchKeyword = !q || item.nama_lengkap.toLowerCase().includes(q) || String(item.nis || '').toLowerCase().includes(q)
+    const matchAsrama = selectedAsramas.length === 0 || selectedAsramas.includes(item.asrama || '')
+    return matchKeyword && matchAsrama
+  })
+
+  const selectedSantri = santri.filter(item => selectedSantriIds.includes(item.id))
+  const activeFilters = selectedAsramas.length + selectedSantriIds.length + (tanggalMulai ? 1 : 0) + (tanggalSelesai ? 1 : 0)
+
+  const handleExport = async () => {
+    if (tanggalMulai && tanggalSelesai && tanggalMulai > tanggalSelesai) {
+      toast.error('Tanggal mulai tidak boleh lebih besar dari tanggal selesai')
+      return
+    }
+
+    setExporting(true)
+    try {
+      const filter: ExportPelanggaranFilter = {
+        asramas: selectedAsramas.length ? selectedAsramas : undefined,
+        santriIds: selectedSantriIds.length ? selectedSantriIds : undefined,
+        tanggalMulai: tanggalMulai || undefined,
+        tanggalSelesai: tanggalSelesai || undefined,
+      }
+      const res = await getDataExportPelanggaran(filter)
+      if ('error' in res) { toast.error(res.error); return }
+      if (res.rows.length === 0) { toast.info('Tidak ada data sesuai pilihan export'); return }
+
+      const XLSX = await import('xlsx')
+      const rows = res.rows.map((row: any, index: number) => ({
+        No: index + 1,
+        'Tanggal Pelanggaran': row.tanggal || '',
+        'Waktu Input': row.created_at || '',
+        NIS: row.nis || '',
+        'Nama Santri': row.nama_lengkap || '',
+        Asrama: row.asrama || '',
+        Kamar: row.kamar || '',
+        Kategori: row.jenis || '',
+        'Nama Pelanggaran': row.nama_pelanggaran || '',
+        Deskripsi: row.deskripsi || '',
+        Poin: Number(row.poin || 0),
+        Penindak: row.penindak_nama || '',
+        'Foto Bukti': row.foto_url || '',
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [
+        { wch: 6 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 28 },
+        { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 26 }, { wch: 42 },
+        { wch: 8 }, { wch: 22 }, { wch: 32 },
+      ]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Pelanggaran')
+
+      const suffix = [tanggalMulai, tanggalSelesai].filter(Boolean).join('_sd_') || new Date().toISOString().slice(0, 10)
+      XLSX.writeFile(wb, `Export_Pelanggaran_${suffix}.xlsx`)
+      toast.success(`${res.rows.length} baris pelanggaran diexport`)
+      onClose()
+    } catch (error: any) {
+      toast.error(`Export gagal: ${error?.message || 'kesalahan tidak diketahui'}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 text-sm">Export Pelanggaran</p>
+              <p className="text-[10px] text-slate-400">{activeFilters > 0 ? `${activeFilters} pilihan aktif` : 'Kosongkan pilihan untuk export semua data'}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {loadingOpts ? (
+            <div className="flex justify-center py-16 gap-2 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat opsi export...</span>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Mulai</label>
+                  <input type="date" value={tanggalMulai} onChange={e => setTanggalMulai(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Selesai</label>
+                  <input type="date" value={tanggalSelesai} onChange={e => setTanggalSelesai(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asrama</label>
+                  {selectedAsramas.length > 0 && <button onClick={() => setSelectedAsramas([])} className="text-[10px] font-bold text-red-500 hover:underline">hapus pilihan</button>}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {asramas.map(asrama => (
+                    <button key={asrama} onClick={() => toggleAsrama(asrama)}
+                      className={cn('px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95',
+                        selectedAsramas.includes(asrama) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400')}>
+                      {asrama}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Santri</label>
+                  {selectedSantriIds.length > 0 && <button onClick={() => setSelectedSantriIds([])} className="text-[10px] font-bold text-red-500 hover:underline">hapus pilihan</button>}
+                </div>
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input type="text" value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="Cari santri di data pelanggaran..."
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
+                </div>
+                {selectedSantri.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {selectedSantri.slice(0, 8).map(item => (
+                      <button key={item.id} onClick={() => toggleSantri(item.id)}
+                        className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                        {item.nama_lengkap} x
+                      </button>
+                    ))}
+                    {selectedSantri.length > 8 && <span className="px-2 py-1 text-[11px] text-slate-400">+{selectedSantri.length - 8} lagi</span>}
+                  </div>
+                )}
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
+                  {filteredSantri.length === 0 ? (
+                    <p className="text-center text-sm text-slate-400 py-8">Tidak ada santri yang cocok</p>
+                  ) : filteredSantri.slice(0, 80).map(item => (
+                    <button key={item.id} onClick={() => toggleSantri(item.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-emerald-50 transition-colors">
+                      {selectedSantriIds.includes(item.id) ? <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" /> : <Square className="w-4 h-4 text-slate-300 shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{item.nama_lengkap}</p>
+                        <p className="text-xs text-slate-400">{item.nis || '-'} · {item.asrama || '-'}/{item.kamar || '-'}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {filteredSantri.length > 80 && <p className="mt-1 text-[10px] text-slate-400">Menampilkan 80 hasil pertama, gunakan pencarian untuk mempersempit.</p>}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 shrink-0 bg-slate-50/50 flex gap-2">
+          <button onClick={onClose}
+            className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-colors">
+            Batal
+          </button>
+          <button onClick={handleExport} disabled={loadingOpts || exporting}
+            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-sm">
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {exporting ? 'Menyiapkan XLSX...' : 'Download XLSX'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // TAB DAFTAR PELANGGAR
 function TabDaftar({ masterList }: { masterList: any[] }) {
   const [rows, setRows] = useState<any[]>([])
@@ -442,6 +660,7 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
   const [search, setSearch] = useState('')
   const [modalId, setModalId] = useState<string | null>(null)
   const [showModalInput, setShowModalInput] = useState(false)
+  const [showModalExport, setShowModalExport] = useState(false)
 
   const load = useCallback(async (pg = 1, s = search) => {
     setLoading(true)
@@ -474,6 +693,11 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Catat Pelanggaran</span>
           <span className="sm:hidden">Catat</span>
+        </button>
+        <button onClick={() => setShowModalExport(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap">
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Export</span>
         </button>
       </div>
 
@@ -572,6 +796,7 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
       )}
       {modalId && <ModalDetail santriId={modalId} onClose={() => setModalId(null)} />}
       {showModalInput && <ModalInputPelanggaran masterList={masterList} onClose={() => setShowModalInput(false)} onSuccess={() => load(1, search)} />}
+      {showModalExport && <ModalExportPelanggaran onClose={() => setShowModalExport(false)} />}
     </div>
   )
 }

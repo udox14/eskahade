@@ -35,3 +35,6 @@
 [layout] session null → redirect /login
  GET /dashboard/laporan/rapor 307 in 1843ms (compile: 1646ms, render: 197ms)
 ✓ Compiled in 180ms
+ GET / 200 in 830ms (compile: 203ms, render: 628ms)
+ GET / 200 in 553ms (compile: 144ms, render: 409ms)
+ GET / 200 in 539ms (compile: 183ms, render: 356ms)

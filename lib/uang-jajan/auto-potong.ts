@@ -44,6 +44,10 @@ type Statement = {
   params: unknown[]
 }
 
+type AutoPotongOptions = {
+  asrama?: string | string[]
+}
+
 const WIB_TIME_ZONE = 'Asia/Jakarta'
 
 function getWibSnapshot(now = new Date()) {
@@ -90,15 +94,21 @@ async function runBatch(db: D1Database, statements: Statement[]) {
   }
 }
 
-export async function runUangJajanAutoPotong(db: D1Database, now = new Date()): Promise<AutoPotongResult> {
+export async function runUangJajanAutoPotong(db: D1Database, now = new Date(), options: AutoPotongOptions = {}): Promise<AutoPotongResult> {
   const wib = getWibSnapshot(now)
+  const asramaFilter = Array.isArray(options.asrama)
+    ? options.asrama.filter(Boolean)
+    : options.asrama
+      ? [options.asrama]
+      : []
+  const asramaFilterSql = asramaFilter.length ? ` AND asrama IN (${asramaFilter.map(() => '?').join(',')})` : ''
 
   const settings = await queryAll<SettingRow>(
     db,
     `SELECT asrama, mode, jam, days, is_active
      FROM uang_jajan_auto_setting
-     WHERE mode = 'AUTO' AND is_active = 1 AND jam <= ?`,
-    [wib.time]
+     WHERE mode = 'AUTO' AND is_active = 1 AND jam <= ?${asramaFilterSql}`,
+    [wib.time, ...asramaFilter]
   )
 
   const activeSettings = settings.filter(setting => parseDays(setting.days).includes(wib.day))

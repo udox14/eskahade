@@ -19,6 +19,13 @@ type ImportMasterPelanggaranRow = {
   urutan?: unknown
 }
 
+export type ExportPelanggaranFilter = {
+  santriIds?: string[]
+  asramas?: string[]
+  tanggalMulai?: string
+  tanggalSelesai?: string
+}
+
 function cleanText(value: unknown) {
   return String(value ?? '').trim()
 }
@@ -412,6 +419,81 @@ export async function getDaftarPelanggar(params: {
 
 // ─── DETAIL SANTRI (lazy, dipanggil saat modal dibuka) ───────────────────────
 // 3 query parallel — riwayat pelanggaran + surat pernyataan + surat perjanjian
+export async function getOpsiExportPelanggaran() {
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+
+  const [asramaRows, santriRows] = await Promise.all([
+    query<{ asrama: string }>(
+      `SELECT DISTINCT s.asrama
+       FROM pelanggaran p
+       JOIN santri s ON s.id = p.santri_id
+       WHERE s.asrama IS NOT NULL AND s.asrama <> ''
+       ORDER BY s.asrama`
+    ),
+    query<{ id: string; nama_lengkap: string; nis: string | null; asrama: string | null; kamar: string | null }>(
+      `SELECT DISTINCT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar
+       FROM pelanggaran p
+       JOIN santri s ON s.id = p.santri_id
+       WHERE s.status_global IN ('aktif','keluar')
+       ORDER BY s.nama_lengkap`
+    ),
+  ])
+
+  return {
+    asramas: asramaRows.map(row => row.asrama),
+    santri: santriRows,
+  }
+}
+
+export async function getDataExportPelanggaran(filter: ExportPelanggaranFilter = {}) {
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+
+  const clauses = ["s.status_global IN ('aktif','keluar')"]
+  const params: any[] = []
+
+  const santriIds = Array.isArray(filter.santriIds)
+    ? filter.santriIds.map(cleanText).filter(Boolean)
+    : []
+  const asramas = Array.isArray(filter.asramas)
+    ? filter.asramas.map(cleanText).filter(Boolean)
+    : []
+
+  if (santriIds.length > 0) {
+    clauses.push(`s.id IN (${santriIds.map(() => '?').join(',')})`)
+    params.push(...santriIds)
+  }
+  if (asramas.length > 0) {
+    clauses.push(`s.asrama IN (${asramas.map(() => '?').join(',')})`)
+    params.push(...asramas)
+  }
+  if (filter.tanggalMulai) {
+    clauses.push('p.tanggal >= ?')
+    params.push(filter.tanggalMulai)
+  }
+  if (filter.tanggalSelesai) {
+    clauses.push('p.tanggal <= ?')
+    params.push(filter.tanggalSelesai)
+  }
+
+  const rows = await query<any>(
+    `SELECT p.id, p.tanggal, p.created_at, p.jenis, p.deskripsi, p.poin, p.foto_url,
+            s.nama_lengkap, s.nis, s.asrama, s.kamar,
+            mp.nama_pelanggaran,
+            u.full_name AS penindak_nama
+     FROM pelanggaran p
+     JOIN santri s ON s.id = p.santri_id
+     LEFT JOIN master_pelanggaran mp ON mp.id = p.master_id
+     LEFT JOIN users u ON u.id = p.penindak_id
+     WHERE ${clauses.join(' AND ')}
+     ORDER BY p.tanggal DESC, p.created_at DESC, s.nama_lengkap`,
+    params
+  )
+
+  return { rows }
+}
+
 export async function getDetailSantri(santriId: string) {
   const [profil, pelanggaran, suratPernyataan, suratPerjanjian] = await Promise.all([
     queryOne<any>(
