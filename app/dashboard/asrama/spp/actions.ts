@@ -474,7 +474,18 @@ export async function simpanTagihanDitiadakanKelasSPP(
     const scope = getScopeOrThrow(session)
     const cleanUnit = String(unitSetor ?? '').trim().toUpperCase()
     const cleanKelas = Number(kelasSekolah)
+    const cleanTahun = Number(tahun)
+    const cleanBulans = Array.from(new Set(bulans.map(Number))).filter(b => Number.isInteger(b) && b >= 1 && b <= 12).sort((a, b) => a - b)
+    const cleanAlasan = String(alasan || '').trim()
     if (!Number.isInteger(cleanKelas) || cleanKelas < 1 || cleanKelas > 13) return { error: 'Kelas sekolah tidak valid.' }
+    if (!Number.isInteger(cleanTahun) || cleanTahun < 2000) return { error: 'Tahun tidak valid.' }
+    if (!cleanBulans.length) return { error: 'Pilih minimal satu bulan.' }
+    if (!cleanAlasan) return { error: 'Alasan wajib diisi.' }
+
+    const billingStart = await getSppBillingStart()
+    if (cleanBulans.some(b => (cleanTahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))) {
+      return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+    }
 
     let where = `s.status_global = 'aktif'
       AND COALESCE(s.bebas_spp, 0) = 0
@@ -497,18 +508,66 @@ export async function simpanTagihanDitiadakanKelasSPP(
       }
     }
 
-    const rows = await query<{ id: string }>(
-      `SELECT s.id
+    const totalRow = await queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total
        FROM santri s
-       WHERE ${where}
-       ORDER BY s.nama_lengkap`,
+       WHERE ${where}`,
       params
     )
-    if (rows.length === 0) return { error: 'Tidak ada santri aktif yang cocok dengan kelas dan unit tersebut.' }
+    const santriCount = totalRow?.total ?? 0
+    if (santriCount === 0) return { error: 'Tidak ada santri aktif yang cocok dengan kelas dan unit tersebut.' }
 
-    const result = await simpanTagihanDitiadakanSPP(rows.map(row => row.id), tahun, bulans, alasan)
-    if ('error' in result) return result
-    return { ...result, santriCount: rows.length }
+    const now = new Date().toISOString()
+    let targetCount = 0
+    for (const bulan of cleanBulans) {
+      const countRow = await queryOne<{ total: number }>(
+        `SELECT COUNT(*) AS total
+         FROM santri s
+         WHERE ${where}
+           AND NOT EXISTS (
+             SELECT 1 FROM spp_log sl
+             WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
+           )`,
+        [...params, cleanTahun, bulan]
+      )
+      targetCount += countRow?.total ?? 0
+
+      await execute(
+        `INSERT INTO spp_tagihan_ditiadakan
+            (id, santri_id, tahun, bulan, alasan, is_active, created_by, created_at, updated_by, updated_at)
+         SELECT lower(hex(randomblob(16))), s.id, ?, ?, ?, 1, ?, ?, ?, ?
+         FROM santri s
+         WHERE ${where}
+           AND NOT EXISTS (
+             SELECT 1 FROM spp_log sl
+             WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
+           )
+         ON CONFLICT(santri_id, tahun, bulan) DO UPDATE SET
+           alasan = excluded.alasan,
+           is_active = 1,
+           updated_by = excluded.updated_by,
+           updated_at = excluded.updated_at`,
+        [cleanTahun, bulan, cleanAlasan, session?.id ?? null, now, session?.id ?? null, now, ...params, cleanTahun, bulan]
+      )
+    }
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'waive_monthly_bill_by_class',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'update',
+      entityType: 'santri_batch',
+      entityId: 'spp-tagihan-ditiadakan-kelas',
+      entityLabel: `Kelas ${cleanKelas}`,
+      summary: `Meniadakan tagihan SPP kelas ${cleanKelas} untuk ${cleanBulans.length} bulan`,
+      details: { unit_setor: cleanUnit, kelas_sekolah: cleanKelas, tahun: cleanTahun, bulan: cleanBulans, alasan: cleanAlasan },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/dewan-santri/surat')
+    return { success: true, count: targetCount, santriCount }
   } catch (error: any) {
     return { error: error?.message || 'Gagal meniadakan tagihan berdasarkan kelas.' }
   }
