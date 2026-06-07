@@ -136,6 +136,12 @@ function assertAdjustmentAccess(session: SessionUser | null) {
   }
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size))
+  return chunks
+}
+
 export async function getDashboardSPPKamar(tahun: number, unitSetor: string, kamar: string) {
   const session = await getSession()
   const scope = getScopeOrThrow(session)
@@ -398,20 +404,23 @@ export async function simpanTagihanDitiadakanSPP(
       if ((santri as any).bebas_spp === 1) return { error: `${santri.nama_lengkap || santri.nis || santriId} sudah bebas SPP permanen.` }
     }
 
-    const santriPh = uniqueSantriIds.map(() => '?').join(',')
     const bulanPh = cleanBulans.map(() => '?').join(',')
-    const paidRows = await query<{ santri_id: string; bulan: number; nama_lengkap: string | null }>(
-      `SELECT sl.santri_id, sl.bulan, s.nama_lengkap
-       FROM spp_log sl
-       LEFT JOIN santri s ON s.id = sl.santri_id
-       WHERE sl.santri_id IN (${santriPh})
-         AND sl.tahun = ?
-         AND sl.bulan IN (${bulanPh})`,
-      [...uniqueSantriIds, cleanTahun, ...cleanBulans]
-    )
-    if (paidRows.length > 0) {
-      const first = paidRows[0]
-      return { error: `${first.nama_lengkap || first.santri_id} bulan ${first.bulan} sudah tercatat lunas. Batalkan pembayaran dulu jika ingin meniadakan tagihan.` }
+    for (const santriChunk of chunkArray(uniqueSantriIds, 40)) {
+      const santriPh = santriChunk.map(() => '?').join(',')
+      const paidRows = await query<{ santri_id: string; bulan: number; nama_lengkap: string | null }>(
+        `SELECT sl.santri_id, sl.bulan, s.nama_lengkap
+         FROM spp_log sl
+         LEFT JOIN santri s ON s.id = sl.santri_id
+         WHERE sl.santri_id IN (${santriPh})
+           AND sl.tahun = ?
+           AND sl.bulan IN (${bulanPh})
+         LIMIT 1`,
+        [...santriChunk, cleanTahun, ...cleanBulans]
+      )
+      if (paidRows.length > 0) {
+        const first = paidRows[0]
+        return { error: `${first.nama_lengkap || first.santri_id} bulan ${first.bulan} sudah tercatat lunas. Batalkan pembayaran dulu jika ingin meniadakan tagihan.` }
+      }
     }
 
     const now = new Date().toISOString()
@@ -426,7 +435,9 @@ export async function simpanTagihanDitiadakanSPP(
               updated_at = excluded.updated_at`,
       params: [generateId(), santriId, cleanTahun, b, cleanAlasan, session?.id ?? null, now, session?.id ?? null, now],
     })))
-    await batch(statements)
+    for (const statementChunk of chunkArray(statements, 50)) {
+      await batch(statementChunk)
+    }
 
     await logActivity({
       actor: actorFromSession(session),
