@@ -450,6 +450,59 @@ export async function simpanTagihanDitiadakanSPP(
   }
 }
 
+export async function simpanTagihanDitiadakanKelasSPP(
+  unitSetor: string,
+  tahun: number,
+  bulans: number[],
+  kelasSekolah: number,
+  alasan: string
+): Promise<{ success: boolean; count: number; santriCount: number } | { error: string }> {
+  try {
+    const session = await getSession()
+    assertAdjustmentAccess(session)
+    const scope = getScopeOrThrow(session)
+    const cleanUnit = String(unitSetor ?? '').trim().toUpperCase()
+    const cleanKelas = Number(kelasSekolah)
+    if (!Number.isInteger(cleanKelas) || cleanKelas < 1 || cleanKelas > 13) return { error: 'Kelas sekolah tidak valid.' }
+
+    let where = `s.status_global = 'aktif'
+      AND COALESCE(s.bebas_spp, 0) = 0
+      AND s.kelas_sekolah IS NOT NULL
+      AND TRIM(s.kelas_sekolah) <> ''
+      AND CAST(s.kelas_sekolah AS INTEGER) = ?`
+    const params: any[] = [cleanKelas]
+
+    if (cleanUnit === 'SEMUA') {
+      if (scope.kind !== 'ADMIN') return { error: 'Hanya admin yang boleh memilih semua unit.' }
+      where += ` AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'`
+    } else {
+      const unit = assertRequestedUnit(scope, cleanUnit)
+      if (isSadesaUnit(unit)) {
+        where += ` AND s.kategori_santri = ?`
+        params.push(SADESA_CATEGORY)
+      } else {
+        where += ` AND COALESCE(s.kategori_santri, 'REGULER') != ? AND s.asrama = ?`
+        params.push(SADESA_CATEGORY, unit)
+      }
+    }
+
+    const rows = await query<{ id: string }>(
+      `SELECT s.id
+       FROM santri s
+       WHERE ${where}
+       ORDER BY s.nama_lengkap`,
+      params
+    )
+    if (rows.length === 0) return { error: 'Tidak ada santri aktif yang cocok dengan kelas dan unit tersebut.' }
+
+    const result = await simpanTagihanDitiadakanSPP(rows.map(row => row.id), tahun, bulans, alasan)
+    if ('error' in result) return result
+    return { ...result, santriCount: rows.length }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal meniadakan tagihan berdasarkan kelas.' }
+  }
+}
+
 export async function cabutTagihanDitiadakanSPP(santriId: string, tahun: number, bulan: number): Promise<{ success: boolean } | { error: string }> {
   try {
     const session = await getSession()

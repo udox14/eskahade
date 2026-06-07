@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, cabutTagihanDitiadakanSPP } from './actions'
+import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP } from './actions'
 import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards, Ban, CalendarX } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -64,6 +64,11 @@ export default function SPPPage() {
   const [waiveReason, setWaiveReason] = useState('')
   const [savingWaive, setSavingWaive] = useState(false)
   const [restoringWaiveKey, setRestoringWaiveKey] = useState<string | null>(null)
+  const [kelasWaive, setKelasWaive] = useState('9')
+  const [kelasWaiveUnit, setKelasWaiveUnit] = useState('SEMUA')
+  const [kelasWaiveMonths, setKelasWaiveMonths] = useState<number[]>([])
+  const [kelasWaiveReason, setKelasWaiveReason] = useState('')
+  const [savingKelasWaive, setSavingKelasWaive] = useState(false)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -79,6 +84,7 @@ export default function SPPPage() {
         if (!res) return
         setScope(res)
         setUnitSetor(res.defaultUnit)
+        setKelasWaiveUnit(res.kind === 'ADMIN' ? 'SEMUA' : res.defaultUnit)
       })
       .catch((error: any) => {
         toast.error(error?.message || 'Gagal memuat batas akses SPP.')
@@ -420,6 +426,27 @@ export default function SPPPage() {
     await refreshSelectedStatus()
   }
 
+  const toggleKelasWaiveMonth = (month: number) => {
+    if (isBeforeBillingStart(tahun, month)) return
+    setKelasWaiveMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a, b) => a - b))
+  }
+
+  const handleSimpanKelasWaive = async () => {
+    if (!kelasWaiveMonths.length) return toast.warning('Pilih minimal satu bulan.')
+    if (!kelasWaiveReason.trim()) return toast.warning('Alasan wajib diisi.')
+    if (!await confirm(`Tiadakan tagihan SPP kelas ${kelasWaive} untuk ${kelasWaiveMonths.length} bulan?`)) return
+    setSavingKelasWaive(true)
+    const res = await simpanTagihanDitiadakanKelasSPP(kelasWaiveUnit, tahun, kelasWaiveMonths, Number(kelasWaive), kelasWaiveReason)
+    setSavingKelasWaive(false)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(`Tidak ada tagihan tersimpan untuk ${res.santriCount} santri`)
+    setKelasWaiveReason('')
+    await refreshActiveList()
+  }
+
   const handleBackToList = () => { window.history.back() }
 
   const activeKamar = kamars[kamarIdx] ?? ''
@@ -550,6 +577,82 @@ export default function SPPPage() {
           ))}
         </div>
       </div>
+
+      {scope?.canAdjustBilling && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+          <div className="mb-3 flex items-center gap-2 text-blue-900">
+            <CalendarX className="h-5 w-5" />
+            <h2 className="text-base font-bold">Tidak Ada Tagihan Massal</h2>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1.2fr_.8fr_1.2fr]">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-blue-900">Unit</label>
+                <select
+                  value={kelasWaiveUnit}
+                  onChange={e => setKelasWaiveUnit(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {scope.kind === 'ADMIN' && <option value="SEMUA">Semua Unit</option>}
+                  {(scope.allowedUnits || []).map(unit => <option key={unit} value={unit}>{unit}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-blue-900">Kelas Sekolah</label>
+                <select
+                  value={kelasWaive}
+                  onChange={e => setKelasWaive(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {[7, 8, 9, 10, 11, 12].map(kelas => <option key={kelas} value={kelas}>Kelas {kelas}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-blue-900">Bulan</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {BULAN_LIST.map((bulanNama, idx) => {
+                  const month = idx + 1
+                  const selected = kelasWaiveMonths.includes(month)
+                  const disabled = isBeforeBillingStart(tahun, month)
+                  return (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => !disabled && toggleKelasWaiveMonth(month)}
+                      disabled={disabled}
+                      title={bulanNama}
+                      className={`h-9 rounded-lg border text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
+                        selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-blue-100 bg-white text-slate-600 hover:border-blue-300'
+                      }`}
+                    >
+                      {bulanNama.slice(0, 3)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label className="block text-xs font-bold text-blue-900">Alasan</label>
+              <textarea
+                value={kelasWaiveReason}
+                onChange={e => setKelasWaiveReason(e.target.value)}
+                rows={3}
+                placeholder="Contoh: Pulang libur kenaikan kelas / EHB hanya satu pekan."
+                className="min-h-20 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleSimpanKelasWaive}
+                disabled={savingKelasWaive}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60"
+              >
+                {savingKelasWaive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Simpan Massal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KAMAR NAVIGATOR */}
       {loadingKamars ? (
