@@ -69,6 +69,7 @@ export default function SPPPage() {
   const [kelasWaiveMonths, setKelasWaiveMonths] = useState<number[]>([])
   const [kelasWaiveReason, setKelasWaiveReason] = useState('')
   const [savingKelasWaive, setSavingKelasWaive] = useState(false)
+  const [kelasWaiveModalOpen, setKelasWaiveModalOpen] = useState(false)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -444,6 +445,7 @@ export default function SPPPage() {
     }
     toast.success(`Tidak ada tagihan tersimpan untuk ${res.santriCount} santri`)
     setKelasWaiveReason('')
+    setKelasWaiveModalOpen(false)
     await refreshActiveList()
   }
 
@@ -576,83 +578,17 @@ export default function SPPPage() {
             </button>
           ))}
         </div>
+        {scope?.canAdjustBilling && (
+          <button
+            type="button"
+            onClick={() => setKelasWaiveModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50"
+          >
+            <CalendarX className="h-4 w-4" />
+            Tidak Ada Tagihan
+          </button>
+        )}
       </div>
-
-      {scope?.canAdjustBilling && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-          <div className="mb-3 flex items-center gap-2 text-blue-900">
-            <CalendarX className="h-5 w-5" />
-            <h2 className="text-base font-bold">Tidak Ada Tagihan Massal</h2>
-          </div>
-          <div className="grid gap-3 md:grid-cols-[1.2fr_.8fr_1.2fr]">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-bold text-blue-900">Unit</label>
-                <select
-                  value={kelasWaiveUnit}
-                  onChange={e => setKelasWaiveUnit(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {scope.kind === 'ADMIN' && <option value="SEMUA">Semua Unit</option>}
-                  {(scope.allowedUnits || []).map(unit => <option key={unit} value={unit}>{unit}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-blue-900">Kelas Sekolah</label>
-                <select
-                  value={kelasWaive}
-                  onChange={e => setKelasWaive(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {[7, 8, 9, 10, 11, 12].map(kelas => <option key={kelas} value={kelas}>Kelas {kelas}</option>)}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-blue-900">Bulan</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {BULAN_LIST.map((bulanNama, idx) => {
-                  const month = idx + 1
-                  const selected = kelasWaiveMonths.includes(month)
-                  const disabled = isBeforeBillingStart(tahun, month)
-                  return (
-                    <button
-                      key={month}
-                      type="button"
-                      onClick={() => !disabled && toggleKelasWaiveMonth(month)}
-                      disabled={disabled}
-                      title={bulanNama}
-                      className={`h-9 rounded-lg border text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
-                        selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-blue-100 bg-white text-slate-600 hover:border-blue-300'
-                      }`}
-                    >
-                      {bulanNama.slice(0, 3)}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <label className="block text-xs font-bold text-blue-900">Alasan</label>
-              <textarea
-                value={kelasWaiveReason}
-                onChange={e => setKelasWaiveReason(e.target.value)}
-                rows={3}
-                placeholder="Contoh: Pulang libur kenaikan kelas / EHB hanya satu pekan."
-                className="min-h-20 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleSimpanKelasWaive}
-                disabled={savingKelasWaive}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60"
-              >
-                {savingKelasWaive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Simpan Massal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* KAMAR NAVIGATOR */}
       {loadingKamars ? (
@@ -765,6 +701,91 @@ export default function SPPPage() {
               <CalendarX className="w-4 h-4"/> Set Tidak Ada Tagihan
             </button>
           )}
+          </div>
+        </div>
+      )}
+      {kelasWaiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-slate-100 p-5">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Tidak Ada Tagihan Massal</h3>
+                <p className="mt-1 text-xs text-slate-500">Tiadakan tagihan SPP berdasarkan kelas sekolah dan bulan tertentu.</p>
+              </div>
+              <button onClick={() => setKelasWaiveModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4"/></button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-500">Unit</label>
+                  <select
+                    value={kelasWaiveUnit}
+                    onChange={e => setKelasWaiveUnit(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {scope?.kind === 'ADMIN' && <option value="SEMUA">Semua Unit</option>}
+                    {(scope?.allowedUnits || []).map(unit => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-500">Kelas Sekolah</label>
+                  <select
+                    value={kelasWaive}
+                    onChange={e => setKelasWaive(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {[7, 8, 9, 10, 11, 12].map(kelas => <option key={kelas} value={kelas}>Kelas {kelas}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold text-slate-500">Bulan</label>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {BULAN_LIST.map((bulanNama, idx) => {
+                    const month = idx + 1
+                    const selected = kelasWaiveMonths.includes(month)
+                    const disabled = isBeforeBillingStart(tahun, month)
+                    return (
+                      <button
+                        key={month}
+                        type="button"
+                        onClick={() => !disabled && toggleKelasWaiveMonth(month)}
+                        disabled={disabled}
+                        className={`h-10 rounded-lg border text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
+                          selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                        }`}
+                      >
+                        {bulanNama.slice(0, 3)}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">Alasan</label>
+                <textarea
+                  value={kelasWaiveReason}
+                  onChange={e => setKelasWaiveReason(e.target.value)}
+                  rows={3}
+                  placeholder="Contoh: Pulang libur kenaikan kelas / EHB hanya satu pekan."
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Santri yang sudah bebas SPP permanen atau sudah membayar bulan tersebut tidak akan diproses.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 p-5">
+              <button onClick={() => setKelasWaiveModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Batal</button>
+              <button
+                onClick={handleSimpanKelasWaive}
+                disabled={savingKelasWaive}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60"
+              >
+                {savingKelasWaive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Simpan Massal
+              </button>
+            </div>
           </div>
         </div>
       )}
