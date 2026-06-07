@@ -38,3 +38,14 @@
  GET / 200 in 830ms (compile: 203ms, render: 628ms)
  GET / 200 in 553ms (compile: 144ms, render: 409ms)
  GET / 200 in 539ms (compile: 183ms, render: 356ms)
+✓ Compiled in 663ms
+✓ Compiled in 2.2s
+✓ Compiled in 900ms
+✓ Compiled in 1214ms
+✓ Compiled in 829ms
+✓ Compiled in 842ms
+✓ Compiled in 784ms
+✓ Compiled in 729ms
+✓ Compiled in 679ms
+✓ Compiled in 615ms
+✓ Compiled in 609ms

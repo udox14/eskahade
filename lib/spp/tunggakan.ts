@@ -82,6 +82,13 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
   const startKey = periodKey(billingStart.tahun, billingStart.bulan)
   const endKey = periodKey(currentYear, currentMonth)
 
+  const santri = await queryOne<{ bebas_spp: number | null }>(
+    `SELECT COALESCE(bebas_spp, 0) AS bebas_spp
+     FROM santri
+     WHERE id = ?`,
+    [santriId]
+  )
+
   const paidRows = await query<{ tahun: number; bulan: number }>(
     `SELECT tahun, bulan
      FROM spp_log
@@ -90,23 +97,35 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
     [santriId, startKey, endKey]
   )
   const paidKeys = new Set(paidRows.map(row => periodKey(row.tahun, row.bulan)))
+  const waivedRows = await query<{ tahun: number; bulan: number }>(
+    `SELECT tahun, bulan
+     FROM spp_tagihan_ditiadakan
+     WHERE santri_id = ?
+       AND is_active = 1
+       AND (tahun * 100 + bulan) BETWEEN ? AND ?`,
+    [santriId, startKey, endKey]
+  )
+  const waivedKeys = new Set(waivedRows.map(row => periodKey(row.tahun, row.bulan)))
 
   const berjalan: SppTunggakanItem[] = []
-  for (let year = billingStart.tahun; year <= currentYear; year++) {
-    const fromMonth = year === billingStart.tahun ? billingStart.bulan : 1
-    const toMonth = year === currentYear ? currentMonth : 12
-    const nominal = await getNominalSppForYear(year)
-    for (let month = fromMonth; month <= toMonth; month++) {
-      if (paidKeys.has(periodKey(year, month))) continue
-      berjalan.push({
-        source: 'BERJALAN',
-        id: null,
-        tahun: year,
-        bulan: month,
-        nama_bulan: BULAN_SPP[month - 1] ?? `Bulan ${month}`,
-        label: monthLabel(year, month),
-        nominal,
-      })
+  if ((santri?.bebas_spp ?? 0) !== 1) {
+    for (let year = billingStart.tahun; year <= currentYear; year++) {
+      const fromMonth = year === billingStart.tahun ? billingStart.bulan : 1
+      const toMonth = year === currentYear ? currentMonth : 12
+      const nominal = await getNominalSppForYear(year)
+      for (let month = fromMonth; month <= toMonth; month++) {
+        const key = periodKey(year, month)
+        if (paidKeys.has(key) || waivedKeys.has(key)) continue
+        berjalan.push({
+          source: 'BERJALAN',
+          id: null,
+          tahun: year,
+          bulan: month,
+          nama_bulan: BULAN_SPP[month - 1] ?? `Bulan ${month}`,
+          label: monthLabel(year, month),
+          nominal,
+        })
+      }
     }
   }
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
-import { getSession, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasAnyRole, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
@@ -13,6 +13,7 @@ type SppClientScope = {
   lockedUnit: string | null
   defaultUnit: string
   allowedUnits: string[]
+  canAdjustBilling: boolean
 }
 
 function getScopeOrThrow(session: SessionUser | null) {
@@ -45,8 +46,9 @@ async function assertSantriAccess(session: SessionUser | null, santriId: string)
     kategori_santri: string | null
     nama_lengkap: string | null
     nis: string | null
+    bebas_spp: number | null
   }>(
-    `SELECT id, asrama, kategori_santri, nama_lengkap, nis
+    `SELECT id, asrama, kategori_santri, nama_lengkap, nis, COALESCE(bebas_spp, 0) AS bebas_spp
      FROM santri
      WHERE id = ? AND status_global = 'aktif'`,
     [santriId]
@@ -81,6 +83,7 @@ export async function getClientRestriction(): Promise<SppClientScope | null> {
   return {
     ...scope,
     allowedUnits: scope.kind === 'ADMIN' ? [...ASRAMA_LIST, SADESA_UNIT] : [scope.defaultUnit],
+    canAdjustBilling: hasAnyRole(session, ['admin', 'dewan_santri']),
   }
 }
 
@@ -118,10 +121,19 @@ async function mapBillingRows(rows: any[], billableCount: number) {
   return rows.map((s: any) => ({
     ...s,
     bulan_ini_lunas: s.bulan_ini_lunas === 1,
-    jumlah_tunggakan_berjalan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)),
+    bebas_spp: s.bebas_spp === 1,
+    tagihan_ditiadakan_bulan_ini: s.tagihan_ditiadakan_bulan_ini === 1,
+    jumlah_tagihan_ditiadakan: s.jumlah_tagihan_ditiadakan ?? 0,
+    jumlah_tunggakan_berjalan: s.bebas_spp === 1 ? 0 : Math.max(0, billableCount - (s.jumlah_bayar ?? 0) - (s.jumlah_tagihan_ditiadakan ?? 0)),
     jumlah_tunggakan_historis: historisMap.get(s.id) ?? 0,
-    jumlah_tunggakan: Math.max(0, billableCount - (s.jumlah_bayar ?? 0)) + (historisMap.get(s.id) ?? 0),
+    jumlah_tunggakan: (s.bebas_spp === 1 ? 0 : Math.max(0, billableCount - (s.jumlah_bayar ?? 0) - (s.jumlah_tagihan_ditiadakan ?? 0))) + (historisMap.get(s.id) ?? 0),
   }))
+}
+
+function assertAdjustmentAccess(session: SessionUser | null) {
+  if (!hasAnyRole(session, ['admin', 'dewan_santri'])) {
+    throw new Error('Hanya admin dan dewan santri yang boleh meniadakan tagihan SPP.')
+  }
 }
 
 export async function getDashboardSPPKamar(tahun: number, unitSetor: string, kamar: string) {
@@ -148,20 +160,35 @@ export async function getDashboardSPPKamar(tahun: number, unitSetor: string, kam
         SELECT DISTINCT santri_id
         FROM spp_log
         WHERE tahun = ? AND bulan = ?
+      ),
+      ditiadakan_tahun AS (
+        SELECT santri_id, COUNT(*) AS jumlah_tagihan_ditiadakan
+        FROM spp_tagihan_ditiadakan
+        WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
+        GROUP BY santri_id
+      ),
+      ditiadakan_bulan_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_tagihan_ditiadakan
+        WHERE is_active = 1 AND tahun = ? AND bulan = ?
       )
     SELECT
-      s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
+      s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
       COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
-      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
+      COALESCE(dt.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas,
+      CASE WHEN dbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS tagihan_ditiadakan_bulan_ini
     FROM santri s
     LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
     LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
+    LEFT JOIN ditiadakan_tahun dt ON dt.santri_id = s.id
+    LEFT JOIN ditiadakan_bulan_ini dbi ON dbi.santri_id = s.id
     WHERE s.status_global = 'aktif'
       AND COALESCE(s.kategori_santri, 'REGULER') != ?
       AND s.asrama = ?
       AND s.kamar = ?
     ORDER BY s.nama_lengkap
-  `, [tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, unit, kamar])
+  `, [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, unit, kamar])
 
   return mapBillingRows(rows, billableCount)
 }
@@ -189,18 +216,33 @@ export async function getDashboardSPPSadesa(tahun: number) {
         SELECT DISTINCT santri_id
         FROM spp_log
         WHERE tahun = ? AND bulan = ?
+      ),
+      ditiadakan_tahun AS (
+        SELECT santri_id, COUNT(*) AS jumlah_tagihan_ditiadakan
+        FROM spp_tagihan_ditiadakan
+        WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
+        GROUP BY santri_id
+      ),
+      ditiadakan_bulan_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_tagihan_ditiadakan
+        WHERE is_active = 1 AND tahun = ? AND bulan = ?
       )
     SELECT
-      s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
+      s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
       COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
-      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
+      COALESCE(dt.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas,
+      CASE WHEN dbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS tagihan_ditiadakan_bulan_ini
     FROM santri s
     LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
     LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
+    LEFT JOIN ditiadakan_tahun dt ON dt.santri_id = s.id
+    LEFT JOIN ditiadakan_bulan_ini dbi ON dbi.santri_id = s.id
     WHERE s.status_global = 'aktif'
       AND s.kategori_santri = ?
     ORDER BY s.nama_lengkap
-  `, [tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY])
+  `, [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY])
 
   return mapBillingRows(rows, billableCount)
 }
@@ -232,20 +274,35 @@ export async function searchDashboardSPP(tahun: number, unitSetor: string, keywo
           SELECT DISTINCT santri_id
           FROM spp_log
           WHERE tahun = ? AND bulan = ?
+        ),
+        ditiadakan_tahun AS (
+          SELECT santri_id, COUNT(*) AS jumlah_tagihan_ditiadakan
+          FROM spp_tagihan_ditiadakan
+          WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
+          GROUP BY santri_id
+        ),
+        ditiadakan_bulan_ini AS (
+          SELECT DISTINCT santri_id
+          FROM spp_tagihan_ditiadakan
+          WHERE is_active = 1 AND tahun = ? AND bulan = ?
         )
       SELECT
-        s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
+        s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
         COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
-        CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
+        COALESCE(dt.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+        CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas,
+        CASE WHEN dbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS tagihan_ditiadakan_bulan_ini
       FROM santri s
       LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
       LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
+      LEFT JOIN ditiadakan_tahun dt ON dt.santri_id = s.id
+      LEFT JOIN ditiadakan_bulan_ini dbi ON dbi.santri_id = s.id
       WHERE s.status_global = 'aktif'
         AND s.kategori_santri = ?
         AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)
       ORDER BY s.nama_lengkap
       LIMIT 50
-    `, [tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, like, like])
+    `, [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, like, like])
     : await query<any>(`
       WITH
         bayar_tahun AS (
@@ -258,21 +315,36 @@ export async function searchDashboardSPP(tahun: number, unitSetor: string, keywo
           SELECT DISTINCT santri_id
           FROM spp_log
           WHERE tahun = ? AND bulan = ?
+        ),
+        ditiadakan_tahun AS (
+          SELECT santri_id, COUNT(*) AS jumlah_tagihan_ditiadakan
+          FROM spp_tagihan_ditiadakan
+          WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
+          GROUP BY santri_id
+        ),
+        ditiadakan_bulan_ini AS (
+          SELECT DISTINCT santri_id
+          FROM spp_tagihan_ditiadakan
+          WHERE is_active = 1 AND tahun = ? AND bulan = ?
         )
       SELECT
-        s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
+        s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
         COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
-        CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas
+        COALESCE(dt.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+        CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas,
+        CASE WHEN dbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS tagihan_ditiadakan_bulan_ini
       FROM santri s
       LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
       LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
+      LEFT JOIN ditiadakan_tahun dt ON dt.santri_id = s.id
+      LEFT JOIN ditiadakan_bulan_ini dbi ON dbi.santri_id = s.id
       WHERE s.status_global = 'aktif'
         AND COALESCE(s.kategori_santri, 'REGULER') != ?
         AND s.asrama = ?
         AND (s.nama_lengkap LIKE ? OR s.nis LIKE ? OR s.kamar LIKE ?)
       ORDER BY CAST(s.kamar AS INTEGER), s.kamar, s.nama_lengkap
       LIMIT 50
-    `, [tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, unit, like, like, like])
+    `, [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, unit, like, like, like])
 
   return mapBillingRows(rows, billableCount)
 }
@@ -284,6 +356,132 @@ export async function getStatusSPP(santriId: string, tahun: number) {
      FROM spp_log WHERE santri_id = ? AND tahun = ?`,
     [santriId, tahun]
   )
+}
+
+export async function getTagihanDitiadakanSPP(santriId: string, tahun: number) {
+  await assertSantriAccess(await getSession(), santriId)
+  return query<any>(
+    `SELECT id, santri_id, bulan, tahun, alasan, is_active, created_at, updated_at
+     FROM spp_tagihan_ditiadakan
+     WHERE santri_id = ? AND tahun = ? AND is_active = 1
+     ORDER BY bulan`,
+    [santriId, tahun]
+  )
+}
+
+export async function simpanTagihanDitiadakanSPP(
+  santriIds: string[],
+  tahun: number,
+  bulans: number[],
+  alasan: string
+): Promise<{ success: boolean; count: number } | { error: string }> {
+  try {
+    const session = await getSession()
+    assertAdjustmentAccess(session)
+    const uniqueSantriIds = Array.from(new Set(santriIds.map(id => String(id || '').trim()).filter(Boolean)))
+    const cleanBulans = Array.from(new Set(bulans.map(Number))).filter(b => Number.isInteger(b) && b >= 1 && b <= 12).sort((a, b) => a - b)
+    const cleanTahun = Number(tahun)
+    const cleanAlasan = String(alasan || '').trim()
+
+    if (!uniqueSantriIds.length) return { error: 'Pilih minimal satu santri.' }
+    if (!Number.isInteger(cleanTahun) || cleanTahun < 2000) return { error: 'Tahun tidak valid.' }
+    if (!cleanBulans.length) return { error: 'Pilih minimal satu bulan.' }
+    if (!cleanAlasan) return { error: 'Alasan wajib diisi.' }
+
+    const billingStart = await getSppBillingStart()
+    if (cleanBulans.some(b => (cleanTahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))) {
+      return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+    }
+
+    for (const santriId of uniqueSantriIds) {
+      const santri = await assertSantriAccess(session, santriId)
+      if ((santri as any).bebas_spp === 1) return { error: `${santri.nama_lengkap || santri.nis || santriId} sudah bebas SPP permanen.` }
+    }
+
+    const santriPh = uniqueSantriIds.map(() => '?').join(',')
+    const bulanPh = cleanBulans.map(() => '?').join(',')
+    const paidRows = await query<{ santri_id: string; bulan: number; nama_lengkap: string | null }>(
+      `SELECT sl.santri_id, sl.bulan, s.nama_lengkap
+       FROM spp_log sl
+       LEFT JOIN santri s ON s.id = sl.santri_id
+       WHERE sl.santri_id IN (${santriPh})
+         AND sl.tahun = ?
+         AND sl.bulan IN (${bulanPh})`,
+      [...uniqueSantriIds, cleanTahun, ...cleanBulans]
+    )
+    if (paidRows.length > 0) {
+      const first = paidRows[0]
+      return { error: `${first.nama_lengkap || first.santri_id} bulan ${first.bulan} sudah tercatat lunas. Batalkan pembayaran dulu jika ingin meniadakan tagihan.` }
+    }
+
+    const now = new Date().toISOString()
+    const statements = uniqueSantriIds.flatMap(santriId => cleanBulans.map(b => ({
+      sql: `INSERT INTO spp_tagihan_ditiadakan
+              (id, santri_id, tahun, bulan, alasan, is_active, created_by, created_at, updated_by, updated_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+            ON CONFLICT(santri_id, tahun, bulan) DO UPDATE SET
+              alasan = excluded.alasan,
+              is_active = 1,
+              updated_by = excluded.updated_by,
+              updated_at = excluded.updated_at`,
+      params: [generateId(), santriId, cleanTahun, b, cleanAlasan, session?.id ?? null, now, session?.id ?? null, now],
+    })))
+    await batch(statements)
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'waive_monthly_bill',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'update',
+      entityType: 'santri_batch',
+      entityId: 'spp-tagihan-ditiadakan',
+      entityLabel: 'SPP Tidak Ada Tagihan',
+      summary: `Meniadakan tagihan SPP ${uniqueSantriIds.length} santri untuk ${cleanBulans.length} bulan`,
+      details: { santri_ids: uniqueSantriIds, tahun: cleanTahun, bulan: cleanBulans, alasan: cleanAlasan },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/dewan-santri/surat')
+    return { success: true, count: statements.length }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal meniadakan tagihan SPP.' }
+  }
+}
+
+export async function cabutTagihanDitiadakanSPP(santriId: string, tahun: number, bulan: number): Promise<{ success: boolean } | { error: string }> {
+  try {
+    const session = await getSession()
+    assertAdjustmentAccess(session)
+    const santri = await assertSantriAccess(session, santriId)
+    await execute(
+      `UPDATE spp_tagihan_ditiadakan
+       SET is_active = 0, updated_by = ?, updated_at = ?
+       WHERE santri_id = ? AND tahun = ? AND bulan = ? AND is_active = 1`,
+      [session?.id ?? null, new Date().toISOString(), santriId, tahun, bulan]
+    )
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'restore_monthly_bill',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'update',
+      entityType: 'santri',
+      entityId: santriId,
+      entityLabel: santri.nama_lengkap || santri.nis || santriId,
+      summary: `Mengaktifkan kembali tagihan SPP ${santri.nama_lengkap || santri.nis || santriId}`,
+      details: { tahun, bulan },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/dewan-santri/surat')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal mengaktifkan kembali tagihan SPP.' }
+  }
 }
 
 export async function getTunggakanHistorisSPP(santriId: string) {
@@ -421,12 +619,20 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
   try {
     const session = await getSession()
     const santri = await assertSantriAccess(session, santriId)
+    if ((santri.bebas_spp ?? 0) === 1) return { error: 'Santri ini berstatus bebas SPP permanen.' }
 
     const billingStart = await getSppBillingStart()
     const invalidMonth = bulans.some(b => (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
     if (invalidMonth) return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
 
     const ph = bulans.map(() => '?').join(',')
+    const waived = await query<{ bulan: number }>(
+      `SELECT bulan FROM spp_tagihan_ditiadakan
+       WHERE santri_id = ? AND tahun = ? AND bulan IN (${ph}) AND is_active = 1`,
+      [santriId, tahun, ...bulans]
+    )
+    if (waived.length > 0) return { error: 'Beberapa bulan berstatus TIDAK ADA TAGIHAN.' }
+
     const exist = await query<any>(
       `SELECT bulan FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan IN (${ph})`,
       [santriId, tahun, ...bulans]
@@ -521,8 +727,20 @@ export async function simpanSppBatch(listTransaksi: Array<{ santriId: string; bu
 
   try {
     for (const item of listTransaksi) {
-      await assertSantriAccess(session, item.santriId)
+      const santri = await assertSantriAccess(session, item.santriId)
+      if ((santri.bebas_spp ?? 0) === 1) return { error: 'Ada santri yang berstatus bebas SPP permanen.' }
+      const billingStart = await getSppBillingStart()
+      if ((item.tahun * 100 + item.bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
+        return { error: 'Ada bulan yang belum memiliki tagihan SPP.' }
+      }
     }
+
+    const waivedChecks = await Promise.all(listTransaksi.map(item => queryOne<{ id: string }>(
+      `SELECT id FROM spp_tagihan_ditiadakan
+       WHERE santri_id = ? AND tahun = ? AND bulan = ? AND is_active = 1`,
+      [item.santriId, item.tahun, item.bulan]
+    )))
+    if (waivedChecks.some(Boolean)) return { error: 'Ada tagihan yang berstatus TIDAK ADA TAGIHAN.' }
 
     await batch(listTransaksi.map(item => ({
       sql: `INSERT INTO spp_log (id, santri_id, bulan, tahun, nominal_bayar, penerima_id, keterangan, tanggal_bayar)

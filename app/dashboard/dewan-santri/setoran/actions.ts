@@ -85,6 +85,7 @@ type MonitoringRow = {
   unit_setor: string
   total_santri: number
   bebas_spp: number
+  tidak_ada_tagihan: number
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
@@ -105,7 +106,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       base_santri AS (
         SELECT
           id,
-          bebas_spp,
+          COALESCE(bebas_spp, 0) AS bebas_spp,
           CASE
             WHEN kategori_santri = ? THEN ?
             ELSE COALESCE(asrama, 'LAINNYA')
@@ -124,6 +125,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         FROM spp_log
         WHERE tahun = ? AND bulan = ?
       ),
+      ditiadakan_ini AS (
+        SELECT DISTINCT santri_id
+        FROM spp_tagihan_ditiadakan
+        WHERE tahun = ? AND bulan = ? AND is_active = 1
+      ),
       nominal_unit AS (
         SELECT bs.unit_setor, SUM(sl.nominal_bayar) AS total_nominal
         FROM base_santri bs
@@ -135,13 +141,15 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       bs.unit_setor,
       COUNT(*) AS total_santri,
       SUM(bs.bebas_spp) AS bebas_spp,
-      COUNT(*) - SUM(bs.bebas_spp) AS wajib_bayar,
-      SUM(CASE WHEN bs.bebas_spp = 0 AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
-      SUM(CASE WHEN bs.bebas_spp = 0 AND bl.santri_id IS NOT NULL AND bi.santri_id IS NULL THEN 1 ELSE 0 END) AS bayar_tunggakan_lalu,
+      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS tidak_ada_tagihan,
+      COUNT(*) - SUM(bs.bebas_spp) - SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS wajib_bayar,
+      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
+      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bl.santri_id IS NOT NULL AND bi.santri_id IS NULL THEN 1 ELSE 0 END) AS bayar_tunggakan_lalu,
       COALESCE(nu.total_nominal, 0) AS total_nominal
     FROM base_santri bs
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN bayar_lalu bl ON bl.santri_id = bs.id
+    LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
     LEFT JOIN nominal_unit nu ON nu.unit_setor = bs.unit_setor
     GROUP BY bs.unit_setor, nu.total_nominal
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
@@ -149,6 +157,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     SADESA_CATEGORY, SADESA_UNIT,
     tahun, bulan,
     tahunSebelumnya, bulanSebelumnya,
+    tahun, bulan,
     tahun, bulan,
     SADESA_UNIT,
   ])
@@ -205,6 +214,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       unit_setor: r.unit_setor,
       total_santri: r.total_santri,
       bebas_spp: r.bebas_spp,
+      tidak_ada_tagihan: isBeforeBillingStart ? 0 : r.tidak_ada_tagihan,
       wajib_bayar: isBeforeBillingStart ? 0 : r.wajib_bayar,
       bayar_bulan_ini: isBeforeBillingStart ? 0 : r.bayar_bulan_ini,
       bayar_tunggakan_lalu: bayarTunggakan,

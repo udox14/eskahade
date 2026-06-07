@@ -20,6 +20,7 @@ type AsramaRow = {
   unit_setor: string
   total_santri: number
   bebas_spp: number
+  tidak_ada_tagihan: number
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
@@ -148,6 +149,7 @@ export default function MonitoringSetoranPage() {
 
   const totalSantri    = data.reduce((a, r) => a + r.total_santri, 0)
   const totalBebasSpp  = data.reduce((a, r) => a + r.bebas_spp, 0)
+  const totalTidakAdaTagihan = data.reduce((a, r) => a + r.tidak_ada_tagihan, 0)
   const totalWajib     = data.reduce((a, r) => a + r.wajib_bayar, 0)
   const totalBayar     = data.reduce((a, r) => a + r.bayar_bulan_ini, 0)
   const totalTunggak   = data.reduce((a, r) => a + r.penunggak, 0)
@@ -217,8 +219,9 @@ export default function MonitoringSetoranPage() {
 
       {/* ── Ringkasan Total - Sleek Version ── */}
       {!userAsrama && hasLoaded && data.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
           <StatCard title="Total Santri" value={fmt(totalSantri)} icon={Users} />
+          <StatCard title="Tidak Ada Tagihan" value={fmt(totalTidakAdaTagihan)} icon={CalendarCheck} color="text-blue-600" />
           <StatCard title="Wajib SPP" value={fmt(totalWajib)} icon={UserCheck} />
           <StatCard title="Telah Lunas" value={fmt(totalBayar)} sub={`${pctKeseluruhan}%`} icon={CheckCircle2} color="text-emerald-600" />
           <StatCard title="Penunggak" value={fmt(totalTunggak)} icon={AlertCircle} color="text-rose-600" />
@@ -262,6 +265,7 @@ export default function MonitoringSetoranPage() {
                     <td className="py-3 px-5">
                       <p className="font-semibold text-slate-800">{row.unit_setor}</p>
                       <p className="text-[11px] text-slate-500 mt-0.5">{fmt(row.total_santri)} Santri ({fmt(row.wajib_bayar)} Wajib)</p>
+                      {row.tidak_ada_tagihan > 0 && <p className="text-[10px] font-semibold text-blue-600 mt-0.5">{fmt(row.tidak_ada_tagihan)} Tidak Ada Tagihan</p>}
                     </td>
                     <td className="py-3 px-5 w-48 lg:w-64">
                       {row.belum_ada_tagihan ? (
@@ -325,6 +329,7 @@ export default function MonitoringSetoranPage() {
                {/* Nano Grid Stats */}
                <div className="flex flex-wrap gap-2 mb-6">
                   <NanoChip label="Bebas SPP" value={activeRow.bebas_spp} />
+                  <NanoChip label="Tidak Ada Tagihan" value={activeRow.tidak_ada_tagihan} color="text-blue-600 bg-blue-50 border-blue-100" />
                   <NanoChip label="Wajib SPP" value={activeRow.wajib_bayar} />
                   <NanoChip label="Telah Lunas" value={activeRow.bayar_bulan_ini} color="text-emerald-600 bg-emerald-50 border-emerald-100" />
                   <NanoChip label="Penunggak" value={activeRow.penunggak} color="text-rose-600 bg-rose-50 border-rose-100" />

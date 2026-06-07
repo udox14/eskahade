@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, cabutTagihanDitiadakanSPP } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards, Ban, CalendarX } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -22,7 +22,7 @@ export default function SPPPage() {
   const [nominal, setNominal] = useState(70000)
   const [tahun, setTahun] = useState(new Date().getFullYear())
   const [unitSetor, setUnitSetor] = useState(ASRAMA_LIST[0])
-  const [scope, setScope] = useState<{ kind: 'ASRAMA' | 'SADESA' | 'ADMIN'; lockedUnit: string | null; defaultUnit: string; allowedUnits: string[] } | null>(null)
+  const [scope, setScope] = useState<{ kind: 'ASRAMA' | 'SADESA' | 'ADMIN'; lockedUnit: string | null; defaultUnit: string; allowedUnits: string[]; canAdjustBilling: boolean } | null>(null)
 
   // Daftar kamar (ringan, hanya nama kamar)
   const [kamars, setKamars] = useState<string[]>([])
@@ -45,6 +45,7 @@ export default function SPPPage() {
   // Payment view
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [riwayatBayar, setRiwayatBayar] = useState<any[]>([])
+  const [tagihanDitiadakan, setTagihanDitiadakan] = useState<any[]>([])
   const [tunggakanHistoris, setTunggakanHistoris] = useState<any[]>([])
   const [selectedMonths, setSelectedMonths] = useState<number[]>([])
   const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 6, value: '2026-06' })
@@ -56,6 +57,13 @@ export default function SPPPage() {
   const [historisCatatan, setHistorisCatatan] = useState('')
   const [savingHistoris, setSavingHistoris] = useState(false)
   const [payingHistorisId, setPayingHistorisId] = useState<string | null>(null)
+  const [waiveModalOpen, setWaiveModalOpen] = useState(false)
+  const [waiveMode, setWaiveMode] = useState<'SINGLE' | 'BATCH'>('SINGLE')
+  const [waiveTargetMonth, setWaiveTargetMonth] = useState<number | null>(null)
+  const [waiveMonths, setWaiveMonths] = useState<number[]>([])
+  const [waiveReason, setWaiveReason] = useState('')
+  const [savingWaive, setSavingWaive] = useState(false)
+  const [restoringWaiveKey, setRestoringWaiveKey] = useState<string | null>(null)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -203,13 +211,28 @@ export default function SPPPage() {
   // Payment
   useEffect(() => {
     if (view === 'PAYMENT' && selectedSantri) {
-      getStatusSPP(selectedSantri.id, tahun).then(data => {
-        setRiwayatBayar(data)
+      Promise.all([
+        getStatusSPP(selectedSantri.id, tahun),
+        getTagihanDitiadakanSPP(selectedSantri.id, tahun),
+      ]).then(([status, ditiadakan]) => {
+        setRiwayatBayar(status)
+        setTagihanDitiadakan(ditiadakan)
         setSelectedMonths([])
       })
       loadTunggakanHistoris(selectedSantri.id)
     }
   }, [view, selectedSantri, tahun])
+
+  const refreshSelectedStatus = async () => {
+    if (!selectedSantri) return
+    const [status, ditiadakan] = await Promise.all([
+      getStatusSPP(selectedSantri.id, tahun),
+      getTagihanDitiadakanSPP(selectedSantri.id, tahun),
+    ])
+    setRiwayatBayar(status)
+    setTagihanDitiadakan(ditiadakan)
+    setSelectedMonths([])
+  }
 
   const loadTunggakanHistoris = async (santriId = selectedSantri?.id) => {
     if (!santriId) return
@@ -233,10 +256,7 @@ export default function SPPPage() {
       // Invalidate cache kamar santri ini supaya refresh saat kembali
       invalidateKamar(selectedSantri.kamar)
       await refreshActiveList()
-      getStatusSPP(selectedSantri.id, tahun).then(data => {
-        setRiwayatBayar(data)
-        setSelectedMonths([])
-      })
+      await refreshSelectedStatus()
     }
   }
 
@@ -271,6 +291,8 @@ export default function SPPPage() {
   const toggleBulan = (idx: number) => {
     if (isBeforeBillingStart(tahun, idx)) return
     if (riwayatBayar.some(r => r.bulan === idx)) return
+    if (selectedSantri?.bebas_spp) return
+    if (tagihanDitiadakan.some(r => r.bulan === idx)) return
     setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx])
   }
 
@@ -289,10 +311,7 @@ export default function SPPPage() {
     toast.success('Status lunas dibatalkan')
     invalidateKamar(selectedSantri.kamar)
     await refreshActiveList()
-    getStatusSPP(selectedSantri.id, tahun).then(data => {
-      setRiwayatBayar(data)
-      setSelectedMonths([])
-    })
+    await refreshSelectedStatus()
   }
 
   const openHistorisModal = () => {
@@ -340,6 +359,67 @@ export default function SPPPage() {
     await refreshActiveList()
   }
 
+  const openSingleWaiveModal = (e: React.MouseEvent, month: number) => {
+    e.stopPropagation()
+    setWaiveMode('SINGLE')
+    setWaiveTargetMonth(month)
+    setWaiveMonths([month])
+    setWaiveReason('')
+    setWaiveModalOpen(true)
+  }
+
+  const openBatchWaiveModal = () => {
+    setWaiveMode('BATCH')
+    setWaiveTargetMonth(null)
+    setWaiveMonths([currentMonthIdx])
+    setWaiveReason('')
+    setWaiveModalOpen(true)
+  }
+
+  const toggleWaiveMonth = (month: number) => {
+    if (isBeforeBillingStart(tahun, month)) return
+    setWaiveMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a, b) => a - b))
+  }
+
+  const handleSimpanWaive = async () => {
+    const targetIds = waiveMode === 'SINGLE'
+      ? selectedSantri ? [selectedSantri.id] : []
+      : Object.keys(drafts)
+    if (!targetIds.length) return toast.warning('Pilih minimal satu santri.')
+    if (!waiveMonths.length) return toast.warning('Pilih minimal satu bulan.')
+    if (!waiveReason.trim()) return toast.warning('Alasan wajib diisi.')
+
+    setSavingWaive(true)
+    const res = await simpanTagihanDitiadakanSPP(targetIds, tahun, waiveMonths, waiveReason)
+    setSavingWaive(false)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(`Tidak ada tagihan tersimpan: ${res.count} data`)
+    setWaiveModalOpen(false)
+    setDrafts({})
+    await refreshActiveList()
+    if (selectedSantri) await refreshSelectedStatus()
+  }
+
+  const handleCabutWaive = async (e: React.MouseEvent, month: number) => {
+    e.stopPropagation()
+    if (!selectedSantri) return
+    if (!await confirm(`Aktifkan kembali tagihan ${BULAN_LIST[month - 1]} ${tahun}?`)) return
+    const key = `${tahun}-${month}`
+    setRestoringWaiveKey(key)
+    const res = await cabutTagihanDitiadakanSPP(selectedSantri.id, tahun, month)
+    setRestoringWaiveKey(null)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    toast.success('Tagihan aktif kembali')
+    await refreshActiveList()
+    await refreshSelectedStatus()
+  }
+
   const handleBackToList = () => { window.history.back() }
 
   const activeKamar = kamars[kamarIdx] ?? ''
@@ -357,6 +437,59 @@ export default function SPPPage() {
   const totalNominalDraft = Object.values(drafts).reduce((a: number, b: any) => a + b.nominal, 0)
   const tunggakanHistorisBelumLunas = tunggakanHistoris.filter(item => item.status !== 'LUNAS')
   const totalHistorisBelumLunas = tunggakanHistorisBelumLunas.reduce((sum, item) => sum + Number(item.nominal_tagihan || 0), 0)
+  const waiveModal = waiveModalOpen ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-slate-100 p-5">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Set Tidak Ada Tagihan</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {waiveMode === 'SINGLE'
+                ? `${selectedSantri?.nama_lengkap || 'Santri'} - ${waiveTargetMonth ? BULAN_LIST[waiveTargetMonth - 1] : ''} ${tahun}`
+                : `${Object.keys(drafts).length} santri dipilih - Tahun ${tahun}`}
+            </p>
+          </div>
+          <button onClick={() => setWaiveModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"><X className="w-4 h-4"/></button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div>
+            <label className="mb-2 block text-xs font-bold text-slate-500">Bulan</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {BULAN_LIST.map((bulanNama, idx) => {
+                const month = idx + 1
+                const disabled = waiveMode === 'SINGLE' ? month !== waiveTargetMonth : isBeforeBillingStart(tahun, month)
+                const selected = waiveMonths.includes(month)
+                return (
+                  <button key={month} type="button" onClick={() => !disabled && toggleWaiveMonth(month)} disabled={disabled}
+                    className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                    }`}>
+                    {bulanNama}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">Alasan</label>
+            <textarea value={waiveReason} onChange={e => setWaiveReason(e.target.value)} rows={3}
+              placeholder="Contoh: Pulang libur kenaikan kelas / tidak berada di pesantren."
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            Status ini tidak dicatat sebagai pembayaran dan bulan terkait tidak dihitung sebagai tunggakan.
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 p-5">
+          <button onClick={() => setWaiveModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button onClick={handleSimpanWaive} disabled={savingWaive} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60 hover:bg-blue-800">
+            {savingWaive ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarX className="w-4 h-4"/>}
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
 
   // ── VIEW: LIST ──────────────────────────────────────────────────────────
   if (view === 'LIST') return (
@@ -458,6 +591,7 @@ export default function SPPPage() {
             {filteredSantri.map((s: any) => {
               const isPaid = s.bulan_ini_lunas
               const isDraft = !!drafts[s.id]
+              const isNoBill = s.bebas_spp || s.tagihan_ditiadakan_bulan_ini
               return (
                 <div key={s.id} onClick={() => handleSelectSantri(s)}
                   className={`p-4 flex items-center justify-between gap-3 transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
@@ -478,17 +612,22 @@ export default function SPPPage() {
                       <div className="flex gap-2 text-xs text-slate-400 items-center">
                         <span>{isSadesaMode ? 'Unit SADESA' : `Kamar ${s.kamar || '-'}`}</span>
                         {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
+                        {isNoBill && <span className="text-blue-600 font-bold bg-blue-50 px-1 rounded">{s.bebas_spp ? 'Bebas SPP' : 'Tidak ada tagihan'}</span>}
                       </div>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    {isCurrentYear && !isPaid ? (
+                    {isCurrentYear && !isPaid && !isNoBill ? (
                       <button onClick={(e) => toggleDraft(e, s)}
                         className={`w-32 h-10 px-3 rounded-lg text-xs font-bold border inline-flex items-center justify-center gap-1 transition-all ${
                           isDraft ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 hover:border-emerald-500 hover:text-emerald-600'
                         }`}>
                         {isDraft ? <><CheckCircle className="w-3 h-3"/> Siap Bayar</> : <><PlusCircle className="w-3 h-3"/> Bayar {BULAN_LIST[currentMonthIdx - 1]}</>}
                       </button>
+                    ) : isNoBill ? (
+                      <span className="w-32 h-10 text-xs font-bold text-blue-700 inline-flex items-center justify-center gap-1 bg-blue-50 px-2 rounded-lg border border-blue-100">
+                        <CalendarX className="w-3 h-3"/> Tidak Ada
+                      </span>
                     ) : (
                       <span className="w-32 h-10 text-xs font-bold text-green-600 inline-flex items-center justify-center gap-1 bg-green-50 px-2 rounded-lg border border-green-100">
                         <CheckCircle className="w-3 h-3"/> Lunas
@@ -505,6 +644,7 @@ export default function SPPPage() {
       {/* FLOATING SAVE */}
       {totalDraft > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
+          <div className="space-y-2">
           <button onClick={handleSimpanBatch} disabled={isSavingBatch}
             className="w-full bg-slate-900 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-black transition-transform active:scale-95 disabled:opacity-70">
             <div className="text-left">
@@ -516,8 +656,16 @@ export default function SPPPage() {
               {isSavingBatch ? 'Menyimpan...' : 'SIMPAN'}
             </div>
           </button>
+          {scope?.canAdjustBilling && (
+            <button onClick={openBatchWaiveModal}
+              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-lg hover:bg-blue-50 inline-flex items-center justify-center gap-2">
+              <CalendarX className="w-4 h-4"/> Set Tidak Ada Tagihan
+            </button>
+          )}
+          </div>
         </div>
       )}
+      {waiveModal}
     </div>
   )
 
@@ -539,12 +687,16 @@ export default function SPPPage() {
         {BULAN_LIST.map((namaBulan, idx) => {
           const bulanIndex = idx + 1
           const dataBayar = riwayatBayar.find(r => r.bulan === bulanIndex)
+          const dataDitiadakan = tagihanDitiadakan.find(r => r.bulan === bulanIndex)
           const isSelected = selectedMonths.includes(bulanIndex)
           const belumAdaTagihan = isBeforeBillingStart(tahun, bulanIndex)
+          const bebasPermanen = !!selectedSantri?.bebas_spp
+          const noBill = bebasPermanen || !!dataDitiadakan
           let style = 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'
           if (dataBayar) style = 'bg-green-100 border-green-500 text-green-800 cursor-default'
           else if (isSelected) style = 'bg-emerald-600 text-white border-emerald-600 shadow-sm transform scale-105'
           else if (belumAdaTagihan) style = 'bg-slate-50 border-slate-200 text-slate-400 cursor-default'
+          else if (noBill) style = 'bg-blue-50 border-blue-200 text-blue-700 cursor-default'
           else if ((tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonthIdx)) {
             style = 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
           }
@@ -563,6 +715,25 @@ export default function SPPPage() {
                     {cancelingPaymentId === dataBayar.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <RotateCcw className="w-4 h-4"/>}
                   </button>
                 )}
+                {!dataBayar && !belumAdaTagihan && dataDitiadakan && scope?.canAdjustBilling && (
+                  <button
+                    onClick={(e) => handleCabutWaive(e, bulanIndex)}
+                    disabled={restoringWaiveKey === `${tahun}-${bulanIndex}`}
+                    className="p-1 rounded-md bg-white/80 hover:bg-white text-blue-700 border border-blue-200 disabled:opacity-60"
+                    title="Aktifkan tagihan kembali"
+                  >
+                    {restoringWaiveKey === `${tahun}-${bulanIndex}` ? <Loader2 className="w-4 h-4 animate-spin"/> : <RotateCcw className="w-4 h-4"/>}
+                  </button>
+                )}
+                {!dataBayar && !belumAdaTagihan && !noBill && scope?.canAdjustBilling && (
+                  <button
+                    onClick={(e) => openSingleWaiveModal(e, bulanIndex)}
+                    className="p-1 rounded-md bg-white/80 hover:bg-white text-blue-700 border border-blue-200"
+                    title="Tiadakan tagihan bulan ini"
+                  >
+                    <Ban className="w-4 h-4"/>
+                  </button>
+                )}
                 {!dataBayar && isSelected && <CheckCircle className="w-5 h-5 text-white/50"/>}
               </div>
               <div className="text-xs mt-2">
@@ -576,6 +747,12 @@ export default function SPPPage() {
                   <>
                     <p className="font-medium opacity-80">BELUM ADA</p>
                     <p className="font-bold text-base">TAGIHAN</p>
+                  </>
+                ) : noBill ? (
+                  <>
+                    <p className="font-medium opacity-80">TIDAK ADA</p>
+                    <p className="font-bold text-base">TAGIHAN</p>
+                    <p className="opacity-70 line-clamp-1">{bebasPermanen ? 'Bebas SPP permanen' : dataDitiadakan?.alasan || 'Ditiadakan'}</p>
                   </>
                 ) : (
                   <>
@@ -718,6 +895,8 @@ export default function SPPPage() {
           </div>
         </div>
       )}
+
+      {waiveModal}
     </div>
   )
 }

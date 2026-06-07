@@ -139,6 +139,8 @@ async function buildSantriSnapshot(profil: Row) {
     spp_log: await getBySantriId('spp_log', santriId),
     spp_setoran_detail: await getBySantriId('spp_setoran_detail', santriId),
     spp_tunggakan_alasan: await getBySantriId('spp_tunggakan_alasan', santriId),
+    spp_tunggakan_historis: await getBySantriId('spp_tunggakan_historis', santriId),
+    spp_tagihan_ditiadakan: await getBySantriId('spp_tagihan_ditiadakan', santriId),
     pembayaran_tahunan: await getBySantriId('pembayaran_tahunan', santriId),
     tabungan_log: await getBySantriId('tabungan_log', santriId),
   }
@@ -235,6 +237,8 @@ async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
   await restoreSnapshotRows('spp_log', keuangan.spp_log ?? snap.spp ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('spp_setoran_detail', keuangan.spp_setoran_detail ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('spp_tunggakan_alasan', keuangan.spp_tunggakan_alasan ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('spp_tunggakan_historis', keuangan.spp_tunggakan_historis ?? [], { santri_id: idAsli })
+  await restoreSnapshotRows('spp_tagihan_ditiadakan', keuangan.spp_tagihan_ditiadakan ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('pembayaran_tahunan', keuangan.pembayaran_tahunan ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('tabungan_log', keuangan.tabungan_log ?? [], { santri_id: idAsli })
 

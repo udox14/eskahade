@@ -15,6 +15,7 @@ type AsramaRow = {
   unit_setor: string
   total_santri: number
   bebas_spp: number
+  tidak_ada_tagihan: number
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
@@ -64,6 +65,7 @@ export default function MonitoringPrintControls({
     return printRows.reduce((acc, row) => {
       acc.total_santri += row.total_santri
       acc.bebas_spp += row.bebas_spp
+      acc.tidak_ada_tagihan += row.tidak_ada_tagihan
       acc.wajib_bayar += row.wajib_bayar
       acc.bayar_bulan_ini += row.bayar_bulan_ini
       acc.penunggak += row.penunggak
@@ -75,6 +77,7 @@ export default function MonitoringPrintControls({
     }, {
       total_santri: 0,
       bebas_spp: 0,
+      tidak_ada_tagihan: 0,
       wajib_bayar: 0,
       bayar_bulan_ini: 0,
       penunggak: 0,
@@ -160,6 +163,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
   totals: {
     total_santri: number
     bebas_spp: number
+    tidak_ada_tagihan: number
     wajib_bayar: number
     bayar_bulan_ini: number
     penunggak: number
@@ -236,6 +240,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
 
         <div className="summary-grid">
           <PrintSummaryCard label="Jumlah Penduduk" value={formatNumber(totals.total_santri)} />
+          <PrintSummaryCard label="Tidak Ada Tagihan" value={formatNumber(totals.tidak_ada_tagihan)} />
           <PrintSummaryCard label="Wajib Bayar" value={formatNumber(totals.wajib_bayar)} />
           <PrintSummaryCard label="Jumlah Bayar" value={formatNumber(totals.jumlah_bayar)} />
           <PrintSummaryCard label="Penerimaan" value={formatCurrency(totals.total_nominal)} />
@@ -248,6 +253,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th rowSpan={2} style={{ width: mode === 'SADESA' ? '100px' : '140px' }}>Asrama</th>
               <th rowSpan={2} style={{ width: '78px' }}>Jumlah Penduduk</th>
               <th rowSpan={2} style={{ width: '72px' }}>Digratiskan</th>
+              <th rowSpan={2} style={{ width: '82px' }}>Tidak Ada Tagihan</th>
               <th rowSpan={2} style={{ width: '74px' }}>Wajib Bayar</th>
               <th rowSpan={2} style={{ width: '82px' }}>Jumlah Bayar Bulan Ini</th>
               <th rowSpan={2} style={{ width: '72px' }}>Penunggak</th>
@@ -275,6 +281,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
                   <td className="text-left font-bold">{row.unit_setor}</td>
                   <td className="text-center">{formatNumber(row.total_santri)}</td>
                   <td className="text-center">{formatNumber(row.bebas_spp)}</td>
+                  <td className="text-center">{formatNumber(row.tidak_ada_tagihan)}</td>
                   <td className="highlight text-center">{formatNumber(row.wajib_bayar)}</td>
                   <td className="text-center">{formatNumber(row.bayar_bulan_ini)}</td>
                   <td className="text-center">{formatNumber(row.penunggak)}</td>
@@ -294,6 +301,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <td colSpan={2} className="text-center">Jumlah Total</td>
               <td className="text-center">{formatNumber(totals.total_santri)}</td>
               <td className="text-center">{formatNumber(totals.bebas_spp)}</td>
+              <td className="text-center">{formatNumber(totals.tidak_ada_tagihan)}</td>
               <td className="text-center">{formatNumber(totals.wajib_bayar)}</td>
               <td className="text-center">{formatNumber(totals.bayar_bulan_ini)}</td>
               <td className="text-center">{formatNumber(totals.penunggak)}</td>
