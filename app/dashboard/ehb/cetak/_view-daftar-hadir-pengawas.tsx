@@ -15,7 +15,7 @@ import {
   type JadwalPengawasCetakTanggal,
   type PengawasCetakItem,
 } from './actions'
-import { PageHeader } from './_shared'
+import { PageHeader, FONT } from './_shared'
 import { dayNameWib, longDateWib } from '../_date-utils'
 
 type JadwalPengawasCetakData = {
@@ -92,15 +92,15 @@ function PrintHeader({ event }: { event: ActiveEvent }) {
   const tahunAjaran = event.tahun_ajaran_nama.replace('/', '-')
 
   return (
-    <div style={kopStyle}>
+    <div style={{ ...kopStyle, fontFamily: FONT }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logohitam.png"
         alt=""
         style={{ width: '25mm', height: '25mm', objectFit: 'contain', flexShrink: 0 }}
       />
-      <div style={{ width: '130mm' }}>
-        <div style={{ fontSize: '21pt', fontWeight: 700, lineHeight: 0.95 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '21pt', fontWeight: 900, lineHeight: 0.95 }}>
           EVALUASI HASIL BELAJAR
         </div>
         <div style={{ fontSize: '17pt', lineHeight: 1 }}>
@@ -109,7 +109,7 @@ function PrintHeader({ event }: { event: ActiveEvent }) {
         <div style={{ fontSize: '9.5pt', lineHeight: 1.15, marginTop: '1mm' }}>
           LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
         </div>
-        <div style={{ borderBottom: '1.2pt solid #000', marginTop: '1.5mm' }} />
+        <div style={{ borderBottom: '1.2pt solid #000', marginTop: '1.5mm', width: '100%' }} />
       </div>
     </div>
   )
@@ -177,10 +177,18 @@ function AttendanceSheet({
                 }}>
                   {assignment?.nama_pengawas ?? ''}
                 </td>
-                <td style={{ ...signatureTdStyle, height: `${rowHeight}mm` }}>
-                  <span style={signatureNumberStyle}>{index + 1}</span>
-                </td>
-                <td style={{ ...signatureTdStyle, height: `${rowHeight}mm` }} />
+                {index % 2 === 0 ? (
+                  <>
+                    <td rowSpan={2} style={signatureTdStyle}>
+                      <span style={signatureNumberStyle}>{index + 1}</span>
+                    </td>
+                    <td rowSpan={2} style={signatureTdStyle}>
+                      {data.ruanganList.length > index + 1 && (
+                        <span style={signatureNumberStyle}>{index + 2}</span>
+                      )}
+                    </td>
+                  </>
+                ) : null}
               </tr>
             )
           })}
@@ -244,7 +252,7 @@ const kopStyle: React.CSSProperties = {
 const pageStyle: React.CSSProperties = {
   width: '210mm',
   height: '330mm',
-  padding: '8mm 10mm',
+  padding: '8mm 10mm 8mm 20mm', // top, right, bottom, left (20mm for binding)
   boxSizing: 'border-box',
   fontFamily: 'Arial, Helvetica, sans-serif',
   backgroundColor: '#fff',
@@ -280,7 +288,7 @@ const tableStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   border: '1pt solid #000',
   backgroundColor: '#e5e7eb',
-  height: '8mm',
+  height: '12mm',
   padding: '1mm 1.5mm',
   textAlign: 'center',
   verticalAlign: 'middle',
