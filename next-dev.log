@@ -4,7 +4,7 @@
 
 ▲ Next.js 16.1.6 (Turbopack)
 - Local:         http://localhost:3000
-- Network:       http://192.168.1.7:3000
+- Network:       http://192.168.1.8:3000
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
@@ -12,46 +12,5 @@
 ✓ Starting...
 ⎔ Establishing remote connection...
 ✓ Ready in 4.2s
-○ Compiling /dashboard/ehb/absensi-menghafal ...
 [layout] session null → redirect /login
- GET /dashboard/ehb/absensi-menghafal 307 in 5.1s (compile: 4.9s, render: 212ms)
-[layout] session null → redirect /login
- GET /dashboard/ehb/absensi-menghafal/rekap 307 in 1021ms (compile: 953ms, render: 67ms)
-[layout] session null → redirect /login
- HEAD /dashboard/ehb/absensi-menghafal 307 in 62ms (compile: 7ms, render: 56ms)
-[layout] session null → redirect /login
- HEAD /dashboard/ehb/absensi-menghafal/rekap 307 in 52ms (compile: 3ms, render: 49ms)
-✓ Compiled in 619ms
-✓ Compiled in 210ms
-✓ Compiled in 174ms
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 1321ms (compile: 1106ms, render: 215ms)
-[layout] session null → redirect /login
- GET /dashboard/dewan-santri/surat 307 in 385ms (compile: 327ms, render: 59ms)
-[layout] session null → redirect /login
- HEAD /dashboard/dewan-santri/surat 307 in 53ms (compile: 4ms, render: 49ms)
-[layout] session null → redirect /login
- HEAD /dashboard/asrama/spp 307 in 48ms (compile: 3ms, render: 45ms)
-[layout] session null → redirect /login
- GET /dashboard/laporan/rapor 307 in 1843ms (compile: 1646ms, render: 197ms)
-✓ Compiled in 180ms
- GET / 200 in 830ms (compile: 203ms, render: 628ms)
- GET / 200 in 553ms (compile: 144ms, render: 409ms)
- GET / 200 in 539ms (compile: 183ms, render: 356ms)
-✓ Compiled in 663ms
-✓ Compiled in 2.2s
-✓ Compiled in 900ms
-✓ Compiled in 1214ms
-✓ Compiled in 829ms
-✓ Compiled in 842ms
-✓ Compiled in 784ms
-✓ Compiled in 729ms
-✓ Compiled in 679ms
-✓ Compiled in 615ms
-✓ Compiled in 609ms
-✓ Compiled in 1249ms
-✓ Compiled in 418ms
-✓ Compiled in 651ms
-✓ Compiled in 491ms
-✓ Compiled in 971ms
-[?25h
+ GET /dashboard/ehb/cetak 307 in 3.3s (compile: 3.0s, render: 224ms)

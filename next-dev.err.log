@@ -1,3 +1,7 @@
 [31mX [41;31m[[41;97mERROR[41;31m][0m [1mA request to the Cloudflare API (/accounts/a170ed4144c00927988a828aa9a41896/workers/subdomain/edge-preview) failed.[0m
 
 
+Unhandled Rejection: Error: Failed to start the remote proxy session. Error reloading remote server: A request to the Cloudflare API (/accounts/a170ed4144c00927988a828aa9a41896/workers/subdomain/edge-preview) failed.
+    at ignore-listed frames {
+  [cause]: [Object]
+}
