@@ -39,7 +39,7 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_LABEL_FULL: Record<string, string> = {
   admin:           'Administrator',
   keamanan:        'Keamanan',
-  sekpen:          'Sekretaris Pen.',
+  sekpen:          'SEKPEN',
   dewan_santri:    'Dewan Santri',
   pengurus_asrama: 'Pengurus Asrama',
   wali_kelas:      'Wali Kelas',

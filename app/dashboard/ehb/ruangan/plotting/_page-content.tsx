@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getPlottingStatus, resetPlotting, autoPlotSantri, getUnplottedSantri, savePlottingPreferences } from './actions'
 import type { MarhalahOrderItem, PlottingPreferenceMap, SeatParity } from './actions'
-import { getActiveEventLight } from '../actions'
+import { getActiveEventLight, getRuanganList, tambahPesertaManual } from '../actions'
 import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
   UserX, Loader2, ArrowLeft, Info, SlidersHorizontal, ArrowUp, ArrowDown
@@ -29,6 +29,9 @@ export default function PlottingEhbPage() {
   const [marhalahOrders, setMarhalahOrders] = useState<Record<string, MarhalahOrderConfig[]>>({})
   
   const [unplotted, setUnplotted] = useState<any[]>([])
+  const [ruanganOptions, setRuanganOptions] = useState<any[]>([])
+  const [selectedRuanganBySantri, setSelectedRuanganBySantri] = useState<Record<string, number>>({})
+  const [assigningSantri, setAssigningSantri] = useState<Record<string, boolean>>({})
   
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -48,7 +51,8 @@ export default function PlottingEhbPage() {
       setKapasitas(res.kapasitas)
       setKapasitasDetail(res.kapasitasDetail || [])
       setJamGroups(res.jamGroups)
-      if (res.jamGroups.length > 0) setActiveJamTab(res.jamGroups[0])
+      const selectedJam = activeJamTab && res.jamGroups.includes(activeJamTab) ? activeJamTab : res.jamGroups[0]
+      if (selectedJam) setActiveJamTab(selectedJam)
       setMarhalahOrders(prev => {
         const savedPreferences = (res.plottingPreferences || {}) as PlottingPreferenceMap
         const byJamGroup = (res.marhalahOrders || []).reduce((acc: Record<string, MarhalahOrderItem[]>, item: MarhalahOrderItem) => {
@@ -82,9 +86,15 @@ export default function PlottingEhbPage() {
 
       const unp = await getUnplottedSantri(evt.id)
       setUnplotted(unp)
+      if (selectedJam) setRuanganOptions(await getRuanganList(evt.id, selectedJam))
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (!event || !activeJamTab) return
+    getRuanganList(event.id, activeJamTab).then(setRuanganOptions)
+  }, [event, activeJamTab])
 
   const buildPreferencePayload = (orders: Record<string, MarhalahOrderConfig[]>): PlottingPreferenceMap => {
     return Object.fromEntries(
@@ -142,6 +152,28 @@ export default function PlottingEhbPage() {
     loadData()
   }
 
+  const handleAssignUnplotted = async (santri: any) => {
+    if (!event) return
+    const ruanganId = selectedRuanganBySantri[santri.id]
+    if (!ruanganId) {
+      toast.warning('Pilih ruangan dulu.')
+      return
+    }
+
+    setAssigningSantri(prev => ({ ...prev, [santri.id]: true }))
+    const res = await tambahPesertaManual(event.id, ruanganId, santri.id, santri.jam_group)
+    setAssigningSantri(prev => ({ ...prev, [santri.id]: false }))
+
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${santri.nama_lengkap} dimasukkan ke ruangan`)
+    setSelectedRuanganBySantri(prev => {
+      const next = { ...prev }
+      delete next[santri.id]
+      return next
+    })
+    loadData()
+  }
+
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
 
   if (!event) return (
@@ -162,6 +194,7 @@ export default function PlottingEhbPage() {
   const effKapP = kapP.total_kapasitas
 
   const activeUnplotted = unplotted.filter(u => u.jam_group === activeJamTab)
+  const getRoomOptionsForSantri = (santri: any) => ruanganOptions.filter((room: any) => room.jenis_kelamin === santri.jenis_kelamin)
 
   const estimateRoomsNeeded = (totalSantri: number, jk: 'L' | 'P') => {
     const roomCaps = kapasitasDetail
@@ -460,6 +493,7 @@ export default function PlottingEhbPage() {
                   <th className="px-5 py-3 font-bold text-slate-600 text-xs uppercase">JK</th>
                   <th className="px-5 py-3 font-bold text-slate-600 text-xs uppercase">Kelas</th>
                   <th className="px-5 py-3 font-bold text-slate-600 text-xs uppercase">Jam Group</th>
+                  <th className="px-5 py-3 font-bold text-slate-600 text-xs uppercase">Ruangan</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -479,6 +513,30 @@ export default function PlottingEhbPage() {
                       <span className="bg-slate-100 text-slate-600 border px-2 py-1 rounded text-xs font-bold">
                         {u.jam_group}
                       </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={selectedRuanganBySantri[u.id] || 0}
+                          onChange={event => setSelectedRuanganBySantri(prev => ({ ...prev, [u.id]: Number(event.target.value) }))}
+                          className="min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-400"
+                        >
+                          <option value={0}>Pilih ruangan</option>
+                          {getRoomOptionsForSantri(u).map((room: any) => (
+                            <option key={room.id} value={room.id}>
+                              Ruang {room.nomor_ruangan} {room.nama_ruangan ? `(${room.nama_ruangan})` : ''} - {room.total_peserta}/{room.kapasitas}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleAssignUnplotted(u)}
+                          disabled={!selectedRuanganBySantri[u.id] || assigningSantri[u.id]}
+                          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {assigningSantri[u.id] ? 'Menyimpan...' : 'Masukkan'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

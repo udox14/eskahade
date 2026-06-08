@@ -248,12 +248,20 @@ export default function RuanganEhbPage() {
 
   const handleCariSantri = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!event || !showTambah || !searchKeyword) return
+    if (!event || !showTambah) return
     setSearching(true)
     const res = await cariSantriUnplotted(event.id, showTambah.jenis_kelamin, searchKeyword, showTambah.jam_group)
     setSearchResults(res)
     setSearching(false)
   }
+
+  useEffect(() => {
+    if (!event || !showTambah) return
+    setSearching(true)
+    cariSantriUnplotted(event.id, showTambah.jenis_kelamin, '', showTambah.jam_group)
+      .then(setSearchResults)
+      .finally(() => setSearching(false))
+  }, [event, showTambah])
 
   const handleTambahPeserta = async (santriId: string) => {
     if (!event || !showTambah) return
@@ -659,7 +667,7 @@ export default function RuanganEhbPage() {
                   placeholder="Cari nama santri..."
                   className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
-                <button type="submit" disabled={searching || !searchKeyword} className="bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700">
+                <button type="submit" disabled={searching} className="bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
                   {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 </button>
               </form>
@@ -684,8 +692,8 @@ export default function RuanganEhbPage() {
                 </div>
               ) : (
                 <div className="text-center py-10 text-slate-400 text-sm">
-                  {searching ? 'Mencari...' : 'Silakan cari nama santri'}
-                  <p className="text-[10px] mt-1">Hanya menampilkan santri {showTambah.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} yang belum diplotting.</p>
+                  {searching ? 'Mencari...' : 'Tidak ada santri yang cocok'}
+                  <p className="text-[10px] mt-1">Menampilkan santri {showTambah.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} yang belum mendapat ruangan pada {showTambah.jam_group}.</p>
                 </div>
               )}
             </div>

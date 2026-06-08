@@ -454,6 +454,12 @@ export async function hapusPeserta(plottingId: number) {
 
 export async function cariSantriUnplotted(eventId: number, jk: string, keyword: string, jamGroup: string) {
     // Cari santri peserta EHB yang berjenis kelamin sesuai, dan BELUM diplot di event ini
+    const q = String(keyword || '').trim()
+    const searchClause = q ? 'AND (s.nama_lengkap LIKE ? OR s.nis LIKE ? OR k.nama_kelas LIKE ?)' : ''
+    const params = q
+      ? [eventId, jamGroup, jk, `%${q}%`, `%${q}%`, `%${q}%`, eventId]
+      : [eventId, jamGroup, jk, eventId]
+
     return query<any>(`
         SELECT s.id, s.nama_lengkap, s.nis, k.nama_kelas
         FROM santri s
@@ -465,10 +471,11 @@ export async function cariSantriUnplotted(eventId: number, jk: string, keyword: 
             OR (s.status_global = 'nonaktif_sementara' AND s.kelas_sekolah = '9')
           )
           AND s.jenis_kelamin = ? 
-          AND s.nama_lengkap LIKE ?
+          ${searchClause}
           AND s.id NOT IN (SELECT santri_id FROM ehb_plotting_santri WHERE ehb_event_id = ?)
-        LIMIT 10
-    `, [eventId, jamGroup, jk, `%${keyword}%`, eventId])
+        ORDER BY k.nama_kelas, s.nama_lengkap
+        LIMIT 50
+    `, params)
 }
 
 export async function tambahPesertaManual(eventId: number, ruanganId: number, santriId: string, jamGroup: string) {
