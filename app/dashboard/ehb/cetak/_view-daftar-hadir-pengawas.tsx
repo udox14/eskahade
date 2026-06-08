@@ -129,7 +129,12 @@ function AttendanceSheet({
     .filter(item => item.tanggal === slot.tanggal && item.sesi_id === slot.sesi.id)
     .forEach(item => assignmentByRoom.set(item.ruangan_id, item))
 
-  const rowHeight = Math.max(6.4, Math.min(10.5, 222 / Math.max(data.ruanganList.length, 1)))
+  const displayRuanganList = [...data.ruanganList]
+  if (displayRuanganList.length % 2 !== 0) {
+    displayRuanganList.push({ id: -1, nomor_ruangan: displayRuanganList.length + 1 } as any)
+  }
+
+  const rowHeight = Math.max(6.4, Math.min(10.5, 222 / Math.max(displayRuanganList.length, 1)))
 
   return (
     <div style={pageStyle}>
@@ -158,13 +163,13 @@ function AttendanceSheet({
           </tr>
         </thead>
         <tbody>
-          {data.ruanganList.map((ruangan, index) => {
-            const assignment = assignmentByRoom.get(ruangan.id)
-            const isEmpty = !assignment
+          {displayRuanganList.map((ruangan, index) => {
+            const assignment = ruangan.id === -1 ? null : assignmentByRoom.get(ruangan.id)
+            const isEmpty = ruangan.id !== -1 && !assignment
             return (
-              <tr key={ruangan.id}>
+              <tr key={ruangan.id === -1 ? 'dummy' : ruangan.id}>
                 <td style={{ ...tdStyle, height: `${rowHeight}mm`, textAlign: 'center' }}>
-                  {ruangan.nomor_ruangan}
+                  {ruangan.id === -1 ? '' : ruangan.nomor_ruangan}
                 </td>
                 <td style={{
                   ...tdStyle,
@@ -175,7 +180,7 @@ function AttendanceSheet({
                   textOverflow: 'clip',
                   textTransform: 'uppercase',
                 }}>
-                  {assignment?.nama_pengawas ?? ''}
+                  {ruangan.id === -1 ? '' : (assignment?.nama_pengawas ?? '')}
                 </td>
                 {index % 2 === 0 ? (
                   <>
@@ -183,7 +188,7 @@ function AttendanceSheet({
                       <span style={signatureNumberStyle}>{index + 1}</span>
                     </td>
                     <td rowSpan={2} style={signatureTdStyle}>
-                      {data.ruanganList.length > index + 1 && (
+                      {displayRuanganList.length > index + 1 && (
                         <span style={signatureNumberStyle}>{index + 2}</span>
                       )}
                     </td>
@@ -348,6 +353,14 @@ export function DaftarHadirPengawasView({ onBack }: { onBack: () => void }) {
     const init = async () => {
       const evt = await getActiveEventForCetak()
       setEvent(evt)
+      if (evt) {
+        try {
+          const loaded = await getJadwalPengawasCetakData(evt.id)
+          setData(loaded)
+        } catch {
+          // ignore error initially
+        }
+      }
       setLoadingInit(false)
     }
     init()
