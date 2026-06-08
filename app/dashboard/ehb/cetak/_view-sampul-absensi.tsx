@@ -77,86 +77,85 @@ function SampulSheet({ card }: { card: SampulCard }) {
     <div style={{
       width: '215mm',
       height: '330mm',
-      padding: '20mm 20mm 20mm 30mm', // top, right, bottom, left (30mm for binding)
+      padding: '15mm 20mm 15mm 30mm', // top, right, bottom, left (30mm for binding)
       boxSizing: 'border-box',
-      fontFamily: 'Arial, sans-serif',
+      fontFamily: '"Montserrat", "Arial", sans-serif',
       position: 'relative',
       backgroundColor: '#fff',
       breakAfter: 'page',
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      justifyContent: 'space-between'
     }}>
-      {/* Top Right Logo */}
-      <div style={{ position: 'absolute', right: '20mm', top: '15mm', display: 'flex', alignItems: 'center', gap: '4mm' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logohitam.png" alt="" style={{ width: '18mm', height: '18mm' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', fontFamily: 'Montserrat, Arial, sans-serif', color: '#000' }}>
-          <div style={{ fontSize: '7.5pt', letterSpacing: '1px', marginBottom: '0.5mm' }}>LEMBAGA PENDIDIKAN</div>
-          <div style={{ fontSize: '7.5pt', letterSpacing: '1px' }}>PONDOK PESANTREN</div>
-          <div style={{ fontSize: '15pt', fontWeight: 900, lineHeight: 1, marginTop: '1mm' }}>SUKAHIDENG</div>
-          <div style={{ fontSize: '5.5pt', marginTop: '1mm', color: '#333' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
+      {/* 1. Top Right Logo */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', height: '25mm' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4mm' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logohitam.png" alt="" style={{ width: '22mm', height: '22mm', objectFit: 'contain' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', color: '#000' }}>
+            <div style={{ fontSize: '7.5pt', letterSpacing: '1px', marginBottom: '0.5mm' }}>LEMBAGA PENDIDIKAN</div>
+            <div style={{ fontSize: '7.5pt', letterSpacing: '1px' }}>PONDOK PESANTREN</div>
+            <div style={{ fontSize: '15pt', fontWeight: 900, lineHeight: 0.9, marginTop: '1mm', fontFamily: 'Arial, sans-serif' }}>SUKAHIDENG</div>
+            <div style={{ fontSize: '5.5pt', marginTop: '1.5mm', color: '#333' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
+          </div>
         </div>
       </div>
 
-      {/* Number and Jam Text */}
-      <div style={{ position: 'relative', marginTop: '25mm', height: '40mm', width: '100%', flexShrink: 0 }}>
-        {/* Gray Banner */}
+      {/* 2. Number and Jam Text */}
+      <div style={{ position: 'relative', height: '55mm' }}>
         <div style={{
           position: 'absolute',
-          left: '20mm',
-          right: '-20mm', // Make it go to the right edge of the page
-          top: '15mm',
+          top: '20mm',
+          left: 0,
+          right: '-20mm', // extends to the edge
           height: '24mm',
           backgroundColor: '#e5e5e5',
+          zIndex: 1,
           display: 'flex',
           alignItems: 'center',
-          paddingLeft: '35mm',
-          zIndex: 1
+          paddingLeft: '45mm'
         }}>
-          <span style={{ fontSize: '32pt', fontWeight: 900, color: '#000' }}>JAM {jamText}</span>
+          <span style={{ fontSize: '30pt', fontWeight: 900, color: '#000', fontFamily: 'Arial, sans-serif' }}>JAM {jamText}</span>
         </div>
-
-        {/* Big Number */}
         <div style={{
           position: 'absolute',
-          left: '20mm',
-          top: '-15mm',
-          fontSize: '180pt',
+          top: 0,
+          left: '10mm',
+          fontSize: '170pt',
           fontWeight: 900,
           color: themeColor,
           lineHeight: 0.75,
           fontFamily: 'Arial, sans-serif',
-          zIndex: 2,
-          letterSpacing: '-2px'
+          zIndex: 2
         }}>
           {jamNumber}
         </div>
       </div>
 
-      {/* EHB Title */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: '30mm', paddingLeft: '25mm', flexShrink: 0 }}>
-        <div style={{ fontSize: '110pt', fontWeight: 900, lineHeight: 0.75, color: '#000', letterSpacing: '-4px' }}>EHB</div>
-        <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '6mm', marginTop: '8mm', color: '#000' }}>
-          <div style={{ fontSize: '26pt', fontWeight: 900, letterSpacing: '-1px' }}>SMT. {semesterLabel}</div>
-          <div style={{ fontSize: '20pt', marginTop: '1mm' }}>T. A. {card.tahunAjaranNama}</div>
+      {/* 3. EHB Title */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '10mm' }}>
+        <div style={{ fontSize: '120pt', fontWeight: 900, lineHeight: 0.75, color: '#000', letterSpacing: '-5px', fontFamily: 'Arial, sans-serif' }}>EHB</div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '6mm', color: '#000', alignSelf: 'center', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '28pt', fontWeight: 900, letterSpacing: '-1px', fontFamily: 'Arial, sans-serif' }}>SMT. {semesterLabel}</div>
+          <div style={{ fontSize: '22pt', marginTop: '2mm', fontFamily: 'Arial, sans-serif' }}>T. A. {card.tahunAjaranNama}</div>
         </div>
       </div>
 
-      {/* RUANG and Number */}
-      <div style={{ marginTop: '20mm', paddingLeft: '25mm', flex: 1 }}>
-        <div style={{ fontSize: '26pt', fontWeight: 900, color: '#000' }}>RUANG</div>
+      {/* 4. RUANG and Number */}
+      <div style={{ paddingLeft: '10mm' }}>
+        <div style={{ fontSize: '28pt', fontWeight: 900, color: '#000', fontFamily: 'Arial, sans-serif' }}>RUANG</div>
         <div style={{ 
           display: 'flex', 
           justifyContent: 'flex-end', 
-          paddingRight: '15mm',
-          marginTop: '-10mm' 
+          paddingRight: '10mm',
+          marginTop: '-15mm' // Pull number up next to RUANG
         }}>
           <div style={{ 
             fontSize: '180pt', 
             fontWeight: 900, 
             color: themeColor, 
-            lineHeight: 0.8,
+            lineHeight: 0.75,
             fontFamily: 'Arial, sans-serif',
             letterSpacing: '-5px'
           }}>
@@ -165,10 +164,10 @@ function SampulSheet({ card }: { card: SampulCard }) {
         </div>
       </div>
 
-      {/* DATA PESERTA Table */}
-      <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '10mm', flexShrink: 0 }}>
+      {/* 5. DATA PESERTA Table */}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
         <table style={{
-          width: '120mm',
+          width: '130mm',
           borderCollapse: 'collapse',
           fontFamily: 'Arial, sans-serif',
           border: `1.5pt solid ${themeColor}`
@@ -210,25 +209,24 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <tr key={idx}>
                 <td style={{
                   border: `0.8pt solid ${themeColor}`,
-                  padding: '3.5mm 4mm',
+                  padding: '3mm 4mm',
                   fontSize: '11pt',
                   textAlign: 'center',
                   color: '#000'
                 }}>{row.kelas}</td>
                 <td style={{
                   border: `0.8pt solid ${themeColor}`,
-                  padding: '3.5mm 4mm',
+                  padding: '3mm 4mm',
                   fontSize: '11pt',
                   textAlign: 'center',
                   color: '#000'
                 }}>{row.jumlah}</td>
               </tr>
             ))}
-            {/* Fill empty rows to make it look nice if there are too few rows */}
             {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
               <tr key={`empty-${idx}`}>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3.5mm 4mm', height: '11.5mm' }}></td>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3.5mm 4mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm', height: '10mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm' }}></td>
               </tr>
             ))}
           </tbody>
