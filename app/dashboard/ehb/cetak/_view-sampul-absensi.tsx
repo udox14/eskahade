@@ -89,15 +89,15 @@ function SampulSheet({ card }: { card: SampulCard }) {
       justifyContent: 'space-between'
     }}>
       {/* 1. Top Right Logo */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', height: '25mm' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4mm' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', height: '20mm', marginTop: '-5mm' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3.5mm' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logohitam.png" alt="" style={{ width: '22mm', height: '22mm', objectFit: 'contain' }} />
+          <img src="/logohitam.png" alt="" style={{ width: '19mm', height: '19mm', objectFit: 'contain' }} />
           <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', color: '#000' }}>
-            <div style={{ fontSize: '7.5pt', letterSpacing: '1px', marginBottom: '0.5mm' }}>LEMBAGA PENDIDIKAN</div>
-            <div style={{ fontSize: '7.5pt', letterSpacing: '1px' }}>PONDOK PESANTREN</div>
-            <div style={{ fontSize: '15pt', fontWeight: 900, lineHeight: 0.9, marginTop: '1mm', fontFamily: 'Arial, sans-serif' }}>SUKAHIDENG</div>
-            <div style={{ fontSize: '5.5pt', marginTop: '1.5mm', color: '#333' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
+            <div style={{ fontSize: '6.5pt', letterSpacing: '1px', marginBottom: '0.5mm' }}>LEMBAGA PENDIDIKAN</div>
+            <div style={{ fontSize: '6.5pt', letterSpacing: '1px' }}>PONDOK PESANTREN</div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', lineHeight: 0.9, marginTop: '1mm', fontFamily: 'Arial, sans-serif' }}>SUKAHIDENG</div>
+            <div style={{ fontSize: '4.5pt', marginTop: '1.5mm', color: '#333' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
           </div>
         </div>
       </div>
@@ -135,10 +135,10 @@ function SampulSheet({ card }: { card: SampulCard }) {
 
       {/* 3. EHB Title */}
       <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '10mm' }}>
-        <div style={{ fontSize: '120pt', fontWeight: 900, lineHeight: 0.75, color: '#000', letterSpacing: '-5px', fontFamily: 'Arial, sans-serif' }}>EHB</div>
+        <div style={{ fontSize: '85pt', fontWeight: 'bold', lineHeight: 0.75, color: '#000', letterSpacing: '-3px', fontFamily: 'Arial, sans-serif' }}>EHB</div>
         <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '6mm', color: '#000', alignSelf: 'center', whiteSpace: 'nowrap' }}>
-          <div style={{ fontSize: '28pt', fontWeight: 900, letterSpacing: '-1px', fontFamily: 'Arial, sans-serif' }}>SMT. {semesterLabel}</div>
-          <div style={{ fontSize: '22pt', marginTop: '2mm', fontFamily: 'Arial, sans-serif' }}>T. A. {card.tahunAjaranNama}</div>
+          <div style={{ fontSize: '22pt', fontWeight: 'bold', letterSpacing: '-1px', fontFamily: 'Arial, sans-serif' }}>SMT. {semesterLabel}</div>
+          <div style={{ fontSize: '16pt', marginTop: '2mm', fontFamily: 'Arial, sans-serif' }}>T. A. {card.tahunAjaranNama}</div>
         </div>
       </div>
 
@@ -177,8 +177,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <th colSpan={2} style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '4mm',
-                fontSize: '13pt',
+                padding: '3mm',
+                fontSize: '14pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`
               }}>DATA PESERTA</th>
@@ -187,8 +187,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <th style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '4mm',
-                fontSize: '11pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 width: '70%'
@@ -196,8 +196,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <th style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '4mm',
-                fontSize: '11pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 width: '30%'
@@ -209,24 +209,26 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <tr key={idx}>
                 <td style={{
                   border: `0.8pt solid ${themeColor}`,
-                  padding: '3mm 4mm',
-                  fontSize: '11pt',
+                  padding: '2mm 4mm',
+                  fontSize: '13pt',
                   textAlign: 'center',
-                  color: '#000'
+                  color: '#000',
+                  fontWeight: 'bold'
                 }}>{row.kelas}</td>
                 <td style={{
                   border: `0.8pt solid ${themeColor}`,
-                  padding: '3mm 4mm',
-                  fontSize: '11pt',
+                  padding: '2mm 4mm',
+                  fontSize: '13pt',
                   textAlign: 'center',
-                  color: '#000'
+                  color: '#000',
+                  fontWeight: 'bold'
                 }}>{row.jumlah}</td>
               </tr>
             ))}
             {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
               <tr key={`empty-${idx}`}>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm', height: '10mm' }}></td>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm', height: '7mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm' }}></td>
               </tr>
             ))}
           </tbody>
@@ -235,8 +237,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <td style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3.5mm',
-                fontSize: '11pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
@@ -244,8 +246,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <td style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3.5mm',
-                fontSize: '11pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
