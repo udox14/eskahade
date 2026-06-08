@@ -55,12 +55,6 @@ async function tetapkanKeluarInternal(params: {
       params: [params.tanggalKeluar, params.alasanKeluar, params.santriId],
     },
     {
-      sql: `UPDATE riwayat_pendidikan
-            SET status_riwayat = 'pindah'
-            WHERE santri_id = ? AND status_riwayat = 'aktif'`,
-      params: [params.santriId],
-    },
-    {
       sql: `UPDATE santri_keluar_tandai
             SET status = 'disetujui',
                 diproses_oleh = ?,
@@ -430,6 +424,34 @@ export async function aktifkanKembali(
      WHERE id = ?`,
     [santriId]
   )
+
+  const kelasAktif = await queryOne<{ id: string }>(
+    `SELECT id
+     FROM riwayat_pendidikan
+     WHERE santri_id = ? AND status_riwayat = 'aktif'
+     LIMIT 1`,
+    [santriId]
+  )
+
+  if (!kelasAktif) {
+    const kelasTerakhir = await queryOne<{ id: string }>(
+      `SELECT id
+       FROM riwayat_pendidikan
+       WHERE santri_id = ? AND status_riwayat = 'pindah'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [santriId]
+    )
+
+    if (kelasTerakhir) {
+      await execute(
+        `UPDATE riwayat_pendidikan
+         SET status_riwayat = 'aktif'
+         WHERE id = ?`,
+        [kelasTerakhir.id]
+      )
+    }
+  }
 
   await logActivity({
     actor: actorFromSession(session),

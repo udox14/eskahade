@@ -1,7 +1,7 @@
 import { guardPage } from '@/lib/auth/guard'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { canCrud } from '@/lib/auth/crud'
-import { getSantriById, updateSantri } from './actions'
+import { getKelasAktifSantri, getKelasPesantrenList, getSantriById, updateSantri } from './actions'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
@@ -28,11 +28,20 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
   const { id } = await params
   const query = await searchParams
   const backHref = query.from === 'psb' ? '/dashboard/psb' : `/dashboard/santri/${id}`
-  const { data: santri, error } = await getSantriById(id)
+  const [{ data: santri, error }, kelasList, kelasAktif] = await Promise.all([
+    getSantriById(id),
+    getKelasPesantrenList(),
+    getKelasAktifSantri(id),
+  ])
 
   if (!santri || error) return notFound()
 
   const s = santri as any
+  const kelasOptions = kelasAktif && !kelasList.some(k => k.id === kelasAktif.kelas_id)
+    ? [...kelasList, { id: kelasAktif.kelas_id, nama_kelas: kelasAktif.nama_kelas }].sort((a, b) =>
+      a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+    )
+    : kelasList
 
   async function handleUpdate(formData: FormData) {
     'use server'
@@ -169,6 +178,13 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
             <div>
               <label className={labelCls}>Kamar</label>
               <input name="kamar" defaultValue={s.kamar || ''} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Kelas Pesantren</label>
+              <select name="kelas_pesantren_id" defaultValue={kelasAktif?.kelas_id || ''} className={inputCls + " bg-white"}>
+                <option value="">-- Belum Masuk Kelas --</option>
+                {kelasOptions.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelCls}>Kategori Setelah Masa Baru</label>

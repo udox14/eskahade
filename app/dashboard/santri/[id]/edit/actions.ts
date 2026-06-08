@@ -13,6 +13,30 @@ export async function getSantriById(id: string) {
   return { data, error: data ? null : 'Santri tidak ditemukan' }
 }
 
+export async function getKelasPesantrenList() {
+  const data = await query<{ id: string; nama_kelas: string }>(`
+    SELECT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+  `)
+
+  return data.sort((a, b) =>
+    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+  )
+}
+
+export async function getKelasAktifSantri(santriId: string) {
+  return queryOne<{ riwayat_id: string; kelas_id: string; nama_kelas: string }>(
+    `SELECT rp.id AS riwayat_id, k.id AS kelas_id, k.nama_kelas
+     FROM riwayat_pendidikan rp
+     JOIN kelas k ON k.id = rp.kelas_id
+     WHERE rp.santri_id = ? AND rp.status_riwayat = 'aktif'
+     ORDER BY rp.created_at DESC
+     LIMIT 1`,
+    [santriId]
+  )
+}
+
 export async function updateSantri(id: string, formData: FormData) {
   const access = await assertCrud('/dashboard/santri', 'update')
   if ('error' in access) return access
@@ -29,10 +53,12 @@ export async function updateSantri(id: string, formData: FormData) {
   )
   if (!beforeSantri) return { error: 'Santri tidak ditemukan.' }
 
+  const beforeKelas = await getKelasAktifSantri(id)
   const now = new Date().toISOString()
   const kategoriSantri = normalizeKategoriSantriDasar(formData.get('kategori_santri'))
   const sekolah = kategoriSantri === 'SADESA' ? null : formData.get('sekolah') || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : formData.get('kelas_sekolah') || null
+  const kelasPesantrenId = String(formData.get('kelas_pesantren_id') || '').trim()
   const afterSantri = {
     nis: formData.get('nis'),
     nama_lengkap: formData.get('nama_lengkap'),
@@ -58,6 +84,11 @@ export async function updateSantri(id: string, formData: FormData) {
     asrama: formData.get('asrama') || null,
     kamar: formData.get('kamar') || null,
   }
+  const afterKelas = kelasPesantrenId
+    ? await queryOne<{ id: string; nama_kelas: string }>('SELECT id, nama_kelas FROM kelas WHERE id = ?', [kelasPesantrenId])
+    : null
+
+  if (kelasPesantrenId && !afterKelas) return { error: 'Kelas pesantren tidak ditemukan.' }
 
   await query(
     `UPDATE santri SET
@@ -88,6 +119,53 @@ export async function updateSantri(id: string, formData: FormData) {
     ]
   )
 
+  const beforeKelasId = beforeKelas?.kelas_id ?? ''
+  if (kelasPesantrenId !== beforeKelasId) {
+    await query(
+      "UPDATE riwayat_pendidikan SET status_riwayat = 'pindah' WHERE santri_id = ? AND status_riwayat = 'aktif'",
+      [id]
+    )
+
+    if (kelasPesantrenId) {
+      await query(
+        'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+        [crypto.randomUUID(), id, kelasPesantrenId, 'aktif', now]
+      )
+    }
+  }
+
+  const changedFields = diffWhitelistedFields(beforeSantri, afterSantri, [
+    'nis',
+    'nama_lengkap',
+    'nik',
+    'tempat_lahir',
+    'tanggal_lahir',
+    'jenis_kelamin',
+    'nama_ayah',
+    'nama_ibu',
+    'alamat',
+    'gol_darah',
+    'alamat_lengkap',
+    'kecamatan',
+    'kab_kota',
+    'provinsi',
+    'jemaah',
+    'no_wa_ortu',
+    'tanggal_masuk',
+    'tanggal_keluar',
+    'kategori_santri',
+    'sekolah',
+    'kelas_sekolah',
+    'asrama',
+    'kamar',
+  ])
+  if (kelasPesantrenId !== beforeKelasId) {
+    changedFields.kelas_pesantren = {
+      before: beforeKelas?.nama_kelas ?? null,
+      after: afterKelas?.nama_kelas ?? null,
+    }
+  }
+
   await logActivity({
     actor: actorFromSession(session),
     module: 'santri',
@@ -99,31 +177,7 @@ export async function updateSantri(id: string, formData: FormData) {
     entityLabel: String(beforeSantri.nama_lengkap || afterSantri.nama_lengkap || id),
     summary: `Memperbarui data santri ${String(beforeSantri.nama_lengkap || afterSantri.nama_lengkap || id)}`,
     details: {
-      changed_fields: diffWhitelistedFields(beforeSantri, afterSantri, [
-        'nis',
-        'nama_lengkap',
-        'nik',
-        'tempat_lahir',
-        'tanggal_lahir',
-        'jenis_kelamin',
-        'nama_ayah',
-        'nama_ibu',
-        'alamat',
-        'gol_darah',
-        'alamat_lengkap',
-        'kecamatan',
-        'kab_kota',
-        'provinsi',
-        'jemaah',
-        'no_wa_ortu',
-        'tanggal_masuk',
-        'tanggal_keluar',
-        'kategori_santri',
-        'sekolah',
-        'kelas_sekolah',
-        'asrama',
-        'kamar',
-      ]),
+      changed_fields: changedFields,
     },
   })
 
@@ -131,6 +185,7 @@ export async function updateSantri(id: string, formData: FormData) {
   const target = redirectTo === '/dashboard/psb' ? redirectTo : '/dashboard/santri'
 
   revalidatePath('/dashboard/santri')
+  revalidatePath('/dashboard/santri/atur-kelas')
   revalidatePath('/dashboard/psb')
   revalidatePath(`/dashboard/santri/${id}`)
   redirect(target)
