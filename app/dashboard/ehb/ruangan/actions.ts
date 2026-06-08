@@ -317,16 +317,13 @@ async function getNextAvailableSeat(ruanganId: number, jamGroup: string) {
   )
   if (!room) return { error: 'Ruangan tujuan tidak ditemukan.' }
 
-  const seats = await query<{ nomor_kursi: number }>(
-    `SELECT nomor_kursi FROM ehb_plotting_santri WHERE ruangan_id = ? AND jam_group = ? ORDER BY nomor_kursi`,
+  const lastSeat = await queryOne<{ nomor_kursi: number | null }>(
+    `SELECT MAX(nomor_kursi) AS nomor_kursi
+     FROM ehb_plotting_santri
+     WHERE ruangan_id = ? AND jam_group = ?`,
     [ruanganId, jamGroup]
   )
-  const usedSeats = new Set(seats.map(seat => Number(seat.nomor_kursi)))
-  for (let seat = 1; seat <= Number(room.kapasitas || 0); seat++) {
-    if (!usedSeats.has(seat)) return { seat }
-  }
-
-  return { error: 'Ruangan tujuan sudah penuh untuk jam group ini.' }
+  return { seat: Number(lastSeat?.nomor_kursi || 0) + 1 }
 }
 
 // Untuk list pemindahan pada jam group aktif
@@ -335,23 +332,82 @@ export async function getOtherRuanganByJamGroup(eventId: number, currentRuanganI
     SELECT id, nomor_ruangan, nama_ruangan, kapasitas,
       (SELECT COUNT(*) FROM ehb_plotting_santri p WHERE p.ruangan_id = r.id AND p.jam_group = ?) as terisi
     FROM ehb_ruangan r
-    WHERE r.ehb_event_id = ? AND r.id != ? AND r.jenis_kelamin = ?
+    WHERE r.ehb_event_id = ? AND r.jenis_kelamin = ?
     ORDER BY r.nomor_ruangan
-  `, [jamGroup, eventId, currentRuanganId, jk])
+  `, [jamGroup, eventId, jk])
 }
 
-export async function pindahSantri(santriId: string, eventId: number, targetRuanganId: number, newJamGroup: string) {
+export async function pindahSantri(santriId: string, eventId: number, targetRuanganId: number, newJamGroup: string, targetNomorKursi?: number) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
-    const nextSeat = await getNextAvailableSeat(targetRuanganId, newJamGroup)
-    if ('error' in nextSeat) return { error: nextSeat.error }
+    const current = await queryOne<{
+      id: number
+      ruangan_id: number
+      nomor_kursi: number
+      jam_group: string
+    }>(
+      `SELECT id, ruangan_id, nomor_kursi, jam_group
+       FROM ehb_plotting_santri
+       WHERE santri_id = ? AND ehb_event_id = ?`,
+      [santriId, eventId]
+    )
+    if (!current) return { error: 'Data plotting santri tidak ditemukan.' }
 
-    await execute(`
-        UPDATE ehb_plotting_santri
-        SET ruangan_id = ?, nomor_kursi = ?, jam_group = ?
-        WHERE santri_id = ? AND ehb_event_id = ?
-    `, [targetRuanganId, nextSeat.seat, newJamGroup, santriId, eventId])
+    const targetRoom = await queryOne<{ id: number }>(
+      `SELECT id FROM ehb_ruangan WHERE id = ? AND ehb_event_id = ?`,
+      [targetRuanganId, eventId]
+    )
+    if (!targetRoom) return { error: 'Ruangan tujuan tidak ditemukan.' }
+
+    let targetSeat = Number(targetNomorKursi || 0)
+    if (!targetSeat || targetSeat < 1) {
+      const nextSeat = await getNextAvailableSeat(targetRuanganId, newJamGroup)
+      if ('error' in nextSeat) return { error: nextSeat.error }
+      targetSeat = nextSeat.seat
+    }
+
+    if (current.ruangan_id === targetRuanganId && current.jam_group === newJamGroup && current.nomor_kursi === targetSeat) {
+      return { success: true }
+    }
+
+    const targetOccupant = await queryOne<{
+      id: number
+      santri_id: string
+      ruangan_id: number
+      nomor_kursi: number
+      jam_group: string
+    }>(
+      `SELECT id, santri_id, ruangan_id, nomor_kursi, jam_group
+       FROM ehb_plotting_santri
+       WHERE ehb_event_id = ? AND ruangan_id = ? AND jam_group = ? AND nomor_kursi = ? AND id != ?
+       LIMIT 1`,
+      [eventId, targetRuanganId, newJamGroup, targetSeat, current.id]
+    )
+
+    if (targetOccupant) {
+      await batch([
+        {
+          sql: `UPDATE ehb_plotting_santri
+                SET ruangan_id = ?, nomor_kursi = ?, jam_group = ?
+                WHERE id = ?`,
+          params: [targetRuanganId, targetSeat, newJamGroup, current.id],
+        },
+        {
+          sql: `UPDATE ehb_plotting_santri
+                SET ruangan_id = ?, nomor_kursi = ?, jam_group = ?
+                WHERE id = ?`,
+          params: [current.ruangan_id, current.nomor_kursi, current.jam_group, targetOccupant.id],
+        },
+      ])
+    } else {
+      await execute(`
+          UPDATE ehb_plotting_santri
+          SET ruangan_id = ?, nomor_kursi = ?, jam_group = ?
+          WHERE id = ?
+      `, [targetRuanganId, targetSeat, newJamGroup, current.id])
+    }
+
     await logActivity({
       actor: actorFromSession(session),
       module: 'ehb_ruangan',
@@ -361,8 +417,16 @@ export async function pindahSantri(santriId: string, eventId: number, targetRuan
       entityType: 'ehb_plotting_santri',
       entityId: `${eventId}:${santriId}`,
       entityLabel: 'Pindah peserta EHB',
-      summary: `Memindahkan peserta EHB ke ruangan baru`,
-      details: { santri_id: santriId, target_ruangan_id: targetRuanganId, jam_group: newJamGroup },
+      summary: `Memindahkan posisi peserta EHB`,
+      details: {
+        santri_id: santriId,
+        from_ruangan_id: current.ruangan_id,
+        from_nomor_kursi: current.nomor_kursi,
+        target_ruangan_id: targetRuanganId,
+        target_nomor_kursi: targetSeat,
+        jam_group: newJamGroup,
+        swapped_with_santri_id: targetOccupant?.santri_id ?? null,
+      },
     })
 
     revalidatePath('/dashboard/ehb/ruangan')

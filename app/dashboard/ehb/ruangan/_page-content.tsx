@@ -47,6 +47,7 @@ export default function RuanganEhbPage() {
   const [showPindah, setShowPindah] = useState<any>(null) // the participant to move
   const [otherRuangan, setOtherRuangan] = useState<any[]>([])
   const [targetRuanganId, setTargetRuanganId] = useState<number>(0)
+  const [targetNomorKursi, setTargetNomorKursi] = useState<number>(0)
 
   // Modal Tambah Peserta Manual
   const [showTambah, setShowTambah] = useState<{ ruangan_id: number, jam_group: string, jenis_kelamin: string } | null>(null)
@@ -225,16 +226,17 @@ export default function RuanganEhbPage() {
   const handleOpenPindah = async (peserta: any) => {
     if (!event || !detailRuangan) return
     setShowPindah(peserta)
-    setTargetRuanganId(0)
+    setTargetRuanganId(detailRuangan.id)
+    setTargetNomorKursi(Number(peserta.nomor_kursi || 1))
     const list = await getOtherRuanganByJamGroup(event.id, detailRuangan.id, detailRuangan.jenis_kelamin, peserta.jam_group)
     setOtherRuangan(list)
   }
 
   const handlePindahSantri = async () => {
-    if (!event || !showPindah || !targetRuanganId) return
-    const res = await pindahSantri(showPindah.santri_id, event.id, targetRuanganId, showPindah.jam_group)
+    if (!event || !showPindah || !targetRuanganId || targetNomorKursi < 1) return
+    const res = await pindahSantri(showPindah.santri_id, event.id, targetRuanganId, showPindah.jam_group, targetNomorKursi)
     if ('error' in res) return toast.error(res.error)
-    toast.success('Santri berhasil dipindahkan')
+    toast.success('Posisi santri berhasil diperbarui')
     setShowPindah(null)
     handleOpenDetail(detailRuangan.id)
     loadData()
@@ -590,16 +592,16 @@ export default function RuanganEhbPage() {
         <div className={`${dashboardModalOverlay} z-50`}>
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">Pindah Ruangan</h3>
+              <h3 className="font-bold text-slate-800">Atur Posisi Peserta</h3>
               <button onClick={() => setShowPindah(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border text-sm">
                 <p className="font-bold text-slate-800">{showPindah.nama_lengkap}</p>
-                <p className="text-xs text-slate-500">{showPindah.nama_kelas} • {showPindah.jam_group}</p>
+                <p className="text-xs text-slate-500">{showPindah.nama_kelas} • {showPindah.jam_group} • Kursi {showPindah.nomor_kursi}</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500">Pindah ke Ruangan:</label>
+                <label className="text-xs font-bold text-slate-500">Ruangan</label>
                 <select
                   value={targetRuanganId}
                   onChange={e => setTargetRuanganId(parseInt(e.target.value))}
@@ -608,17 +610,28 @@ export default function RuanganEhbPage() {
                   <option value={0}>-- Pilih Ruangan --</option>
                   {otherRuangan.map(r => (
                     <option key={r.id} value={r.id}>
-                      Ruang {r.nomor_ruangan} {r.nama_ruangan ? `(${r.nama_ruangan})` : ''} - Sisa {r.kapasitas - r.terisi} kursi
+                      Ruang {r.nomor_ruangan} {r.nama_ruangan ? `(${r.nama_ruangan})` : ''}{r.id === detailRuangan?.id ? ' - saat ini' : ` - Sisa ${r.kapasitas - r.terisi} kursi`}
                     </option>
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500">Nomor Kursi / Urut</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={targetNomorKursi}
+                  onChange={e => setTargetNomorKursi(parseInt(e.target.value) || 0)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">Jika nomor tujuan sudah ditempati, posisi kedua peserta akan ditukar.</p>
+              </div>
               <button
                 onClick={handlePindahSantri}
-                disabled={targetRuanganId === 0}
+                disabled={targetRuanganId === 0 || targetNomorKursi < 1}
                 className="w-full bg-indigo-600 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
-                Pindahkan Sekarang
+                Simpan Posisi
               </button>
             </div>
           </div>
