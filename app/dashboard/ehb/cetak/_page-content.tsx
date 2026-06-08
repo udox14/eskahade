@@ -10,6 +10,7 @@ import { NomorPesertaView } from './_view-nomor'
 import { DaftarHadirView } from './_view-daftar-hadir'
 import { DaftarHadirPengawasView } from './_view-daftar-hadir-pengawas'
 import { TempelanRuanganView } from './_view-tempelan-ruangan'
+import { SampulAbsensiView } from './_view-sampul-absensi'
 import { TempelanHumasView, TempelanPengepakanView } from './_view-tempelan-humas-packing'
 import { JadwalMengawasView } from './_view-jadwal-mengawas'
 import { JadwalEhbView } from './_view-jadwal-ehb'
@@ -28,6 +29,7 @@ type View =
   | 'tempelan-ruangan'
   | 'tempelan-humas'
   | 'tempelan-pengepakan'
+  | 'sampul-absensi'
   | 'sensus-ruangan'
   | 'jadwal-mengawas'
   | 'jadwal-ehb'
@@ -42,6 +44,7 @@ const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.Element
   { view: 'tempelan-ruangan', label: 'Tempelan Ruangan',     desc: 'Nomor ruangan beserta daftar peserta di dalamnya.',         icon: LayoutList },
   { view: 'tempelan-humas',   label: 'Tempelan Humas',       desc: 'Rekap jumlah peserta per ruangan untuk setiap kelas.',       icon: Megaphone },
   { view: 'tempelan-pengepakan', label: 'Tempelan Pengepakan', desc: 'Rekap kelas dan peserta per jam untuk setiap ruangan.',     icon: Boxes },
+  { view: 'sampul-absensi',   label: 'Sampul Absensi',       desc: 'Cetak sampul lembar kehadiran per ruangan dan sesi.',       icon: ClipboardList },
   { view: 'sensus-ruangan',   label: 'Sensus Ruangan',       desc: 'Rekap jumlah peserta per kelas di tiap ruangan, satu halaman per jam.', icon: TableProperties },
   { view: 'jadwal-mengawas',  label: 'Jadwal Mengawas',      desc: 'Jadwal tugas mengawas seluruh pengawas EHB.',               icon: CalendarCheck },
   { view: 'jadwal-ehb',       label: 'Jadwal EHB',           desc: 'Jadwal ujian keseluruhan untuk ditempel di mading.',        icon: Calendar },
@@ -59,6 +62,7 @@ export default function CetakEhbPage() {
   if (view === 'tempelan-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanRuanganView onBack={() => setView('menu')} /></div>
   if (view === 'tempelan-humas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanHumasView onBack={() => setView('menu')} /></div>
   if (view === 'tempelan-pengepakan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanPengepakanView onBack={() => setView('menu')} /></div>
+  if (view === 'sampul-absensi') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><SampulAbsensiView onBack={() => setView('menu')} /></div>
   if (view === 'sensus-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><SensusRuanganView onBack={() => setView('menu')} /></div>
   if (view === 'jadwal-mengawas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalMengawasView onBack={() => setView('menu')} /></div>
   if (view === 'jadwal-ehb') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalEhbView onBack={() => setView('menu')} /></div>
