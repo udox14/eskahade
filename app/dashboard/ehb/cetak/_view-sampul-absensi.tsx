@@ -156,7 +156,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
           width: '100%',
           borderCollapse: 'collapse',
           fontFamily: 'Arial, sans-serif',
-          border: \`1.5pt solid \${themeColor}\`
+          border: `1.5pt solid ${themeColor}`
         }}>
           <thead>
             <tr>
@@ -166,7 +166,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
                 padding: '4mm',
                 fontSize: '12pt',
                 fontWeight: 'bold',
-                border: \`1.5pt solid \${themeColor}\`
+                border: `1.5pt solid ${themeColor}`
               }}>DATA PESERTA</th>
             </tr>
             <tr>
@@ -176,7 +176,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
                 padding: '3mm',
                 fontSize: '11pt',
                 fontWeight: 'bold',
-                border: \`1.5pt solid \${themeColor}\`,
+                border: `1.5pt solid ${themeColor}`,
                 width: '70%'
               }}>KELAS</th>
               <th style={{
@@ -185,7 +185,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
                 padding: '3mm',
                 fontSize: '11pt',
                 fontWeight: 'bold',
-                border: \`1.5pt solid \${themeColor}\`,
+                border: `1.5pt solid ${themeColor}`,
                 width: '30%'
               }}>JUMLAH</th>
             </tr>
@@ -194,14 +194,14 @@ function SampulSheet({ card }: { card: SampulCard }) {
             {card.rows.map((row, idx) => (
               <tr key={idx}>
                 <td style={{
-                  border: \`0.8pt solid \${themeColor}\`,
+                  border: `0.8pt solid ${themeColor}`,
                   padding: '3mm 4mm',
                   fontSize: '12pt',
                   textAlign: 'center',
                   color: '#000'
                 }}>{row.kelas}</td>
                 <td style={{
-                  border: \`0.8pt solid \${themeColor}\`,
+                  border: `0.8pt solid ${themeColor}`,
                   padding: '3mm 4mm',
                   fontSize: '12pt',
                   textAlign: 'center',
@@ -211,9 +211,9 @@ function SampulSheet({ card }: { card: SampulCard }) {
             ))}
             {/* Fill empty rows to make it look nice if there are too few rows */}
             {Array.from({ length: Math.max(0, 5 - card.rows.length) }).map((_, idx) => (
-              <tr key={\`empty-\${idx}\`}>
-                <td style={{ border: \`0.8pt solid \${themeColor}\`, padding: '3mm 4mm', height: '11.5mm' }}></td>
-                <td style={{ border: \`0.8pt solid \${themeColor}\`, padding: '3mm 4mm' }}></td>
+              <tr key={`empty-${idx}`}>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm', height: '11.5mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3mm 4mm' }}></td>
               </tr>
             ))}
           </tbody>
@@ -225,7 +225,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
                 padding: '3mm',
                 fontSize: '11pt',
                 fontWeight: 'bold',
-                border: \`1.5pt solid \${themeColor}\`,
+                border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
               }}>JUMLAH</td>
               <td style={{
@@ -234,7 +234,7 @@ function SampulSheet({ card }: { card: SampulCard }) {
                 padding: '3mm',
                 fontSize: '11pt',
                 fontWeight: 'bold',
-                border: \`1.5pt solid \${themeColor}\`,
+                border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
               }}>{card.total}</td>
             </tr>
@@ -275,12 +275,12 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: 'Sampul Absensi EHB',
-    pageStyle: \`
+    pageStyle: `
       @page { size: 210mm 330mm; margin: 0; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
-    \`,
+    `,
   })
 
   useEffect(() => {
