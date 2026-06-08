@@ -23,7 +23,7 @@ export async function getSantriBaru(params: {
   const clauses: string[] = [
     "s.status_global = 'aktif'",
     // Hanya santri yang belum punya riwayat pendidikan (santri baru)
-    "NOT EXISTS (SELECT 1 FROM riwayat_pendidikan rp WHERE rp.santri_id = s.id)"
+    "NOT EXISTS (SELECT 1 FROM riwayat_pendidikan rp WHERE rp.santri_id = s.id AND rp.status_riwayat = 'aktif')"
   ]
   const baseParams: any[] = []
 

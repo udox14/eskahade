@@ -24,7 +24,6 @@ export default async function AturKelasPage() {
     LEFT JOIN hasil_tes_klasifikasi htk ON htk.santri_id = s.id
     WHERE s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
-    LIMIT 1000
   `, [])
 
   const riwayatAda = await query<{ santri_id: string }>(
