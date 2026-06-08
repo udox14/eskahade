@@ -67,7 +67,7 @@ function buildSampulCards(rows: TempelanPengepakanItem[]): SampulCard[] {
 
 function SampulSheet({ card }: { card: SampulCard }) {
   const isJam1 = card.jamGroup.includes('1') || card.jamGroup.toLowerCase().includes('pertama') || card.jamGroup.toLowerCase() === 'ke-1'
-  const themeColor = isJam1 ? '#ef4444' : '#10b981' // modern red and modern emerald green
+  const themeColor = isJam1 ? '#ef4444' : '#22c55e'
   const jamText = parseJamGroup(card.jamGroup).toUpperCase()
   const jamNumber = card.jamGroup.match(/\d+/) ? card.jamGroup.match(/\d+/)![0] : (isJam1 ? '1' : '2')
   
@@ -75,167 +75,186 @@ function SampulSheet({ card }: { card: SampulCard }) {
 
   return (
     <div style={{
-      width: '210mm',
+      width: '215mm',
       height: '330mm',
-      padding: '0',
+      padding: '20mm 20mm 20mm 30mm', // top, right, bottom, left (30mm for binding)
       boxSizing: 'border-box',
-      fontFamily: '"Inter", "Segoe UI", "Arial", sans-serif',
+      fontFamily: 'Arial, sans-serif',
       position: 'relative',
       backgroundColor: '#fff',
       breakAfter: 'page',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
     }}>
-      {/* Left Binding Area */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: '20mm',
-        height: '330mm',
-        backgroundColor: '#f8fafc',
-        borderRight: '1.5pt dashed #cbd5e1'
-      }} />
+      {/* Top Right Logo */}
+      <div style={{ position: 'absolute', right: '20mm', top: '15mm', display: 'flex', alignItems: 'center', gap: '4mm' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logohitam.png" alt="" style={{ width: '18mm', height: '18mm' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', fontFamily: 'Montserrat, Arial, sans-serif', color: '#000' }}>
+          <div style={{ fontSize: '7.5pt', letterSpacing: '1px', marginBottom: '0.5mm' }}>LEMBAGA PENDIDIKAN</div>
+          <div style={{ fontSize: '7.5pt', letterSpacing: '1px' }}>PONDOK PESANTREN</div>
+          <div style={{ fontSize: '15pt', fontWeight: 900, lineHeight: 1, marginTop: '1mm' }}>SUKAHIDENG</div>
+          <div style={{ fontSize: '5.5pt', marginTop: '1mm', color: '#333' }}>Sukarame - Tasikmalaya - Jawa Barat</div>
+        </div>
+      </div>
 
-      {/* Content Area */}
-      <div style={{
-        marginLeft: '20mm',
-        padding: '15mm 20mm 25mm 20mm', // top, right, bottom, left
-        height: '330mm',
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Header Instansi */}
+      {/* Number and Jam Text */}
+      <div style={{ position: 'relative', marginTop: '25mm', height: '40mm', width: '100%', flexShrink: 0 }}>
+        {/* Gray Banner */}
+        <div style={{
+          position: 'absolute',
+          left: '20mm',
+          right: '-20mm', // Make it go to the right edge of the page
+          top: '15mm',
+          height: '24mm',
+          backgroundColor: '#e5e5e5',
+          display: 'flex',
+          alignItems: 'center',
+          paddingLeft: '35mm',
+          zIndex: 1
+        }}>
+          <span style={{ fontSize: '32pt', fontWeight: 900, color: '#000' }}>JAM {jamText}</span>
+        </div>
+
+        {/* Big Number */}
+        <div style={{
+          position: 'absolute',
+          left: '20mm',
+          top: '-15mm',
+          fontSize: '180pt',
+          fontWeight: 900,
+          color: themeColor,
+          lineHeight: 0.75,
+          fontFamily: 'Arial, sans-serif',
+          zIndex: 2,
+          letterSpacing: '-2px'
+        }}>
+          {jamNumber}
+        </div>
+      </div>
+
+      {/* EHB Title */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: '30mm', paddingLeft: '25mm', flexShrink: 0 }}>
+        <div style={{ fontSize: '110pt', fontWeight: 900, lineHeight: 0.75, color: '#000', letterSpacing: '-4px' }}>EHB</div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '6mm', marginTop: '8mm', color: '#000' }}>
+          <div style={{ fontSize: '26pt', fontWeight: 900, letterSpacing: '-1px' }}>SMT. {semesterLabel}</div>
+          <div style={{ fontSize: '20pt', marginTop: '1mm' }}>T. A. {card.tahunAjaranNama}</div>
+        </div>
+      </div>
+
+      {/* RUANG and Number */}
+      <div style={{ marginTop: '20mm', paddingLeft: '25mm', flex: 1 }}>
+        <div style={{ fontSize: '26pt', fontWeight: 900, color: '#000' }}>RUANG</div>
         <div style={{ 
           display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          borderBottom: `2.5pt solid ${themeColor}`, 
-          paddingBottom: '6mm' 
+          justifyContent: 'flex-end', 
+          paddingRight: '15mm',
+          marginTop: '-10mm' 
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5mm' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logohitam.png" alt="Logo" style={{ width: '22mm', height: '22mm' }} />
-            <div>
-              <div style={{ fontSize: '9pt', fontWeight: 600, letterSpacing: '2px', color: '#64748b' }}>
-                LEMBAGA PENDIDIKAN PONDOK PESANTREN
-              </div>
-              <div style={{ fontSize: '22pt', fontWeight: 900, color: '#0f172a', letterSpacing: '1px', marginTop: '-1mm' }}>
-                SUKAHIDENG
-              </div>
-              <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '1mm' }}>
-                Sukarame - Tasikmalaya - Jawa Barat
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Title */}
-        <div style={{ marginTop: '15mm', textAlign: 'center' }}>
-          <div style={{ fontSize: '16pt', fontWeight: 800, letterSpacing: '4px', color: '#475569' }}>
-            EVALUASI HASIL BELAJAR
-          </div>
-          <div style={{ fontSize: '12pt', fontWeight: 600, color: '#94a3b8', marginTop: '2mm', letterSpacing: '1px' }}>
-            SEMESTER {semesterLabel} - T.A. {card.tahunAjaranNama}
-          </div>
-        </div>
-
-        {/* Info Cards (Ruang & Jam) */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '15mm', marginTop: '20mm' }}>
-          {/* Ruang Box */}
-          <div style={{
-            width: '80mm',
-            height: '55mm',
-            backgroundColor: '#fff',
-            border: `2.5pt solid ${themeColor}`,
-            borderRadius: '6mm',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: `0 10px 25px -5px ${themeColor}30`
-          }}>
-            <div style={{ fontSize: '13pt', fontWeight: 800, color: '#64748b', letterSpacing: '3px' }}>RUANG</div>
-            <div style={{ fontSize: '65pt', fontWeight: 900, color: themeColor, lineHeight: 1, marginTop: '1mm' }}>
-              {formatRoomNumber(card.nomorRuangan)}
-            </div>
-          </div>
-          
-          {/* Jam Box */}
-          <div style={{
-            width: '80mm',
-            height: '55mm',
-            backgroundColor: themeColor,
-            borderRadius: '6mm',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: `0 10px 25px -5px ${themeColor}40`,
-            color: '#fff'
-          }}>
-            <div style={{ fontSize: '13pt', fontWeight: 800, opacity: 0.9, letterSpacing: '3px' }}>JAM SESI</div>
-            <div style={{ fontSize: '65pt', fontWeight: 900, lineHeight: 1, marginTop: '1mm' }}>
-              {jamNumber}
-            </div>
-          </div>
-        </div>
-
-        {/* Data Peserta Table */}
-        <div style={{ marginTop: '25mm', flex: 1 }}>
           <div style={{ 
-            backgroundColor: '#f1f5f9', 
-            padding: '4mm 5mm', 
-            borderTopLeftRadius: '4mm', 
-            borderTopRightRadius: '4mm',
-            borderBottom: `2pt solid ${themeColor}`,
-            display: 'flex',
-            justifyContent: 'center'
+            fontSize: '180pt', 
+            fontWeight: 900, 
+            color: themeColor, 
+            lineHeight: 0.8,
+            fontFamily: 'Arial, sans-serif',
+            letterSpacing: '-5px'
           }}>
-            <span style={{ fontSize: '13pt', fontWeight: 800, color: '#334155', letterSpacing: '2px' }}>DATA PESERTA UJIAN</span>
+            {formatRoomNumber(card.nomorRuangan)}
           </div>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            borderLeft: '1.5pt solid #e2e8f0',
-            borderRight: '1.5pt solid #e2e8f0',
-          }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '4mm', textAlign: 'center', fontSize: '11pt', fontWeight: 700, color: '#475569', borderBottom: '1.5pt solid #e2e8f0', width: '70%' }}>MARHALAH / KELAS</th>
-                <th style={{ padding: '4mm', textAlign: 'center', fontSize: '11pt', fontWeight: 700, color: '#475569', borderBottom: '1.5pt solid #e2e8f0', width: '30%', borderLeft: '1.5pt solid #e2e8f0' }}>JUMLAH</th>
-              </tr>
-            </thead>
-            <tbody>
-              {card.rows.map((row, idx) => (
-                <tr key={idx}>
-                  <td style={{ padding: '4.5mm', textAlign: 'center', fontSize: '13pt', fontWeight: 600, color: '#1e293b', borderBottom: '1pt dashed #cbd5e1' }}>{row.kelas}</td>
-                  <td style={{ padding: '4.5mm', textAlign: 'center', fontSize: '14pt', fontWeight: 800, color: themeColor, borderBottom: '1pt dashed #cbd5e1', borderLeft: '1.5pt solid #e2e8f0' }}>{row.jumlah}</td>
-                </tr>
-              ))}
-              {/* Fill empty rows to make the table look robust */}
-              {Array.from({ length: Math.max(0, 8 - card.rows.length) }).map((_, idx) => (
-                <tr key={`empty-${idx}`}>
-                  <td style={{ padding: '4.5mm', height: '14mm', borderBottom: '1pt dashed #cbd5e1' }}></td>
-                  <td style={{ padding: '4.5mm', borderBottom: '1pt dashed #cbd5e1', borderLeft: '1.5pt solid #e2e8f0' }}></td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td style={{ padding: '5mm', textAlign: 'center', fontSize: '13pt', fontWeight: 800, color: '#334155', borderBottom: '1.5pt solid #e2e8f0' }}>TOTAL KESELURUHAN</td>
-                <td style={{ padding: '5mm', textAlign: 'center', fontSize: '16pt', fontWeight: 900, color: '#fff', backgroundColor: themeColor, borderBottom: `1.5pt solid ${themeColor}` }}>{card.total}</td>
-              </tr>
-            </tfoot>
-          </table>
-          <div style={{
-            height: '4mm',
-            backgroundColor: themeColor,
-            borderBottomLeftRadius: '4mm',
-            borderBottomRightRadius: '4mm',
-          }} />
         </div>
+      </div>
 
+      {/* DATA PESERTA Table */}
+      <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '10mm', flexShrink: 0 }}>
+        <table style={{
+          width: '120mm',
+          borderCollapse: 'collapse',
+          fontFamily: 'Arial, sans-serif',
+          border: `1.5pt solid ${themeColor}`
+        }}>
+          <thead>
+            <tr>
+              <th colSpan={2} style={{
+                backgroundColor: themeColor,
+                color: '#fff',
+                padding: '4mm',
+                fontSize: '13pt',
+                fontWeight: 'bold',
+                border: `1.5pt solid ${themeColor}`
+              }}>DATA PESERTA</th>
+            </tr>
+            <tr>
+              <th style={{
+                backgroundColor: themeColor,
+                color: '#fff',
+                padding: '4mm',
+                fontSize: '11pt',
+                fontWeight: 'bold',
+                border: `1.5pt solid ${themeColor}`,
+                width: '70%'
+              }}>KELAS</th>
+              <th style={{
+                backgroundColor: themeColor,
+                color: '#fff',
+                padding: '4mm',
+                fontSize: '11pt',
+                fontWeight: 'bold',
+                border: `1.5pt solid ${themeColor}`,
+                width: '30%'
+              }}>JUMLAH</th>
+            </tr>
+          </thead>
+          <tbody>
+            {card.rows.map((row, idx) => (
+              <tr key={idx}>
+                <td style={{
+                  border: `0.8pt solid ${themeColor}`,
+                  padding: '3.5mm 4mm',
+                  fontSize: '11pt',
+                  textAlign: 'center',
+                  color: '#000'
+                }}>{row.kelas}</td>
+                <td style={{
+                  border: `0.8pt solid ${themeColor}`,
+                  padding: '3.5mm 4mm',
+                  fontSize: '11pt',
+                  textAlign: 'center',
+                  color: '#000'
+                }}>{row.jumlah}</td>
+              </tr>
+            ))}
+            {/* Fill empty rows to make it look nice if there are too few rows */}
+            {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
+              <tr key={`empty-${idx}`}>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3.5mm 4mm', height: '11.5mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '3.5mm 4mm' }}></td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style={{
+                backgroundColor: themeColor,
+                color: '#fff',
+                padding: '3.5mm',
+                fontSize: '11pt',
+                fontWeight: 'bold',
+                border: `1.5pt solid ${themeColor}`,
+                textAlign: 'center'
+              }}>JUMLAH</td>
+              <td style={{
+                backgroundColor: themeColor,
+                color: '#fff',
+                padding: '3.5mm',
+                fontSize: '11pt',
+                fontWeight: 'bold',
+                border: `1.5pt solid ${themeColor}`,
+                textAlign: 'center'
+              }}>{card.total}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   )
@@ -272,7 +291,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
     contentRef: printRef,
     documentTitle: 'Sampul Absensi EHB',
     pageStyle: `
-      @page { size: 210mm 330mm; margin: 0; }
+      @page { size: 215mm 330mm; margin: 0; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
