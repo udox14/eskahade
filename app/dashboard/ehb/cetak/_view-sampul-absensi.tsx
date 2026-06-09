@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { AlertTriangle, FileBadge, Filter, Loader2, Printer } from 'lucide-react'
+import { AlertTriangle, FileBadge, Filter, Loader2, Printer, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getActiveEventForCetak,
@@ -10,7 +10,7 @@ import {
   type ActiveEvent,
   type TempelanPengepakanItem,
 } from './actions'
-import { FONT, PageHeader, parseJamGroup } from './_shared'
+import { PageHeader, parseJamGroup } from './_shared'
 import { formatTempelanClassName } from './_view-tempelan-humas-packing'
 
 type PrintMode = 'semua' | 'jam' | 'ruangan'
@@ -65,159 +65,99 @@ function buildSampulCards(rows: TempelanPengepakanItem[]): SampulCard[] {
     }))
 }
 
-function SampulSheet({ card }: { card: SampulCard }) {
+type SampulSettings = {
+  ruangX: number
+  ruangY: number
+  ruangSize: number
+  tableY: number
+  tableScale: number
+}
+
+function SampulSheet({ card, settings }: { card: SampulCard, settings: SampulSettings }) {
   const isJam1 = card.jamGroup.includes('1') || card.jamGroup.toLowerCase().includes('pertama') || card.jamGroup.toLowerCase() === 'ke-1'
   const themeColor = isJam1 ? '#ef4444' : '#22c55e'
-  const jamText = parseJamGroup(card.jamGroup).toUpperCase()
   
-  const semesterLabel = card.semester === 1 ? 'SEMESTER GANJIL' : 'SEMESTER GENAP'
-  const tahunAjaran = card.tahunAjaranNama.replace('/', '-')
+  // Background images
+  const bgImage = isJam1 ? '/bg-sampul-1.png' : '/bg-sampul-2.png'
 
   return (
     <div style={{
       width: '215mm',
       height: '330mm',
-      padding: '15mm 15mm 20mm 25mm', // 25mm for left binding margin
       boxSizing: 'border-box',
-      fontFamily: '"Arial", sans-serif',
+      fontFamily: '"Montserrat", "Arial", sans-serif',
+      position: 'relative',
       backgroundColor: '#fff',
-      color: '#000',
       breakAfter: 'page',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
+      overflow: 'hidden'
     }}>
-      {/* 1. Professional Header like Tempelan Ruangan */}
+      {/* Background Image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img 
+        src={bgImage} 
+        alt="" 
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          zIndex: 0, 
+          objectFit: 'fill' 
+        }} 
+      />
+
+      {/* Room Number */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '5mm',
-        flexShrink: 0,
+        position: 'absolute',
+        left: `${settings.ruangX}mm`,
+        top: `${settings.ruangY}mm`,
+        fontSize: `${settings.ruangSize}pt`,
+        fontWeight: 900,
+        color: themeColor,
+        lineHeight: 0.8,
+        letterSpacing: '-2px',
+        zIndex: 1,
       }}>
-        <img src="/logohitam.png" alt="" style={{ width: '28mm', height: '28mm', objectFit: 'contain', flexShrink: 0 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div style={{ fontSize: '24pt', fontWeight: 900, lineHeight: 0.95, letterSpacing: '0' }}>
-            EVALUASI HASIL BELAJAR
-          </div>
-          <div style={{ fontSize: '20pt', lineHeight: 0.95, letterSpacing: '0', marginTop: '1mm' }}>
-            {semesterLabel} T.A. {tahunAjaran}
-          </div>
-          <div style={{ fontSize: '13pt', lineHeight: 1.1, marginTop: '2mm' }}>
-            LEMBAGA PENDIDIKAN PONDOK PESANTREN SUKAHIDENG
-          </div>
-          <div style={{ borderBottom: '1.5pt solid #000', marginTop: '3mm', width: '100%' }} />
-        </div>
+        {formatRoomNumber(card.nomorRuangan)}
       </div>
 
-      {/* 2. Main Title */}
-      <div style={{ textAlign: 'center', marginTop: '15mm' }}>
-        <h1 style={{ fontSize: '32pt', fontWeight: 900, margin: 0, letterSpacing: '2px' }}>SAMPUL DAFTAR HADIR</h1>
-      </div>
-
-      {/* 3. Grid for Ruangan and Jam (Side by side boxes) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12mm', marginTop: '20mm', padding: '0 10mm' }}>
-        
-        {/* RUANG Box */}
-        <div style={{
-          border: '3pt solid #000',
-          display: 'flex',
-          flexDirection: 'column',
-          boxSizing: 'border-box',
-          height: '80mm',
-          borderRadius: '4mm',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            height: '18mm',
-            backgroundColor: '#000',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24pt',
-            fontWeight: 900,
-            letterSpacing: '2px',
-          }}>
-            RUANGAN
-          </div>
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '130pt',
-            fontWeight: 900,
-            lineHeight: 0.8,
-            letterSpacing: '-4px',
-          }}>
-            {formatRoomNumber(card.nomorRuangan)}
-          </div>
-        </div>
-
-        {/* JAM Box */}
-        <div style={{
-          border: `3pt solid ${themeColor}`,
-          display: 'flex',
-          flexDirection: 'column',
-          boxSizing: 'border-box',
-          height: '80mm',
-          borderRadius: '4mm',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            height: '18mm',
-            backgroundColor: themeColor,
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24pt',
-            fontWeight: 900,
-            letterSpacing: '2px',
-          }}>
-            SESI UJIAN
-          </div>
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: themeColor,
-          }}>
-            <div style={{ fontSize: '30pt', fontWeight: 900, lineHeight: 1 }}>JAM</div>
-            <div style={{ fontSize: '50pt', fontWeight: 900, lineHeight: 1, textAlign: 'center', marginTop: '2mm' }}>
-              {jamText}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Table DATA PESERTA */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '25mm' }}>
+      {/* Table DATA PESERTA */}
+      <div style={{
+        position: 'absolute',
+        top: `${settings.tableY}mm`,
+        left: 0,
+        right: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        zIndex: 1,
+        transform: `scale(${settings.tableScale / 100})`,
+        transformOrigin: 'top center'
+      }}>
         <table style={{
-          width: '150mm',
+          width: '130mm',
           borderCollapse: 'collapse',
           fontFamily: 'Arial, sans-serif',
-          border: `2pt solid ${themeColor}`
+          border: `1.5pt solid ${themeColor}`,
+          backgroundColor: '#fff'
         }}>
           <thead>
             <tr>
               <th colSpan={2} style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '4mm',
-                fontSize: '15pt',
+                padding: '3mm',
+                fontSize: '14pt',
                 fontWeight: 'bold',
-                border: `2pt solid ${themeColor}`
+                border: `1.5pt solid ${themeColor}`
               }}>DATA PESERTA</th>
             </tr>
             <tr>
               <th style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3mm',
-                fontSize: '13pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 width: '70%'
@@ -225,8 +165,8 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <th style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3mm',
-                fontSize: '13pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 width: '30%'
@@ -237,25 +177,27 @@ function SampulSheet({ card }: { card: SampulCard }) {
             {card.rows.map((row, idx) => (
               <tr key={idx}>
                 <td style={{
-                  border: `1.5pt solid ${themeColor}`,
-                  padding: '3.5mm 4mm',
-                  fontSize: '14pt',
+                  border: `0.8pt solid ${themeColor}`,
+                  padding: '2mm 4mm',
+                  fontSize: '13pt',
                   textAlign: 'center',
+                  color: '#000',
                   fontWeight: 'bold'
                 }}>{row.kelas}</td>
                 <td style={{
-                  border: `1.5pt solid ${themeColor}`,
-                  padding: '3.5mm 4mm',
-                  fontSize: '14pt',
+                  border: `0.8pt solid ${themeColor}`,
+                  padding: '2mm 4mm',
+                  fontSize: '13pt',
                   textAlign: 'center',
+                  color: '#000',
                   fontWeight: 'bold'
                 }}>{row.jumlah}</td>
               </tr>
             ))}
-            {Array.from({ length: Math.max(0, 5 - card.rows.length) }).map((_, idx) => (
+            {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
               <tr key={`empty-${idx}`}>
-                <td style={{ border: `1.5pt solid ${themeColor}`, padding: '3.5mm 4mm', height: '12mm' }}></td>
-                <td style={{ border: `1.5pt solid ${themeColor}`, padding: '3.5mm 4mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm', height: '7mm' }}></td>
+                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm' }}></td>
               </tr>
             ))}
           </tbody>
@@ -264,17 +206,17 @@ function SampulSheet({ card }: { card: SampulCard }) {
               <td style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3.5mm',
-                fontSize: '13pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
-              }}>TOTAL PESERTA</td>
+              }}>JUMLAH</td>
               <td style={{
                 backgroundColor: themeColor,
                 color: '#fff',
-                padding: '3.5mm',
-                fontSize: '13pt',
+                padding: '2.5mm',
+                fontSize: '12pt',
                 fontWeight: 'bold',
                 border: `1.5pt solid ${themeColor}`,
                 textAlign: 'center'
@@ -287,12 +229,12 @@ function SampulSheet({ card }: { card: SampulCard }) {
   )
 }
 
-function SampulPreview({ cards }: { cards: SampulCard[] }) {
+function SampulPreview({ cards, settings }: { cards: SampulCard[], settings: SampulSettings }) {
   return (
     <div className="flex flex-col items-center gap-6">
       {cards.slice(0, 3).map(card => (
         <div key={card.key} className="bg-white shadow-xl flex-shrink-0" style={{ zoom: 0.38 }}>
-          <SampulSheet card={card} />
+          <SampulSheet card={card} settings={settings} />
         </div>
       ))}
       {cards.length > 3 && (
@@ -312,6 +254,29 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
   const [selectedRuangan, setSelectedRuangan] = useState('')
   
   const [hasLoaded, setHasLoaded] = useState(false)
+  
+  const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings] = useState<SampulSettings>(() => {
+    // load from localStorage if exists
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sampul_settings')
+      if (saved) return JSON.parse(saved)
+    }
+    return {
+      ruangX: 105,
+      ruangY: 135,
+      ruangSize: 180,
+      tableY: 200,
+      tableScale: 100
+    }
+  })
+
+  // Save settings whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sampul_settings', JSON.stringify(settings))
+    }
+  }, [settings])
 
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
@@ -387,10 +352,50 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="bg-white border rounded-xl overflow-hidden">
-        <div className="bg-slate-50 px-5 py-3 border-b flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-500" />
-          <h3 className="font-bold text-slate-700 text-sm">Preview Sampul Absensi</h3>
+        <div className="bg-slate-50 px-5 py-3 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <h3 className="font-bold text-slate-700 text-sm">Preview Sampul Absensi</h3>
+          </div>
+          <button 
+            onClick={() => setShowSettings(!showSettings)} 
+            className={`p-1.5 rounded-md transition-colors ${showSettings ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-slate-200 text-slate-500'}`}
+            title="Pengaturan Posisi Tabel & Angka"
+          >
+            <Settings2 className="w-5 h-5" />
+          </button>
         </div>
+
+        {showSettings && (
+          <div className="bg-slate-100 border-b border-indigo-100 p-4 grid grid-cols-2 md:grid-cols-5 gap-4">
+            <label className="text-xs font-bold text-slate-600 block">
+              Posisi Ruang X (Kiri/Kanan)
+              <input type="range" min="0" max="215" value={settings.ruangX} onChange={e => setSettings({...settings, ruangX: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+              <div className="text-center mt-1 text-slate-500">{settings.ruangX} mm</div>
+            </label>
+            <label className="text-xs font-bold text-slate-600 block">
+              Posisi Ruang Y (Atas/Bawah)
+              <input type="range" min="0" max="330" value={settings.ruangY} onChange={e => setSettings({...settings, ruangY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+              <div className="text-center mt-1 text-slate-500">{settings.ruangY} mm</div>
+            </label>
+            <label className="text-xs font-bold text-slate-600 block">
+              Ukuran Font Ruang
+              <input type="range" min="50" max="300" value={settings.ruangSize} onChange={e => setSettings({...settings, ruangSize: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+              <div className="text-center mt-1 text-slate-500">{settings.ruangSize} pt</div>
+            </label>
+            <label className="text-xs font-bold text-slate-600 block">
+              Posisi Tabel Y (Atas/Bawah)
+              <input type="range" min="0" max="330" value={settings.tableY} onChange={e => setSettings({...settings, tableY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+              <div className="text-center mt-1 text-slate-500">{settings.tableY} mm</div>
+            </label>
+            <label className="text-xs font-bold text-slate-600 block">
+              Skala Tabel (%)
+              <input type="range" min="50" max="150" value={settings.tableScale} onChange={e => setSettings({...settings, tableScale: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+              <div className="text-center mt-1 text-slate-500">{settings.tableScale}%</div>
+            </label>
+          </div>
+        )}
+
         <div className="p-5 flex flex-col lg:flex-row gap-4 lg:items-end lg:justify-between">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
             <label className="text-xs font-bold text-slate-500 uppercase">
@@ -470,7 +475,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
 
           <div className="bg-slate-100 border rounded-2xl p-4 flex justify-center overflow-auto max-h-[900px]">
             {filteredCards.length > 0 ? (
-              <SampulPreview cards={filteredCards} />
+              <SampulPreview cards={filteredCards} settings={settings} />
             ) : (
               <div className="py-16 text-sm font-semibold text-slate-500">Tidak ada data pada filter ini.</div>
             )}
@@ -479,7 +484,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
           <div className="hidden">
             <div ref={printRef}>
               {filteredCards.map(card => (
-                <SampulSheet key={card.key} card={card} />
+                <SampulSheet key={card.key} card={card} settings={settings} />
               ))}
             </div>
           </div>
