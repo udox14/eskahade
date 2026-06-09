@@ -671,3 +671,21 @@ export async function getJadwalEhbCetakData(eventId: number) {
     panitia,
   }
 }
+
+export async function getSampulSettings() {
+  const row = await queryOne<{ value: string }>(`SELECT value FROM app_settings WHERE key = 'sampul_map_settings'`)
+  if (!row) return null
+  try {
+    return JSON.parse(row.value)
+  } catch {
+    return null
+  }
+}
+
+export async function setSampulSettings(settings: any) {
+  const json = JSON.stringify(settings)
+  await execute(`
+    INSERT INTO app_settings (key, value) VALUES ('sampul_map_settings', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `, [json])
+}

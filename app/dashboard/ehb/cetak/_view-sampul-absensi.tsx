@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { AlertTriangle, FileBadge, Filter, Loader2, Printer, Settings2 } from 'lucide-react'
+import { AlertTriangle, FileBadge, Filter, Loader2, Printer, Settings2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getActiveEventForCetak,
   getTempelanPengepakanData,
+  getSampulSettings,
+  setSampulSettings,
   type ActiveEvent,
   type TempelanPengepakanItem,
 } from './actions'
@@ -69,13 +71,23 @@ type SampulSettings = {
   ruangX: number
   ruangY: number
   ruangSize: number
+  tableX: number
   tableY: number
   tableScale: number
 }
 
+const DEFAULT_SETTINGS: SampulSettings = {
+  ruangX: 105,
+  ruangY: 135,
+  ruangSize: 180,
+  tableX: 0,
+  tableY: 200,
+  tableScale: 100
+}
+
 function SampulSheet({ card, settings }: { card: SampulCard, settings: SampulSettings }) {
   const isJam1 = card.jamGroup.includes('1') || card.jamGroup.toLowerCase().includes('pertama') || card.jamGroup.toLowerCase() === 'ke-1'
-  const themeColor = isJam1 ? '#ef4444' : '#22c55e'
+  const themeColor = isJam1 ? '#b91c1c' : '#15803d' // Darker red and darker green
   
   // Background images
   const bgImage = isJam1 ? '/bg-sampul-1.png' : '/bg-sampul-2.png'
@@ -131,99 +143,102 @@ function SampulSheet({ card, settings }: { card: SampulCard, settings: SampulSet
         display: 'flex',
         justifyContent: 'center',
         zIndex: 1,
-        transform: `scale(${settings.tableScale / 100})`,
-        transformOrigin: 'top center'
       }}>
-        <table style={{
-          width: '130mm',
-          borderCollapse: 'collapse',
-          fontFamily: 'Arial, sans-serif',
-          border: `1.5pt solid ${themeColor}`,
-          backgroundColor: '#fff'
+        <div style={{
+          transform: `scale(${settings.tableScale / 100}) translateX(${settings.tableX}mm)`,
+          transformOrigin: 'top center'
         }}>
-          <thead>
-            <tr>
-              <th colSpan={2} style={{
-                backgroundColor: themeColor,
-                color: '#fff',
-                padding: '3mm',
-                fontSize: '14pt',
-                fontWeight: 'bold',
-                border: `1.5pt solid ${themeColor}`
-              }}>DATA PESERTA</th>
-            </tr>
-            <tr>
-              <th style={{
-                backgroundColor: themeColor,
-                color: '#fff',
-                padding: '2.5mm',
-                fontSize: '12pt',
-                fontWeight: 'bold',
-                border: `1.5pt solid ${themeColor}`,
-                width: '70%'
-              }}>KELAS</th>
-              <th style={{
-                backgroundColor: themeColor,
-                color: '#fff',
-                padding: '2.5mm',
-                fontSize: '12pt',
-                fontWeight: 'bold',
-                border: `1.5pt solid ${themeColor}`,
-                width: '30%'
-              }}>JUMLAH</th>
-            </tr>
-          </thead>
-          <tbody>
-            {card.rows.map((row, idx) => (
-              <tr key={idx}>
-                <td style={{
-                  border: `0.8pt solid ${themeColor}`,
-                  padding: '2mm 4mm',
-                  fontSize: '13pt',
-                  textAlign: 'center',
-                  color: '#000',
-                  fontWeight: 'bold'
-                }}>{row.kelas}</td>
-                <td style={{
-                  border: `0.8pt solid ${themeColor}`,
-                  padding: '2mm 4mm',
-                  fontSize: '13pt',
-                  textAlign: 'center',
-                  color: '#000',
-                  fontWeight: 'bold'
-                }}>{row.jumlah}</td>
+          <table style={{
+            width: '130mm',
+            borderCollapse: 'collapse',
+            fontFamily: 'Arial, sans-serif',
+            border: '2pt solid #000',
+            backgroundColor: '#fff'
+          }}>
+            <thead>
+              <tr>
+                <th colSpan={2} style={{
+                  backgroundColor: themeColor,
+                  color: '#fff',
+                  padding: '3mm',
+                  fontSize: '14pt',
+                  fontWeight: 'bold',
+                  border: '1.5pt solid #000'
+                }}>DATA PESERTA</th>
               </tr>
-            ))}
-            {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
-              <tr key={`empty-${idx}`}>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm', height: '7mm' }}></td>
-                <td style={{ border: `0.8pt solid ${themeColor}`, padding: '2mm 4mm' }}></td>
+              <tr>
+                <th style={{
+                  backgroundColor: themeColor,
+                  color: '#fff',
+                  padding: '2.5mm',
+                  fontSize: '12pt',
+                  fontWeight: 'bold',
+                  border: '1.5pt solid #000',
+                  width: '70%'
+                }}>KELAS</th>
+                <th style={{
+                  backgroundColor: themeColor,
+                  color: '#fff',
+                  padding: '2.5mm',
+                  fontSize: '12pt',
+                  fontWeight: 'bold',
+                  border: '1.5pt solid #000',
+                  width: '30%'
+                }}>JUMLAH</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td style={{
-                backgroundColor: themeColor,
-                color: '#fff',
-                padding: '2.5mm',
-                fontSize: '12pt',
-                fontWeight: 'bold',
-                border: `1.5pt solid ${themeColor}`,
-                textAlign: 'center'
-              }}>JUMLAH</td>
-              <td style={{
-                backgroundColor: themeColor,
-                color: '#fff',
-                padding: '2.5mm',
-                fontSize: '12pt',
-                fontWeight: 'bold',
-                border: `1.5pt solid ${themeColor}`,
-                textAlign: 'center'
-              }}>{card.total}</td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody>
+              {card.rows.map((row, idx) => (
+                <tr key={idx}>
+                  <td style={{
+                    border: '1pt solid #000',
+                    padding: '2mm 4mm',
+                    fontSize: '13pt',
+                    textAlign: 'center',
+                    color: '#000',
+                    fontWeight: 'bold'
+                  }}>{row.kelas}</td>
+                  <td style={{
+                    border: '1pt solid #000',
+                    padding: '2mm 4mm',
+                    fontSize: '13pt',
+                    textAlign: 'center',
+                    color: '#000',
+                    fontWeight: 'bold'
+                  }}>{row.jumlah}</td>
+                </tr>
+              ))}
+              {Array.from({ length: Math.max(0, 6 - card.rows.length) }).map((_, idx) => (
+                <tr key={`empty-${idx}`}>
+                  <td style={{ border: '1pt solid #000', padding: '2mm 4mm', height: '7mm' }}></td>
+                  <td style={{ border: '1pt solid #000', padding: '2mm 4mm' }}></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td style={{
+                  backgroundColor: themeColor,
+                  color: '#fff',
+                  padding: '2.5mm',
+                  fontSize: '12pt',
+                  fontWeight: 'bold',
+                  border: '1.5pt solid #000',
+                  textAlign: 'center'
+                }}>JUMLAH</td>
+                <td style={{
+                  backgroundColor: themeColor,
+                  color: '#fff',
+                  padding: '2.5mm',
+                  fontSize: '12pt',
+                  fontWeight: 'bold',
+                  border: '1.5pt solid #000',
+                  textAlign: 'center'
+                }}>{card.total}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -254,34 +269,15 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
   const [selectedRuangan, setSelectedRuangan] = useState('')
   
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
   
   const [showSettings, setShowSettings] = useState(false)
-  const [settings, setSettings] = useState<SampulSettings>(() => {
-    // load from localStorage if exists
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sampul_settings')
-      if (saved) return JSON.parse(saved)
-    }
-    return {
-      ruangX: 105,
-      ruangY: 135,
-      ruangSize: 180,
-      tableY: 200,
-      tableScale: 100
-    }
-  })
-
-  // Save settings whenever it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('sampul_settings', JSON.stringify(settings))
-    }
-  }, [settings])
+  const [settings, setSettings] = useState<SampulSettings>(DEFAULT_SETTINGS)
 
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: 'Sampul Absensi EHB',
+    documentTitle: 'Sampul Map EHB',
     pageStyle: `
       @page { size: 215mm 330mm; margin: 0; }
       @media print {
@@ -292,7 +288,15 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const init = async () => {
-      const evt = await getActiveEventForCetak()
+      const [evt, dbSettings] = await Promise.all([
+        getActiveEventForCetak(),
+        getSampulSettings()
+      ])
+      
+      if (dbSettings) {
+        setSettings({ ...DEFAULT_SETTINGS, ...dbSettings })
+      }
+
       setEvent(evt)
       if (evt) {
         try {
@@ -304,6 +308,18 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
     }
     init()
   }, [])
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true)
+    try {
+      await setSampulSettings(settings)
+      toast.success('Konfigurasi posisi berhasil disimpan!')
+    } catch {
+      toast.error('Gagal menyimpan konfigurasi.')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   const allCards = useMemo(() => buildSampulCards(data), [data])
   
@@ -333,7 +349,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
   if (loadingInit) return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   if (!event) return (
     <div className="space-y-6">
-      <PageHeader title="Sampul Absensi" onBack={onBack} />
+      <PageHeader title="Sampul Map" onBack={onBack} />
       <div className="bg-amber-50 text-amber-800 p-4 rounded-xl flex items-center gap-3">
         <AlertTriangle className="w-5 h-5 shrink-0" />
         <p className="text-sm font-medium">Belum ada event EHB yang aktif.</p>
@@ -343,7 +359,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sampul Absensi" onBack={onBack} />
+      <PageHeader title="Sampul Map" onBack={onBack} />
 
       <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-3 flex items-center gap-3">
         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
@@ -355,7 +371,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
         <div className="bg-slate-50 px-5 py-3 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
-            <h3 className="font-bold text-slate-700 text-sm">Preview Sampul Absensi</h3>
+            <h3 className="font-bold text-slate-700 text-sm">Preview Sampul Map</h3>
           </div>
           <button 
             onClick={() => setShowSettings(!showSettings)} 
@@ -367,32 +383,51 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
         </div>
 
         {showSettings && (
-          <div className="bg-slate-100 border-b border-indigo-100 p-4 grid grid-cols-2 md:grid-cols-5 gap-4">
-            <label className="text-xs font-bold text-slate-600 block">
-              Posisi Ruang X (Kiri/Kanan)
-              <input type="range" min="0" max="215" value={settings.ruangX} onChange={e => setSettings({...settings, ruangX: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
-              <div className="text-center mt-1 text-slate-500">{settings.ruangX} mm</div>
-            </label>
-            <label className="text-xs font-bold text-slate-600 block">
-              Posisi Ruang Y (Atas/Bawah)
-              <input type="range" min="0" max="330" value={settings.ruangY} onChange={e => setSettings({...settings, ruangY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
-              <div className="text-center mt-1 text-slate-500">{settings.ruangY} mm</div>
-            </label>
-            <label className="text-xs font-bold text-slate-600 block">
-              Ukuran Font Ruang
-              <input type="range" min="50" max="300" value={settings.ruangSize} onChange={e => setSettings({...settings, ruangSize: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
-              <div className="text-center mt-1 text-slate-500">{settings.ruangSize} pt</div>
-            </label>
-            <label className="text-xs font-bold text-slate-600 block">
-              Posisi Tabel Y (Atas/Bawah)
-              <input type="range" min="0" max="330" value={settings.tableY} onChange={e => setSettings({...settings, tableY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
-              <div className="text-center mt-1 text-slate-500">{settings.tableY} mm</div>
-            </label>
-            <label className="text-xs font-bold text-slate-600 block">
-              Skala Tabel (%)
-              <input type="range" min="50" max="150" value={settings.tableScale} onChange={e => setSettings({...settings, tableScale: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
-              <div className="text-center mt-1 text-slate-500">{settings.tableScale}%</div>
-            </label>
+          <div className="bg-slate-100 border-b border-indigo-100 p-5">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <label className="text-xs font-bold text-slate-600 block">
+                Posisi Ruang X
+                <input type="range" min="0" max="215" value={settings.ruangX} onChange={e => setSettings({...settings, ruangX: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.ruangX} mm</div>
+              </label>
+              <label className="text-xs font-bold text-slate-600 block">
+                Posisi Ruang Y
+                <input type="range" min="0" max="330" value={settings.ruangY} onChange={e => setSettings({...settings, ruangY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.ruangY} mm</div>
+              </label>
+              <label className="text-xs font-bold text-slate-600 block">
+                Ukuran Font Ruang
+                <input type="range" min="50" max="300" value={settings.ruangSize} onChange={e => setSettings({...settings, ruangSize: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.ruangSize} pt</div>
+              </label>
+              
+              <label className="text-xs font-bold text-slate-600 block">
+                Posisi Tabel X
+                <input type="range" min="-100" max="100" value={settings.tableX} onChange={e => setSettings({...settings, tableX: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.tableX} mm</div>
+              </label>
+              <label className="text-xs font-bold text-slate-600 block">
+                Posisi Tabel Y
+                <input type="range" min="0" max="330" value={settings.tableY} onChange={e => setSettings({...settings, tableY: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.tableY} mm</div>
+              </label>
+              <label className="text-xs font-bold text-slate-600 block">
+                Skala Tabel (%)
+                <input type="range" min="50" max="150" value={settings.tableScale} onChange={e => setSettings({...settings, tableScale: Number(e.target.value)})} className="w-full mt-2 accent-indigo-600" />
+                <div className="text-center mt-1 text-slate-500">{settings.tableScale}%</div>
+              </label>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <button 
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+              >
+                {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Simpan ke Database
+              </button>
+            </div>
           </div>
         )}
 
@@ -469,7 +504,7 @@ export function SampulAbsensiView({ onBack }: { onBack: () => void }) {
               disabled={filteredCards.length === 0}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-6 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-lg transition-all"
             >
-              <Printer className="w-4 h-4" /> Cetak Sampul
+              <Printer className="w-4 h-4" /> Cetak Sampul Map
             </button>
           </div>
 
