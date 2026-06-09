@@ -84,7 +84,7 @@ export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, sem
     riwayat_id: r.riwayat_id,
     nis: r.nis,
     nama: r.nama_lengkap,
-    nilai: r.nilai ?? 0
+    nilai: r.nilai ?? ''
   }))
 }
 
@@ -108,12 +108,17 @@ export async function getJudulKitabNilai(kelasId: string, mapelId: number) {
 export async function simpanNilaiPerMapel(
   semester: number,
   mapelId: number,
-  data: { riwayat_id: string; nilai: number }[]
+  data: { riwayat_id: string; nilai: number | '' | null | undefined }[]
 ) {
   const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
 
-  await batch(data.map(item => ({
+  const cleanData = data.map(item => ({
+    riwayat_id: item.riwayat_id,
+    nilai: item.nilai === '' || item.nilai === null || item.nilai === undefined ? null : Number(item.nilai),
+  }))
+
+  await batch(cleanData.map(item => ({
     sql: `INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
           VALUES (?, ?, ?, ?, ?)
           ON CONFLICT(riwayat_pendidikan_id, mapel_id, semester) DO UPDATE SET nilai = excluded.nilai`,
@@ -129,11 +134,11 @@ export async function simpanNilaiPerMapel(
     entityType: 'nilai_mapel_batch',
     entityId: `${mapelId}:${semester}`,
     entityLabel: `Nilai mapel ${mapelId}`,
-    summary: `Menyimpan nilai mapel untuk ${data.length} santri`,
+    summary: `Menyimpan nilai mapel untuk ${cleanData.length} santri`,
     details: {
       mapel_id: mapelId,
       semester,
-      total_santri: data.length,
+      total_santri: cleanData.length,
     },
   })
 

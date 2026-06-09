@@ -14,7 +14,8 @@ import {
   MessageSquare,
   BookOpen,
   LayoutGrid,
-  FileText
+  FileText,
+  X
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -33,12 +34,10 @@ import { KEPRIBADIAN_FIELDS } from './constants'
 import { toast } from 'sonner'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
-type AkademikMode = 'direct' | 'excel'
 
 export default function InputNilaiPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('akademik')
-  const [akademikMode, setAkademikMode] = useState<AkademikMode>('direct')
   
   const [refData, setRefData] = useState<{ mapel: any[], kelas: any[], marhalah: any[] }>({ mapel: [], kelas: [], marhalah: [] })
   const [selectedKelas, setSelectedKelas] = useState('')
@@ -48,6 +47,7 @@ export default function InputNilaiPage() {
   const [loading, setLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
 
   // Data States (Lazy Loaded)
   const [akademikData, setAkademikData] = useState<any[]>([])
@@ -90,7 +90,7 @@ export default function InputNilaiPage() {
       return
     }
 
-    if (activeTab === 'akademik' && akademikMode === 'direct' && selectedMapel) {
+    if (activeTab === 'akademik' && selectedMapel) {
       setLoading(true)
       setSelectedKitabTitle('')
       Promise.all([
@@ -117,7 +117,7 @@ export default function InputNilaiPage() {
     } else {
       setSelectedKitabTitle('')
     }
-  }, [selectedKelas, selectedSemester, activeTab, akademikMode, selectedMapel])
+  }, [selectedKelas, selectedSemester, activeTab, selectedMapel])
 
   // --- EXCEL HANDLERS ---
   const handleDownloadTemplate = async () => {
@@ -184,7 +184,7 @@ export default function InputNilaiPage() {
 
     if (res.success) {
       toast.success("Data berhasil diimpor sepenuhnya")
-      setExcelPreview([])
+      closeExcelModal()
     } else {
       toast.error(res.error || "Gagal simpan")
     }
@@ -226,6 +226,20 @@ export default function InputNilaiPage() {
     toast.dismiss(t)
     if (res.success) toast.success("Catatan berhasil disimpan")
     else toast.error(res.error || "Gagal simpan")
+  }
+
+  const closeExcelModal = () => {
+    setIsExcelModalOpen(false)
+    setExcelPreview([])
+  }
+
+  const handleAkademikNilaiChange = (idx: number, value: string) => {
+    if (value === '') {
+      updateField(setAkademikData, akademikData, idx, 'nilai', '')
+      return
+    }
+
+    updateField(setAkademikData, akademikData, idx, 'nilai', Math.min(100, Math.max(0, parseInt(value) || 0)))
   }
 
   const handleBack = () => {
@@ -320,7 +334,7 @@ export default function InputNilaiPage() {
             )}
           </div>
 
-          {activeTab === 'akademik' && akademikMode === 'direct' && (
+          {activeTab === 'akademik' && (
             <div className="animate-in fade-in slide-in-from-top-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Mata Pelajaran</label>
               <select 
@@ -336,15 +350,15 @@ export default function InputNilaiPage() {
             </div>
           )}
 
-          {activeTab === 'akademik' && akademikMode === 'excel' && (
-            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 flex items-end">
-              <button 
-                onClick={handleDownloadTemplate}
-                disabled={isDownloading || !selectedKelas}
-                className="w-full bg-blue-600 text-white h-10 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm font-bold text-sm active:scale-95"
+          {activeTab === 'akademik' && (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => setIsExcelModalOpen(true)}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
               >
-                {isDownloading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4" />}
-                Download Template
+                <FileSpreadsheet className="h-4 w-4" />
+                Upload Excel Global
               </button>
             </div>
           )}
@@ -354,24 +368,6 @@ export default function InputNilaiPage() {
       <div className="space-y-5">
         {activeTab === 'akademik' && (
           <div className="space-y-5">
-            <div className="flex gap-3">
-              <button
-                onClick={() => setAkademikMode('direct')}
-                className={`flex-1 px-4 py-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${akademikMode === 'direct' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-inner' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
-              >
-                <LayoutGrid className="w-5 h-5" />
-                <span className="font-bold text-sm">Input Per Mapel</span>
-              </button>
-              <button
-                onClick={() => setAkademikMode('excel')}
-                className={`flex-1 px-4 py-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${akademikMode === 'excel' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-inner' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
-              >
-                <FileSpreadsheet className="w-5 h-5" />
-                <span className="font-bold text-sm">Upload Excel (Global)</span>
-              </button>
-            </div>
-
-            {akademikMode === 'direct' && (
               <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b bg-slate-50/50 flex justify-between items-center">
                   <div className="flex items-center gap-3">
@@ -417,8 +413,8 @@ export default function InputNilaiPage() {
                             <td className="px-3 py-2">
                               <input
                                 type="number"
-                                value={row.nilai}
-                                onChange={(e) => updateField(setAkademikData, akademikData, idx, 'nilai', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                                value={row.nilai ?? ''}
+                                onChange={(e) => handleAkademikNilaiChange(idx, e.target.value)}
                                 className="w-full h-10 text-center px-2 border border-slate-200 rounded-lg font-bold text-base text-blue-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                               />
                             </td>
@@ -430,57 +426,6 @@ export default function InputNilaiPage() {
                   )}
                 </div>
               </div>
-            )}
-
-            {akademikMode === 'excel' && (
-              <div className="space-y-6">
-                <div className="bg-white p-10 rounded-2xl border-2 border-dashed border-slate-200 text-center transition-all hover:border-blue-300 hover:bg-blue-50/20 relative">
-                  <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <Upload className="w-12 h-12 text-blue-500 mx-auto mb-4 opacity-70" />
-                  <h3 className="text-lg font-bold text-slate-700">Upload File Global</h3>
-                  <p className="text-sm text-slate-400 max-w-sm mx-auto">Upload Excel yang berisi nilai akademik, kepribadian, dan catatan dalam satu file.</p>
-                </div>
-
-                {excelPreview.length > 0 && (
-                  <div className="bg-white border rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95">
-                    <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="text-green-400 w-5 h-5" />
-                        <span className="font-bold">Preview: {excelPreview.length} Santri Terdeteksi</span>
-                      </div>
-                      <button onClick={handleSimpanExcel} disabled={loading} className="bg-green-500 hover:bg-green-600 px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95">
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Massal
-                      </button>
-                    </div>
-                    <div className="max-h-[500px] overflow-auto">
-                      <table className="w-full text-xs whitespace-nowrap">
-                        <thead className="bg-slate-100 sticky top-0 z-10">
-                          <tr>
-                            <th className="p-3 text-left border-b">Santri</th>
-                            {refData.mapel.slice(0, 5).map(m => <th key={m.id} className="p-3 text-center border-b">{m.nama}</th>)}
-                            <th className="p-3 text-center border-b bg-blue-50">Akhlak</th>
-                            <th className="p-3 text-left border-b bg-indigo-50">Catatan</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {excelPreview.slice(0, 20).map((row: any, i) => (
-                            <tr key={i} className="hover:bg-slate-50">
-                              <td className="p-3 font-bold text-slate-700">{row['NAMA SANTRI']}</td>
-                              {refData.mapel.slice(0, 5).map(m => (
-                                <td key={m.id} className="p-3 text-center text-slate-500 font-mono">{row[m.nama.toUpperCase()] || '-'}</td>
-                              ))}
-                              <td className="p-3 text-center bg-blue-50/50 text-blue-600 font-bold">{row['KEDISIPLINAN'] || '-'}</td>
-                              <td className="p-3 bg-indigo-50/50 text-indigo-700 italic truncate max-w-[200px]">{row['CATATAN WALI KELAS'] || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {excelPreview.length > 20 && <div className="p-3 text-center text-slate-400 italic bg-slate-50 border-t">... dan {excelPreview.length - 20} data lainnya</div>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -579,6 +524,91 @@ export default function InputNilaiPage() {
           </div>
         )}
       </div>
+
+      {isExcelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
+                  <FileSpreadsheet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Upload Excel Global</h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeExcelModal}
+                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto p-5">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  disabled={isDownloading || !selectedKelas}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 disabled:opacity-50 md:w-auto"
+                >
+                  {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Download Template
+                </button>
+                <div className="hidden md:block" />
+              </div>
+
+              <div className="relative rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center transition-all hover:border-emerald-300 hover:bg-emerald-50/30">
+                <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 cursor-pointer opacity-0" />
+                <Upload className="mx-auto mb-3 h-10 w-10 text-emerald-600 opacity-80" />
+                <h3 className="text-base font-bold text-slate-700">Pilih File Excel</h3>
+              </div>
+
+              {excelPreview.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border bg-white shadow-sm animate-in zoom-in-95">
+                  <div className="flex flex-col gap-3 bg-slate-900 p-4 text-white sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-400" />
+                      <span className="font-bold">Preview: {excelPreview.length} Santri Terdeteksi</span>
+                    </div>
+                    <button onClick={handleSimpanExcel} disabled={loading} className="flex items-center justify-center gap-2 rounded-xl bg-green-500 px-5 py-2 text-sm font-bold shadow-lg transition-all hover:bg-green-600 disabled:opacity-50 active:scale-95">
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Massal
+                    </button>
+                  </div>
+                  <div className="max-h-[420px] overflow-auto">
+                    <table className="w-full min-w-[720px] whitespace-nowrap text-xs">
+                      <thead className="sticky top-0 z-10 bg-slate-100">
+                        <tr>
+                          <th className="border-b p-3 text-left">Santri</th>
+                          {refData.mapel.slice(0, 5).map(m => <th key={m.id} className="border-b p-3 text-center">{m.nama}</th>)}
+                          <th className="border-b bg-blue-50 p-3 text-center">Akhlak</th>
+                          <th className="border-b bg-indigo-50 p-3 text-left">Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {excelPreview.slice(0, 20).map((row: any, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="p-3 font-bold text-slate-700">{row['NAMA SANTRI']}</td>
+                            {refData.mapel.slice(0, 5).map(m => (
+                              <td key={m.id} className="p-3 text-center font-mono text-slate-500">{row[m.nama.toUpperCase()] || '-'}</td>
+                            ))}
+                            <td className="bg-blue-50/50 p-3 text-center font-bold text-blue-600">{row['KEDISIPLINAN'] || '-'}</td>
+                            <td className="max-w-[200px] truncate bg-indigo-50/50 p-3 italic text-indigo-700">{row['CATATAN WALI KELAS'] || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {excelPreview.length > 20 && <div className="border-t bg-slate-50 p-3 text-center text-slate-400 italic">... dan {excelPreview.length - 20} data lainnya</div>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
