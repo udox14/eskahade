@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, execute } from '@/lib/db'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

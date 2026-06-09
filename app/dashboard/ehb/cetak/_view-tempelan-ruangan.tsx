@@ -66,7 +66,7 @@ function formatRoomNumber(roomNumber: number) {
   return String(roomNumber).padStart(2, '0')
 }
 
-function TempelanPrint({ data }: { data: TempelanRuanganItem[] }) {
+function TempelanPrint({ data, isZigZag }: { data: TempelanRuanganItem[], isZigZag: boolean }) {
   const first = data[0]
   const jamSummary = buildJamSummary(data)
   const seatMap = new Map(getSeatNumbers(data))
@@ -202,12 +202,12 @@ function TempelanPrint({ data }: { data: TempelanRuanganItem[] }) {
                         <div style={{
                           ...summaryTdStyle,
                           fontWeight: isTotal ? 900 : 400,
-                          textAlign: isTotal ? 'center' : 'left',
-                          paddingLeft: isTotal ? '1mm' : '2mm',
+                          justifyContent: isTotal ? 'center' : 'flex-start',
+                          paddingLeft: isTotal ? '0' : '2mm',
                         }}>
                           {isTotal ? 'Total' : row?.kelas ?? ''}
                         </div>
-                        <div style={{ ...summaryTdStyle, textAlign: 'center', fontWeight: isTotal ? 900 : 400 }}>
+                        <div style={{ ...summaryTdStyle, justifyContent: 'center', fontWeight: isTotal ? 900 : 400 }}>
                           {isTotal ? summary.total : row?.jumlah ?? ''}
                         </div>
                       </div>
@@ -229,9 +229,9 @@ function TempelanPrint({ data }: { data: TempelanRuanganItem[] }) {
             {Array.from({ length: rows * columns }).map((_, index) => {
               const row = Math.floor(index / columns)
               const col = index % columns
-              const seatNumber = row % 2 === 0
-                ? row * columns + col + 1
-                : row * columns + (columns - col)
+              const seatNumber = isZigZag && row % 2 !== 0
+                ? row * columns + (columns - col)
+                : row * columns + col + 1
               const nomorPeserta = seatMap.get(seatNumber)
 
               return (
@@ -283,10 +283,10 @@ const summaryTdStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-function TempelanPreview({ data }: { data: TempelanRuanganItem[] }) {
+function TempelanPreview({ data, isZigZag }: { data: TempelanRuanganItem[], isZigZag: boolean }) {
   return (
     <div className="bg-white shadow-xl flex-shrink-0" style={{ zoom: 0.35 }}>
-      <TempelanPrint data={data} />
+      <TempelanPrint data={data} isZigZag={isZigZag} />
     </div>
   )
 }
@@ -301,6 +301,7 @@ export function TempelanRuanganView({ onBack }: { onBack: () => void }) {
   const [loadingData, setLoadingData] = useState(false)
   const [loadingBulk, setLoadingBulk] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [isZigZag, setIsZigZag] = useState(true)
 
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
@@ -413,7 +414,7 @@ export function TempelanRuanganView({ onBack }: { onBack: () => void }) {
           <Filter className="w-4 h-4 text-slate-500" />
           <h3 className="font-bold text-slate-700 text-sm">Filter Ruangan</h3>
         </div>
-        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="text-xs font-bold text-slate-500 mb-1 block">Pilih Ruangan</label>
             <select
@@ -431,6 +432,18 @@ export function TempelanRuanganView({ onBack }: { onBack: () => void }) {
                   Ruangan {formatRoomNumber(r.nomor_ruangan)}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">Pola Denah</label>
+            <select
+              value={isZigZag ? 'zigzag' : 'lurus'}
+              onChange={e => setIsZigZag(e.target.value === 'zigzag')}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="zigzag">Zig Zag (Ular)</option>
+              <option value="lurus">Lurus (Kiri ke Kanan)</option>
             </select>
           </div>
 
@@ -474,13 +487,13 @@ export function TempelanRuanganView({ onBack }: { onBack: () => void }) {
 
           {tempelanData.length > 0 && (
             <div className="bg-slate-100 border rounded-2xl p-4 flex justify-center overflow-auto max-h-[800px]">
-              <TempelanPreview data={tempelanData} />
+              <TempelanPreview data={tempelanData} isZigZag={isZigZag} />
             </div>
           )}
 
           <div className="hidden">
             <div ref={printRef}>
-              {tempelanData.length > 0 && <TempelanPrint data={tempelanData} />}
+              {tempelanData.length > 0 && <TempelanPrint data={tempelanData} isZigZag={isZigZag} />}
             </div>
           </div>
         </div>
@@ -489,7 +502,7 @@ export function TempelanRuanganView({ onBack }: { onBack: () => void }) {
       <div className="hidden">
         <div ref={bulkPrintRef}>
           {bulkRooms.map(room => (
-            <TempelanPrint key={room[0].ruangan_id} data={room} />
+            <TempelanPrint key={room[0].ruangan_id} data={room} isZigZag={isZigZag} />
           ))}
         </div>
       </div>
