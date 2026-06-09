@@ -44,7 +44,7 @@ const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.Element
   { view: 'tempelan-ruangan', label: 'Tempelan Ruangan',     desc: 'Nomor ruangan beserta daftar peserta di dalamnya.',         icon: LayoutList },
   { view: 'tempelan-humas',   label: 'Tempelan Humas',       desc: 'Rekap jumlah peserta per ruangan untuk setiap kelas.',       icon: Megaphone },
   { view: 'tempelan-pengepakan', label: 'Tempelan Pengepakan', desc: 'Rekap kelas dan peserta per jam untuk setiap ruangan.',     icon: Boxes },
-  { view: 'sampul-absensi',   label: 'Sampul Absensi',       desc: 'Cetak sampul lembar kehadiran per ruangan dan sesi.',       icon: ClipboardList },
+  { view: 'sampul-absensi',   label: 'Sampul Map',           desc: 'Cetak sampul lembar kehadiran per ruangan dan sesi.',       icon: ClipboardList },
   { view: 'sensus-ruangan',   label: 'Sensus Ruangan',       desc: 'Rekap jumlah peserta per kelas di tiap ruangan, satu halaman per jam.', icon: TableProperties },
   { view: 'jadwal-mengawas',  label: 'Jadwal Mengawas',      desc: 'Jadwal tugas mengawas seluruh pengawas EHB.',               icon: CalendarCheck },
   { view: 'jadwal-ehb',       label: 'Jadwal EHB',           desc: 'Jadwal ujian keseluruhan untuk ditempel di mading.',        icon: Calendar },

@@ -341,7 +341,7 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
               <div key={idx} className="bg-white shadow-xl flex-shrink-0" style={{ zoom: 0.35 }}>
                 <DaftarHadirPrint
                   event={event}
-                  ruangan={selectedRuangan as number}
+                  ruangan={ruanganList.find(r => r.id === selectedRuangan)?.nomor_ruangan ?? 0}
                   jamGroup={selectedJamGroup}
                   peserta={chunk}
                   sesiList={sesiList}
@@ -357,7 +357,7 @@ export function DaftarHadirView({ onBack }: { onBack: () => void }) {
                 <DaftarHadirPrint
                   key={idx}
                   event={event}
-                  ruangan={selectedRuangan as number}
+                  ruangan={ruanganList.find(r => r.id === selectedRuangan)?.nomor_ruangan ?? 0}
                   jamGroup={selectedJamGroup}
                   peserta={chunk}
                   sesiList={sesiList}
