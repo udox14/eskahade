@@ -21,6 +21,7 @@ import {
   getReferensiData, 
   getDataSantriPerKelas, 
   getDataNilaiPerMapel,
+  getJudulKitabNilai,
   simpanNilaiPerMapel,
   simpanNilaiExcelMenyeluruh,
   getDataKepribadian,
@@ -33,11 +34,6 @@ import { toast } from 'sonner'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
 type AkademikMode = 'direct' | 'excel'
-
-const getMapelLabel = (mapel?: any) => {
-  if (!mapel) return ''
-  return mapel.nama_kitab ? `${mapel.nama} - ${mapel.nama_kitab}` : mapel.nama
-}
 
 export default function InputNilaiPage() {
   const router = useRouter()
@@ -58,7 +54,11 @@ export default function InputNilaiPage() {
   const [kepribadianData, setKepribadianData] = useState<any[]>([])
   const [catatanData, setCatatanData] = useState<any[]>([])
   const [excelPreview, setExcelPreview] = useState<any[]>([])
+  const [selectedKitabTitle, setSelectedKitabTitle] = useState('')
   const selectedMapelData = refData.mapel.find(m => m.id == selectedMapel)
+  const selectedMapelTitle = selectedMapelData
+    ? `${selectedMapelData.nama}${selectedKitabTitle ? ` - ${selectedKitabTitle}` : ''}`
+    : ''
 
   const fetchRef = async () => {
     setIsInitializing(true)
@@ -85,23 +85,37 @@ export default function InputNilaiPage() {
 
   // Lazy Load Logic
   useEffect(() => {
-    if (!selectedKelas) return
+    if (!selectedKelas) {
+      setSelectedKitabTitle('')
+      return
+    }
 
     if (activeTab === 'akademik' && akademikMode === 'direct' && selectedMapel) {
       setLoading(true)
-      getDataNilaiPerMapel(selectedKelas, Number(selectedMapel), Number(selectedSemester))
-        .then(setAkademikData)
+      setSelectedKitabTitle('')
+      Promise.all([
+        getDataNilaiPerMapel(selectedKelas, Number(selectedMapel), Number(selectedSemester)),
+        getJudulKitabNilai(selectedKelas, Number(selectedMapel)),
+      ])
+        .then(([nilai, kitab]) => {
+          setAkademikData(nilai)
+          setSelectedKitabTitle(kitab)
+        })
         .finally(() => setLoading(false))
     } else if (activeTab === 'kepribadian') {
+      setSelectedKitabTitle('')
       setLoading(true)
       getDataKepribadian(selectedKelas, Number(selectedSemester))
         .then(setKepribadianData)
         .finally(() => setLoading(false))
     } else if (activeTab === 'catatan') {
+      setSelectedKitabTitle('')
       setLoading(true)
       getDataCatatanWali(selectedKelas, Number(selectedSemester))
         .then(setCatatanData)
         .finally(() => setLoading(false))
+    } else {
+      setSelectedKitabTitle('')
     }
   }, [selectedKelas, selectedSemester, activeTab, akademikMode, selectedMapel])
 
@@ -316,7 +330,7 @@ export default function InputNilaiPage() {
               >
                 <option value="">-- Pilih Mapel --</option>
                 {refData.mapel.map((m: any) => (
-                  <option key={m.id} value={m.id}>{getMapelLabel(m)}</option>
+                  <option key={m.id} value={m.id}>{m.nama}</option>
                 ))}
               </select>
             </div>
@@ -364,7 +378,7 @@ export default function InputNilaiPage() {
                     <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
                       <BookOpen className="w-4 h-4" />
                     </div>
-                    <h3 className="font-bold text-slate-800">Daftar Nilai {selectedMapel ? getMapelLabel(selectedMapelData) : ''}</h3>
+                    <h3 className="font-bold text-slate-800">Daftar Nilai {selectedMapel ? selectedMapelTitle : ''}</h3>
                   </div>
                   {selectedMapel && (
                     <button onClick={handleSimpanDirectAkademik} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95">

@@ -12,6 +12,7 @@ import {
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
 import { RaporSatuHalaman } from './rapor-view'
+import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
   CalendarDays,
@@ -68,6 +69,8 @@ export default function CetakRaporPage() {
   const [editIdentitasOpen, setEditIdentitasOpen] = useState(false)
   const [identitySaving, setIdentitySaving] = useState(false)
   const [identitasForm, setIdentitasForm] = useState<any>(emptyIdentitasForm)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
@@ -78,6 +81,7 @@ export default function CetakRaporPage() {
   const selectedKelasName = useMemo(() => {
     return kelasList.find(k => k.id === selectedKelas)?.nama_kelas || 'Kelas'
   }, [kelasList, selectedKelas])
+  const paginatedDaftar = usePagination(daftar, pageSize, currentPage)
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -106,8 +110,13 @@ export default function CetakRaporPage() {
     setDaftar([])
     setDataRapor([])
     setDataIdentitas([])
+    setCurrentPage(1)
     getKelasList(selectedTA).then(setKelasList)
   }, [selectedTA, tahunAjaranList])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedKelas, selectedSemester])
 
   useEffect(() => {
     if (!printQueued || printRows.length === 0) return
@@ -133,6 +142,7 @@ export default function CetakRaporPage() {
     setDataRapor([])
     setDataIdentitas([])
     setPrintRows([])
+    setCurrentPage(1)
 
     try {
       const semester = Number(selectedSemester)
@@ -295,7 +305,7 @@ export default function CetakRaporPage() {
   const hasData = daftar.length > 0
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col space-y-6">
+    <div className="space-y-6 pb-6">
       <div className="flex flex-col gap-3 print:hidden md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Cetak Rapor Santri</h1>
@@ -380,21 +390,22 @@ export default function CetakRaporPage() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl border bg-white shadow-sm print:hidden">
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm print:hidden">
         {loading ? (
-          <div className="flex h-full flex-col items-center justify-center text-slate-400">
+          <div className="flex min-h-[360px] flex-col items-center justify-center text-slate-400">
             <Loader2 className="mb-3 h-10 w-10 animate-spin text-blue-500" />
             <p>Sedang menyusun daftar santri...</p>
           </div>
         ) : !hasData ? (
-          <div className="flex h-full flex-col items-center justify-center text-slate-400">
+          <div className="flex min-h-[360px] flex-col items-center justify-center px-4 text-center text-slate-400">
             <FileText className="mb-3 h-12 w-12 text-slate-300" />
             <p className="font-medium">Belum ada data ditampilkan.</p>
             <p className="text-sm">Silakan pilih kelas dan klik tombol Tampilkan.</p>
           </div>
         ) : (
-          <div className="h-full overflow-auto">
-            <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+          <>
+          <div className="w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[900px] border-collapse text-left text-sm">
               <thead className="sticky top-0 z-10 bg-slate-800 text-white">
                 <tr>
                   <th className="w-14 px-4 py-3 text-center">No</th>
@@ -406,9 +417,9 @@ export default function CetakRaporPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {daftar.map((row, idx) => (
+                {paginatedDaftar.paged.map((row, idx) => (
                   <tr key={row.riwayat_id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-center text-slate-500">{idx + 1}</td>
+                    <td className="px-4 py-3 text-center text-slate-500">{paginatedDaftar.start + idx + 1}</td>
                     <td className="px-4 py-3">
                       <p className="font-bold text-slate-800">{row.nama}</p>
                       <p className="text-xs text-slate-500">{row.kelas?.nama_kelas || selectedKelasName}</p>
@@ -454,6 +465,15 @@ export default function CetakRaporPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={paginatedDaftar.safePage}
+            totalPages={paginatedDaftar.totalPages}
+            pageSize={pageSize}
+            total={paginatedDaftar.total}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
+          </>
         )}
       </div>
 

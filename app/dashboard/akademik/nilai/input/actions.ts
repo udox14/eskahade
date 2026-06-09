@@ -15,17 +15,7 @@ export async function getReferensiData() {
     if (!session) return { mapel: [], kelas: [], marhalah: [] }
 
     // ── Mapel
-    const mapel = await query<any>(`
-      SELECT mp.id,
-             mp.nama,
-             GROUP_CONCAT(DISTINCT k.nama_kitab) AS nama_kitab
-      FROM mapel mp
-      LEFT JOIN kitab k ON k.mapel_id = mp.id
-        AND k.tahun_ajaran_id IN (SELECT id FROM tahun_ajaran WHERE is_active = 1)
-      WHERE mp.aktif = 1
-      GROUP BY mp.id, mp.nama
-      ORDER BY mp.nama
-    `)
+    const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
 
     // ── Marhalah
     const marhalah = await query<any>('SELECT id, nama FROM marhalah ORDER BY urutan')
@@ -96,6 +86,23 @@ export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, sem
     nama: r.nama_lengkap,
     nilai: r.nilai ?? 0
   }))
+}
+
+export async function getJudulKitabNilai(kelasId: string, mapelId: number) {
+  const row = await query<any>(`
+    SELECT GROUP_CONCAT(nama_kitab, ', ') AS nama_kitab
+    FROM (
+      SELECT DISTINCT kt.nama_kitab
+      FROM kelas k
+      JOIN kitab kt ON kt.marhalah_id = k.marhalah_id
+        AND kt.tahun_ajaran_id = k.tahun_ajaran_id
+        AND kt.mapel_id = ?
+      WHERE k.id = ?
+      ORDER BY kt.nama_kitab
+    )
+  `, [mapelId, kelasId])
+
+  return String(row[0]?.nama_kitab ?? '').trim()
 }
 
 export async function simpanNilaiPerMapel(
