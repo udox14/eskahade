@@ -1,7 +1,10 @@
 'use server'
 
-import { query } from '@/lib/db'
+import { execute, query, queryOne } from '@/lib/db'
 import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
+import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
+import { revalidatePath } from 'next/cache'
 
 export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
@@ -256,6 +259,7 @@ export async function getDataIdentitas(kelasId: string) {
            s.nama_lengkap, s.nis, s.nik, s.tempat_lahir, s.tanggal_lahir,
            s.jenis_kelamin, s.nama_ayah, s.nama_ibu, s.alamat, s.alamat_lengkap,
            s.kecamatan, s.kab_kota, s.provinsi, s.asrama, s.kamar, s.tahun_masuk,
+           s.no_wa_ortu,
            k.nama_kelas, ta.nama AS tahun_ajaran
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
@@ -284,9 +288,184 @@ export async function getDataIdentitas(kelasId: string) {
     asrama: s.asrama,
     kamar: s.kamar,
     tahun_masuk: s.tahun_masuk,
+    no_wa_ortu: s.no_wa_ortu,
     kelas: s.nama_kelas,
     tahun_ajaran: s.tahun_ajaran,
   }))
+}
+
+type IdentitasForm = {
+  riwayat_id: string
+  santri_id: string
+  nis: string
+  nama_lengkap: string
+  nik?: string | null
+  tempat_lahir?: string | null
+  tanggal_lahir?: string | null
+  jenis_kelamin?: string | null
+  nama_ayah?: string | null
+  nama_ibu?: string | null
+  no_wa_ortu?: string | null
+  alamat?: string | null
+  alamat_lengkap?: string | null
+  kecamatan?: string | null
+  kab_kota?: string | null
+  provinsi?: string | null
+  asrama?: string | null
+  kamar?: string | null
+  tahun_masuk?: string | number | null
+}
+
+function cleanText(value: unknown) {
+  const text = String(value ?? '').trim()
+  return text || null
+}
+
+function cleanYear(value: unknown) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const year = Number(text)
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) return NaN
+  return year
+}
+
+export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+
+  const row = await queryOne<any>(`
+    SELECT rp.id AS riwayat_id, rp.kelas_id, rp.santri_id,
+           k.wali_kelas_id, k.nama_kelas, ta.nama AS tahun_ajaran,
+           s.nama_lengkap, s.nis, s.nik, s.tempat_lahir, s.tanggal_lahir,
+           s.jenis_kelamin, s.nama_ayah, s.nama_ibu, s.no_wa_ortu,
+           s.alamat, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
+           s.asrama, s.kamar, s.tahun_masuk
+    FROM riwayat_pendidikan rp
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
+    JOIN santri s ON s.id = rp.santri_id
+    WHERE rp.id = ? AND rp.santri_id = ? AND rp.status_riwayat = 'aktif'
+    LIMIT 1
+  `, [payload.riwayat_id, payload.santri_id])
+
+  if (!row) return { error: 'Data santri aktif tidak ditemukan.' }
+
+  const fullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+  const waliOwnClass = hasRole(session, 'wali_kelas') && row.wali_kelas_id === session.id
+  if (!fullAccess && !waliOwnClass) {
+    return { error: 'Anda tidak punya akses mengedit identitas santri ini.' }
+  }
+
+  const nis = String(payload.nis ?? '').trim()
+  const namaLengkap = String(payload.nama_lengkap ?? '').trim()
+  if (!nis) return { error: 'NIS wajib diisi.' }
+  if (!namaLengkap) return { error: 'Nama lengkap wajib diisi.' }
+
+  const tahunMasuk = cleanYear(payload.tahun_masuk)
+  if (Number.isNaN(tahunMasuk)) return { error: 'Tahun masuk harus berupa angka tahun yang valid.' }
+
+  const duplicateNis = await queryOne<{ id: string }>(
+    'SELECT id FROM santri WHERE nis = ? AND id <> ? LIMIT 1',
+    [nis, payload.santri_id]
+  )
+  if (duplicateNis) return { error: 'NIS sudah digunakan santri lain.' }
+
+  const after = {
+    nis,
+    nama_lengkap: namaLengkap,
+    nik: cleanText(payload.nik),
+    tempat_lahir: cleanText(payload.tempat_lahir),
+    tanggal_lahir: cleanText(payload.tanggal_lahir),
+    jenis_kelamin: cleanText(payload.jenis_kelamin) || 'L',
+    nama_ayah: cleanText(payload.nama_ayah),
+    nama_ibu: cleanText(payload.nama_ibu),
+    no_wa_ortu: cleanText(payload.no_wa_ortu),
+    alamat: cleanText(payload.alamat),
+    alamat_lengkap: cleanText(payload.alamat_lengkap),
+    kecamatan: cleanText(payload.kecamatan),
+    kab_kota: cleanText(payload.kab_kota),
+    provinsi: cleanText(payload.provinsi),
+    asrama: cleanText(payload.asrama),
+    kamar: cleanText(payload.kamar),
+    tahun_masuk: tahunMasuk,
+  }
+
+  await execute(`
+    UPDATE santri SET
+      nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
+      jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, no_wa_ortu = ?,
+      alamat = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
+      asrama = ?, kamar = ?, tahun_masuk = ?, updated_at = ?
+    WHERE id = ?
+  `, [
+    after.nis,
+    after.nama_lengkap,
+    after.nik,
+    after.tempat_lahir,
+    after.tanggal_lahir,
+    after.jenis_kelamin,
+    after.nama_ayah,
+    after.nama_ibu,
+    after.no_wa_ortu,
+    after.alamat,
+    after.alamat_lengkap,
+    after.kecamatan,
+    after.kab_kota,
+    after.provinsi,
+    after.asrama,
+    after.kamar,
+    after.tahun_masuk,
+    new Date().toISOString(),
+    payload.santri_id,
+  ])
+
+  const changedFields = diffWhitelistedFields(row, after, [
+    'nis',
+    'nama_lengkap',
+    'nik',
+    'tempat_lahir',
+    'tanggal_lahir',
+    'jenis_kelamin',
+    'nama_ayah',
+    'nama_ibu',
+    'no_wa_ortu',
+    'alamat',
+    'alamat_lengkap',
+    'kecamatan',
+    'kab_kota',
+    'provinsi',
+    'asrama',
+    'kamar',
+    'tahun_masuk',
+  ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'laporan_rapor',
+    action: 'update',
+    fiturHref: '/dashboard/laporan/rapor',
+    logKind: 'update',
+    entityType: 'santri',
+    entityId: payload.santri_id,
+    entityLabel: namaLengkap,
+    summary: `Memperbarui identitas santri ${namaLengkap} dari menu cetak rapor`,
+    details: { changed_fields: changedFields, riwayat_id: payload.riwayat_id, kelas_id: row.kelas_id },
+  })
+
+  revalidatePath('/dashboard/laporan/rapor')
+  revalidatePath('/dashboard/santri')
+  revalidatePath(`/dashboard/santri/${payload.santri_id}`)
+
+  return {
+    success: true,
+    data: {
+      riwayat_id: row.riwayat_id,
+      santri_id: row.santri_id,
+      ...after,
+      kelas: row.nama_kelas,
+      tahun_ajaran: row.tahun_ajaran,
+    },
+  }
 }
 
 export async function getLegerRaporData(kelasId: string, semester: number) {

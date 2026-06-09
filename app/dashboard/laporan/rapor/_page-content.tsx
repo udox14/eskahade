@@ -8,6 +8,7 @@ import {
   getKelasList,
   getLegerRaporData,
   getTahunAjaranList,
+  updateIdentitasSantriRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
 import { RaporSatuHalaman } from './rapor-view'
@@ -19,12 +20,37 @@ import {
   FileText,
   IdCard,
   Loader2,
+  Pencil,
   Printer,
   Search,
+  Save,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type PrintKind = 'rapor' | 'identitas'
+
+const emptyIdentitasForm = {
+  riwayat_id: '',
+  santri_id: '',
+  nis: '',
+  nama_lengkap: '',
+  nik: '',
+  tempat_lahir: '',
+  tanggal_lahir: '',
+  jenis_kelamin: 'L',
+  nama_ayah: '',
+  nama_ibu: '',
+  no_wa_ortu: '',
+  alamat: '',
+  alamat_lengkap: '',
+  kecamatan: '',
+  kab_kota: '',
+  provinsi: '',
+  asrama: '',
+  kamar: '',
+  tahun_masuk: '',
+}
 
 export default function CetakRaporPage() {
   const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
@@ -39,6 +65,9 @@ export default function CetakRaporPage() {
   const [dataIdentitas, setDataIdentitas] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [editIdentitasOpen, setEditIdentitasOpen] = useState(false)
+  const [identitySaving, setIdentitySaving] = useState(false)
+  const [identitasForm, setIdentitasForm] = useState<any>(emptyIdentitasForm)
 
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
@@ -151,6 +180,70 @@ export default function CetakRaporPage() {
   const printIdentitasOne = (row: any) => {
     const identitas = dataIdentitas.find(item => item.riwayat_id === row.riwayat_id)
     queuePrint('identitas', identitas ? [identitas] : [], `Identitas_${row.nama}`)
+  }
+
+  const openEditIdentitas = (row: any) => {
+    const identitas = dataIdentitas.find(item => item.riwayat_id === row.riwayat_id)
+    if (!identitas) {
+      toast.warning('Data identitas belum tersedia.')
+      return
+    }
+
+    setIdentitasForm({
+      ...emptyIdentitasForm,
+      ...identitas,
+      tanggal_lahir: identitas.tanggal_lahir || '',
+      tahun_masuk: identitas.tahun_masuk ? String(identitas.tahun_masuk) : '',
+    })
+    setEditIdentitasOpen(true)
+  }
+
+  const setIdentitasField = (field: string, value: string) => {
+    setIdentitasForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSaveIdentitas = async () => {
+    setIdentitySaving(true)
+    const toastId = toast.loading('Menyimpan identitas santri...')
+
+    try {
+      const res = await updateIdentitasSantriRapor(identitasForm)
+      if (res?.error) {
+        toast.error(res.error)
+        return
+      }
+      if (!res?.data) {
+        toast.error('Server tidak mengembalikan data identitas terbaru.')
+        return
+      }
+
+      const updated = res.data
+      setDataIdentitas(prev => prev.map(item => item.riwayat_id === updated.riwayat_id ? updated : item))
+      setDaftar(prev => prev.map(item => item.riwayat_id === updated.riwayat_id
+        ? { ...item, nis: updated.nis || '-', nama: updated.nama_lengkap || 'Tanpa Nama' }
+        : item
+      ))
+      setDataRapor(prev => prev.map(item => item.id === updated.riwayat_id
+        ? {
+            ...item,
+            santri: {
+              ...item.santri,
+              nama_lengkap: updated.nama_lengkap,
+              nis: updated.nis,
+              nama_ayah: updated.nama_ayah,
+            },
+          }
+        : item
+      ))
+      setEditIdentitasOpen(false)
+      toast.success('Identitas santri berhasil diperbarui.')
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal menyimpan identitas santri.')
+    } finally {
+      toast.dismiss(toastId)
+      setIdentitySaving(false)
+    }
   }
 
   const handleExportLeger = async () => {
@@ -309,7 +402,7 @@ export default function CetakRaporPage() {
                   <th className="w-32 px-4 py-3">NIS</th>
                   <th className="w-40 px-4 py-3">Status Nilai</th>
                   <th className="w-40 px-4 py-3 text-center">Rapor</th>
-                  <th className="w-44 px-4 py-3 text-center">Identitas</th>
+                  <th className="w-64 px-4 py-3 text-center">Identitas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -341,12 +434,20 @@ export default function CetakRaporPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => printIdentitasOne(row)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800"
-                      >
-                        <IdCard className="h-3.5 w-3.5" /> Cetak Identitas
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openEditIdentitas(row)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </button>
+                        <button
+                          onClick={() => printIdentitasOne(row)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                        >
+                          <IdCard className="h-3.5 w-3.5" /> Cetak
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -378,6 +479,117 @@ export default function CetakRaporPage() {
           )}
         </div>
       </div>
+
+      {editIdentitasOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Edit Identitas Rapor</p>
+                <h2 className="text-lg font-bold text-slate-800">{identitasForm.nama_lengkap || 'Santri'}</h2>
+                <p className="text-xs text-slate-500">Perubahan disimpan ke data utama santri.</p>
+              </div>
+              <button
+                onClick={() => setEditIdentitasOpen(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">NIS</label>
+                  <input value={identitasForm.nis || ''} onChange={e => setIdentitasField('nis', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Lengkap</label>
+                  <input value={identitasForm.nama_lengkap || ''} onChange={e => setIdentitasField('nama_lengkap', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">NIK</label>
+                  <input value={identitasForm.nik || ''} onChange={e => setIdentitasField('nik', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Jenis Kelamin</label>
+                  <select value={identitasForm.jenis_kelamin || 'L'} onChange={e => setIdentitasField('jenis_kelamin', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="L">Laki-laki</option>
+                    <option value="P">Perempuan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tempat Lahir</label>
+                  <input value={identitasForm.tempat_lahir || ''} onChange={e => setIdentitasField('tempat_lahir', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tanggal Lahir</label>
+                  <input type="date" value={identitasForm.tanggal_lahir || ''} onChange={e => setIdentitasField('tanggal_lahir', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tahun Masuk</label>
+                  <input type="number" value={identitasForm.tahun_masuk || ''} onChange={e => setIdentitasField('tahun_masuk', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">No. Telepon Orang Tua</label>
+                  <input value={identitasForm.no_wa_ortu || ''} onChange={e => setIdentitasField('no_wa_ortu', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Ayah</label>
+                  <input value={identitasForm.nama_ayah || ''} onChange={e => setIdentitasField('nama_ayah', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Ibu</label>
+                  <input value={identitasForm.nama_ibu || ''} onChange={e => setIdentitasField('nama_ibu', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
+                  <input value={identitasForm.asrama || ''} onChange={e => setIdentitasField('asrama', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Jama'ah / Kamar</label>
+                  <input value={identitasForm.kamar || ''} onChange={e => setIdentitasField('kamar', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Alamat Ringkas</label>
+                  <textarea value={identitasForm.alamat || ''} onChange={e => setIdentitasField('alamat', e.target.value)} rows={2} className="w-full resize-none rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Alamat Lengkap</label>
+                  <textarea value={identitasForm.alamat_lengkap || ''} onChange={e => setIdentitasField('alamat_lengkap', e.target.value)} rows={2} className="w-full resize-none rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kecamatan</label>
+                  <input value={identitasForm.kecamatan || ''} onChange={e => setIdentitasField('kecamatan', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kab/Kota</label>
+                  <input value={identitasForm.kab_kota || ''} onChange={e => setIdentitasField('kab_kota', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Provinsi</label>
+                  <input value={identitasForm.provinsi || ''} onChange={e => setIdentitasField('provinsi', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
+              <button onClick={() => setEditIdentitasOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
+                Batal
+              </button>
+              <button
+                onClick={handleSaveIdentitas}
+                disabled={identitySaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {identitySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Simpan Identitas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

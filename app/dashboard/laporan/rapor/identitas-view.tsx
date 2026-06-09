@@ -122,7 +122,7 @@ export function IdentitasSantriHalaman({ data }: { data: any }) {
           <Row label="a. Ayah" value={upperOrDots(data.nama_ayah)} />
           <Row label="b. Ibu" value={upperOrDots(data.nama_ibu)} />
           <Row no="9." label="Alamat Orang Tua/ Wali*)" value={alamat} multiline />
-          <Row label="No. Telepon" value={`${DOTS}....`} />
+          <Row label="No. Telepon" value={valueOrDots(data.no_wa_ortu)} />
           <tr>
             <td className="align-top py-[3px]">10.</td>
             <td className="align-top py-[3px]" colSpan={3}>Pekerjaan Orang Tua/ Wali*)</td>

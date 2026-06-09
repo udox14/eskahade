@@ -15,7 +15,17 @@ export async function getReferensiData() {
     if (!session) return { mapel: [], kelas: [], marhalah: [] }
 
     // ── Mapel
-    const mapel = await query<any>('SELECT id, nama FROM mapel WHERE aktif = 1 ORDER BY nama')
+    const mapel = await query<any>(`
+      SELECT mp.id,
+             mp.nama,
+             GROUP_CONCAT(DISTINCT k.nama_kitab) AS nama_kitab
+      FROM mapel mp
+      LEFT JOIN kitab k ON k.mapel_id = mp.id
+        AND k.tahun_ajaran_id IN (SELECT id FROM tahun_ajaran WHERE is_active = 1)
+      WHERE mp.aktif = 1
+      GROUP BY mp.id, mp.nama
+      ORDER BY mp.nama
+    `)
 
     // ── Marhalah
     const marhalah = await query<any>('SELECT id, nama FROM marhalah ORDER BY urutan')

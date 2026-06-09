@@ -34,6 +34,11 @@ import { toast } from 'sonner'
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
 type AkademikMode = 'direct' | 'excel'
 
+const getMapelLabel = (mapel?: any) => {
+  if (!mapel) return ''
+  return mapel.nama_kitab ? `${mapel.nama} - ${mapel.nama_kitab}` : mapel.nama
+}
+
 export default function InputNilaiPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('akademik')
@@ -53,6 +58,7 @@ export default function InputNilaiPage() {
   const [kepribadianData, setKepribadianData] = useState<any[]>([])
   const [catatanData, setCatatanData] = useState<any[]>([])
   const [excelPreview, setExcelPreview] = useState<any[]>([])
+  const selectedMapelData = refData.mapel.find(m => m.id == selectedMapel)
 
   const fetchRef = async () => {
     setIsInitializing(true)
@@ -310,7 +316,7 @@ export default function InputNilaiPage() {
               >
                 <option value="">-- Pilih Mapel --</option>
                 {refData.mapel.map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.nama}</option>
+                  <option key={m.id} value={m.id}>{getMapelLabel(m)}</option>
                 ))}
               </select>
             </div>
@@ -358,7 +364,7 @@ export default function InputNilaiPage() {
                     <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
                       <BookOpen className="w-4 h-4" />
                     </div>
-                    <h3 className="font-bold text-slate-800">Daftar Nilai {selectedMapel ? refData.mapel.find(m => m.id == selectedMapel)?.nama : ''}</h3>
+                    <h3 className="font-bold text-slate-800">Daftar Nilai {selectedMapel ? getMapelLabel(selectedMapelData) : ''}</h3>
                   </div>
                   {selectedMapel && (
                     <button onClick={handleSimpanDirectAkademik} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95">

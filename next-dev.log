@@ -14,3 +14,4 @@
 ✓ Ready in 4.2s
 [layout] session null → redirect /login
  GET /dashboard/ehb/cetak 307 in 3.3s (compile: 3.0s, render: 224ms)
+✓ Compiled in 360ms
