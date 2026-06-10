@@ -12,14 +12,15 @@ export default async function DashboardPage() {
   if (!session) redirect('/login')
 
   const userName = session.full_name || 'Pengguna'
-  const userRoles = getEffectiveRoles(session)
-  const fiturAkses = await getFiturForRoles(userRoles, session.id)
+  const displayRoles = session.roles && session.roles.length > 0 ? session.roles : [session.role]
+  const effectiveRoles = getEffectiveRoles(session)
+  const fiturAkses = await getFiturForRoles(effectiveRoles, session.id)
 
   return (
     <HomeClient
       userName={userName}
       userRole={session.role || 'wali_kelas'}
-      userRoles={userRoles}
+      userRoles={displayRoles}
       fiturAkses={fiturAkses}
     />
   )

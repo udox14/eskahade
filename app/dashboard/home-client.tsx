@@ -220,7 +220,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const greeting  = getGreeting(hour)
   const firstName = userName.split(' ')[0]
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
-  const roleLabel = effectiveRoles.map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
+  const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
   const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
   const totalFitur = fiturAkses.filter(f => f.href !== '/dashboard').length
 

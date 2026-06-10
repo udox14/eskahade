@@ -291,7 +291,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
 
   const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole];
-  const roleLabels = effectiveRoles.map(r => ROLE_LABEL[r] ?? r.replace('_', ' '));
+  const roleLabels = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' '));
 
   return (
     <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
