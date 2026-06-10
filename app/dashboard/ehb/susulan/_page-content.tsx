@@ -1,14 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getActiveEventLight, getSusulanList, markSusulanDone } from './actions'
 import { 
-  CheckCircle2, AlertTriangle, Loader2, Search, CheckSquare, ClipboardList, BarChart3, BookOpen
+  CheckCircle2, AlertTriangle, Loader2, Search, CheckSquare, ClipboardList, BarChart3, BookOpen, FileSpreadsheet, X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { shortDateWib } from '../_date-utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+
+type ExportScope = 'session' | 'day' | 'all'
+type ExportStatus = 'all' | 'A' | 'I' | 'S'
+
+const dashboardModalOverlay = 'fixed inset-y-0 left-[var(--dashboard-sidebar-offset,0px)] right-0 z-50 flex items-center justify-center bg-black/50 p-4'
 
 export default function SusulanEhbPage() {
   const confirm = useConfirm()
@@ -17,6 +22,12 @@ export default function SusulanEhbPage() {
   const [loading, setLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
   const [activeTab, setActiveTab] = useState<'daftar' | 'rekap'>('daftar')
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportScope, setExportScope] = useState<ExportScope>('all')
+  const [exportStatus, setExportStatus] = useState<ExportStatus>('all')
+  const [exportDate, setExportDate] = useState('')
+  const [exportSessionKey, setExportSessionKey] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
 
   // Multi-select for bulk action
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -65,6 +76,81 @@ export default function SusulanEhbPage() {
     (s.marhalah_nama || '').toLowerCase().includes(keyword.toLowerCase()) ||
     (s.nama_kitab || '').toLowerCase().includes(keyword.toLowerCase())
   )
+
+  const dateOptions = useMemo(() => {
+    return Array.from(new Set(susulanList.map(s => s.tanggal).filter(Boolean)))
+      .sort((a, b) => String(a).localeCompare(String(b)))
+  }, [susulanList])
+
+  const sessionOptions = useMemo(() => {
+    const map = new Map<string, any>()
+    for (const row of susulanList) {
+      const key = `${row.tanggal}|${row.sesi_id}`
+      if (!map.has(key)) map.set(key, row)
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const dateCompare = String(a.tanggal).localeCompare(String(b.tanggal))
+      if (dateCompare !== 0) return dateCompare
+      return Number(a.sesi_id) - Number(b.sesi_id)
+    })
+  }, [susulanList])
+
+  useEffect(() => {
+    if (!exportDate && dateOptions.length > 0) setExportDate(dateOptions[0])
+    if (!exportSessionKey && sessionOptions.length > 0) {
+      const first = sessionOptions[0]
+      setExportSessionKey(`${first.tanggal}|${first.sesi_id}`)
+    }
+  }, [dateOptions, exportDate, exportSessionKey, sessionOptions])
+
+  const getExportRows = () => {
+    return susulanList.filter(row => {
+      if (exportStatus !== 'all' && row.status_absen !== exportStatus) return false
+      if (exportScope === 'day') return row.tanggal === exportDate
+      if (exportScope === 'session') return `${row.tanggal}|${row.sesi_id}` === exportSessionKey
+      return true
+    })
+  }
+
+  const handleExportExcel = async () => {
+    const rows = getExportRows()
+    if (rows.length === 0) return toast.warning('Tidak ada data sesuai pilihan export.')
+
+    setIsExporting(true)
+    const toastId = toast.loading('Membuat file Excel...')
+    try {
+      const XLSX = await import('xlsx')
+      const data = rows.map((row, index) => ({
+        No: index + 1,
+        NIS: row.nis || '',
+        'Nama Santri': row.nama_lengkap || '',
+        Kelas: row.nama_kelas || '',
+        Marhalah: row.marhalah_nama || '',
+        Tanggal: shortDateWib(row.tanggal),
+        Sesi: row.sesi_label || '',
+        'Jam Group': row.jam_group || '',
+        'Mata Pelajaran': row.mapel_nama || '',
+        'Nama Kitab': row.nama_kitab || '',
+        'Status Absen': statusAbsenLabel(row.status_absen),
+        'Status Susulan': row.is_susulan_done === 1 ? 'Selesai' : 'Belum',
+      }))
+      const sheet = XLSX.utils.json_to_sheet(data)
+      sheet['!cols'] = [
+        { wch: 6 }, { wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
+        { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
+      ]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, sheet, 'Daftar Susulan')
+      XLSX.writeFile(wb, buildExportFilename(event?.nama || 'EHB', exportScope, exportStatus, rows[0]))
+      toast.success(`Export ${rows.length} data susulan berhasil.`)
+      setShowExportModal(false)
+    } catch (err: any) {
+      toast.error('Gagal membuat file Excel', { description: err?.message })
+    } finally {
+      toast.dismiss(toastId)
+      setIsExporting(false)
+    }
+  }
 
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
 
@@ -136,6 +222,12 @@ export default function SusulanEhbPage() {
                 <BookOpen className="w-4 h-4"/> {totalMapelRekap} Mapel
               </div>
             )}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-all"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Export Excel
+            </button>
             {activeTab === 'daftar' && selectedIds.length > 0 && (
                 <button 
                     onClick={handleBulkMarkDone}
@@ -209,7 +301,7 @@ export default function SusulanEhbPage() {
                         s.status_absen === 'I' ? 'bg-blue-100 text-blue-700' :
                         'bg-red-100 text-red-700'
                       }`}>
-                        {s.status_absen === 'S' ? 'Sakit' : s.status_absen === 'I' ? 'Izin' : 'Alpha'}
+                        {statusAbsenLabel(s.status_absen)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -291,8 +383,118 @@ export default function SusulanEhbPage() {
           </div>
         )}
       </div>
+
+      {showExportModal && (
+        <div className={dashboardModalOverlay} role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b p-5">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Export Daftar Susulan</h2>
+                <p className="mt-1 text-sm text-slate-500">Pilih cakupan data dan status absen yang mau masuk Excel.</p>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase text-slate-500">Cakupan Export</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'session', label: 'Per Sesi' },
+                    { value: 'day', label: 'Per Hari' },
+                    { value: 'all', label: 'Semua' },
+                  ].map(item => (
+                    <button
+                      key={item.value}
+                      onClick={() => setExportScope(item.value as ExportScope)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-bold transition ${exportScope === item.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {exportScope === 'day' && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Hari</span>
+                  <select value={exportDate} onChange={e => setExportDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    {dateOptions.map(date => <option key={date} value={date}>{shortDateWib(date)}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {exportScope === 'session' && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Sesi</span>
+                  <select value={exportSessionKey} onChange={e => setExportSessionKey(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    {sessionOptions.map(row => (
+                      <option key={`${row.tanggal}|${row.sesi_id}`} value={`${row.tanggal}|${row.sesi_id}`}>
+                        {shortDateWib(row.tanggal)} - {row.sesi_label} ({row.jam_group})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase text-slate-500">Status Absen</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[
+                    { value: 'all', label: 'Semua' },
+                    { value: 'A', label: 'Alfa' },
+                    { value: 'I', label: 'Izin' },
+                    { value: 'S', label: 'Sakit' },
+                  ].map(item => (
+                    <button
+                      key={item.value}
+                      onClick={() => setExportStatus(item.value as ExportStatus)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-bold transition ${exportStatus === item.value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                {getExportRows().length} data akan diexport.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t bg-slate-50 p-4">
+              <button onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
+                Batal
+              </button>
+              <button onClick={handleExportExcel} disabled={isExporting} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60">
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Export Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function statusAbsenLabel(status: string) {
+  if (status === 'S') return 'Sakit'
+  if (status === 'I') return 'Izin'
+  return 'Alfa'
+}
+
+function buildExportFilename(eventName: string, scope: ExportScope, status: ExportStatus, firstRow: any) {
+  const scopeLabel = scope === 'all' ? 'Semua' : scope === 'day' ? shortDateWib(firstRow.tanggal) : `${shortDateWib(firstRow.tanggal)}_${firstRow.sesi_label || 'Sesi'}`
+  const statusLabel = status === 'all' ? 'Semua_Status' : statusAbsenLabel(status)
+  const clean = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_')
+  return `Susulan_EHB_${clean(eventName)}_${clean(scopeLabel)}_${clean(statusLabel)}.xlsx`
 }
 
 function buildRekapGroups(list: any[]) {

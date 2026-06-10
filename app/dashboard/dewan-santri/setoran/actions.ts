@@ -89,7 +89,7 @@ type MonitoringRow = {
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
-  total_nominal: number
+  nominal_bulan_ini: number
 }
 
 export async function getMonitoringSetoran(tahun: number, bulan: number) {
@@ -120,21 +120,33 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         FROM spp_log
         WHERE tahun = ? AND bulan = ?
       ),
-      bayar_lalu AS (
-        SELECT DISTINCT santri_id
+      bayar_tunggakan AS (
+        SELECT santri_id, COUNT(*) AS jumlah_bayar, SUM(nominal_bayar) AS total_nominal
         FROM spp_log
-        WHERE tahun = ? AND bulan = ?
+        WHERE (tahun * 100 + bulan) < (? * 100 + ?)
+          AND tanggal_bayar IS NOT NULL
+          AND CAST(strftime('%Y', tanggal_bayar) AS INTEGER) = ?
+          AND CAST(strftime('%m', tanggal_bayar) AS INTEGER) = ?
+        GROUP BY santri_id
       ),
       ditiadakan_ini AS (
         SELECT DISTINCT santri_id
         FROM spp_tagihan_ditiadakan
         WHERE tahun = ? AND bulan = ? AND is_active = 1
       ),
-      nominal_unit AS (
-        SELECT bs.unit_setor, SUM(sl.nominal_bayar) AS total_nominal
+      nominal_bulan_ini AS (
+        SELECT bs.unit_setor, SUM(sl.nominal_bayar) AS nominal_bulan_ini
         FROM base_santri bs
         JOIN spp_log sl ON sl.santri_id = bs.id
         WHERE sl.tahun = ? AND sl.bulan = ?
+        GROUP BY bs.unit_setor
+      ),
+      tunggakan_unit AS (
+        SELECT bs.unit_setor,
+               COUNT(DISTINCT bt.santri_id) AS jumlah_bayar,
+               SUM(bt.total_nominal) AS total_nominal
+        FROM base_santri bs
+        JOIN bayar_tunggakan bt ON bt.santri_id = bs.id
         GROUP BY bs.unit_setor
       )
     SELECT
@@ -144,19 +156,19 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS tidak_ada_tagihan,
       COUNT(*) - SUM(bs.bebas_spp) - SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS wajib_bayar,
       SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
-      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bl.santri_id IS NOT NULL AND bi.santri_id IS NULL THEN 1 ELSE 0 END) AS bayar_tunggakan_lalu,
-      COALESCE(nu.total_nominal, 0) AS total_nominal
+      COALESCE(tu.jumlah_bayar, 0) AS bayar_tunggakan_lalu,
+      COALESCE(nbi.nominal_bulan_ini, 0) AS nominal_bulan_ini
     FROM base_santri bs
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
-    LEFT JOIN bayar_lalu bl ON bl.santri_id = bs.id
     LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
-    LEFT JOIN nominal_unit nu ON nu.unit_setor = bs.unit_setor
-    GROUP BY bs.unit_setor, nu.total_nominal
+    LEFT JOIN nominal_bulan_ini nbi ON nbi.unit_setor = bs.unit_setor
+    LEFT JOIN tunggakan_unit tu ON tu.unit_setor = bs.unit_setor
+    GROUP BY bs.unit_setor, nbi.nominal_bulan_ini, tu.jumlah_bayar
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
   `, [
     SADESA_CATEGORY, SADESA_UNIT,
     tahun, bulan,
-    tahunSebelumnya, bulanSebelumnya,
+    tahun, bulan, tahun, bulan,
     tahun, bulan,
     tahun, bulan,
     SADESA_UNIT,
@@ -202,6 +214,28 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan]
   )
   const historisPaidMap = new Map(historisPaidRows.map(r => [r.unit_setor, r]))
+  const tunggakanPaidRows = await query<{
+    unit_setor: string
+    total_nominal: number
+  }>(
+    `SELECT
+        CASE
+          WHEN s.kategori_santri = ? THEN ?
+          ELSE COALESCE(s.asrama, 'LAINNYA')
+        END AS unit_setor,
+        COALESCE(SUM(sl.nominal_bayar), 0) AS total_nominal
+     FROM spp_log sl
+     JOIN santri s ON s.id = sl.santri_id
+     WHERE (sl.tahun * 100 + sl.bulan) < (? * 100 + ?)
+       AND sl.tanggal_bayar IS NOT NULL
+       AND CAST(strftime('%Y', sl.tanggal_bayar) AS INTEGER) = ?
+       AND CAST(strftime('%m', sl.tanggal_bayar) AS INTEGER) = ?
+       AND s.status_global = 'aktif'
+       ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
+     GROUP BY unit_setor`,
+    [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan, tahun, bulan]
+  )
+  const tunggakanPaidMap = new Map(tunggakanPaidRows.map(r => [r.unit_setor, r.total_nominal]))
 
   return baseRows.map(r => {
     const setoran = setoranMap.get(r.unit_setor)
@@ -209,7 +243,10 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     const penunggak = isBeforeBillingStart ? 0 : Math.max(0, r.wajib_bayar - r.bayar_bulan_ini)
     const persentase = isBeforeBillingStart || r.wajib_bayar <= 0 ? 0 : Math.round((r.bayar_bulan_ini / r.wajib_bayar) * 100)
     const bayarTunggakan = (isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu) + (historisPaid?.jumlah_bayar ?? 0)
-    const totalNominal = (isBeforeBillingStart ? 0 : r.total_nominal) + (historisPaid?.total_nominal ?? 0)
+    const nominalBulanIni = isBeforeBillingStart ? 0 : r.nominal_bulan_ini
+    const nominalTunggakanBerjalan = isBeforeBillingStart ? 0 : (tunggakanPaidMap.get(r.unit_setor) ?? 0)
+    const nominalTunggakanHistoris = historisPaid?.total_nominal ?? 0
+    const totalNominal = nominalBulanIni + nominalTunggakanBerjalan + nominalTunggakanHistoris
     return {
       unit_setor: r.unit_setor,
       total_santri: r.total_santri,
@@ -220,6 +257,10 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       bayar_tunggakan_lalu: bayarTunggakan,
       penunggak,
       total_nominal: totalNominal,
+      nominal_bulan_ini: nominalBulanIni,
+      nominal_tunggakan_lalu: nominalTunggakanBerjalan + nominalTunggakanHistoris,
+      nominal_tunggakan_berjalan: nominalTunggakanBerjalan,
+      nominal_tunggakan_historis: nominalTunggakanHistoris,
       persentase,
       tanggal_setor: setoran?.tanggal_terima ?? null,
       nama_penyetor: setoran?.nama_penyetor ?? null,

@@ -477,7 +477,7 @@ export default function AbsensiMenghafalPage() {
                           Izin
                         </button>
                         <button onClick={() => handleSetAbsen(p.santri_id, 'A')} disabled={isSaving} className={`rounded-lg text-xs font-bold transition-all flex items-center justify-center ${isAlpha ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                          Alpha
+                          Alfa
                         </button>
                       </div>
                     </div>

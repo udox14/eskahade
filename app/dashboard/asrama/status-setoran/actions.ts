@@ -19,7 +19,7 @@ export async function getStatusSetoranSaya(tahun: number) {
   }
 
   const data = await query<any>(`
-    SELECT ss.bulan, ss.tanggal_terima, u.full_name AS penerima_nama
+    SELECT ss.bulan, ss.tanggal_terima, ss.jumlah_aktual, ss.nama_penyetor, u.full_name AS penerima_nama
     FROM spp_setoran ss
     LEFT JOIN users u ON u.id = ss.penerima_id
     WHERE COALESCE(NULLIF(TRIM(ss.unit_setor), ''), ss.asrama) = ? AND ss.tahun = ?
@@ -31,6 +31,8 @@ export async function getStatusSetoranSaya(tahun: number) {
     statusBulan[d.bulan] = {
       lunas: true,
       tanggal: d.tanggal_terima,
+      jumlahAktual: d.jumlah_aktual,
+      penyetor: d.nama_penyetor,
       penerima: d.penerima_nama || 'Sistem',
     }
   })

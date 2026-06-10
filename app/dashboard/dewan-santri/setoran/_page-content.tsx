@@ -26,6 +26,10 @@ type AsramaRow = {
   bayar_tunggakan_lalu: number
   penunggak: number
   total_nominal: number
+  nominal_bulan_ini: number
+  nominal_tunggakan_lalu: number
+  nominal_tunggakan_berjalan?: number
+  nominal_tunggakan_historis?: number
   persentase: number
   tanggal_setor: string | null
   nama_penyetor: string | null
@@ -154,6 +158,8 @@ export default function MonitoringSetoranPage() {
   const totalBayar     = data.reduce((a, r) => a + r.bayar_bulan_ini, 0)
   const totalTunggak   = data.reduce((a, r) => a + r.penunggak, 0)
   const totalNominal   = data.reduce((a, r) => a + r.total_nominal, 0)
+  const totalNominalBulanIni = data.reduce((a, r) => a + r.nominal_bulan_ini, 0)
+  const totalNominalTunggakan = data.reduce((a, r) => a + r.nominal_tunggakan_lalu, 0)
   const pctKeseluruhan = totalWajib > 0 ? Math.round((totalBayar / totalWajib) * 100) : 0
   const selectedBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
   const tahunAjaranDisplay = tahunAjaranNama ?? deriveAcademicYear(tahun, bulan)
@@ -226,9 +232,9 @@ export default function MonitoringSetoranPage() {
           <StatCard title="Telah Lunas" value={fmt(totalBayar)} sub={`${pctKeseluruhan}%`} icon={CheckCircle2} color="text-emerald-600" />
           <StatCard title="Penunggak" value={fmt(totalTunggak)} icon={AlertCircle} color="text-rose-600" />
           <div className="col-span-2 md:col-span-1 border border-indigo-100 bg-indigo-50/50 rounded-xl p-3 flex flex-col justify-center relative overflow-hidden">
-             <div className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest mb-1">Uang Terkumpul</div>
+             <div className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest mb-1">Uang Tercatat</div>
              <div className="text-xl font-bold text-indigo-900 leading-none">{fmtRp(totalNominal)}</div>
-             <div className="text-[10px] text-slate-500 mt-1">Potensi: {fmtRp(totalWajib * nominal)}</div>
+             <div className="text-[10px] text-slate-500 mt-1">Bulan ini {fmtRp(totalNominalBulanIni)} + tunggakan {fmtRp(totalNominalTunggakan)}</div>
           </div>
         </div>
       )}
@@ -254,7 +260,7 @@ export default function MonitoringSetoranPage() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-5 font-medium">Unit Setor & Populasi</th>
                   <th className="py-3 px-5 font-medium">Progres Pembayaran</th>
-                  <th className="py-3 px-5 font-medium text-right">Keuangan Masuk</th>
+                  <th className="py-3 px-5 font-medium text-right">Uang Tercatat</th>
                   <th className="py-3 px-5 font-medium text-center">Rekap Fiskal</th>
                   <th className="py-3 px-5 w-12"></th>
                 </tr>
@@ -286,6 +292,11 @@ export default function MonitoringSetoranPage() {
                     </td>
                     <td className="py-3 px-5 text-right">
                       <p className="font-semibold text-slate-900">{row.belum_ada_tagihan ? '-' : fmtRp(row.total_nominal)}</p>
+                      {!row.belum_ada_tagihan && row.nominal_tunggakan_lalu > 0 && (
+                        <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                          {fmtRp(row.nominal_bulan_ini)} bulan ini + {fmtRp(row.nominal_tunggakan_lalu)} tunggakan
+                        </p>
+                      )}
                       {row.penunggak > 0 && <p className="text-[10px] font-medium text-rose-500 mt-0.5">-{fmt(row.penunggak)} Orang Nunggak</p>}
                     </td>
                     <td className="py-3 px-5 text-center">
@@ -333,7 +344,7 @@ export default function MonitoringSetoranPage() {
                   <NanoChip label="Wajib SPP" value={activeRow.wajib_bayar} />
                   <NanoChip label="Telah Lunas" value={activeRow.bayar_bulan_ini} color="text-emerald-600 bg-emerald-50 border-emerald-100" />
                   <NanoChip label="Penunggak" value={activeRow.penunggak} color="text-rose-600 bg-rose-50 border-rose-100" />
-                  <NanoChip label="Bayar Bulan Lalu" value={activeRow.bayar_tunggakan_lalu} />
+                  <NanoChip label="Bayar Tunggakan" value={activeRow.bayar_tunggakan_lalu} />
                </div>
 
                {/* Area Form Setoran */}
@@ -362,7 +373,7 @@ export default function MonitoringSetoranPage() {
                          </div>
                          <div>
                            <label className="text-[11px] font-medium text-slate-500 mb-1.5 block flex justify-between">
-                              Total Uang Fisik <span className="text-slate-400">Target: {fmtRp(activeRow.total_nominal)}</span>
+                              Total Uang Fisik <span className="text-slate-400">Target sistem: {fmtRp(activeRow.total_nominal)}</span>
                            </label>
                            <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
@@ -370,6 +381,11 @@ export default function MonitoringSetoranPage() {
                            </div>
                          </div>
                        </div>
+                       {activeRow.nominal_tunggakan_lalu > 0 && (
+                         <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                           Target sistem berasal dari {fmtRp(activeRow.nominal_bulan_ini)} SPP bulan {BULAN_NAMA[bulan]} dan {fmtRp(activeRow.nominal_tunggakan_lalu)} pelunasan tunggakan yang tercatat bulan ini.
+                         </div>
+                       )}
                        <div className="flex gap-2 pt-2">
                          {isEditingForm && <button type="button" onClick={() => setIsEditingForm(false)} className="px-4 py-2 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1">Batal</button>}
                          <button type="submit" disabled={savingSetoran} className={`px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors flex justify-center items-center gap-2 ${isEditingForm ? 'flex-1' : 'w-full'} disabled:opacity-50`}>

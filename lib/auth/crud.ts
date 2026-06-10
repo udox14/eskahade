@@ -1,5 +1,6 @@
-import { query, queryOne } from '@/lib/db'
+import { query } from '@/lib/db'
 import { getSession, getEffectiveRoles, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 
 export type CrudAction = 'create' | 'update' | 'delete'
 
@@ -61,19 +62,15 @@ export async function canCrudForSession(
   if (roles.length === 0) return false
 
   const column = actionColumn(action)
-  const placeholders = roles.map(() => '?').join(',')
-
   try {
-    const row = await queryOne<{ allowed: number }>(
-      `SELECT 1 AS allowed
+    const rows = await query<CrudPermissionRow>(
+      `SELECT fitur_href, role, can_create, can_update, can_delete
        FROM role_fitur_crud_permission
        WHERE fitur_href = ?
-         AND role IN (${placeholders})
-         AND ${column} = 1
-       LIMIT 1`,
-      [fiturHref, ...roles]
+         AND ${column} = 1`,
+      [fiturHref]
     )
-    return row?.allowed === 1
+    return rows.some(row => rolesCanAccessFeature([row.role], roles))
   } catch (err: any) {
     console.error('[crud] canCrudForSession ERROR:', err?.message)
     return false

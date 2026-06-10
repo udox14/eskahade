@@ -15,3 +15,10 @@
 [layout] session null → redirect /login
  GET /dashboard/ehb/cetak 307 in 3.3s (compile: 3.0s, render: 224ms)
 ✓ Compiled in 360ms
+✓ Compiled in 601ms
+✓ Compiled in 292ms
+✓ Compiled in 400ms
+✓ Compiled in 1316ms
+✓ Compiled in 429ms
+✓ Compiled in 363ms
+✓ Compiled in 340ms

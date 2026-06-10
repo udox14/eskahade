@@ -15,6 +15,9 @@ export async function getSusulanList(eventId: number) {
         SELECT 
             a.id as absensi_id,
             a.tanggal,
+            a.sesi_id,
+            es.label as sesi_label,
+            es.jam_group,
             a.status_absen,
             a.is_susulan_done,
             s.id as santri_id,
@@ -40,6 +43,7 @@ export async function getSusulanList(eventId: number) {
         JOIN kelas k ON k.id = rp.kelas_id
         LEFT JOIN marhalah mh ON mh.id = k.marhalah_id
         JOIN ehb_jadwal j ON j.ehb_event_id = a.ehb_event_id AND j.kelas_id = k.id AND j.tanggal = a.tanggal AND j.sesi_id = a.sesi_id
+        JOIN ehb_sesi es ON es.id = a.sesi_id
         JOIN mapel m ON m.id = j.mapel_id
         WHERE a.ehb_event_id = ? AND a.status_absen IN ('A', 'I', 'S')
         ORDER BY a.is_susulan_done ASC, a.tanggal DESC, mh.urutan ASC, k.nama_kelas ASC, s.nama_lengkap ASC

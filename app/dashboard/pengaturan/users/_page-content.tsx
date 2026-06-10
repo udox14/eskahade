@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
@@ -1436,7 +1437,7 @@ export default function ManajemenUserPage() {
                 <div className="space-y-1">
                   {allFitur.filter(f => f.href !== '/dashboard').map(f => {
                     const userRoles = getEffectiveUserRoles(overrideUser)
-                    const hasViaRole = f.roles.some(r => userRoles.includes(r))
+                    const hasViaRole = rolesCanAccessFeature(f.roles, userRoles)
                     const override = overrideList.find(o => o.fitur_id === f.id)
                     const effectiveAccess = override ? override.action === 'grant' : hasViaRole
 

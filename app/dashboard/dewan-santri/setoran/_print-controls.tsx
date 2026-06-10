@@ -21,6 +21,8 @@ type AsramaRow = {
   bayar_tunggakan_lalu: number
   penunggak: number
   total_nominal: number
+  nominal_bulan_ini: number
+  nominal_tunggakan_lalu: number
   persentase: number
   tanggal_setor: string | null
   nama_penyetor: string | null
@@ -72,6 +74,8 @@ export default function MonitoringPrintControls({
       acc.bayar_tunggakan_lalu += row.bayar_tunggakan_lalu
       acc.jumlah_bayar += row.bayar_bulan_ini + row.bayar_tunggakan_lalu
       acc.total_nominal += row.total_nominal
+      acc.nominal_bulan_ini += row.nominal_bulan_ini
+      acc.nominal_tunggakan_lalu += row.nominal_tunggakan_lalu
       if (row.tanggal_setor) acc.tersetor += 1
       return acc
     }, {
@@ -84,6 +88,8 @@ export default function MonitoringPrintControls({
       bayar_tunggakan_lalu: 0,
       jumlah_bayar: 0,
       total_nominal: 0,
+      nominal_bulan_ini: 0,
+      nominal_tunggakan_lalu: 0,
       tersetor: 0,
     })
   }, [printRows])
@@ -170,6 +176,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
     bayar_tunggakan_lalu: number
     jumlah_bayar: number
     total_nominal: number
+    nominal_bulan_ini: number
+    nominal_tunggakan_lalu: number
     tersetor: number
   }
   totalPersentase: number
@@ -243,7 +251,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
           <PrintSummaryCard label="Tidak Ada Tagihan" value={formatNumber(totals.tidak_ada_tagihan)} />
           <PrintSummaryCard label="Wajib Bayar" value={formatNumber(totals.wajib_bayar)} />
           <PrintSummaryCard label="Jumlah Bayar" value={formatNumber(totals.jumlah_bayar)} />
-          <PrintSummaryCard label="Penerimaan" value={formatCurrency(totals.total_nominal)} />
+          <PrintSummaryCard label="Uang Tercatat" value={formatCurrency(totals.total_nominal)} />
         </div>
 
         <table>
@@ -257,10 +265,11 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th rowSpan={2} style={{ width: '74px' }}>Wajib Bayar</th>
               <th rowSpan={2} style={{ width: '82px' }}>Jumlah Bayar Bulan Ini</th>
               <th rowSpan={2} style={{ width: '72px' }}>Penunggak</th>
-              <th rowSpan={2} style={{ width: '88px' }}>Bayar Tunggakan Bulan Lalu</th>
+              <th rowSpan={2} style={{ width: '88px' }}>Bayar Tunggakan</th>
               <th rowSpan={2} style={{ width: '72px' }}>Jumlah Bayar</th>
               <th colSpan={2} style={{ width: '92px' }}>Biaya</th>
-              <th colSpan={2} style={{ width: '126px' }}>Jumlah</th>
+              <th colSpan={2} style={{ width: '126px' }}>Uang Tercatat</th>
+              <th colSpan={2} style={{ width: '126px' }}>Rincian</th>
               <th rowSpan={2} style={{ width: '48px' }}>%</th>
               <th rowSpan={2} style={{ width: '62px' }}>Tgl Stor</th>
               <th rowSpan={2} style={{ width: '48px' }}>Rank</th>
@@ -270,6 +279,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th>Nominal</th>
               <th className="currency">Rp</th>
               <th>Nominal</th>
+              <th>Bulan Ini</th>
+              <th>Tunggakan</th>
             </tr>
           </thead>
           <tbody>
@@ -291,6 +302,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
                   <td className="text-right">{formatNumber(nominal)}</td>
                   <td className="currency money-highlight">Rp</td>
                   <td className="money-highlight text-right">{formatNumber(row.total_nominal)}</td>
+                  <td className="text-right">{formatNumber(row.nominal_bulan_ini)}</td>
+                  <td className="text-right">{formatNumber(row.nominal_tunggakan_lalu)}</td>
                   <td className="highlight text-center">{row.persentase}</td>
                   <td className="text-center">{safeFormatShortDate(row.tanggal_setor)}</td>
                   <td className="text-center">{row.rank}</td>
@@ -311,6 +324,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <td className="total-amount text-right">{formatNumber(nominal)}</td>
               <td className="currency total-amount">Rp</td>
               <td className="total-amount text-right">{formatNumber(totals.total_nominal)}</td>
+              <td className="total-amount text-right">{formatNumber(totals.nominal_bulan_ini)}</td>
+              <td className="total-amount text-right">{formatNumber(totals.nominal_tunggakan_lalu)}</td>
               <td className="text-center">{totalPersentase}</td>
               <td className="text-center">{totals.tersetor > 0 ? 'Ada' : '-'}</td>
               <td className="text-center">-</td>
@@ -321,7 +336,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
         <div className="footer-note">
           <div className="text-[10px] text-slate-600">
             <div>Keterangan:</div>
-            <div>Kolom jumlah bayar adalah akumulasi pembayaran bulan berjalan dan tunggakan bulan sebelumnya.</div>
+            <div>Kolom uang tercatat adalah akumulasi SPP bulan berjalan dan pelunasan tunggakan yang tercatat pada periode laporan.</div>
           </div>
           <div className="signature">
             <div className="text-[11px]">Tasikmalaya, {printedAt}</div>

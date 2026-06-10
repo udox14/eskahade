@@ -24,6 +24,7 @@ export default function StatusSetoranPage() {
 
   const currentMonth = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
+  const fmtRp = (n: number) => `Rp ${new Intl.NumberFormat('id-ID').format(Number(n || 0))}`
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
@@ -64,7 +65,7 @@ export default function StatusSetoranPage() {
             const isPast = (tahun < new Date().getFullYear()) || (tahun === new Date().getFullYear() && bulanIndex < currentMonth)
             
             return (
-              <div key={bulanIndex} className={`p-5 rounded-xl border-2 flex flex-col justify-between h-32 transition-all ${
+              <div key={bulanIndex} className={`p-5 rounded-xl border-2 flex flex-col justify-between min-h-36 transition-all ${
                 isLunas ? 'bg-green-50 border-green-200' : 
                 isPast ? 'bg-red-50 border-red-200' : 'bg-white border-slate-100'
               }`}>
@@ -79,7 +80,9 @@ export default function StatusSetoranPage() {
                   {isLunas ? (
                     <>
                       <p className="font-bold text-green-700 uppercase tracking-wider mb-1">SUDAH DISETOR</p>
+                      {info.jumlahAktual != null && <p className="text-green-700 font-semibold">{fmtRp(info.jumlahAktual)}</p>}
                       <p className="text-green-600 opacity-80">Diterima: {new Date(info.tanggal).toLocaleDateString('id-ID')}</p>
+                      {info.penyetor && <p className="text-green-600 opacity-80">Penyetor: {info.penyetor}</p>}
                       <p className="text-green-600 opacity-80">Oleh: {info.penerima}</p>
                     </>
                   ) : (

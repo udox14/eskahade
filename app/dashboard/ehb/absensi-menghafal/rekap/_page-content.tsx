@@ -26,7 +26,7 @@ type BlokOption = {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  A: 'Alpha',
+  A: 'Alfa',
   I: 'Izin',
   S: 'Sakit',
 }
@@ -184,7 +184,7 @@ export default function RekapAbsensiMenghafalPage() {
           </select>
           <select value={status} onChange={e => setStatus(e.target.value)} className="h-11 rounded-xl border px-3 text-sm bg-white">
             <option value="">A/I/S</option>
-            <option value="A">Alpha</option>
+            <option value="A">Alfa</option>
             <option value="I">Izin</option>
             <option value="S">Sakit</option>
           </select>
@@ -251,4 +251,3 @@ export default function RekapAbsensiMenghafalPage() {
     </div>
   )
 }
-

@@ -4,6 +4,7 @@
 // Supports: multi-role checks + per-user grant/revoke overrides.
 
 import { execute, query } from '@/lib/db'
+import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 
 export interface FiturAkses {
   id: number
@@ -165,7 +166,7 @@ export async function getFiturForRoles(roles: string[], userId?: string): Promis
     if (!f.is_active) return false
     if (revokedIds.has(f.id)) return false              // revoked → blokir
     if (grantedIds.has(f.id)) return true                // granted → izinkan
-    return f.roles.some(r => roles.includes(r))          // cek role biasa
+    return rolesCanAccessFeature(f.roles, roles)         // cek role + jabatan struktural
   })
 }
 
@@ -203,6 +204,6 @@ export async function canAccessHref(href: string, roles: string[], userId?: stri
     }
   }
 
-  // Cek role biasa (multi-role)
-  return fitur.roles.some(r => roles.includes(r))
+  // Cek role biasa (multi-role) + jabatan struktural
+  return rolesCanAccessFeature(fitur.roles, roles)
 }

@@ -24,29 +24,38 @@ export default async function DashboardLayout({
 
   // Ambil data user dari DB — pakai try-catch agar tidak crash kalau kolom belum ada
   let userName = session.full_name || 'User'
-  let userRoles = getEffectiveRoles(session)
+  let displayRoles = session.roles && session.roles.length > 0 ? session.roles : [session.role]
+  let accessRoles = getEffectiveRoles(session)
   let avatarUrl: string | null = null
   let userShowBottomNav = true  // default aktif
 
   try {
-    const user = await queryOne<{ full_name: string; role: string; roles: string | null; avatar_url: string | null; show_bottomnav: number | null }>(
-      'SELECT full_name, role, roles, avatar_url, show_bottomnav FROM users WHERE id = ?',
+    const user = await queryOne<{ full_name: string; role: string; roles: string | null; avatar_url: string | null; show_bottomnav: number | null; structural_jabatan: string | null }>(
+      'SELECT full_name, role, roles, avatar_url, show_bottomnav, structural_jabatan FROM users WHERE id = ?',
       [session.id]
     );
     if (user) {
       userName = user.full_name || userName
       // Parse multi-role dari DB
+      let rawRoles = session.roles && session.roles.length > 0 ? session.roles : [session.role]
       try {
         if (user.roles) {
           const parsed = JSON.parse(user.roles)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            userRoles = parsed
+            rawRoles = parsed
           }
         }
       } catch {
         // fallback ke session roles
       }
-      if (userRoles.length === 0) userRoles = [user.role]
+      if (rawRoles.length === 0) rawRoles = [user.role]
+      displayRoles = rawRoles
+      accessRoles = getEffectiveRoles({
+        ...session,
+        role: rawRoles[0] || user.role || session.role,
+        roles: rawRoles,
+        structural_jabatan: user.structural_jabatan ?? null,
+      })
       avatarUrl = user.avatar_url ?? null
       // NULL = belum diset user → ikut default (aktif), 0 = user matiin sendiri
       userShowBottomNav = user.show_bottomnav !== 0
@@ -55,7 +64,7 @@ export default async function DashboardLayout({
     console.error('[layout] queryOne users ERROR:', err?.message)
   }
 
-  console.log('[layout] userRoles:', userRoles)
+  console.log('[layout] accessRoles:', accessRoles)
 
   try {
     await ensureOperasionalSchema()
@@ -69,16 +78,16 @@ export default async function DashboardLayout({
 
   try {
     [fiturAkses, globalBottomNavEnabled] = await Promise.all([
-      getFiturForRoles(userRoles, session.id),
+      getFiturForRoles(accessRoles, session.id),
       getBottomNavGlobalEnabled(),
     ])
   } catch (err: any) {
     console.error('[layout] fetch error:', err?.message)
-    try { fiturAkses = await getFiturForRoles(userRoles, session.id) } catch {}
+    try { fiturAkses = await getFiturForRoles(accessRoles, session.id) } catch {}
   }
 
   const hasOperasionalRecipientMenu = fiturAkses.some(f => f.href === '/dashboard/operasional')
-  if (userRoles.includes('admin') && !hasOperasionalRecipientMenu) {
+  if (accessRoles.includes('admin') && !hasOperasionalRecipientMenu) {
     fiturAkses = [
       ...fiturAkses,
       {
@@ -100,8 +109,8 @@ export default async function DashboardLayout({
 
   return (
     <ClientLayout
-      userRole={userRoles[0] || 'wali_kelas'}
-      userRoles={userRoles}
+      userRole={displayRoles[0] || 'wali_kelas'}
+      userRoles={displayRoles}
       userEmail=""
       userName={userName}
       avatarUrl={avatarUrl}
