@@ -129,6 +129,8 @@ const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; i
   'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
   'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
   'EHB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
+  'Operasional':  { dot: 'bg-cyan-500',    line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
+  'PSB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -156,8 +158,10 @@ const GROUP_ORDER = [
   'Keuangan Pusat',
   'Keuangan Santri',
   'Keuangan',
+  'Operasional',
   'UPK',
   'EHB',
+  'PSB',
   'Master Data',
 ]
 
