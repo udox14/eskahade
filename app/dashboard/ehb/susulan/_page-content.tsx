@@ -124,8 +124,11 @@ export default function SusulanEhbPage() {
         No: index + 1,
         NIS: row.nis || '',
         'Nama Santri': row.nama_lengkap || '',
+        Asrama: row.asrama || '',
+        Kamar: row.kamar || '',
         Kelas: row.nama_kelas || '',
-        Marhalah: row.marhalah_nama || '',
+        Sekolah: row.sekolah || '',
+        'Kelas Sekolah': row.kelas_sekolah || '',
         Tanggal: shortDateWib(row.tanggal),
         Sesi: row.sesi_label || '',
         'Jam Group': row.jam_group || '',
@@ -136,8 +139,9 @@ export default function SusulanEhbPage() {
       }))
       const sheet = XLSX.utils.json_to_sheet(data)
       sheet['!cols'] = [
-        { wch: 6 }, { wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
-        { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
+        { wch: 6 }, { wch: 14 }, { wch: 28 }, { wch: 18 }, { wch: 12 }, { wch: 16 },
+        { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 24 },
+        { wch: 28 }, { wch: 14 }, { wch: 16 },
       ]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, sheet, 'Daftar Susulan')
