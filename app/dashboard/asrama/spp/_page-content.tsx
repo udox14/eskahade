@@ -1,9 +1,8 @@
 'use client'
 
-import React from 'react'
-import { useState, useEffect } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getKamarsSPP, getDashboardSPPKamar, getDashboardSPPSadesa, getClientRestriction, simpanSppBatch, batalkanPembayaranSPP, getSppBillingStart, searchDashboardSPP, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards, Ban, CalendarX } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards, Ban, CalendarX, BarChart3, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -14,8 +13,6 @@ const BULAN_LIST = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Jul
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 const SADESA_UNIT = 'SADESA'
 
-type FilterStatus = 'SEMUA' | 'SUDAH_BAYAR_INI' | 'NUNGGAK' | 'AMAN'
-
 export default function SPPPage() {
   const confirm = useConfirm()
   const [view, setView] = useState<'LIST' | 'PAYMENT'>('LIST')
@@ -23,24 +20,30 @@ export default function SPPPage() {
   const [tahun, setTahun] = useState(new Date().getFullYear())
   const [unitSetor, setUnitSetor] = useState(ASRAMA_LIST[0])
   const [scope, setScope] = useState<{ kind: 'ASRAMA' | 'SADESA' | 'ADMIN'; lockedUnit: string | null; defaultUnit: string; allowedUnits: string[]; canAdjustBilling: boolean } | null>(null)
+  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 6, value: '2026-06' })
 
-  // Daftar kamar (ringan, hanya nama kamar)
-  const [kamars, setKamars] = useState<string[]>([])
-  const [kamarIdx, setKamarIdx] = useState(0)
-  const [loadingKamars, setLoadingKamars] = useState(false)
+  // Data State
+  const [allSantri, setAllSantri] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(false)
+  const [rekapStats, setRekapStats] = useState<any>(null)
+  const [statusSetoran, setStatusSetoran] = useState<any>(null)
+  const [filterOptions, setFilterOptions] = useState<any>({ kamars: [], sekolahs: [], kelasSekolahs: [], kelasPesantrens: [] })
 
-  // Data santri kamar aktif (lazy)
-  const [santriKamar, setSantriKamar] = useState<any[]>([])
-  const [loadingKamar, setLoadingKamar] = useState(false)
-  // Cache: kamar → santri[], supaya tidak re-fetch kamar yang sudah pernah dibuka
-  const [kamarCache, setKamarCache] = useState<Record<string, any[]>>({})
-
+  // Pagination & Search
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number | 'all'>(25)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [loadingSearch, setLoadingSearch] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('SEMUA')
-  const [drafts, setDrafts] = useState<Record<string, any>>({})
-  const [isSavingBatch, setIsSavingBatch] = useState(false)
+
+  // Filter Modal
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [filters, setFilters] = useState({ kamar: '', statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' })
+  
+  // Rekap Panel
+  const [rekapExpanded, setRekapExpanded] = useState(false)
+  const [rekapBebasList, setRekapBebasList] = useState(false)
+
+  // Quick Pay
+  const [payingSantriId, setPayingSantriId] = useState<string | null>(null)
 
   // Payment view
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
@@ -48,8 +51,9 @@ export default function SPPPage() {
   const [tagihanDitiadakan, setTagihanDitiadakan] = useState<any[]>([])
   const [tunggakanHistoris, setTunggakanHistoris] = useState<any[]>([])
   const [selectedMonths, setSelectedMonths] = useState<number[]>([])
-  const [billingStart, setBillingStart] = useState({ tahun: 2026, bulan: 6, value: '2026-06' })
   const [cancelingPaymentId, setCancelingPaymentId] = useState<string | null>(null)
+  
+  // Modals for payment view & batch waive
   const [historisModalOpen, setHistorisModalOpen] = useState(false)
   const [historisTahun, setHistorisTahun] = useState(new Date().getFullYear())
   const [historisMonths, setHistorisMonths] = useState<number[]>([])
@@ -58,12 +62,13 @@ export default function SPPPage() {
   const [savingHistoris, setSavingHistoris] = useState(false)
   const [payingHistorisId, setPayingHistorisId] = useState<string | null>(null)
   const [waiveModalOpen, setWaiveModalOpen] = useState(false)
-  const [waiveMode, setWaiveMode] = useState<'SINGLE' | 'BATCH'>('SINGLE')
   const [waiveTargetMonth, setWaiveTargetMonth] = useState<number | null>(null)
   const [waiveMonths, setWaiveMonths] = useState<number[]>([])
   const [waiveReason, setWaiveReason] = useState('')
   const [savingWaive, setSavingWaive] = useState(false)
   const [restoringWaiveKey, setRestoringWaiveKey] = useState<string | null>(null)
+  
+  // Kelas Waive Modal
   const [kelasWaive, setKelasWaive] = useState('9')
   const [kelasWaiveUnit, setKelasWaiveUnit] = useState('SEMUA')
   const [kelasWaiveMonths, setKelasWaiveMonths] = useState<number[]>([])
@@ -74,11 +79,11 @@ export default function SPPPage() {
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
   const isSadesaMode = unitSetor === SADESA_UNIT
-  const currentUnitLabel = isSadesaMode ? 'SADESA' : unitSetor
+  const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
 
   // Init
   useEffect(() => {
-    getNominalSPP().then(setNominal)
+    getNominalSPP(tahun).then(setNominal)
     getSppBillingStart().then(setBillingStart)
     getClientRestriction()
       .then(res => {
@@ -90,120 +95,120 @@ export default function SPPPage() {
       .catch((error: any) => {
         toast.error(error?.message || 'Gagal memuat batas akses SPP.')
       })
-  }, [])
+  }, [tahun])
 
-  // Load daftar kamar saat asrama/tahun berubah — ringan, hanya distinct kamar
-  useEffect(() => {
+  // Load Data
+  const loadData = async () => {
     if (!scope || !unitSetor) return
     if (!scope.allowedUnits.includes(unitSetor)) return
-    setLoadingKamars(true)
-    setKamars([])
-    setSantriKamar([])
-    setKamarCache({})
-    setKamarIdx(0)
-    setDrafts({})
-    getKamarsSPP(tahun, unitSetor)
-      .then(res => {
-        setKamars(res)
-      })
-      .catch((error: any) => {
-        toast.error(error?.message || 'Gagal memuat daftar kamar.')
-      })
-      .finally(() => {
-        setLoadingKamars(false)
-      })
+
+    setLoadingData(true)
+    try {
+      const [santriData, rekapData, setoranData, filtersData] = await Promise.all([
+        getDashboardSPPAll(tahun, unitSetor),
+        getRekapStatistikSPP(tahun, unitSetor),
+        getStatusSetoranUnit(tahun, unitSetor),
+        getFilterOptions(unitSetor)
+      ])
+      setAllSantri(santriData)
+      setRekapStats(rekapData)
+      setStatusSetoran(setoranData)
+      setFilterOptions(filtersData)
+    } catch (error: any) {
+      toast.error(error?.message || 'Gagal memuat data SPP.')
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+    setPage(1)
   }, [scope, unitSetor, tahun])
 
-  // Load santri kamar aktif — lazy, dengan cache
-  useEffect(() => {
-    if (!scope) return
-    if (!scope.allowedUnits.includes(unitSetor)) return
+  // Filter Logic
+  const filteredSantri = useMemo(() => {
+    let result = allSantri
 
-    if (isSadesaMode) {
-      setLoadingKamar(true)
-      setSantriKamar([])
-      getDashboardSPPSadesa(tahun)
-        .then(res => {
-          setSantriKamar(res)
-        })
-        .catch((error: any) => {
-          toast.error(error?.message || 'Gagal memuat daftar santri SADESA.')
-        })
-        .finally(() => {
-          setLoadingKamar(false)
-        })
-      return
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(s => s.nama_lengkap?.toLowerCase().includes(q))
+    }
+    if (filters.kamar) result = result.filter(s => s.kamar === filters.kamar)
+    if (filters.sekolah) result = result.filter(s => s.sekolah === filters.sekolah)
+    if (filters.kelasSekolah) result = result.filter(s => s.kelas_sekolah === filters.kelasSekolah)
+    if (filters.kelasPesantren) result = result.filter(s => s.kelas_pesantren === filters.kelasPesantren)
+
+    switch (filters.statusPembayaran) {
+      case 'LUNAS':
+        result = result.filter(s => s.bulan_ini_lunas)
+        break
+      case 'NUNGGAK':
+        result = result.filter(s => s.jumlah_tunggakan > 0)
+        break
+      case 'AMAN':
+        result = result.filter(s => s.jumlah_tunggakan === 0 && !s.bebas_spp)
+        break
+      case 'BEBAS_SPP':
+        result = result.filter(s => s.bebas_spp)
+        break
+      case 'TIDAK_ADA_TAGIHAN':
+        result = result.filter(s => s.tagihan_ditiadakan_bulan_ini)
+        break
     }
 
-    if (!kamars.length) return
-    const kamar = kamars[kamarIdx]
-    if (!kamar) return
+    return result
+  }, [allSantri, searchQuery, filters])
 
-    // Kalau sudah di-cache, pakai cache
-    if (kamarCache[kamar]) {
-      setSantriKamar(kamarCache[kamar])
-      return
+  const paginatedSantri = useMemo(() => {
+    if (pageSize === 'all') return filteredSantri
+    const start = (page - 1) * pageSize
+    return filteredSantri.slice(start, start + pageSize)
+  }, [filteredSantri, page, pageSize])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.kamar) count++
+    if (filters.sekolah) count++
+    if (filters.kelasSekolah) count++
+    if (filters.kelasPesantren) count++
+    if (filters.statusPembayaran !== 'SEMUA') count++
+    return count
+  }, [filters])
+
+  const totalPages = pageSize === 'all' ? 1 : Math.ceil(filteredSantri.length / pageSize)
+
+  // Quick Pay
+  const handleQuickPay = async (e: React.MouseEvent, santri: any) => {
+    e.stopPropagation()
+    if (!isCurrentYear) return
+    const isNoBill = santri.bebas_spp || santri.tagihan_ditiadakan_bulan_ini
+    if (santri.bulan_ini_lunas || isNoBill) return
+
+    if (!await confirm(`Bayar SPP ${BULAN_LIST[currentMonthIdx - 1]} ${tahun} untuk ${santri.nama_lengkap}? Nominal: Rp ${nominal.toLocaleString('id-ID')}`)) return
+    
+    setPayingSantriId(santri.id)
+    const toastId = toast.loading('Memproses...')
+    const res = await bayarSPPBulanBerjalan(santri.id, tahun, currentMonthIdx, nominal)
+    toast.dismiss(toastId)
+    setPayingSantriId(null)
+    
+    if ('error' in res) {
+      toast.error(res.error)
+    } else {
+      toast.success('Pembayaran Berhasil!')
+      await loadData()
+      if (view === 'PAYMENT' && selectedSantri?.id === santri.id) {
+        await refreshSelectedStatus()
+      }
     }
-
-    setLoadingKamar(true)
-    setSantriKamar([])
-    getDashboardSPPKamar(tahun, unitSetor, kamar)
-      .then(res => {
-        setSantriKamar(res)
-        setKamarCache(prev => ({ ...prev, [kamar]: res }))
-      })
-      .catch((error: any) => {
-        toast.error(error?.message || 'Gagal memuat daftar santri kamar.')
-      })
-      .finally(() => {
-        setLoadingKamar(false)
-      })
-  }, [scope, kamarIdx, kamars, isSadesaMode, tahun, unitSetor])
-
-  useEffect(() => {
-    const q = searchQuery.trim()
-    if (!scope) return
-    if (!scope.allowedUnits.includes(unitSetor)) return
-    if (q.length < 2) {
-      setSearchResults([])
-      setLoadingSearch(false)
-      return
-    }
-
-    setLoadingSearch(true)
-    const timer = window.setTimeout(() => {
-      searchDashboardSPP(tahun, unitSetor, q)
-        .then(setSearchResults)
-        .catch((error: any) => {
-          toast.error(error?.message || 'Gagal mencari data santri.')
-        })
-        .finally(() => setLoadingSearch(false))
-    }, 250)
-
-    return () => window.clearTimeout(timer)
-  }, [scope, searchQuery, tahun, unitSetor])
-
-  // Invalidate cache kamar tertentu setelah simpan batch
-  const invalidateKamar = (kamar: string) => {
-    setKamarCache(prev => { const n = { ...prev }; delete n[kamar]; return n })
   }
 
-  const refreshActiveList = async () => {
-    if (isSadesaMode) {
-      const data = await getDashboardSPPSadesa(tahun)
-      setSantriKamar(data)
-      return
-    }
-    if (!activeKamar) return
-    const data = await getDashboardSPPKamar(tahun, unitSetor, activeKamar)
-    setSantriKamar(data)
-    setKamarCache(prev => ({ ...prev, [activeKamar]: data }))
-  }
-
-  // Back button
+  // Back button handling
   useEffect(() => {
     if (view === 'PAYMENT') window.history.pushState({ view: 'PAYMENT' }, '')
   }, [view])
+  
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'PAYMENT') {
@@ -215,7 +220,7 @@ export default function SPPPage() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // Payment
+  // Payment view functions
   useEffect(() => {
     if (view === 'PAYMENT' && selectedSantri) {
       Promise.all([
@@ -260,38 +265,8 @@ export default function SPPPage() {
     toast.dismiss(toastId)
     if ('error' in res) { toast.error(res.error) } else {
       toast.success('Pembayaran Berhasil!')
-      // Invalidate cache kamar santri ini supaya refresh saat kembali
-      invalidateKamar(selectedSantri.kamar)
-      await refreshActiveList()
+      await loadData()
       await refreshSelectedStatus()
-    }
-  }
-
-  const toggleDraft = (e: React.MouseEvent, santri: any) => {
-    e.stopPropagation()
-    setDrafts(prev => {
-      const next = { ...prev }
-      if (next[santri.id]) { delete next[santri.id] }
-      else { next[santri.id] = { nominal, bulan: currentMonthIdx, nama: santri.nama_lengkap } }
-      return next
-    })
-  }
-
-  const handleSimpanBatch = async () => {
-    const listPayload = Object.keys(drafts).map(id => ({
-      santriId: id, bulan: drafts[id].bulan, tahun, nominal: drafts[id].nominal,
-    }))
-    if (!listPayload.length) return
-    if (!await confirm(`Simpan pembayaran untuk ${listPayload.length} santri?`)) return
-    setIsSavingBatch(true)
-    const res = await simpanSppBatch(listPayload)
-    setIsSavingBatch(false)
-    if ('error' in res) { toast.error(res.error) } else {
-      toast.success(`Sukses menyimpan ${(res as any).count} pembayaran!`)
-      // Invalidate cache kamar aktif
-      invalidateKamar(kamars[kamarIdx])
-      await refreshActiveList()
-      setDrafts({})
     }
   }
 
@@ -302,8 +277,6 @@ export default function SPPPage() {
     if (tagihanDitiadakan.some(r => r.bulan === idx)) return
     setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx])
   }
-
-  const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
 
   const handleBatalkanPembayaran = async (e: React.MouseEvent, dataBayar: any) => {
     e.stopPropagation()
@@ -316,11 +289,11 @@ export default function SPPPage() {
       return
     }
     toast.success('Status lunas dibatalkan')
-    invalidateKamar(selectedSantri.kamar)
-    await refreshActiveList()
+    await loadData()
     await refreshSelectedStatus()
   }
 
+  // Historis modals
   const openHistorisModal = () => {
     setHistorisTahun(billingStart.bulan === 1 ? billingStart.tahun - 1 : billingStart.tahun)
     setHistorisNominal(String(nominal))
@@ -349,7 +322,7 @@ export default function SPPPage() {
     toast.success(`Tunggakan historis tersimpan: ${res.count} bulan`)
     setHistorisModalOpen(false)
     await loadTunggakanHistoris()
-    await refreshActiveList()
+    await loadData()
   }
 
   const handleBayarHistoris = async (item: any) => {
@@ -363,22 +336,14 @@ export default function SPPPage() {
     }
     toast.success('Tunggakan historis dilunasi')
     await loadTunggakanHistoris()
-    await refreshActiveList()
+    await loadData()
   }
 
+  // Waive modals
   const openSingleWaiveModal = (e: React.MouseEvent, month: number) => {
     e.stopPropagation()
-    setWaiveMode('SINGLE')
     setWaiveTargetMonth(month)
     setWaiveMonths([month])
-    setWaiveReason('')
-    setWaiveModalOpen(true)
-  }
-
-  const openBatchWaiveModal = () => {
-    setWaiveMode('BATCH')
-    setWaiveTargetMonth(null)
-    setWaiveMonths([currentMonthIdx])
     setWaiveReason('')
     setWaiveModalOpen(true)
   }
@@ -389,25 +354,21 @@ export default function SPPPage() {
   }
 
   const handleSimpanWaive = async () => {
-    const targetIds = waiveMode === 'SINGLE'
-      ? selectedSantri ? [selectedSantri.id] : []
-      : Object.keys(drafts)
-    if (!targetIds.length) return toast.warning('Pilih minimal satu santri.')
+    if (!selectedSantri) return
     if (!waiveMonths.length) return toast.warning('Pilih minimal satu bulan.')
     if (!waiveReason.trim()) return toast.warning('Alasan wajib diisi.')
 
     setSavingWaive(true)
-    const res = await simpanTagihanDitiadakanSPP(targetIds, tahun, waiveMonths, waiveReason)
+    const res = await simpanTagihanDitiadakanSPP([selectedSantri.id], tahun, waiveMonths, waiveReason)
     setSavingWaive(false)
     if ('error' in res) {
       toast.error(res.error)
       return
     }
-    toast.success(`Tidak ada tagihan tersimpan: ${res.count} data`)
+    toast.success(`Tidak ada tagihan tersimpan untuk bulan tersebut`)
     setWaiveModalOpen(false)
-    setDrafts({})
-    await refreshActiveList()
-    if (selectedSantri) await refreshSelectedStatus()
+    await loadData()
+    await refreshSelectedStatus()
   }
 
   const handleCabutWaive = async (e: React.MouseEvent, month: number) => {
@@ -423,7 +384,7 @@ export default function SPPPage() {
       return
     }
     toast.success('Tagihan aktif kembali')
-    await refreshActiveList()
+    await loadData()
     await refreshSelectedStatus()
   }
 
@@ -446,79 +407,13 @@ export default function SPPPage() {
     toast.success(`Tidak ada tagihan tersimpan untuk ${res.santriCount} santri`)
     setKelasWaiveReason('')
     setKelasWaiveModalOpen(false)
-    await refreshActiveList()
+    await loadData()
   }
 
   const handleBackToList = () => { window.history.back() }
 
-  const activeKamar = kamars[kamarIdx] ?? ''
-
-  const isSearching = searchQuery.trim().length >= 2
-  const sourceSantri = isSearching ? searchResults : santriKamar
-  const filteredSantri = sourceSantri.filter(s => {
-    if (filterStatus === 'SUDAH_BAYAR_INI') return s.bulan_ini_lunas
-    if (filterStatus === 'NUNGGAK') return s.jumlah_tunggakan > 0
-    if (filterStatus === 'AMAN') return s.jumlah_tunggakan === 0
-    return true
-  })
-
-  const totalDraft = Object.keys(drafts).length
-  const totalNominalDraft = Object.values(drafts).reduce((a: number, b: any) => a + b.nominal, 0)
   const tunggakanHistorisBelumLunas = tunggakanHistoris.filter(item => item.status !== 'LUNAS')
   const totalHistorisBelumLunas = tunggakanHistorisBelumLunas.reduce((sum, item) => sum + Number(item.nominal_tagihan || 0), 0)
-  const waiveModal = waiveModalOpen ? (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-        <div className="flex items-start justify-between border-b border-slate-100 p-5">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">Set Tidak Ada Tagihan</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              {waiveMode === 'SINGLE'
-                ? `${selectedSantri?.nama_lengkap || 'Santri'} - ${waiveTargetMonth ? BULAN_LIST[waiveTargetMonth - 1] : ''} ${tahun}`
-                : `${Object.keys(drafts).length} santri dipilih - Tahun ${tahun}`}
-            </p>
-          </div>
-          <button onClick={() => setWaiveModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"><X className="w-4 h-4"/></button>
-        </div>
-        <div className="space-y-4 p-5">
-          <div>
-            <label className="mb-2 block text-xs font-bold text-slate-500">Bulan</label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {BULAN_LIST.map((bulanNama, idx) => {
-                const month = idx + 1
-                const disabled = waiveMode === 'SINGLE' ? month !== waiveTargetMonth : isBeforeBillingStart(tahun, month)
-                const selected = waiveMonths.includes(month)
-                return (
-                  <button key={month} type="button" onClick={() => !disabled && toggleWaiveMonth(month)} disabled={disabled}
-                    className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                      selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
-                    }`}>
-                    {bulanNama}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500">Alasan</label>
-            <textarea value={waiveReason} onChange={e => setWaiveReason(e.target.value)} rows={3}
-              placeholder="Contoh: Pulang libur kenaikan kelas / tidak berada di pesantren."
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            Status ini tidak dicatat sebagai pembayaran dan bulan terkait tidak dihitung sebagai tunggakan.
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 p-5">
-          <button onClick={() => setWaiveModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button onClick={handleSimpanWaive} disabled={savingWaive} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60 hover:bg-blue-800">
-            {savingWaive ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarX className="w-4 h-4"/>}
-            Simpan
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null
 
   // ── VIEW: LIST ──────────────────────────────────────────────────────────
   if (view === 'LIST') return (
@@ -528,16 +423,16 @@ export default function SPPPage() {
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Dashboard SPP"
-          description={isSadesaMode ? 'Monitoring pembayaran seluruh santri kategori SADESA.' : 'Monitoring pembayaran santri per kamar.'}
+          description={isSadesaMode ? 'Monitoring pembayaran seluruh santri kategori SADESA.' : 'Monitoring pembayaran santri per unit/asrama.'}
           className="flex-1"
         />
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1">
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
             <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">-</button>
             <span className="px-2 font-mono font-bold text-slate-700">{tahun}</span>
             <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">+</button>
           </div>
-          <div className={`p-2 rounded-lg border flex items-center gap-2 ${scope?.lockedUnit ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
+          <div className={`p-2 rounded-lg border shadow-sm flex items-center gap-2 ${scope?.lockedUnit ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
             {scope?.lockedUnit ? <Lock className="w-3 h-3 text-orange-600"/> : <Home className="w-4 h-4 text-slate-400"/>}
             <select
               value={unitSetor}
@@ -551,33 +446,137 @@ export default function SPPPage() {
         </div>
       </div>
 
-      {/* SEARCH & FILTER */}
-      <div className="flex flex-col md:flex-row gap-4">
+      {/* REKAP & STATISTIK */}
+      {!loadingData && rekapStats && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all">
+          <div 
+            onClick={() => setRekapExpanded(!rekapExpanded)}
+            className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-slate-700 font-bold">
+              <BarChart3 className="w-5 h-5 text-indigo-600"/>
+              Rekap & Statistik SPP {unitSetor}
+            </div>
+            {rekapExpanded ? <ChevronLeft className="w-5 h-5 -rotate-90 text-slate-400" /> : <ChevronRight className="w-5 h-5 rotate-90 text-slate-400" />}
+          </div>
+          
+          <div className={`grid gap-4 p-4 ${rekapExpanded ? 'block' : 'hidden'}`}>
+            {/* Row 1: Santri Counts */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-slate-800">{rekapStats.totalSantri}</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">Total Santri</p>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center cursor-pointer hover:bg-blue-100" onClick={() => setRekapBebasList(!rekapBebasList)}>
+                <p className="text-2xl font-bold text-blue-800">{rekapStats.bebasSppCount}</p>
+                <p className="text-xs text-blue-600 uppercase tracking-wide mt-1">Bebas SPP</p>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-slate-800">{rekapStats.wajibSpp}</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">Wajib SPP</p>
+              </div>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-orange-800">{rekapStats.wajibBulanIni}</p>
+                <p className="text-xs text-orange-600 uppercase tracking-wide mt-1">Wajib Bln Ini</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-red-800">{rekapStats.nunggakBulanIni}</p>
+                <p className="text-xs text-red-600 uppercase tracking-wide mt-1">Nunggak Bln Ini</p>
+              </div>
+            </div>
+
+            {/* Bebas SPP List Expanded */}
+            {rekapBebasList && rekapStats.bebasSppList?.length > 0 && (
+              <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 text-sm">
+                <span className="font-bold text-blue-800 mb-2 block">Daftar Santri Bebas SPP:</span>
+                <div className="flex flex-wrap gap-2">
+                  {rekapStats.bebasSppList.map((name: string) => (
+                    <span key={name} className="px-2 py-1 bg-white border border-blue-200 rounded-md text-blue-700 text-xs shadow-sm">{name}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Row 2: Financials */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <h4 className="font-bold text-emerald-900 flex items-center gap-2 mb-3">
+                  <WalletCards className="w-4 h-4"/> Uang Diterima Bulan {BULAN_LIST[currentMonthIdx - 1]} {new Date().getFullYear()}
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center bg-white/60 p-2 rounded border border-emerald-100">
+                    <span className="text-emerald-700">Total Keseluruhan</span>
+                    <span className="font-bold text-emerald-900 text-lg">Rp {rekapStats.uangDiterimaTotal.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center px-2 py-1">
+                    <span className="text-emerald-600 text-xs">├─ Untuk tagihan bulan berjalan</span>
+                    <span className="font-bold text-emerald-800">Rp {rekapStats.uangHarusSetor.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center px-2 py-1">
+                    <span className="text-emerald-600 text-xs">└─ Untuk tunggakan lama</span>
+                    <span className="font-bold text-emerald-800">Rp {rekapStats.uangTunggakanLama.toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-2">
+                    <Home className="w-4 h-4"/> Status Setoran ke Pusat
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">Setoran untuk bulan {BULAN_LIST[currentMonthIdx - 1]} {tahun}</p>
+                </div>
+                
+                {statusSetoran?.[currentMonthIdx] ? (
+                  <div className="bg-white border border-green-200 p-3 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2 text-green-700 font-bold mb-1">
+                      <CheckCircle className="w-4 h-4"/> Sudah Disetor
+                    </div>
+                    <div className="text-xs text-slate-600 space-y-1 mt-2">
+                      <p>Diterima: <span className="font-bold">{new Date(statusSetoran[currentMonthIdx].tanggal).toLocaleDateString('id-ID')}</span></p>
+                      <p>Oleh: <span className="font-bold">{statusSetoran[currentMonthIdx].penerima}</span></p>
+                      <p>Total: <span className="font-bold text-green-700 text-sm">Rp {statusSetoran[currentMonthIdx].jumlahAktual.toLocaleString('id-ID')}</span></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-red-200 p-3 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2 text-red-600 font-bold mb-1">
+                      <AlertCircle className="w-4 h-4"/> Belum Disetor
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Uang tagihan bulan berjalan (Rp {rekapStats.uangHarusSetor.toLocaleString('id-ID')}) belum disetorkan ke Dewan Santri.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SEARCH & FILTER BAR */}
+      <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"/>
           <input
             type="text"
-            placeholder="Cari nama santri..."
-            className="w-full pl-10 pr-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            placeholder="Ketik nama santri untuk mencari..."
+            className="w-full pl-10 pr-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
           />
         </div>
-        <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 overflow-x-auto">
-          <Filter className="w-4 h-4 text-slate-400 ml-2 flex-shrink-0"/>
-          {(['SEMUA', 'SUDAH_BAYAR_INI', 'NUNGGAK', 'AMAN'] as FilterStatus[]).map(f => (
-            <button key={f} onClick={() => setFilterStatus(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                filterStatus === f
-                  ? f === 'SUDAH_BAYAR_INI' ? 'bg-green-100 text-green-700 shadow-sm'
-                  : f === 'NUNGGAK' ? 'bg-red-100 text-red-700 shadow-sm'
-                  : 'bg-white shadow text-slate-800'
-                  : 'text-slate-500 hover:bg-slate-100'
-              }`}>
-              {f === 'SEMUA' ? 'Semua' : f === 'SUDAH_BAYAR_INI' ? `Lunas ${BULAN_LIST[currentMonthIdx - 1]}` : f === 'NUNGGAK' ? 'Menunggak' : 'Aman'}
-            </button>
-          ))}
-        </div>
+        
+        <button
+          onClick={() => setFilterModalOpen(true)}
+          className={`px-4 py-3 rounded-xl border flex items-center gap-2 font-bold transition-colors shadow-sm ${
+            activeFilterCount > 0 ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Filter className="w-4 h-4" />
+          Filter {activeFilterCount > 0 && <span className="bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">{activeFilterCount}</span>}
+        </button>
+
         {scope?.canAdjustBilling && (
           <button
             type="button"
@@ -585,125 +584,242 @@ export default function SPPPage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50"
           >
             <CalendarX className="h-4 w-4" />
-            Tidak Ada Tagihan
+            Tidak Ada Tagihan Massal
           </button>
         )}
       </div>
 
-      {/* KAMAR NAVIGATOR */}
-      {loadingKamars ? (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-slate-400"/></div>
-      ) : !isSadesaMode && kamars.length > 0 && (
-        <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border">
-          <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
-            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
-            <ChevronLeft className="w-6 h-6"/>
-          </button>
-          <div className="flex flex-col items-center">
-            <span className="text-xs text-slate-500 uppercase font-bold tracking-widest">Kamar Saat Ini</span>
-            <select value={kamarIdx} onChange={e => setKamarIdx(Number(e.target.value))}
-              className="font-bold text-lg text-slate-800 text-center outline-none bg-transparent cursor-pointer">
-              {kamars.map((k, idx) => <option key={k} value={idx}>{k}</option>)}
-            </select>
-          </div>
-          <button onClick={() => setKamarIdx(i => Math.min(kamars.length - 1, i + 1))} disabled={kamarIdx === kamars.length - 1}
-            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 text-slate-600">
-            <ChevronRight className="w-6 h-6"/>
-          </button>
-        </div>
-      )}
-
-      {/* SANTRI LIST */}
-      {loadingKamar || loadingSearch ? (
-        <div className="text-center py-12"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-      ) : !isSadesaMode && !activeKamar && !isSearching ? null : filteredSantri.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
-          {isSearching ? 'Tidak ada santri yang cocok dengan pencarian.' : santriKamar.length === 0 ? (isSadesaMode ? 'Belum ada santri kategori SADESA.' : 'Tidak ada santri di kamar ini.') : 'Tidak ada santri yang cocok dengan filter.'}
+      {/* SANTRI LIST / COMPACT TABLE */}
+      {loadingData ? (
+        <div className="text-center py-20"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-500"/></div>
+      ) : filteredSantri.length === 0 ? (
+        <div className="text-center py-20 bg-white text-slate-400 border border-slate-200 shadow-sm rounded-xl">
+          <Search className="w-10 h-10 mx-auto mb-3 text-slate-300"/>
+          <p className="text-lg font-bold text-slate-500">Tidak ada santri ditemukan</p>
+          <p className="text-sm">Coba sesuaikan pencarian atau filter Anda.</p>
         </div>
       ) : (
-        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 border-b font-bold text-slate-700 text-sm flex justify-between items-center">
-            <span className="text-lg">{isSearching ? 'HASIL PENCARIAN' : (isSadesaMode ? 'UNIT SADESA' : `KAMAR ${activeKamar}`)}</span>
-            <span className="text-xs bg-white border px-2 py-1 rounded font-normal text-slate-500">{filteredSantri.length} Santri</span>
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col">
+          {/* Desktop Table Header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 bg-slate-50 px-4 py-3 border-b font-bold text-slate-500 text-xs uppercase tracking-wider items-center">
+            <div className="col-span-1 text-center">#</div>
+            <div className="col-span-4">Nama Santri</div>
+            <div className="col-span-2 text-center">Kamar / Kls</div>
+            <div className="col-span-2 text-center">Status {BULAN_LIST[currentMonthIdx - 1]}</div>
+            <div className="col-span-1 text-center">Tunggakan</div>
+            <div className="col-span-2 text-right">Aksi</div>
           </div>
-          <div className="divide-y">
-            {filteredSantri.map((s: any) => {
+
+          <div className="divide-y divide-slate-100 flex-1">
+            {paginatedSantri.map((s: any, idx) => {
+              const rowNum = pageSize === 'all' ? idx + 1 : (page - 1) * pageSize + idx + 1
               const isPaid = s.bulan_ini_lunas
-              const isDraft = !!drafts[s.id]
               const isNoBill = s.bebas_spp || s.tagihan_ditiadakan_bulan_ini
+              const canQuickPay = isCurrentYear && !isPaid && !isNoBill
+
               return (
                 <div key={s.id} onClick={() => handleSelectSantri(s)}
-                  className={`p-4 flex items-center justify-between gap-3 transition-colors cursor-pointer group ${isDraft ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  className="group flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 px-4 py-3 md:py-2 items-start md:items-center hover:bg-slate-50 cursor-pointer transition-colors relative">
+                  
+                  {/* Mobile Row No. & Avatar */}
+                  <div className="hidden md:block col-span-1 text-center text-xs font-bold text-slate-400">{rowNum}</div>
+                  
+                  {/* Avatar & Name */}
+                  <div className="w-full md:col-span-4 flex items-center gap-3">
                     {s.foto_url ? (
-                      <img
-                        src={s.foto_url}
-                        alt={s.nama_lengkap}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 flex-shrink-0"
-                      />
+                      <img src={s.foto_url} alt={s.nama_lengkap} className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600 group-hover:bg-white group-hover:text-emerald-600 border flex-shrink-0">
-                        {String(s.nama_lengkap || '?').split(' ').slice(0, 2).map((part: string) => part[0]).join('')}
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-500 border flex-shrink-0">
+                        {String(s.nama_lengkap || '?').split(' ').slice(0, 2).map((p: string) => p[0]).join('')}
                       </div>
                     )}
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-800 leading-snug line-clamp-2">{s.nama_lengkap}</p>
-                      <div className="flex gap-2 text-xs text-slate-400 items-center">
-                        <span>{isSadesaMode ? 'Unit SADESA' : `Kamar ${s.kamar || '-'}`}</span>
-                        {s.jumlah_tunggakan > 0 && <span className="text-red-500 font-bold bg-red-50 px-1 rounded">-{s.jumlah_tunggakan} Bln</span>}
-                        {isNoBill && <span className="text-blue-600 font-bold bg-blue-50 px-1 rounded">{s.bebas_spp ? 'Bebas SPP' : 'Tidak ada tagihan'}</span>}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-800 leading-snug truncate">{s.nama_lengkap}</p>
+                      {/* Mobile extra info */}
+                      <div className="md:hidden flex gap-2 text-xs mt-1 items-center">
+                        <span className="text-slate-500 bg-slate-100 px-1.5 rounded">{isSadesaMode ? 'SADESA' : `Km ${s.kamar || '-'}`}</span>
+                        <span className="text-slate-500">{s.kelas_sekolah || '-'} · {s.kelas_pesantren || '-'}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    {isCurrentYear && !isPaid && !isNoBill ? (
-                      <button onClick={(e) => toggleDraft(e, s)}
-                        className={`w-32 h-10 px-3 rounded-lg text-xs font-bold border inline-flex items-center justify-center gap-1 transition-all ${
-                          isDraft ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 hover:border-emerald-500 hover:text-emerald-600'
-                        }`}>
-                        {isDraft ? <><CheckCircle className="w-3 h-3"/> Siap Bayar</> : <><PlusCircle className="w-3 h-3"/> Bayar {BULAN_LIST[currentMonthIdx - 1]}</>}
-                      </button>
+
+                  {/* Desktop Kamar & Kelas */}
+                  <div className="hidden md:flex col-span-2 flex-col items-center justify-center text-xs text-slate-500 text-center">
+                    <span className="font-bold text-slate-700">{isSadesaMode ? 'SADESA' : `Km ${s.kamar || '-'}`}</span>
+                    <span className="opacity-70">{s.kelas_sekolah || '-'} · {s.kelas_pesantren || '-'}</span>
+                  </div>
+
+                  {/* Status Bulan Ini */}
+                  <div className="md:col-span-2 w-full md:w-auto flex md:justify-center items-center mt-2 md:mt-0">
+                    <span className="md:hidden text-xs text-slate-400 w-24">Bulan ini:</span>
+                    {isPaid ? (
+                      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-md text-xs font-bold border border-green-100"><CheckCircle className="w-3 h-3"/> Lunas</span>
                     ) : isNoBill ? (
-                      <span className="w-32 h-10 text-xs font-bold text-blue-700 inline-flex items-center justify-center gap-1 bg-blue-50 px-2 rounded-lg border border-blue-100">
-                        <CalendarX className="w-3 h-3"/> Tidak Ada
-                      </span>
+                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold border border-blue-100"><CalendarX className="w-3 h-3"/> {s.bebas_spp ? 'Bebas SPP' : 'Tdk Ada'}</span>
                     ) : (
-                      <span className="w-32 h-10 text-xs font-bold text-green-600 inline-flex items-center justify-center gap-1 bg-green-50 px-2 rounded-lg border border-green-100">
-                        <CheckCircle className="w-3 h-3"/> Lunas
-                      </span>
+                      <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2 py-1 rounded-md text-xs font-bold border border-slate-200">Belum Bayar</span>
+                    )}
+                  </div>
+
+                  {/* Tunggakan */}
+                  <div className="md:col-span-1 w-full md:w-auto flex md:justify-center items-center mt-1 md:mt-0">
+                    <span className="md:hidden text-xs text-slate-400 w-24">Tunggakan:</span>
+                    {s.jumlah_tunggakan > 0 ? (
+                      <span className="inline-flex items-center bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-100">{s.jumlah_tunggakan} Bln</span>
+                    ) : s.bebas_spp ? (
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                    ) : (
+                      <span className="inline-flex items-center bg-green-50 text-green-600 px-2 py-1 rounded-md text-xs font-bold border border-green-100">0</span>
+                    )}
+                  </div>
+
+                  {/* Aksi / Quick Pay */}
+                  <div className="md:col-span-2 w-full md:w-auto flex justify-end md:justify-end mt-3 md:mt-0 border-t md:border-0 pt-2 md:pt-0 border-slate-100">
+                    {canQuickPay && (
+                      <button 
+                        onClick={(e) => handleQuickPay(e, s)}
+                        disabled={payingSantriId === s.id}
+                        className="w-full md:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center justify-center gap-1 disabled:opacity-70"
+                      >
+                        {payingSantriId === s.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <CreditCard className="w-3 h-3"/>}
+                        Bayar {BULAN_LIST[currentMonthIdx - 1]}
+                      </button>
                     )}
                   </div>
                 </div>
               )
             })}
           </div>
+
+          {/* Pagination Footer */}
+          {filteredSantri.length > 0 && (
+            <div className="bg-slate-50 border-t px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-sm text-slate-600">
+                <span>Tampilkan:</span>
+                <select 
+                  value={pageSize} 
+                  onChange={e => { setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPage(1); }}
+                  className="bg-white border rounded px-2 py-1 outline-none focus:border-indigo-400"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value="all">Semua</option>
+                </select>
+                <span>dari {filteredSantri.length} santri</span>
+              </div>
+              
+              {pageSize !== 'all' && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronLeft className="w-5 h-5"/></button>
+                  <div className="flex items-center">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Simple logic to show window of 5 pages
+                      let p = page <= 3 ? i + 1 : page >= totalPages - 2 ? totalPages - 4 + i : page - 2 + i
+                      if (p < 1) p = 1
+                      if (p > totalPages) p = totalPages
+                      return (
+                        <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-md text-sm font-bold mx-0.5 ${page === p ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 text-slate-700'}`}>
+                          {p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronRight className="w-5 h-5"/></button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* FLOATING SAVE */}
-      {totalDraft > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50 animate-in slide-in-from-bottom-4">
-          <div className="space-y-2">
-          <button onClick={handleSimpanBatch} disabled={isSavingBatch}
-            className="w-full bg-slate-900 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-black transition-transform active:scale-95 disabled:opacity-70">
-            <div className="text-left">
-              <p className="text-xs text-slate-400">{totalDraft} Santri Dipilih</p>
-              <p className="text-xl font-bold text-emerald-400">Total: Rp {totalNominalDraft.toLocaleString('id-ID')}</p>
+      {/* FILTER MODAL */}
+      {filterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Filter className="w-5 h-5 text-indigo-600"/> Filter Santri</h3>
+              <button onClick={() => setFilterModalOpen(false)} className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 rounded-full transition-colors"><X className="w-5 h-5"/></button>
             </div>
-            <div className="flex items-center gap-2 font-bold bg-white/10 px-4 py-2 rounded-lg">
-              {isSavingBatch ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-              {isSavingBatch ? 'Menyimpan...' : 'SIMPAN'}
+            
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">Status Pembayaran</label>
+                <select 
+                  value={filters.statusPembayaran} 
+                  onChange={e => setFilters(f => ({ ...f, statusPembayaran: e.target.value }))}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                >
+                  <option value="SEMUA">Semua Status</option>
+                  <option value="LUNAS">Lunas Bulan {BULAN_LIST[currentMonthIdx - 1]}</option>
+                  <option value="NUNGGAK">Menunggak</option>
+                  <option value="AMAN">Aman (Tidak Menunggak)</option>
+                  <option value="BEBAS_SPP">Bebas SPP</option>
+                  <option value="TIDAK_ADA_TAGIHAN">Tidak Ada Tagihan (Waived)</option>
+                </select>
+              </div>
+
+              {!isSadesaMode && filterOptions.kamars?.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Kamar</label>
+                  <select value={filters.kamar} onChange={e => setFilters(f => ({ ...f, kamar: e.target.value }))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                    <option value="">Semua Kamar</option>
+                    {filterOptions.kamars.map((k: string) => <option key={k} value={k}>Kamar {k}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {filterOptions.sekolahs?.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Sekolah</label>
+                  <select value={filters.sekolah} onChange={e => setFilters(f => ({ ...f, sekolah: e.target.value }))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                    <option value="">Semua Sekolah</option>
+                    {filterOptions.sekolahs.map((k: string) => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {filterOptions.kelasSekolahs?.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">Kelas Sekolah</label>
+                    <select value={filters.kelasSekolah} onChange={e => setFilters(f => ({ ...f, kelasSekolah: e.target.value }))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                      <option value="">Semua</option>
+                      {filterOptions.kelasSekolahs.map((k: string) => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                )}
+                {filterOptions.kelasPesantrens?.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">Kelas Pesantren</label>
+                    <select value={filters.kelasPesantren} onChange={e => setFilters(f => ({ ...f, kelasPesantren: e.target.value }))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                      <option value="">Semua</option>
+                      {filterOptions.kelasPesantrens.map((k: string) => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
-          </button>
-          {scope?.canAdjustBilling && (
-            <button onClick={openBatchWaiveModal}
-              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-lg hover:bg-blue-50 inline-flex items-center justify-center gap-2">
-              <CalendarX className="w-4 h-4"/> Set Tidak Ada Tagihan
-            </button>
-          )}
+
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+              <button 
+                onClick={() => { setFilters({ kamar: '', statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' }); setPage(1); }}
+                className="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+              >
+                Reset Filter
+              </button>
+              <button 
+                onClick={() => { setFilterModalOpen(false); setPage(1); }}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all"
+              >
+                Terapkan
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* KELAS WAIVE MODAL */}
       {kelasWaiveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
@@ -789,7 +905,6 @@ export default function SPPPage() {
           </div>
         </div>
       )}
-      {waiveModal}
     </div>
   )
 
@@ -962,6 +1077,7 @@ export default function SPPPage() {
         </div>
       )}
 
+      {/* HISTORIS MODAL */}
       {historisModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
@@ -1020,7 +1136,58 @@ export default function SPPPage() {
         </div>
       )}
 
-      {waiveModal}
+      {/* SINGLE WAIVE MODAL */}
+      {waiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-slate-100 p-5">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Set Tidak Ada Tagihan</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedSantri?.nama_lengkap || 'Santri'} - {waiveTargetMonth ? BULAN_LIST[waiveTargetMonth - 1] : ''} {tahun}
+                </p>
+              </div>
+              <button onClick={() => setWaiveModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"><X className="w-4 h-4"/></button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-2 block text-xs font-bold text-slate-500">Bulan</label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {BULAN_LIST.map((bulanNama, idx) => {
+                    const month = idx + 1
+                    const disabled = month !== waiveTargetMonth
+                    const selected = waiveMonths.includes(month)
+                    return (
+                      <button key={month} type="button" onClick={() => !disabled && toggleWaiveMonth(month)} disabled={disabled}
+                        className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                          selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                        }`}>
+                        {bulanNama}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">Alasan</label>
+                <textarea value={waiveReason} onChange={e => setWaiveReason(e.target.value)} rows={3}
+                  placeholder="Contoh: Pulang libur kenaikan kelas / tidak berada di pesantren."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Status ini tidak dicatat sebagai pembayaran dan bulan terkait tidak dihitung sebagai tunggakan.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 p-5">
+              <button onClick={() => setWaiveModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Batal</button>
+              <button onClick={handleSimpanWaive} disabled={savingWaive} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60 hover:bg-blue-800">
+                {savingWaive ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarX className="w-4 h-4"/>}
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
