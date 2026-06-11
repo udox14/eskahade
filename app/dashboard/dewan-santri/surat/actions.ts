@@ -114,3 +114,13 @@ export async function hapusRiwayatSurat(id: string): Promise<{ success: boolean 
   revalidatePath('/dashboard/dewan-santri/surat')
   return { success: true }
 }
+
+export async function getSantriById(id: string) {
+  const rows = await query<SantriSuratRow>(`
+    SELECT id, nama_lengkap, nis, asrama, kamar, tempat_lahir, tanggal_lahir,
+           jenis_kelamin, alamat, nama_ayah, sekolah, kelas_sekolah
+    FROM santri
+    WHERE id = ? LIMIT 1
+  `, [id])
+  return rows[0] ?? null
+}

@@ -3,7 +3,8 @@
 import React from 'react'
 
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapusRiwayatSurat } from './actions'
+import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapusRiwayatSurat, getSantriById } from './actions'
+import { useSearchParams } from 'next/navigation'
 import { SuratView } from './surat-view'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, Search, FileText, ArrowLeft, Loader2, History, Trash2 } from 'lucide-react'
@@ -62,9 +63,33 @@ type RiwayatSurat = {
 
 export default function LayananSuratPage() {
   const confirm = useConfirm()
+  const searchParams = useSearchParams()
   // State Navigasi Generator
   const [step, setStep] = useState(1) 
   const [jenisSurat, setJenisSurat] = useState<JenisSurat | null>(null)
+
+  useEffect(() => {
+    const action = searchParams.get('action')
+    const sId = searchParams.get('santriId')
+    if (action === 'tagihan' && sId) {
+      setJenisSurat('TAGIHAN')
+      setLoading(true)
+      getSantriById(sId).then(async (s) => {
+        if (s) {
+          setSelectedSantri(s)
+          const tunggakan = await cekTunggakanSantri(s.id)
+          setDataTunggakan(tunggakan)
+          setStep(4)
+        } else {
+          toast.error("Santri tidak ditemukan")
+        }
+        setLoading(false)
+      }).catch(err => {
+        toast.error(err?.message || "Gagal memuat data santri")
+        setLoading(false)
+      })
+    }
+  }, [searchParams])
   
   // State Data Generator
   const [search, setSearch] = useState('')

@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta } from './actions'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, Eye, X, Check, Search, Save
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -52,6 +52,34 @@ export default function MonitoringSetoranPage() {
   const [billingStartInput, setBillingStartInput] = useState('2026-06')
   const [savingBillingStart, setSavingBillingStart] = useState(false)
   const [tahunAjaranNama, setTahunAjaranNama] = useState<string | null>(null)
+
+  // TABS & PENUNGGAK STATE
+  const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak'>('setoran')
+  const [penunggakList, setPenunggakList] = useState<any[]>([])
+  const [selectedAsramaPenunggak, setSelectedAsramaPenunggak] = useState<string>('')
+  const [loadingPenunggak, setLoadingPenunggak] = useState(false)
+  const [searchPenunggak, setSearchPenunggak] = useState('')
+
+  useEffect(() => {
+    if (activeTab === 'penunggak' && selectedAsramaPenunggak) {
+      setLoadingPenunggak(true)
+      getDaftarPenunggak(tahun, bulan, selectedAsramaPenunggak).then(res => {
+        setPenunggakList(res)
+        setLoadingPenunggak(false)
+      }).catch(err => {
+        toast.error(err?.message || "Gagal memuat daftar penunggak")
+        setLoadingPenunggak(false)
+      })
+    } else {
+      setPenunggakList([])
+    }
+  }, [activeTab, selectedAsramaPenunggak, tahun, bulan])
+
+  const filteredPenunggak = React.useMemo(() => {
+    if (!searchPenunggak.trim()) return penunggakList
+    const queryStr = searchPenunggak.toLowerCase()
+    return penunggakList.filter(p => p.nama_lengkap.toLowerCase().includes(queryStr))
+  }, [penunggakList, searchPenunggak])
   
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -215,113 +243,237 @@ export default function MonitoringSetoranPage() {
         </div>
       </div>
 
-      {hasLoaded && <MonitoringPrintControls hasLoaded={hasLoaded} data={data} bulan={bulan} tahun={tahun} nominal={nominal} tahunAjaran={tahunAjaranDisplay} />}
-
-      {selectedBeforeBillingStart && hasLoaded && (
-        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Periode {BULAN_NAMA[bulan]} {tahun} berstatus <span className="font-bold">BELUM ADA TAGIHAN</span>. Awal tagihan aktif dimulai {BULAN_NAMA[billingStart.bulan]} {billingStart.tahun}.
-        </div>
-      )}
-
-      {/* ── Ringkasan Total - Sleek Version ── */}
-      {!userAsrama && hasLoaded && data.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-          <StatCard title="Total Santri" value={fmt(totalSantri)} icon={Users} />
-          <StatCard title="Tidak Ada Tagihan" value={fmt(totalTidakAdaTagihan)} icon={CalendarCheck} color="text-blue-600" />
-          <StatCard title="Wajib SPP" value={fmt(totalWajib)} icon={UserCheck} />
-          <StatCard title="Telah Lunas" value={fmt(totalBayar)} sub={`${pctKeseluruhan}%`} icon={CheckCircle2} color="text-emerald-600" />
-          <StatCard title="Penunggak" value={fmt(totalTunggak)} icon={AlertCircle} color="text-rose-600" />
-          <div className="col-span-2 md:col-span-1 border border-indigo-100 bg-indigo-50/50 rounded-xl p-3 flex flex-col justify-center relative overflow-hidden">
-             <div className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest mb-1">Uang Tercatat</div>
-             <div className="text-xl font-bold text-indigo-900 leading-none">{fmtRp(totalNominal)}</div>
-             <div className="text-[10px] text-slate-500 mt-1">Bulan ini {fmtRp(totalNominalBulanIni)} + tunggakan {fmtRp(totalNominalTunggakan)}</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tabel Utama ── */}
-      <div className="bg-white border md:rounded-2xl shadow-sm rounded-xl overflow-hidden min-h-[40vh]">
-        {loading ? (
-          <div className="flex justify-center flex-col items-center py-24 text-slate-400">
-            <RefreshCw className="w-6 h-6 animate-spin mb-3 text-blue-500" />
-            <span className="text-sm font-medium">Sinkronisasi data...</span>
-          </div>
-        ) : !hasLoaded ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center text-slate-400">
-             <Search className="w-10 h-10 mb-3 opacity-50"/>
-             <p className="text-sm font-medium">Tidak ada data aktif. Klik Tarik Data.</p>
-          </div>
-        ) : data.length === 0 ? (
-          <div className="py-24 text-center text-sm font-medium text-slate-400">Tidak ditemukan data.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-5 font-medium">Unit Setor & Populasi</th>
-                  <th className="py-3 px-5 font-medium">Progres Pembayaran</th>
-                  <th className="py-3 px-5 font-medium text-right">Uang Tercatat</th>
-                  <th className="py-3 px-5 font-medium text-center">Rekap Fiskal</th>
-                  <th className="py-3 px-5 w-12"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.map((row) => (
-                  <tr key={row.unit_setor} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="py-3 px-5">
-                      <p className="font-semibold text-slate-800">{row.unit_setor}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{fmt(row.total_santri)} Santri ({fmt(row.wajib_bayar)} Wajib)</p>
-                      {row.tidak_ada_tagihan > 0 && <p className="text-[10px] font-semibold text-blue-600 mt-0.5">{fmt(row.tidak_ada_tagihan)} Tidak Ada Tagihan</p>}
-                    </td>
-                    <td className="py-3 px-5 w-48 lg:w-64">
-                      {row.belum_ada_tagihan ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                          <CalendarCheck className="w-3.5 h-3.5"/> Belum Ada Tagihan
-                        </span>
-                      ) : (
-                        <>
-                          <div className="flex justify-between items-center text-[11px] font-medium mb-1.5">
-                            <span className="text-slate-500">{fmt(row.bayar_bulan_ini)} Lunas</span>
-                            <span className={row.persentase >= 80 ? 'text-emerald-600' : row.persentase >= 50 ? 'text-yellow-600' : 'text-rose-600'}>{row.persentase}%</span>
-                          </div>
-                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full transition-all duration-700 ${row.persentase >= 80 ? 'bg-emerald-500' : row.persentase >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} style={{ width: `${row.persentase}%`}}></div>
-                          </div>
-                        </>
-                      )}
-                    </td>
-                    <td className="py-3 px-5 text-right">
-                      <p className="font-semibold text-slate-900">{row.belum_ada_tagihan ? '-' : fmtRp(row.total_nominal)}</p>
-                      {!row.belum_ada_tagihan && row.nominal_tunggakan_lalu > 0 && (
-                        <p className="text-[10px] font-medium text-slate-500 mt-0.5">
-                          {fmtRp(row.nominal_bulan_ini)} bulan ini + {fmtRp(row.nominal_tunggakan_lalu)} tunggakan
-                        </p>
-                      )}
-                      {row.penunggak > 0 && <p className="text-[10px] font-medium text-rose-500 mt-0.5">-{fmt(row.penunggak)} Orang Nunggak</p>}
-                    </td>
-                    <td className="py-3 px-5 text-center">
-                      {row.belum_ada_tagihan ? (
-                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md inline-block">Tidak Ditagihkan</span>
-                      ) : row.tanggal_setor ? (
-                        <div className="inline-flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50">
-                          <CheckCircle2 className="w-3.5 h-3.5"/> Disetor {format(new Date(row.tanggal_setor), 'dd/MM')}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md inline-block">Belum Laporan</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-5 text-right">
-                      <button onClick={() => openDetailModal(row)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
-                        <Eye className="w-4 h-4"/>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* Tabs Menu */}
+      <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1 mb-6">
+        <button onClick={() => setActiveTab('setoran')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'setoran' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Setoran Unit</button>
+        <button onClick={() => setActiveTab('penunggak')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'penunggak' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daftar Penunggak</button>
       </div>
+
+      {activeTab === 'setoran' && (
+        <>
+          {hasLoaded && <MonitoringPrintControls hasLoaded={hasLoaded} data={data} bulan={bulan} tahun={tahun} nominal={nominal} tahunAjaran={tahunAjaranDisplay} />}
+
+          {selectedBeforeBillingStart && hasLoaded && (
+            <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Periode {BULAN_NAMA[bulan]} {tahun} berstatus <span className="font-bold">BELUM ADA TAGIHAN</span>. Awal tagihan aktif dimulai {BULAN_NAMA[billingStart.bulan]} {billingStart.tahun}.
+            </div>
+          )}
+
+          {/* ── Ringkasan Total - Sleek Version ── */}
+          {!userAsrama && hasLoaded && data.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+              <StatCard title="Total Santri" value={fmt(totalSantri)} icon={Users} />
+              <StatCard title="Tidak Ada Tagihan" value={fmt(totalTidakAdaTagihan)} icon={CalendarCheck} color="text-blue-600" />
+              <StatCard title="Wajib SPP" value={fmt(totalWajib)} icon={UserCheck} />
+              <StatCard title="Telah Lunas" value={fmt(totalBayar)} sub={`${pctKeseluruhan}%`} icon={CheckCircle2} color="text-emerald-600" />
+              <StatCard title="Penunggak" value={fmt(totalTunggak)} icon={AlertCircle} color="text-rose-600" />
+              <div className="col-span-2 md:col-span-1 border border-indigo-100 bg-indigo-50/50 rounded-xl p-3 flex flex-col justify-center relative overflow-hidden">
+                 <div className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest mb-1">Uang Tercatat</div>
+                 <div className="text-xl font-bold text-indigo-900 leading-none">{fmtRp(totalNominal)}</div>
+                 <div className="text-[10px] text-slate-500 mt-1">Bulan ini {fmtRp(totalNominalBulanIni)} + tunggakan {fmtRp(totalNominalTunggakan)}</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Tabel Utama ── */}
+          <div className="bg-white border md:rounded-2xl shadow-sm rounded-xl overflow-hidden min-h-[40vh]">
+            {loading ? (
+              <div className="flex justify-center flex-col items-center py-24 text-slate-400">
+                <RefreshCw className="w-6 h-6 animate-spin mb-3 text-blue-500" />
+                <span className="text-sm font-medium">Sinkronisasi data...</span>
+              </div>
+            ) : !hasLoaded ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center text-slate-400">
+                 <Search className="w-10 h-10 mb-3 opacity-50"/>
+                 <p className="text-sm font-medium">Tidak ada data aktif. Klik Tarik Data.</p>
+              </div>
+            ) : data.length === 0 ? (
+              <div className="py-24 text-center text-sm font-medium text-slate-400">Tidak ditemukan data.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-5 font-medium">Unit Setor & Populasi</th>
+                      <th className="py-3 px-5 font-medium">Progres Pembayaran</th>
+                      <th className="py-3 px-5 font-medium text-right">Uang Tercatat</th>
+                      <th className="py-3 px-5 font-medium text-center">Rekap Fiskal</th>
+                      <th className="py-3 px-5 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {data.map((row) => (
+                      <tr key={row.unit_setor} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="py-3 px-5">
+                          <p className="font-semibold text-slate-800">{row.unit_setor}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{fmt(row.total_santri)} Santri ({fmt(row.wajib_bayar)} Wajib)</p>
+                          {row.tidak_ada_tagihan > 0 && <p className="text-[10px] font-semibold text-blue-600 mt-0.5">{fmt(row.tidak_ada_tagihan)} Tidak Ada Tagihan</p>}
+                        </td>
+                        <td className="py-3 px-5 w-48 lg:w-64">
+                          {row.belum_ada_tagihan ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                              <CalendarCheck className="w-3.5 h-3.5"/> Belum Ada Tagihan
+                            </span>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-center text-[11px] font-medium mb-1.5">
+                                <span className="text-slate-500">{fmt(row.bayar_bulan_ini)} Lunas</span>
+                                <span className={row.persentase >= 80 ? 'text-emerald-600' : row.persentase >= 50 ? 'text-yellow-600' : 'text-rose-600'}>{row.persentase}%</span>
+                              </div>
+                              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className={`h-full transition-all duration-700 ${row.persentase >= 80 ? 'bg-emerald-500' : row.persentase >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} style={{ width: `${row.persentase}%`}}></div>
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="py-3 px-5 text-right">
+                          <p className="font-semibold text-slate-900">{row.belum_ada_tagihan ? '-' : fmtRp(row.total_nominal)}</p>
+                          {!row.belum_ada_tagihan && row.nominal_tunggakan_lalu > 0 && (
+                            <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                              {fmtRp(row.nominal_bulan_ini)} bulan ini + {fmtRp(row.nominal_tunggakan_lalu)} tunggakan
+                            </p>
+                          )}
+                          {row.penunggak > 0 && <p className="text-[10px] font-medium text-rose-500 mt-0.5">-{fmt(row.penunggak)} Orang Nunggak</p>}
+                        </td>
+                        <td className="py-3 px-5 text-center">
+                          {row.belum_ada_tagihan ? (
+                            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md inline-block">Tidak Ditagihkan</span>
+                          ) : row.tanggal_setor ? (
+                            <div className="inline-flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50">
+                              <CheckCircle2 className="w-3.5 h-3.5"/> Disetor {format(new Date(row.tanggal_setor), 'dd/MM')}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md inline-block">Belum Laporan</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-5 text-right">
+                          <button onClick={() => openDetailModal(row)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+                            <Eye className="w-4 h-4"/>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'penunggak' && (
+        <div className="space-y-6">
+          {/* Filter Bar */}
+          <div className="bg-white border rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
+              <div className="flex flex-col">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Unit / Asrama</label>
+                <select
+                  value={selectedAsramaPenunggak}
+                  onChange={e => { setSelectedAsramaPenunggak(e.target.value); setSearchPenunggak(''); }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Pilih Asrama --</option>
+                  {data.map(r => (
+                    <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                  ))}
+                  <option value="SEMUA">Semua Asrama</option>
+                </select>
+              </div>
+
+              {selectedAsramaPenunggak && (
+                <div className="flex flex-col flex-1 sm:flex-none">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cari Nama</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Cari santri..."
+                      value={searchPenunggak}
+                      onChange={e => setSearchPenunggak(e.target.value)}
+                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedAsramaPenunggak && (
+              <div className="text-right w-full md:w-auto text-xs text-slate-500">
+                Menampilkan <span className="font-bold text-slate-700">{filteredPenunggak.length}</span> penunggak
+              </div>
+            )}
+          </div>
+
+          {/* Table / List */}
+          {!selectedAsramaPenunggak ? (
+            <div className="bg-white border rounded-2xl p-12 text-center text-slate-400 shadow-sm">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-30 text-blue-500" />
+              <h3 className="text-base font-bold text-slate-600">Pilih Asrama Terlebih Dahulu</h3>
+              <p className="text-sm mt-1 max-w-md mx-auto">Silakan tentukan unit atau asrama dari menu dropdown di atas untuk memuat daftar santri yang menunggak pembayaran SPP.</p>
+            </div>
+          ) : loadingPenunggak ? (
+            <div className="bg-white border rounded-2xl py-20 text-center text-slate-400 shadow-sm">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-blue-500" />
+              <p className="text-sm font-semibold">Memuat daftar penunggak...</p>
+            </div>
+          ) : filteredPenunggak.length === 0 ? (
+            <div className="bg-white border rounded-2xl p-12 text-center text-slate-400 shadow-sm">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-500 opacity-80" />
+              <h3 className="text-base font-bold text-slate-600">Lunas SPP</h3>
+              <p className="text-sm mt-1">Luar biasa! Tidak ada santri yang memiliki tunggakan SPP pada filter asrama ini.</p>
+            </div>
+          ) : (
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-5 text-center w-12">#</th>
+                      <th className="py-3 px-5">Nama Santri</th>
+                      <th className="py-3 px-5">Asrama / Kamar</th>
+                      <th className="py-3 px-5 text-center">Tunggakan (Bulan)</th>
+                      <th className="py-3 px-5 text-right">Total Tunggakan</th>
+                      <th className="py-3 px-5 text-right pr-6 w-40">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredPenunggak.map((p, idx) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3.5 px-5 text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="py-3.5 px-5 font-bold text-slate-800">{p.nama_lengkap}</td>
+                        <td className="py-3.5 px-5">
+                          <p className="font-semibold text-slate-700">{p.asrama || 'Tidak ada'}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">Kamar: {p.kamar || '-'}</p>
+                        </td>
+                        <td className="py-3.5 px-5 text-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                            {p.total_tunggakan_bulan} Bulan
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-950">
+                          {fmtRp(p.total_tunggakan_nominal)}
+                        </td>
+                        <td className="py-3.5 px-5 text-right pr-6">
+                          <a
+                            href={`/dashboard/dewan-santri/surat?action=tagihan&santriId=${p.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-orange-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Cetak Surat
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Modal Detail Kompak ── */}
       {isModalOpen && activeRow && (

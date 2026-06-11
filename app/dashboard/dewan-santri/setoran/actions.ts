@@ -330,3 +330,129 @@ export async function simpanSetoran(
     return { error: error?.message || 'Gagal menyimpan setoran.' }
   }
 }
+
+export async function getDaftarPenunggak(tahun: number, bulan: number, unitSetor?: string) {
+  const session = await getSession()
+  assertMonitoringAccess(session)
+
+  const settings = await getSppSettings(tahun)
+  const nominal = settings.nominal
+
+  const rows = await query<{
+    id: string
+    nama_lengkap: string
+    nis: string | null
+    asrama: string | null
+    kamar: string | null
+    bebas_spp: number
+    kategori_santri: string | null
+    unit_setor: string
+    tunggakan_historis_bulan: number
+    tunggakan_berjalan_bulan: number
+    total_tunggakan_bulan: number
+    total_tunggakan_nominal: number
+  }>(`
+    WITH
+      billing_start AS (
+        SELECT COALESCE(value, '2026-06') AS val FROM app_settings WHERE key = 'spp_tagihan_mulai' LIMIT 1
+      ),
+      consts AS (
+        SELECT
+          CAST(SUBSTR(val, 1, 4) AS INTEGER) AS start_yr,
+          CAST(SUBSTR(val, 6, 2) AS INTEGER) AS start_mo,
+          ? AS cur_yr,
+          ? AS cur_mo
+        FROM billing_start
+      ),
+      billable_calc AS (
+        SELECT
+          start_yr,
+          start_mo,
+          cur_yr,
+          cur_mo,
+          CASE
+            WHEN (cur_yr * 100 + cur_mo) < (start_yr * 100 + start_mo) THEN 0
+            ELSE (cur_yr - start_yr) * 12 + (cur_mo - start_mo) + 1
+          END AS billable_months
+        FROM consts
+      ),
+      bayar_range AS (
+        SELECT sl.santri_id, COUNT(*) AS jml_bayar
+        FROM spp_log sl
+        CROSS JOIN billable_calc bc
+        WHERE (sl.tahun * 100 + sl.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
+        GROUP BY sl.santri_id
+      ),
+      waive_range AS (
+        SELECT std.santri_id, COUNT(*) AS jml_waive
+        FROM spp_tagihan_ditiadakan std
+        CROSS JOIN billable_calc bc
+        WHERE std.is_active = 1
+          AND (std.tahun * 100 + std.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
+        GROUP BY std.santri_id
+      ),
+      historis_tunggakan AS (
+        SELECT santri_id, COUNT(*) AS jml_historis, SUM(nominal_tagihan) AS nominal_historis
+        FROM spp_tunggakan_historis
+        WHERE status = 'BELUM_LUNAS'
+        GROUP BY santri_id
+      ),
+      santri_bill AS (
+        SELECT
+          s.id,
+          s.nama_lengkap,
+          s.nis,
+          s.asrama,
+          s.kamar,
+          s.bebas_spp,
+          s.kategori_santri,
+          CASE
+            WHEN s.kategori_santri = ? THEN ?
+            ELSE COALESCE(s.asrama, 'LAINNYA')
+          END AS unit_setor,
+          COALESCE(br.jml_bayar, 0) AS jml_bayar,
+          COALESCE(wr.jml_waive, 0) AS jml_waive,
+          COALESCE(ht.jml_historis, 0) AS jml_historis,
+          COALESCE(ht.nominal_historis, 0) AS nominal_historis,
+          bc.billable_months
+        FROM santri s
+        CROSS JOIN billable_calc bc
+        LEFT JOIN bayar_range br ON br.santri_id = s.id
+        LEFT JOIN waive_range wr ON wr.santri_id = s.id
+        LEFT JOIN historis_tunggakan ht ON ht.santri_id = s.id
+        WHERE s.status_global = 'aktif'
+          AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      )
+    SELECT
+      id,
+      nama_lengkap,
+      nis,
+      asrama,
+      kamar,
+      bebas_spp,
+      kategori_santri,
+      unit_setor,
+      jml_historis AS tunggakan_historis_bulan,
+      CASE
+        WHEN bebas_spp = 1 THEN 0
+        ELSE MAX(0, billable_months - jml_bayar - jml_waive)
+      END AS tunggakan_berjalan_bulan,
+      jml_historis + CASE WHEN bebas_spp = 1 THEN 0 ELSE MAX(0, billable_months - jml_bayar - jml_waive) END AS total_tunggakan_bulan,
+      nominal_historis + (CASE WHEN bebas_spp = 1 THEN 0 ELSE MAX(0, billable_months - jml_bayar - jml_waive) END * ?) AS total_tunggakan_nominal
+    FROM santri_bill
+    WHERE (jml_historis + CASE WHEN bebas_spp = 1 THEN 0 ELSE MAX(0, billable_months - jml_bayar - jml_waive) END) > 0
+    ORDER BY nama_lengkap ASC
+  `, [
+    tahun,
+    bulan,
+    SADESA_CATEGORY,
+    SADESA_UNIT,
+    nominal,
+  ])
+
+  if (unitSetor && unitSetor !== 'SEMUA') {
+    return rows.filter(r => r.unit_setor === unitSetor)
+  }
+  return rows
+}
+
