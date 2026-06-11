@@ -120,12 +120,10 @@ export default function UangJajanPage() {
   const [kamarCache, setKamarCache] = useState<Record<string, SantriKamarRow[]>>({})
   const [searchText, setSearchText] = useState('')
 
-  const [draftJajan, setDraftJajan] = useState<Record<string, number>>({})
-  const [manualMode, setManualMode] = useState<Record<string, boolean>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [savingAutoSantri, setSavingAutoSantri] = useState<Record<string, boolean>>({})
-  const [customAutoSantri, setCustomAutoSantri] = useState<SantriKamarRow | null>(null)
-  const [customAutoNominal, setCustomAutoNominal] = useState('')
+  const [customNominalSantri, setCustomNominalSantri] = useState<SantriKamarRow | null>(null)
+  const [customNominalValue, setCustomNominalValue] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSantri, setSelectedSantri] = useState<SantriKamarRow | null>(null)
@@ -144,8 +142,6 @@ export default function UangJajanPage() {
   const [settingDays, setSettingDays] = useState<number[]>([1, 2, 3, 4, 5, 6])
   const [settingActive, setSettingActive] = useState(true)
 
-  const setDrafts = (val: SetStateAction<Record<string, number>>) => setDraftJajan(val)
-
   useEffect(() => {
     getClientRestriction().then(res => {
       if (res) { setUserAsrama(res); setAsrama(res) }
@@ -162,7 +158,6 @@ export default function UangJajanPage() {
       setSearchRows([])
       setKamarCache({})
       setKamarIdx(0)
-      setDrafts({})
     })
 
     getKamarsTabungan(asrama).then(res => {
@@ -254,71 +249,67 @@ export default function UangJajanPage() {
     })
   }
 
-  const handleSelectJajan = (santriId: string, nominal: number, saldo: number) => {
-    if (nominal > saldo) { toast.warning('Saldo uang jajan tidak cukup.'); return }
-    setDraftJajan(prev => {
-      if (prev[santriId] === nominal) { const n = { ...prev }; delete n[santriId]; return n }
-      return { ...prev, [santriId]: nominal }
-    })
+  const handleDirectJajanDeduction = async (santri: SantriKamarRow, nominal: number) => {
+    if (nominal > santri.saldo_jajan) {
+      toast.warning('Saldo uang jajan tidak cukup.')
+      return false
+    }
+    const labelNominal = fmtRp(nominal)
+    if (!await confirm(`Potong saldo jajan ${santri.nama_lengkap} sebesar ${labelNominal}?`)) return false
+
+    setIsSaving(true)
+    const toastId = toast.loading('Memproses transaksi...')
+    const res = await simpanTransaksiDompet(
+      santri.id,
+      'JAJAN',
+      'KELUAR',
+      nominal,
+      'Jajan Harian'
+    )
+    setIsSaving(false)
+    toast.dismiss(toastId)
+
+    const error = getActionError(res)
+    if (error) {
+      toast.error('Gagal', { description: error })
+      return false
+    } else {
+      toast.success('Berhasil', { description: `Saldo jajan ${santri.nama_lengkap} terpotong ${labelNominal}.` })
+      refreshAfterMutasi(santri.kamar ?? activeKamar)
+      return true
+    }
   }
 
   const handleSaveAutoNominal = async (santri: SantriKamarRow, nominal: number) => {
-    if (!nominal) { toast.warning('Nominal auto tidak valid'); return false }
+    if (!nominal) {
+      toast.warning('Nominal auto tidak valid')
+      return false
+    }
     setSavingAutoSantri(prev => ({ ...prev, [santri.id]: true }))
     const res = await saveSantriAutoNominal(santri.id, nominal, asrama)
     setSavingAutoSantri(prev => ({ ...prev, [santri.id]: false }))
     const error = getActionError(res)
-    if (error) { toast.error('Gagal', { description: error }); return false }
+    if (error) {
+      toast.error('Gagal', { description: error })
+      return false
+    }
     toast.success('Nominal auto tersimpan', { description: `${santri.nama_lengkap}: ${fmtRp(nominal)}` })
     refreshAfterMutasi(santri.kamar ?? activeKamar)
     return true
   }
 
-  const openCustomAutoModal = (santri: SantriKamarRow) => {
-    setCustomAutoSantri(santri)
-    setCustomAutoNominal(santri.auto_nominal ? String(santri.auto_nominal) : '')
-  }
-
-  const handleSaveCustomAutoNominal = async (e: FormEvent) => {
+  const handleSaveCustomNominal = async (e: FormEvent) => {
     e.preventDefault()
-    if (!customAutoSantri) return
-    const nominal = parseNominal(customAutoNominal)
-    if (!nominal) return toast.warning('Nominal auto tidak valid')
-    const ok = await handleSaveAutoNominal(customAutoSantri, nominal)
-    if (ok) setCustomAutoSantri(null)
-  }
+    if (!customNominalSantri) return
+    const nominal = parseNominal(customNominalValue)
+    if (!nominal) return toast.warning('Nominal tidak valid')
 
-  const handleManualInput = (santriId: string, value: string, saldo: number) => {
-    const val = parseInt(value) || 0
-    if (val > saldo) return
-    if (val > 0) setDraftJajan(prev => ({ ...prev, [santriId]: val }))
-    else setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
-  }
-
-  const toggleManualMode = (santriId: string) => {
-    setManualMode(prev => ({ ...prev, [santriId]: !prev[santriId] }))
-    setDraftJajan(prev => { const n = { ...prev }; delete n[santriId]; return n })
-  }
-
-  const handleSimpanJajan = async () => {
-    const list = (Object.entries(draftJajan) as [string, number][]).map(([id, nominal]) => ({ santriId: id, nominal }))
-    if (!list.length) return
-    const overLimit = list.filter(l => l.nominal > 20000)
-    const warn = overLimit.length ? `\n\n${overLimit.length} santri mengambil > 20.000.` : ''
-    if (!await confirm(`Simpan jajan untuk ${list.length} santri?\nTotal: ${fmtRp(list.reduce((a, b) => a + b.nominal, 0))}${warn}`)) return
-
-    setIsSaving(true)
-    const toastId = toast.loading('Memproses transaksi...')
-    const res = await simpanJajanMassal(list)
-    setIsSaving(false)
-    toast.dismiss(toastId)
-
-    const error = getActionError(res)
-    if (error) toast.error('Gagal', { description: error })
-    else {
-      toast.success('Berhasil', { description: 'Saldo uang jajan santri telah terpotong.' })
-      setDraftJajan({})
-      refreshAfterMutasi(activeKamar)
+    if (isAutoMode) {
+      const ok = await handleSaveAutoNominal(customNominalSantri, nominal)
+      if (ok) setCustomNominalSantri(null)
+    } else {
+      const ok = await handleDirectJajanDeduction(customNominalSantri, nominal)
+      if (ok) setCustomNominalSantri(null)
     }
   }
 
@@ -428,8 +419,6 @@ export default function UangJajanPage() {
       setSettingActive(Boolean(setting.is_active))
     }
   }
-
-  const totalJajanDraft = Object.values(draftJajan).reduce((a, b) => a + b, 0)
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-32">
@@ -541,13 +530,11 @@ export default function UangJajanPage() {
         <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="divide-y">
             {visibleSantri.map(s => {
-              const draftVal = draftJajan[s.id]
-              const finalSaldo = s.saldo_jajan - (draftVal || 0)
+              const finalSaldo = s.saldo_jajan
               const isLow = finalSaldo <= 5000
-              const isManual = manualMode[s.id]
 
               return (
-                <div key={s.id} className={`p-4 transition-colors ${draftVal ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
+                <div key={s.id} className="p-4 transition-colors hover:bg-slate-50">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                       <SantriPhotoAvatar
@@ -598,49 +585,33 @@ export default function UangJajanPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {isManual ? (
-                      <div className="flex flex-1 animate-in items-center gap-2 fade-in">
-                        <input type="number" placeholder="0"
-                          className="w-full rounded-xl border border-slate-200 px-2 py-1.5 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-500"
-                          autoFocus
-                          onChange={e => handleManualInput(s.id, e.target.value, s.saldo_jajan)}
-                        />
-                        <button onClick={() => toggleManualMode(s.id)} className="whitespace-nowrap text-xs text-slate-500 underline">Batal</button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
-                          {JAJAN_OPTS.map(opt => (
-                            <button key={opt} onClick={() => isAutoMode ? handleSaveAutoNominal(s, opt) : handleSelectJajan(s.id, opt, s.saldo_jajan)}
-                              disabled={savingAutoSantri[s.id] || (!isAutoMode && s.saldo_jajan < opt)}
-                              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
-                                (isAutoMode ? s.auto_nominal === opt : draftVal === opt)
-                                  ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
-                              }`}>
-                              {opt / 1000}k
-                            </button>
-                          ))}
-                          {isAutoMode && (
-                            <button
-                              onClick={() => openCustomAutoModal(s)}
-                              disabled={savingAutoSantri[s.id]}
-                              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
-                                s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal)
-                                  ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
-                              }`}
-                            >
-                              {s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal) ? fmtShortNominal(s.auto_nominal) : 'Custom'}
-                            </button>
-                          )}
-                        </div>
-                        <button onClick={() => toggleManualMode(s.id)}
-                          className="rounded-lg border border-dashed border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100">
-                          Manual
+                    <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
+                      {JAJAN_OPTS.map(opt => (
+                        <button key={opt} onClick={() => isAutoMode ? handleSaveAutoNominal(s, opt) : handleDirectJajanDeduction(s, opt)}
+                          disabled={savingAutoSantri[s.id] || (!isAutoMode && s.saldo_jajan < opt)}
+                          className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                            (isAutoMode ? s.auto_nominal === opt : false)
+                              ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
+                          }`}>
+                          {opt / 1000}k
                         </button>
-                      </>
-                    )}
+                      ))}
+                      <button
+                        onClick={() => {
+                          setCustomNominalSantri(s)
+                          setCustomNominalValue(isAutoMode && s.auto_nominal ? String(s.auto_nominal) : '')
+                        }}
+                        disabled={savingAutoSantri[s.id]}
+                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                          isAutoMode && s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal)
+                            ? 'scale-105 border-orange-600 bg-orange-600 text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-orange-400 disabled:bg-slate-50 disabled:opacity-30'
+                        }`}
+                      >
+                        {isAutoMode && s.auto_nominal && !JAJAN_OPTS.includes(s.auto_nominal) ? fmtShortNominal(s.auto_nominal) : 'Custom'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -649,32 +620,18 @@ export default function UangJajanPage() {
         </div>
       )}
 
-      {totalJajanDraft > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 animate-in px-4 slide-in-from-bottom-4">
-          <button onClick={handleSimpanJajan} disabled={isSaving}
-            className="flex w-full items-center justify-between rounded-xl bg-slate-900 px-6 py-4 text-white shadow-2xl transition-transform hover:bg-black active:scale-95">
-            <div className="text-left">
-              <p className="text-xs text-slate-400">Total Jajan Hari Ini</p>
-              <p className="text-xl font-bold text-orange-400">{fmtRp(totalJajanDraft)}</p>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 font-bold">
-              {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="h-5 w-5"/>}
-              {isSaving ? 'Menyimpan...' : 'Simpan'}
-            </div>
-          </button>
-        </div>
-      )}
-
-      {customAutoSantri && (
+      {customNominalSantri && (
         <div className="fixed inset-0 z-50 flex animate-in items-center justify-center bg-black/60 p-4 backdrop-blur-sm fade-in">
-          <form onSubmit={handleSaveCustomAutoNominal} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+          <form onSubmit={handleSaveCustomNominal} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-4">
-              <p className="text-sm font-bold text-slate-800">Nominal Auto</p>
-              <p className="mt-1 truncate text-xs text-slate-500">{customAutoSantri.nama_lengkap}</p>
+              <p className="text-sm font-bold text-slate-800">
+                {isAutoMode ? 'Nominal Auto' : 'Potong Saldo Jajan'}
+              </p>
+              <p className="mt-1 truncate text-xs text-slate-500">{customNominalSantri.nama_lengkap}</p>
             </div>
             <input
-              value={customAutoNominal}
-              onChange={e => setCustomAutoNominal(e.target.value)}
+              value={customNominalValue}
+              onChange={e => setCustomNominalValue(e.target.value)}
               inputMode="numeric"
               autoFocus
               placeholder="Nominal Rp..."
@@ -683,16 +640,16 @@ export default function UangJajanPage() {
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setCustomAutoSantri(null)}
+                onClick={() => setCustomNominalSantri(null)}
                 className="rounded-lg px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100"
               >
                 Batal
               </button>
               <button
-                disabled={savingAutoSantri[customAutoSantri.id] || !parseNominal(customAutoNominal)}
+                disabled={isSaving || !parseNominal(customNominalValue)}
                 className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-40"
               >
-                {savingAutoSantri[customAutoSantri.id] ? 'Menyimpan...' : 'Simpan'}
+                {isSaving ? 'Memproses...' : 'Simpan'}
               </button>
             </div>
           </form>
@@ -705,9 +662,9 @@ export default function UangJajanPage() {
             <div className="flex items-start justify-between gap-3 border-b bg-slate-50 p-5">
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
-                  <Settings className="h-5 w-5 text-emerald-700"/> Auto Potong Uang Jajan
+                  <Settings className="h-5 w-5 text-emerald-700"/> Atur Mode & Jadwal
                 </h3>
-                <p className="mt-1 text-sm text-slate-500">Atur cara pakai, jadwal, dan status auto untuk asrama ini.</p>
+                <p className="mt-1 text-sm text-slate-500">Atur cara pakai, jadwal, dan status pemotongan uang jajan.</p>
               </div>
               <button onClick={() => setIsAutoModalOpen(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold text-slate-500 hover:bg-white hover:text-slate-800">
                 Tutup
@@ -734,49 +691,41 @@ export default function UangJajanPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jam WIB</label>
-                    <input value={settingJam} onChange={e => setSettingJam(e.target.value)} type="time" className="w-full rounded-lg border px-2 py-2 text-sm"/>
-                  </div>
-                  <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">
-                    <input type="checkbox" checked={settingActive} onChange={e => setSettingActive(e.target.checked)} />
-                    Auto aktif
-                  </label>
-                </div>
+                {settingMode === 'AUTO' && (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jam WIB</label>
+                        <input value={settingJam} onChange={e => setSettingJam(e.target.value)} type="time" className="w-full rounded-lg border px-2 py-2 text-sm"/>
+                      </div>
+                      <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">
+                        <input type="checkbox" checked={settingActive} onChange={e => setSettingActive(e.target.checked)} />
+                        Auto aktif
+                      </label>
+                    </div>
 
-                <div>
-                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hari Aktif</label>
-                  <div className="flex flex-wrap gap-1">
-                    {DAY_OPTIONS.map(day => (
-                      <button key={day.value} type="button" onClick={() => toggleSettingDay(day.value)}
-                        className={`rounded-lg border px-2 py-1 text-xs font-bold ${settingDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
-                        {day.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div>
+                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hari Aktif</label>
+                      <div className="flex flex-wrap gap-1">
+                        {DAY_OPTIONS.map(day => (
+                          <button key={day.value} type="button" onClick={() => toggleSettingDay(day.value)}
+                            className={`rounded-lg border px-2 py-1 text-xs font-bold ${settingDays.includes(day.value) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 text-xs text-orange-800">
-                  Nominal AUTO diatur per santri dari tombol nominal atau input custom pada kartu santri.
+                  {settingMode === 'AUTO'
+                    ? 'Jadwal pemotongan otomatis uang jajan santri diatur di sini. Nominal potong diatur per santri dari tombol nominal/custom di kartu santri.'
+                    : 'Mode MANUAL aktif. Tidak ada pemotongan otomatis. Anda dapat memotong uang jajan santri langsung dari tombol nominal/custom di kartu santri.'}
                 </div>
 
                 <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Simpan Pengaturan</button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const res = await runAutoPotongNow()
-                    if ('error' in res) toast.error('Gagal', { description: res.error })
-                    else toast.success(`Diproses: ${res.result.deducted} santri`)
-                    refreshAfterMutasi(activeKamar)
-                  }}
-                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
-                >
-                  Proses Sekarang
-                </button>
               </form>
-
-                        
             </div>
           </div>
         </div>
