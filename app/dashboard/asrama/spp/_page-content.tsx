@@ -417,7 +417,7 @@ export default function SPPPage() {
 
   // ── VIEW: LIST ──────────────────────────────────────────────────────────
   if (view === 'LIST') return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-32">
+    <div className="space-y-6 w-full pb-32 md:px-3">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
@@ -477,11 +477,11 @@ export default function SPPPage() {
               </div>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-orange-800">{rekapStats.wajibBulanIni}</p>
-                <p className="text-xs text-orange-600 uppercase tracking-wide mt-1">Wajib Bln Ini</p>
+                <p className="text-xs text-orange-600 uppercase tracking-wide mt-1">Wajib Bulan Ini</p>
               </div>
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-red-800">{rekapStats.nunggakBulanIni}</p>
-                <p className="text-xs text-red-600 uppercase tracking-wide mt-1">Nunggak Bln Ini</p>
+                <p className="text-xs text-red-600 uppercase tracking-wide mt-1">Nunggak Bulan Ini</p>
               </div>
             </div>
 
@@ -604,7 +604,7 @@ export default function SPPPage() {
           <div className="hidden md:grid grid-cols-12 gap-4 bg-slate-50 px-4 py-3 border-b font-bold text-slate-500 text-xs uppercase tracking-wider items-center">
             <div className="col-span-1 text-center">#</div>
             <div className="col-span-4">Nama Santri</div>
-            <div className="col-span-2 text-center">Kamar / Kls</div>
+            <div className="col-span-2 text-center">Kamar / Kelas</div>
             <div className="col-span-2 text-center">Status {BULAN_LIST[currentMonthIdx - 1]}</div>
             <div className="col-span-1 text-center">Tunggakan</div>
             <div className="col-span-2 text-right">Aksi</div>
@@ -637,7 +637,7 @@ export default function SPPPage() {
                       <p className="font-bold text-slate-800 leading-snug truncate">{s.nama_lengkap}</p>
                       {/* Mobile extra info */}
                       <div className="md:hidden flex gap-2 text-xs mt-1 items-center">
-                        <span className="text-slate-500 bg-slate-100 px-1.5 rounded">{isSadesaMode ? 'SADESA' : `Km ${s.kamar || '-'}`}</span>
+                        <span className="text-slate-500 bg-slate-100 px-1.5 rounded">{isSadesaMode ? 'SADESA' : `Kamar ${s.kamar || '-'}`}</span>
                         <span className="text-slate-500">{s.kelas_sekolah || '-'} · {s.kelas_pesantren || '-'}</span>
                       </div>
                     </div>
@@ -645,7 +645,7 @@ export default function SPPPage() {
 
                   {/* Desktop Kamar & Kelas */}
                   <div className="hidden md:flex col-span-2 flex-col items-center justify-center text-xs text-slate-500 text-center">
-                    <span className="font-bold text-slate-700">{isSadesaMode ? 'SADESA' : `Km ${s.kamar || '-'}`}</span>
+                    <span className="font-bold text-slate-700">{isSadesaMode ? 'SADESA' : `Kamar ${s.kamar || '-'}`}</span>
                     <span className="opacity-70">{s.kelas_sekolah || '-'} · {s.kelas_pesantren || '-'}</span>
                   </div>
 
@@ -655,7 +655,7 @@ export default function SPPPage() {
                     {isPaid ? (
                       <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-md text-xs font-bold border border-green-100"><CheckCircle className="w-3 h-3"/> Lunas</span>
                     ) : isNoBill ? (
-                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold border border-blue-100"><CalendarX className="w-3 h-3"/> {s.bebas_spp ? 'Bebas SPP' : 'Tdk Ada'}</span>
+                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold border border-blue-100"><CalendarX className="w-3 h-3"/> {s.bebas_spp ? 'Bebas SPP' : 'Tidak Ada'}</span>
                     ) : (
                       <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2 py-1 rounded-md text-xs font-bold border border-slate-200">Belum Bayar</span>
                     )}
@@ -665,7 +665,7 @@ export default function SPPPage() {
                   <div className="md:col-span-1 w-full md:w-auto flex md:justify-center items-center mt-1 md:mt-0">
                     <span className="md:hidden text-xs text-slate-400 w-24">Tunggakan:</span>
                     {s.jumlah_tunggakan > 0 ? (
-                      <span className="inline-flex items-center bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-100">{s.jumlah_tunggakan} Bln</span>
+                      <span className="inline-flex items-center bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-100">{s.jumlah_tunggakan} Bulan</span>
                     ) : s.bebas_spp ? (
                       <span className="text-slate-400 font-bold text-xs">-</span>
                     ) : (
