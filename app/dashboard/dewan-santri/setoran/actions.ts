@@ -456,3 +456,185 @@ export async function getDaftarPenunggak(tahun: number, bulan: number, unitSetor
   return rows
 }
 
+export async function getDaftarBebasSpp(unitSetor?: string) {
+  const session = await getSession()
+  assertMonitoringAccess(session)
+
+  const rows = await query<{
+    id: string
+    nama_lengkap: string
+    nis: string | null
+    asrama: string | null
+    kamar: string | null
+    sekolah: string | null
+    kelas_sekolah: string | null
+    kelas_pesantren: string | null
+    unit_setor: string
+  }>(`
+    SELECT
+      s.id,
+      s.nama_lengkap,
+      s.nis,
+      s.asrama,
+      s.kamar,
+      COALESCE(s.sekolah, '-') AS sekolah,
+      COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
+      COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
+      CASE
+        WHEN s.kategori_santri = ? THEN ?
+        ELSE COALESCE(s.asrama, 'LAINNYA')
+      END AS unit_setor
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE s.status_global = 'aktif'
+      AND s.bebas_spp = 1
+      ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
+    ORDER BY s.nama_lengkap ASC
+  `, [SADESA_CATEGORY, SADESA_UNIT])
+
+  if (unitSetor && unitSetor !== 'SEMUA') {
+    return rows.filter(r => r.unit_setor === unitSetor)
+  }
+  return rows
+}
+
+export async function getPenunggakExportData(
+  targetTahun: number,
+  targetBulan: number,
+  selectedAsrama: string,
+  periodeFilter: 'BULAN_INI' | 'SEMUA_BULAN'
+) {
+  const session = await getSession()
+  assertMonitoringAccess(session)
+
+  const billingStart = await getSppBillingStart()
+  const targetYm = targetTahun * 100 + targetBulan
+
+  const rows = await query<any>(`
+    SELECT
+      s.id,
+      s.nama_lengkap,
+      s.asrama,
+      s.kamar,
+      COALESCE(s.sekolah, '-') AS sekolah,
+      COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
+      COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
+      s.bebas_spp,
+      s.kategori_santri,
+      CASE
+        WHEN s.kategori_santri = ? THEN ?
+        ELSE COALESCE(s.asrama, 'LAINNYA')
+      END AS unit_setor
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+  `, [SADESA_CATEGORY, SADESA_UNIT])
+
+  const filteredRows = selectedAsrama && selectedAsrama !== 'SEMUA'
+    ? rows.filter(r => r.unit_setor === selectedAsrama)
+    : rows
+
+  if (filteredRows.length === 0) return []
+
+  const ids = filteredRows.map(r => r.id)
+  const ph = ids.map(() => '?').join(',')
+
+  const payments = await query<any>(`
+    SELECT santri_id, tahun, bulan
+    FROM spp_log
+    WHERE (tahun * 100 + bulan) <= ?
+      AND santri_id IN (${ph})
+  `, [targetYm, ...ids])
+
+  const paymentsMap = new Map<string, Set<string>>()
+  payments.forEach(p => {
+    if (!paymentsMap.has(p.santri_id)) {
+      paymentsMap.set(p.santri_id, new Set())
+    }
+    paymentsMap.get(p.santri_id)!.add(`${p.tahun}-${p.bulan}`)
+  })
+
+  const waives = await query<any>(`
+    SELECT santri_id, tahun, bulan
+    FROM spp_tagihan_ditiadakan
+    WHERE is_active = 1
+      AND (tahun * 100 + bulan) <= ?
+      AND santri_id IN (${ph})
+  `, [targetYm, ...ids])
+
+  const waivesMap = new Map<string, Set<string>>()
+  waives.forEach(w => {
+    if (!waivesMap.has(w.santri_id)) {
+      waivesMap.set(w.santri_id, new Set())
+    }
+    waivesMap.get(w.santri_id)!.add(`${w.tahun}-${w.bulan}`)
+  })
+
+  const historis = await query<any>(`
+    SELECT santri_id, tahun, bulan
+    FROM spp_tunggakan_historis
+    WHERE status = 'BELUM_LUNAS'
+      AND santri_id IN (${ph})
+  `, ids)
+
+  const historisMap = new Map<string, { tahun: number; bulan: number }[]>()
+  historis.forEach(h => {
+    if (!historisMap.has(h.santri_id)) {
+      historisMap.set(h.santri_id, [])
+    }
+    historisMap.get(h.santri_id)!.push({ tahun: h.tahun, bulan: h.bulan })
+  })
+
+  const result: any[] = []
+
+  const allBerjalanMonths: { tahun: number; bulan: number }[] = []
+  let currYr = billingStart.tahun
+  let currMo = billingStart.bulan
+  while ((currYr * 100 + currMo) <= targetYm) {
+    allBerjalanMonths.push({ tahun: currYr, bulan: currMo })
+    currMo++
+    if (currMo > 12) {
+      currMo = 1
+      currYr++
+    }
+  }
+
+  filteredRows.forEach(s => {
+    const studentUnpaid: { tahun: number; bulan: number }[] = []
+
+    const histList = historisMap.get(s.id) ?? []
+    histList.forEach(h => studentUnpaid.push(h))
+
+    if (s.bebas_spp !== 1) {
+      const studentPayments = paymentsMap.get(s.id) ?? new Set<string>()
+      const studentWaives = waivesMap.get(s.id) ?? new Set<string>()
+
+      allBerjalanMonths.forEach(m => {
+        const key = `${m.tahun}-${m.bulan}`
+        if (!studentPayments.has(key) && !studentWaives.has(key)) {
+          studentUnpaid.push(m)
+        }
+      })
+    }
+
+    if (studentUnpaid.length > 0) {
+      if (periodeFilter === 'BULAN_INI') {
+        const hasCurrentMonthUnpaid = studentUnpaid.some(
+          m => m.tahun === targetTahun && m.bulan === targetBulan
+        )
+        if (!hasCurrentMonthUnpaid) return
+      }
+
+      result.push({
+        ...s,
+        unpaidMonths: studentUnpaid,
+      })
+    }
+  })
+
+  return result
+}
+

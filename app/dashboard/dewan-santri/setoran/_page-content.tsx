@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak } from './actions'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -54,13 +54,27 @@ export default function MonitoringSetoranPage() {
   const [tahunAjaranNama, setTahunAjaranNama] = useState<string | null>(null)
 
   // TABS & PENUNGGAK STATE
-  const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak'>('setoran')
+  const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
   const [penunggakList, setPenunggakList] = useState<any[]>([])
   const [selectedAsramaPenunggak, setSelectedAsramaPenunggak] = useState<string>('')
   const [loadingPenunggak, setLoadingPenunggak] = useState(false)
   const [searchPenunggak, setSearchPenunggak] = useState('')
   const [pagePenunggak, setPagePenunggak] = useState(1)
   const [pageSizePenunggak, setPageSizePenunggak] = useState<number | 'all'>(25)
+
+  // BEBAS SPP STATE
+  const [bebasList, setBebasList] = useState<any[]>([])
+  const [selectedAsramaBebas, setSelectedAsramaBebas] = useState<string>('')
+  const [loadingBebas, setLoadingBebas] = useState(false)
+  const [searchBebas, setSearchBebas] = useState('')
+  const [pageBebas, setPageBebas] = useState(1)
+  const [pageSizeBebas, setPageSizeBebas] = useState<number | 'all'>(25)
+
+  // EXPORT EXCEL STATE
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [exportAsrama, setExportAsrama] = useState<string>('SEMUA')
+  const [exportPeriode, setExportPeriode] = useState<'BULAN_INI' | 'SEMUA_BULAN'>('SEMUA_BULAN')
+  const [exportingExcel, setExportingExcel] = useState(false)
 
   useEffect(() => {
     if (activeTab === 'penunggak' && selectedAsramaPenunggak) {
@@ -91,6 +105,146 @@ export default function MonitoringSetoranPage() {
   }, [filteredPenunggak, pagePenunggak, pageSizePenunggak])
 
   const totalPagesPenunggak = pageSizePenunggak === 'all' ? 1 : Math.ceil(filteredPenunggak.length / pageSizePenunggak)
+
+  useEffect(() => {
+    if (activeTab === 'bebas' && selectedAsramaBebas) {
+      setLoadingBebas(true)
+      getDaftarBebasSpp(selectedAsramaBebas).then(res => {
+        setBebasList(res)
+        setPageBebas(1)
+        setLoadingBebas(false)
+      }).catch(err => {
+        toast.error(err?.message || "Gagal memuat daftar bebas SPP")
+        setLoadingBebas(false)
+      })
+    } else {
+      setBebasList([])
+    }
+  }, [activeTab, selectedAsramaBebas])
+
+  const filteredBebas = React.useMemo(() => {
+    if (!searchBebas.trim()) return bebasList
+    const queryStr = searchBebas.toLowerCase()
+    return bebasList.filter(p => p.nama_lengkap.toLowerCase().includes(queryStr))
+  }, [bebasList, searchBebas])
+
+  const paginatedBebas = React.useMemo(() => {
+    if (pageSizeBebas === 'all') return filteredBebas
+    const start = (pageBebas - 1) * pageSizeBebas
+    return filteredBebas.slice(start, start + pageSizeBebas)
+  }, [filteredBebas, pageBebas, pageSizeBebas])
+
+  const totalPagesBebas = pageSizeBebas === 'all' ? 1 : Math.ceil(filteredBebas.length / pageSizeBebas)
+
+  function formatUnpaidMonths(unpaidMonths: { tahun: number; bulan: number }[]): string {
+    if (!unpaidMonths || unpaidMonths.length === 0) return '-'
+    
+    // Sort chronologically
+    const sorted = [...unpaidMonths].sort((a, b) => (a.tahun * 100 + a.bulan) - (b.tahun * 100 + b.bulan))
+    
+    const groups: { tahun: number; bulan: number }[][] = []
+    let currentGroup: { tahun: number; bulan: number }[] = []
+    
+    for (let i = 0; i < sorted.length; i++) {
+      const item = sorted[i]
+      if (currentGroup.length === 0) {
+        currentGroup.push(item)
+      } else {
+        const last = currentGroup[currentGroup.length - 1]
+        const diff = (item.tahun * 12 + item.bulan) - (last.tahun * 12 + last.bulan)
+        if (diff === 1) {
+          currentGroup.push(item)
+        } else {
+          groups.push(currentGroup)
+          currentGroup = [item]
+        }
+      }
+    }
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup)
+    }
+    
+    // Format each group
+    const formattedGroups = groups.map(group => {
+      if (group.length === 1) {
+        return `${BULAN_NAMA[group[0].bulan].toUpperCase()} ${group[0].tahun}`
+      }
+      const start = group[0]
+      const end = group[group.length - 1]
+      if (start.tahun === end.tahun) {
+        return `${BULAN_NAMA[start.bulan].toUpperCase()} - ${BULAN_NAMA[end.bulan].toUpperCase()} ${start.tahun}`
+      } else {
+        return `${BULAN_NAMA[start.bulan].toUpperCase()} ${start.tahun} - ${BULAN_NAMA[end.bulan].toUpperCase()} ${end.tahun}`
+      }
+    })
+    
+    return formattedGroups.join(', ')
+  }
+
+  const handleExportExcelPenunggak = async () => {
+    setExportingExcel(true)
+    try {
+      const rawData = await getPenunggakExportData(
+        tahun,
+        bulan,
+        exportAsrama,
+        exportPeriode
+      )
+
+      if (!rawData || rawData.length === 0) {
+        toast.error("Tidak ada data penunggak untuk diexport.")
+        setExportingExcel(false)
+        return
+      }
+
+      const excelRows = rawData.map((row: any, idx: number) => {
+        return {
+          'No': idx + 1,
+          'Nama': row.nama_lengkap,
+          'Asrama': row.asrama || '-',
+          'Kamar': row.kamar || '-',
+          'Sekolah': row.sekolah || '-',
+          'Kelas Sekolah': row.kelas_sekolah || '-',
+          'Kelas Pesantren': row.kelas_pesantren || '-',
+          'Bulan Tunggakan': formatUnpaidMonths(row.unpaidMonths),
+          'Keterangan': ''
+        }
+      })
+
+      const XLSX = await import('xlsx')
+      const worksheet = XLSX.utils.json_to_sheet(excelRows)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Penunggak SPP')
+
+      const wscols = [
+        { wch: 6 },   // No
+        { wch: 30 },  // Nama
+        { wch: 18 },  // Asrama
+        { wch: 10 },  // Kamar
+        { wch: 15 },  // Sekolah
+        { wch: 15 },  // Kelas Sekolah
+        { wch: 18 },  // Kelas Pesantren
+        { wch: 35 },  // Bulan Tunggakan
+        { wch: 25 },  // Keterangan
+      ]
+      worksheet['!cols'] = wscols
+
+      const asramaSuffix = exportAsrama === 'SEMUA' ? 'Semua_Asrama' : exportAsrama.replace(/\s+/g, '_')
+      const periodSuffix = exportPeriode === 'BULAN_INI' 
+        ? `${BULAN_NAMA[bulan].toUpperCase()}_${tahun}` 
+        : `s.d_${BULAN_NAMA[bulan].toUpperCase()}_${tahun}`
+
+      const filename = `Tunggakan_SPP_${asramaSuffix}_${periodSuffix}.xlsx`
+      XLSX.writeFile(workbook, filename)
+
+      toast.success("Data penunggak berhasil diexport ke Excel!")
+      setIsExportModalOpen(false)
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal mengexport file Excel")
+    } finally {
+      setExportingExcel(false)
+    }
+  }
   
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -258,6 +412,7 @@ export default function MonitoringSetoranPage() {
       <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1 mb-6">
         <button onClick={() => setActiveTab('setoran')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'setoran' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Setoran Unit</button>
         <button onClick={() => setActiveTab('penunggak')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'penunggak' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daftar Penunggak</button>
+        <button onClick={() => setActiveTab('bebas')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'bebas' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bebas SPP</button>
       </div>
 
       {activeTab === 'setoran' && (
@@ -376,13 +531,13 @@ export default function MonitoringSetoranPage() {
         <div className="space-y-6">
           {/* Filter Bar */}
           <div className="bg-white border rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-end">
               <div className="flex flex-col">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Unit / Asrama</label>
                 <select
                   value={selectedAsramaPenunggak}
                   onChange={e => { setSelectedAsramaPenunggak(e.target.value); setSearchPenunggak(''); }}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 h-10"
                 >
                   <option value="">-- Pilih Asrama --</option>
                   {data.map(r => (
@@ -402,11 +557,20 @@ export default function MonitoringSetoranPage() {
                       placeholder="Cari santri..."
                       value={searchPenunggak}
                       onChange={e => { setSearchPenunggak(e.target.value); setPagePenunggak(1); }}
-                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 h-10"
                     />
                   </div>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(true)}
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-sm transition-all h-10"
+              >
+                <Download className="w-4 h-4" />
+                Export Excel
+              </button>
             </div>
 
             {selectedAsramaPenunggak && (
@@ -528,6 +692,154 @@ export default function MonitoringSetoranPage() {
         </div>
       )}
 
+      {activeTab === 'bebas' && (
+        <div className="space-y-6">
+          {/* Filter Bar */}
+          <div className="bg-white border rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
+              <div className="flex flex-col">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Unit / Asrama</label>
+                <select
+                  value={selectedAsramaBebas}
+                  onChange={e => { setSelectedAsramaBebas(e.target.value); setSearchBebas(''); }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Pilih Asrama --</option>
+                  {data.map(r => (
+                    <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                  ))}
+                  <option value="SEMUA">Semua Asrama</option>
+                </select>
+              </div>
+
+              {selectedAsramaBebas && (
+                <div className="flex flex-col flex-1 sm:flex-none">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cari Nama</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Cari santri..."
+                      value={searchBebas}
+                      onChange={e => { setSearchBebas(e.target.value); setPageBebas(1); }}
+                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedAsramaBebas && (
+              <div className="text-right w-full md:w-auto text-xs text-slate-500">
+                Menampilkan <span className="font-bold text-slate-700">{filteredBebas.length}</span> santri bebas SPP
+              </div>
+            )}
+          </div>
+
+          {/* Table / List */}
+          {!selectedAsramaBebas ? (
+            <div className="bg-white border rounded-2xl p-12 text-center text-slate-400 shadow-sm">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-30 text-blue-500" />
+              <h3 className="text-base font-bold text-slate-600">Pilih Asrama Terlebih Dahulu</h3>
+              <p className="text-sm mt-1 max-w-md mx-auto">Silakan tentukan unit atau asrama dari menu dropdown di atas untuk memuat daftar santri yang dibebaskan dari SPP.</p>
+            </div>
+          ) : loadingBebas ? (
+            <div className="bg-white border rounded-2xl py-20 text-center text-slate-400 shadow-sm">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-blue-500" />
+              <p className="text-sm font-semibold">Memuat daftar bebas SPP...</p>
+            </div>
+          ) : filteredBebas.length === 0 ? (
+            <div className="bg-white border rounded-2xl p-12 text-center text-slate-400 shadow-sm">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-500 opacity-80" />
+              <h3 className="text-base font-bold text-slate-600">Tidak Ada Santri Bebas SPP</h3>
+              <p className="text-sm mt-1">Tidak ada santri yang dibebaskan dari kewajiban SPP pada filter asrama ini.</p>
+            </div>
+          ) : (
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-5 text-center w-12">#</th>
+                      <th className="py-3 px-5">Nama Santri</th>
+                      <th className="py-3 px-5">Asrama / Kamar</th>
+                      <th className="py-3 px-5">Sekolah / Kelas</th>
+                      <th className="py-3 px-5">Kelas Pesantren</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedBebas.map((p, idx) => {
+                      const rowNum = pageSizeBebas === 'all' ? idx + 1 : (pageBebas - 1) * pageSizeBebas + idx + 1
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3.5 px-5 text-center font-bold text-slate-400">{rowNum}</td>
+                          <td className="py-3.5 px-5 font-bold text-slate-800">
+                            {p.nama_lengkap}
+                            {p.nis && <p className="text-[10px] text-slate-500 font-normal mt-0.5">NIS: {p.nis}</p>}
+                          </td>
+                          <td className="py-3.5 px-5">
+                            <p className="font-semibold text-slate-700">{p.asrama || 'Tidak ada'}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Kamar: {p.kamar || '-'}</p>
+                          </td>
+                          <td className="py-3.5 px-5">
+                            <p className="font-semibold text-slate-700">{p.sekolah || '-'}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Kelas: {p.kelas_sekolah || '-'}</p>
+                          </td>
+                          <td className="py-3.5 px-5">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                              {p.kelas_pesantren || '-'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer for Bebas */}
+              {filteredBebas.length > 0 && (
+                <div className="bg-slate-50 border-t px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>Tampilkan:</span>
+                    <select 
+                      value={pageSizeBebas} 
+                      onChange={e => { setPageSizeBebas(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPageBebas(1); }}
+                      className="bg-white border rounded px-2 py-1 outline-none focus:border-blue-400"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value="all">Semua</option>
+                    </select>
+                    <span>dari {filteredBebas.length} santri</span>
+                  </div>
+                  
+                  {pageSizeBebas !== 'all' && totalPagesBebas > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPageBebas(p => Math.max(1, p - 1))} disabled={pageBebas === 1} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronLeft className="w-5 h-5"/></button>
+                      <div className="flex items-center">
+                        {Array.from({ length: Math.min(5, totalPagesBebas) }, (_, i) => {
+                          let p = pageBebas <= 3 ? i + 1 : pageBebas >= totalPagesBebas - 2 ? totalPagesBebas - 4 + i : pageBebas - 2 + i
+                          if (p < 1) p = 1
+                          if (p > totalPagesBebas) p = totalPagesBebas
+                          return (
+                            <button key={p} onClick={() => setPageBebas(p)} className={`w-8 h-8 rounded-md text-sm font-bold mx-0.5 ${pageBebas === p ? 'bg-blue-600 text-white' : 'hover:bg-slate-200 text-slate-700'}`}>
+                              {p}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button onClick={() => setPageBebas(p => Math.min(totalPagesBebas, p + 1))} disabled={pageBebas === totalPagesBebas} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Modal Detail Kompak ── */}
       {isModalOpen && activeRow && (
         <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
@@ -600,6 +912,96 @@ export default function MonitoringSetoranPage() {
                        </div>
                     </form>
                   )}
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Export Excel ── */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm sm:max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4">
+            
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+               <div>
+                 <h2 className="text-lg font-bold text-slate-900">Export Excel Penunggak</h2>
+                 <p className="text-xs text-slate-500 mt-0.5">Konfigurasi data export excel</p>
+               </div>
+               <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors"><X className="w-4 h-4"/></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+               {/* Pilihan Asrama */}
+               <div>
+                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Pilihan Asrama</label>
+                 <select
+                   value={exportAsrama}
+                   onChange={e => setExportAsrama(e.target.value)}
+                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                 >
+                   <option value="SEMUA">Semua Asrama</option>
+                   {data.map(r => (
+                     <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                   ))}
+                 </select>
+               </div>
+
+               {/* Pilihan Periode */}
+               <div>
+                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Filter Periode</label>
+                 <div className="grid grid-cols-1 gap-2">
+                   <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                     <input
+                       type="radio"
+                       name="exportPeriode"
+                       value="BULAN_INI"
+                       checked={exportPeriode === 'BULAN_INI'}
+                       onChange={() => setExportPeriode('BULAN_INI')}
+                       className="mt-0.5 focus:ring-blue-500 text-blue-600 border-slate-300"
+                     />
+                     <div>
+                       <p className="text-sm font-bold text-slate-800">Hanya Bulan Ini</p>
+                       <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak khusus pada bulan {BULAN_NAMA[bulan]} {tahun}.</p>
+                     </div>
+                   </label>
+                   
+                   <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                     <input
+                       type="radio"
+                       name="exportPeriode"
+                       value="SEMUA_BULAN"
+                       checked={exportPeriode === 'SEMUA_BULAN'}
+                       onChange={() => setExportPeriode('SEMUA_BULAN')}
+                       className="mt-0.5 focus:ring-blue-500 text-blue-600 border-slate-300"
+                     />
+                     <div>
+                       <p className="text-sm font-bold text-slate-800">Semua Bulan (Akumulasi)</p>
+                       <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak pada bulan mana pun hingga bulan {BULAN_NAMA[bulan]} {tahun}.</p>
+                     </div>
+                   </label>
+                 </div>
+               </div>
+
+               {/* Buttons */}
+               <div className="flex gap-2 pt-2">
+                 <button
+                   type="button"
+                   onClick={() => setIsExportModalOpen(false)}
+                   disabled={exportingExcel}
+                   className="px-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1 transition-colors"
+                 >
+                   Batal
+                 </button>
+                 <button
+                   type="button"
+                   onClick={handleExportExcelPenunggak}
+                   disabled={exportingExcel}
+                   className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex justify-center items-center gap-2 flex-1 disabled:opacity-50"
+                 >
+                   {exportingExcel ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>} 
+                   {exportingExcel ? 'Exporting...' : 'Export Excel'}
+                 </button>
                </div>
             </div>
           </div>
