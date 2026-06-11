@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, WalletCards, Ban, CalendarX, BarChart3, AlertCircle } from 'lucide-react'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -454,7 +454,7 @@ export default function SPPPage() {
             className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
           >
             <div className="flex items-center gap-2 text-slate-700 font-bold">
-              <BarChart3 className="w-5 h-5 text-indigo-600"/>
+              <BarChart className="w-5 h-5 text-indigo-600"/>
               Rekap & Statistik SPP {unitSetor}
             </div>
             {rekapExpanded ? <ChevronLeft className="w-5 h-5 -rotate-90 text-slate-400" /> : <ChevronRight className="w-5 h-5 rotate-90 text-slate-400" />}
@@ -501,7 +501,7 @@ export default function SPPPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                 <h4 className="font-bold text-emerald-900 flex items-center gap-2 mb-3">
-                  <WalletCards className="w-4 h-4"/> Uang Diterima Bulan {BULAN_LIST[currentMonthIdx - 1]} {new Date().getFullYear()}
+                  <Wallet className="w-4 h-4"/> Uang Diterima Bulan {BULAN_LIST[currentMonthIdx - 1]} {new Date().getFullYear()}
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between items-center bg-white/60 p-2 rounded border border-emerald-100">
@@ -1010,7 +1010,7 @@ export default function SPPPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 text-base font-bold text-orange-900">
-              <WalletCards className="w-5 h-5"/> Tunggakan Terdahulu
+              <Wallet className="w-5 h-5"/> Tunggakan Terdahulu
             </h2>
             <p className="mt-1 text-xs text-orange-700">
               Khusus bulan sebelum awal tagihan sistem ({BULAN_LIST[billingStart.bulan - 1]} {billingStart.tahun}).
