@@ -59,12 +59,15 @@ export default function MonitoringSetoranPage() {
   const [selectedAsramaPenunggak, setSelectedAsramaPenunggak] = useState<string>('')
   const [loadingPenunggak, setLoadingPenunggak] = useState(false)
   const [searchPenunggak, setSearchPenunggak] = useState('')
+  const [pagePenunggak, setPagePenunggak] = useState(1)
+  const [pageSizePenunggak, setPageSizePenunggak] = useState<number | 'all'>(25)
 
   useEffect(() => {
     if (activeTab === 'penunggak' && selectedAsramaPenunggak) {
       setLoadingPenunggak(true)
       getDaftarPenunggak(tahun, bulan, selectedAsramaPenunggak).then(res => {
         setPenunggakList(res)
+        setPagePenunggak(1) // Reset page to 1
         setLoadingPenunggak(false)
       }).catch(err => {
         toast.error(err?.message || "Gagal memuat daftar penunggak")
@@ -80,6 +83,14 @@ export default function MonitoringSetoranPage() {
     const queryStr = searchPenunggak.toLowerCase()
     return penunggakList.filter(p => p.nama_lengkap.toLowerCase().includes(queryStr))
   }, [penunggakList, searchPenunggak])
+
+  const paginatedPenunggak = React.useMemo(() => {
+    if (pageSizePenunggak === 'all') return filteredPenunggak
+    const start = (pagePenunggak - 1) * pageSizePenunggak
+    return filteredPenunggak.slice(start, start + pageSizePenunggak)
+  }, [filteredPenunggak, pagePenunggak, pageSizePenunggak])
+
+  const totalPagesPenunggak = pageSizePenunggak === 'all' ? 1 : Math.ceil(filteredPenunggak.length / pageSizePenunggak)
   
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -390,7 +401,7 @@ export default function MonitoringSetoranPage() {
                       type="text"
                       placeholder="Cari santri..."
                       value={searchPenunggak}
-                      onChange={e => setSearchPenunggak(e.target.value)}
+                      onChange={e => { setSearchPenunggak(e.target.value); setPagePenunggak(1); }}
                       className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -424,7 +435,7 @@ export default function MonitoringSetoranPage() {
               <p className="text-sm mt-1">Luar biasa! Tidak ada santri yang memiliki tunggakan SPP pada filter asrama ini.</p>
             </div>
           ) : (
-            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead>
@@ -438,38 +449,80 @@ export default function MonitoringSetoranPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredPenunggak.map((p, idx) => (
-                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3.5 px-5 text-center font-bold text-slate-400">{idx + 1}</td>
-                        <td className="py-3.5 px-5 font-bold text-slate-800">{p.nama_lengkap}</td>
-                        <td className="py-3.5 px-5">
-                          <p className="font-semibold text-slate-700">{p.asrama || 'Tidak ada'}</p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Kamar: {p.kamar || '-'}</p>
-                        </td>
-                        <td className="py-3.5 px-5 text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
-                            {p.total_tunggakan_bulan} Bulan
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-950">
-                          {fmtRp(p.total_tunggakan_nominal)}
-                        </td>
-                        <td className="py-3.5 px-5 text-right pr-6">
-                          <a
-                            href={`/dashboard/dewan-santri/surat?action=tagihan&santriId=${p.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-orange-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            Cetak Surat
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedPenunggak.map((p, idx) => {
+                      const rowNum = pageSizePenunggak === 'all' ? idx + 1 : (pagePenunggak - 1) * pageSizePenunggak + idx + 1
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3.5 px-5 text-center font-bold text-slate-400">{rowNum}</td>
+                          <td className="py-3.5 px-5 font-bold text-slate-800">{p.nama_lengkap}</td>
+                          <td className="py-3.5 px-5">
+                            <p className="font-semibold text-slate-700">{p.asrama || 'Tidak ada'}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Kamar: {p.kamar || '-'}</p>
+                          </td>
+                          <td className="py-3.5 px-5 text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                              {p.total_tunggakan_bulan} Bulan
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-950">
+                            {fmtRp(p.total_tunggakan_nominal)}
+                          </td>
+                          <td className="py-3.5 px-5 text-right pr-6">
+                            <a
+                              href={`/dashboard/dewan-santri/surat?action=tagihan&santriId=${p.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-orange-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Cetak Surat
+                            </a>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Footer for Penunggak */}
+              {filteredPenunggak.length > 0 && (
+                <div className="bg-slate-50 border-t px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>Tampilkan:</span>
+                    <select 
+                      value={pageSizePenunggak} 
+                      onChange={e => { setPageSizePenunggak(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPagePenunggak(1); }}
+                      className="bg-white border rounded px-2 py-1 outline-none focus:border-blue-400"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value="all">Semua</option>
+                    </select>
+                    <span>dari {filteredPenunggak.length} penunggak</span>
+                  </div>
+                  
+                  {pageSizePenunggak !== 'all' && totalPagesPenunggak > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPagePenunggak(p => Math.max(1, p - 1))} disabled={pagePenunggak === 1} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronLeft className="w-5 h-5"/></button>
+                      <div className="flex items-center">
+                        {Array.from({ length: Math.min(5, totalPagesPenunggak) }, (_, i) => {
+                          let p = pagePenunggak <= 3 ? i + 1 : pagePenunggak >= totalPagesPenunggak - 2 ? totalPagesPenunggak - 4 + i : pagePenunggak - 2 + i
+                          if (p < 1) p = 1
+                          if (p > totalPagesPenunggak) p = totalPagesPenunggak
+                          return (
+                            <button key={p} onClick={() => setPagePenunggak(p)} className={`w-8 h-8 rounded-md text-sm font-bold mx-0.5 ${pagePenunggak === p ? 'bg-blue-600 text-white' : 'hover:bg-slate-200 text-slate-700'}`}>
+                              {p}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button onClick={() => setPagePenunggak(p => Math.min(totalPagesPenunggak, p + 1))} disabled={pagePenunggak === totalPagesPenunggak} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
