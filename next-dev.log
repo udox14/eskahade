@@ -28,3 +28,6 @@
 [layout] session null → redirect /login
  GET /dashboard/asrama/spp 307 in 892ms (compile: 688ms, render: 204ms)
 ✓ Compiled in 110ms
+○ Compiling /api/update-db ...
+⎔ Establishing remote connection...
+ GET /api/update-db 200 in 17.5s (compile: 4.9s, render: 12.5s)
