@@ -22,3 +22,9 @@
 ✓ Compiled in 429ms
 ✓ Compiled in 363ms
 ✓ Compiled in 340ms
+ HEAD / 200 in 1148ms (compile: 699ms, render: 449ms)
+[layout] session null → redirect /login
+ GET /dashboard/asrama/spp 307 in 2.0s (compile: 1726ms, render: 324ms)
+[layout] session null → redirect /login
+ GET /dashboard/asrama/spp 307 in 892ms (compile: 688ms, render: 204ms)
+✓ Compiled in 110ms

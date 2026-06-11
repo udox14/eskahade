@@ -171,13 +171,25 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
 
 export async function getJumlahTunggakanHistorisBySantri(santriIds: string[]) {
   if (santriIds.length === 0) return new Map<string, number>()
-  const placeholders = santriIds.map(() => '?').join(',')
-  const rows = await query<{ santri_id: string; jumlah: number }>(
-    `SELECT santri_id, COUNT(*) AS jumlah
-     FROM spp_tunggakan_historis
-     WHERE status = 'BELUM_LUNAS' AND santri_id IN (${placeholders})
-     GROUP BY santri_id`,
-    santriIds
-  )
-  return new Map(rows.map(row => [row.santri_id, row.jumlah]))
+
+  // D1 has a limit of 100 bind variables per query, so chunk into batches
+  const CHUNK_SIZE = 80
+  const result = new Map<string, number>()
+
+  for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
+    const chunk = santriIds.slice(i, i + CHUNK_SIZE)
+    const placeholders = chunk.map(() => '?').join(',')
+    const rows = await query<{ santri_id: string; jumlah: number }>(
+      `SELECT santri_id, COUNT(*) AS jumlah
+       FROM spp_tunggakan_historis
+       WHERE status = 'BELUM_LUNAS' AND santri_id IN (${placeholders})
+       GROUP BY santri_id`,
+      chunk
+    )
+    for (const row of rows) {
+      result.set(row.santri_id, row.jumlah)
+    }
+  }
+
+  return result
 }
