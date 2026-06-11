@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam } from '../rekap-asrama/actions'
+import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam, deleteAbsenMalamRecord } from '../rekap-asrama/actions'
 import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
@@ -95,6 +95,25 @@ export default function RekapAbsenMalamPage() {
     } catch (error: any) {
       console.error(error)
       alert("Gagal memuat rekap absen malam. Error: " + (error?.message || "Unknown error"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelAlfa = async (santriId: string, nama: string, tanggalStr: string) => {
+    const confirm = window.confirm(`Apakah Anda yakin ingin membatalkan status ALFA untuk ${nama} pada tanggal ${formatTanggal(tanggalStr)}?`)
+    if (!confirm) return
+
+    setLoading(true)
+    try {
+      const res = await deleteAbsenMalamRecord(santriId, tanggalStr)
+      if ('error' in res) {
+        alert(res.error)
+        return
+      }
+      await load()
+    } catch (e: any) {
+      alert("Gagal membatalkan alfa: " + (e?.message || e))
     } finally {
       setLoading(false)
     }
@@ -328,9 +347,19 @@ export default function RekapAbsenMalamPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {santri.tanggal.map((item: any) => (
-                        <span key={`${santri.id}-${item.tanggal}`} className="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
-                          {formatTanggal(item.tanggal)}
-                          {item.keterangan ? ` - ${item.keterangan}` : ''}
+                        <span key={`${santri.id}-${item.tanggal}`} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 pl-2 pr-1.5 py-1 text-xs font-semibold text-red-700">
+                          <span>
+                            {formatTanggal(item.tanggal)}
+                            {item.keterangan ? ` - ${item.keterangan}` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelAlfa(santri.id, santri.nama_lengkap, item.tanggal)}
+                            className="rounded-md p-0.5 hover:bg-red-200 hover:text-red-900 transition-colors cursor-pointer"
+                            title={`Batalkan Alfa tanggal ${item.tanggal}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </span>
                       ))}
                     </div>
@@ -385,10 +414,18 @@ export default function RekapAbsenMalamPage() {
                               const st = detail[d]
                               return (
                                 <td key={d} className="px-1 py-2 text-center">
-                                  {st === 'ALFA'
-                                    ? <span className="inline-block w-5 h-5 rounded bg-red-500 text-white text-[9px] font-black leading-5">A</span>
-                                    : <span className="text-slate-200">·</span>
-                                  }
+                                  {st === 'ALFA' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelAlfa(s.id, s.nama_lengkap, d)}
+                                      className="inline-block w-5 h-5 rounded bg-red-500 text-white text-[9px] font-black leading-5 hover:bg-red-600 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                      title={`Batalkan Alfa ${s.nama_lengkap} tanggal ${d}`}
+                                    >
+                                      A
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-200">·</span>
+                                  )}
                                 </td>
                               )
                             })}

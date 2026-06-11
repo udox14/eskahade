@@ -1,6 +1,6 @@
 'use server'
 
-import { query, batch } from '@/lib/db'
+import { query, batch, execute } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -260,4 +260,48 @@ export async function importAbsenBerjamaahFingerprint(alfaRows: { santri_id: str
   } catch (error: any) {
     return { error: error.message }
   }
+}
+
+export async function deleteAbsenMalamRecord(santriId: string, tanggal: string) {
+  const session = await getSession()
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'keamanan'])) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Jika pengurus asrama, check asrama binaan
+  if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan) {
+    const rows = await query<any>('SELECT asrama FROM santri WHERE id = ?', [santriId])
+    const santri = rows[0]
+    if (santri && santri.asrama !== session.asrama_binaan) {
+      return { error: 'Pengurus asrama hanya bisa mengubah absen santri asramanya.' }
+    }
+  }
+
+  await execute(
+    'DELETE FROM absen_malam_v2 WHERE santri_id = ? AND tanggal = ?',
+    [santriId, tanggal]
+  )
+
+  const { logActivity, actorFromSession } = await import('@/lib/activity-log')
+  const rows = await query<any>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+  const santriNama = rows[0]?.nama_lengkap || santriId
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'asrama_absen_malam',
+    action: 'delete',
+    fiturHref: '/dashboard/keamanan/rekap-absen-malam',
+    logKind: 'delete',
+    entityType: 'absen_malam',
+    entityId: `${santriId}_${tanggal}`,
+    entityLabel: santriNama,
+    summary: `Membatalkan status alfa absen malam ${santriNama} pada ${tanggal}`,
+    details: { santri_id: santriId, tanggal },
+  })
+
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath('/dashboard/keamanan/rekap-absen-malam')
+  revalidatePath('/dashboard/asrama/absen-malam')
+
+  return { success: true }
 }

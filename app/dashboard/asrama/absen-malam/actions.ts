@@ -76,12 +76,10 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   try {
     izinList = await query<any>(
       `SELECT p.id, p.santri_id, p.jenis, p.alasan, p.tgl_selesai_rencana FROM perizinan p
-       WHERE p.status = 'AKTIF'
-         AND p.tgl_kembali_aktual IS NULL
-         AND p.tgl_mulai <= ?
-         AND p.tgl_selesai_rencana >= ?
+       WHERE p.tgl_mulai <= ?
+         AND (p.tgl_kembali_aktual IS NULL OR p.tgl_kembali_aktual > ?)
          AND p.santri_id IN (${ph})`,
-      [tanggalWindow.end, tanggalWindow.start, ...ids]
+      [tanggalWindow.end, tanggalWindow.end, ...ids]
     )
   } catch {}
 
@@ -130,10 +128,9 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
       AND p.status = 'AKTIF'
       AND p.tgl_kembali_aktual IS NULL
       AND p.tgl_mulai <= ?
-      AND p.tgl_selesai_rencana >= ?
     ORDER BY p.tgl_selesai_rencana ASC
     LIMIT 1
-  `, [santriId, tanggalWindow.end, tanggalWindow.start])
+  `, [santriId, tanggalWindow.end])
 
   const row = izin[0]
   if (!row) return { error: 'Izin aktif santri ini tidak ditemukan atau sudah ditandai kembali.' }
@@ -212,17 +209,16 @@ export async function batchSaveAbsenMalam(
     status: record.status === 'ALFA' ? 'ALFA' : 'HADIR',
     keterangan: (record.keterangan || '').trim(),
   }))
+
   const tanggalWindow = getTanggalWindowIso(tanggal)
   const activeIzinIds = santriIds.length
     ? new Set((await query<{ santri_id: string }>(
         `SELECT DISTINCT santri_id
          FROM perizinan
-         WHERE status = 'AKTIF'
-           AND tgl_kembali_aktual IS NULL
-           AND tgl_mulai <= ?
-           AND tgl_selesai_rencana >= ?
+         WHERE tgl_mulai <= ?
+           AND (tgl_kembali_aktual IS NULL OR tgl_kembali_aktual > ?)
            AND santri_id IN (${santriIds.map(() => '?').join(',')})`,
-        [tanggalWindow.end, tanggalWindow.start, ...santriIds]
+        [tanggalWindow.end, tanggalWindow.end, ...santriIds]
       )).map(row => row.santri_id))
     : new Set<string>()
   const writableRecords = normalized.filter(r => !activeIzinIds.has(r.santri_id))
