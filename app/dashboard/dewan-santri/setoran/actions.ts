@@ -511,6 +511,20 @@ export async function getPenunggakExportData(
   const billingStart = await getSppBillingStart()
   const targetYm = targetTahun * 100 + targetBulan
 
+  let asramaSql = ''
+  let extraParams: any[] = []
+  if (selectedAsrama && selectedAsrama !== 'SEMUA') {
+    asramaSql = `
+      AND (
+        CASE
+          WHEN s.kategori_santri = ? THEN ?
+          ELSE COALESCE(s.asrama, 'LAINNYA')
+        END
+      ) = ?
+    `
+    extraParams = [SADESA_CATEGORY, SADESA_UNIT, selectedAsrama]
+  }
+
   const rows = await query<any>(`
     SELECT
       s.id,
@@ -531,23 +545,20 @@ export async function getPenunggakExportData(
     LEFT JOIN kelas k ON k.id = rp.kelas_id
     WHERE s.status_global = 'aktif'
       AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
-  `, [SADESA_CATEGORY, SADESA_UNIT])
+      ${asramaSql}
+  `, [SADESA_CATEGORY, SADESA_UNIT, ...extraParams])
 
-  const filteredRows = selectedAsrama && selectedAsrama !== 'SEMUA'
-    ? rows.filter(r => r.unit_setor === selectedAsrama)
-    : rows
-
-  if (filteredRows.length === 0) return []
-
-  const ids = filteredRows.map(r => r.id)
-  const ph = ids.map(() => '?').join(',')
+  if (rows.length === 0) return []
 
   const payments = await query<any>(`
-    SELECT santri_id, tahun, bulan
-    FROM spp_log
-    WHERE (tahun * 100 + bulan) <= ?
-      AND santri_id IN (${ph})
-  `, [targetYm, ...ids])
+    SELECT sl.santri_id, sl.tahun, sl.bulan
+    FROM spp_log sl
+    INNER JOIN santri s ON s.id = sl.santri_id
+    WHERE (sl.tahun * 100 + sl.bulan) <= ?
+      AND s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      ${asramaSql}
+  `, [targetYm, ...extraParams])
 
   const paymentsMap = new Map<string, Set<string>>()
   payments.forEach(p => {
@@ -558,12 +569,15 @@ export async function getPenunggakExportData(
   })
 
   const waives = await query<any>(`
-    SELECT santri_id, tahun, bulan
-    FROM spp_tagihan_ditiadakan
-    WHERE is_active = 1
-      AND (tahun * 100 + bulan) <= ?
-      AND santri_id IN (${ph})
-  `, [targetYm, ...ids])
+    SELECT std.santri_id, std.tahun, std.bulan
+    FROM spp_tagihan_ditiadakan std
+    INNER JOIN santri s ON s.id = std.santri_id
+    WHERE std.is_active = 1
+      AND (std.tahun * 100 + std.bulan) <= ?
+      AND s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      ${asramaSql}
+  `, [targetYm, ...extraParams])
 
   const waivesMap = new Map<string, Set<string>>()
   waives.forEach(w => {
@@ -574,11 +588,14 @@ export async function getPenunggakExportData(
   })
 
   const historis = await query<any>(`
-    SELECT santri_id, tahun, bulan
-    FROM spp_tunggakan_historis
-    WHERE status = 'BELUM_LUNAS'
-      AND santri_id IN (${ph})
-  `, ids)
+    SELECT sth.santri_id, sth.tahun, sth.bulan
+    FROM spp_tunggakan_historis sth
+    INNER JOIN santri s ON s.id = sth.santri_id
+    WHERE sth.status = 'BELUM_LUNAS'
+      AND s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      ${asramaSql}
+  `, extraParams)
 
   const historisMap = new Map<string, { tahun: number; bulan: number }[]>()
   historis.forEach(h => {
@@ -602,7 +619,7 @@ export async function getPenunggakExportData(
     }
   }
 
-  filteredRows.forEach(s => {
+  rows.forEach(s => {
     const studentUnpaid: { tahun: number; bulan: number }[] = []
 
     const histList = historisMap.get(s.id) ?? []
