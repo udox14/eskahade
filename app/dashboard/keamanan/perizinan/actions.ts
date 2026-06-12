@@ -2,7 +2,7 @@
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
-import { getSession } from '@/lib/auth/session'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
@@ -475,6 +475,185 @@ export async function cariSantri(keyword: string) {
     WHERE nama_lengkap LIKE ?
     LIMIT 5
   `, [`%${keyword}%`])
+}
+
+// ─── Ensure perizinan_pengajuan table ────────────────────────────────────────
+async function ensurePengajuanTable() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS perizinan_pengajuan (
+      id TEXT PRIMARY KEY,
+      santri_id TEXT NOT NULL,
+      jenis TEXT NOT NULL DEFAULT 'PULANG',
+      tgl_mulai TEXT NOT NULL,
+      tgl_selesai_rencana TEXT NOT NULL,
+      alasan TEXT NOT NULL,
+      pemberi_izin TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      submitted_by TEXT,
+      reviewed_by TEXT,
+      reviewed_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `)
+}
+
+// ─── Ajukan Izin Pulang (oleh pengurus asrama) ────────────────────────────────
+export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = await getSession()
+
+  const santri_id = String(formData.get('santri_id') ?? '').trim()
+  if (!santri_id) return { error: 'Santri wajib dipilih.' }
+
+  // Force jenis PULANG
+  formData.set('jenis', 'PULANG')
+  const payload = buildIzinPayload(formData)
+  if ('error' in payload) return payload
+
+  const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  if (jenis !== 'PULANG') return { error: 'Pengajuan dari asrama hanya untuk izin pulang.' }
+
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
+    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+    [santri_id]
+  )
+
+  await ensurePengajuanTable()
+  const pengajuanId = generateId()
+
+  await execute(`
+    INSERT INTO perizinan_pengajuan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, submitted_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+  `, [pengajuanId, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'create',
+    entityType: 'perizinan_pengajuan',
+    entityId: pengajuanId,
+    entityLabel: santri?.nama_lengkap || santri?.nis || santri_id,
+    summary: `Mengajukan izin pulang untuk ${santri?.nama_lengkap || santri?.nis || santri_id}`,
+    details: { jenis, alasan: alasan_final, pemberi_izin, tgl_mulai, tgl_selesai_rencana },
+  })
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true }
+}
+
+// ─── Get Pengajuan Pending dari Asrama ────────────────────────────────────────
+export async function getPengajuanPendingAsrama(): Promise<any[]> {
+  try {
+    await ensurePengajuanTable()
+    return await query<any>(`
+      SELECT pq.id, pq.created_at, pq.jenis, pq.alasan, pq.pemberi_izin,
+             pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
+             pq.santri_id,
+             s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+             u.full_name AS submitted_by_name
+      FROM perizinan_pengajuan pq
+      JOIN santri s ON s.id = pq.santri_id
+      LEFT JOIN users u ON u.id = pq.submitted_by
+      WHERE pq.status = 'PENDING'
+      ORDER BY pq.created_at ASC
+    `)
+  } catch {
+    return []
+  }
+}
+
+// ─── Approve Pengajuan Asrama ─────────────────────────────────────────────────
+export async function approveIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = await getSession()
+
+  if (!hasAnyRole(session, ['dewan_santri', 'admin'])) {
+    return { error: 'Hanya dewan santri yang dapat menyetujui pengajuan.' }
+  }
+
+  const pengajuan = await queryOne<any>(`
+    SELECT pq.*, s.nama_lengkap, s.nis
+    FROM perizinan_pengajuan pq
+    JOIN santri s ON s.id = pq.santri_id
+    WHERE pq.id = ? AND pq.status = 'PENDING'
+  `, [id])
+
+  if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
+
+  const izinId = generateId()
+
+  await execute(`
+    INSERT INTO perizinan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'AKTIF', ?)
+  `, [izinId, pengajuan.santri_id, pengajuan.jenis, pengajuan.tgl_mulai,
+      pengajuan.tgl_selesai_rencana, pengajuan.alasan, pengajuan.pemberi_izin,
+      session?.id ?? null])
+
+  await execute(`
+    UPDATE perizinan_pengajuan
+    SET status = 'APPROVED', reviewed_by = ?, reviewed_at = datetime('now')
+    WHERE id = ?
+  `, [session?.id ?? null, id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'create',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'create',
+    entityType: 'perizinan',
+    entityId: izinId,
+    entityLabel: pengajuan.nama_lengkap || pengajuan.nis || pengajuan.santri_id,
+    summary: `Menyetujui pengajuan izin pulang ${pengajuan.nama_lengkap || pengajuan.santri_id}`,
+    details: { dari_pengajuan: id },
+  })
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/asrama/absen-malam')
+  return { success: true }
+}
+
+// ─── Reject Pengajuan Asrama ──────────────────────────────────────────────────
+export async function rejectIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = await getSession()
+
+  if (!hasAnyRole(session, ['dewan_santri', 'admin'])) {
+    return { error: 'Hanya dewan santri yang dapat menolak pengajuan.' }
+  }
+
+  const pengajuan = await queryOne<any>(
+    'SELECT id, santri_id FROM perizinan_pengajuan WHERE id = ? AND status = ?',
+    [id, 'PENDING']
+  )
+  if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
+
+  await execute(`
+    UPDATE perizinan_pengajuan
+    SET status = 'REJECTED', reviewed_by = ?, reviewed_at = datetime('now')
+    WHERE id = ?
+  `, [session?.id ?? null, id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'update',
+    entityType: 'perizinan_pengajuan',
+    entityId: id,
+    entityLabel: id,
+    summary: `Menolak pengajuan izin asrama`,
+    details: {},
+  })
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true }
 }
 
 export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
