@@ -695,7 +695,7 @@ export default function DataSakitPage() {
         {activeTab === 'aktif' && (
           <>
             <div className="md:hidden">
-              {loading ? (
+              {(loading || !selectedAsrama) ? (
                 <div className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
               ) : visibleRows.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 px-5">Tidak ada santri sakit aktif.</div>
@@ -772,7 +772,7 @@ export default function DataSakitPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {loading ? (
+                  {(loading || !selectedAsrama) ? (
                     <tr><td colSpan={5} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
                   ) : visibleRows.length === 0 ? (
                     <tr>
@@ -853,7 +853,7 @@ export default function DataSakitPage() {
         {/* TAB: Riwayat */}
         {activeTab === 'riwayat' && (
           <>
-            {loadingRiwayatList ? (
+            {(loadingRiwayatList || !selectedAsrama) ? (
               <div className="py-16 text-center text-slate-400">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                 <p className="text-sm">Memuat riwayat sakit...</p>

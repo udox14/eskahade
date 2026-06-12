@@ -546,7 +546,7 @@ export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitIte
       s.nis,
       s.kamar,
       s.asrama,
-      u.name AS pencatat_nama
+      u.full_name AS pencatat_nama
     FROM absen_sakit ab
     JOIN santri s ON s.id = ab.santri_id
     LEFT JOIN users u ON u.id = ab.created_by
