@@ -243,7 +243,6 @@ export async function simpanDataSakit(payload: {
   const mulaiAt = normalizeDateTime(payload.mulaiAt).toISOString()
   const beliSurat = payload.beliSurat ? 1 : 0
   const nomorSuratSakit = beliSurat ? (payload.nomorSuratSakit || '').trim() : ''
-  if (beliSurat && !nomorSuratSakit) return { error: 'Isi dulu nomor surat sakit.' }
   const active = await queryOne<{ episode_id: string; mulai_at: string | null }>(`
     WITH closed AS (
       SELECT DISTINCT COALESCE(episode_id, id) AS episode_key
@@ -448,6 +447,36 @@ export type RiwayatSantriSummary = {
   foto_url: string | null
   total_episode: number
   last_sakit_at: string | null
+}
+
+export async function getNextNomorSurat(params: { asrama: string; tanggal: string }): Promise<{ nextNo: number; tahunAjaran: string }> {
+  const session = await requireAllowedSession()
+  if (!session) return { nextNo: 1, tahunAjaran: '' }
+
+  const restrictedAsrama = await getRestrictedAsrama()
+  const targetAsrama = restrictedAsrama || params.asrama
+
+  const date = new Date(`${params.tanggal}T00:00:00`)
+  const month = date.getMonth() + 1
+  const year = date.getFullYear()
+  const tahunStart = month >= 7 ? year : year - 1
+  const tahunAjaran = `${tahunStart}/${tahunStart + 1}`
+  const dateStart = `${tahunStart}-07-01`
+  const dateEnd = `${tahunStart + 1}-06-30`
+
+  const result = await queryOne<{ max_no: number | null }>(`
+    SELECT MAX(CAST(ab.nomor_surat_sakit AS INTEGER)) AS max_no
+    FROM absen_sakit ab
+    JOIN santri s ON s.id = ab.santri_id
+    WHERE s.asrama = ?
+      AND ab.beli_surat = 1
+      AND ab.nomor_surat_sakit IS NOT NULL
+      AND ab.nomor_surat_sakit != ''
+      AND ab.tanggal >= ?
+      AND ab.tanggal <= ?
+  `, [targetAsrama, dateStart, dateEnd])
+
+  return { nextNo: (result?.max_no ?? 0) + 1, tahunAjaran }
 }
 
 export async function getRiwayatSantriList(params: { asrama: string }): Promise<RiwayatSantriSummary[]> {

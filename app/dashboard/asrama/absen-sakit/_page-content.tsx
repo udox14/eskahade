@@ -27,6 +27,7 @@ import {
   getDaftarAsramaSakit,
   getDataSakit,
   getRiwayatSakit,
+  getNextNomorSurat,
   getRiwayatSantriList,
   getSessionInfo,
   simpanDataSakit,
@@ -237,6 +238,8 @@ export default function DataSakitPage() {
   const [sakitApa, setSakitApa] = useState('')
   const [beliSurat, setBeliSurat] = useState(false)
   const [nomorSuratSakit, setNomorSuratSakit] = useState('')
+  const [tahunAjaranSurat, setTahunAjaranSurat] = useState('')
+  const [loadingNomor, setLoadingNomor] = useState(false)
   const [mulaiAt, setMulaiAt] = useState(localDateTimeNow())
 
   // Detail / riwayat per-santri modal state
@@ -376,6 +379,19 @@ export default function DataSakitPage() {
     if (riwayatPage !== riwayatSafePage) setRiwayatPage(riwayatSafePage)
   }, [riwayatPage, riwayatSafePage])
 
+  const fetchAutoNomor = async (asrama: string, tgl: string) => {
+    setLoadingNomor(true)
+    try {
+      const { nextNo, tahunAjaran } = await getNextNomorSurat({ asrama, tanggal: tgl })
+      setNomorSuratSakit(String(nextNo))
+      setTahunAjaranSurat(tahunAjaran)
+    } catch {
+      // silent — user can input manually
+    } finally {
+      setLoadingNomor(false)
+    }
+  }
+
   const resetModal = () => {
     setSantriSearch('')
     setHasilCari([])
@@ -383,6 +399,8 @@ export default function DataSakitPage() {
     setSakitApa('')
     setBeliSurat(false)
     setNomorSuratSakit('')
+    setTahunAjaranSurat('')
+    setLoadingNomor(false)
     setMulaiAt(localDateTimeNow())
     setSesi(getDefaultSesi())
     setTanggal(todayKey())
@@ -417,8 +435,10 @@ export default function DataSakitPage() {
     const current = rows.find(row => row.santri_id === santri.id)
     if (current) {
       setSakitApa(current.sakit_apa === '-' ? '' : current.sakit_apa)
-      setBeliSurat(current.beli_surat === 1)
+      const hasBeli = current.beli_surat === 1
+      setBeliSurat(hasBeli)
       setNomorSuratSakit(current.nomor_surat_sakit || '')
+      if (hasBeli && !current.nomor_surat_sakit) void fetchAutoNomor(selectedAsrama, tanggal)
       if (current.mulai_at) {
         const date = new Date(current.mulai_at)
         if (!Number.isNaN(date.getTime())) {
@@ -480,10 +500,17 @@ export default function DataSakitPage() {
 
   const openDetail = async (row: DataSakitRow) => {
     setDetailSantri(row)
+    setRiwayat([])
     setLoadingRiwayat(true)
-    const data = await getRiwayatSakit(row.santri_id)
-    setRiwayat(data)
-    setLoadingRiwayat(false)
+    try {
+      const data = await getRiwayatSakit(row.santri_id)
+      setRiwayat(data)
+    } catch {
+      toast.error('Gagal memuat riwayat sakit')
+      setDetailSantri(null)
+    } finally {
+      setLoadingRiwayat(false)
+    }
   }
 
   const openDetailFromSummary = async (summary: RiwayatSantriSummary) => {
@@ -1114,8 +1141,14 @@ export default function DataSakitPage() {
                   type="checkbox"
                   checked={beliSurat}
                   onChange={e => {
-                    setBeliSurat(e.target.checked)
-                    if (!e.target.checked) setNomorSuratSakit('')
+                    const checked = e.target.checked
+                    setBeliSurat(checked)
+                    if (!checked) {
+                      setNomorSuratSakit('')
+                      setTahunAjaranSurat('')
+                      return
+                    }
+                    void fetchAutoNomor(selectedAsrama, tanggal)
                   }}
                   className="w-5 h-5 accent-emerald-600"
                 />
@@ -1123,13 +1156,34 @@ export default function DataSakitPage() {
 
               {beliSurat ? (
                 <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Nomor Surat Sakit</label>
-                  <input
-                    value={nomorSuratSakit}
-                    onChange={e => setNomorSuratSakit(e.target.value)}
-                    placeholder="Contoh: 12"
-                    className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nomor Surat Sakit</label>
+                    {tahunAjaranSurat ? (
+                      <span className="text-[10px] text-slate-400 font-medium">TA {tahunAjaranSurat}</span>
+                    ) : null}
+                  </div>
+                  <div className="relative">
+                    <input
+                      value={nomorSuratSakit}
+                      onChange={e => setNomorSuratSakit(e.target.value)}
+                      placeholder={loadingNomor ? 'Memuat nomor...' : 'Otomatis / isi manual'}
+                      disabled={loadingNomor}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                    {loadingNomor ? (
+                      <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void fetchAutoNomor(selectedAsrama, tanggal)}
+                        title="Reset ke nomor otomatis"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 px-1.5 py-1 rounded-lg hover:bg-emerald-50"
+                      >
+                        Auto
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Nomor otomatis per asrama per tahun ajaran. Bisa diubah manual.</p>
                 </div>
               ) : null}
             </div>
