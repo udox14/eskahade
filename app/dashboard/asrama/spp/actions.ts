@@ -869,6 +869,85 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
   }
 }
 
+export async function bayarSemuaSantriAsrama(
+  unitSetor: string,
+  tahun: number,
+  bulan: number,
+  nominalPerBulan: number
+): Promise<{ success: boolean; count: number } | { error: string }> {
+  try {
+    const session = await getSession()
+    const scope = getScopeOrThrow(session)
+    const unit = assertRequestedUnit(scope, unitSetor)
+
+    const billingStart = await getSppBillingStart()
+    if ((tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
+      return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+    }
+
+    const sadesaMode = isSadesaUnit(unit)
+    const unitWhere = sadesaMode
+      ? `AND s.kategori_santri = ?`
+      : `AND COALESCE(s.kategori_santri, 'REGULER') != ? AND s.asrama = ?`
+    const unitParams: any[] = sadesaMode ? [SADESA_CATEGORY] : [SADESA_CATEGORY, unit]
+
+    const eligibleSql = `
+      SELECT COUNT(*) AS total FROM santri s
+      WHERE s.status_global = 'aktif'
+        AND COALESCE(s.bebas_spp, 0) = 0
+        ${unitWhere}
+        AND NOT EXISTS (
+          SELECT 1 FROM spp_tagihan_ditiadakan td
+          WHERE td.santri_id = s.id AND td.tahun = ? AND td.bulan = ? AND td.is_active = 1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM spp_log sl
+          WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
+        )`
+
+    const countRow = await queryOne<{ total: number }>(eligibleSql, [...unitParams, tahun, bulan, tahun, bulan])
+    const count = countRow?.total ?? 0
+    if (count === 0) return { error: 'Tidak ada santri dengan tagihan yang belum lunas.' }
+
+    await execute(
+      `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar)
+       SELECT lower(hex(randomblob(16))), s.id, ?, ?, ?, ?, 'Bayar Semua', date('now')
+       FROM santri s
+       WHERE s.status_global = 'aktif'
+         AND COALESCE(s.bebas_spp, 0) = 0
+         ${unitWhere}
+         AND NOT EXISTS (
+           SELECT 1 FROM spp_tagihan_ditiadakan td
+           WHERE td.santri_id = s.id AND td.tahun = ? AND td.bulan = ? AND td.is_active = 1
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM spp_log sl
+           WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
+         )`,
+      [tahun, bulan, nominalPerBulan, session?.id ?? null, ...unitParams, tahun, bulan, tahun, bulan]
+    )
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp',
+      action: 'payment',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'create',
+      entityType: 'santri_batch',
+      entityId: 'spp-bayar-semua',
+      entityLabel: unit,
+      summary: `Mencatat pembayaran SPP massal ${count} santri ${unit} bulan ${bulan}/${tahun}`,
+      details: { tahun, bulan, nominal_per_bulan: nominalPerBulan, unit_setor: unit, count },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    return { success: true, count }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal membayar semua santri.' }
+  }
+}
+
 export async function batalkanPembayaranSPP(logId: string): Promise<{ success: boolean } | { error: string }> {
   if (!logId) return { error: 'Data pembayaran tidak valid.' }
 

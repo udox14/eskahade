@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -45,6 +45,7 @@ export default function SPPPage() {
 
   // Quick Pay
   const [payingSantriId, setPayingSantriId] = useState<string | null>(null)
+  const [loadingBatchPay, setLoadingBatchPay] = useState(false)
 
   // Payment view
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
@@ -296,6 +297,21 @@ export default function SPPPage() {
     await refreshSelectedStatus()
   }
 
+  const handleBayarSemuaSantri = async () => {
+    const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
+    if (belumLunas.length === 0) return
+    if (!await confirm(`Tandai ${belumLunas.length} santri ${unitSetor} SUDAH BAYAR SPP ${BULAN_LIST[currentMonthIdx - 1]} ${tahun}?\n\nNominal per santri: Rp ${nominal.toLocaleString('id-ID')}`)) return
+    setLoadingBatchPay(true)
+    const toastId = toast.loading('Memproses pembayaran massal...')
+    const res = await bayarSemuaSantriAsrama(unitSetor, tahun, currentMonthIdx, nominal)
+    toast.dismiss(toastId)
+    setLoadingBatchPay(false)
+    if ('error' in res) { toast.error(res.error) } else {
+      toast.success(`${res.count} santri berhasil ditandai lunas`)
+      await loadData()
+    }
+  }
+
   // Historis modals
   const openHistorisModal = () => {
     setHistorisTahun(billingStart.bulan === 1 ? billingStart.tahun - 1 : billingStart.tahun)
@@ -425,7 +441,7 @@ export default function SPPPage() {
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
-          title="Dashboard SPP"
+          title="Pembayaran SPP"
           description={isSadesaMode ? 'Monitoring pembayaran seluruh santri kategori SADESA.' : 'Monitoring pembayaran santri per unit/asrama.'}
           className="flex-1"
         />
@@ -457,6 +473,20 @@ export default function SPPPage() {
             {loadingData ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
             Tampilkan
           </button>
+          {hasLoaded && isCurrentYear && (() => {
+            const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
+            if (belumLunas.length === 0) return null
+            return (
+              <button
+                onClick={handleBayarSemuaSantri}
+                disabled={loadingBatchPay || loadingData}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 h-9"
+              >
+                {loadingBatchPay ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Users className="w-3.5 h-3.5"/>}
+                Tandai Semua Lunas ({belumLunas.length})
+              </button>
+            )
+          })()}
         </div>
       </div>
 
