@@ -122,48 +122,42 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string) {
 
   const rows = await query<any>(`
     WITH
-      bayar_tahun AS (
-        SELECT santri_id, COUNT(*) AS jumlah_bayar
+      spp_agg AS (
+        SELECT
+          santri_id,
+          COUNT(*) AS jumlah_bayar,
+          MAX(CASE WHEN bulan = ? THEN 1 ELSE 0 END) AS bayar_bulan_ini
         FROM spp_log
         WHERE tahun = ? AND bulan BETWEEN ? AND ?
         GROUP BY santri_id
       ),
-      bayar_bulan_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_log
-        WHERE tahun = ? AND bulan = ?
-      ),
-      ditiadakan_tahun AS (
-        SELECT santri_id, COUNT(*) AS jumlah_tagihan_ditiadakan
+      ditiadakan_agg AS (
+        SELECT
+          santri_id,
+          COUNT(*) AS jumlah_tagihan_ditiadakan,
+          MAX(CASE WHEN bulan = ? THEN 1 ELSE 0 END) AS ditiadakan_bulan_ini
         FROM spp_tagihan_ditiadakan
         WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
         GROUP BY santri_id
-      ),
-      ditiadakan_bulan_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_tagihan_ditiadakan
-        WHERE is_active = 1 AND tahun = ? AND bulan = ?
       )
     SELECT
       s.id, s.nama_lengkap, s.asrama, COALESCE(s.kamar, '-') AS kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
       COALESCE(s.sekolah, '-') AS sekolah, COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
       COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
-      COALESCE(bt.jumlah_bayar, 0) AS jumlah_bayar,
-      COALESCE(dt.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
-      CASE WHEN bbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bulan_ini_lunas,
-      CASE WHEN dbi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS tagihan_ditiadakan_bulan_ini
+      COALESCE(sa.jumlah_bayar, 0) AS jumlah_bayar,
+      COALESCE(da.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+      COALESCE(sa.bayar_bulan_ini, 0) AS bulan_ini_lunas,
+      COALESCE(da.ditiadakan_bulan_ini, 0) AS tagihan_ditiadakan_bulan_ini
     FROM santri s
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN kelas k ON k.id = rp.kelas_id
-    LEFT JOIN bayar_tahun bt ON bt.santri_id = s.id
-    LEFT JOIN bayar_bulan_ini bbi ON bbi.santri_id = s.id
-    LEFT JOIN ditiadakan_tahun dt ON dt.santri_id = s.id
-    LEFT JOIN ditiadakan_bulan_ini dbi ON dbi.santri_id = s.id
+    LEFT JOIN spp_agg sa ON sa.santri_id = s.id
+    LEFT JOIN ditiadakan_agg da ON da.santri_id = s.id
     WHERE s.status_global = 'aktif'
-      ${sadesaMode ? 'AND s.kategori_santri = ?' : 'AND COALESCE(s.kategori_santri, "REGULER") != ? AND s.asrama = ?'}
+      ${sadesaMode ? 'AND s.kategori_santri = ?' : 'AND (s.kategori_santri IS NULL OR s.kategori_santri != ?) AND s.asrama = ?'}
     ORDER BY s.nama_lengkap ASC
-  `, sadesaMode ? [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY] 
-                : [tahun, startMonth, maxCheck, tahun, currentMonth, tahun, startMonth, maxCheck, tahun, currentMonth, SADESA_CATEGORY, unit])
+  `, sadesaMode ? [currentMonth, tahun, startMonth, maxCheck, currentMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY]
+                : [currentMonth, tahun, startMonth, maxCheck, currentMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY, unit])
 
   const historisMap = await getJumlahTunggakanHistorisBySantri(rows.map((s: any) => s.id))
   
@@ -192,6 +186,12 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   const sadesaMode = isSadesaUnit(unit)
 
   const currentMonth = new Date().getMonth() + 1
+  const currentYear = new Date().getFullYear()
+  const currentMonthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+  const nextMo = currentMonth === 12 ? 1 : currentMonth + 1
+  const nextYr = currentMonth === 12 ? currentYear + 1 : currentYear
+  const currentMonthEnd = `${nextYr}-${String(nextMo).padStart(2, '0')}-01`
+
   const billingStart = await getSppBillingStart()
   const isBeforeBillingStart = (tahun * 100 + currentMonth) < (billingStart.tahun * 100 + billingStart.bulan)
 
@@ -201,7 +201,7 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
         SELECT id, nama_lengkap, COALESCE(bebas_spp, 0) AS bebas_spp
         FROM santri
         WHERE status_global = 'aktif'
-          ${sadesaMode ? 'AND kategori_santri = ?' : 'AND COALESCE(kategori_santri, "REGULER") != ? AND asrama = ?'}
+          ${sadesaMode ? 'AND kategori_santri = ?' : 'AND (kategori_santri IS NULL OR kategori_santri != ?) AND asrama = ?'}
       ),
       bayar_ini AS (
         SELECT DISTINCT santri_id
@@ -216,16 +216,13 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
       uang_masuk_bulan_ini AS (
         SELECT sl.santri_id, sl.nominal_bayar, sl.bulan, sl.tahun
         FROM spp_log sl
-        WHERE CAST(strftime('%Y', sl.tanggal_bayar) AS INTEGER) = ?
-          AND CAST(strftime('%m', sl.tanggal_bayar) AS INTEGER) = ?
+        WHERE sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
       ),
       uang_historis_masuk_bulan_ini AS (
         SELECT th.santri_id, th.nominal_tagihan
         FROM spp_tunggakan_historis th
         WHERE th.status = 'LUNAS'
-          AND th.tanggal_lunas IS NOT NULL
-          AND CAST(strftime('%Y', th.tanggal_lunas) AS INTEGER) = ?
-          AND CAST(strftime('%m', th.tanggal_lunas) AS INTEGER) = ?
+          AND th.tanggal_lunas >= ? AND th.tanggal_lunas < ?
       )
     SELECT
       bs.id,
@@ -242,8 +239,8 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN uang_masuk_bulan_ini um ON um.santri_id = bs.id
     LEFT JOIN uang_historis_masuk_bulan_ini uh ON uh.santri_id = bs.id
-  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, new Date().getFullYear(), currentMonth, new Date().getFullYear(), currentMonth] 
-                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, new Date().getFullYear(), currentMonth, new Date().getFullYear(), currentMonth])
+  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
+                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
 
   let totalSantri = 0
   let bebasSppCount = 0

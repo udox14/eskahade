@@ -5,7 +5,8 @@ import {
   getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin,
   getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin,
   getAlasanIzinList, simpanAlasanIzinList,
-  ajukanIzinAsrama, getPengajuanPendingAsrama, approveIzinAsrama, rejectIzinAsrama
+  ajukanIzinAsrama, getPengajuanPendingAsrama, approveIzinAsrama, rejectIzinAsrama,
+  getRiwayatPengajuanAsrama
 } from './actions'
 import { 
   Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, 
@@ -116,9 +117,24 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
   const [pengajuanCount, setPengajuanCount] = useState(0)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
+  // Asrama-only riwayat state
+  const [riwayatPengajuan, setRiwayatPengajuan] = useState<any[]>([])
+  const [loadingRiwayat, setLoadingRiwayat] = useState(false)
+
   const [draftAlasan, setDraftAlasan] = useState<string[]>(DEFAULT_LIST_ALASAN)
   const [newAlasan, setNewAlasan] = useState('')
   const [savingAlasan, setSavingAlasan] = useState(false)
+
+  const loadRiwayat = useCallback(async () => {
+    if (!isAsrama) return
+    setLoadingRiwayat(true)
+    try {
+      const rows = await getRiwayatPengajuanAsrama()
+      setRiwayatPengajuan(rows)
+    } finally {
+      setLoadingRiwayat(false)
+    }
+  }, [isAsrama])
 
   useEffect(() => {
     getAsramaList().then(setAsramaOptions)
@@ -130,7 +146,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
     if (isDewanOrAdmin) {
       getPengajuanPendingAsrama().then(rows => setPengajuanCount(rows.length))
     }
-  }, [isDewanOrAdmin])
+    if (isAsrama) {
+      loadRiwayat()
+    }
+  }, [isDewanOrAdmin, isAsrama, loadRiwayat])
 
   const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, ta = tglAwal, tk = tglAkhir, st = statusFilter) => {
     setLoading(true)
@@ -254,7 +273,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
             : "Data perizinan berhasil disimpan!")
         setIsOpenInput(false)
         setIsOpenEdit(false)
-        loadData(1) // Return to page 1
+        if (isAsrama) {
+          loadRiwayat()
+        } else {
+          loadData(1)
+        }
       }
     } catch (error: any) {
       console.error('Gagal menyimpan data izin:', error)
@@ -490,6 +513,145 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
       </div>
     </>
   )
+
+  // ── ASRAMA VIEW (simplified) ──────────────────────────────────────────────
+  if (isAsrama) {
+    const statusBadge = (status: string) => {
+      if (status === 'PENDING') return <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">Menunggu</span>
+      if (status === 'APPROVED') return <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3"/>Disetujui</span>
+      return <span className="text-[10px] font-bold bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-200 flex items-center gap-1"><X className="w-3 h-3"/>Ditolak</span>
+    }
+
+    return (
+      <div className="space-y-5 max-w-2xl mx-auto pb-20">
+        {/* HEADER */}
+        <div className="flex items-start gap-4">
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6 text-slate-600" />
+          </button>
+          <DashboardPageHeader
+            title="Pengajuan Izin Pulang"
+            description="Ajukan izin pulang santri. Persetujuan diberikan oleh dewan santri."
+            className="flex-1"
+          />
+        </div>
+
+        {/* TOMBOL AJUKAN */}
+        <div className="flex justify-end">
+          <button
+            onClick={openTambahModal}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> Ajukan Izin Pulang
+          </button>
+        </div>
+
+        {/* RIWAYAT PENGAJUAN */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Riwayat Pengajuan</h2>
+          {loadingRiwayat ? (
+            <div className="flex justify-center py-12 text-slate-400 bg-white rounded-2xl border border-slate-200">
+              <Clock className="w-5 h-5 animate-spin" /><span className="ml-2 text-sm font-medium">Memuat...</span>
+            </div>
+          ) : riwayatPengajuan.length === 0 ? (
+            <div className="text-center py-14 bg-white rounded-2xl border border-slate-200 flex flex-col items-center">
+              <div className="bg-slate-50 p-4 rounded-full mb-3"><Home className="w-8 h-8 text-slate-300" /></div>
+              <p className="text-sm text-slate-500 font-medium">Belum ada riwayat pengajuan.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {riwayatPengajuan.map(item => (
+                <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{item.nama}</p>
+                      <p className="text-[11px] text-slate-500">{item.nis} · {item.asrama} / {item.kamar}</p>
+                    </div>
+                    <div className="flex items-center">{statusBadge(item.status)}</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1 border border-slate-100">
+                    <p className="italic text-slate-500">"{item.alasan}"</p>
+                    <div className="flex gap-4 pt-1 border-t border-slate-100">
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.jenis, item.tgl_mulai)}</span>
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2">
+                    Diajukan: {formatWibDateTime(item.created_at)} · Via {item.pemberi_izin}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* MODAL INPUT (reuse existing) */}
+        {isOpenInput && (
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg">Ajukan Izin Pulang</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Pengajuan akan diteruskan ke dewan santri untuk disetujui.</p>
+                </div>
+                <button type="button" onClick={() => setIsOpenInput(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
+              </div>
+              <form onSubmit={handleSimpan} className="p-5 max-h-[80vh] overflow-y-auto space-y-5">
+                {!selectedSantri ? (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Pilih Santri</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium" placeholder="Ketik Nama / NIS..." value={searchSantri} onChange={(e) => setSearchSantri(e.target.value)} autoFocus />
+                      </div>
+                      <button type="button" onClick={handleCariSantri} className="bg-slate-800 text-white px-4 rounded-xl font-bold hover:bg-slate-900 transition-colors text-sm">Cari</button>
+                    </div>
+                    {hasilCari.length > 0 && (
+                      <div className="mt-3 divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                        {hasilCari.map(s => (
+                          <div key={s.id} onClick={() => setSelectedSantri(s)} className="p-3 bg-white hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{s.nama_lengkap}</p>
+                              <p className="text-[10px] text-slate-400">{s.nis}</p>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{s.asrama} / {s.kamar}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-purple-50 p-3.5 rounded-xl flex justify-between items-center border border-purple-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <User className="w-5 h-5 text-purple-600"/>
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-slate-800">{selectedSantri.nama_lengkap}</p>
+                        <p className="text-[11px] font-medium text-slate-500">{selectedSantri.nis} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg hover:bg-rose-100 transition-colors">Ganti</button>
+                  </div>
+                )}
+
+                {selectedSantri && renderFormFields()}
+
+                {selectedSantri && (
+                  <div className="pt-2">
+                    <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3.5 rounded-xl font-bold shadow-sm shadow-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                      <Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN PULANG
+                    </button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">

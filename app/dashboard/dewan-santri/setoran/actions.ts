@@ -101,6 +101,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
   const bulanSebelumnya = bulan === 1 ? 12 : bulan - 1
   const tahunSebelumnya = bulan === 1 ? tahun - 1 : tahun
 
+  const monthStart = `${tahun}-${String(bulan).padStart(2, '0')}-01`
+  const nextMo = bulan === 12 ? 1 : bulan + 1
+  const nextYr = bulan === 12 ? tahun + 1 : tahun
+  const monthEnd = `${nextYr}-${String(nextMo).padStart(2, '0')}-01`
+
   const baseRows = await query<MonitoringRow>(`
     WITH
       base_santri AS (
@@ -124,9 +129,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         SELECT santri_id, COUNT(*) AS jumlah_bayar, SUM(nominal_bayar) AS total_nominal
         FROM spp_log
         WHERE (tahun * 100 + bulan) < (? * 100 + ?)
-          AND tanggal_bayar IS NOT NULL
-          AND CAST(strftime('%Y', tanggal_bayar) AS INTEGER) = ?
-          AND CAST(strftime('%m', tanggal_bayar) AS INTEGER) = ?
+          AND tanggal_bayar >= ? AND tanggal_bayar < ?
         GROUP BY santri_id
       ),
       ditiadakan_ini AS (
@@ -163,12 +166,12 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
     LEFT JOIN nominal_bulan_ini nbi ON nbi.unit_setor = bs.unit_setor
     LEFT JOIN tunggakan_unit tu ON tu.unit_setor = bs.unit_setor
-    GROUP BY bs.unit_setor, nbi.nominal_bulan_ini, tu.jumlah_bayar
+    GROUP BY bs.unit_setor
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
   `, [
     SADESA_CATEGORY, SADESA_UNIT,
     tahun, bulan,
-    tahun, bulan, tahun, bulan,
+    tahun, bulan, monthStart, monthEnd,
     tahun, bulan,
     tahun, bulan,
     SADESA_UNIT,
@@ -205,13 +208,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
      FROM spp_tunggakan_historis th
      JOIN santri s ON s.id = th.santri_id
      WHERE th.status = 'LUNAS'
-       AND th.tanggal_lunas IS NOT NULL
-       AND CAST(strftime('%Y', th.tanggal_lunas) AS INTEGER) = ?
-       AND CAST(strftime('%m', th.tanggal_lunas) AS INTEGER) = ?
+       AND th.tanggal_lunas >= ? AND th.tanggal_lunas < ?
        AND s.status_global = 'aktif'
        ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
      GROUP BY unit_setor`,
-    [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan]
+    [SADESA_CATEGORY, SADESA_UNIT, monthStart, monthEnd]
   )
   const historisPaidMap = new Map(historisPaidRows.map(r => [r.unit_setor, r]))
   const tunggakanPaidRows = await query<{
@@ -227,13 +228,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
      FROM spp_log sl
      JOIN santri s ON s.id = sl.santri_id
      WHERE (sl.tahun * 100 + sl.bulan) < (? * 100 + ?)
-       AND sl.tanggal_bayar IS NOT NULL
-       AND CAST(strftime('%Y', sl.tanggal_bayar) AS INTEGER) = ?
-       AND CAST(strftime('%m', sl.tanggal_bayar) AS INTEGER) = ?
+       AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
        AND s.status_global = 'aktif'
        ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
      GROUP BY unit_setor`,
-    [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan, tahun, bulan]
+    [SADESA_CATEGORY, SADESA_UNIT, tahun, bulan, monthStart, monthEnd]
   )
   const tunggakanPaidMap = new Map(tunggakanPaidRows.map(r => [r.unit_setor, r.total_nominal]))
 

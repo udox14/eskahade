@@ -540,8 +540,42 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
     details: { jenis, alasan: alasan_final, pemberi_izin, tgl_mulai, tgl_selesai_rencana },
   })
 
+  // Trim oldest jika per-user sudah > 30
+  if (session?.id) {
+    await execute(`
+      DELETE FROM perizinan_pengajuan
+      WHERE submitted_by = ? AND id NOT IN (
+        SELECT id FROM perizinan_pengajuan
+        WHERE submitted_by = ?
+        ORDER BY created_at DESC
+        LIMIT 30
+      )
+    `, [session.id, session.id])
+  }
+
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
+}
+
+// ─── Get Riwayat Pengajuan milik user asrama (maks 30) ───────────────────────
+export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
+  const session = await getSession()
+  if (!session) return []
+  try {
+    await ensurePengajuanTable()
+    return await query<any>(`
+      SELECT pq.id, pq.created_at, pq.jenis, pq.alasan, pq.pemberi_izin,
+             pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
+             s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
+      FROM perizinan_pengajuan pq
+      JOIN santri s ON s.id = pq.santri_id
+      WHERE pq.submitted_by = ?
+      ORDER BY pq.created_at DESC
+      LIMIT 30
+    `, [session.id])
+  } catch {
+    return []
+  }
 }
 
 // ─── Get Pengajuan Pending dari Asrama ────────────────────────────────────────
