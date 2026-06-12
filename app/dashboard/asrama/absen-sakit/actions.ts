@@ -439,6 +439,44 @@ export async function hapusDataSakit(payload: { episodeId: string }) {
   return { success: true, nama: target.nama_lengkap }
 }
 
+export type RiwayatSantriSummary = {
+  santri_id: string
+  nama_lengkap: string
+  nis: string | null
+  kamar: string | null
+  asrama: string | null
+  foto_url: string | null
+  total_episode: number
+  last_sakit_at: string | null
+}
+
+export async function getRiwayatSantriList(params: { asrama: string }): Promise<RiwayatSantriSummary[]> {
+  await ensureSchema()
+
+  const session = await requireAllowedSession()
+  if (!session) return []
+
+  const restrictedAsrama = await getRestrictedAsrama()
+  const targetAsrama = restrictedAsrama || params.asrama
+
+  return query<RiwayatSantriSummary>(`
+    SELECT
+      ab.santri_id,
+      s.nama_lengkap,
+      s.nis,
+      s.kamar,
+      s.asrama,
+      s.foto_url,
+      COUNT(DISTINCT COALESCE(ab.episode_id, ab.id)) AS total_episode,
+      MAX(COALESCE(ab.mulai_at, ab.tanggal || 'T00:00:00.000Z')) AS last_sakit_at
+    FROM absen_sakit ab
+    JOIN santri s ON s.id = ab.santri_id
+    WHERE s.asrama = ?
+    GROUP BY ab.santri_id, s.nama_lengkap, s.nis, s.kamar, s.asrama, s.foto_url
+    ORDER BY total_episode DESC, last_sakit_at DESC
+  `, [targetAsrama])
+}
+
 export async function getRiwayatSakit(santriId: string): Promise<RiwayatSakitItem[]> {
   await ensureSchema()
 
