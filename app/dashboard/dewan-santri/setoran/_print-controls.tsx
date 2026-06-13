@@ -53,14 +53,16 @@ export default function MonitoringPrintControls({
 
   const printRows = useMemo(() => {
     const filtered = data.filter(row => printMode === 'SADESA' ? row.is_sadesa : !row.is_sadesa)
-    return filtered
-      .slice()
-      .sort((a, b) => {
-        if (b.persentase !== a.persentase) return b.persentase - a.persentase
-        if (b.bayar_bulan_ini !== a.bayar_bulan_ini) return b.bayar_bulan_ini - a.bayar_bulan_ini
-        return a.unit_setor.localeCompare(b.unit_setor)
-      })
-      .map((row, index) => ({ ...row, rank: index + 1 }))
+    const withSetor = filtered
+      .filter(r => r.tanggal_setor && !r.belum_ada_tagihan)
+      .sort((a, b) => new Date(a.tanggal_setor!).getTime() - new Date(b.tanggal_setor!).getTime())
+    const withoutSetor = filtered
+      .filter(r => !r.tanggal_setor || r.belum_ada_tagihan)
+      .sort((a, b) => a.unit_setor.localeCompare(b.unit_setor))
+    return [
+      ...withSetor.map((row, i) => ({ ...row, rank: i + 1 as number | null })),
+      ...withoutSetor.map(row => ({ ...row, rank: null as number | null })),
+    ]
   }, [data, printMode])
 
   const printTotals = useMemo(() => {
@@ -165,7 +167,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
   tahunAjaran: string
   nominal: number
   mode: PrintMode
-  rows: Array<AsramaRow & { rank: number }>
+  rows: Array<AsramaRow & { rank: number | null }>
   totals: {
     total_santri: number
     bebas_spp: number
@@ -271,7 +273,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th colSpan={2} style={{ width: '126px' }}>Uang Tercatat</th>
               <th colSpan={2} style={{ width: '126px' }}>Rincian</th>
               <th rowSpan={2} style={{ width: '48px' }}>%</th>
-              <th rowSpan={2} style={{ width: '62px' }}>Tgl Stor</th>
+              <th rowSpan={2} style={{ width: '72px' }}>Tgl/Jam Stor</th>
               <th rowSpan={2} style={{ width: '48px' }}>Rank</th>
             </tr>
             <tr className="sub-head">
@@ -305,8 +307,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
                   <td className="text-right">{formatNumber(row.nominal_bulan_ini)}</td>
                   <td className="text-right">{formatNumber(row.nominal_tunggakan_lalu)}</td>
                   <td className="highlight text-center">{row.persentase}</td>
-                  <td className="text-center">{safeFormatShortDate(row.tanggal_setor)}</td>
-                  <td className="text-center">{row.rank}</td>
+                  <td className="text-center">{safeFormatDateTime(row.tanggal_setor)}</td>
+                  <td className="text-center font-bold">{row.rank ?? '-'}</td>
                 </tr>
               )
             })}
@@ -368,9 +370,9 @@ function formatCurrency(value: number) {
   return `Rp ${formatNumber(value)}`
 }
 
-function safeFormatShortDate(value: string | null) {
+function safeFormatDateTime(value: string | null) {
   if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
-  return format(date, 'dd/MM')
+  return format(date, 'dd/MM HH:mm')
 }

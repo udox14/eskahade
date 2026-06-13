@@ -64,6 +64,7 @@ export default function MonitoringSetoranPage() {
   const [setoranWindowInput, setSetoranWindowInput] = useState('')
   const [savingSetoranWindow, setSavingSetoranWindow] = useState(false)
   const [isSetoranWindowModalOpen, setIsSetoranWindowModalOpen] = useState(false)
+  const [filterAsrama, setFilterAsrama] = useState('SEMUA')
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -386,15 +387,31 @@ export default function MonitoringSetoranPage() {
     }
   }
 
-  const totalSantri    = data.reduce((a, r) => a + r.total_santri, 0)
-  const totalBebasSpp  = data.reduce((a, r) => a + r.bebas_spp, 0)
-  const totalTidakAdaTagihan = data.reduce((a, r) => a + r.tidak_ada_tagihan, 0)
-  const totalWajib     = data.reduce((a, r) => a + r.wajib_bayar, 0)
-  const totalBayar     = data.reduce((a, r) => a + r.bayar_bulan_ini, 0)
-  const totalTunggak   = data.reduce((a, r) => a + r.penunggak, 0)
-  const totalNominal   = data.reduce((a, r) => a + r.total_nominal, 0)
-  const totalNominalBulanIni = data.reduce((a, r) => a + r.nominal_bulan_ini, 0)
-  const totalNominalTunggakan = data.reduce((a, r) => a + r.nominal_tunggakan_lalu, 0)
+  const rankMap = React.useMemo(() => {
+    const ranked = data
+      .filter(r => r.tanggal_setor !== null && !r.belum_ada_tagihan)
+      .sort((a, b) => new Date(a.tanggal_setor!).getTime() - new Date(b.tanggal_setor!).getTime())
+    const map = new Map<string, number>()
+    ranked.forEach((r, i) => map.set(r.unit_setor, i + 1))
+    return map
+  }, [data])
+
+  const filteredData = React.useMemo(() => {
+    if (filterAsrama === 'SEMUA') return data
+    if (filterAsrama === 'SUDAH_SETOR') return data.filter(r => r.tanggal_setor !== null)
+    if (filterAsrama === 'BELUM_SETOR') return data.filter(r => !r.tanggal_setor && !r.belum_ada_tagihan)
+    return data.filter(r => r.unit_setor === filterAsrama)
+  }, [data, filterAsrama])
+
+  const totalSantri    = filteredData.reduce((a, r) => a + r.total_santri, 0)
+  const totalBebasSpp  = filteredData.reduce((a, r) => a + r.bebas_spp, 0)
+  const totalTidakAdaTagihan = filteredData.reduce((a, r) => a + r.tidak_ada_tagihan, 0)
+  const totalWajib     = filteredData.reduce((a, r) => a + r.wajib_bayar, 0)
+  const totalBayar     = filteredData.reduce((a, r) => a + r.bayar_bulan_ini, 0)
+  const totalTunggak   = filteredData.reduce((a, r) => a + r.penunggak, 0)
+  const totalNominal   = filteredData.reduce((a, r) => a + r.total_nominal, 0)
+  const totalNominalBulanIni = filteredData.reduce((a, r) => a + r.nominal_bulan_ini, 0)
+  const totalNominalTunggakan = filteredData.reduce((a, r) => a + r.nominal_tunggakan_lalu, 0)
   const pctKeseluruhan = totalWajib > 0 ? Math.round((totalBayar / totalWajib) * 100) : 0
   const selectedBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
   const tahunAjaranDisplay = tahunAjaranNama ?? deriveAcademicYear(tahun, bulan)
@@ -423,6 +440,26 @@ export default function MonitoringSetoranPage() {
           <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
           <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
         </div>
+
+        {!userAsrama && (
+          <select
+            value={filterAsrama}
+            onChange={e => setFilterAsrama(e.target.value)}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="SEMUA">Semua Asrama</option>
+            <option value="SUDAH_SETOR">Sudah Setor</option>
+            <option value="BELUM_SETOR">Belum Setor</option>
+            {hasLoaded && data.length > 0 && (
+              <>
+                <option disabled>──────────</option>
+                {data.map(r => (
+                  <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                ))}
+              </>
+            )}
+          </select>
+        )}
 
         <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 flex-1 min-w-[220px]">
           <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
@@ -473,7 +510,7 @@ export default function MonitoringSetoranPage() {
           )}
 
           {/* ── Ringkasan Total - Sleek Version ── */}
-          {!userAsrama && hasLoaded && data.length > 0 && (
+          {!userAsrama && hasLoaded && filteredData.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
               <StatCard title="Total Santri" value={fmt(totalSantri)} icon={Users} />
               <StatCard title="Tidak Ada Tagihan" value={fmt(totalTidakAdaTagihan)} icon={CalendarCheck} color="text-blue-600" />
@@ -500,8 +537,10 @@ export default function MonitoringSetoranPage() {
                  <Search className="w-10 h-10 mb-3 opacity-50"/>
                  <p className="text-sm font-medium">Tidak ada data aktif. Klik Tarik Data.</p>
               </div>
-            ) : data.length === 0 ? (
-              <div className="py-24 text-center text-sm font-medium text-slate-400">Tidak ditemukan data.</div>
+            ) : filteredData.length === 0 ? (
+              <div className="py-24 text-center text-sm font-medium text-slate-400">
+                {hasLoaded ? 'Tidak ada data untuk filter ini.' : 'Tidak ditemukan data.'}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -515,7 +554,7 @@ export default function MonitoringSetoranPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {data.map((row) => (
+                    {filteredData.map((row) => (
                       <tr key={row.unit_setor} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="py-3 px-5">
                           <p className="font-semibold text-slate-800">{row.unit_setor}</p>
@@ -552,8 +591,15 @@ export default function MonitoringSetoranPage() {
                           {row.belum_ada_tagihan ? (
                             <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md inline-block">Tidak Ditagihkan</span>
                           ) : row.tanggal_setor ? (
-                            <div className="inline-flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50">
-                              <CheckCircle2 className="w-3.5 h-3.5"/> Disetor {format(new Date(row.tanggal_setor), 'dd/MM')}
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="inline-flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50">
+                                <CheckCircle2 className="w-3.5 h-3.5"/> Disetor {format(new Date(row.tanggal_setor), 'dd/MM HH:mm')}
+                              </div>
+                              {rankMap.has(row.unit_setor) && (
+                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                  #{rankMap.get(row.unit_setor)}
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md inline-block">Belum Laporan</span>
