@@ -861,7 +861,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     backfillManualWaliKelasFromGuruMaghrib(),
   ])
 
-  const [tarif, pembuatSoalRows, raporRows, pemeriksaanResolvedRows, pengawasanRows] = await Promise.all([
+  const [tarif, pembuatSoalRows, raporRows, pemeriksaanResolvedRows, pengawasanRows, pengajarGuruRows] = await Promise.all([
     getHonorTarif(eventId),
     query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
       SELECT
@@ -962,6 +962,21 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       GROUP BY COALESCE(CAST(pengawas_id AS TEXT), 'sadesa:' || nama), guru_id, nama
       ORDER BY nama
     `, [eventId, eventId, eventId, eventId]),
+    // Guru yang punya role 'guru' atau 'wali_kelas' (main role atau secondary).
+    // Dipakai untuk menentukan tarif honor pengawasan: pengawas dari pengajar = tarif RAB penuh.
+    query<{ guru_id: number }>(`
+      SELECT DISTINCT CAST(u.source_ref_id AS INTEGER) as guru_id
+      FROM users u
+      WHERE u.source_type = 'guru'
+        AND u.source_ref_id IS NOT NULL
+        AND (
+          u.role IN ('guru', 'wali_kelas')
+          OR EXISTS (
+            SELECT 1 FROM json_each(COALESCE(u.roles, '[]'))
+            WHERE value IN ('guru', 'wali_kelas')
+          )
+        )
+    `),
   ])
 
   const soalItems: HonorItem[] = pembuatSoalRows
@@ -1026,17 +1041,29 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
     detail: details.join('; '),
   }))
 
-  const pengawasanItems: HonorItem[] = pengawasanRows.map(row => ({
-    id: `pengawas-${row.pengawas_id ?? row.nama}`,
-    jenis: 'pengawasan',
-    guru_id: row.guru_id,
-    nama: row.nama,
-    qty: Number(row.qty || 0),
-    tarif: tarif.pengawasan,
-    total: Number(row.qty || 0) * tarif.pengawasan,
-    detail: row.detail || 'Jadwal pengawasan',
-    editable: false,
-  }))
+  const pengajarGuruIds = new Set(
+    pengajarGuruRows.map(row => Number(row.guru_id)).filter(id => Number.isFinite(id))
+  )
+  const POTONGAN_NON_PENGAJAR = 5000
+
+  const pengawasanItems: HonorItem[] = pengawasanRows.map(row => {
+    const isPengajar = row.guru_id != null && pengajarGuruIds.has(Number(row.guru_id))
+    const tarifPengawas = isPengajar
+      ? tarif.pengawasan
+      : Math.max(0, tarif.pengawasan - POTONGAN_NON_PENGAJAR)
+    const qty = Number(row.qty || 0)
+    return {
+      id: `pengawas-${row.pengawas_id ?? row.nama}`,
+      jenis: 'pengawasan',
+      guru_id: row.guru_id,
+      nama: row.nama,
+      qty,
+      tarif: tarifPengawas,
+      total: qty * tarifPengawas,
+      detail: row.detail || 'Jadwal pengawasan',
+      editable: false,
+    }
+  })
 
   return [...soalItems, ...raporItems, ...pemeriksaanItems, ...pengawasanItems]
 }
