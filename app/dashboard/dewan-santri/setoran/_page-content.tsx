@@ -63,6 +63,7 @@ export default function MonitoringSetoranPage() {
   const [setoranWindow, setSetoranWindow] = useState<string | null>(null)
   const [setoranWindowInput, setSetoranWindowInput] = useState('')
   const [savingSetoranWindow, setSavingSetoranWindow] = useState(false)
+  const [isSetoranWindowModalOpen, setIsSetoranWindowModalOpen] = useState(false)
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -371,14 +372,15 @@ export default function MonitoringSetoranPage() {
     }
   }
 
-  async function handleSimpanSetoranWindow(e: React.FormEvent) {
+  async function handleSimpanSetoranWindow(e: React.FormEvent): Promise<boolean> {
     e.preventDefault()
     setSavingSetoranWindow(true)
     try {
       const res = await simpanSppSetoranWindow(tahun, bulan, setoranWindowInput)
-      if ('error' in res) { toast.error(res.error); return }
+      if ('error' in res) { toast.error(res.error); return false }
       setSetoranWindow(setoranWindowInput)
       toast.success('Tanggal mulai setoran diperbarui')
+      return true
     } finally {
       setSavingSetoranWindow(false)
     }
@@ -440,29 +442,21 @@ export default function MonitoringSetoranPage() {
               </button>
             </form>
 
-            <form onSubmit={handleSimpanSetoranWindow} className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-              <div className="flex items-center gap-2 text-indigo-700">
-                <CalendarDays className="w-4 h-4 shrink-0" />
-                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                  Mulai Setor
-                  {setoranWindow && <span className="ml-1 text-emerald-600 font-semibold">✓</span>}
-                </label>
-              </div>
-              <input
-                type="date"
-                value={setoranWindowInput}
-                onChange={e => setSetoranWindowInput(e.target.value)}
-                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button type="submit" disabled={savingSetoranWindow || !setoranWindowInput} className="h-10 w-full sm:w-10 inline-flex items-center justify-center rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-50" title="Simpan tanggal mulai setoran">
-                {savingSetoranWindow ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            <div className="flex gap-2">
+              <button onClick={() => load()} disabled={loading} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
               </button>
-            </form>
-
-            <button onClick={() => load()} disabled={loading} className={`w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsSetoranWindowModalOpen(true)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${setoranWindow ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                title="Atur tanggal mulai setoran"
+              >
+                <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                {setoranWindow ? format(new Date(setoranWindow), 'd MMM') : 'Mulai Setor'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -973,6 +967,49 @@ export default function MonitoringSetoranPage() {
                   )}
                </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Mulai Setor ── */}
+      {isSetoranWindowModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Mulai Setor</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Tanggal asrama mulai bisa setor — {BULAN_NAMA[bulan]} {tahun}</p>
+              </div>
+              <button onClick={() => setIsSetoranWindowModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors"><X className="w-4 h-4"/></button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                const ok = await handleSimpanSetoranWindow(e)
+                if (ok) setIsSetoranWindowModalOpen(false)
+              }}
+              className="p-5 space-y-4"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Tanggal Mulai Setor</label>
+                <input
+                  type="date"
+                  value={setoranWindowInput}
+                  onChange={e => setSetoranWindowInput(e.target.value)}
+                  className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1.5">Setelah tanggal ini asrama dapat melaporkan setoran tunai untuk {BULAN_NAMA[bulan]} {tahun}.</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setIsSetoranWindowModalOpen(false)} className="px-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1 transition-colors">
+                  Batal
+                </button>
+                <button type="submit" disabled={savingSetoranWindow || !setoranWindowInput} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex justify-center items-center gap-2 flex-1 disabled:opacity-50">
+                  {savingSetoranWindow ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                  {savingSetoranWindow ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
