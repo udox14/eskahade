@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData } from './actions'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download, CalendarDays
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -37,6 +37,14 @@ type AsramaRow = {
   belum_ada_tagihan?: boolean
   is_sadesa?: boolean
 }
+
+type CacheEntry = {
+  tahun: number
+  bulan: number
+  data: AsramaRow[]
+  nominal: number
+}
+let _setoranCache: CacheEntry | null = null
 const MonitoringPrintControls = dynamic(() => import('./_print-controls'), { ssr: false })
 
 export default function MonitoringSetoranPage() {
@@ -52,6 +60,9 @@ export default function MonitoringSetoranPage() {
   const [billingStartInput, setBillingStartInput] = useState('2026-06')
   const [savingBillingStart, setSavingBillingStart] = useState(false)
   const [tahunAjaranNama, setTahunAjaranNama] = useState<string | null>(null)
+  const [setoranWindow, setSetoranWindow] = useState<string | null>(null)
+  const [setoranWindowInput, setSetoranWindowInput] = useState('')
+  const [savingSetoranWindow, setSavingSetoranWindow] = useState(false)
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -258,17 +269,29 @@ export default function MonitoringSetoranPage() {
 
   const tahunList = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
-  const load = async () => {
+  const load = async (forceRefresh = false) => {
+    if (!forceRefresh && _setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan) {
+      const rows = _setoranCache.data
+      setData(userAsrama ? rows.filter((r: AsramaRow) => r.unit_setor === userAsrama) : rows)
+      setNominal(_setoranCache.nominal)
+      setHasLoaded(true)
+      if (isModalOpen && activeRow) {
+        const updatedRow = rows.find((r: AsramaRow) => r.unit_setor === activeRow.unit_setor)
+        if (updatedRow) setActiveRow(updatedRow)
+      }
+      return
+    }
     setLoading(true)
     try {
       const [rows, settings] = await Promise.all([
         getMonitoringSetoran(tahun, bulan),
         getSppSettings(tahun),
       ])
+      _setoranCache = { tahun, bulan, data: rows, nominal: settings.nominal }
       setData(userAsrama ? rows.filter((r: AsramaRow) => r.unit_setor === userAsrama) : rows)
       setNominal(settings.nominal)
       setHasLoaded(true)
-      
+
       if (isModalOpen && activeRow) {
         const updatedRow = rows.find((r: AsramaRow) => r.unit_setor === activeRow.unit_setor)
         if (updatedRow) setActiveRow(updatedRow)
@@ -290,8 +313,12 @@ export default function MonitoringSetoranPage() {
   }, [])
 
   useEffect(() => {
-    load()
-  }, [tahun, bulan, userAsrama])
+    setHasLoaded(false)
+    getSppSetoranWindow(tahun, bulan).then(w => {
+      setSetoranWindow(w)
+      setSetoranWindowInput(w ?? '')
+    })
+  }, [tahun, bulan])
 
   function prevBulan() {
     if (bulan === 1) { setBulan(12); setTahun(t => t - 1) }
@@ -322,7 +349,7 @@ export default function MonitoringSetoranPage() {
       if ('error' in res) { toast.error(res.error); return }
       toast.success('Setoran berhasil disimpan')
       setIsEditingForm(false)
-      load() 
+      load(true)
     } finally {
       setSavingSetoran(false)
     }
@@ -338,9 +365,22 @@ export default function MonitoringSetoranPage() {
       setBillingStart(updated)
       setBillingStartInput(updated.value)
       toast.success('Awal tagihan SPP diperbarui')
-      load()
+      load(true)
     } finally {
       setSavingBillingStart(false)
+    }
+  }
+
+  async function handleSimpanSetoranWindow(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingSetoranWindow(true)
+    try {
+      const res = await simpanSppSetoranWindow(tahun, bulan, setoranWindowInput)
+      if ('error' in res) { toast.error(res.error); return }
+      setSetoranWindow(setoranWindowInput)
+      toast.success('Tanggal mulai setoran diperbarui')
+    } finally {
+      setSavingSetoranWindow(false)
     }
   }
 
@@ -383,7 +423,7 @@ export default function MonitoringSetoranPage() {
             <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="grid gap-2">
             <form onSubmit={handleSimpanBillingStart} className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
               <div className="flex items-center gap-2 text-blue-700">
                 <CalendarCheck className="w-4 h-4 shrink-0" />
@@ -400,9 +440,28 @@ export default function MonitoringSetoranPage() {
               </button>
             </form>
 
-            <button onClick={load} disabled={loading} className={`w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+            <form onSubmit={handleSimpanSetoranWindow} className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+              <div className="flex items-center gap-2 text-indigo-700">
+                <CalendarDays className="w-4 h-4 shrink-0" />
+                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                  Mulai Setor
+                  {setoranWindow && <span className="ml-1 text-emerald-600 font-semibold">✓</span>}
+                </label>
+              </div>
+              <input
+                type="date"
+                value={setoranWindowInput}
+                onChange={e => setSetoranWindowInput(e.target.value)}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button type="submit" disabled={savingSetoranWindow || !setoranWindowInput} className="h-10 w-full sm:w-10 inline-flex items-center justify-center rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-50" title="Simpan tanggal mulai setoran">
+                {savingSetoranWindow ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              </button>
+            </form>
+
+            <button onClick={() => load()} disabled={loading} className={`w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Memuat...' : 'Tarik Data'}
+              {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
             </button>
           </div>
         </div>

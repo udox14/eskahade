@@ -298,15 +298,16 @@ export async function simpanSetoran(
         params: [SADESA_UNIT],
       },
       {
-        sql: `INSERT INTO spp_setoran (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun, tanggal_terima, penerima_id, jumlah_aktual, nama_penyetor)
-              VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
+        sql: `INSERT INTO spp_setoran (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun, tanggal_terima, penerima_id, jumlah_aktual, nama_penyetor, status)
+              VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 'dikonfirmasi')
               ON CONFLICT(unit_setor, bulan, tahun) DO UPDATE SET
                 asrama = excluded.asrama,
                 jenis_unit_setor = excluded.jenis_unit_setor,
                 tanggal_terima = excluded.tanggal_terima,
                 penerima_id = excluded.penerima_id,
                 jumlah_aktual = excluded.jumlah_aktual,
-                nama_penyetor = excluded.nama_penyetor`,
+                nama_penyetor = excluded.nama_penyetor,
+                status = 'dikonfirmasi'`,
         params: [
           generateId(),
           cleanUnit,
@@ -496,6 +497,41 @@ export async function getDaftarBebasSpp(unitSetor?: string) {
     return rows.filter(r => r.unit_setor === unitSetor)
   }
   return rows
+}
+
+export async function getSppSetoranWindow(tahun: number, bulan: number) {
+  const row = await queryOne<{ tanggal_mulai: string }>(
+    `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
+    [tahun, bulan]
+  )
+  return row?.tanggal_mulai ?? null
+}
+
+export async function simpanSppSetoranWindow(
+  tahun: number,
+  bulan: number,
+  tanggalMulai: string
+): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  try {
+    assertMonitoringAccess(session)
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(tanggalMulai)) {
+      return { error: 'Format tanggal tidak valid (YYYY-MM-DD).' }
+    }
+    await execute(
+      `INSERT INTO spp_setoran_window (tahun, bulan, tanggal_mulai, created_by, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(tahun, bulan) DO UPDATE SET
+         tanggal_mulai = excluded.tanggal_mulai,
+         updated_at    = datetime('now')`,
+      [tahun, bulan, tanggalMulai, session?.id ?? null]
+    )
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/asrama/spp')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal menyimpan tanggal mulai setoran.' }
+  }
 }
 
 export async function getPenunggakExportData(

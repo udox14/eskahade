@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama } from './actions'
-import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users } from 'lucide-react'
+import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama, getSetoranInfoBulanIni, submitSetoranAsrama } from './actions'
+import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users, Send, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -78,6 +78,20 @@ export default function SPPPage() {
   const [savingKelasWaive, setSavingKelasWaive] = useState(false)
   const [kelasWaiveModalOpen, setKelasWaiveModalOpen] = useState(false)
 
+  // Setoran ke Pusat state
+  const [setoranInfo, setSetoranInfo] = useState<{
+    unit: string
+    tahun: number
+    bulan: number
+    tanggalMulai: string | null
+    setoran: any | null
+  } | null>(null)
+  const [setoranInfoLoading, setSetoranInfoLoading] = useState(false)
+  const [setoranNama, setSetoranNama] = useState('')
+  const [setoranBulanIni, setSetoranBulanIni] = useState('')
+  const [setoranTunggakan, setSetoranTunggakan] = useState('')
+  const [submittingSetoran, setSubmittingSetoran] = useState(false)
+
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
   const isSadesaMode = unitSetor === SADESA_UNIT
@@ -98,6 +112,15 @@ export default function SPPPage() {
         toast.error(error?.message || 'Gagal memuat batas akses SPP.')
       })
   }, [tahun])
+
+  // Load setoran info for current month (independent of main data load)
+  useEffect(() => {
+    setSetoranInfoLoading(true)
+    getSetoranInfoBulanIni()
+      .then(setSetoranInfo)
+      .catch(() => {})
+      .finally(() => setSetoranInfoLoading(false))
+  }, [])
 
   // Load Data
   const loadData = async () => {
@@ -431,6 +454,29 @@ export default function SPPPage() {
 
   const handleBackToList = () => { window.history.back() }
 
+  const refreshSetoranInfo = () => {
+    getSetoranInfoBulanIni().then(setSetoranInfo).catch(() => {})
+  }
+
+  const handleSubmitSetoran = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const jumlahBulanIni = Number(setoranBulanIni.replace(/\D/g, '') || '0')
+    const jumlahTunggakan = Number(setoranTunggakan.replace(/\D/g, '') || '0')
+    if (jumlahBulanIni + jumlahTunggakan <= 0) {
+      toast.error('Isi minimal satu jumlah setoran.')
+      return
+    }
+    setSubmittingSetoran(true)
+    const res = await submitSetoranAsrama(jumlahBulanIni, jumlahTunggakan, setoranNama)
+    setSubmittingSetoran(false)
+    if ('error' in res) { toast.error(res.error); return }
+    toast.success('Setoran berhasil dikirim ke Dewan Santri!')
+    setSetoranNama('')
+    setSetoranBulanIni('')
+    setSetoranTunggakan('')
+    refreshSetoranInfo()
+  }
+
   const tunggakanHistorisBelumLunas = tunggakanHistoris.filter(item => item.status !== 'LUNAS')
   const totalHistorisBelumLunas = tunggakanHistorisBelumLunas.reduce((sum, item) => sum + Number(item.nominal_tagihan || 0), 0)
 
@@ -489,6 +535,119 @@ export default function SPPPage() {
           })()}
         </div>
       </div>
+
+      {/* SETORAN KE PUSAT */}
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10)
+        const windowOpen = setoranInfo?.tanggalMulai && today >= setoranInfo.tanggalMulai
+        const sudahDikirim = !!setoranInfo?.setoran?.tanggal_setor
+        const sudahDikonfirmasi = !!setoranInfo?.setoran?.tanggal_terima
+        const fmtTgl = (s: string) => { try { return new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) } catch { return s } }
+        const fmtRpLocal = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
+
+        return (
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100">
+              <Wallet className="w-4 h-4 text-indigo-600 shrink-0"/>
+              <h3 className="font-bold text-slate-800 text-sm">Setoran SPP ke Pusat</h3>
+              <span className="text-xs text-slate-400">— {BULAN_LIST[currentMonthIdx - 1]} {new Date().getFullYear()}</span>
+            </div>
+
+            {setoranInfoLoading ? (
+              <div className="p-4 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-indigo-400"/></div>
+            ) : sudahDikonfirmasi ? (
+              <div className="p-4 flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0"/>
+                <div className="text-sm">
+                  <p className="font-bold text-green-700">Sudah Dikonfirmasi Dewan Santri</p>
+                  <p className="text-slate-500 mt-0.5">Diterima {fmtTgl(setoranInfo!.setoran.tanggal_terima)} · Total {fmtRpLocal(setoranInfo!.setoran.jumlah_aktual)}</p>
+                </div>
+              </div>
+            ) : sudahDikirim ? (
+              <div className="p-4 flex items-start gap-3">
+                <Clock className="w-5 h-5 text-blue-500 mt-0.5 shrink-0"/>
+                <div className="text-sm flex-1">
+                  <p className="font-bold text-blue-700">Sudah Dikirim — Menunggu Konfirmasi</p>
+                  <p className="text-slate-500 mt-0.5">
+                    Dikirim {fmtTgl(setoranInfo!.setoran.tanggal_setor)} · Penyetor: <strong>{setoranInfo!.setoran.nama_penyetor}</strong>
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-600">
+                    {(setoranInfo!.setoran.jumlah_bulan_ini ?? 0) > 0 && <span>Bulan ini: <strong>{fmtRpLocal(setoranInfo!.setoran.jumlah_bulan_ini)}</strong></span>}
+                    {(setoranInfo!.setoran.jumlah_tunggakan_bayar ?? 0) > 0 && <span>Tunggakan: <strong>{fmtRpLocal(setoranInfo!.setoran.jumlah_tunggakan_bayar)}</strong></span>}
+                    <span className="font-bold text-slate-800">Total: {fmtRpLocal(setoranInfo!.setoran.jumlah_aktual)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : !setoranInfo?.tanggalMulai ? (
+              <div className="p-4 flex items-center gap-3 text-amber-700 bg-amber-50/60">
+                <AlertCircle className="w-4 h-4 shrink-0"/>
+                <p className="text-sm font-medium">Dewan Santri belum membuka periode setoran bulan ini.</p>
+              </div>
+            ) : !windowOpen ? (
+              <div className="p-4 flex items-center gap-3 text-blue-700 bg-blue-50/60">
+                <Clock className="w-4 h-4 shrink-0"/>
+                <p className="text-sm font-medium">Setoran dibuka mulai <strong>{fmtTgl(setoranInfo!.tanggalMulai)}</strong>.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitSetoran} className="p-4 space-y-3">
+                <p className="text-xs text-slate-500">Periode setoran sudah dibuka. Isi data setoran di bawah.</p>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nama Penyetor</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nama pengurus yang menyetor..."
+                    value={setoranNama}
+                    onChange={e => setSetoranNama(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">SPP Bulan Ini</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Rp</span>
+                      <input
+                        type="text"
+                        placeholder="0"
+                        value={setoranBulanIni ? Number(setoranBulanIni.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
+                        onChange={e => setSetoranBulanIni(e.target.value)}
+                        className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Tunggakan</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Rp</span>
+                      <input
+                        type="text"
+                        placeholder="0"
+                        value={setoranTunggakan ? Number(setoranTunggakan.replace(/\D/g, '')).toLocaleString('id-ID') : ''}
+                        onChange={e => setSetoranTunggakan(e.target.value)}
+                        className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-sm font-bold text-slate-700">
+                    Total: {`Rp ${(Number(setoranBulanIni.replace(/\D/g,'') || 0) + Number(setoranTunggakan.replace(/\D/g,'') || 0)).toLocaleString('id-ID')}`}
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={submittingSetoran}
+                    className="flex items-center gap-2 bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {submittingSetoran ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4"/>}
+                    Kirim Setoran
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )
+      })()}
 
       {/* REKAP & STATISTIK / MAIN LIST / PLACEHOLDER */}
       {!hasLoaded ? (

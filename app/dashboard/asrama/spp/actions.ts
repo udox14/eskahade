@@ -945,6 +945,105 @@ export async function bayarSemuaSantriAsrama(
   }
 }
 
+export async function getSetoranInfoBulanIni() {
+  const session = await getSession()
+  const scope = getScopeOrThrow(session)
+  const unit = scope.defaultUnit
+  const now = new Date()
+  const yr = now.getFullYear()
+  const mo = now.getMonth() + 1
+
+  const [windowRow, setoranRow] = await Promise.all([
+    queryOne<{ tanggal_mulai: string }>(
+      `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
+      [yr, mo]
+    ),
+    queryOne<{
+      tanggal_setor: string | null
+      tanggal_terima: string | null
+      jumlah_aktual: number | null
+      jumlah_bulan_ini: number | null
+      jumlah_tunggakan_bayar: number | null
+      status: string | null
+      nama_penyetor: string | null
+    }>(
+      `SELECT tanggal_setor, tanggal_terima, jumlah_aktual, jumlah_bulan_ini, jumlah_tunggakan_bayar, status, nama_penyetor
+       FROM spp_setoran
+       WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ?`,
+      [unit, yr, mo]
+    ),
+  ])
+
+  return {
+    unit,
+    tahun: yr,
+    bulan: mo,
+    tanggalMulai: windowRow?.tanggal_mulai ?? null,
+    setoran: setoranRow ?? null,
+  }
+}
+
+export async function submitSetoranAsrama(
+  jumlahBulanIni: number,
+  jumlahTunggakan: number,
+  namaPenyetor: string
+): Promise<{ success: boolean } | { error: string }> {
+  try {
+    const session = await getSession()
+    const scope = getScopeOrThrow(session)
+    const unit = scope.defaultUnit
+    const cleanUnit = unit.trim().toUpperCase()
+
+    const now = new Date()
+    const yr = now.getFullYear()
+    const mo = now.getMonth() + 1
+    const today = now.toISOString().slice(0, 10)
+
+    const windowRow = await queryOne<{ tanggal_mulai: string }>(
+      `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
+      [yr, mo]
+    )
+    if (!windowRow) return { error: 'Dewan Santri belum membuka periode setoran bulan ini.' }
+    if (today < windowRow.tanggal_mulai) return { error: `Setoran baru dibuka mulai ${windowRow.tanggal_mulai}.` }
+
+    const existing = await queryOne<{ tanggal_terima: string | null }>(
+      `SELECT tanggal_terima FROM spp_setoran WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ?`,
+      [cleanUnit, yr, mo]
+    )
+    if (existing?.tanggal_terima) return { error: 'Setoran bulan ini sudah dikonfirmasi oleh Dewan Santri.' }
+
+    const jumlahTotal = (jumlahBulanIni || 0) + (jumlahTunggakan || 0)
+    if (jumlahTotal <= 0) return { error: 'Jumlah setoran harus lebih dari 0.' }
+    if (!namaPenyetor.trim()) return { error: 'Nama penyetor wajib diisi.' }
+
+    await execute(
+      `INSERT INTO spp_setoran
+         (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun,
+          tanggal_setor, nama_penyetor, jumlah_aktual, jumlah_bulan_ini, jumlah_tunggakan_bayar, status)
+       VALUES (?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, 'menunggu_konfirmasi')
+       ON CONFLICT(unit_setor, bulan, tahun) DO UPDATE SET
+         tanggal_setor         = excluded.tanggal_setor,
+         nama_penyetor         = excluded.nama_penyetor,
+         jumlah_aktual         = excluded.jumlah_aktual,
+         jumlah_bulan_ini      = excluded.jumlah_bulan_ini,
+         jumlah_tunggakan_bayar = excluded.jumlah_tunggakan_bayar,
+         status                = 'menunggu_konfirmasi'`,
+      [
+        generateId(), cleanUnit, cleanUnit,
+        isSadesaUnit(cleanUnit) ? 'SADESA' : 'ASRAMA',
+        mo, yr,
+        namaPenyetor.trim(), jumlahTotal, jumlahBulanIni || 0, jumlahTunggakan || 0,
+      ]
+    )
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal mengirim setoran.' }
+  }
+}
+
 export async function batalkanPembayaranSPP(logId: string): Promise<{ success: boolean } | { error: string }> {
   if (!logId) return { error: 'Data pembayaran tidak valid.' }
 
