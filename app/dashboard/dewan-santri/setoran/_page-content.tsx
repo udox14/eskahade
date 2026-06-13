@@ -406,58 +406,52 @@ export default function MonitoringSetoranPage() {
     <div className="min-h-screen bg-slate-50 p-2 md:p-3 max-w-[100vw] overflow-hidden text-slate-800">
       
       {/* ── Header ── */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Monitoring SPP</h1>
-          <p className="text-sm text-slate-500 mt-1">Laporan setoran tunai unit bulan {BULAN_NAMA[bulan]} {tahun}</p>
+      <div className="mb-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Monitoring SPP</h1>
+        <p className="text-sm text-slate-500 mt-1">Laporan setoran tunai unit bulan {BULAN_NAMA[bulan]} {tahun}</p>
+      </div>
+
+      {/* ── Controls Bar ── */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-xl p-3">
+        <div className="flex items-center rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5 min-w-[10.5rem]">
+          <button onClick={prevBulan} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
+          <div className="flex-1 px-2 text-center text-base font-semibold text-slate-700">{BULAN_NAMA[bulan]} {tahun}</div>
+          <button onClick={nextBulan} disabled={tahun === now.getFullYear() && bulan === now.getMonth() + 1} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-30"><ChevronRight className="w-4 h-4"/></button>
         </div>
-        
-        {/* Filtering & Actions - Compact Flex */}
-        <div className="grid gap-3 bg-white border border-slate-200 shadow-sm rounded-xl p-3 md:grid-cols-[auto_auto_1fr] md:items-center">
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5 md:min-w-[10.5rem]">
-            <button onClick={prevBulan} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
-            <div className="px-2 text-center text-base font-semibold text-slate-700">{BULAN_NAMA[bulan]} {tahun}</div>
-            <button onClick={nextBulan} disabled={tahun === now.getFullYear() && bulan === now.getMonth() + 1} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-30"><ChevronRight className="w-4 h-4"/></button>
-          </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-slate-700">
-            <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
-          </div>
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-slate-700">
+          <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="font-medium">Tarif: <span className="text-slate-900 font-semibold">{fmtRp(nominal)}</span></span>
+        </div>
 
-          <div className="grid gap-2">
-            <form onSubmit={handleSimpanBillingStart} className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-              <div className="flex items-center gap-2 text-blue-700">
-                <CalendarCheck className="w-4 h-4 shrink-0" />
-                <label className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</label>
-              </div>
-              <input
-                type="month"
-                value={billingStartInput}
-                onChange={e => setBillingStartInput(e.target.value)}
-                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button type="submit" disabled={savingBillingStart} className="h-10 w-full sm:w-10 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
-                {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              </button>
-            </form>
+        <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 flex-1 min-w-[220px]">
+          <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
+          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</span>
+          <input
+            type="month"
+            value={billingStartInput}
+            onChange={e => setBillingStartInput(e.target.value)}
+            className="h-9 flex-1 min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button type="submit" disabled={savingBillingStart} className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
+            {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          </button>
+        </form>
 
-            <div className="flex gap-2">
-              <button onClick={() => load()} disabled={loading} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSetoranWindowModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${setoranWindow ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                title="Atur tanggal mulai setoran"
-              >
-                <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                {setoranWindow ? format(new Date(setoranWindow), 'd MMM') : 'Mulai Setor'}
-              </button>
-            </div>
-          </div>
+        <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+          <button onClick={() => load()} disabled={loading} className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsSetoranWindowModalOpen(true)}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${setoranWindow ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+            title="Atur tanggal mulai setoran"
+          >
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            {setoranWindow ? format(new Date(setoranWindow), 'd MMM') : 'Mulai Setor'}
+          </button>
         </div>
       </div>
 
