@@ -6,7 +6,7 @@ import {
   getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin,
   getAlasanIzinList, simpanAlasanIzinList,
   ajukanIzinAsrama, getPengajuanPendingAsrama, approveIzinAsrama, rejectIzinAsrama,
-  getRiwayatPengajuanAsrama
+  getRiwayatPengajuanAsrama, cariSantriAsrama, updatePengajuanAsrama, hapusPengajuanAsrama
 } from './actions'
 import { 
   Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, 
@@ -120,6 +120,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
   // Asrama-only riwayat state
   const [riwayatPengajuan, setRiwayatPengajuan] = useState<any[]>([])
   const [loadingRiwayat, setLoadingRiwayat] = useState(false)
+  const [editingPengajuan, setEditingPengajuan] = useState<any | null>(null)
+  const [deletingPengajuanId, setDeletingPengajuanId] = useState<string | null>(null)
 
   const [draftAlasan, setDraftAlasan] = useState<string[]>(DEFAULT_LIST_ALASAN)
   const [newAlasan, setNewAlasan] = useState('')
@@ -182,9 +184,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
   const handleCariSantri = async (e: React.FormEvent) => {
     e.preventDefault()
     if (searchSantri.length < 3) { toast.warning("Ketik minimal 3 huruf untuk mencari."); return }
-    const res = await cariSantri(searchSantri)
+    const res = isAsrama && asramaBinaan
+      ? await cariSantriAsrama(searchSantri, asramaBinaan)
+      : await cariSantri(searchSantri)
     setHasilCari(res)
-    if (res.length === 0) toast.info("Santri tidak ditemukan.")
+    if (res.length === 0) toast.info(isAsrama ? "Santri tidak ditemukan di asrama binaan Anda." : "Santri tidak ditemukan.")
   }
 
   const resetFormState = () => {
@@ -259,20 +263,25 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
 
       const res = isOpenEdit
         ? await updateIzin(editData.id, formData)
-        : isAsrama
-          ? await ajukanIzinAsrama(formData)
-          : await simpanIzin(formData)
+        : isAsrama && editingPengajuan
+          ? await updatePengajuanAsrama(editingPengajuan.id, formData)
+          : isAsrama
+            ? await ajukanIzinAsrama(formData)
+            : await simpanIzin(formData)
 
       if ('error' in res) {
         toast.error("Gagal menyimpan: " + (res as any).error)
       } else {
         toast.success(isOpenEdit
           ? "Perubahan izin berhasil disimpan!"
-          : isAsrama
-            ? "Pengajuan izin dikirim. Menunggu persetujuan dewan santri."
-            : "Data perizinan berhasil disimpan!")
+          : isAsrama && editingPengajuan
+            ? "Pengajuan berhasil diperbarui."
+            : isAsrama
+              ? "Pengajuan izin dikirim. Menunggu persetujuan dewan santri."
+              : "Data perizinan berhasil disimpan!")
         setIsOpenInput(false)
         setIsOpenEdit(false)
+        setEditingPengajuan(null)
         if (isAsrama) {
           loadRiwayat()
         } else {
@@ -359,6 +368,36 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
     } finally {
       toast.dismiss(loadingToast)
     }
+  }
+
+  const openEditPengajuan = (item: any) => {
+    resetFormState()
+    setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, asrama: item.asrama, kamar: item.kamar })
+    setFormDateStart(toWibDateInputValue(item.tgl_mulai))
+    setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
+    const matchedPrefix = alasanOptions.find(a => item.alasan.startsWith(a + ' - '))
+    if (matchedPrefix) {
+      setAlasanDropdown(matchedPrefix)
+      setDeskripsiIzin(item.alasan.replace(matchedPrefix + ' - ', ''))
+    } else if (alasanOptions.includes(item.alasan)) {
+      setAlasanDropdown(item.alasan)
+      setDeskripsiIzin('')
+    } else {
+      setDeskripsiIzin(item.alasan)
+    }
+    setPemberiIzin(item.pemberi_izin || '')
+    setEditingPengajuan(item)
+    setIsOpenInput(true)
+  }
+
+  const handleHapusPengajuan = async (id: string) => {
+    if (!await confirm('Hapus pengajuan izin ini?')) return
+    setDeletingPengajuanId(id)
+    const res = await hapusPengajuanAsrama(id)
+    setDeletingPengajuanId(null)
+    if ('error' in res) { toast.error((res as any).error); return }
+    toast.success('Pengajuan dihapus.')
+    loadRiwayat()
   }
 
   const openPengajuanModal = async () => {
@@ -567,7 +606,28 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                       <p className="font-bold text-slate-900 text-sm">{item.nama}</p>
                       <p className="text-[11px] text-slate-500">{item.nis} · {item.asrama} / {item.kamar}</p>
                     </div>
-                    <div className="flex items-center">{statusBadge(item.status)}</div>
+                    <div className="flex items-center gap-2">
+                      {statusBadge(item.status)}
+                      {item.status === 'PENDING' && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => openEditPengajuan(item)}
+                            title="Edit pengajuan"
+                            className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg border border-slate-100 transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleHapusPengajuan(item.id)}
+                            disabled={deletingPengajuanId === item.id}
+                            title="Hapus pengajuan"
+                            className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg border border-slate-100 transition-colors disabled:opacity-50"
+                          >
+                            {deletingPengajuanId === item.id ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1 border border-slate-100">
                     <p className="italic text-slate-500">"{item.alasan}"</p>
@@ -577,7 +637,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-2">
-                    Diajukan: {formatWibDateTime(item.created_at)} · Via {item.pemberi_izin}
+                    {formatWibDateTime(item.created_at)}
+                    {item.submitted_by_name && <> · oleh <span className="font-medium text-slate-500">{item.submitted_by_name}</span></>}
+                    {' '}· Via {item.pemberi_izin}
                   </p>
                 </div>
               ))}
@@ -591,10 +653,14 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
             <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <div>
-                  <h3 className="font-bold text-slate-900 text-lg">Ajukan Izin Pulang</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Pengajuan akan diteruskan ke dewan santri untuk disetujui.</p>
+                  <h3 className="font-bold text-slate-900 text-lg">
+                    {editingPengajuan ? 'Edit Pengajuan Izin Pulang' : 'Ajukan Izin Pulang'}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {editingPengajuan ? 'Perbarui detail pengajuan (masih menunggu persetujuan).' : 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.'}
+                  </p>
                 </div>
-                <button type="button" onClick={() => setIsOpenInput(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
+                <button type="button" onClick={() => { setIsOpenInput(false); setEditingPengajuan(null) }} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
               </div>
               <form onSubmit={handleSimpan} className="p-5 max-h-[80vh] overflow-y-auto space-y-5">
                 {!selectedSantri ? (
@@ -632,7 +698,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                         <p className="text-[11px] font-medium text-slate-500">{selectedSantri.nis} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg hover:bg-rose-100 transition-colors">Ganti</button>
+                    {!editingPengajuan && (
+                      <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg hover:bg-rose-100 transition-colors">Ganti</button>
+                    )}
                   </div>
                 )}
 
@@ -641,7 +709,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                 {selectedSantri && (
                   <div className="pt-2">
                     <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3.5 rounded-xl font-bold shadow-sm shadow-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-                      <Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN PULANG
+                      {editingPengajuan
+                        ? <><CheckCircle className="w-5 h-5" /> SIMPAN PERUBAHAN</>
+                        : <><Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN PULANG</>}
                     </button>
                   </div>
                 )}

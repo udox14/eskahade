@@ -497,11 +497,24 @@ async function ensurePengajuanTable() {
   `)
 }
 
+// ─── Cari Santri terbatas ke asrama binaan ───────────────────────────────────
+export async function cariSantriAsrama(keyword: string, asramaBinaan: string) {
+  if (!asramaBinaan) return []
+  return query<any>(`
+    SELECT id, nama_lengkap, nis, asrama, kamar
+    FROM santri
+    WHERE nama_lengkap LIKE ? AND asrama = ? AND status_global = 'aktif'
+    LIMIT 5
+  `, [`%${keyword}%`, asramaBinaan])
+}
+
 // ─── Ajukan Izin Pulang (oleh pengurus asrama) ────────────────────────────────
 export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan/perizinan')
   if ('error' in access) return access
   const session = await getSession()
+
+  if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
 
   const santri_id = String(formData.get('santri_id') ?? '').trim()
   if (!santri_id) return { error: 'Santri wajib dipilih.' }
@@ -514,10 +527,14 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
   if (jenis !== 'PULANG') return { error: 'Pengajuan dari asrama hanya untuk izin pulang.' }
 
-  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
-    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null; asrama: string | null }>(
+    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
     [santri_id]
   )
+
+  if (santri?.asrama !== session.asrama_binaan) {
+    return { error: 'Santri ini bukan dari asrama binaan Anda.' }
+  }
 
   await ensurePengajuanTable()
   const pengajuanId = generateId()
@@ -557,25 +574,80 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
   return { success: true }
 }
 
-// ─── Get Riwayat Pengajuan milik user asrama (maks 30) ───────────────────────
+// ─── Get Riwayat Pengajuan per asrama binaan (maks 30) ───────────────────────
 export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
   const session = await getSession()
-  if (!session) return []
+  if (!session?.asrama_binaan) return []
   try {
     await ensurePengajuanTable()
     return await query<any>(`
       SELECT pq.id, pq.created_at, pq.jenis, pq.alasan, pq.pemberi_izin,
              pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
-             s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
+             pq.santri_id,
+             s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+             u.full_name AS submitted_by_name
       FROM perizinan_pengajuan pq
       JOIN santri s ON s.id = pq.santri_id
-      WHERE pq.submitted_by = ?
+      LEFT JOIN users u ON u.id = pq.submitted_by
+      WHERE s.asrama = ?
       ORDER BY pq.created_at DESC
       LIMIT 30
-    `, [session.id])
+    `, [session.asrama_binaan])
   } catch {
     return []
   }
+}
+
+// ─── Update Pengajuan PENDING milik asrama ────────────────────────────────────
+export async function updatePengajuanAsrama(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = await getSession()
+  if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
+
+  const pengajuan = await queryOne<any>(`
+    SELECT pq.id FROM perizinan_pengajuan pq
+    JOIN santri s ON s.id = pq.santri_id
+    WHERE pq.id = ? AND pq.status = 'PENDING' AND s.asrama = ?
+  `, [id, session.asrama_binaan])
+
+  if (!pengajuan) return { error: 'Pengajuan tidak ditemukan, sudah diproses, atau bukan milik asrama Anda.' }
+
+  formData.set('jenis', 'PULANG')
+  const payload = buildIzinPayload(formData)
+  if ('error' in payload) return payload
+
+  const { tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+
+  await execute(`
+    UPDATE perizinan_pengajuan
+    SET tgl_mulai = ?, tgl_selesai_rencana = ?, alasan = ?, pemberi_izin = ?
+    WHERE id = ?
+  `, [tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, id])
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true }
+}
+
+// ─── Hapus Pengajuan PENDING milik asrama ─────────────────────────────────────
+export async function hapusPengajuanAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  if ('error' in access) return access
+  const session = await getSession()
+  if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
+
+  const pengajuan = await queryOne<any>(`
+    SELECT pq.id FROM perizinan_pengajuan pq
+    JOIN santri s ON s.id = pq.santri_id
+    WHERE pq.id = ? AND pq.status = 'PENDING' AND s.asrama = ?
+  `, [id, session.asrama_binaan])
+
+  if (!pengajuan) return { error: 'Pengajuan tidak ditemukan, sudah diproses, atau bukan milik asrama Anda.' }
+
+  await execute('DELETE FROM perizinan_pengajuan WHERE id = ?', [id])
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true }
 }
 
 // ─── Get Pengajuan Pending dari Asrama ────────────────────────────────────────
