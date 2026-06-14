@@ -17,18 +17,20 @@ type RaporMapel = {
 }
 
 async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
-  const tahunAjaranIdKelas = await query<any>(
-    'SELECT tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
-  ).then(r => r[0]?.tahun_ajaran_id ?? null)
+  const kelas = await queryOne<any>(
+    'SELECT marhalah_id, tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
+  )
+  const tahunAjaranIdKelas = kelas?.tahun_ajaran_id ?? null
+  const effMarhalahId = marhalahId || kelas?.marhalah_id || null
 
-  if (marhalahId && tahunAjaranIdKelas) {
+  if (effMarhalahId && tahunAjaranIdKelas) {
     const listKitab = await query<any>(`
       SELECT mp.id, mp.nama, kt.nama_kitab
       FROM kitab kt
       JOIN mapel mp ON mp.id = kt.mapel_id
       WHERE kt.marhalah_id = ? AND kt.tahun_ajaran_id = ?
       ORDER BY mp.nama ASC
-    `, [marhalahId, tahunAjaranIdKelas])
+    `, [effMarhalahId, tahunAjaranIdKelas])
 
     if (listKitab.length) {
       return listKitab.map((m: any) => ({
@@ -40,13 +42,17 @@ async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
   }
 
   return query<any>(`
-    SELECT DISTINCT mp.id, mp.nama, '-' AS nama_kitab
+    SELECT DISTINCT mp.id, mp.nama, COALESCE(kt.nama_kitab, '-') AS nama_kitab
     FROM nilai_akademik na
     JOIN mapel mp ON mp.id = na.mapel_id
     JOIN riwayat_pendidikan rp ON rp.id = na.riwayat_pendidikan_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN kitab kt ON kt.mapel_id = mp.id 
+      AND kt.marhalah_id = COALESCE(k.marhalah_id, ?) 
+      AND kt.tahun_ajaran_id = COALESCE(k.tahun_ajaran_id, ?)
     WHERE rp.kelas_id = ?
     ORDER BY mp.nama ASC
-  `, [kelasId]).then(rows => rows.map((m: any) => ({
+  `, [effMarhalahId || '', tahunAjaranIdKelas || 0, kelasId]).then(rows => rows.map((m: any) => ({
     id: m.id,
     nama: m.nama || 'Tanpa Nama',
     nama_kitab: m.nama_kitab || '-',
