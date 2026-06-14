@@ -92,7 +92,7 @@ export function RaporSatuHalaman({
           JUDUL RAPOR
       ═══════════════════════════════════════ */}
       <div className="text-center my-3">
-        <h2 className="text-[14px] font-bold tracking-widest uppercase">
+        <h2 className="text-[16px] font-bold tracking-widest uppercase">
           Laporan Hasil Belajar
         </h2>
       </div>
@@ -120,20 +120,22 @@ export function RaporSatuHalaman({
               </table>
             </td>
             <td className="w-[55%]">
-              <table className="w-full">
-                <tbody>
-                  <tr>
-                    <td className="w-[110px] py-[2.5px] whitespace-nowrap">Tahun Pelajaran</td>
-                    <td className="w-3 py-[2.5px]">:</td>
-                    <td className="font-bold py-[2.5px] whitespace-nowrap">{tahunAjaran}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-[2.5px] whitespace-nowrap">Semester</td>
-                    <td className="py-[2.5px]">:</td>
-                    <td className="py-[2.5px] whitespace-nowrap">{semesterLabel}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="flex justify-end">
+                <table className="w-[280px]">
+                  <tbody>
+                    <tr>
+                      <td className="w-[110px] py-[2.5px] whitespace-nowrap">Tahun Pelajaran</td>
+                      <td className="w-3 py-[2.5px]">:</td>
+                      <td className="font-bold py-[2.5px] whitespace-nowrap">{tahunAjaran}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-[2.5px] whitespace-nowrap">Semester</td>
+                      <td className="py-[2.5px]">:</td>
+                      <td className="py-[2.5px] whitespace-nowrap">{semesterLabel}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -222,22 +224,22 @@ export function RaporSatuHalaman({
 
         <div className="flex gap-3">
           {/* KOLOM KIRI: Kepribadian, Ketidakhadiran, Kenaikan */}
-          <div className="flex-1 flex flex-col justify-between">
+          <div className="flex-1 flex flex-col">
             {/* Kepribadian */}
             <div>
               <table className="w-full border-collapse border border-black text-[11px]">
                 <thead>
                   <tr className="text-center bg-gray-50">
-                    <th className="border border-black px-2 py-[4px] whitespace-nowrap" colSpan={2}>Kepribadian</th>
-                    <th className="border border-black px-2 py-[4px] w-[80px] whitespace-nowrap">Predikat</th>
+                    <th className="border border-black px-2 py-[5px] whitespace-nowrap" colSpan={2}>Kepribadian</th>
+                    <th className="border border-black px-2 py-[5px] w-[80px] whitespace-nowrap">Predikat</th>
                   </tr>
                 </thead>
                 <tbody>
                   {kepribadian.map((k, i) => (
                     <tr key={i}>
-                      <td className="border border-black px-1 py-[3.5px] text-center w-5 whitespace-nowrap">{i + 1}</td>
-                      <td className="border border-black px-2 py-[3.5px] whitespace-nowrap">{k.label}</td>
-                      <td className="border border-black px-2 py-[3.5px] text-center font-medium whitespace-nowrap">{k.predikat}</td>
+                      <td className="border border-black px-2 py-[4px] text-center w-5 whitespace-nowrap">{i + 1}</td>
+                      <td className="border border-black px-2 py-[4px] whitespace-nowrap">{k.label}</td>
+                      <td className="border border-black px-2 py-[4px] text-center font-medium whitespace-nowrap">{k.predikat}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -251,8 +253,8 @@ export function RaporSatuHalaman({
               <table className="w-full border-collapse border border-black text-[11px]">
                 <thead>
                   <tr className="text-center bg-gray-50">
-                    <th className="border border-black px-2 py-[4px] whitespace-nowrap" colSpan={2}>Ketidakhadiran</th>
-                    <th className="border border-black px-2 py-[4px] w-[80px] whitespace-nowrap">Jumlah</th>
+                    <th className="border border-black px-2 py-[5px] whitespace-nowrap" colSpan={2}>Ketidakhadiran</th>
+                    <th className="border border-black px-2 py-[5px] w-[80px] whitespace-nowrap">Jumlah</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -262,9 +264,9 @@ export function RaporSatuHalaman({
                     { label: 'Alpa',  val: data.absen?.alfa  ?? 0 },
                   ].map((row, i) => (
                     <tr key={i}>
-                      <td className="border border-black px-1 py-[3.5px] text-center w-5 whitespace-nowrap">{i + 1}</td>
-                      <td className="border border-black px-2 py-[3.5px] whitespace-nowrap">{row.label}</td>
-                      <td className="border border-black px-2 py-[3.5px] text-center whitespace-nowrap">
+                      <td className="border border-black px-2 py-[4px] text-center w-5 whitespace-nowrap">{i + 1}</td>
+                      <td className="border border-black px-2 py-[4px] whitespace-nowrap">{row.label}</td>
+                      <td className="border border-black px-2 py-[4px] text-center whitespace-nowrap">
                         {row.val > 0 ? `${row.val} Hari` : '-'}
                       </td>
                     </tr>
@@ -280,12 +282,12 @@ export function RaporSatuHalaman({
               <table className="w-full border-collapse border border-black text-[11px]">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="border border-black px-2 py-[4px] text-center whitespace-nowrap">Naik Ke Marhalah:</th>
+                    <th className="border border-black px-2 py-[5px] text-center whitespace-nowrap">Naik Ke Marhalah:</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-black px-2 py-[5px] text-center font-bold text-black uppercase whitespace-nowrap">
+                    <td className="border border-black px-2 py-[4px] text-center font-bold text-black uppercase whitespace-nowrap">
                       {naik || '-'}
                     </td>
                   </tr>
@@ -295,17 +297,17 @@ export function RaporSatuHalaman({
           </div>
 
           {/* KOLOM KANAN: Saran Wali Kelas & Saran Orang Tua */}
-          <div className="w-[44%] flex flex-col justify-between">
+          <div className="w-[44%] flex flex-col">
             {/* Saran Wali Kelas */}
             <table className="w-full border-collapse border border-black text-[11px]">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="border border-black px-2 py-[4px] text-center whitespace-nowrap">Catatan / Saran Wali Kelas</th>
+                  <th className="border border-black px-2 py-[5px] text-center whitespace-nowrap">Catatan / Saran Wali Kelas</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="border border-black px-3 py-2 h-[105px] align-top text-left">
+                  <td className="border border-black px-3 py-2 h-[120px] align-top text-left">
                     <span className="text-[10.5px] text-slate-700 italic whitespace-pre-wrap leading-relaxed">
                       {catatanWali || '-'}
                     </span>
@@ -320,12 +322,12 @@ export function RaporSatuHalaman({
             <table className="w-full border-collapse border border-black text-[11px]">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="border border-black px-2 py-[4px] text-center whitespace-nowrap">Tanggapan Orang Tua / Wali</th>
+                  <th className="border border-black px-2 py-[5px] text-center whitespace-nowrap">Tanggapan Orang Tua / Wali</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="border border-black px-3 py-2 h-[95px] align-bottom">
+                  <td className="border border-black px-3 py-2 h-[114px] align-bottom">
                     <div className="border-t border-dashed border-gray-400 w-full mt-10 mb-1" />
                   </td>
                 </tr>
