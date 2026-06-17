@@ -77,30 +77,37 @@ export function RaporSatuHalaman({
       {/* ═══════════════════════════════════════
           KOP SURAT
       ═══════════════════════════════════════ */}
-      <div className="mb-3">
-        <Image
-          src="/kop-pesantren.png"
-          alt="Kop Pesantren Sukahideng"
-          width={760}
-          height={120}
-          className="w-full object-contain"
-          priority
-        />
+      <div className="w-full flex justify-center items-center gap-4 h-[90px] mb-3">
+        <div className="flex-shrink-0">
+          <Image
+            src="/logohitam.png"
+            alt="Logo Pesantren Sukahideng"
+            width={85}
+            height={85}
+            className="object-contain"
+            priority
+          />
+        </div>
+        <div className="text-center">
+          <p className="text-[14px] font-normal tracking-[0.2px] leading-tight">
+            LEMBAGA PENDIDIKAN PONDOK PESANTREN
+          </p>
+          <h1 className="text-[34px] font-bold leading-none my-1 tracking-[0.5px]">
+            SUKAHIDENG
+          </h1>
+          <p className="text-[14px] font-normal tracking-[0.2px] leading-tight">
+            SUKARAME TASIKMALAYA JAWA BARAT
+          </p>
+        </div>
       </div>
 
-      {/* ═══════════════════════════════════════
-          JUDUL RAPOR
-      ═══════════════════════════════════════ */}
-      <div className="text-center my-3">
-        <h2 className="text-[16px] font-bold tracking-widest uppercase">
-          Laporan Hasil Belajar
-        </h2>
-      </div>
+      {/* Garis Pembatas Single */}
+      <div className="border-t border-black w-full mb-3 mt-1" />
 
       {/* ═══════════════════════════════════════
           IDENTITAS SANTRI  (2 kolom)
       ═══════════════════════════════════════ */}
-      <table className="w-full text-[11.5px] mb-4">
+      <table className="w-full text-[11.5px] mb-2">
         <tbody>
           <tr>
             <td className="w-[45%]">
@@ -140,6 +147,19 @@ export function RaporSatuHalaman({
           </tr>
         </tbody>
       </table>
+
+      {/* Garis Pembatas Double (atas tipis, bawah agak tebal dikit) */}
+      <div className="w-full border-t border-black mb-[1.5px] mt-1" />
+      <div className="w-full border-t-[2.5px] border-black mb-3" />
+
+      {/* ═══════════════════════════════════════
+          JUDUL RAPOR
+      ═══════════════════════════════════════ */}
+      <div className="text-center mb-3 mt-1">
+        <h2 className="text-[16px] font-bold tracking-widest uppercase">
+          Laporan Hasil Belajar
+        </h2>
+      </div>
 
       {/* ═══════════════════════════════════════
           TABEL NILAI
