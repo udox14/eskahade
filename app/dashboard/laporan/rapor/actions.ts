@@ -258,7 +258,15 @@ export async function getDataRapor(kelasId: string, semester: number) {
     ])
   })
 
-  const raporMapel = await getRaporMapel(kelasId, listSantri[0]?.marhalah_id)
+  const raporMapelAll = await getRaporMapel(kelasId, listSantri[0]?.marhalah_id)
+
+  // Mapel yang tidak diujiankan (tidak ada satupun nilai > 0 dari seluruh
+  // santri di kelas ini) tidak disertakan dalam rapor.
+  const mapelDiujikan = new Set<string>()
+  nilaiAkademik.forEach((n: any) => {
+    if (Number(n.nilai) > 0) mapelDiujikan.add(String(n.mapel_id))
+  })
+  const raporMapel = raporMapelAll.filter((m) => mapelDiujikan.has(String(m.id)))
 
   // Ambil rata-rata kelas per mapel untuk kolom "Rata-rata Kelas"
   // Hitung manual dari nilaiAkademik

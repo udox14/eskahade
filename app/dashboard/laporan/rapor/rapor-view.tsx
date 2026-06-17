@@ -121,7 +121,7 @@ export function RaporSatuHalaman({
                   <tr>
                     <td className="py-[2.5px] whitespace-nowrap">Marhalah</td>
                     <td className="py-[2.5px]">:</td>
-                    <td className="py-[2.5px] whitespace-nowrap">{data.kelas?.marhalah?.nama ?? data.kelas?.nama_kelas ?? '-'}</td>
+                    <td className="py-[2.5px] whitespace-nowrap">{data.kelas?.nama_kelas ?? data.kelas?.marhalah?.nama ?? '-'}</td>
                   </tr>
                 </tbody>
               </table>
