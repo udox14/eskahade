@@ -37,6 +37,12 @@ export default function JuaraUmumPage() {
   const [recalcing, setRecalcing] = useState(false)
   const [recalcKelas, setRecalcKelas] = useState('all')
   const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 })
+  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape')
+
+  // Dimensi kertas F4 mengikuti orientasi.
+  const paper = orientation === 'landscape'
+    ? { w: '330mm', h: '215mm' }
+    : { w: '215mm', h: '330mm' }
 
   // Opsi kelas untuk recalc per kelas (diturunkan dari data yang sudah dimuat).
   const kelasOptions = useMemo(() => {
@@ -316,9 +322,24 @@ export default function JuaraUmumPage() {
 
          /* PREVIEW AREA (KERTAS F4 SIMULASI NARROW MARGIN) */
          <div className="bg-slate-200 p-4 md:p-8 rounded-2xl overflow-x-auto shadow-inner border border-slate-300">
-            <div className="text-center mb-4 flex items-center justify-center gap-2">
+            <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-200">Preview Dokumen Cetak</span>
                 <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-amber-200 inline-flex items-center gap-1"><Pencil className="w-3 h-3"/> Bisa Diedit</span>
+                {/* Toggle orientasi cetak */}
+                <div className="inline-flex rounded-full border border-slate-300 bg-white overflow-hidden text-xs font-bold">
+                    <button
+                        onClick={() => setOrientation('landscape')}
+                        className={`px-3 py-1 transition-colors ${orientation === 'landscape' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                        Landscape
+                    </button>
+                    <button
+                        onClick={() => setOrientation('portrait')}
+                        className={`px-3 py-1 transition-colors ${orientation === 'portrait' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                        Portrait
+                    </button>
+                </div>
             </div>
 
             {/* KERTAS PUTIH MURNI UNTUK DICETAK (Tanpa Kop, Font Arial 11pt, Kertas F4, Margin Sempit) */}
@@ -326,8 +347,8 @@ export default function JuaraUmumPage() {
                 ref={printRef}
                 className="bg-white mx-auto shadow-xl relative text-black"
                 style={{
-                  width: '330mm',
-                  minHeight: '215mm',
+                  width: paper.w,
+                  minHeight: paper.h,
                   padding: '10mm', /* Margin narrow (1cm) */
                   fontFamily: 'Arial, Helvetica, sans-serif',
                   fontSize: '11pt'
@@ -336,7 +357,7 @@ export default function JuaraUmumPage() {
                 {/* CSS Khusus Print: reset margin, paksa Arial F4 narrow, dan ratakan tampilan input jadi teks polos saat dicetak */}
                 <style type="text/css" media="print">
                     {`
-                      @page { size: 330mm 215mm landscape; margin: 10mm; }
+                      @page { size: ${paper.w} ${paper.h} ${orientation}; margin: 10mm; }
                       body {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
