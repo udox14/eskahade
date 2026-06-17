@@ -29,19 +29,24 @@ export function RaporSatuHalaman({
   data,
   semester,
   tahunAjaran = '2024/2025',
+  titimangsaTempat = 'Sukahideng',
+  titimangsaTanggal = '',
 }: {
   data: any
   semester: number
   tahunAjaran?: string
+  titimangsaTempat?: string
+  titimangsaTanggal?: string
 }) {
   const semesterLabel = semester === 1 ? 'Ganjil' : 'Genap'
 
-  // Tanggal diterbitkan (hari ini)
-  const tglCetak = new Date().toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
+  // Tanggal diterbitkan: pakai titimangsa jika diset, kalau kosong pakai hari ini
+  const tglCetak = (titimangsaTanggal ? new Date(titimangsaTanggal) : new Date())
+    .toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    })
 
   // Hitung jumlah + rata-rata dari nilai yang ada
   const nilaiList: any[] = data.nilai ?? []
@@ -367,7 +372,7 @@ export function RaporSatuHalaman({
               <tr>
                 <td className="w-[90px] py-[1px] whitespace-nowrap">Diberikan di</td>
                 <td className="w-3 py-[1px]">:</td>
-                <td className="py-[1px] font-semibold whitespace-nowrap">Sukahideng</td>
+                <td className="py-[1px] font-semibold whitespace-nowrap">{titimangsaTempat || 'Sukahideng'}</td>
               </tr>
               <tr>
                 <td className="py-[1px] whitespace-nowrap">Pada tanggal</td>

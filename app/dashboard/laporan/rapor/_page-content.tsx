@@ -8,8 +8,10 @@ import {
   getKelasList,
   getKitabPilihanOptions,
   getLegerRaporData,
+  getRaporTitimangsa,
   getTahunAjaranList,
   saveKitabPilihan,
+  saveRaporTitimangsa,
   updateIdentitasSantriRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
@@ -18,6 +20,7 @@ import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
   BookOpen,
+  CalendarCog,
   CalendarDays,
   CheckCircle2,
   FileSpreadsheet,
@@ -84,6 +87,11 @@ export default function CetakRaporPage() {
 
   const [paperSize, setPaperSize] = useState<'A4' | 'F4'>('F4')
 
+  const [titimangsa, setTitimangsa] = useState<{ tempat: string; tanggal: string }>({ tempat: 'Sukahideng', tanggal: '' })
+  const [titimangsaModalOpen, setTitimangsaModalOpen] = useState(false)
+  const [titimangsaForm, setTitimangsaForm] = useState<{ tempat: string; tanggal: string }>({ tempat: 'Sukahideng', tanggal: '' })
+  const [titimangsaSaving, setTitimangsaSaving] = useState(false)
+
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
   const [printTitle, setPrintTitle] = useState('Cetak_Rapor')
@@ -148,6 +156,7 @@ export default function CetakRaporPage() {
       const aktif = list.find((t: any) => t.is_active === 1)
       if (aktif) setSelectedTA(aktif.id)
     })
+    getRaporTitimangsa().then(setTitimangsa).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -335,6 +344,32 @@ export default function CetakRaporPage() {
     }
   }
 
+  const openTitimangsaModal = () => {
+    setTitimangsaForm(titimangsa)
+    setTitimangsaModalOpen(true)
+  }
+
+  const handleSaveTitimangsa = async () => {
+    setTitimangsaSaving(true)
+    const toastId = toast.loading('Menyimpan titimangsa...')
+    try {
+      const res = await saveRaporTitimangsa(titimangsaForm.tempat, titimangsaForm.tanggal)
+      if (res?.error) {
+        toast.error(res.error)
+        return
+      }
+      if (res?.data) setTitimangsa(res.data)
+      setTitimangsaModalOpen(false)
+      toast.success('Titimangsa rapor tersimpan.')
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal menyimpan titimangsa.')
+    } finally {
+      toast.dismiss(toastId)
+      setTitimangsaSaving(false)
+    }
+  }
+
   const openKitabModal = async () => {
     if (!selectedKelas) return toast.warning('Pilih kelas terlebih dahulu.')
     setKitabModalOpen(true)
@@ -435,6 +470,12 @@ export default function CetakRaporPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Cetak Rapor Santri</h1>
           <p className="text-sm text-slate-500">Pilih kelas, lalu cetak rapor atau identitas per santri.</p>
+          <button
+            onClick={openTitimangsaModal}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+          >
+            <CalendarCog className="h-3.5 w-3.5" /> Titimangsa: {titimangsa.tempat}{titimangsa.tanggal ? `, ${titimangsa.tanggal}` : ' (tgl cetak)'}
+          </button>
         </div>
         {hasData ? (
           <div className="flex flex-col gap-2">
@@ -638,6 +679,8 @@ export default function CetakRaporPage() {
                     data={siswa}
                     semester={Number(selectedSemester)}
                     tahunAjaran={tahunAjaran}
+                    titimangsaTempat={titimangsa.tempat}
+                    titimangsaTanggal={titimangsa.tanggal}
                   />
                 </div>
               ))}
@@ -825,6 +868,71 @@ export default function CetakRaporPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {kitabSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {titimangsaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Titimangsa Rapor</p>
+                <h2 className="text-lg font-bold text-slate-800">Tempat &amp; Tanggal Terbit</h2>
+                <p className="text-xs text-slate-500">Berlaku untuk semua kelas (universal).</p>
+              </div>
+              <button
+                onClick={() => setTitimangsaModalOpen(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Diberikan di (Tempat)</label>
+                <input
+                  value={titimangsaForm.tempat}
+                  onChange={e => setTitimangsaForm(prev => ({ ...prev, tempat: e.target.value }))}
+                  placeholder="Sukahideng"
+                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tanggal Terbit</label>
+                <input
+                  type="date"
+                  value={titimangsaForm.tanggal}
+                  onChange={e => setTitimangsaForm(prev => ({ ...prev, tanggal: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-slate-400">Kosongkan untuk memakai tanggal saat mencetak.</p>
+                {titimangsaForm.tanggal && (
+                  <button
+                    onClick={() => setTitimangsaForm(prev => ({ ...prev, tanggal: '' }))}
+                    className="mt-1 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Kosongkan tanggal
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
+              <button onClick={() => setTitimangsaModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
+                Batal
+              </button>
+              <button
+                onClick={handleSaveTitimangsa}
+                disabled={titimangsaSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {titimangsaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Simpan
               </button>
             </div>

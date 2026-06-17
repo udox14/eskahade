@@ -597,6 +597,64 @@ export async function getLegerRaporData(kelasId: string, semester: number) {
   }
 }
 
+// ─── TITIMANGSA RAPOR (universal) ───────────────────────────────────────────
+
+export async function getRaporTitimangsa(): Promise<{ tempat: string; tanggal: string }> {
+  const rows = await query<any>(
+    `SELECT key, value FROM app_settings WHERE key IN ('rapor_titimangsa_tempat', 'rapor_titimangsa_tanggal')`
+  )
+  const map = new Map<string, string>(rows.map((r: any) => [r.key, r.value]))
+  return {
+    tempat: map.get('rapor_titimangsa_tempat') || 'Sukahideng',
+    tanggal: map.get('rapor_titimangsa_tanggal') || '',   // '' = pakai tanggal hari ini
+  }
+}
+
+export async function saveRaporTitimangsa(tempat: string, tanggal: string) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik'])) {
+    return { error: 'Anda tidak punya akses mengatur titimangsa rapor.' }
+  }
+
+  const tempatClean = String(tempat ?? '').trim() || 'Sukahideng'
+  const tanggalClean = String(tanggal ?? '').trim()   // YYYY-MM-DD atau ''
+  if (tanggalClean && !/^\d{4}-\d{2}-\d{2}$/.test(tanggalClean)) {
+    return { error: 'Format tanggal tidak valid.' }
+  }
+
+  await batch([
+    {
+      sql: `INSERT INTO app_settings (key, value, updated_at)
+            VALUES ('rapor_titimangsa_tempat', ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      params: [tempatClean],
+    },
+    {
+      sql: `INSERT INTO app_settings (key, value, updated_at)
+            VALUES ('rapor_titimangsa_tanggal', ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      params: [tanggalClean],
+    },
+  ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'laporan_rapor',
+    action: 'update',
+    fiturHref: '/dashboard/laporan/rapor',
+    logKind: 'update',
+    entityType: 'rapor_titimangsa',
+    entityId: 'global',
+    entityLabel: 'Titimangsa rapor',
+    summary: `Mengatur titimangsa rapor: ${tempatClean}${tanggalClean ? `, ${tanggalClean}` : ' (tanggal cetak)'}`,
+    details: { tempat: tempatClean, tanggal: tanggalClean },
+  })
+
+  revalidatePath('/dashboard/laporan/rapor')
+  return { success: true, data: { tempat: tempatClean, tanggal: tanggalClean } }
+}
+
 // ─── PILIHAN KITAB RAPOR ────────────────────────────────────────────────────
 
 type KitabOpsi = { kitab_id: number; nama_kitab: string }
