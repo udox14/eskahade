@@ -102,8 +102,6 @@ export default function CetakRaporPage() {
     @media print {
       html, body { margin: 0 !important; padding: 0 !important; }
       .print-sheet {
-        width: 100% !important;
-        max-width: 100% !important;
         min-height: 0 !important;
         margin: 0 !important;
         box-shadow: none !important;
@@ -155,11 +153,31 @@ export default function CetakRaporPage() {
     setCurrentPage(1)
   }, [selectedKelas, selectedSemester])
 
+  // Skala tiap sheet supaya dijamin muat 1 halaman A4 (96dpi).
+  // A4 = 210x297mm. Konten yang lebih tinggi di-zoom-out otomatis.
+  // Kertas lebih besar (F4/Legal) tetap aman karena konten <= A4.
+  const fitSheetsToPage = () => {
+    const root = printRef.current
+    if (!root) return
+    const A4_W = (210 / 25.4) * 96   // ~793.7px
+    const A4_H = (297 / 25.4) * 96   // ~1122.5px
+    const sheets = root.querySelectorAll<HTMLElement>('.print-sheet')
+    sheets.forEach(el => {
+      el.style.zoom = '1'
+      const w = el.scrollWidth
+      const h = el.scrollHeight
+      // -2px epsilon supaya pembulatan tidak memicu halaman kedua
+      const scale = Math.min(1, (A4_W - 2) / w, (A4_H - 2) / h)
+      el.style.zoom = scale < 1 ? String(scale) : '1'
+    })
+  }
+
   useEffect(() => {
     if (!printQueued || printRows.length === 0) return
 
     const timer = window.setTimeout(() => {
       toast.info('Menyiapkan dokumen untuk dicetak...')
+      fitSheetsToPage()
       handlePrint()
       setPrintQueued(false)
     }, 80)
