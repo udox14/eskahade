@@ -86,8 +86,8 @@ export function IdentitasSantriHalaman({ data }: { data: any }) {
   return (
     <div
       className={[
-        'w-[210mm] min-h-[297mm] bg-white mx-auto',
-        'shadow-lg print:shadow-none print:break-after-page',
+        'print-sheet w-[210mm] min-h-[297mm] bg-white mx-auto',
+        'shadow-lg print:shadow-none',
         'text-black font-serif text-[12px] leading-normal',
         'px-[26mm] py-[22mm]',
       ].join(' ')}

@@ -67,8 +67,8 @@ export function RaporSatuHalaman({
   return (
     <div
       className={[
-        'w-[210mm] min-h-[297mm] bg-white mx-auto',
-        'shadow-lg print:shadow-none print:break-after-page',
+        'print-sheet w-[210mm] min-h-[297mm] bg-white mx-auto',
+        'shadow-lg print:shadow-none',
         'text-black text-[11.5px] leading-snug',
         'px-[14mm] py-[8mm]',
       ].join(' ')}

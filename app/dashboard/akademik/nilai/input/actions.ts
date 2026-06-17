@@ -56,7 +56,7 @@ export async function getDataSantriPerKelas(kelasId: string) {
     SELECT rp.id, s.nis, s.nama_lengkap
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
 
@@ -74,9 +74,9 @@ export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, sem
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, na.nilai
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
-    LEFT JOIN nilai_akademik na ON na.riwayat_pendidikan_id = rp.id 
+    LEFT JOIN nilai_akademik na ON na.riwayat_pendidikan_id = rp.id
          AND na.mapel_id = ? AND na.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [mapelId, semester, kelasId])
 
@@ -275,7 +275,7 @@ export async function getDataKepribadian(kelasId: string, semester: number) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     LEFT JOIN nilai_akhlak na ON na.riwayat_pendidikan_id = rp.id AND na.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [semester, kelasId])
 
@@ -330,7 +330,7 @@ export async function getDataCatatanWali(kelasId: string, semester: number) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [semester, kelasId])
 

@@ -10,6 +10,25 @@ export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
 }
 
+// D1 batasi max 100 bound param/query. Pecah IN (...) jadi chunk biar kelas
+// dengan santri >100 tidak kena "too many SQL variables".
+const SQL_VAR_CHUNK = 90
+
+async function getNilaiChunked(riwayatIds: string[], semester: number) {
+  const out: any[] = []
+  for (let i = 0; i < riwayatIds.length; i += SQL_VAR_CHUNK) {
+    const part = riwayatIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<any>(`
+      SELECT riwayat_pendidikan_id, mapel_id, nilai
+      FROM nilai_akademik
+      WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+    `, [...part, semester])
+    out.push(...rows)
+  }
+  return out
+}
+
 export async function getKelasListForLeger(tahunAjaranId?: number) {
   const session = await getSession()
   if (!session) return []
@@ -52,7 +71,7 @@ export async function getLegerData(kelasId: string, semester: number) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
     LIMIT 1000
   `, [semester, kelasId])
@@ -60,20 +79,16 @@ export async function getLegerData(kelasId: string, semester: number) {
   if (!santriList.length) return { mapel: mapelList, siswa: [] }
 
   const riwayatIds = santriList.map((s: any) => s.id)
-  const ph = riwayatIds.map(() => '?').join(',')
+  const nilaiList = await getNilaiChunked(riwayatIds, semester)
 
-  const nilaiList = await query<any>(`
-    SELECT riwayat_pendidikan_id, mapel_id, nilai
-    FROM nilai_akademik
-    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
-    LIMIT 5000
-  `, [...riwayatIds, semester])
+  // Lookup O(1) per (riwayat, mapel)
+  const nilaiMap = new Map<string, number | string>()
+  nilaiList.forEach((n: any) => nilaiMap.set(`${n.riwayat_pendidikan_id}:${n.mapel_id}`, n.nilai))
 
   const legerSiswa = santriList.map((s: any) => {
     const nilaiPerMapel: Record<string, number | string> = {}
     mapelList.forEach((m: any) => {
-      const n = nilaiList.find((item: any) => item.riwayat_pendidikan_id === s.id && item.mapel_id === m.id)
-      nilaiPerMapel[m.id] = n ? n.nilai : 0
+      nilaiPerMapel[m.id] = nilaiMap.get(`${s.id}:${m.id}`) ?? 0
     })
     return {
       id: s.id,

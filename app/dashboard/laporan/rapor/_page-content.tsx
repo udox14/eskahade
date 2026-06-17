@@ -93,9 +93,36 @@ export default function CetakRaporPage() {
   }, [kelasList, selectedKelas])
   const paginatedDaftar = usePagination(daftar, pageSize, currentPage)
 
+  // Cetak adaptif: apapun kertas yang dipilih user (A4/F4/Legal/Folio),
+  // tiap rapor/identitas tetap satu halaman penuh, tidak tumpah ke halaman 2.
+  // size: auto => ikut kertas terpilih. Sheet diregang ke lebar halaman,
+  // tinggi mengikuti konten, dan dijaga tidak terpotong antar halaman.
+  const pageStyle = `
+    @page { size: auto; margin: 0; }
+    @media print {
+      html, body { margin: 0 !important; padding: 0 !important; }
+      .print-sheet {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        break-after: page;
+        page-break-after: always;
+      }
+      .print-sheet:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+    }
+  `
+
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: printTitle,
+    pageStyle,
     onAfterPrint: () => {
       toast.success('Dokumen dikirim ke printer.')
     },
