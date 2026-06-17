@@ -82,6 +82,8 @@ export default function CetakRaporPage() {
   // mapel_id -> kitab_id ('' = gabung semua judul)
   const [kitabSelections, setKitabSelections] = useState<Record<number, string>>({})
 
+  const [paperSize, setPaperSize] = useState<'A4' | 'F4'>('F4')
+
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
   const [printTitle, setPrintTitle] = useState('Cetak_Rapor')
@@ -93,26 +95,37 @@ export default function CetakRaporPage() {
   }, [kelasList, selectedKelas])
   const paginatedDaftar = usePagination(daftar, pageSize, currentPage)
 
-  // Cetak adaptif: apapun kertas yang dipilih user (A4/F4/Legal/Folio),
-  // tiap rapor/identitas tetap satu halaman penuh, tidak tumpah ke halaman 2.
-  // size: auto => ikut kertas terpilih. Sheet diregang ke lebar halaman,
-  // tinggi mengikuti konten, dan dijaga tidak terpotong antar halaman.
+  // Dua ukuran kertas yang dipakai di lapangan: A4 & F4 (folio).
+  const PAPER = {
+    A4: { w: 210, h: 297 },
+    F4: { w: 215, h: 330 },
+  } as const
+  const paper = PAPER[paperSize]
+
+  // @page dipaksa ke ukuran terpilih supaya printer tidak menebak / menskala.
+  // Lebar & tinggi sheet diset eksak per kertas, lalu di-zoom agar pas 1 halaman.
   const pageStyle = `
-    @page { size: auto; margin: 0; }
+    @page { size: ${paper.w}mm ${paper.h}mm; margin: 0; }
     @media print {
       html, body { margin: 0 !important; padding: 0 !important; }
-      .print-sheet {
-        min-height: 0 !important;
-        margin: 0 !important;
-        box-shadow: none !important;
+      .sheet-wrap {
+        width: 100%;
+        display: flex;
+        justify-content: center;       /* center horizontal => margin kiri = kanan */
+        align-items: flex-start;
+        overflow: hidden;
         break-inside: avoid;
         page-break-inside: avoid;
         break-after: page;
         page-break-after: always;
       }
-      .print-sheet:last-child {
+      .sheet-wrap:last-child {
         break-after: auto;
         page-break-after: auto;
+      }
+      .print-sheet {
+        margin: 0 !important;
+        box-shadow: none !important;
       }
     }
   `
@@ -153,22 +166,33 @@ export default function CetakRaporPage() {
     setCurrentPage(1)
   }, [selectedKelas, selectedSemester])
 
-  // Skala tiap sheet supaya dijamin muat 1 halaman A4 (96dpi).
-  // A4 = 210x297mm. Konten yang lebih tinggi di-zoom-out otomatis.
-  // Kertas lebih besar (F4/Legal) tetap aman karena konten <= A4.
+  // Skala tiap sheet agar muat 1 halaman kertas terpilih (96dpi), tetap center.
+  // transform-origin top center => sisa ruang dibagi rata kiri-kanan
+  // (margin kiri = margin kanan). Wrapper di-set tinggi hasil skala supaya
+  // tidak ada ruang kosong / tumpah ke halaman berikutnya.
   const fitSheetsToPage = () => {
     const root = printRef.current
     if (!root) return
-    const A4_W = (210 / 25.4) * 96   // ~793.7px
-    const A4_H = (297 / 25.4) * 96   // ~1122.5px
-    const sheets = root.querySelectorAll<HTMLElement>('.print-sheet')
-    sheets.forEach(el => {
-      el.style.zoom = '1'
+    const PXW = (paper.w / 25.4) * 96
+    const PXH = (paper.h / 25.4) * 96
+    const wraps = root.querySelectorAll<HTMLElement>('.sheet-wrap')
+    wraps.forEach(wrap => {
+      const el = wrap.querySelector<HTMLElement>('.print-sheet')
+      if (!el) return
+      el.style.transform = 'none'
+      el.style.transformOrigin = 'top center'
+      el.style.width = `${paper.w}mm`
+      el.style.minHeight = '0'   // buang floor 297mm biar ukur tinggi konten asli
       const w = el.scrollWidth
       const h = el.scrollHeight
       // -2px epsilon supaya pembulatan tidak memicu halaman kedua
-      const scale = Math.min(1, (A4_W - 2) / w, (A4_H - 2) / h)
-      el.style.zoom = scale < 1 ? String(scale) : '1'
+      const scale = Math.min(1, (PXW - 2) / w, (PXH - 2) / h)
+      if (scale < 1) {
+        el.style.transform = `scale(${scale})`
+        wrap.style.height = `${Math.ceil(h * scale)}px`
+      } else {
+        wrap.style.height = ''
+      }
     })
   }
 
@@ -413,7 +437,26 @@ export default function CetakRaporPage() {
           <p className="text-sm text-slate-500">Pilih kelas, lalu cetak rapor atau identitas per santri.</p>
         </div>
         {hasData ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Ukuran Kertas</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+                {(['A4', 'F4'] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPaperSize(p)}
+                    className={[
+                      'px-4 py-1.5 text-sm font-bold transition-colors',
+                      paperSize === p ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100',
+                    ].join(' ')}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-slate-400">{paperSize === 'F4' ? '215 × 330 mm' : '210 × 297 mm'}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <button
               onClick={openKitabModal}
               className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
@@ -440,6 +483,7 @@ export default function CetakRaporPage() {
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
               Leger Excel
             </button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -585,22 +629,25 @@ export default function CetakRaporPage() {
       </div>
 
       <div className="fixed -left-[10000px] top-0 print:static print:left-0">
-        <div ref={printRef} className="w-fit bg-white">
+        <div ref={printRef} className="w-fit bg-white print:w-full">
           {printKind === 'rapor' ? (
             <div>
               {printRows.map((siswa) => (
-                <RaporSatuHalaman
-                  key={siswa.id}
-                  data={siswa}
-                  semester={Number(selectedSemester)}
-                  tahunAjaran={tahunAjaran}
-                />
+                <div key={siswa.id} className="sheet-wrap">
+                  <RaporSatuHalaman
+                    data={siswa}
+                    semester={Number(selectedSemester)}
+                    tahunAjaran={tahunAjaran}
+                  />
+                </div>
               ))}
             </div>
           ) : (
             <div>
               {printRows.map((siswa) => (
-                <IdentitasSantriHalaman key={siswa.riwayat_id} data={siswa} />
+                <div key={siswa.riwayat_id} className="sheet-wrap">
+                  <IdentitasSantriHalaman data={siswa} />
+                </div>
               ))}
             </div>
           )}
