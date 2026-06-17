@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import Image from 'next/image'
 import { terbilang } from "@/lib/terbilang"
 
@@ -31,12 +32,16 @@ export function RaporSatuHalaman({
   tahunAjaran = '2024/2025',
   titimangsaTempat = 'Sukahideng',
   titimangsaTanggal = '',
+  pimpinanTtd,
+  waliTtd,
 }: {
   data: any
   semester: number
   tahunAjaran?: string
   titimangsaTempat?: string
   titimangsaTanggal?: string
+  pimpinanTtd?: { url: string; x: number; y: number; w: number }
+  waliTtd?: { url: string; x: number; y: number; w: number }
 }) {
   const semesterLabel = semester === 1 ? 'Ganjil' : 'Genap'
 
@@ -68,6 +73,20 @@ export function RaporSatuHalaman({
 
   const kepribadian: { label: string; predikat: string }[] =
     data.kepribadian?.length ? data.kepribadian : KEPRIBADIAN_DEFAULT
+
+  // TTD overlay (in front of text): posisi & ukuran dari pengaturan.
+  const ttdStyle = (t?: { x: number; y: number; w: number }): CSSProperties => ({
+    position: 'absolute',
+    left: '50%',
+    bottom: '24px',
+    transform: `translate(calc(-50% + ${t?.x ?? 0}px), ${t?.y ?? 0}px)`,
+    width: `${t?.w ?? 100}px`,
+    height: 'auto',
+    zIndex: 10,
+    pointerEvents: 'none',
+  })
+  // Pimpinan: pakai TTD upload, fallback ke gambar statis lama.
+  const pimpinanUrl = pimpinanTtd?.url || '/ttd-pimpinan.png'
 
   return (
     <div
@@ -398,8 +417,12 @@ export function RaporSatuHalaman({
         </div>
 
         {/* Wali Kelas */}
-        <div className="text-center w-[32%] flex flex-col justify-between h-[100px]">
+        <div className="relative text-center w-[32%] flex flex-col justify-between h-[100px]">
           <p className="mb-0 whitespace-nowrap">Wali Kelas,</p>
+          {waliTtd?.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={waliTtd.url} alt="TTD Wali Kelas" style={ttdStyle(waliTtd)} />
+          ) : null}
           <div>
             <p className="font-bold uppercase border-t border-black pt-[2px] mb-0 text-[11px] whitespace-nowrap">
               {data.wali_kelas_nama}
@@ -408,18 +431,13 @@ export function RaporSatuHalaman({
         </div>
 
         {/* Pimpinan Pesantren */}
-        <div className="text-center w-[32%] flex flex-col justify-between h-[100px]">
+        <div className="relative text-center w-[32%] flex flex-col justify-between h-[100px]">
           <p className="mb-0 whitespace-nowrap">Pimpinan Pesantren,</p>
-          <div className="relative flex flex-col items-center w-full">
-            <div className="absolute bottom-[16px] left-1/2 -translate-x-1/2 h-[50px] w-[100px] pointer-events-none">
-              <Image
-                src="/ttd-pimpinan.png"
-                alt="TTD Pimpinan"
-                width={100}
-                height={50}
-                className="object-contain w-full h-full"
-              />
-            </div>
+          {pimpinanUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={pimpinanUrl} alt="TTD Pimpinan" style={ttdStyle(pimpinanTtd)} />
+          ) : null}
+          <div>
             <p className="font-bold uppercase border-t border-black pt-[2px] mb-0 text-[11px] w-full whitespace-nowrap">
               Drs. KH. Ii Abdul Basith Wahab
             </p>

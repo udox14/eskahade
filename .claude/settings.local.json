@@ -10,7 +10,8 @@
       "Bash(sed -n '/CREATE TABLE IF NOT EXISTS riwayat_pendidikan/,/^\\);/p' /c/DATA/eskahade/migrations/0001_schema.sql)",
       "Bash(npx tsx -e ' *)",
       "Bash(node --input-type=module -e ' *)",
-      "Bash(grep -n \"kitabModalOpen &&\\\\|titimangsaModalOpen\\\\|^    </div>\\\\s*$\\\\|\\) : \\(\\\\|Simpan$\\\\|kitabOptions.length === 0\\)\" /c/DATA/eskahade/app/dashboard/laporan/rapor/_page-content.tsx)"
+      "Bash(grep -n \"kitabModalOpen &&\\\\|titimangsaModalOpen\\\\|^    </div>\\\\s*$\\\\|\\) : \\(\\\\|Simpan$\\\\|kitabOptions.length === 0\\)\" /c/DATA/eskahade/app/dashboard/laporan/rapor/_page-content.tsx)",
+      "Bash(npx eslint *)"
     ]
   }
 }

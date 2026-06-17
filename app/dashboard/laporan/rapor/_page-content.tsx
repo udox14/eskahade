@@ -9,9 +9,13 @@ import {
   getKitabPilihanOptions,
   getLegerRaporData,
   getRaporTitimangsa,
+  getRaporTtdPimpinan,
+  getRaporTtdWali,
   getTahunAjaranList,
   saveKitabPilihan,
   saveRaporTitimangsa,
+  saveRaporTtdPimpinan,
+  saveRaporTtdWali,
   updateIdentitasSantriRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
@@ -28,14 +32,174 @@ import {
   IdCard,
   Loader2,
   Pencil,
+  PenLine,
   Printer,
   Search,
   Save,
+  Upload,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type PrintKind = 'rapor' | 'identitas'
+
+type TtdValue = { url: string; x: number; y: number; w: number }
+
+const fileToBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
+// Editor TTD: upload gambar + geser posisi X/Y + ukuran, dengan preview live.
+function TtdEditorModal({
+  open,
+  title,
+  subtitle,
+  previewName,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  title: string
+  subtitle: string
+  previewName: string
+  initial: TtdValue
+  onClose: () => void
+  onSave: (v: TtdValue) => Promise<void>
+}) {
+  const [form, setForm] = useState<TtdValue>(initial)
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Reset form tiap modal dibuka.
+  useEffect(() => {
+    if (open) setForm(initial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  if (!open) return null
+
+  const set = (patch: Partial<TtdValue>) => setForm(prev => ({ ...prev, ...patch }))
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar.')
+      return
+    }
+    setUploading(true)
+    try {
+      const base64 = await fileToBase64(file)
+      const res = await fetch('/api/upload-foto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, folder: 'ttd-rapor', filenamePrefix: 'ttd' }),
+      })
+      const data = await res.json()
+      if (data?.url) {
+        set({ url: data.url })
+        toast.success('Tanda tangan terupload.')
+      } else {
+        toast.error(data?.error || 'Gagal upload.')
+      }
+    } catch {
+      toast.error('Gagal upload tanda tangan.')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await onSave(form)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const ttdImgStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: '50%',
+    bottom: '24px',
+    transform: `translate(calc(-50% + ${form.x}px), ${form.y}px)`,
+    width: `${form.w}px`,
+    height: 'auto',
+    zIndex: 10,
+    pointerEvents: 'none',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+            <h2 className="text-lg font-bold text-slate-800">{previewName}</h2>
+            <p className="text-xs text-slate-500">{subtitle}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700" aria-label="Tutup modal">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          {/* Preview */}
+          <div className="relative mx-auto flex h-[130px] w-[240px] flex-col justify-end overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
+            {form.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.url} alt="Preview TTD" style={ttdImgStyle} />
+            ) : null}
+            <p className="z-[1] border-t border-black pt-[2px] text-[11px] font-bold uppercase">{previewName || 'Nama'}</p>
+          </div>
+
+          {/* Upload */}
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {form.url ? 'Ganti Gambar Tanda Tangan' : 'Upload Gambar Tanda Tangan'}
+            <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+          </label>
+
+          {/* Sliders */}
+          <div>
+            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+              <span>Geser Horizontal (X)</span><span>{form.x}px</span>
+            </div>
+            <input type="range" min={-120} max={120} value={form.x} onChange={e => set({ x: Number(e.target.value) })} className="w-full accent-blue-600" />
+          </div>
+          <div>
+            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+              <span>Geser Vertikal (Y)</span><span>{form.y}px</span>
+            </div>
+            <input type="range" min={-100} max={60} value={form.y} onChange={e => set({ y: Number(e.target.value) })} className="w-full accent-blue-600" />
+          </div>
+          <div>
+            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+              <span>Ukuran (Lebar)</span><span>{form.w}px</span>
+            </div>
+            <input type="range" min={30} max={240} value={form.w} onChange={e => set({ w: Number(e.target.value) })} className="w-full accent-blue-600" />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
+          <button onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
+            Batal
+          </button>
+          <button onClick={save} disabled={saving || uploading} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const emptyIdentitasForm = {
   riwayat_id: '',
@@ -91,6 +255,11 @@ export default function CetakRaporPage() {
   const [titimangsaModalOpen, setTitimangsaModalOpen] = useState(false)
   const [titimangsaForm, setTitimangsaForm] = useState<{ tempat: string; tanggal: string }>({ tempat: 'Sukahideng', tanggal: '' })
   const [titimangsaSaving, setTitimangsaSaving] = useState(false)
+
+  const [pimpinanTtd, setPimpinanTtd] = useState<TtdValue>({ url: '', x: 0, y: 0, w: 100 })
+  const [pimpinanTtdOpen, setPimpinanTtdOpen] = useState(false)
+  const [waliTtd, setWaliTtd] = useState<{ url: string; x: number; y: number; w: number; nama: string | null } | null>(null)
+  const [waliTtdOpen, setWaliTtdOpen] = useState(false)
 
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
@@ -157,6 +326,7 @@ export default function CetakRaporPage() {
       if (aktif) setSelectedTA(aktif.id)
     })
     getRaporTitimangsa().then(setTitimangsa).catch(() => {})
+    getRaporTtdPimpinan().then(setPimpinanTtd).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -234,15 +404,17 @@ export default function CetakRaporPage() {
 
     try {
       const semester = Number(selectedSemester)
-      const [list, rapor, identitas] = await Promise.all([
+      const [list, rapor, identitas, waliTtdData] = await Promise.all([
         getDaftarCetakRapor(selectedKelas, semester),
         getDataRapor(selectedKelas, semester),
         getDataIdentitas(selectedKelas),
+        getRaporTtdWali(selectedKelas),
       ])
 
       setDaftar(list.siswa || [])
       setDataRapor(rapor || [])
       setDataIdentitas(identitas || [])
+      setWaliTtd(waliTtdData)
 
       if (!list.siswa?.length) {
         toast.info('Data Kosong', { description: 'Belum ada santri aktif di kelas ini.' })
@@ -370,6 +542,23 @@ export default function CetakRaporPage() {
     }
   }
 
+  const savePimpinanTtd = async (v: TtdValue) => {
+    const res = await saveRaporTtdPimpinan(v)
+    if (res?.error) { toast.error(res.error); return }
+    if (res?.data) setPimpinanTtd(res.data)
+    setPimpinanTtdOpen(false)
+    toast.success('Tanda tangan pimpinan tersimpan.')
+  }
+
+  const saveWaliTtd = async (v: TtdValue) => {
+    if (!selectedKelas) return
+    const res = await saveRaporTtdWali(selectedKelas, v)
+    if (res?.error) { toast.error(res.error); return }
+    if (res?.data) setWaliTtd(prev => ({ ...res.data, nama: prev?.nama ?? null }))
+    setWaliTtdOpen(false)
+    toast.success('Tanda tangan wali kelas tersimpan.')
+  }
+
   const openKitabModal = async () => {
     if (!selectedKelas) return toast.warning('Pilih kelas terlebih dahulu.')
     setKitabModalOpen(true)
@@ -470,12 +659,20 @@ export default function CetakRaporPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Cetak Rapor Santri</h1>
           <p className="text-sm text-slate-500">Pilih kelas, lalu cetak rapor atau identitas per santri.</p>
-          <button
-            onClick={openTitimangsaModal}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-          >
-            <CalendarCog className="h-3.5 w-3.5" /> Titimangsa: {titimangsa.tempat}{titimangsa.tanggal ? `, ${titimangsa.tanggal}` : ' (tgl cetak)'}
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              onClick={openTitimangsaModal}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+            >
+              <CalendarCog className="h-3.5 w-3.5" /> Titimangsa: {titimangsa.tempat}{titimangsa.tanggal ? `, ${titimangsa.tanggal}` : ' (tgl cetak)'}
+            </button>
+            <button
+              onClick={() => setPimpinanTtdOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+            >
+              <PenLine className="h-3.5 w-3.5" /> TTD Pimpinan
+            </button>
+          </div>
         </div>
         {hasData ? (
           <div className="flex flex-col gap-2">
@@ -497,12 +694,18 @@ export default function CetakRaporPage() {
               </div>
               <span className="text-xs text-slate-400">{paperSize === 'F4' ? '215 × 330 mm' : '210 × 297 mm'}</span>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <button
               onClick={openKitabModal}
               className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
             >
               <BookOpen className="h-4 w-4" /> Atur Kitab Rapor
+            </button>
+            <button
+              onClick={() => waliTtd ? setWaliTtdOpen(true) : toast.warning('Kelas ini belum punya wali kelas.')}
+              className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+            >
+              <PenLine className="h-4 w-4" /> TTD Wali Kelas
             </button>
             <button
               onClick={() => queuePrint('rapor', dataRapor, `Rapor_${selectedKelasName}_Smt${selectedSemester}`)}
@@ -681,6 +884,8 @@ export default function CetakRaporPage() {
                     tahunAjaran={tahunAjaran}
                     titimangsaTempat={titimangsa.tempat}
                     titimangsaTanggal={titimangsa.tanggal}
+                    pimpinanTtd={pimpinanTtd}
+                    waliTtd={waliTtd ? { url: waliTtd.url, x: waliTtd.x, y: waliTtd.y, w: waliTtd.w } : undefined}
                   />
                 </div>
               ))}
@@ -939,6 +1144,26 @@ export default function CetakRaporPage() {
           </div>
         </div>
       )}
+
+      <TtdEditorModal
+        open={pimpinanTtdOpen}
+        title="Tanda Tangan Pimpinan (Global)"
+        subtitle="Berlaku untuk semua rapor."
+        previewName="Drs. KH. Ii Abdul Basith Wahab"
+        initial={pimpinanTtd}
+        onClose={() => setPimpinanTtdOpen(false)}
+        onSave={savePimpinanTtd}
+      />
+
+      <TtdEditorModal
+        open={waliTtdOpen}
+        title="Tanda Tangan Wali Kelas"
+        subtitle={`Khusus wali kelas ${selectedKelasName}.`}
+        previewName={waliTtd?.nama || 'Wali Kelas'}
+        initial={waliTtd ? { url: waliTtd.url, x: waliTtd.x, y: waliTtd.y, w: waliTtd.w } : { url: '', x: 0, y: 0, w: 100 }}
+        onClose={() => setWaliTtdOpen(false)}
+        onSave={saveWaliTtd}
+      />
     </div>
   )
 }

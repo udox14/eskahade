@@ -655,6 +655,133 @@ export async function saveRaporTitimangsa(tempat: string, tanggal: string) {
   return { success: true, data: { tempat: tempatClean, tanggal: tanggalClean } }
 }
 
+// ─── TANDA TANGAN RAPOR ─────────────────────────────────────────────────────
+
+type TtdSetting = { url: string; x: number; y: number; w: number }
+
+export async function getRaporTtdPimpinan(): Promise<TtdSetting> {
+  const rows = await query<any>(
+    `SELECT key, value FROM app_settings WHERE key IN
+      ('rapor_ttd_pimpinan_url','rapor_ttd_pimpinan_x','rapor_ttd_pimpinan_y','rapor_ttd_pimpinan_w')`
+  )
+  const map = new Map<string, string>(rows.map((r: any) => [r.key, r.value]))
+  return {
+    url: map.get('rapor_ttd_pimpinan_url') || '',
+    x: Number(map.get('rapor_ttd_pimpinan_x') ?? 0) || 0,
+    y: Number(map.get('rapor_ttd_pimpinan_y') ?? 0) || 0,
+    w: Number(map.get('rapor_ttd_pimpinan_w') ?? 100) || 100,
+  }
+}
+
+export async function saveRaporTtdPimpinan(s: TtdSetting) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik'])) {
+    return { error: 'Anda tidak punya akses mengatur tanda tangan pimpinan.' }
+  }
+  const url = String(s.url ?? '').trim()
+  const x = Math.trunc(Number(s.x) || 0)
+  const y = Math.trunc(Number(s.y) || 0)
+  const w = Math.max(20, Math.min(400, Math.trunc(Number(s.w) || 100)))
+
+  await batch([
+    ['rapor_ttd_pimpinan_url', url],
+    ['rapor_ttd_pimpinan_x', String(x)],
+    ['rapor_ttd_pimpinan_y', String(y)],
+    ['rapor_ttd_pimpinan_w', String(w)],
+  ].map(([key, value]) => ({
+    sql: `INSERT INTO app_settings (key, value, updated_at)
+          VALUES (?, ?, datetime('now'))
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    params: [key, value],
+  })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'laporan_rapor',
+    action: 'update',
+    fiturHref: '/dashboard/laporan/rapor',
+    logKind: 'update',
+    entityType: 'rapor_ttd_pimpinan',
+    entityId: 'global',
+    entityLabel: 'TTD Pimpinan',
+    summary: 'Mengatur tanda tangan pimpinan rapor',
+    details: { url, x, y, w },
+  })
+
+  revalidatePath('/dashboard/laporan/rapor')
+  return { success: true, data: { url, x, y, w } }
+}
+
+type TtdWali = TtdSetting & { user_id: string | null; nama: string | null }
+
+export async function getRaporTtdWali(kelasId: string): Promise<TtdWali | null> {
+  const kelas = await queryOne<any>(
+    `SELECT k.wali_kelas_id, u.full_name AS wali_nama
+     FROM kelas k LEFT JOIN users u ON u.id = k.wali_kelas_id
+     WHERE k.id = ? LIMIT 1`, [kelasId]
+  )
+  if (!kelas?.wali_kelas_id) return null
+
+  const row = await queryOne<any>(
+    'SELECT ttd_url, pos_x, pos_y, width FROM rapor_ttd_wali WHERE user_id = ? LIMIT 1',
+    [kelas.wali_kelas_id]
+  )
+  return {
+    user_id: kelas.wali_kelas_id,
+    nama: kelas.wali_nama || null,
+    url: row?.ttd_url || '',
+    x: Number(row?.pos_x ?? 0) || 0,
+    y: Number(row?.pos_y ?? 0) || 0,
+    w: Number(row?.width ?? 100) || 100,
+  }
+}
+
+export async function saveRaporTtdWali(kelasId: string, s: TtdSetting) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+
+  const kelas = await queryOne<any>(
+    'SELECT wali_kelas_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
+  )
+  if (!kelas?.wali_kelas_id) return { error: 'Kelas ini belum punya wali kelas.' }
+
+  const fullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+  const isOwnWali = hasRole(session, 'wali_kelas') && kelas.wali_kelas_id === session.id
+  if (!fullAccess && !isOwnWali) {
+    return { error: 'Anda hanya bisa mengatur tanda tangan untuk kelas yang Anda wali-i.' }
+  }
+
+  const url = String(s.url ?? '').trim()
+  const x = Math.trunc(Number(s.x) || 0)
+  const y = Math.trunc(Number(s.y) || 0)
+  const w = Math.max(20, Math.min(400, Math.trunc(Number(s.w) || 100)))
+
+  await execute(`
+    INSERT INTO rapor_ttd_wali (user_id, ttd_url, pos_x, pos_y, width, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      ttd_url = excluded.ttd_url, pos_x = excluded.pos_x,
+      pos_y = excluded.pos_y, width = excluded.width, updated_at = excluded.updated_at
+  `, [kelas.wali_kelas_id, url, x, y, w])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'laporan_rapor',
+    action: 'update',
+    fiturHref: '/dashboard/laporan/rapor',
+    logKind: 'update',
+    entityType: 'rapor_ttd_wali',
+    entityId: kelas.wali_kelas_id,
+    entityLabel: 'TTD Wali Kelas',
+    summary: `Mengatur tanda tangan wali kelas (kelas ${kelasId})`,
+    details: { kelas_id: kelasId, url, x, y, w },
+  })
+
+  revalidatePath('/dashboard/laporan/rapor')
+  return { success: true, data: { url, x, y, w } }
+}
+
 // ─── PILIHAN KITAB RAPOR ────────────────────────────────────────────────────
 
 type KitabOpsi = { kitab_id: number; nama_kitab: string }
