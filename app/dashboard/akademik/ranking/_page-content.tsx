@@ -326,8 +326,8 @@ export default function JuaraUmumPage() {
                 ref={printRef}
                 className="bg-white mx-auto shadow-xl relative text-black"
                 style={{
-                  width: '215mm',
-                  minHeight: '330mm',
+                  width: '330mm',
+                  minHeight: '215mm',
                   padding: '10mm', /* Margin narrow (1cm) */
                   fontFamily: 'Arial, Helvetica, sans-serif',
                   fontSize: '11pt'
@@ -336,7 +336,7 @@ export default function JuaraUmumPage() {
                 {/* CSS Khusus Print: reset margin, paksa Arial F4 narrow, dan ratakan tampilan input jadi teks polos saat dicetak */}
                 <style type="text/css" media="print">
                     {`
-                      @page { size: 215mm 330mm portrait; margin: 10mm; }
+                      @page { size: 330mm 215mm landscape; margin: 10mm; }
                       body {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
