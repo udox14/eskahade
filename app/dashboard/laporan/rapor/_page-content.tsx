@@ -6,8 +6,10 @@ import {
   getDataIdentitas,
   getDataRapor,
   getKelasList,
+  getKitabPilihanOptions,
   getLegerRaporData,
   getTahunAjaranList,
+  saveKitabPilihan,
   updateIdentitasSantriRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
@@ -15,6 +17,7 @@ import { RaporSatuHalaman } from './rapor-view'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   FileSpreadsheet,
@@ -71,6 +74,13 @@ export default function CetakRaporPage() {
   const [identitasForm, setIdentitasForm] = useState<any>(emptyIdentitasForm)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+
+  const [kitabModalOpen, setKitabModalOpen] = useState(false)
+  const [kitabLoading, setKitabLoading] = useState(false)
+  const [kitabSaving, setKitabSaving] = useState(false)
+  const [kitabOptions, setKitabOptions] = useState<any[]>([])
+  // mapel_id -> kitab_id ('' = gabung semua judul)
+  const [kitabSelections, setKitabSelections] = useState<Record<number, string>>({})
 
   const [printKind, setPrintKind] = useState<PrintKind>('rapor')
   const [printRows, setPrintRows] = useState<any[]>([])
@@ -256,6 +266,52 @@ export default function CetakRaporPage() {
     }
   }
 
+  const openKitabModal = async () => {
+    if (!selectedKelas) return toast.warning('Pilih kelas terlebih dahulu.')
+    setKitabModalOpen(true)
+    setKitabLoading(true)
+    try {
+      const opts = await getKitabPilihanOptions(selectedKelas)
+      setKitabOptions(opts)
+      const init: Record<number, string> = {}
+      opts.forEach((m: any) => {
+        init[m.mapel_id] = m.selected_kitab_id != null ? String(m.selected_kitab_id) : ''
+      })
+      setKitabSelections(init)
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal memuat opsi kitab.')
+      setKitabModalOpen(false)
+    } finally {
+      setKitabLoading(false)
+    }
+  }
+
+  const handleSaveKitab = async () => {
+    setKitabSaving(true)
+    const toastId = toast.loading('Menyimpan pilihan kitab...')
+    try {
+      const selections = kitabOptions.map((m: any) => ({
+        mapel_id: m.mapel_id,
+        kitab_id: kitabSelections[m.mapel_id] ? Number(kitabSelections[m.mapel_id]) : null,
+      }))
+      const res = await saveKitabPilihan(selectedKelas, selections)
+      if (res?.error) {
+        toast.error(res.error)
+        return
+      }
+      setKitabModalOpen(false)
+      toast.success('Pilihan kitab tersimpan.')
+      await handleLoad()
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal menyimpan pilihan kitab.')
+    } finally {
+      toast.dismiss(toastId)
+      setKitabSaving(false)
+    }
+  }
+
   const handleExportLeger = async () => {
     if (!selectedKelas) return toast.warning('Pilih kelas terlebih dahulu.')
 
@@ -312,7 +368,13 @@ export default function CetakRaporPage() {
           <p className="text-sm text-slate-500">Pilih kelas, lalu cetak rapor atau identitas per santri.</p>
         </div>
         {hasData ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              onClick={openKitabModal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
+            >
+              <BookOpen className="h-4 w-4" /> Atur Kitab Rapor
+            </button>
             <button
               onClick={() => queuePrint('rapor', dataRapor, `Rapor_${selectedKelasName}_Smt${selectedSemester}`)}
               className="flex items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-green-800"
@@ -605,6 +667,73 @@ export default function CetakRaporPage() {
               >
                 {identitySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Simpan Identitas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {kitabModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Atur Kitab Rapor</p>
+                <h2 className="text-lg font-bold text-slate-800">{selectedKelasName}</h2>
+                <p className="text-xs text-slate-500">Pilih satu kitab per mapel. &quot;Gabung semua judul&quot; = tampilkan seluruh kitab.</p>
+              </div>
+              <button
+                onClick={() => setKitabModalOpen(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              {kitabLoading ? (
+                <div className="flex min-h-[160px] items-center justify-center text-slate-400">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : kitabOptions.length === 0 ? (
+                <div className="flex min-h-[160px] flex-col items-center justify-center text-center text-slate-400">
+                  <BookOpen className="mb-3 h-10 w-10 text-slate-300" />
+                  <p className="font-medium">Tidak ada mapel berkitab ganda.</p>
+                  <p className="text-sm">Semua mapel hanya punya satu kitab, tidak perlu diatur.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {kitabOptions.map((m: any) => (
+                    <div key={m.mapel_id} className="grid grid-cols-1 gap-1 sm:grid-cols-[1fr_1.4fr] sm:items-center">
+                      <label className="text-sm font-bold text-slate-700">{m.mapel_nama}</label>
+                      <select
+                        value={kitabSelections[m.mapel_id] ?? ''}
+                        onChange={e => setKitabSelections(prev => ({ ...prev, [m.mapel_id]: e.target.value }))}
+                        className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Gabung semua judul</option>
+                        {m.opsi.map((k: any) => (
+                          <option key={k.kitab_id} value={k.kitab_id}>{k.nama_kitab}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
+              <button onClick={() => setKitabModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
+                Batal
+              </button>
+              <button
+                onClick={handleSaveKitab}
+                disabled={kitabSaving || kitabLoading || kitabOptions.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {kitabSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Simpan
               </button>
             </div>
           </div>

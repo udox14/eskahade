@@ -1,6 +1,6 @@
 'use server'
 
-import { execute, query, queryOne } from '@/lib/db'
+import { batch, execute, query, queryOne } from '@/lib/db'
 import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -8,6 +8,32 @@ import { revalidatePath } from 'next/cache'
 
 export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
+}
+
+// D1 batasi maksimal 100 bound parameter per query. Pecah IN (...) jadi chunk
+// agar kelas dengan banyak santri tidak kena "too many SQL variables".
+const SQL_VAR_CHUNK = 90
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+// Jalankan query ber-IN secara chunk lalu gabung hasilnya.
+// build(ph, ids) mengembalikan { sql, params } untuk satu chunk.
+async function queryChunkedByIds<T = any>(
+  ids: string[],
+  build: (ph: string, ids: string[]) => { sql: string; params: unknown[] }
+): Promise<T[]> {
+  if (!ids.length) return []
+  const out: T[] = []
+  for (const part of chunk(ids, SQL_VAR_CHUNK)) {
+    const ph = part.map(() => '?').join(',')
+    const { sql, params } = build(ph, part)
+    out.push(...await query<T>(sql, params))
+  }
+  return out
 }
 
 type RaporMapel = {
@@ -24,13 +50,22 @@ async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
   const effMarhalahId = marhalahId || kelas?.marhalah_id || null
 
   if (effMarhalahId && tahunAjaranIdKelas) {
+    // Satu baris per mapel. Kalau ada pilihan kitab utk kelas ini -> pakai itu,
+    // kalau belum dipilih -> gabung semua judul kitab (default aman).
     const listKitab = await query<any>(`
-      SELECT mp.id, mp.nama, kt.nama_kitab
+      SELECT mp.id, mp.nama,
+        COALESCE(
+          (SELECT kt2.nama_kitab FROM kitab kt2
+             JOIN rapor_kitab_pilihan rkp ON rkp.kitab_id = kt2.id
+             WHERE rkp.kelas_id = ? AND rkp.mapel_id = mp.id LIMIT 1),
+          REPLACE(GROUP_CONCAT(DISTINCT kt.nama_kitab), ',', ', ')
+        ) AS nama_kitab
       FROM kitab kt
       JOIN mapel mp ON mp.id = kt.mapel_id
       WHERE kt.marhalah_id = ? AND kt.tahun_ajaran_id = ?
+      GROUP BY mp.id, mp.nama
       ORDER BY mp.nama ASC
-    `, [effMarhalahId, tahunAjaranIdKelas])
+    `, [kelasId, effMarhalahId, tahunAjaranIdKelas])
 
     if (listKitab.length) {
       return listKitab.map((m: any) => ({
@@ -42,15 +77,17 @@ async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
   }
 
   return query<any>(`
-    SELECT DISTINCT mp.id, mp.nama, COALESCE(kt.nama_kitab, '-') AS nama_kitab
+    SELECT mp.id, mp.nama,
+      COALESCE(REPLACE(GROUP_CONCAT(DISTINCT kt.nama_kitab), ',', ', '), '-') AS nama_kitab
     FROM nilai_akademik na
     JOIN mapel mp ON mp.id = na.mapel_id
     JOIN riwayat_pendidikan rp ON rp.id = na.riwayat_pendidikan_id
     JOIN kelas k ON k.id = rp.kelas_id
-    LEFT JOIN kitab kt ON kt.mapel_id = mp.id 
-      AND kt.marhalah_id = COALESCE(k.marhalah_id, ?) 
+    LEFT JOIN kitab kt ON kt.mapel_id = mp.id
+      AND kt.marhalah_id = COALESCE(k.marhalah_id, ?)
       AND kt.tahun_ajaran_id = COALESCE(k.tahun_ajaran_id, ?)
     WHERE rp.kelas_id = ?
+    GROUP BY mp.id, mp.nama
     ORDER BY mp.nama ASC
   `, [effMarhalahId || '', tahunAjaranIdKelas || 0, kelasId]).then(rows => rows.map((m: any) => ({
     id: m.id,
@@ -69,7 +106,7 @@ export async function getDaftarCetakRapor(kelasId: string, semester: number) {
     JOIN santri s ON s.id = rp.santri_id
     JOIN kelas k ON k.id = rp.kelas_id
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
 
@@ -78,12 +115,14 @@ export async function getDaftarCetakRapor(kelasId: string, semester: number) {
   const mapel = await getRaporMapel(kelasId, listSantri[0]?.marhalah_id)
   const totalMapel = mapel.length
   const riwayatIds = listSantri.map((s: any) => s.riwayat_id)
-  const ph = riwayatIds.map(() => '?').join(',')
-  const nilaiRows = await query<any>(`
-    SELECT riwayat_pendidikan_id, mapel_id, nilai
-    FROM nilai_akademik
-    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
-  `, [...riwayatIds, semester])
+  const nilaiRows = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
+    sql: `
+      SELECT riwayat_pendidikan_id, mapel_id, nilai
+      FROM nilai_akademik
+      WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+    `,
+    params: [...ids, semester],
+  }))
 
   const nilaiMap = new Map<string, number>()
   nilaiRows.forEach((n: any) => {
@@ -132,7 +171,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN users u ON u.id = k.wali_kelas_id
     LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [semester, kelasId])
 
@@ -142,32 +181,37 @@ export async function getDataRapor(kelasId: string, semester: number) {
   const totalSantri = listSantri.length
 
   const riwayatIds = listSantri.map((s: any) => s.id)
-  const ph = riwayatIds.map(() => '?').join(',')
 
-  const nilaiAkademik = await query<any>(`
-    SELECT na.riwayat_pendidikan_id, na.mapel_id, mp.nama AS mapel_nama, na.nilai
-    FROM nilai_akademik na
-    JOIN mapel mp ON mp.id = na.mapel_id
-    WHERE na.riwayat_pendidikan_id IN (${ph}) AND na.semester = ?
-    ORDER BY mp.nama ASC
-  `, [...riwayatIds, semester])
+  const nilaiAkademik = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
+    sql: `
+      SELECT na.riwayat_pendidikan_id, na.mapel_id, mp.nama AS mapel_nama, na.nilai
+      FROM nilai_akademik na
+      JOIN mapel mp ON mp.id = na.mapel_id
+      WHERE na.riwayat_pendidikan_id IN (${ph}) AND na.semester = ?
+      ORDER BY mp.nama ASC
+    `,
+    params: [...ids, semester],
+  }))
 
-  const absensiAgg = await query<any>(`
-    SELECT
-      riwayat_pendidikan_id,
-      SUM(CASE WHEN shubuh  = 'S' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN ashar   = 'S' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN maghrib = 'S' THEN 1 ELSE 0 END) AS total_sakit,
-      SUM(CASE WHEN shubuh  = 'I' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN ashar   = 'I' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN maghrib = 'I' THEN 1 ELSE 0 END) AS total_izin,
-      SUM(CASE WHEN shubuh  = 'A' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN ashar   = 'A' THEN 1 ELSE 0 END) +
-      SUM(CASE WHEN maghrib = 'A' THEN 1 ELSE 0 END) AS total_alfa
-    FROM absensi_harian
-    WHERE riwayat_pendidikan_id IN (${ph})
-    GROUP BY riwayat_pendidikan_id
-  `, riwayatIds)
+  const absensiAgg = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
+    sql: `
+      SELECT
+        riwayat_pendidikan_id,
+        SUM(CASE WHEN shubuh  = 'S' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN ashar   = 'S' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN maghrib = 'S' THEN 1 ELSE 0 END) AS total_sakit,
+        SUM(CASE WHEN shubuh  = 'I' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN ashar   = 'I' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN maghrib = 'I' THEN 1 ELSE 0 END) AS total_izin,
+        SUM(CASE WHEN shubuh  = 'A' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN ashar   = 'A' THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN maghrib = 'A' THEN 1 ELSE 0 END) AS total_alfa
+      FROM absensi_harian
+      WHERE riwayat_pendidikan_id IN (${ph})
+      GROUP BY riwayat_pendidikan_id
+    `,
+    params: ids,
+  }))
 
   // Build map untuk lookup O(1)
   const absenMap = new Map<string, { sakit: number; izin: number; alfa: number }>()
@@ -179,11 +223,14 @@ export async function getDataRapor(kelasId: string, semester: number) {
     })
   })
 
-  const nilaiAkhlak = await query<any>(`
-    SELECT riwayat_pendidikan_id, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian
-    FROM nilai_akhlak
-    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
-  `, [...riwayatIds, semester])
+  const nilaiAkhlak = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
+    sql: `
+      SELECT riwayat_pendidikan_id, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian
+      FROM nilai_akhlak
+      WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+    `,
+    params: [...ids, semester],
+  }))
 
   const akhlakMap = new Map<string, any>()
   nilaiAkhlak.forEach((a: any) => {
@@ -271,7 +318,7 @@ export async function getDataIdentitas(kelasId: string) {
     JOIN santri s ON s.id = rp.santri_id
     JOIN kelas k ON k.id = rp.kelas_id
     LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
 
@@ -350,7 +397,7 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
     JOIN kelas k ON k.id = rp.kelas_id
     LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
     JOIN santri s ON s.id = rp.santri_id
-    WHERE rp.id = ? AND rp.santri_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.id = ? AND rp.santri_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     LIMIT 1
   `, [payload.riwayat_id, payload.santri_id])
 
@@ -483,19 +530,21 @@ export async function getLegerRaporData(kelasId: string, semester: number) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     LEFT JOIN ranking r ON r.riwayat_pendidikan_id = rp.id AND r.semester = ?
-    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [semester, kelasId])
 
   if (!siswaList.length) return { mapel: daftar.mapel, siswa: [] }
 
   const riwayatIds = siswaList.map((s: any) => s.riwayat_id)
-  const ph = riwayatIds.map(() => '?').join(',')
-  const nilaiRows = await query<any>(`
-    SELECT riwayat_pendidikan_id, mapel_id, nilai
-    FROM nilai_akademik
-    WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
-  `, [...riwayatIds, semester])
+  const nilaiRows = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
+    sql: `
+      SELECT riwayat_pendidikan_id, mapel_id, nilai
+      FROM nilai_akademik
+      WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
+    `,
+    params: [...ids, semester],
+  }))
 
   const nilaiMap = new Map<string, number>()
   nilaiRows.forEach((n: any) => {
@@ -521,6 +570,99 @@ export async function getLegerRaporData(kelasId: string, semester: number) {
       }
     }),
   }
+}
+
+// ─── PILIHAN KITAB RAPOR ────────────────────────────────────────────────────
+
+type KitabOpsi = { kitab_id: number; nama_kitab: string }
+type MapelKitabPilihan = {
+  mapel_id: number
+  mapel_nama: string
+  selected_kitab_id: number | null   // null = gabung semua judul (default)
+  opsi: KitabOpsi[]
+}
+
+// Daftar mapel yang punya >1 kitab utk kelas ini, beserta pilihan saat ini.
+// Dipakai modal "Atur Kitab Rapor". Mapel berkitab tunggal tidak perlu diatur.
+export async function getKitabPilihanOptions(kelasId: string): Promise<MapelKitabPilihan[]> {
+  const kelas = await queryOne<any>(
+    'SELECT marhalah_id, tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
+  )
+  if (!kelas?.marhalah_id || !kelas?.tahun_ajaran_id) return []
+
+  const rows = await query<any>(`
+    SELECT mp.id AS mapel_id, mp.nama AS mapel_nama,
+           kt.id AS kitab_id, kt.nama_kitab,
+           rkp.kitab_id AS selected_kitab_id
+    FROM kitab kt
+    JOIN mapel mp ON mp.id = kt.mapel_id
+    LEFT JOIN rapor_kitab_pilihan rkp
+      ON rkp.kelas_id = ? AND rkp.mapel_id = mp.id
+    WHERE kt.marhalah_id = ? AND kt.tahun_ajaran_id = ?
+    ORDER BY mp.nama ASC, kt.nama_kitab ASC
+  `, [kelasId, kelas.marhalah_id, kelas.tahun_ajaran_id])
+
+  const map = new Map<number, MapelKitabPilihan>()
+  for (const r of rows) {
+    let m = map.get(r.mapel_id)
+    if (!m) {
+      m = {
+        mapel_id: r.mapel_id,
+        mapel_nama: r.mapel_nama || 'Tanpa Nama',
+        selected_kitab_id: r.selected_kitab_id ?? null,
+        opsi: [],
+      }
+      map.set(r.mapel_id, m)
+    }
+    m.opsi.push({ kitab_id: r.kitab_id, nama_kitab: r.nama_kitab || '-' })
+  }
+
+  // Hanya mapel berkitab ganda yang butuh diatur.
+  return Array.from(map.values()).filter(m => m.opsi.length > 1)
+}
+
+// Simpan pilihan kitab per mapel. kitab_id null/0 = hapus pilihan (gabung semua).
+export async function saveKitabPilihan(
+  kelasId: string,
+  selections: { mapel_id: number; kitab_id: number | null }[]
+) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && !hasRole(session, 'wali_kelas')) {
+    return { error: 'Anda tidak punya akses mengatur kitab rapor.' }
+  }
+  if (!selections.length) return { success: true }
+
+  await batch(selections.map(s =>
+    s.kitab_id
+      ? {
+          sql: `INSERT INTO rapor_kitab_pilihan (kelas_id, mapel_id, kitab_id, updated_at)
+                VALUES (?, ?, ?, datetime('now'))
+                ON CONFLICT(kelas_id, mapel_id)
+                DO UPDATE SET kitab_id = excluded.kitab_id, updated_at = datetime('now')`,
+          params: [kelasId, s.mapel_id, s.kitab_id],
+        }
+      : {
+          sql: 'DELETE FROM rapor_kitab_pilihan WHERE kelas_id = ? AND mapel_id = ?',
+          params: [kelasId, s.mapel_id],
+        }
+  ))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'laporan_rapor',
+    action: 'update',
+    fiturHref: '/dashboard/laporan/rapor',
+    logKind: 'update',
+    entityType: 'rapor_kitab_pilihan',
+    entityId: kelasId,
+    entityLabel: `Kitab rapor kelas ${kelasId}`,
+    summary: `Mengatur pilihan kitab rapor untuk ${selections.length} mapel`,
+    details: { kelas_id: kelasId, selections },
+  })
+
+  revalidatePath('/dashboard/laporan/rapor')
+  return { success: true }
 }
 
 function angkaKePredikat(angka: number): string {

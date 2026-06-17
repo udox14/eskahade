@@ -5,7 +5,9 @@
       "Bash(npx wrangler *)",
       "Bash(node -e ' *)",
       "Bash(node /c/DATA/eskahade/fix_db.mjs)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(sed -n '/CREATE TABLE IF NOT EXISTS santri/,/^\\);/p' /c/DATA/eskahade/migrations/0001_schema.sql)",
+      "Bash(sed -n '/CREATE TABLE IF NOT EXISTS riwayat_pendidikan/,/^\\);/p' /c/DATA/eskahade/migrations/0001_schema.sql)"
     ]
   }
 }
