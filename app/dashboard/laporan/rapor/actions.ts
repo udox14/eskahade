@@ -161,7 +161,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
     SELECT rp.id, rp.santri_id, rp.grade_lanjutan,
            s.nama_lengkap, s.nis, s.nama_ayah,
            k.id AS kelas_id, k.nama_kelas,
-           m.id AS marhalah_id, m.nama AS marhalah_nama,
+           m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan,
            u.full_name AS wali_kelas_nama,
            r.ranking_kelas, r.predikat, r.rata_rata, r.jumlah_nilai,
            r.catatan_wali_kelas
@@ -179,6 +179,22 @@ export async function getDataRapor(kelasId: string, semester: number) {
 
   // Hitung total santri di kelas ini untuk info ranking
   const totalSantri = listSantri.length
+
+  // "Naik Ke Marhalah": khusus semester genap diisi otomatis marhalah
+  // berikutnya berdasarkan urutan. Marhalah terakhir => "Lulus".
+  const marhalahList = await query<any>('SELECT nama, urutan FROM marhalah ORDER BY urutan ASC')
+  const marhalahByUrutan = new Map<number, string>()
+  let marhalahUrutanMax = 0
+  marhalahList.forEach((m: any) => {
+    marhalahByUrutan.set(Number(m.urutan), m.nama)
+    if (Number(m.urutan) > marhalahUrutanMax) marhalahUrutanMax = Number(m.urutan)
+  })
+  const hitungNaik = (urutan: number | null, gradeLanjutan: string | null) => {
+    if (semester !== 2) return gradeLanjutan || '-'
+    if (urutan == null) return gradeLanjutan || '-'
+    if (urutan >= marhalahUrutanMax) return 'Lulus'
+    return marhalahByUrutan.get(urutan + 1) || gradeLanjutan || '-'
+  }
 
   const riwayatIds = listSantri.map((s: any) => s.id)
 
@@ -276,11 +292,12 @@ export async function getDataRapor(kelasId: string, semester: number) {
       id: s.id,
       santri_id: s.santri_id,
       santri: { nama_lengkap: s.nama_lengkap, nis: s.nis, nama_ayah: s.nama_ayah },
-      kelas: { 
-        id: s.kelas_id, 
-        nama_kelas: s.nama_kelas, 
+      kelas: {
+        id: s.kelas_id,
+        nama_kelas: s.nama_kelas,
         grade_lanjutan: s.grade_lanjutan || null,
-        marhalah: { id: s.marhalah_id, nama: s.marhalah_nama } 
+        naik_marhalah: hitungNaik(s.marhalah_urutan ?? null, s.grade_lanjutan || null),
+        marhalah: { id: s.marhalah_id, nama: s.marhalah_nama }
       },
       wali_kelas_nama: s.wali_kelas_nama || '..........................',
       ranking: {

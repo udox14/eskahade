@@ -58,7 +58,7 @@ export function RaporSatuHalaman({
 
   const rankingKelas = data.ranking?.ranking_kelas ?? '-'
   const totalSantri  = data.ranking?.total_santri ?? '-'
-  const naik         = data.kelas?.grade_lanjutan ?? '-'
+  const naik         = data.kelas?.naik_marhalah ?? data.kelas?.grade_lanjutan ?? '-'
   const catatanWali  = data.ranking?.catatan_wali_kelas ?? ''
 
   const kepribadian: { label: string; predikat: string }[] =
