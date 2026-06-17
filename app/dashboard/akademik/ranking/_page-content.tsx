@@ -373,7 +373,7 @@ export default function JuaraUmumPage() {
                             <th className="border border-black p-2 w-[5%] text-center">Juara</th>
                             {/* Kolom nama tidak diberi lebar fixed agar otomatis melebar semaksimal mungkin */}
                             <th className="border border-black p-2 w-auto">Nama Santri</th>
-                            <th className="border border-black p-2 w-[22%]">Asrama / Kamar</th>
+                            <th className="border border-black p-2 w-[12%]">Asrama / Kamar</th>
                             <th className="border border-black p-2 w-[8%] text-center">Jml Nilai</th>
                             <th className="border border-black p-2 w-[8%] text-center">Rata-rata</th>
                         </tr>
