@@ -11,7 +11,8 @@
       "Bash(npx tsx -e ' *)",
       "Bash(node --input-type=module -e ' *)",
       "Bash(grep -n \"kitabModalOpen &&\\\\|titimangsaModalOpen\\\\|^    </div>\\\\s*$\\\\|\\) : \\(\\\\|Simpan$\\\\|kitabOptions.length === 0\\)\" /c/DATA/eskahade/app/dashboard/laporan/rapor/_page-content.tsx)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(grep -iE \"lib[\\\\\\\\/]db\")"
     ]
   }
 }

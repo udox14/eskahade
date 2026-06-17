@@ -106,7 +106,11 @@ export async function getLegerData(kelasId: string, semester: number) {
   return { mapel: mapelList, siswa: legerSiswa }
 }
 
-export async function hitungDanSimpanLeger(kelasId: string, semester: number) {
+export async function hitungDanSimpanLeger(
+  kelasId: string,
+  semester: number,
+  opts: { force?: boolean; skipLog?: boolean } = {}
+) {
   const session = await getSession()
   const { mapel, siswa } = await getLegerData(kelasId, semester)
   if (!siswa.length) return { error: 'Tidak ada siswa' }
@@ -122,18 +126,35 @@ export async function hitungDanSimpanLeger(kelasId: string, semester: number) {
 
   kalkulasi.sort((a, b) => b.rata_rata - a.rata_rata)
 
-  for (let idx = 0; idx < kalkulasi.length; idx++) {
-    const item = kalkulasi[idx]
-    const predikat = getPredikat(item.rata_rata)
-    await execute(`
-      INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
+  // force = sekpen sengaja hitung ulang dari nilai guru -> timpa termasuk baris 'sekpen' & set sumber 'guru'.
+  // tanpa force (alur guru biasa) = jangan timpa baris yang sudah difinalkan sekpen.
+  const conflictClause = opts.force
+    ? `ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
+        jumlah_nilai = excluded.jumlah_nilai,
+        rata_rata = excluded.rata_rata,
+        ranking_kelas = excluded.ranking_kelas,
+        predikat = excluded.predikat,
+        sumber = 'guru'`
+    : `ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
         jumlah_nilai = excluded.jumlah_nilai,
         rata_rata = excluded.rata_rata,
         ranking_kelas = excluded.ranking_kelas,
         predikat = excluded.predikat
+      WHERE ranking.sumber != 'sekpen'`
+
+  for (let idx = 0; idx < kalkulasi.length; idx++) {
+    const item = kalkulasi[idx]
+    const predikat = getPredikat(item.rata_rata)
+    await execute(`
+      INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat, sumber)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'guru')
+      ${conflictClause}
     `, [generateId(), item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, idx + 1, predikat])
+  }
+
+  if (opts.skipLog) {
+    revalidatePath('/dashboard/akademik/leger')
+    return { success: true, count: kalkulasi.length }
   }
 
   await logActivity({
