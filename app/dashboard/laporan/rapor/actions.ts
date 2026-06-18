@@ -263,10 +263,23 @@ export async function getDataRapor(kelasId: string, semester: number) {
   // Mapel yang tidak diujiankan (tidak ada satupun nilai > 0 dari seluruh
   // santri di kelas ini) tidak disertakan dalam rapor.
   const mapelDiujikan = new Set<string>()
+  const namaByMapel = new Map<string, string>()
   nilaiAkademik.forEach((n: any) => {
     if (Number(n.nilai) > 0) mapelDiujikan.add(String(n.mapel_id))
+    if (!namaByMapel.has(String(n.mapel_id))) namaByMapel.set(String(n.mapel_id), n.mapel_nama)
   })
-  const raporMapel = raporMapelAll.filter((m) => mapelDiujikan.has(String(m.id)))
+
+  // Mapel diujiankan tapi belum punya kitab di manajemen kitab => tetap
+  // ditampilkan (kitab '-'), supaya tidak ada mapel hilang dari rapor.
+  const adaDiKitab = new Set(raporMapelAll.map((m) => String(m.id)))
+  const tambahan = [...mapelDiujikan]
+    .filter((id) => !adaDiKitab.has(id))
+    .map((id) => ({ id: Number(id), nama: namaByMapel.get(id) || 'Tanpa Nama', nama_kitab: '-' }))
+
+  const raporMapel = [
+    ...raporMapelAll.filter((m) => mapelDiujikan.has(String(m.id))),
+    ...tambahan,
+  ].sort((a, b) => String(a.nama).localeCompare(String(b.nama)))
 
   // Ambil rata-rata kelas per mapel untuk kolom "Rata-rata Kelas"
   // Hitung manual dari nilaiAkademik
