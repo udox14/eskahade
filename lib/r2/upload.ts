@@ -42,8 +42,8 @@ export async function uploadBufferToR2(params: {
       },
     })
 
-    const baseUrl = process.env.R2_PUBLIC_URL!
-    return { url: `${baseUrl}/${key}` }
+    // Serve lewat worker (same-origin), bukan pub-*.r2.dev yang rate-limited.
+    return { url: `/api/file/${key}` }
   } catch (err: unknown) {
     return { error: `Gagal upload: ${errorMessage(err)}` }
   }
@@ -88,8 +88,18 @@ export async function uploadToR2(
 export async function deleteFromR2(url: string): Promise<void> {
   try {
     const r2 = await getR2()
-    const baseUrl = process.env.R2_PUBLIC_URL!
-    const key = url.replace(`${baseUrl}/`, '')
+    const baseUrl = process.env.R2_PUBLIC_URL
+    // Dukung url baru (/api/file/<key>) maupun lama (pub-*.r2.dev/<key>).
+    let key = url
+    if (key.startsWith('/api/file/')) {
+      key = key.slice('/api/file/'.length)
+    } else if (baseUrl && key.startsWith(`${baseUrl}/`)) {
+      key = key.slice(baseUrl.length + 1)
+    } else {
+      // Fallback: ambil path setelah host (buang protokol+domain).
+      const m = key.match(/^https?:\/\/[^/]+\/(.+)$/)
+      if (m) key = m[1]
+    }
     if (key && key !== url) {
       await r2.delete(key)
     }

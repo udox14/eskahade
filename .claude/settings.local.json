@@ -17,7 +17,9 @@
       "WebFetch(domain:pub-1209482eb6d6461389443ee22c5764f5.r2.dev)",
       "Bash(curl -s -o /tmp/ttd.png -w \"HTTP %{http_code} | type %{content_type} | bytes %{size_download}\\\\n\" \"https://pub-1209482eb6d6461389443ee22c5764f5.r2.dev/ttd-rapor/ttd_1781788767114.png\")",
       "Read(//tmp/**)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "mcp__216efd6a-20d2-4f0d-a196-8ec636e31c7b__r2_bucket_get",
+      "Bash(sleep 2; cat /c/Users/IAbdu/AppData/Local/Temp/claude/C--DATA-eskahade/ec02b139-e781-4a47-b586-6580f55f6b96/tasks/bg5i4j86w.output 2>/dev/null | head -60)"
     ]
   }
 }
