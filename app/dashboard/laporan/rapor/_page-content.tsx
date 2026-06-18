@@ -17,7 +17,6 @@ import {
   saveRaporTtdPimpinan,
   saveRaporTtdWali,
   updateIdentitasSantriRapor,
-  uploadTtdRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
 import { RaporSatuHalaman } from './rapor-view'
@@ -45,6 +44,31 @@ import { toast } from 'sonner'
 type PrintKind = 'rapor' | 'identitas'
 
 type TtdValue = { url: string; x: number; y: number; w: number; nama?: string }
+
+// Re-encode gambar lewat canvas -> PNG (jaga transparansi) + perkecil.
+// Hasilkan base64 bersih & kecil, hindari file mentah besar yang gagal upload.
+const reencodeToPng = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => {
+      const img = new window.Image()
+      img.onload = () => {
+        const maxW = 700
+        const ratio = Math.min(maxW / img.width, 1)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(img.width * ratio))
+        canvas.height = Math.max(1, Math.round(img.height * ratio))
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('Canvas tidak didukung.'))
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.onerror = reject
+      img.src = e.target?.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 
 // Editor TTD: upload gambar + geser posisi X/Y + ukuran, dengan preview live.
 function TtdEditorModal({
@@ -89,14 +113,18 @@ function TtdEditorModal({
     }
     setUploading(true)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await uploadTtdRapor(fd)
-      if (res?.url) {
-        set({ url: res.url })
+      const base64 = await reencodeToPng(file)
+      const res = await fetch('/api/upload-foto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, folder: 'ttd-rapor', filenamePrefix: 'ttd' }),
+      })
+      const data = await res.json()
+      if (data?.url) {
+        set({ url: data.url })
         toast.success('Tanda tangan terupload.')
       } else {
-        toast.error(res?.error || 'Gagal upload.')
+        toast.error(data?.error || 'Gagal upload.')
       }
     } catch {
       toast.error('Gagal upload tanda tangan.')
