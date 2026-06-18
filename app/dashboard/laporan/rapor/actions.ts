@@ -658,11 +658,14 @@ export async function saveRaporTitimangsa(tempat: string, tanggal: string) {
 // ─── TANDA TANGAN RAPOR ─────────────────────────────────────────────────────
 
 type TtdSetting = { url: string; x: number; y: number; w: number }
+type TtdPimpinan = TtdSetting & { nama: string }
 
-export async function getRaporTtdPimpinan(): Promise<TtdSetting> {
+const PIMPINAN_NAMA_DEFAULT = 'Drs. KH. Ii Abdul Basith Wahab'
+
+export async function getRaporTtdPimpinan(): Promise<TtdPimpinan> {
   const rows = await query<any>(
     `SELECT key, value FROM app_settings WHERE key IN
-      ('rapor_ttd_pimpinan_url','rapor_ttd_pimpinan_x','rapor_ttd_pimpinan_y','rapor_ttd_pimpinan_w')`
+      ('rapor_ttd_pimpinan_url','rapor_ttd_pimpinan_x','rapor_ttd_pimpinan_y','rapor_ttd_pimpinan_w','rapor_ttd_pimpinan_nama')`
   )
   const map = new Map<string, string>(rows.map((r: any) => [r.key, r.value]))
   return {
@@ -670,10 +673,11 @@ export async function getRaporTtdPimpinan(): Promise<TtdSetting> {
     x: Number(map.get('rapor_ttd_pimpinan_x') ?? 0) || 0,
     y: Number(map.get('rapor_ttd_pimpinan_y') ?? 0) || 0,
     w: Number(map.get('rapor_ttd_pimpinan_w') ?? 100) || 100,
+    nama: map.get('rapor_ttd_pimpinan_nama') || PIMPINAN_NAMA_DEFAULT,
   }
 }
 
-export async function saveRaporTtdPimpinan(s: TtdSetting) {
+export async function saveRaporTtdPimpinan(s: TtdPimpinan) {
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik'])) {
@@ -683,12 +687,14 @@ export async function saveRaporTtdPimpinan(s: TtdSetting) {
   const x = Math.trunc(Number(s.x) || 0)
   const y = Math.trunc(Number(s.y) || 0)
   const w = Math.max(20, Math.min(400, Math.trunc(Number(s.w) || 100)))
+  const nama = String(s.nama ?? '').trim() || PIMPINAN_NAMA_DEFAULT
 
   await batch([
     ['rapor_ttd_pimpinan_url', url],
     ['rapor_ttd_pimpinan_x', String(x)],
     ['rapor_ttd_pimpinan_y', String(y)],
     ['rapor_ttd_pimpinan_w', String(w)],
+    ['rapor_ttd_pimpinan_nama', nama],
   ].map(([key, value]) => ({
     sql: `INSERT INTO app_settings (key, value, updated_at)
           VALUES (?, ?, datetime('now'))
@@ -706,11 +712,11 @@ export async function saveRaporTtdPimpinan(s: TtdSetting) {
     entityId: 'global',
     entityLabel: 'TTD Pimpinan',
     summary: 'Mengatur tanda tangan pimpinan rapor',
-    details: { url, x, y, w },
+    details: { url, x, y, w, nama },
   })
 
   revalidatePath('/dashboard/laporan/rapor')
-  return { success: true, data: { url, x, y, w } }
+  return { success: true, data: { url, x, y, w, nama } }
 }
 
 type TtdWali = TtdSetting & { user_id: string | null; nama: string | null }

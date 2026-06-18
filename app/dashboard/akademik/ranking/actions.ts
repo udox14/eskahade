@@ -15,6 +15,7 @@ export async function getJuaraUmum(semester: number) {
     LEFT JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN users u ON u.id = k.wali_kelas_id
+    WHERE m.nama IS NULL OR LOWER(m.nama) != 'mutaqaddimah'
   `, [])
 
   const rankingData = await query<any>(`
@@ -177,6 +178,7 @@ export async function getRecalcKelasList() {
            m.urutan AS marhalah_urutan
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE m.nama IS NULL OR LOWER(m.nama) != 'mutaqaddimah'
   `, [])
   return rows
     .map((r: any) => ({ id: r.id, nama: r.nama_kelas, urutan: r.marhalah_urutan || 999 }))

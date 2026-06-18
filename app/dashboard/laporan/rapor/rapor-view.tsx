@@ -33,6 +33,7 @@ export function RaporSatuHalaman({
   titimangsaTempat = 'Sukahideng',
   titimangsaTanggal = '',
   pimpinanTtd,
+  pimpinanNama = 'Drs. KH. Ii Abdul Basith Wahab',
   waliTtd,
 }: {
   data: any
@@ -41,6 +42,7 @@ export function RaporSatuHalaman({
   titimangsaTempat?: string
   titimangsaTanggal?: string
   pimpinanTtd?: { url: string; x: number; y: number; w: number }
+  pimpinanNama?: string
   waliTtd?: { url: string; x: number; y: number; w: number }
 }) {
   const semesterLabel = semester === 1 ? 'Ganjil' : 'Genap'
@@ -53,17 +55,15 @@ export function RaporSatuHalaman({
       year: 'numeric',
     })
 
-  // Hitung jumlah + rata-rata dari nilai yang ada
+  // nilaiList = mapel yang DIUJIANKAN di kelas ini (sudah difilter di server).
   const nilaiList: any[] = data.nilai ?? []
-  const nilaiValid = nilaiList.filter((n: any) => n.angka && n.angka > 0)
-  const jumlahNilai = nilaiValid.reduce((a: number, b: any) => a + (b.angka ?? 0), 0)
+  const jumlahNilai = nilaiList.reduce((a: number, b: any) => a + (Number(b.angka) || 0), 0)
 
-  // Rata-rata pakai data dari ranking jika ada, fallback hitung manual
+  // Rata-rata = jumlah nilai / banyak mapel DIUJIANKAN (bukan yang diisi santri).
+  // Santri yang tidak ikut satu mapel => nilai 0, tetap masuk pembagi.
   const rataRata: number =
-    data.ranking?.rata_rata > 0
-      ? parseFloat(Number(data.ranking.rata_rata).toFixed(2))
-      : nilaiValid.length > 0
-      ? parseFloat((jumlahNilai / nilaiValid.length).toFixed(2))
+    nilaiList.length > 0
+      ? parseFloat((jumlahNilai / nilaiList.length).toFixed(2))
       : 0
 
   const rankingKelas = data.ranking?.ranking_kelas ?? '-'
@@ -231,9 +231,9 @@ export function RaporSatuHalaman({
           {/* Jumlah Nilai */}
           <tr className="font-semibold">
             <td colSpan={3} className="border border-black px-3 py-[5px] text-center whitespace-nowrap">Jumlah Nilai</td>
-            <td className="border border-black px-2 py-[5px] text-center whitespace-nowrap">{nilaiValid.length > 0 ? jumlahNilai : '-'}</td>
+            <td className="border border-black px-2 py-[5px] text-center whitespace-nowrap">{jumlahNilai > 0 ? jumlahNilai : '-'}</td>
             <td colSpan={2} className="border border-black px-3 py-[5px] italic whitespace-nowrap">
-              {nilaiValid.length > 0 ? toHuruf(jumlahNilai) : '-'}
+              {jumlahNilai > 0 ? toHuruf(jumlahNilai) : '-'}
             </td>
           </tr>
 
@@ -439,7 +439,7 @@ export function RaporSatuHalaman({
           ) : null}
           <div>
             <p className="font-bold uppercase border-t border-black pt-[2px] mb-0 text-[11px] w-full whitespace-nowrap">
-              Drs. KH. Ii Abdul Basith Wahab
+              {pimpinanNama}
             </p>
           </div>
         </div>

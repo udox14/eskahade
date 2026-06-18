@@ -85,19 +85,32 @@ export async function getLegerData(kelasId: string, semester: number) {
   const nilaiMap = new Map<string, number | string>()
   nilaiList.forEach((n: any) => nilaiMap.set(`${n.riwayat_pendidikan_id}:${n.mapel_id}`, n.nilai))
 
+  // Mapel yang DIUJIANKAN di kelas = ada minimal 1 nilai > 0 dari seluruh santri.
+  // Pembagi rata-rata = jumlah mapel ini (bukan per santri). Santri yang tidak
+  // ikut satu mapel => nilai 0, tetap masuk pembagi.
+  const mapelDiujikan = new Set<string>()
+  nilaiList.forEach((n: any) => {
+    if (Number(n.nilai) > 0) mapelDiujikan.add(String(n.mapel_id))
+  })
+  const divisor = mapelDiujikan.size
+
   const legerSiswa = santriList.map((s: any) => {
     const nilaiPerMapel: Record<string, number | string> = {}
+    let jumlah = 0
     mapelList.forEach((m: any) => {
-      nilaiPerMapel[m.id] = nilaiMap.get(`${s.id}:${m.id}`) ?? 0
+      const v = nilaiMap.get(`${s.id}:${m.id}`) ?? 0
+      nilaiPerMapel[m.id] = v
+      jumlah += Number(v) || 0
     })
+    const rata = divisor > 0 ? Number((jumlah / divisor).toFixed(2)) : 0
     return {
       id: s.id,
       riwayat_id: s.id,
       nis: s.nis || '-',
       nama: s.nama_lengkap || 'Tanpa Nama',
       nilai: nilaiPerMapel,
-      jumlah: s.jumlah_nilai || 0,
-      rata: s.rata_rata || 0,
+      jumlah,
+      rata,
       rank: s.ranking_kelas || '-',
     }
   })
@@ -112,15 +125,23 @@ export async function hitungDanSimpanLeger(
   opts: { force?: boolean; skipLog?: boolean } = {}
 ) {
   const session = await getSession()
-  const { mapel, siswa } = await getLegerData(kelasId, semester)
+  const { siswa } = await getLegerData(kelasId, semester)
   if (!siswa.length) return { error: 'Tidak ada siswa' }
 
-  const totalMapel = mapel.length || 10
+  // Pembagi = jumlah mapel diujiankan di kelas (ada nilai >0 dari minimal 1 santri).
+  const mapelDiujikan = new Set<string>()
+  siswa.forEach((s: any) => {
+    Object.entries(s.nilai).forEach(([mapelId, v]: [string, any]) => {
+      if (Number(v) > 0) mapelDiujikan.add(mapelId)
+    })
+  })
+  const divisor = mapelDiujikan.size
 
   const kalkulasi = siswa.map((s: any) => {
     let jumlah = 0
     Object.values(s.nilai).forEach((v: any) => { jumlah += Number(v) || 0 })
-    const rata = Number((jumlah / totalMapel).toFixed(2))
+    // Santri yang tidak ikut satu mapel => nilai 0, tetap dibagi total mapel diujiankan.
+    const rata = divisor > 0 ? Number((jumlah / divisor).toFixed(2)) : 0
     return { riwayat_pendidikan_id: s.riwayat_id, semester, jumlah_nilai: jumlah, rata_rata: rata }
   })
 
@@ -171,7 +192,6 @@ export async function hitungDanSimpanLeger(
       kelas_id: kelasId,
       semester,
       total_santri: kalkulasi.length,
-      total_mapel: totalMapel,
     },
   })
 

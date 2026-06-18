@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo } from 'react'
 import { getJuaraUmum, getSantriByKelas, saveKejuaraan, recalcKejuaraanKelas, getRecalcKelasList } from './actions'
-import { Trophy, Loader2, Printer, Search, Pencil, Save, RefreshCw } from 'lucide-react'
+import { Trophy, Loader2, Printer, Search, Pencil, Save, RefreshCw, FileSpreadsheet } from 'lucide-react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
@@ -164,6 +164,42 @@ export default function JuaraUmumPage() {
     }
   }
 
+  // Export Excel: 3 sheet (Juara 1/2/3). Nomor 001,002.. nyambung lintas sheet (juara 1 -> 3).
+  const handleExportExcel = async () => {
+    const filled = rows.filter(r => r.santri_nama.trim())
+    if (filled.length === 0) {
+      alert('Belum ada nama juara untuk diexport.')
+      return
+    }
+    const XLSX = await import('xlsx')
+    const pad = (n: number) => String(n).padStart(3, '0')
+    const headers = ['Kelas', 'Ranking', 'Nama Santri', 'Nomor']
+
+    const wb = XLSX.utils.book_new()
+    let counter = 0 // global -> nomor nyambung juara1..juara3
+
+    for (const juara of [1, 2, 3]) {
+      // rows sudah urut marhalah_urutan -> nama_kelas (Tamhidiyyah 1 .. dst).
+      const data = rows
+        .filter(r => r.rank === juara && r.santri_nama.trim())
+        .map(r => {
+          counter++
+          return [r.kelas_nama, r.rank, r.santri_nama, pad(counter)]
+        })
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+      ws['!cols'] = [
+        { wch: Math.max(8, ...data.map(d => String(d[0]).length)) },
+        { wch: 8 },
+        { wch: Math.max(12, ...data.map(d => String(d[2]).length)) },
+        { wch: 8 },
+      ]
+      XLSX.utils.book_append_sheet(wb, ws, `Juara ${juara}`)
+    }
+
+    const sem = selectedSemester === '1' ? 'Ganjil' : 'Genap'
+    XLSX.writeFile(wb, `Kejuaraan_${sem}_${tahunAjaran.replace(/\//g, '-')}.xlsx`)
+  }
+
   // Hitung ulang dari nilai guru (per kelas / semua). Hasilnya hitungan guru, bukan sekpen.
   // "Semua" dipecah: satu kelas per request (loop sekuensial) -> hindari limit subrequest Worker.
   const handleRecalc = async () => {
@@ -269,6 +305,13 @@ export default function JuaraUmumPage() {
             >
               {saving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
               Simpan ke Database
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="w-full sm:w-auto bg-green-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-green-800 transition-colors shadow-sm font-bold"
+            >
+              <FileSpreadsheet className="w-5 h-5"/>
+              Export Excel
             </button>
             <button
               onClick={handlePrint}

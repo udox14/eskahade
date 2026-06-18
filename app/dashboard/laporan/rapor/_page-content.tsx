@@ -43,7 +43,7 @@ import { toast } from 'sonner'
 
 type PrintKind = 'rapor' | 'identitas'
 
-type TtdValue = { url: string; x: number; y: number; w: number }
+type TtdValue = { url: string; x: number; y: number; w: number; nama?: string }
 
 const fileToBase64 = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -60,6 +60,7 @@ function TtdEditorModal({
   subtitle,
   previewName,
   initial,
+  editableName = false,
   onClose,
   onSave,
 }: {
@@ -68,6 +69,7 @@ function TtdEditorModal({
   subtitle: string
   previewName: string
   initial: TtdValue
+  editableName?: boolean
   onClose: () => void
   onSave: (v: TtdValue) => Promise<void>
 }) {
@@ -156,8 +158,20 @@ function TtdEditorModal({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={form.url} alt="Preview TTD" style={ttdImgStyle} />
             ) : null}
-            <p className="z-[1] border-t border-black pt-[2px] text-[11px] font-bold uppercase">{previewName || 'Nama'}</p>
+            <p className="z-[1] border-t border-black pt-[2px] text-[11px] font-bold uppercase">{(editableName ? form.nama : previewName) || 'Nama'}</p>
           </div>
+
+          {editableName && (
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Pimpinan</label>
+              <input
+                value={form.nama ?? ''}
+                onChange={e => set({ nama: e.target.value })}
+                placeholder="Nama lengkap pimpinan"
+                className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
 
           {/* Upload */}
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
@@ -256,7 +270,7 @@ export default function CetakRaporPage() {
   const [titimangsaForm, setTitimangsaForm] = useState<{ tempat: string; tanggal: string }>({ tempat: 'Sukahideng', tanggal: '' })
   const [titimangsaSaving, setTitimangsaSaving] = useState(false)
 
-  const [pimpinanTtd, setPimpinanTtd] = useState<TtdValue>({ url: '', x: 0, y: 0, w: 100 })
+  const [pimpinanTtd, setPimpinanTtd] = useState<TtdValue>({ url: '', x: 0, y: 0, w: 100, nama: '' })
   const [pimpinanTtdOpen, setPimpinanTtdOpen] = useState(false)
   const [waliTtd, setWaliTtd] = useState<{ url: string; x: number; y: number; w: number; nama: string | null } | null>(null)
   const [waliTtdOpen, setWaliTtdOpen] = useState(false)
@@ -543,7 +557,7 @@ export default function CetakRaporPage() {
   }
 
   const savePimpinanTtd = async (v: TtdValue) => {
-    const res = await saveRaporTtdPimpinan(v)
+    const res = await saveRaporTtdPimpinan({ url: v.url, x: v.x, y: v.y, w: v.w, nama: v.nama ?? '' })
     if (res?.error) { toast.error(res.error); return }
     if (res?.data) setPimpinanTtd(res.data)
     setPimpinanTtdOpen(false)
@@ -885,6 +899,7 @@ export default function CetakRaporPage() {
                     titimangsaTempat={titimangsa.tempat}
                     titimangsaTanggal={titimangsa.tanggal}
                     pimpinanTtd={pimpinanTtd}
+                    pimpinanNama={pimpinanTtd.nama}
                     waliTtd={waliTtd ? { url: waliTtd.url, x: waliTtd.x, y: waliTtd.y, w: waliTtd.w } : undefined}
                   />
                 </div>
@@ -1149,8 +1164,9 @@ export default function CetakRaporPage() {
         open={pimpinanTtdOpen}
         title="Tanda Tangan Pimpinan (Global)"
         subtitle="Berlaku untuk semua rapor."
-        previewName="Drs. KH. Ii Abdul Basith Wahab"
+        previewName={pimpinanTtd.nama || 'Nama Pimpinan'}
         initial={pimpinanTtd}
+        editableName
         onClose={() => setPimpinanTtdOpen(false)}
         onSave={savePimpinanTtd}
       />
