@@ -377,9 +377,9 @@ export default function CetakRaporPage() {
   }, [selectedKelas, selectedSemester])
 
   // Skala tiap sheet agar muat 1 halaman kertas terpilih (96dpi), tetap center.
-  // transform-origin top center => sisa ruang dibagi rata kiri-kanan
-  // (margin kiri = margin kanan). Wrapper di-set tinggi hasil skala supaya
-  // tidak ada ruang kosong / tumpah ke halaman berikutnya.
+  // Pakai CSS `zoom` (bukan `transform: scale`): zoom me-reflow layout sehingga
+  // Chrome mencetak teks sebagai vektor (selectable, file kecil). `transform`
+  // memaksa Chrome meraster sheet jadi bitmap => PDF berupa gambar & berat.
   const fitSheetsToPage = () => {
     const root = printRef.current
     if (!root) return
@@ -389,20 +389,17 @@ export default function CetakRaporPage() {
     wraps.forEach(wrap => {
       const el = wrap.querySelector<HTMLElement>('.print-sheet')
       if (!el) return
+      el.style.removeProperty('zoom')
       el.style.transform = 'none'
-      el.style.transformOrigin = 'top center'
       el.style.width = `${paper.w}mm`
       el.style.minHeight = '0'   // buang floor 297mm biar ukur tinggi konten asli
       const w = el.scrollWidth
       const h = el.scrollHeight
       // -2px epsilon supaya pembulatan tidak memicu halaman kedua
       const scale = Math.min(1, (PXW - 2) / w, (PXH - 2) / h)
-      if (scale < 1) {
-        el.style.transform = `scale(${scale})`
-        wrap.style.height = `${Math.ceil(h * scale)}px`
-      } else {
-        wrap.style.height = ''
-      }
+      // zoom me-reflow box-nya sendiri, jadi wrapper otomatis ikut tinggi hasil.
+      if (scale < 1) el.style.setProperty('zoom', String(scale))
+      wrap.style.height = ''
     })
   }
 
