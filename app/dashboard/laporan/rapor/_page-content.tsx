@@ -174,13 +174,13 @@ function TtdEditorModal({
             <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
               <span>Geser Horizontal (X)</span><span>{form.x}px</span>
             </div>
-            <input type="range" min={-120} max={120} value={form.x} onChange={e => set({ x: Number(e.target.value) })} className="w-full accent-blue-600" />
+            <input type="range" min={-180} max={180} value={form.x} onChange={e => set({ x: Number(e.target.value) })} className="w-full accent-blue-600" />
           </div>
           <div>
             <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
               <span>Geser Vertikal (Y)</span><span>{form.y}px</span>
             </div>
-            <input type="range" min={-100} max={60} value={form.y} onChange={e => set({ y: Number(e.target.value) })} className="w-full accent-blue-600" />
+            <input type="range" min={-140} max={140} value={form.y} onChange={e => set({ y: Number(e.target.value) })} className="w-full accent-blue-600" />
           </div>
           <div>
             <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
