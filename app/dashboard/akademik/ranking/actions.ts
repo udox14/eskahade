@@ -139,15 +139,6 @@ export async function saveKejuaraan(semester: number, rows: SaveKejuaraanRow[]) 
     seen.add(r.riwayat_pendidikan_id)
   }
 
-  // Nomor ranking tidak boleh dobel (mis. dua "juara 2").
-  const seenRank = new Set<number>()
-  for (const r of valid) {
-    if (seenRank.has(r.ranking_kelas)) {
-      return { error: `Nomor ranking ${r.ranking_kelas} dipakai lebih dari sekali. Tiap ranking harus unik.` }
-    }
-    seenRank.add(r.ranking_kelas)
-  }
-
   const statements = valid.map(r => ({
     sql: `
       INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, sumber)
