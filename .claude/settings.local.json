@@ -12,7 +12,8 @@
       "Bash(node --input-type=module -e ' *)",
       "Bash(grep -n \"kitabModalOpen &&\\\\|titimangsaModalOpen\\\\|^    </div>\\\\s*$\\\\|\\) : \\(\\\\|Simpan$\\\\|kitabOptions.length === 0\\)\" /c/DATA/eskahade/app/dashboard/laporan/rapor/_page-content.tsx)",
       "Bash(npx eslint *)",
-      "Bash(grep -iE \"lib[\\\\\\\\/]db\")"
+      "Bash(grep -iE \"lib[\\\\\\\\/]db\")",
+      "mcp__216efd6a-20d2-4f0d-a196-8ec636e31c7b__d1_database_query"
     ]
   }
 }

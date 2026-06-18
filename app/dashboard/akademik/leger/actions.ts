@@ -137,18 +137,50 @@ export async function hitungDanSimpanLeger(
   })
   const divisor = mapelDiujikan.size
 
-  const kalkulasi = siswa.map((s: any) => {
-    let jumlah = 0
-    Object.values(s.nilai).forEach((v: any) => { jumlah += Number(v) || 0 })
-    // Santri yang tidak ikut satu mapel => nilai 0, tetap dibagi total mapel diujiankan.
-    const rata = divisor > 0 ? Number((jumlah / divisor).toFixed(2)) : 0
-    return { riwayat_pendidikan_id: s.riwayat_id, semester, jumlah_nilai: jumlah, rata_rata: rata }
-  })
+  // Tanpa force: baris yang difinalkan sekpen TIDAK diubah, dan nomor ranking
+  // yang dipakai sekpen di-RESERVE supaya santri lain tidak dapat nomor sama
+  // (penyebab "juara 2 dua orang"). Dengan force: semua dihitung ulang 1..N.
+  const allIds = siswa.map((s: any) => s.riwayat_id)
+  const pinnedRanks = new Set<number>()
+  const pinnedIds = new Set<string>()
+  if (!opts.force) {
+    for (let i = 0; i < allIds.length; i += SQL_VAR_CHUNK) {
+      const part = allIds.slice(i, i + SQL_VAR_CHUNK)
+      const ph = part.map(() => '?').join(',')
+      const rows = await query<any>(
+        `SELECT riwayat_pendidikan_id, ranking_kelas FROM ranking
+         WHERE semester = ? AND sumber = 'sekpen' AND riwayat_pendidikan_id IN (${ph})`,
+        [semester, ...part]
+      )
+      rows.forEach((r: any) => {
+        pinnedIds.add(String(r.riwayat_pendidikan_id))
+        if (r.ranking_kelas != null) pinnedRanks.add(Number(r.ranking_kelas))
+      })
+    }
+  }
 
-  kalkulasi.sort((a, b) => b.rata_rata - a.rata_rata)
+  const kalkulasi = siswa
+    .filter((s: any) => !pinnedIds.has(String(s.riwayat_id)))
+    .map((s: any) => {
+      let jumlah = 0
+      Object.values(s.nilai).forEach((v: any) => { jumlah += Number(v) || 0 })
+      // Santri yang tidak ikut satu mapel => nilai 0, tetap dibagi total mapel diujiankan.
+      const rata = divisor > 0 ? Number((jumlah / divisor).toFixed(2)) : 0
+      return { riwayat_pendidikan_id: s.riwayat_id, semester, jumlah_nilai: jumlah, rata_rata: rata }
+    })
 
-  // force = sekpen sengaja hitung ulang dari nilai guru -> timpa termasuk baris 'sekpen' & set sumber 'guru'.
-  // tanpa force (alur guru biasa) = jangan timpa baris yang sudah difinalkan sekpen.
+  // Urutkan rata desc, tiebreak jumlah desc -> ranking selalu unik (tanpa dobel).
+  kalkulasi.sort((a, b) => b.rata_rata - a.rata_rata || b.jumlah_nilai - a.jumlah_nilai)
+
+  // Assign nomor ranking, lewati nomor yang sudah dipin sekpen.
+  const ranked = kalkulasi.map((item) => ({ ...item, ranking_kelas: 0 }))
+  let nextRank = 1
+  for (const item of ranked) {
+    while (pinnedRanks.has(nextRank)) nextRank++
+    item.ranking_kelas = nextRank
+    nextRank++
+  }
+
   const conflictClause = opts.force
     ? `ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
         jumlah_nilai = excluded.jumlah_nilai,
@@ -163,14 +195,13 @@ export async function hitungDanSimpanLeger(
         predikat = excluded.predikat
       WHERE ranking.sumber != 'sekpen'`
 
-  for (let idx = 0; idx < kalkulasi.length; idx++) {
-    const item = kalkulasi[idx]
+  for (const item of ranked) {
     const predikat = getPredikat(item.rata_rata)
     await execute(`
       INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, predikat, sumber)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'guru')
       ${conflictClause}
-    `, [generateId(), item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, idx + 1, predikat])
+    `, [generateId(), item.riwayat_pendidikan_id, item.semester, item.jumlah_nilai, item.rata_rata, item.ranking_kelas, predikat])
   }
 
   if (opts.skipLog) {
