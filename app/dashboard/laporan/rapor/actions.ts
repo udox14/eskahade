@@ -1,6 +1,7 @@
 'use server'
 
 import { batch, execute, query, queryOne } from '@/lib/db'
+import { uploadToR2 } from '@/lib/r2/upload'
 import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -653,6 +654,24 @@ export async function saveRaporTitimangsa(tempat: string, tanggal: string) {
 }
 
 // ─── TANDA TANGAN RAPOR ─────────────────────────────────────────────────────
+
+// Upload gambar TTD via File (sama jalur foto santri yang terbukti jalan),
+// hindari jalur base64 /api/upload-foto yang bikin PNG broken.
+export async function uploadTtdRapor(formData: FormData) {
+  const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && !hasRole(session, 'wali_kelas')) {
+    return { error: 'Anda tidak punya akses upload tanda tangan.' }
+  }
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) return { error: 'File tidak valid.' }
+  if (!file.type.startsWith('image/')) return { error: 'File harus berupa gambar.' }
+
+  const res = await uploadToR2(file, `ttd_${session.id}`, 'ttd-rapor')
+  if ('error' in res) return { error: res.error }
+  return { url: res.url }
+}
+
 
 type TtdSetting = { url: string; x: number; y: number; w: number }
 type TtdPimpinan = TtdSetting & { nama: string }

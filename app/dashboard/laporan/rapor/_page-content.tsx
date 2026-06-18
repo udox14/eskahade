@@ -17,6 +17,7 @@ import {
   saveRaporTtdPimpinan,
   saveRaporTtdWali,
   updateIdentitasSantriRapor,
+  uploadTtdRapor,
 } from './actions'
 import { IdentitasSantriHalaman } from './identitas-view'
 import { RaporSatuHalaman } from './rapor-view'
@@ -44,14 +45,6 @@ import { toast } from 'sonner'
 type PrintKind = 'rapor' | 'identitas'
 
 type TtdValue = { url: string; x: number; y: number; w: number; nama?: string }
-
-const fileToBase64 = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 
 // Editor TTD: upload gambar + geser posisi X/Y + ukuran, dengan preview live.
 function TtdEditorModal({
@@ -96,18 +89,14 @@ function TtdEditorModal({
     }
     setUploading(true)
     try {
-      const base64 = await fileToBase64(file)
-      const res = await fetch('/api/upload-foto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64, folder: 'ttd-rapor', filenamePrefix: 'ttd' }),
-      })
-      const data = await res.json()
-      if (data?.url) {
-        set({ url: data.url })
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await uploadTtdRapor(fd)
+      if (res?.url) {
+        set({ url: res.url })
         toast.success('Tanda tangan terupload.')
       } else {
-        toast.error(data?.error || 'Gagal upload.')
+        toast.error(res?.error || 'Gagal upload.')
       }
     } catch {
       toast.error('Gagal upload tanda tangan.')

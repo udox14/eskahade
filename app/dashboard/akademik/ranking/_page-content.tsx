@@ -1,10 +1,20 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { getJuaraUmum, getSantriByKelas, saveKejuaraan, recalcKejuaraanKelas, getRecalcKelasList } from './actions'
-import { Trophy, Loader2, Printer, Search, Pencil, Save, RefreshCw, FileSpreadsheet } from 'lucide-react'
+import { getJuaraUmum, getSantriByKelas, saveKejuaraanRow, recalcKejuaraanKelas, getRecalcKelasList, importKejuaraan } from './actions'
+import { Trophy, Loader2, Printer, Search, Pencil, Check, AlertCircle, RefreshCw, FileSpreadsheet, Upload } from 'lucide-react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+
+// Parse input nilai -> number|null. Kosong = null (bukan 0).
+function parseNum(v: string): number | null {
+  const t = v.trim()
+  if (t === '') return null
+  const n = Number(t.replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+type RowStatus = 'saving' | 'saved' | 'error'
 
 type SantriRef = { id: string; rp_id: string; nama: string; nis: string; asrama: string; kamar: string }
 
@@ -33,11 +43,13 @@ export default function JuaraUmumPage() {
   const [rows, setRows] = useState<EditRow[]>([])
   const [santriByKelas, setSantriByKelas] = useState<Record<string, SantriRef[]>>({})
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [recalcing, setRecalcing] = useState(false)
   const [recalcKelas, setRecalcKelas] = useState('all')
   const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 })
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape')
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Dimensi kertas F4 mengikuti orientasi.
   const paper = orientation === 'landscape'
@@ -87,6 +99,7 @@ export default function JuaraUmumPage() {
         rata: r.rata === 0 || r.rata ? String(r.rata) : '',
       }))
       setRows(mapped)
+      setRowStatus({})
       setSantriByKelas(santriMap)
       if (res.length > 0 && res[0].tahun_ajaran) {
         setTahunAjaran(res[0].tahun_ajaran)
@@ -102,65 +115,50 @@ export default function JuaraUmumPage() {
     setRows(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
   }
 
-  // Saat sekpen memilih nama santri dari combobox: asrama & kamar otomatis dari database.
+  // Auto-save SATU baris ke database. Dipanggil saat pilih santri / selesai isi nilai.
+  // Hanya jalan bila santri sudah dipilih (punya riwayat_pendidikan_id).
+  const saveRow = async (idx: number, rowArg?: EditRow) => {
+    const row = rowArg ?? rows[idx]
+    if (!row || !row.riwayat_pendidikan_id) return
+    setRowStatus(s => ({ ...s, [idx]: 'saving' }))
+    try {
+      const res = await saveKejuaraanRow(Number(selectedSemester), {
+        riwayat_pendidikan_id: row.riwayat_pendidikan_id,
+        ranking_kelas: row.rank,
+        jumlah: parseNum(row.jumlah),
+        rata: parseNum(row.rata),
+      })
+      if (res?.error) {
+        setRowStatus(s => ({ ...s, [idx]: 'error' }))
+        return
+      }
+      // Tandai baris jadi 'sekpen' (final) tanpa reload.
+      setRows(prev => prev.map((r, i) => (i === idx ? { ...r, sumber: 'sekpen' } : r)))
+      setRowStatus(s => ({ ...s, [idx]: 'saved' }))
+    } catch {
+      setRowStatus(s => ({ ...s, [idx]: 'error' }))
+    }
+  }
+
+  // Saat sekpen memilih nama santri dari combobox: asrama & kamar otomatis dari database,
+  // lalu langsung auto-save baris itu (per item).
   const handlePickSantri = (idx: number, kelasId: string, namaInput: string) => {
     const list = santriByKelas[kelasId] || []
     const found = list.find(s => s.nama.toLowerCase() === namaInput.toLowerCase())
     if (found) {
-      updateRow(idx, {
+      const patch = {
         santri_nama: found.nama,
         nis: found.nis,
         asrama: found.asrama,
         kamar: found.kamar,
         riwayat_pendidikan_id: found.rp_id,
-      })
-    } else {
-      // Ketikan bebas (santri belum match) — biarkan, asrama/kamar dikosongkan.
-      updateRow(idx, { santri_nama: namaInput, nis: '', asrama: '', kamar: '', riwayat_pendidikan_id: null })
-    }
-  }
-
-  // Simpan ke database -> jadi riwayat ranking santri. jumlah/rata kosong -> NULL (bukan 0).
-  const handleSave = async () => {
-    const parseNum = (v: string): number | null => {
-      const t = v.trim()
-      if (t === '') return null
-      const n = Number(t.replace(',', '.'))
-      return Number.isFinite(n) ? n : null
-    }
-    const payload = rows
-      .filter(r => r.riwayat_pendidikan_id && r.santri_nama.trim())
-      .map(r => ({
-        riwayat_pendidikan_id: r.riwayat_pendidikan_id as string,
-        ranking_kelas: r.rank,
-        jumlah: parseNum(r.jumlah),
-        rata: parseNum(r.rata),
-      }))
-
-    if (payload.length === 0) {
-      alert('Belum ada baris yang berisi santri terpilih (lewat combobox) untuk disimpan.')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const res = await saveKejuaraan(Number(selectedSemester), payload)
-      if (res?.error) {
-        alert(res.error)
-      } else {
-        // Tandai baris tersimpan jadi 'sekpen' (final) tanpa reload.
-        const savedIds = new Set(payload.map(p => p.riwayat_pendidikan_id))
-        setRows(prev => prev.map(r =>
-          r.riwayat_pendidikan_id && savedIds.has(r.riwayat_pendidikan_id)
-            ? { ...r, sumber: 'sekpen' }
-            : r
-        ))
-        alert(`Berhasil menyimpan ${res?.saved ?? payload.length} data juara.`)
       }
-    } catch (e) {
-      alert('Gagal menyimpan data ke database.')
-    } finally {
-      setSaving(false)
+      updateRow(idx, patch)
+      saveRow(idx, { ...rows[idx], ...patch }) // pakai nilai terbaru, bukan state lama
+    } else {
+      // Ketikan bebas (santri belum match) — biarkan, asrama/kamar dikosongkan, belum disimpan.
+      updateRow(idx, { santri_nama: namaInput, nis: '', asrama: '', kamar: '', riwayat_pendidikan_id: null })
+      setRowStatus(s => { const c = { ...s }; delete c[idx]; return c })
     }
   }
 
@@ -198,6 +196,52 @@ export default function JuaraUmumPage() {
 
     const sem = selectedSemester === '1' ? 'Ganjil' : 'Genap'
     XLSX.writeFile(wb, `Kejuaraan_${sem}_${tahunAjaran.replace(/\//g, '-')}.xlsx`)
+  }
+
+  // Import balik file Excel hasil export (upsert). Baca 3 sheet (Juara 1/2/3).
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // reset biar bisa pilih file sama lagi
+    if (!file) return
+    setImporting(true)
+    try {
+      const XLSX = await import('xlsx')
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+
+      const items: { kelas_nama: string; ranking_kelas: number; santri_nama: string }[] = []
+      for (const name of wb.SheetNames) {
+        const json = XLSX.utils.sheet_to_json<any>(wb.Sheets[name], { defval: '' })
+        for (const r of json) {
+          const kelas = String(r['Kelas'] ?? '').trim()
+          const rank = Number(r['Ranking'])
+          const nama = String(r['Nama Santri'] ?? '').trim()
+          if (!kelas || !rank) continue
+          items.push({ kelas_nama: kelas, ranking_kelas: rank, santri_nama: nama })
+        }
+      }
+
+      if (items.length === 0) {
+        alert('File tidak berisi data valid. Pakai file hasil Export Excel fitur ini.')
+        return
+      }
+
+      const res = await importKejuaraan(Number(selectedSemester), items)
+      if (res?.success) {
+        alert(
+          `Import selesai.\n` +
+          `Diupdate/ditambah: ${res.upsert}\n` +
+          `Sama (dilewati): ${res.sama}\n` +
+          `Kosong (tak nimpa): ${res.kosong}\n` +
+          `Santri tak ketemu: ${res.takKetemu}`
+        )
+        await loadData() // refresh preview
+      }
+    } catch (err) {
+      alert('Gagal import. Pastikan file .xlsx hasil export fitur ini.')
+    } finally {
+      setImporting(false)
+    }
   }
 
   // Hitung ulang dari nilai guru (per kelas / semua). Hasilnya hitungan guru, bukan sekpen.
@@ -296,16 +340,25 @@ export default function JuaraUmumPage() {
           Tarik Data Juara
         </button>
 
+        {/* Import dari file Excel hasil export (upsert) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={importing}
+          className="w-full sm:w-auto bg-violet-600 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm font-bold"
+        >
+          {importing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Upload className="w-5 h-5"/>}
+          Import Excel
+        </button>
+
         {rows.length > 0 && (
           <div className="w-full sm:w-auto sm:ml-auto flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-sm font-bold"
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-              Simpan ke Database
-            </button>
             <button
               onClick={handleExportExcel}
               className="w-full sm:w-auto bg-green-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-green-800 transition-colors shadow-sm font-bold"
@@ -368,6 +421,7 @@ export default function JuaraUmumPage() {
             <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-200">Preview Dokumen Cetak</span>
                 <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-amber-200 inline-flex items-center gap-1"><Pencil className="w-3 h-3"/> Bisa Diedit</span>
+                <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-emerald-200 inline-flex items-center gap-1"><Check className="w-3 h-3"/> Auto-Simpan</span>
                 {/* Toggle orientasi cetak */}
                 <div className="inline-flex rounded-full border border-slate-300 bg-white overflow-hidden text-xs font-bold">
                     <button
@@ -473,16 +527,23 @@ export default function JuaraUmumPage() {
                                   )}
                                 </td>
 
-                                {/* Nama Santri — combobox (datalist) per kelas */}
+                                {/* Nama Santri — combobox (datalist) per kelas + indikator auto-save */}
                                 <td className="border border-black p-1">
-                                  <input
-                                    type="text"
-                                    list={datalistId}
-                                    className="cetak-input w-full uppercase bg-amber-50/40 border border-slate-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-400"
-                                    value={item.santri_nama}
-                                    placeholder="Ketik / pilih nama…"
-                                    onChange={(e) => handlePickSantri(idx, item.kelas_id, e.target.value)}
-                                  />
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      list={datalistId}
+                                      className="cetak-input flex-1 uppercase bg-amber-50/40 border border-slate-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-400"
+                                      value={item.santri_nama}
+                                      placeholder="Ketik / pilih nama…"
+                                      onChange={(e) => handlePickSantri(idx, item.kelas_id, e.target.value)}
+                                    />
+                                    <span className="no-print w-4 shrink-0 flex items-center justify-center">
+                                      {rowStatus[idx] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400"/>}
+                                      {rowStatus[idx] === 'saved' && <Check className="w-3.5 h-3.5 text-emerald-600"/>}
+                                      {rowStatus[idx] === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-500"/>}
+                                    </span>
+                                  </div>
                                   <datalist id={datalistId}>
                                     {list.map(s => (
                                       <option key={s.id} value={s.nama} />
@@ -503,6 +564,7 @@ export default function JuaraUmumPage() {
                                     className="cetak-input w-full text-center bg-amber-50/40 border border-slate-200 rounded px-1 py-1 outline-none focus:ring-1 focus:ring-indigo-400"
                                     value={item.jumlah}
                                     onChange={(e) => updateRow(idx, { jumlah: e.target.value })}
+                                    onBlur={() => saveRow(idx)}
                                   />
                                 </td>
 
@@ -514,6 +576,7 @@ export default function JuaraUmumPage() {
                                     className="cetak-input w-full text-center bg-amber-50/40 border border-slate-200 rounded px-1 py-1 outline-none focus:ring-1 focus:ring-indigo-400"
                                     value={item.rata}
                                     onChange={(e) => updateRow(idx, { rata: e.target.value })}
+                                    onBlur={() => saveRow(idx)}
                                   />
                                 </td>
                             </tr>

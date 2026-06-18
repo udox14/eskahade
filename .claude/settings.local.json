@@ -13,7 +13,11 @@
       "Bash(grep -n \"kitabModalOpen &&\\\\|titimangsaModalOpen\\\\|^    </div>\\\\s*$\\\\|\\) : \\(\\\\|Simpan$\\\\|kitabOptions.length === 0\\)\" /c/DATA/eskahade/app/dashboard/laporan/rapor/_page-content.tsx)",
       "Bash(npx eslint *)",
       "Bash(grep -iE \"lib[\\\\\\\\/]db\")",
-      "mcp__216efd6a-20d2-4f0d-a196-8ec636e31c7b__d1_database_query"
+      "mcp__216efd6a-20d2-4f0d-a196-8ec636e31c7b__d1_database_query",
+      "WebFetch(domain:pub-1209482eb6d6461389443ee22c5764f5.r2.dev)",
+      "Bash(curl -s -o /tmp/ttd.png -w \"HTTP %{http_code} | type %{content_type} | bytes %{size_download}\\\\n\" \"https://pub-1209482eb6d6461389443ee22c5764f5.r2.dev/ttd-rapor/ttd_1781788767114.png\")",
+      "Read(//tmp/**)",
+      "Bash(xxd)"
     ]
   }
 }

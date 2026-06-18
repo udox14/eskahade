@@ -1,6 +1,6 @@
 'use server'
 
-import { query, batch, generateId } from '@/lib/db'
+import { query, execute, batch, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { hitungDanSimpanLeger } from '@/app/dashboard/akademik/leger/actions'
@@ -113,7 +113,7 @@ export async function getSantriByKelas() {
   return map
 }
 
-// Simpan hasil kejuaraan (manual sekpen / hasil edit) ke tabel ranking.
+// Simpan SATU baris kejuaraan (auto-save per item) ke tabel ranking.
 // UPSERT by (riwayat_pendidikan_id, semester) -> jadi riwayat ranking santri, satu sumber.
 // jumlah_nilai / rata_rata disimpan NULL bila kosong (bukan 0).
 export type SaveKejuaraanRow = {
@@ -123,37 +123,90 @@ export type SaveKejuaraanRow = {
   rata: number | null
 }
 
-export async function saveKejuaraan(semester: number, rows: SaveKejuaraanRow[]) {
-  const session = await getSession()
-
-  // Hanya baris yang punya santri terpilih (riwayat_pendidikan_id) yang disimpan.
-  const valid = rows.filter(r => r.riwayat_pendidikan_id)
-  if (valid.length === 0) return { error: 'Tidak ada baris berisi santri untuk disimpan.' }
-
-  // Satu santri tak boleh dobel di semester yang sama (UPSERT key sama -> tabrakan dalam 1 batch).
-  const seen = new Set<string>()
-  for (const r of valid) {
-    if (seen.has(r.riwayat_pendidikan_id)) {
-      return { error: 'Ada santri yang dipilih lebih dari sekali. Pastikan tiap juara santri berbeda.' }
-    }
-    seen.add(r.riwayat_pendidikan_id)
+export async function saveKejuaraanRow(semester: number, row: SaveKejuaraanRow) {
+  if (!row.riwayat_pendidikan_id) {
+    return { error: 'Santri belum dipilih.' }
   }
 
-  const statements = valid.map(r => ({
-    sql: `
-      INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, sumber)
-      VALUES (?, ?, ?, ?, ?, ?, 'sekpen')
-      ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
-        jumlah_nilai = excluded.jumlah_nilai,
-        rata_rata = excluded.rata_rata,
-        ranking_kelas = excluded.ranking_kelas,
-        sumber = 'sekpen'
-    `,
-    params: [generateId(), r.riwayat_pendidikan_id, semester, r.jumlah, r.rata, r.ranking_kelas],
-  }))
+  await execute(`
+    INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, sumber)
+    VALUES (?, ?, ?, ?, ?, ?, 'sekpen')
+    ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
+      jumlah_nilai = excluded.jumlah_nilai,
+      rata_rata = excluded.rata_rata,
+      ranking_kelas = excluded.ranking_kelas,
+      sumber = 'sekpen'
+  `, [generateId(), row.riwayat_pendidikan_id, semester, row.jumlah, row.rata, row.ranking_kelas])
 
-  // Satu round-trip untuk semua baris -> hemat write.
-  await batch(statements)
+  return { success: true }
+}
+
+// Import hasil export Excel (upsert). Tiap item: kelas + ranking + nama santri.
+// Aturan:
+//  - nama kosong  -> skip (tak nimpa data yang ada)
+//  - tak ketemu di DB -> skip (dilaporkan)
+//  - ranking sama dengan yang tersimpan -> skip (tak ada perubahan)
+//  - ranking beda / belum ada -> upsert (jumlah_nilai & rata_rata existing TIDAK ditimpa)
+export type ImportKejuaraanItem = {
+  kelas_nama: string
+  ranking_kelas: number
+  santri_nama: string
+}
+
+export async function importKejuaraan(semester: number, items: ImportKejuaraanItem[]) {
+  const session = await getSession()
+
+  // 1 query: peta santri aktif (kelas_nama + nama -> rp_id).
+  const santriRows = await query<any>(`
+    SELECT rp.id AS rp_id, k.nama_kelas, s.nama_lengkap
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    WHERE rp.status_riwayat = 'aktif' AND s.status_global = 'aktif'
+  `, [])
+  const key = (kelas: string, nama: string) => `${kelas.trim().toLowerCase()}||${nama.trim().toLowerCase()}`
+  const santriMap = new Map<string, string>()
+  for (const r of santriRows) {
+    const k = key(r.nama_kelas, r.nama_lengkap)
+    if (!santriMap.has(k)) santriMap.set(k, r.rp_id) // nama dobel: ambil pertama
+  }
+
+  // 1 query: ranking tersimpan utk semester ini (rp_id -> ranking_kelas) buat banding sama/beda.
+  const existingRows = await query<any>(
+    `SELECT riwayat_pendidikan_id, ranking_kelas FROM ranking WHERE semester = ?`,
+    [semester]
+  )
+  const existingRank = new Map<string, number>()
+  for (const r of existingRows) existingRank.set(r.riwayat_pendidikan_id, r.ranking_kelas)
+
+  let upsert = 0, sama = 0, kosong = 0, takKetemu = 0
+  const seenRp = new Set<string>()
+  const statements: { sql: string; params?: unknown[] }[] = []
+
+  for (const it of items) {
+    if (!it.santri_nama || !it.santri_nama.trim()) { kosong++; continue }
+    const rpId = santriMap.get(key(it.kelas_nama, it.santri_nama))
+    if (!rpId) { takKetemu++; continue }
+    if (seenRp.has(rpId)) continue // santri dobel dalam file -> ambil pertama
+    seenRp.add(rpId)
+
+    if (existingRank.get(rpId) === it.ranking_kelas) { sama++; continue } // sama -> skip
+
+    // beda / belum ada -> upsert. jumlah_nilai & rata_rata existing dijaga (tak disebut di UPDATE).
+    statements.push({
+      sql: `
+        INSERT INTO ranking (id, riwayat_pendidikan_id, semester, jumlah_nilai, rata_rata, ranking_kelas, sumber)
+        VALUES (?, ?, ?, NULL, NULL, ?, 'sekpen')
+        ON CONFLICT(riwayat_pendidikan_id, semester) DO UPDATE SET
+          ranking_kelas = excluded.ranking_kelas,
+          sumber = 'sekpen'
+      `,
+      params: [generateId(), rpId, semester, it.ranking_kelas],
+    })
+    upsert++
+  }
+
+  if (statements.length > 0) await batch(statements)
 
   await logActivity({
     actor: actorFromSession(session),
@@ -161,14 +214,14 @@ export async function saveKejuaraan(semester: number, rows: SaveKejuaraanRow[]) 
     action: 'update',
     fiturHref: '/dashboard/akademik/ranking',
     logKind: 'update',
-    entityType: 'kejuaraan_batch',
+    entityType: 'kejuaraan_import',
     entityId: `semester:${semester}`,
-    entityLabel: `Kejuaraan semester ${semester}`,
-    summary: `Menyimpan ${valid.length} data juara (input manual)`,
-    details: { semester, total: valid.length },
+    entityLabel: `Import kejuaraan semester ${semester}`,
+    summary: `Import: ${upsert} upsert, ${sama} sama, ${kosong} kosong, ${takKetemu} tak ketemu`,
+    details: { semester, upsert, sama, kosong, tak_ketemu: takKetemu },
   })
 
-  return { success: true, saved: valid.length }
+  return { success: true, upsert, sama, kosong, takKetemu }
 }
 
 // Daftar kelas untuk recalc "semua" — dipecah di client, satu kelas per request.
