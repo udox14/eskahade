@@ -107,13 +107,16 @@ function chunkArray<T>(items: T[], size: number) {
   return chunks
 }
 
-export async function getDashboardSPPAll(tahun: number, unitSetor: string) {
+export async function getDashboardSPPAll(tahun: number, unitSetor: string, targetMonth?: number) {
   const session = await getSession()
   const scope = getScopeOrThrow(session)
   const unit = assertRequestedUnit(scope, unitSetor)
 
   const billingStart = await getSppBillingStart()
   const currentMonth = new Date().getMonth() + 1
+  // Bulan yang status lunas/ditiadakan-nya ditampilkan di kolom "Status".
+  // Default bulan berjalan; bisa dipilih bulan sebelumnya lewat filter.
+  const checkMonth = targetMonth && targetMonth >= 1 && targetMonth <= 12 ? targetMonth : currentMonth
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
   const startMonth = tahun === billingStart.tahun ? billingStart.bulan : (tahun < billingStart.tahun ? 13 : 1)
   const billableCount = Math.max(0, maxCheck - startMonth + 1)
@@ -156,8 +159,8 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string) {
     WHERE s.status_global = 'aktif'
       ${sadesaMode ? 'AND s.kategori_santri = ?' : 'AND (s.kategori_santri IS NULL OR s.kategori_santri != ?) AND s.asrama = ?'}
     ORDER BY s.nama_lengkap ASC
-  `, sadesaMode ? [currentMonth, tahun, startMonth, maxCheck, currentMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY]
-                : [currentMonth, tahun, startMonth, maxCheck, currentMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY, unit])
+  `, sadesaMode ? [checkMonth, tahun, startMonth, maxCheck, checkMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY]
+                : [checkMonth, tahun, startMonth, maxCheck, checkMonth, tahun, startMonth, maxCheck, SADESA_CATEGORY, unit])
 
   const historisMap = await getJumlahTunggakanHistorisBySantri(rows.map((s: any) => s.id))
   

@@ -37,7 +37,7 @@ export default function SPPPage() {
 
   // Filter Modal
   const [filterModalOpen, setFilterModalOpen] = useState(false)
-  const [filters, setFilters] = useState({ kamar: '', statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' })
+  const [filters, setFilters] = useState<{ kamar: string[]; statusPembayaran: string; sekolah: string; kelasSekolah: string; kelasPesantren: string }>({ kamar: [], statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' })
   
   // Rekap Panel
   const [rekapExpanded, setRekapExpanded] = useState(false)
@@ -94,6 +94,9 @@ export default function SPPPage() {
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
+  // Bulan yang ditampilkan di list (default bulan berjalan, bisa lihat bulan sebelumnya)
+  const [viewMonth, setViewMonth] = useState(currentMonthIdx)
+  const maxViewMonth = isCurrentYear ? currentMonthIdx : 12
   const isSadesaMode = unitSetor === SADESA_UNIT
   const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
 
@@ -130,7 +133,7 @@ export default function SPPPage() {
     setLoadingData(true)
     try {
       const [santriData, rekapData, setoranData, filtersData] = await Promise.all([
-        getDashboardSPPAll(tahun, unitSetor),
+        getDashboardSPPAll(tahun, unitSetor, viewMonth),
         getRekapStatistikSPP(tahun, unitSetor),
         getStatusSetoranUnit(tahun, unitSetor),
         getFilterOptions(unitSetor)
@@ -151,7 +154,12 @@ export default function SPPPage() {
       loadData()
     }
     setPage(1)
-  }, [scope, unitSetor, tahun])
+  }, [scope, unitSetor, tahun, viewMonth])
+
+  // Clamp bulan terpilih jika ganti tahun (mis. tahun berjalan tak boleh > bulan ini)
+  useEffect(() => {
+    setViewMonth(m => Math.min(m, isCurrentYear ? currentMonthIdx : 12))
+  }, [tahun])
 
   // Filter Logic
   const filteredSantri = useMemo(() => {
@@ -161,7 +169,7 @@ export default function SPPPage() {
       const q = searchQuery.toLowerCase()
       result = result.filter(s => s.nama_lengkap?.toLowerCase().includes(q))
     }
-    if (filters.kamar) result = result.filter(s => s.kamar === filters.kamar)
+    if (filters.kamar.length) result = result.filter(s => filters.kamar.includes(s.kamar))
     if (filters.sekolah) result = result.filter(s => s.sekolah === filters.sekolah)
     if (filters.kelasSekolah) result = result.filter(s => s.kelas_sekolah === filters.kelasSekolah)
     if (filters.kelasPesantren) result = result.filter(s => s.kelas_pesantren === filters.kelasPesantren)
@@ -195,7 +203,7 @@ export default function SPPPage() {
 
   const activeFilterCount = useMemo(() => {
     let count = 0
-    if (filters.kamar) count++
+    if (filters.kamar.length) count++
     if (filters.sekolah) count++
     if (filters.kelasSekolah) count++
     if (filters.kelasPesantren) count++
@@ -212,11 +220,11 @@ export default function SPPPage() {
     const isNoBill = santri.bebas_spp || santri.tagihan_ditiadakan_bulan_ini
     if (santri.bulan_ini_lunas || isNoBill) return
 
-    if (!await confirm(`Bayar SPP ${BULAN_LIST[currentMonthIdx - 1]} ${tahun} untuk ${santri.nama_lengkap}? Nominal: Rp ${nominal.toLocaleString('id-ID')}`)) return
-    
+    if (!await confirm(`Bayar SPP ${BULAN_LIST[viewMonth - 1]} ${tahun} untuk ${santri.nama_lengkap}? Nominal: Rp ${nominal.toLocaleString('id-ID')}`)) return
+
     setPayingSantriId(santri.id)
     const toastId = toast.loading('Memproses...')
-    const res = await bayarSPPBulanBerjalan(santri.id, tahun, currentMonthIdx, nominal)
+    const res = await bayarSPPBulanBerjalan(santri.id, tahun, viewMonth, nominal)
     toast.dismiss(toastId)
     setPayingSantriId(null)
     
@@ -323,10 +331,10 @@ export default function SPPPage() {
   const handleBayarSemuaSantri = async () => {
     const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
     if (belumLunas.length === 0) return
-    if (!await confirm(`Tandai ${belumLunas.length} santri ${unitSetor} SUDAH BAYAR SPP ${BULAN_LIST[currentMonthIdx - 1]} ${tahun}?\n\nNominal per santri: Rp ${nominal.toLocaleString('id-ID')}`)) return
+    if (!await confirm(`Tandai ${belumLunas.length} santri ${unitSetor} SUDAH BAYAR SPP ${BULAN_LIST[viewMonth - 1]} ${tahun}?\n\nNominal per santri: Rp ${nominal.toLocaleString('id-ID')}`)) return
     setLoadingBatchPay(true)
     const toastId = toast.loading('Memproses pembayaran massal...')
-    const res = await bayarSemuaSantriAsrama(unitSetor, tahun, currentMonthIdx, nominal)
+    const res = await bayarSemuaSantriAsrama(unitSetor, tahun, viewMonth, nominal)
     toast.dismiss(toastId)
     setLoadingBatchPay(false)
     if ('error' in res) { toast.error(res.error) } else {
@@ -496,6 +504,20 @@ export default function SPPPage() {
             <button onClick={() => setTahun(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">-</button>
             <span className="px-2 font-mono font-bold text-slate-700">{tahun}</span>
             <button onClick={() => setTahun(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded text-sm font-bold">+</button>
+          </div>
+          <div className="p-2 rounded-lg border shadow-sm flex items-center gap-2 bg-white">
+            <CalendarX className="w-4 h-4 text-slate-400" />
+            <select
+              value={viewMonth}
+              onChange={e => setViewMonth(Number(e.target.value))}
+              className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+            >
+              {BULAN_LIST.map((namaBulan, idx) => {
+                const month = idx + 1
+                const disabled = isBeforeBillingStart(tahun, month) || month > maxViewMonth
+                return <option key={month} value={month} disabled={disabled}>{namaBulan}</option>
+              })}
+            </select>
           </div>
           <div className={`p-2 rounded-lg border shadow-sm flex items-center gap-2 ${scope?.lockedUnit ? 'bg-orange-50 border-orange-200' : 'bg-white'}`}>
             {scope?.lockedUnit ? <Lock className="w-3 h-3 text-orange-600"/> : <Home className="w-4 h-4 text-slate-400"/>}
@@ -828,7 +850,7 @@ export default function SPPPage() {
             <div className="col-span-1 text-center">#</div>
             <div className="col-span-4">Nama Santri</div>
             <div className="col-span-2 text-center">Kamar / Kelas</div>
-            <div className="col-span-2 text-center">Status {BULAN_LIST[currentMonthIdx - 1]}</div>
+            <div className="col-span-2 text-center">Status {BULAN_LIST[viewMonth - 1]}</div>
             <div className="col-span-1 text-center">Tunggakan</div>
             <div className="col-span-2 text-right">Aksi</div>
           </div>
@@ -905,7 +927,7 @@ export default function SPPPage() {
                         className="w-full md:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center justify-center gap-1 disabled:opacity-70"
                       >
                         {payingSantriId === s.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <CreditCard className="w-3 h-3"/>}
-                        Bayar {BULAN_LIST[currentMonthIdx - 1]}
+                        Bayar {BULAN_LIST[viewMonth - 1]}
                       </button>
                     )}
                   </div>
@@ -976,7 +998,7 @@ export default function SPPPage() {
                   className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
                 >
                   <option value="SEMUA">Semua Status</option>
-                  <option value="LUNAS">Lunas Bulan {BULAN_LIST[currentMonthIdx - 1]}</option>
+                  <option value="LUNAS">Lunas Bulan {BULAN_LIST[viewMonth - 1]}</option>
                   <option value="NUNGGAK">Menunggak</option>
                   <option value="AMAN">Aman (Tidak Menunggak)</option>
                   <option value="BEBAS_SPP">Bebas SPP</option>
@@ -986,11 +1008,30 @@ export default function SPPPage() {
 
               {!isSadesaMode && filterOptions.kamars?.length > 0 && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Kamar</label>
-                  <select value={filters.kamar} onChange={e => setFilters(f => ({ ...f, kamar: e.target.value }))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                    <option value="">Semua Kamar</option>
-                    {filterOptions.kamars.map((k: string) => <option key={k} value={k}>Kamar {k}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-500">Kamar {filters.kamar.length > 0 && <span className="text-indigo-600">({filters.kamar.length} dipilih)</span>}</label>
+                    {filters.kamar.length > 0 && (
+                      <button type="button" onClick={() => setFilters(f => ({ ...f, kamar: [] }))} className="text-[11px] font-bold text-rose-600 hover:underline">Hapus</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {filterOptions.kamars.map((k: string) => {
+                      const selected = filters.kamar.includes(k)
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setFilters(f => ({ ...f, kamar: selected ? f.kamar.filter(x => x !== k) : [...f.kamar, k] }))}
+                          className={`flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${
+                            selected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300'
+                          }`}
+                        >
+                          {selected && <CheckCircle className="w-3 h-3" />}
+                          Kamar {k}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1028,7 +1069,7 @@ export default function SPPPage() {
 
             <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
               <button 
-                onClick={() => { setFilters({ kamar: '', statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' }); setPage(1); }}
+                onClick={() => { setFilters({ kamar: [], statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' }); setPage(1); }}
                 className="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               >
                 Reset Filter
