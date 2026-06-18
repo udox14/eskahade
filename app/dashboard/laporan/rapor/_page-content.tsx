@@ -980,14 +980,6 @@ export default function CetakRaporPage() {
                   <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Ibu</label>
                   <input value={identitasForm.nama_ibu || ''} onChange={e => setIdentitasField('nama_ibu', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
-                  <input value={identitasForm.asrama || ''} onChange={e => setIdentitasField('asrama', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Jama'ah / Kamar</label>
-                  <input value={identitasForm.kamar || ''} onChange={e => setIdentitasField('kamar', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
                 <div className="md:col-span-2">
                   <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Alamat Ringkas</label>
                   <textarea value={identitasForm.alamat || ''} onChange={e => setIdentitasField('alamat', e.target.value)} rows={2} className="w-full resize-none rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />

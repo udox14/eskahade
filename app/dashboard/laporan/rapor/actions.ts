@@ -463,17 +463,16 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
     kecamatan: cleanText(payload.kecamatan),
     kab_kota: cleanText(payload.kab_kota),
     provinsi: cleanText(payload.provinsi),
-    asrama: cleanText(payload.asrama),
-    kamar: cleanText(payload.kamar),
     tahun_masuk: tahunMasuk,
   }
 
+  // Asrama & kamar TIDAK diubah dari menu rapor (urusan pengurus asrama).
   await execute(`
     UPDATE santri SET
       nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
       jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, no_wa_ortu = ?,
       alamat = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
-      asrama = ?, kamar = ?, tahun_masuk = ?, updated_at = ?
+      tahun_masuk = ?, updated_at = ?
     WHERE id = ?
   `, [
     after.nis,
@@ -490,8 +489,6 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
     after.kecamatan,
     after.kab_kota,
     after.provinsi,
-    after.asrama,
-    after.kamar,
     after.tahun_masuk,
     new Date().toISOString(),
     payload.santri_id,
@@ -512,8 +509,6 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
     'kecamatan',
     'kab_kota',
     'provinsi',
-    'asrama',
-    'kamar',
     'tahun_masuk',
   ])
 
@@ -540,6 +535,8 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
       riwayat_id: row.riwayat_id,
       santri_id: row.santri_id,
       ...after,
+      asrama: row.asrama,
+      kamar: row.kamar,
       kelas: row.nama_kelas,
       tahun_ajaran: row.tahun_ajaran,
     },
