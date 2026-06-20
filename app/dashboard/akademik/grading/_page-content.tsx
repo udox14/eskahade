@@ -591,20 +591,46 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
     }
   }
 
-  // Reorder dalam kolom via drag; simpan urutan kolom itu.
-  const handleDrop = (grade: Grade, targetId: string) => {
-    if (!dragId || dragId === targetId) { setDragId(null); return }
-    const ids = byGrade(grade).map(s => s.riwayat_id)
-    const from = ids.indexOf(dragId)
-    const to = ids.indexOf(targetId)
-    if (from < 0 || to < 0) { setDragId(null); return }
-    ids.splice(to, 0, ids.splice(from, 1)[0])
-    setItems(prev => prev.map(it => {
-      const idx = ids.indexOf(it.riwayat_id)
-      return idx >= 0 ? { ...it, urutan: idx } : it
-    }))
+  // Drag ala kanban: drop ke kolom grade (targetId=chip tujuan, atau null=akhir kolom).
+  // Dalam kolom = reorder. Antar kolom = pindah grade + posisikan.
+  const moveToColumn = async (grade: Grade, targetId: string | null) => {
+    const id = dragId
     setDragId(null)
-    simpanUrutanGrade(ids)
+    if (!id || id === targetId) return
+    const dragged = items.find(i => i.riwayat_id === id)
+    if (!dragged) return
+
+    // Urutan baru kolom tujuan: tanpa item yang didrag, sisipkan di posisi target.
+    const colIds = byGrade(grade).map(s => s.riwayat_id).filter(x => x !== id)
+    let insertAt = colIds.length
+    if (targetId) {
+      const ti = colIds.indexOf(targetId)
+      if (ti >= 0) insertAt = ti
+    }
+    colIds.splice(insertAt, 0, id)
+
+    const sameGrade = dragged.grade === grade
+
+    // Optimistik: set grade (jika pindah) + urutan kolom tujuan.
+    setItems(prev => prev.map(it => {
+      const base = it.riwayat_id === id ? { ...it, grade } : it
+      const idx = colIds.indexOf(base.riwayat_id)
+      return idx >= 0 ? { ...base, urutan: idx } : base
+    }))
+
+    // Simpan grade dulu (kalau pindah kolom), lalu urutan.
+    if (!sameGrade) {
+      setRowStatus(s => ({ ...s, [id]: 'saving' }))
+      const res = await setGradeSantri(id, grade)
+      if (res?.error) {
+        setRowStatus(s => ({ ...s, [id]: 'error' }))
+        getGradingSekpen(selectedKelas).then(setItems)
+        return
+      }
+      setRowStatus(s => ({ ...s, [id]: 'saved' }))
+      setTimeout(() => setRowStatus(s => { const c = { ...s }; delete c[id]; return c }), 1500)
+    }
+    simpanUrutanGrade(colIds)
   }
 
   // Alternatif drag: geser satu posisi naik/turun dalam kolom.
@@ -685,22 +711,26 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
                     </button>
                   )}
 
-                  {/* Daftar chip santri di kolom ini (drag untuk atur urutan) */}
-                  <div className="p-3 space-y-2 min-h-[120px]">
+                  {/* Daftar chip santri di kolom ini — drag reorder / pindah grade (kanban) */}
+                  <div
+                    className="p-3 space-y-2 min-h-[120px] flex-1"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => moveToColumn(col.key, null)}
+                  >
                     {list.length === 0 ? (
-                      <p className="text-xs text-slate-300 italic text-center py-6">Belum ada santri</p>
+                      <p className="text-xs text-slate-300 italic text-center py-6 pointer-events-none">Seret santri ke sini</p>
                     ) : list.map((s, idx) => (
                       <div
                         key={s.riwayat_id}
                         draggable
                         onDragStart={() => setDragId(s.riwayat_id)}
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDrop(col.key, s.riwayat_id)}
-                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border cursor-grab active:cursor-grabbing ${col.chip} ${dragId === s.riwayat_id ? 'opacity-40' : ''}`}
+                        onDrop={(e) => { e.stopPropagation(); moveToColumn(col.key, s.riwayat_id) }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-grab active:cursor-grabbing ${col.chip} ${dragId === s.riwayat_id ? 'opacity-40' : ''}`}
                       >
                         <span className="text-[10px] font-black opacity-50 w-4 text-right shrink-0">{idx + 1}</span>
                         <GripVertical className="w-4 h-4 opacity-40 shrink-0" />
-                        <div className="min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
                           <p className="font-bold text-sm truncate">{s.nama}</p>
                           <p className="text-[10px] font-mono opacity-60">{s.nis}</p>
                         </div>

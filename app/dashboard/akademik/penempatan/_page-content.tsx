@@ -7,7 +7,7 @@ import {
 } from './actions'
 import { gradeCocokKelas, type Grade } from '@/lib/akademik/grade'
 import {
-  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers,
+  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -40,6 +40,7 @@ export default function PenempatanKelasPage() {
   const [saving, setSaving] = useState(false)
 
   const [selectedGender, setSelectedGender] = useState<'L' | 'P'>('L')
+  const [statOpen, setStatOpen] = useState(false)
 
   // santri_id -> kelas_id tujuan
   const [placements, setPlacements] = useState<Record<string, string>>({})
@@ -95,6 +96,13 @@ export default function PenempatanKelasPage() {
     }))
     return g
   }, [kandidat])
+
+  // Penempatan sesi ini (belum disimpan) per kelas, untuk overlay statistik.
+  const pendingByKelas = useMemo(() => {
+    const m: Record<string, number> = {}
+    Object.values(placements).forEach(kid => { if (kid) m[kid] = (m[kid] || 0) + 1 })
+    return m
+  }, [placements])
 
   const toggleSelect = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -230,6 +238,79 @@ export default function PenempatanKelasPage() {
               <Layers className="w-3.5 h-3.5" /> Master Kelas →
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* STATISTIK (accordion) */}
+      {kandidat.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => setStatOpen(o => !o)}
+            className="w-full flex items-center gap-2 px-5 py-3 text-left hover:bg-slate-50"
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span className="text-sm font-bold text-slate-700">Statistik</span>
+            <span className="text-xs text-slate-400 hidden sm:inline">— ringkasan grade & isi tiap kelas</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${statOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {statOpen && (
+            <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
+              {/* Ringkasan grade kandidat */}
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Kandidat per Grade ({kandidat.length} total)</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { k: 'A', label: 'Grade A', cls: 'bg-green-50 text-green-700 border-green-200' },
+                    { k: 'B', label: 'Grade B', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    { k: 'C', label: 'Grade C', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+                    { k: 'X', label: 'Belum Ada Grade', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+                  ] as const).map(g => (
+                    <span key={g.k} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border ${g.cls}`}>
+                      {g.label}
+                      <span className="font-black">{grouped[g.k]?.length || 0}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Isi tiap kelas tujuan */}
+              {kelasTujuan.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-2">Jumlah Santri per Kelas</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-slate-500 font-bold uppercase text-[11px] border-b border-slate-100">
+                        <tr>
+                          <th className="py-2 pr-3">Kelas</th>
+                          <th className="py-2 px-3 text-center">Komposisi</th>
+                          <th className="py-2 px-3 text-center">Terisi</th>
+                          <th className="py-2 px-3 text-center">+ Baru (sesi ini)</th>
+                          <th className="py-2 pl-3 text-center">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {kelasTujuan.map(k => {
+                          const tambah = pendingByKelas[k.id] || 0
+                          return (
+                            <tr key={k.id}>
+                              <td className="py-2 pr-3 font-bold text-slate-800">
+                                {k.nama_kelas}
+                                <span className="ml-2 text-[10px] font-bold text-slate-400">{k.jenis_kelamin === 'C' ? 'CAMPUR' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span>
+                              </td>
+                              <td className="py-2 px-3 text-center text-slate-500 font-semibold">{k.grade || '-'}</td>
+                              <td className="py-2 px-3 text-center text-slate-600">{k.jumlah}</td>
+                              <td className="py-2 px-3 text-center font-bold text-indigo-600">{tambah > 0 ? `+${tambah}` : '-'}</td>
+                              <td className="py-2 pl-3 text-center font-black text-slate-800">{k.jumlah + tambah}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

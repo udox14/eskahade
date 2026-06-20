@@ -22,6 +22,7 @@ export type KelasTujuan = {
   nama_kelas: string
   grade: string | null
   jenis_kelamin: string
+  jumlah: number // santri aktif yang sudah ada di kelas ini
 }
 
 // Kolom grade_urutan (urutan manual hasil grading) dipakai juga untuk mengurutkan
@@ -48,7 +49,9 @@ export async function getKelasUntukMarhalah(marhalahId: string, jenisKelamin?: s
     params.push(jenisKelamin)
   }
   const data = await query<KelasTujuan>(`
-    SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin
+    SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin,
+           (SELECT COUNT(*) FROM riwayat_pendidikan rp
+            WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif') AS jumlah
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     WHERE k.marhalah_id = ?${genderFilter}
