@@ -49,11 +49,16 @@ function MarhalahList({ data, onOpen, reload }: { data: any; onOpen: (id: number
   const bersihkan = async () => {
     if (!window.confirm('Hapus semua assignment & materi residu lama (paket di luar konvensi baru)? Tidak bisa dibatalkan.')) return
     setCleaning(true)
-    const res = await bersihkanResiduHafalan()
-    setCleaning(false)
-    if ('error' in res) return toast.error(res.error)
-    toast.success(res.clean ? 'Sudah bersih, tidak ada residu.' : `Dibersihkan: ${res.deletedPaket} paket, ${res.deletedBab} bab, ${res.deletedBlok} blok`)
-    await reload()
+    try {
+      const res = await bersihkanResiduHafalan()
+      if ('error' in res) return toast.error(res.error)
+      toast.success(res.clean ? 'Sudah bersih, tidak ada residu.' : `Dibersihkan: ${res.deletedPaket} paket, ${res.deletedBab} bab, ${res.deletedBlok} blok`)
+      await reload()
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal membersihkan residu.')
+    } finally {
+      setCleaning(false)
+    }
   }
 
   return (
@@ -104,11 +109,16 @@ function MarhalahDetail({ marhalah, data, onBack, reload }: { marhalah: any; dat
 
   const run = async (fn: () => Promise<any>, ok: string) => {
     setBusy(true)
-    const res = await fn()
-    setBusy(false)
-    if (res && 'error' in res) return toast.error(res.error)
-    toast.success(ok)
-    await reload()
+    try {
+      const res = await fn()
+      if (res && 'error' in res) return toast.error(res.error)
+      toast.success(ok)
+      await reload()
+    } catch (e: any) {
+      toast.error(e?.message || 'Terjadi kesalahan.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

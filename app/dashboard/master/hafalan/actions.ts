@@ -264,44 +264,37 @@ export async function bersihkanResiduHafalan() {
     .filter(p => p.jenis === 'quran' ? !/^__quran_m\d+$/.test(p.nama) : !validNonQuran.has(`${p.jenis}:${p.nama}`))
     .map(p => p.id)
 
-  // kumpulkan bab residu: milik paket residu + bab yatim (paket_id NULL)
-  const babIds = new Set<number>()
-  if (residuePaketIds.length) {
-    const rows = await query<{ id: number }>(`SELECT id FROM hafalan_bab WHERE paket_id IN (${residuePaketIds.map(() => '?').join(',')})`, residuePaketIds)
-    rows.forEach(r => babIds.add(r.id))
-  }
-  const orphan = await query<{ id: number }>('SELECT id FROM hafalan_bab WHERE paket_id IS NULL')
-  orphan.forEach(r => babIds.add(r.id))
+  // Kondisi bab residu: bab yatim (paket_id NULL) + bab milik paket residu.
+  // Pakai subquery supaya tidak meledakkan jumlah parameter (limit SQLite ~999).
+  const cond = residuePaketIds.length
+    ? `(hafalan_bab.paket_id IS NULL OR hafalan_bab.paket_id IN (${residuePaketIds.map(() => '?').join(',')}))`
+    : 'hafalan_bab.paket_id IS NULL'
+  const condParams = residuePaketIds.length ? residuePaketIds : []
+  const babSub = `SELECT id FROM hafalan_bab WHERE ${cond}`
 
-  const babList = Array.from(babIds)
-  let deletedBlok = 0
-  if (babList.length) {
-    const ph = babList.map(() => '?').join(',')
-    const blok = await query<{ id: number }>(`SELECT id FROM hafalan_blok WHERE bab_id IN (${ph})`, babList)
-    const blokIds = blok.map(b => b.id)
-    deletedBlok = blokIds.length
-    if (blokIds.length) {
-      const bph = blokIds.map(() => '?').join(',')
-      await execute(`DELETE FROM hafalan_progress WHERE blok_id IN (${bph})`, blokIds)
-    }
-    await execute(`DELETE FROM hafalan_bab WHERE id IN (${ph})`, babList)
+  const babCount = (await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM hafalan_bab WHERE ${cond}`, condParams))?.n || 0
+  const blokCount = (await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM hafalan_blok WHERE bab_id IN (${babSub})`, condParams))?.n || 0
+
+  if (residuePaketIds.length === 0 && babCount === 0) {
+    return { success: true, deletedPaket: 0, deletedBab: 0, deletedBlok: 0, clean: true }
   }
+
+  await execute(`DELETE FROM hafalan_progress WHERE blok_id IN (SELECT id FROM hafalan_blok WHERE bab_id IN (${babSub}))`, condParams)
+  await execute(`DELETE FROM hafalan_blok WHERE bab_id IN (${babSub})`, condParams)
+  await execute(`DELETE FROM hafalan_bab WHERE ${cond}`, condParams)
   if (residuePaketIds.length) {
     const ph = residuePaketIds.map(() => '?').join(',')
     await execute(`DELETE FROM hafalan_paket_marhalah WHERE paket_id IN (${ph})`, residuePaketIds)
     await execute(`DELETE FROM hafalan_paket WHERE id IN (${ph})`, residuePaketIds)
   }
 
-  if (residuePaketIds.length === 0 && babList.length === 0) {
-    return { success: true, deletedPaket: 0, deletedBab: 0, deletedBlok: 0, clean: true }
-  }
   await logActivity({
     actor: actorFromSession(session), module: 'master_hafalan', action: 'delete',
     fiturHref: FITUR, logKind: 'delete', entityType: 'hafalan_residu', entityLabel: 'Bersihkan residu',
-    summary: `Bersihkan residu: ${residuePaketIds.length} paket, ${babList.length} bab, ${deletedBlok} blok`,
+    summary: `Bersihkan residu: ${residuePaketIds.length} paket, ${babCount} bab, ${blokCount} blok`,
   })
   revalidatePath(FITUR)
-  return { success: true, deletedPaket: residuePaketIds.length, deletedBab: babList.length, deletedBlok }
+  return { success: true, deletedPaket: residuePaketIds.length, deletedBab: babCount, deletedBlok: blokCount }
 }
 
 export async function removeQuranSurah(payload: { babId: number }) {
