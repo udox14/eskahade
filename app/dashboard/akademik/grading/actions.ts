@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
+import { query, execute, batch } from '@/lib/db'
 import { getCachedMapelAll } from '@/lib/cache/master'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
@@ -91,17 +91,31 @@ export type GradingSekpenItem = {
   nis: string
   nama: string
   grade: Grade | null
+  urutan: number | null
+}
+
+// Kolom grade_urutan menyimpan urutan manual santri dalam kolom grade (kecil = atas).
+let gradeUrutanReady = false
+async function ensureGradeUrutanColumn() {
+  if (gradeUrutanReady) return
+  try {
+    await execute('ALTER TABLE riwayat_pendidikan ADD COLUMN grade_urutan INTEGER')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) throw error
+  }
+  gradeUrutanReady = true
 }
 
 export async function getGradingSekpen(kelasId: string): Promise<GradingSekpenItem[]> {
   if (!kelasId) return []
+  await ensureGradeUrutanColumn()
   const rows = await query<any>(`
-    SELECT rp.id AS riwayat_id, rp.grade_lanjutan,
+    SELECT rp.id AS riwayat_id, rp.grade_lanjutan, rp.grade_urutan,
            s.id AS santri_id, s.nis, s.nama_lengkap
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
-    ORDER BY s.nama_lengkap
+    ORDER BY (rp.grade_urutan IS NULL), rp.grade_urutan, s.nama_lengkap
   `, [kelasId])
 
   return rows.map((r: any) => ({
@@ -110,7 +124,67 @@ export async function getGradingSekpen(kelasId: string): Promise<GradingSekpenIt
     nis: r.nis,
     nama: r.nama_lengkap,
     grade: normalizeGrade(r.grade_lanjutan),
+    urutan: r.grade_urutan ?? null,
   }))
+}
+
+// Masukkan banyak santri (mis. "sisa yang belum") ke satu grade sekaligus.
+export async function setGradeBanyak(riwayatIds: string[], grade: Grade) {
+  const session = await assertCrud(FITUR_HREF, 'update')
+  if ('error' in session) return { error: session.error }
+  if (!hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Khusus sekpen.' }
+  const ids = (riwayatIds || []).filter(Boolean)
+  if (ids.length === 0) return { error: 'Tidak ada santri.' }
+
+  const value = gradeLabel(grade)
+  try {
+    const CHUNK = 200
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK)
+      const ph = chunk.map(() => '?').join(',')
+      await execute(`UPDATE riwayat_pendidikan SET grade_lanjutan = ? WHERE id IN (${ph})`, [value, ...chunk])
+    }
+  } catch {
+    return { error: 'Gagal menyimpan grade.' }
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_grading',
+    action: 'update',
+    fiturHref: FITUR_HREF,
+    logKind: 'update',
+    entityType: 'grading_sekpen_massal',
+    entityId: 'sisa',
+    entityLabel: value,
+    summary: `Sekpen memasukkan ${ids.length} santri ke ${value}`,
+    details: { count: ids.length, grade: value },
+  })
+
+  revalidatePath(FITUR_HREF)
+  return { success: true, count: ids.length }
+}
+
+// Simpan urutan manual santri dalam satu kolom grade (orderedIds urut atas->bawah).
+export async function simpanUrutanGrade(orderedIds: string[]) {
+  const session = await assertCrud(FITUR_HREF, 'update')
+  if ('error' in session) return { error: session.error }
+  if (!hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Khusus sekpen.' }
+  await ensureGradeUrutanColumn()
+  const ids = (orderedIds || []).filter(Boolean)
+  if (ids.length === 0) return { success: true }
+
+  try {
+    await batch(ids.map((id, idx) => ({
+      sql: 'UPDATE riwayat_pendidikan SET grade_urutan = ? WHERE id = ?',
+      params: [idx, id],
+    })))
+  } catch {
+    return { error: 'Gagal menyimpan urutan.' }
+  }
+
+  revalidatePath(FITUR_HREF)
+  return { success: true }
 }
 
 // Simpan grade satu santri seketika (override vonis wali kelas). Eksklusif admin/sekpen.

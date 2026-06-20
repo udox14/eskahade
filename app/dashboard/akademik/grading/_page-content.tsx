@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect, useRef } from 'react'
-import { getKelasList, getDataGrading, simpanGradingBatch, getGradingSekpen, setGradeSantri, type GradingSekpenItem } from './actions'
-import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet, Check, X, LayoutGrid, List as ListIcon } from 'lucide-react'
+import { getKelasList, getDataGrading, simpanGradingBatch, getGradingSekpen, setGradeSantri, setGradeBanyak, simpanUrutanGrade, type GradingSekpenItem } from './actions'
+import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet, Check, X, LayoutGrid, List as ListIcon, ChevronDown, ChevronUp, GripVertical, CornerDownLeft } from 'lucide-react'
 import { type Grade } from '@/lib/akademik/grade'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -16,30 +16,29 @@ export default function GradingPage({ isSekpen = false }: { isSekpen?: boolean }
 
   if (!isSekpen) return <GradingWaliView />
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end max-w-6xl mx-auto">
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            onClick={() => setView('kolom')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'kolom' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <LayoutGrid className="w-4 h-4" /> 3 Kolom
-          </button>
-          <button
-            onClick={() => setView('tabel')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'tabel' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <ListIcon className="w-4 h-4" /> Tabel
-          </button>
-        </div>
-      </div>
-      {view === 'kolom' ? <GradingSekpenView /> : <GradingWaliView />}
+  const toggle = (
+    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+      <button
+        onClick={() => setView('kolom')}
+        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'kolom' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        <LayoutGrid className="w-4 h-4" /> 3 Kolom
+      </button>
+      <button
+        onClick={() => setView('tabel')}
+        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'tabel' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        <ListIcon className="w-4 h-4" /> Tabel
+      </button>
     </div>
   )
+
+  return view === 'kolom'
+    ? <GradingSekpenView toggle={toggle} />
+    : <GradingWaliView headerExtra={toggle} />
 }
 
-function GradingWaliView() {
+function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}) {
   const confirm = useConfirm()
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState<string>('')
@@ -237,8 +236,8 @@ function GradingWaliView() {
   const totalPerubahan = Object.keys(pendingChanges).length
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24">
-      
+    <div className="space-y-6 w-full pb-24">
+
       {/* HEADER */}
       <DashboardPageHeader
         title="Grading"
@@ -246,18 +245,21 @@ function GradingWaliView() {
       />
 
       {/* FILTER KELAS */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <label className="block text-sm font-bold text-slate-700 mb-2">Pilih Kelas</label>
-        <select 
-          className="w-full md:w-1/3 border border-slate-300 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-          value={selectedKelas}
-          onChange={e => setSelectedKelas(e.target.value)}
-        >
-          <option value="">-- Pilih Kelas --</option>
-          {kelasList.map(k => (
-            <option key={k.id} value={k.id}>{k.nama_kelas}</option>
-          ))}
-        </select>
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="w-full md:w-1/3">
+          <label className="block text-sm font-bold text-slate-700 mb-2">Pilih Kelas</label>
+          <select
+            className="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            value={selectedKelas}
+            onChange={e => setSelectedKelas(e.target.value)}
+          >
+            <option value="">-- Pilih Kelas --</option>
+            {kelasList.map(k => (
+              <option key={k.id} value={k.id}>{k.nama_kelas}</option>
+            ))}
+          </select>
+        </div>
+        {headerExtra}
       </div>
 
       {/* CONTENT */}
@@ -519,15 +521,17 @@ const GRADE_COLS: { key: Grade; label: string; head: string; chip: string }[] = 
   { key: 'C', label: 'Grade C', head: 'bg-orange-50 text-orange-800 border-orange-200', chip: 'bg-orange-100 text-orange-800 border-orange-200' },
 ]
 
-function GradingSekpenView() {
+function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
   const [kelasList, setKelasList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [items, setItems] = useState<GradingSekpenItem[]>([])
   const [loading, setLoading] = useState(false)
   // riwayat_id -> status simpan per-item
   const [rowStatus, setRowStatus] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
-  // input combobox per kolom grade
-  const [picker, setPicker] = useState<Record<Grade, string>>({ A: '', B: '', C: '' })
+  // accordion pool "belum ada grade" (default terlipat — utamakan kolom)
+  const [poolOpen, setPoolOpen] = useState(false)
+  // drag-reorder dalam kolom
+  const [dragId, setDragId] = useState<string | null>(null)
 
   useEffect(() => {
     getKelasList().then(res => {
@@ -548,7 +552,15 @@ function GradingSekpenView() {
   }, [selectedKelas])
 
   const belum = items.filter(i => i.grade === null)
-  const byGrade = (g: Grade) => items.filter(i => i.grade === g)
+  // urutan manual (kecil=atas) duluan, sisanya (urutan null) alfabet di bawah
+  const byGrade = (g: Grade) => items
+    .filter(i => i.grade === g)
+    .sort((a, b) => {
+      const ua = a.urutan ?? Number.MAX_SAFE_INTEGER
+      const ub = b.urutan ?? Number.MAX_SAFE_INTEGER
+      if (ua !== ub) return ua - ub
+      return a.nama.localeCompare(b.nama, undefined, { sensitivity: 'base' })
+    })
 
   // Simpan grade satu santri seketika; update state lokal optimistik + indikator.
   const assign = async (riwayatId: string, grade: Grade | null) => {
@@ -567,31 +579,69 @@ function GradingSekpenView() {
     }
   }
 
-  // Pilih nama dari combobox kolom grade -> set grade santri itu.
-  const handlePick = (grade: Grade, nama: string) => {
-    const found = items.find(i => i.nama.toLowerCase() === nama.toLowerCase())
-    setPicker(p => ({ ...p, [grade]: '' }))
-    if (found) assign(found.riwayat_id, grade)
+  // Masukkan semua yang belum ke satu grade (mis. grading A & B dulu, sisanya C).
+  const assignAllBelum = async (grade: Grade) => {
+    const ids = belum.map(s => s.riwayat_id)
+    if (ids.length === 0) return
+    setItems(prev => prev.map(i => i.grade === null ? { ...i, grade } : i))
+    const res = await setGradeBanyak(ids, grade)
+    if (res?.error) {
+      alert(res.error)
+      getGradingSekpen(selectedKelas).then(setItems)
+    }
+  }
+
+  // Reorder dalam kolom via drag; simpan urutan kolom itu.
+  const handleDrop = (grade: Grade, targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return }
+    const ids = byGrade(grade).map(s => s.riwayat_id)
+    const from = ids.indexOf(dragId)
+    const to = ids.indexOf(targetId)
+    if (from < 0 || to < 0) { setDragId(null); return }
+    ids.splice(to, 0, ids.splice(from, 1)[0])
+    setItems(prev => prev.map(it => {
+      const idx = ids.indexOf(it.riwayat_id)
+      return idx >= 0 ? { ...it, urutan: idx } : it
+    }))
+    setDragId(null)
+    simpanUrutanGrade(ids)
+  }
+
+  // Alternatif drag: geser satu posisi naik/turun dalam kolom.
+  const move = (grade: Grade, riwayatId: string, dir: 'up' | 'down') => {
+    const ids = byGrade(grade).map(s => s.riwayat_id)
+    const i = ids.indexOf(riwayatId)
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (i < 0 || j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    setItems(prev => prev.map(it => {
+      const idx = ids.indexOf(it.riwayat_id)
+      return idx >= 0 ? { ...it, urutan: idx } : it
+    }))
+    simpanUrutanGrade(ids)
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+    <div className="space-y-6 w-full pb-24">
       <DashboardPageHeader
         title="Grading (Sekpen)"
         description="Tetapkan grade tiap santri ke kolom A/B/C. Tersimpan otomatis per santri — bisa menimpa vonis wali kelas."
       />
 
       {/* FILTER KELAS */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <label className="block text-sm font-bold text-slate-700 mb-2">Pilih Kelas</label>
-        <select
-          className="w-full md:w-1/3 border border-slate-300 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"
-          value={selectedKelas}
-          onChange={e => setSelectedKelas(e.target.value)}
-        >
-          <option value="">-- Pilih Kelas --</option>
-          {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
-        </select>
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="w-full md:w-1/3">
+          <label className="block text-sm font-bold text-slate-700 mb-2">Pilih Kelas</label>
+          <select
+            className="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+            value={selectedKelas}
+            onChange={e => setSelectedKelas(e.target.value)}
+          >
+            <option value="">-- Pilih Kelas --</option>
+            {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
+          </select>
+        </div>
+        {toggle}
       </div>
 
       {!selectedKelas ? (
@@ -610,39 +660,6 @@ function GradingSekpenView() {
         </div>
       ) : (
         <>
-          {/* POOL: BELUM ADA GRADE */}
-          {belum.length > 0 && (
-            <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-bold text-amber-800">Belum Ada Grade ({belum.length})</span>
-                <span className="text-xs text-amber-700/70">— pilih grade lewat tombol untuk menempatkan</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {belum.map(s => (
-                  <div key={s.riwayat_id} className="bg-white border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm leading-tight">{s.nama}</p>
-                      <p className="text-[10px] font-mono text-slate-400">{s.nis}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      {(['A', 'B', 'C'] as Grade[]).map(g => (
-                        <button
-                          key={g}
-                          onClick={() => assign(s.riwayat_id, g)}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 text-xs font-black transition-colors"
-                        >
-                          {g}
-                        </button>
-                      ))}
-                    </div>
-                    {rowStatus[s.riwayat_id] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* 3 KOLOM A / B / C */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {GRADE_COLS.map(col => {
@@ -654,42 +671,59 @@ function GradingSekpenView() {
                     <span className="text-xs font-bold opacity-70">{list.length}</span>
                   </div>
 
-                  {/* Combobox tambah santri ke kolom ini */}
-                  <div className="p-3 border-b border-slate-100">
-                    <input
-                      type="text"
-                      list={`santri-kelas-${col.key}`}
-                      value={picker[col.key]}
-                      placeholder="Ketik / pilih nama…"
-                      className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400"
-                      onChange={e => {
-                        const v = e.target.value
-                        setPicker(p => ({ ...p, [col.key]: v }))
-                        // datalist option dipilih (match persis) -> langsung assign
-                        if (items.some(i => i.nama.toLowerCase() === v.toLowerCase())) handlePick(col.key, v)
-                      }}
-                    />
-                    <datalist id={`santri-kelas-${col.key}`}>
-                      {items.filter(i => i.grade !== col.key).map(i => (
-                        <option key={i.riwayat_id} value={i.nama} />
-                      ))}
-                    </datalist>
-                  </div>
+                  {/* Combobox tambah santri ke kolom ini (multi-pick, tutup saat klik luar) */}
+                  <KolomCombobox colKey={col.key} items={items} onAssign={assign} />
 
-                  {/* Daftar chip santri di kolom ini */}
+                  {/* Tombol: masukkan semua sisa (yang belum) ke kolom ini */}
+                  {belum.length > 0 && (
+                    <button
+                      onClick={() => assignAllBelum(col.key)}
+                      className="mx-3 mt-2 flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                    >
+                      <CornerDownLeft className="w-3.5 h-3.5" />
+                      Masukkan {belum.length} sisa ke {col.label}
+                    </button>
+                  )}
+
+                  {/* Daftar chip santri di kolom ini (drag untuk atur urutan) */}
                   <div className="p-3 space-y-2 min-h-[120px]">
                     {list.length === 0 ? (
                       <p className="text-xs text-slate-300 italic text-center py-6">Belum ada santri</p>
-                    ) : list.map(s => (
-                      <div key={s.riwayat_id} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border ${col.chip}`}>
+                    ) : list.map((s, idx) => (
+                      <div
+                        key={s.riwayat_id}
+                        draggable
+                        onDragStart={() => setDragId(s.riwayat_id)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDrop(col.key, s.riwayat_id)}
+                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border cursor-grab active:cursor-grabbing ${col.chip} ${dragId === s.riwayat_id ? 'opacity-40' : ''}`}
+                      >
+                        <span className="text-[10px] font-black opacity-50 w-4 text-right shrink-0">{idx + 1}</span>
+                        <GripVertical className="w-4 h-4 opacity-40 shrink-0" />
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate">{s.nama}</p>
                           <p className="text-[10px] font-mono opacity-60">{s.nis}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           {rowStatus[s.riwayat_id] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                           {rowStatus[s.riwayat_id] === 'saved' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                           {rowStatus[s.riwayat_id] === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                          <button
+                            onClick={() => move(col.key, s.riwayat_id, 'up')}
+                            disabled={idx === 0}
+                            title="Naik"
+                            className="text-slate-400 hover:text-indigo-700 hover:bg-white/60 rounded-md p-0.5 disabled:opacity-25 disabled:hover:bg-transparent"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => move(col.key, s.riwayat_id, 'down')}
+                            disabled={idx === list.length - 1}
+                            title="Turun"
+                            className="text-slate-400 hover:text-indigo-700 hover:bg-white/60 rounded-md p-0.5 disabled:opacity-25 disabled:hover:bg-transparent"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => assign(s.riwayat_id, null)}
                             title="Keluarkan dari grade ini"
@@ -705,7 +739,104 @@ function GradingSekpenView() {
               )
             })}
           </div>
+
+          {/* POOL: BELUM ADA GRADE (accordion, di bawah, default terlipat) */}
+          {belum.length > 0 && (
+            <div className="bg-amber-50/60 border border-amber-200 rounded-2xl overflow-hidden">
+              <button
+                onClick={() => setPoolOpen(o => !o)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-amber-50"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-sm font-bold text-amber-800">Belum Ada Grade ({belum.length})</span>
+                <span className="text-xs text-amber-700/70 hidden sm:inline">— pilih grade lewat tombol untuk menempatkan</span>
+                <ChevronDown className={`w-4 h-4 text-amber-600 ml-auto transition-transform ${poolOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {poolOpen && (
+                <div className="flex flex-wrap gap-2 p-4 pt-0">
+                  {belum.map(s => (
+                    <div key={s.riwayat_id} className="bg-white border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm leading-tight">{s.nama}</p>
+                        <p className="text-[10px] font-mono text-slate-400">{s.nis}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {(['A', 'B', 'C'] as Grade[]).map(g => (
+                          <button
+                            key={g}
+                            onClick={() => assign(s.riwayat_id, g)}
+                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 text-xs font-black transition-colors"
+                          >
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                      {rowStatus[s.riwayat_id] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
+      )}
+    </div>
+  )
+}
+
+// Combobox custom: pilih banyak santri cepat. Klik nama -> langsung assign (nama hilang),
+// dropdown tetap terbuka. Tutup hanya saat klik di luar area combobox.
+function KolomCombobox({
+  colKey, items, onAssign,
+}: {
+  colKey: Grade
+  items: GradingSekpenItem[]
+  onAssign: (riwayatId: string, grade: Grade) => void
+}) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const candidates = items.filter(
+    i => i.grade !== colKey && i.nama.toLowerCase().includes(q.trim().toLowerCase())
+  )
+
+  return (
+    <div ref={ref} className="p-3 border-b border-slate-100 relative">
+      <input
+        type="text"
+        value={q}
+        onChange={e => { setQ(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        placeholder="Ketik / pilih nama…"
+        className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400"
+      />
+      {open && (
+        <div className="absolute left-3 right-3 top-full mt-1 z-30 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+          {candidates.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400 italic">Tidak ada santri</p>
+          ) : candidates.map(i => (
+            <button
+              key={i.riwayat_id}
+              type="button"
+              onClick={() => onAssign(i.riwayat_id, colKey)}
+              className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm flex items-center gap-2"
+            >
+              <span className="font-semibold text-slate-800">{i.nama}</span>
+              <span className="text-[10px] font-mono text-slate-400">{i.nis}</span>
+              {i.grade && <span className="ml-auto text-[10px] font-bold text-slate-400">[{i.grade}]</span>}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )

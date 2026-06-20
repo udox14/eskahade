@@ -39,6 +39,8 @@ export default function PenempatanKelasPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const [selectedGender, setSelectedGender] = useState<'L' | 'P'>('L')
+
   // santri_id -> kelas_id tujuan
   const [placements, setPlacements] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<string[]>([])
@@ -57,8 +59,8 @@ export default function PenempatanKelasPage() {
     setBulkKelas('')
     try {
       const [data, kelas] = await Promise.all([
-        getPenempatanData(selectedMarhalah),
-        getKelasUntukMarhalah(selectedMarhalah),
+        getPenempatanData(selectedMarhalah, selectedGender),
+        getKelasUntukMarhalah(selectedMarhalah, selectedGender),
       ])
       setKandidat(data)
       setKelasTujuan(kelas)
@@ -84,6 +86,13 @@ export default function PenempatanKelasPage() {
   const grouped = useMemo(() => {
     const g: Record<string, KandidatPenempatan[]> = { A: [], B: [], C: [], X: [] }
     kandidat.forEach(k => g[k.grade ?? 'X'].push(k))
+    // Urutkan tiap grade ikut urutan grading (kecil=atas), baru/null jatuh ke bawah alfabet.
+    Object.values(g).forEach(list => list.sort((a, b) => {
+      const ua = a.urutan ?? Number.MAX_SAFE_INTEGER
+      const ub = b.urutan ?? Number.MAX_SAFE_INTEGER
+      if (ua !== ub) return ua - ub
+      return a.nama.localeCompare(b.nama, undefined, { sensitivity: 'base' })
+    }))
     return g
   }, [kandidat])
 
@@ -143,7 +152,7 @@ export default function PenempatanKelasPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+    <div className="space-y-6 w-full pb-24">
       <DashboardPageHeader
         title="Penempatan Kelas"
         description="Lanjutan tes klasifikasi & grading. Kelompokkan santri per grade, lalu masukkan ke kelas sesuai komposisinya."
@@ -182,6 +191,23 @@ export default function PenempatanKelasPage() {
             <option value="">-- Pilih Marhalah --</option>
             {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
           </select>
+        </div>
+        <div className="w-full md:w-auto">
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Kelamin</label>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setSelectedGender('L')}
+              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'L' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Putra
+            </button>
+            <button
+              onClick={() => setSelectedGender('P')}
+              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'P' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Putri
+            </button>
+          </div>
         </div>
         <button
           onClick={handleTampilkan}

@@ -21,17 +21,38 @@ export type KelasTujuan = {
   id: string
   nama_kelas: string
   grade: string | null
+  jenis_kelamin: string
 }
 
-// Kelas tahun-aktif di sebuah marhalah, lengkap dengan komposisi grade (untuk saran).
-export async function getKelasUntukMarhalah(marhalahId: string): Promise<KelasTujuan[]> {
+// Kolom grade_urutan (urutan manual hasil grading) dipakai juga untuk mengurutkan
+// kandidat penempatan. Pastikan kolomnya ada.
+let gradeUrutanReady = false
+async function ensureGradeUrutanColumn() {
+  if (gradeUrutanReady) return
+  try {
+    await execute('ALTER TABLE riwayat_pendidikan ADD COLUMN grade_urutan INTEGER')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) throw error
+  }
+  gradeUrutanReady = true
+}
+
+// Kelas tahun-aktif di marhalah, lengkap komposisi grade.
+// jenisKelamin (L/P) opsional: kelas yang muncul hanya yang gender-nya sama ATAU campur (C).
+export async function getKelasUntukMarhalah(marhalahId: string, jenisKelamin?: string): Promise<KelasTujuan[]> {
   if (!marhalahId) return []
+  const params: any[] = [marhalahId]
+  let genderFilter = ''
+  if (jenisKelamin === 'L' || jenisKelamin === 'P') {
+    genderFilter = " AND (k.jenis_kelamin = ? OR k.jenis_kelamin = 'C')"
+    params.push(jenisKelamin)
+  }
   const data = await query<KelasTujuan>(`
-    SELECT k.id, k.nama_kelas, k.grade
+    SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
-    WHERE k.marhalah_id = ?
-  `, [marhalahId])
+    WHERE k.marhalah_id = ?${genderFilter}
+  `, params)
   return data.sort((a, b) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
@@ -44,6 +65,8 @@ export type KandidatPenempatan = {
   sumber: 'baru' | 'lama'
   grade: 'A' | 'B' | 'C' | null
   asal: string // rekomendasi marhalah (baru) / kelas sekarang (lama)
+  jenis_kelamin: string
+  urutan: number | null // urutan manual hasil grading (lama); null untuk baru
   riwayat_lama_id: string | null
 }
 
@@ -51,8 +74,12 @@ export type KandidatPenempatan = {
 //  - "baru": santri aktif tanpa riwayat aktif, grade dari tes klasifikasi,
 //            target marhalah = rekomendasi_marhalah (match nama).
 //  - "lama": santri di kelas marhalah sebelumnya (urutan - 1), grade dari grade_lanjutan.
-export async function getPenempatanData(marhalahTargetId: string): Promise<KandidatPenempatan[]> {
+// jenisKelamin (L/P) opsional untuk memfilter santri per gender.
+export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?: string): Promise<KandidatPenempatan[]> {
   if (!marhalahTargetId) return []
+  await ensureGradeUrutanColumn()
+
+  const gender = (jenisKelamin === 'L' || jenisKelamin === 'P') ? jenisKelamin : null
 
   const marhalahList = await getCachedMarhalahList()
   const target = marhalahList.find((m: any) => String(m.id) === String(marhalahTargetId))
@@ -62,18 +89,21 @@ export async function getPenempatanData(marhalahTargetId: string): Promise<Kandi
   const sourceMarhalah = marhalahList.find((m: any) => Number(m.urutan) === Number(target.urutan) - 1)
 
   // ── Santri BARU (hasil tes klasifikasi, belum punya kelas) ──
+  const baruParams: any[] = []
+  let baruGender = ''
+  if (gender) { baruGender = ' AND s.jenis_kelamin = ?'; baruParams.push(gender) }
   const santriBaru = await query<any>(`
-    SELECT s.id AS santri_id, s.nis, s.nama_lengkap,
+    SELECT s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
            htk.rekomendasi_marhalah, htk.catatan_grade
     FROM santri s
     JOIN hasil_tes_klasifikasi htk ON htk.santri_id = s.id
-    WHERE s.status_global = 'aktif'
+    WHERE s.status_global = 'aktif'${baruGender}
       AND NOT EXISTS (
         SELECT 1 FROM riwayat_pendidikan rp
         WHERE rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
       )
     ORDER BY s.nama_lengkap
-  `, [])
+  `, baruParams)
 
   const kandidatBaru: KandidatPenempatan[] = santriBaru
     .filter((s: any) => String(s.rekomendasi_marhalah || '').trim().toLowerCase() === targetNama)
@@ -84,23 +114,31 @@ export async function getPenempatanData(marhalahTargetId: string): Promise<Kandi
       sumber: 'baru' as const,
       grade: normalizeGrade(s.catatan_grade),
       asal: s.rekomendasi_marhalah || '-',
+      jenis_kelamin: s.jenis_kelamin,
+      urutan: null,
       riwayat_lama_id: null,
     }))
 
   // ── Santri LAMA (naik dari marhalah sebelumnya) ──
   let kandidatLama: KandidatPenempatan[] = []
   if (sourceMarhalah) {
+    // Sumber santri lama TIDAK difilter tahun aktif: tiap santri hanya punya 1
+    // riwayat 'aktif'. Ini agar kenaikan lintas-tahun jalan (kelas asal tahun lalu
+    // sudah non-aktif setelah tahun baru diaktifkan). Kelas TUJUAN tetap tahun aktif.
+    const lamaParams: any[] = [sourceMarhalah.id]
+    let lamaGender = ''
+    if (gender) { lamaGender = ' AND s.jenis_kelamin = ?'; lamaParams.push(gender) }
     const santriLama = await query<any>(`
-      SELECT rp.id AS riwayat_lama_id, rp.grade_lanjutan,
-             s.id AS santri_id, s.nis, s.nama_lengkap,
+      SELECT rp.id AS riwayat_lama_id, rp.grade_lanjutan, rp.grade_urutan,
+             s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
              k.nama_kelas
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
       JOIN kelas k ON k.id = rp.kelas_id
-      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
       WHERE k.marhalah_id = ? AND rp.status_riwayat = 'aktif'
-      ORDER BY s.nama_lengkap
-    `, [sourceMarhalah.id])
+        AND s.status_global = 'aktif'${lamaGender}
+      ORDER BY (rp.grade_urutan IS NULL), rp.grade_urutan, s.nama_lengkap
+    `, lamaParams)
 
     kandidatLama = santriLama.map((s: any) => ({
       santri_id: s.santri_id,
@@ -109,6 +147,8 @@ export async function getPenempatanData(marhalahTargetId: string): Promise<Kandi
       sumber: 'lama' as const,
       grade: normalizeGrade(s.grade_lanjutan),
       asal: s.nama_kelas,
+      jenis_kelamin: s.jenis_kelamin,
+      urutan: s.grade_urutan ?? null,
       riwayat_lama_id: s.riwayat_lama_id,
     }))
   }
