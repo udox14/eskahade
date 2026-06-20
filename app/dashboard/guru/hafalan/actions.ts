@@ -151,8 +151,8 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   const santriIds = santri.map(row => row.santri_id)
   const riwayatBySantri = new Map(santri.map(row => [row.santri_id, row.riwayat_id]))
   const placeholders = santriIds.map(() => '?').join(',')
-  const progressRows = await query<{ blok_id: number; santri_id: string; status: string; marhalah_id: number | null }>(`
-    SELECT hp.blok_id, hp.santri_id, hp.status, hp.marhalah_id
+  const progressRows = await query<{ blok_id: number; santri_id: string; status: string; marhalah_id: number | null; highlight: string | null }>(`
+    SELECT hp.blok_id, hp.santri_id, hp.status, hp.marhalah_id, hp.highlight
     FROM hafalan_progress hp
     JOIN hafalan_blok hblk ON hblk.id = hp.blok_id
     JOIN hafalan_bab hb ON hb.id = hblk.bab_id
@@ -163,15 +163,31 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   const progress: Record<string, boolean> = {}
   const progressStatus: Record<string, string> = {}
   const progressEditable: Record<string, boolean> = {}
+  // Jurumiyah: highlight kata. progressHighlight = kata marhalah ini (editable),
+  // progressHighlightLocked = kata dari marhalah sebelumnya (terkunci).
+  const progressHighlight: Record<string, number[]> = {}
+  const progressHighlightLocked: Record<string, number[]> = {}
+  const parseWords = (raw: string | null): number[] => {
+    if (!raw) return []
+    try { const a = JSON.parse(raw); return Array.isArray(a) ? a.map(Number).filter(Number.isFinite) : [] } catch { return [] }
+  }
   for (const row of progressRows) {
     const riwayatId = riwayatBySantri.get(row.santri_id)
     if (!riwayatId) continue
-    progress[`${riwayatId}:${row.blok_id}`] = true
-    progressStatus[`${riwayatId}:${row.blok_id}`] = row.status
     const key = `${riwayatId}:${row.blok_id}`
+    progress[key] = true
+    progressStatus[key] = row.status
     progressEditable[key] = !!progressEditable[key] || row.marhalah_id === kelas.marhalah_id
+    const words = parseWords(row.highlight)
+    if (words.length) {
+      if (row.marhalah_id === kelas.marhalah_id) {
+        progressHighlight[key] = Array.from(new Set([...(progressHighlight[key] || []), ...words]))
+      } else {
+        progressHighlightLocked[key] = Array.from(new Set([...(progressHighlightLocked[key] || []), ...words]))
+      }
+    }
   }
-  return { santri, bab, progress, progressStatus, progressEditable, editableBlokIds }
+  return { santri, bab, progress, progressStatus, progressEditable, progressHighlight, progressHighlightLocked, editableBlokIds }
 }
 
 export async function toggleHafalanProgress(payload: { kelasId: string; jenis: string; riwayatId: string; blokId: number }) {
@@ -298,4 +314,63 @@ export async function simpanHafalanProgressBatch(payload: {
 
   revalidatePath('/dashboard/guru/hafalan')
   return { success: true, checkedBlokIds: checkedIds }
+}
+
+/** Jurumiyah: simpan highlight kata per blok (1 bab = 1 blok teks utuh). */
+export async function simpanHafalanHighlightBatch(payload: {
+  kelasId: string
+  jenis: string
+  riwayatId: string
+  perBlok: { blokId: number; words: number[] }[]
+}) {
+  const session = await getSession()
+  if (!session) return { error: 'Tidak terautentikasi.' }
+  if (!(await canAccessKelas(session, payload.kelasId))) return { error: 'Akses kelas ditolak.' }
+  if (!isHafalanType(payload.jenis)) return { error: 'Jenis hafalan tidak valid.' }
+  await ensureGuruFeatureSchema()
+
+  const validRows = await query<{ id: number; santri_id: string; marhalah_id: number | null }>(`
+    SELECT hblk.id, rp.santri_id, k.marhalah_id
+    FROM hafalan_blok hblk
+    JOIN hafalan_bab hb ON hb.id = hblk.bab_id
+    JOIN hafalan_paket_marhalah hpm ON hpm.paket_id = hb.paket_id AND hpm.jenis = hb.jenis
+    JOIN kelas k ON k.marhalah_id = hpm.marhalah_id
+    JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.id = ?
+    WHERE k.id = ? AND hb.jenis = ? AND hb.is_active = 1 AND hblk.is_active = 1
+  `, [payload.riwayatId, payload.kelasId, payload.jenis])
+
+  const validIds = new Set(validRows.map(r => Number(r.id)))
+  if (validIds.size === 0) return { error: 'Belum ada materi hafalan aktif untuk kelas ini.' }
+  const scope = validRows[0]
+  if (!scope?.santri_id || !scope.marhalah_id) return { error: 'Data santri atau marhalah tidak valid.' }
+  const guruId = await getGuruIdForSession(session)
+
+  // hapus progress highlight marhalah ini untuk blok valid, lalu tulis ulang
+  const ph = Array.from(validIds).map(() => '?').join(',')
+  await execute(
+    `DELETE FROM hafalan_progress WHERE santri_id = ? AND marhalah_id = ? AND blok_id IN (${ph})`,
+    [scope.santri_id, scope.marhalah_id, ...Array.from(validIds)]
+  )
+
+  let saved = 0
+  for (const item of payload.perBlok) {
+    const blokId = Number(item.blokId)
+    if (!validIds.has(blokId)) continue
+    const words = Array.from(new Set((item.words || []).map(Number).filter(Number.isFinite))).sort((a, b) => a - b)
+    if (words.length === 0) continue
+    await execute(`
+      INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, santri_id, kelas_id, marhalah_id, guru_id, status, highlight, tanggal_setor, updated_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'hafal', ?, date('now'), ?, datetime('now'))
+    `, [generateId(), blokId, payload.riwayatId, scope.santri_id, payload.kelasId, scope.marhalah_id, guruId, JSON.stringify(words), session.id])
+    saved += 1
+  }
+
+  await logActivity({
+    actor: actorFromSession(session), module: 'guru_hafalan', action: 'update',
+    fiturHref: '/dashboard/guru/hafalan', logKind: 'update', entityType: 'hafalan_highlight_batch',
+    entityId: `${payload.riwayatId}:${payload.jenis}`, summary: `Menyimpan highlight hafalan ${saved} bab`,
+    details: { kelas_id: payload.kelasId, jenis: payload.jenis, blok: saved },
+  })
+  revalidatePath('/dashboard/guru/hafalan')
+  return { success: true, saved }
 }

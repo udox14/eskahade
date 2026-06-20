@@ -89,10 +89,20 @@ async function ensureKitabPaket(jenis: string, kitabKey: string, marhalahId: num
     paket = await queryOne<{ id: number }>('SELECT id FROM hafalan_paket WHERE jenis = ? AND nama = ?', [jenis, kitabKey])
     if (!paket) return null
   }
-  // seed isi kitab sekali (kalau masih kosong)
-  const count = await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM hafalan_bab WHERE paket_id = ?', [paket.id])
-  if ((count?.n || 0) === 0) {
-    const matan = getMatanBab(jenis, kitabKey)
+  const matan = getMatanBab(jenis, kitabKey)
+  const expectedBlok = matan.reduce((a, b) => a + b.segmen.length, 0)
+  const babCnt = (await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM hafalan_bab WHERE paket_id = ?', [paket.id]))?.n || 0
+  const blokCnt = (await queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM hafalan_blok hblk JOIN hafalan_bab hb ON hb.id = hblk.bab_id WHERE hb.paket_id = ?', [paket.id]))?.n || 0
+
+  // seed kalau kosong; reseed kalau struktur tak cocok dengan matan (mis. jurumiyah lama multi-blok)
+  const needSeed = babCnt === 0 || babCnt !== matan.length || blokCnt !== expectedBlok
+  if (needSeed) {
+    if (babCnt > 0) {
+      // wipe materi lama paket ini (bab+blok+progress)
+      await execute('DELETE FROM hafalan_progress WHERE blok_id IN (SELECT id FROM hafalan_blok WHERE bab_id IN (SELECT id FROM hafalan_bab WHERE paket_id = ?))', [paket.id])
+      await execute('DELETE FROM hafalan_blok WHERE bab_id IN (SELECT id FROM hafalan_bab WHERE paket_id = ?)', [paket.id])
+      await execute('DELETE FROM hafalan_bab WHERE paket_id = ?', [paket.id])
+    }
     for (const bab of matan) {
       await execute(
         'INSERT INTO hafalan_bab (jenis, marhalah_id, paket_id, judul, urutan) VALUES (?, ?, ?, ?, ?)',

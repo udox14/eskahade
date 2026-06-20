@@ -324,6 +324,7 @@ async function ensureGuruFeatureSchemaOnce() {
     'ALTER TABLE hafalan_progress ADD COLUMN kelas_id TEXT REFERENCES kelas(id)',
     'ALTER TABLE hafalan_progress ADD COLUMN marhalah_id INTEGER REFERENCES marhalah(id)',
     'ALTER TABLE hafalan_blok ADD COLUMN ref TEXT',
+    'ALTER TABLE hafalan_progress ADD COLUMN highlight TEXT',
   ]) {
     try {
       await execute(alterSql)

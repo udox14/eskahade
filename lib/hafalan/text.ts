@@ -72,7 +72,12 @@ export function resolveHafalanText(ref?: string | null): HafalanText | null {
         const s = bab.segmen?.[seg]
         return s ? { arab: s, meta: bab.nama } : null
       }
-      return bab.arab ? { arab: bab.arab, terjemah: bab.terjemah, meta: bab.nama } : null
+      // bab utuh: gabung semua segmen jadi satu teks (untuk highlight per kata)
+      const joined = Object.keys(bab.segmen || {})
+        .sort((a, b) => Number(a) - Number(b))
+        .map(k => bab.segmen[k])
+        .join(' ')
+      return joined ? { arab: joined, meta: bab.nama } : null
     }
     case 'amtsilah': {
       const item = AMTSILAH.wazan?.[rest[0]]
@@ -96,18 +101,21 @@ export type MatanBab = {
   segmen: { n: number; ref: string; label?: string }[]
 }
 
-function babFromSource(src: AnyRecord | null, refPrefix: string): MatanBab[] {
+function babFromSource(src: AnyRecord | null, refPrefix: string, opts?: { whole?: boolean }): MatanBab[] {
   if (!src?.bab) return []
   return Object.entries(src.bab)
     .map(([slug, b]: [string, any]) => ({
       slug,
       nama: b.nama || slug,
       urutan: Number(b.urutan) || 0,
-      segmen: Object.entries(b.segmen || {}).map(([n, seg]: [string, any]) => ({
-        n: Number(n),
-        ref: `${refPrefix}:${slug}:${n}`,
-        label: seg && typeof seg === 'object' ? seg.no : undefined,
-      })),
+      // whole: 1 bab = 1 blok teks utuh (ref tanpa indeks segmen). Selain itu per-segmen.
+      segmen: opts?.whole
+        ? [{ n: 1, ref: `${refPrefix}:${slug}` }]
+        : Object.entries(b.segmen || {}).map(([n, seg]: [string, any]) => ({
+            n: Number(n),
+            ref: `${refPrefix}:${slug}:${n}`,
+            label: seg && typeof seg === 'object' ? seg.no : undefined,
+          })),
     }))
     .sort((a, b) => a.urutan - b.urutan)
 }
@@ -117,7 +125,7 @@ export type MatanSource = { key: string; label: string; bab: MatanBab[] }
 
 export function getMatanSources(jenis: string): MatanSource[] {
   if (jenis === 'jurumiyah') {
-    return [{ key: 'jurumiyah', label: JURUMIYAH.judul || 'Matan Al-Ajurrumiyyah', bab: babFromSource(JURUMIYAH, 'jurumiyah') }]
+    return [{ key: 'jurumiyah', label: JURUMIYAH.judul || 'Matan Al-Ajurrumiyyah', bab: babFromSource(JURUMIYAH, 'jurumiyah', { whole: true }) }]
   }
   if (jenis === 'hadits') {
     return Object.entries(HADITS_KITAB)
