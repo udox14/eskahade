@@ -3,8 +3,12 @@
 import { query, execute } from '@/lib/db'
 import { getCachedMapelAll } from '@/lib/cache/master'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { normalizeGrade, gradeLabel, type Grade } from '@/lib/akademik/grade'
 import { revalidatePath } from 'next/cache'
+
+const FITUR_HREF = '/dashboard/akademik/grading'
 
 export async function getKelasList() {
   const session = await getSession()
@@ -77,6 +81,68 @@ export async function getDataGrading(kelasId: string) {
       grade_final: s.grade_lanjutan || (rekomendasi !== '-' ? rekomendasi : 'Grade C'),
     }
   })
+}
+
+// ── View Sekpen: 3 kolom A/B/C, simpan per-item (bukan batch) ──
+
+export type GradingSekpenItem = {
+  riwayat_id: string
+  santri_id: string
+  nis: string
+  nama: string
+  grade: Grade | null
+}
+
+export async function getGradingSekpen(kelasId: string): Promise<GradingSekpenItem[]> {
+  if (!kelasId) return []
+  const rows = await query<any>(`
+    SELECT rp.id AS riwayat_id, rp.grade_lanjutan,
+           s.id AS santri_id, s.nis, s.nama_lengkap
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+    ORDER BY s.nama_lengkap
+  `, [kelasId])
+
+  return rows.map((r: any) => ({
+    riwayat_id: r.riwayat_id,
+    santri_id: r.santri_id,
+    nis: r.nis,
+    nama: r.nama_lengkap,
+    grade: normalizeGrade(r.grade_lanjutan),
+  }))
+}
+
+// Simpan grade satu santri seketika (override vonis wali kelas). Eksklusif admin/sekpen.
+// grade null = hapus grade (santri kembali ke kolom "belum").
+export async function setGradeSantri(riwayatId: string, grade: Grade | null) {
+  const session = await assertCrud(FITUR_HREF, 'update')
+  if ('error' in session) return { error: session.error }
+  if (!hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Khusus sekpen.' }
+  if (!riwayatId) return { error: 'Data tidak valid.' }
+
+  const value = grade ? gradeLabel(grade) : null
+  try {
+    await execute('UPDATE riwayat_pendidikan SET grade_lanjutan = ? WHERE id = ?', [value, riwayatId])
+  } catch {
+    return { error: 'Gagal menyimpan grade.' }
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_grading',
+    action: 'update',
+    fiturHref: FITUR_HREF,
+    logKind: 'update',
+    entityType: 'grading_sekpen',
+    entityId: riwayatId,
+    entityLabel: value || 'kosong',
+    summary: `Sekpen mengatur grade santri menjadi ${value || 'kosong'}`,
+    details: { riwayat_id: riwayatId, grade: value },
+  })
+
+  revalidatePath(FITUR_HREF)
+  return { success: true }
 }
 
 export async function simpanGradingBatch(payload: { riwayat_id: string; grade: string }[]) {

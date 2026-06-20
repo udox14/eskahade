@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { isKomposisiKelas } from '@/lib/akademik/grade'
 
 // Pakai cache untuk data yang jarang berubah
 export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
@@ -110,7 +111,8 @@ export async function tambahKelas(formData: FormData) {
   const marhalahId = formData.get('marhalah_id') as string
   const jenisKelamin = formData.get('jenis_kelamin') as string
   const tempat = ((formData.get('tempat') as string) || '').trim()
-  const grade = ((formData.get('grade') as string) || '').trim().toUpperCase()
+  const gradeRaw = ((formData.get('grade') as string) || '').trim().toUpperCase()
+  const grade = isKomposisiKelas(gradeRaw) ? gradeRaw : ''
   const baruLama = ((formData.get('baru_lama') as string) || '').trim().toUpperCase()
 
   await ensureKelasExtraColumns()
@@ -225,7 +227,8 @@ export async function importKelasMassal(dataExcel: any[]) {
     const namaMarhalah = String(row['MARHALAH'] || row['marhalah'] || '').trim()
     const jkRaw = String(row['JENIS KELAMIN'] || row['jenis kelamin'] || 'L').toUpperCase().trim()
     const tempat = String(row['TEMPAT'] || row['tempat'] || '').trim()
-    const grade = String(row['GRADE'] || row['grade'] || '').trim().toUpperCase()
+    const gradeRaw = String(row['GRADE'] || row['grade'] || '').trim().toUpperCase()
+    const grade = isKomposisiKelas(gradeRaw) ? gradeRaw : ''
     const baruLama = String(row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '').trim().toUpperCase()
 
     if (!namaKelas || !namaMarhalah) continue

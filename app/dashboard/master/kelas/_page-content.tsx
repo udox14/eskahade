@@ -171,8 +171,16 @@ export default function MasterKelasPage() {
                 <input type="text" name="tempat" placeholder="Contoh: Gedung Barat" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
               </div>
               <div className="w-full md:w-1/4">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Grade</label>
-                <input type="text" name="grade" placeholder="Contoh: A / AB / C" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm uppercase" />
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Grade (Komposisi)</label>
+                <select name="grade" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                  <option value="">- Pilih -</option>
+                  <option value="A">A (hanya A)</option>
+                  <option value="AB">AB (A & B)</option>
+                  <option value="ABC">ABC (campur semua)</option>
+                  <option value="B">B (hanya B)</option>
+                  <option value="BC">BC (B & C)</option>
+                  <option value="C">C (hanya C)</option>
+                </select>
               </div>
               <div className="w-full md:w-1/4">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">B/L (Baru/Lama)</label>
