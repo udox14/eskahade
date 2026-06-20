@@ -19,7 +19,18 @@
       "Read(//tmp/**)",
       "Bash(xxd)",
       "mcp__216efd6a-20d2-4f0d-a196-8ec636e31c7b__r2_bucket_get",
-      "Bash(sleep 2; cat /c/Users/IAbdu/AppData/Local/Temp/claude/C--DATA-eskahade/ec02b139-e781-4a47-b586-6580f55f6b96/tasks/bg5i4j86w.output 2>/dev/null | head -60)"
+      "Bash(sleep 2; cat /c/Users/IAbdu/AppData/Local/Temp/claude/C--DATA-eskahade/ec02b139-e781-4a47-b586-6580f55f6b96/tasks/bg5i4j86w.output 2>/dev/null | head -60)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(node -e \"const q=require\\('./lib/hafalan/data/quran.json'\\); console.log\\('surat:',Object.keys\\(q\\).length\\); console.log\\('1.nama:',q['1'].nama,'| latin:',q['1'].latin\\); console.log\\('1:1:',JSON.stringify\\(q['1'].ayat['1']\\)\\); console.log\\('114 ayat count:',Object.keys\\(q['114'].ayat\\).length\\);\")",
+      "Bash(find /c/DATA/eskahade -maxdepth 3 -iname \"*.docx\" -o -iname \"*.doc\" 2>/dev/null | head; echo \"---downloads---\"; ls ~/Downloads/*.docx ~/Downloads/*.doc 2>/dev/null | head)",
+      "Read(//c/tmp/**)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Jurumiyah.docx\" ./_jrm.docx)",
+      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Hadits Akhlaq ibtidaiyah 1 - New Look.docx\" ./_h.docx)",
+      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Talkhish Riyadl Ibtidaiyah 2 - New Look.docx\" ./_t.docx)",
+      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Talkhish Riyadl Ibtidaiyah 2 - New Look.docx\" ./_t2.docx)"
     ]
   }
 }

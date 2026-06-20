@@ -1,0 +1,13 @@
+{
+  "judul": "Amtsilah Tashrifiyah",
+  "wazan": {
+    "fa-ala-yaf-ulu": {
+      "arab": "نَصَرَ يَنْصُرُ نَصْرًا وَمَنْصَرًا فَهُوَ نَاصِرٌ وَذَاكَ مَنْصُورٌ",
+      "terjemah": "Telah menolong, sedang/akan menolong, pertolongan..."
+    },
+    "fa-ala-yaf-ilu": {
+      "arab": "ضَرَبَ يَضْرِبُ ضَرْبًا وَمَضْرَبًا فَهُوَ ضَارِبٌ وَذَاكَ مَضْرُوبٌ",
+      "terjemah": "Telah memukul, sedang/akan memukul, pukulan..."
+    }
+  }
+}

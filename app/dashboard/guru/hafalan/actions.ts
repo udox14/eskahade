@@ -14,6 +14,7 @@ import {
   HAFALAN_TYPES,
   isHafalanType,
 } from '@/lib/akademik/guru-access'
+import { resolveHafalanText } from '@/lib/hafalan/text'
 
 export async function getHafalanInitialData() {
   const session = await getSession()
@@ -101,7 +102,7 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
       )
       SELECT hb.id AS bab_id, hb.judul, hb.urutan AS bab_urutan, hb.parent_id,
              parent.judul AS parent_judul, parent.urutan AS parent_urutan,
-             hblk.id AS blok_id, hblk.label, hblk.deskripsi, hblk.urutan AS blok_urutan,
+             hblk.id AS blok_id, hblk.label, hblk.deskripsi, hblk.ref, hblk.urutan AS blok_urutan,
              vp.is_editable, vp.source_marhalah_nama, vp.paket_urutan
       FROM hafalan_bab hb
       JOIN visible_paket vp ON vp.paket_id = hb.paket_id
@@ -132,10 +133,13 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
     }
     if (row.blok_id) {
       if (row.is_editable === 1) editableBlokIds.push(Number(row.blok_id))
+      const teks = resolveHafalanText(row.ref)
       babMap.get(row.bab_id).blok.push({
         id: row.blok_id,
         label: row.label,
         deskripsi: row.deskripsi,
+        ref: row.ref,
+        teks: teks ? { arab: teks.arab, terjemah: teks.terjemah, meta: teks.meta } : null,
         urutan: row.blok_urutan,
         is_editable: row.is_editable === 1,
       })
