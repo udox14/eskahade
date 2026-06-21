@@ -12,8 +12,8 @@ import {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
-  Download, FileWarning, Shuffle, Home, UserX, DoorOpen,
+  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
+  FileWarning, Shuffle, Home, UserX, DoorOpen,
   Search, ChevronLeft, X
 } from 'lucide-react'
 
@@ -75,7 +75,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/ranking':                     'Lihat peringkat dan prestasi santri per kelas.',
   '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
   '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
-  '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode dan filter.',
+  '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode and filter.',
   '/dashboard/akademik/absensi/verifikasi':          'Verifikasi dan proses sidang alfa santri mingguan.',
   '/dashboard/akademik/absensi/vonis-final':         'Proses vonis final alfa pengajian dari hasil pemanggilan.',
   '/dashboard/akademik/absensi/cetak':               'Cetak surat pemanggilan untuk santri yang banyak alfa.',
@@ -204,9 +204,22 @@ function getGreeting(hour: number) {
   return { text: 'Selamat Malam', sub: 'Istirahat yang cukup ya.', emoji: '🌙' }
 }
 
+function getGreetingImage(hour: number) {
+  if (hour >= 4  && hour < 11) return '/hero_pagi.png'
+  if (hour >= 11 && hour < 15) return '/hero_siang.png'
+  if (hour >= 15 && hour < 18) return '/hero_sore.png'
+  return '/hero_malam.png'
+}
+
 function formatTanggal(date: Date) {
   return date.toLocaleDateString('id-ID', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
+
+function formatJam(date: Date) {
+  return date.toLocaleTimeString('id-ID', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   })
 }
 
@@ -219,12 +232,14 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setNow(new Date()), 0)
-    return () => window.clearTimeout(timer)
+    setNow(new Date())
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
 
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)
+  const heroImage = getGreetingImage(hour)
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
   const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
   const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
@@ -252,80 +267,91 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
     <div className="space-y-6 pb-16">
 
       {/* ── Hero Greeting Card ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none shadow-xl">
-        {/* Noise texture overlay */}
-        <div className="absolute inset-0 opacity-[0.035]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px',
-        }} />
-
+      <div 
+        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/80 p-5 sm:p-7"
+        style={{
+          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82)), url('/hero-bg.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
         {/* Glow orbs */}
-        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-8 right-1/3 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/5 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Content */}
-        <div className="relative z-10 p-5 sm:p-8">
-          {/* Top: date pill + logo */}
-          <div className="flex items-start justify-between gap-3 mb-5">
-            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-[11px] font-medium text-white/70 leading-none">
-                {now ? formatTanggal(now) : '—'}
-              </span>
+        {/* Content (Responsive flex layout matching mockup) */}
+        <div className="relative z-10 flex items-end justify-between gap-4">
+          
+          {/* Left Side: Greeting & User Name */}
+          <div className="space-y-4 flex-1 min-w-0">
+            <div className="space-y-1">
+              <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
+                <span>{greeting.emoji}</span>
+                <span>{greeting.text},</span>
+              </p>
+              <h1 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight leading-none break-words">
+                {userName}
+                <span className="text-emerald-500">.</span>
+              </h1>
+              <p className="text-slate-400 text-xs sm:text-sm pt-1 font-semibold italic">
+                "{greeting.sub}"
+              </p>
             </div>
-            <img src="/logo.png" alt="Logo"
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-85 shrink-0 drop-shadow-xl" />
-          </div>
 
-          {/* Greeting text */}
-          <div className="space-y-1">
-            <p className="text-white/50 text-sm font-medium">
-              {greeting.emoji} {greeting.text}
-            </p>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-none break-words">
-              {userName}
-              <span className="text-emerald-400">.</span>
-            </h1>
-            <p className="text-white/40 text-sm pt-0.5">{greeting.sub}</p>
-          </div>
+            {/* Mockup Pills row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Role Card */}
+              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
+                <div className="w-5.5 h-5.5 rounded-full bg-blue-500/10 flex items-center justify-center text-[10px]">
+                  {roleEmoji}
+                </div>
+                <div className="leading-none text-left">
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
+                  <p className="text-xs font-bold text-slate-700 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
+                </div>
+              </div>
 
-          {/* Divider */}
-          <div className="my-4 h-px bg-white/8" />
-
-          {/* Bottom: role + stats */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">{roleEmoji}</span>
-              <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-1">Login sebagai</p>
-                <p className="text-sm font-bold text-white/90 leading-none">{roleLabel}</p>
+              {/* stats Card */}
+              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <div className="leading-none text-left">
+                  <p className="text-xs font-bold text-slate-700 leading-none">
+                    <span className="text-emerald-600 font-black">{totalFitur}</span>
+                  </p>
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mt-0.5">layanan aktif</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/20 rounded-full px-3.5 py-1.5 shadow-inner">
-              <span className="text-emerald-400 text-xs font-black">{totalFitur}</span>
-              <span className="text-white/60 text-xs font-medium">fitur aktif</span>
-            </div>
           </div>
+
+          {/* Right Side: 3D Muslim Illustration with Laptop */}
+          <div className="w-28 h-28 sm:w-44 sm:h-44 shrink-0 flex items-end justify-end select-none pointer-events-none mb-[-20px] mr-[-10px] sm:mb-[-28px] sm:mr-[-15px]">
+            <img 
+              src={heroImage} 
+              alt="Illustration" 
+              className="max-w-full max-h-full object-contain object-bottom" 
+            />
+          </div>
+
         </div>
       </div>
 
-      {/* ── Search Bar ── */}
-      <div className="relative animate-in fade-in duration-200">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-          <Search className="h-4.5 w-4.5 text-slate-400" />
+      {/* ── Search Bar Redesigned ── */}
+      <div className="relative group animate-in fade-in duration-200">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <Search className="h-4.5 w-4.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
         </div>
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari menu atau layanan..."
-          className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all duration-200 shadow-sm"
+          placeholder="Cari menu atau layanan di sini..."
+          className="w-full pl-11 pr-10 py-3.5 bg-slate-100 border border-transparent rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-250 focus:ring-4 focus:ring-emerald-500/5 transition-all duration-200 shadow-inner focus:shadow-sm"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -382,7 +408,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
                     </Link>
                   )
                 })}
@@ -394,12 +419,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
         {/* ── VIEW 2: CATEGORY SELECTION (default state - clean horizontal list) ── */}
         {searchQuery.trim() === '' && activeGroup === null && (
           <div className="space-y-3.5 animate-in fade-in duration-200">
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Kategori Menu ({groups.length})
-              </span>
-            </div>
-
             {groups.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
                 <Settings className="w-10 h-10 opacity-20 mb-1" />
@@ -407,7 +426,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                 <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                 {groups.map(group => {
                   const meta = getGroupMeta(group)
                   const GroupIcon = meta.icon
@@ -417,22 +436,24 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                     <button
                       key={group}
                       onClick={() => setActiveGroup(group)}
-                      className="group flex items-center gap-3 p-3.5 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left active:scale-[0.97] cursor-pointer"
+                      className="group flex flex-col items-center justify-between p-3.5 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-350 hover:shadow-md transition-all duration-200 text-center active:scale-95 cursor-pointer min-h-[110px]"
                     >
-                      {/* Stylized direct icon on the left (no enclosing box/badge) */}
+                      {/* Stylized direct icon on the top (no badge) */}
                       <div className="shrink-0 flex items-center justify-center w-8 h-8">
                         <GroupIcon className={cn("w-7 h-7 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
                       </div>
 
-                      {/* Text content on the right */}
-                      <div className="flex-1 min-w-0 leading-tight">
-                        <span className="block text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors truncate">
+                      {/* Text content in the middle */}
+                      <div className="flex-1 min-w-0 leading-tight mt-1 flex flex-col justify-center">
+                        <span className="block text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors line-clamp-2">
                           {group === '_standalone' ? 'Menu Utama' : group}
                         </span>
-                        <span className="inline-block text-[9px] text-slate-400 font-bold mt-0.5">
-                          {items.length} fitur
-                        </span>
                       </div>
+
+                      {/* Item count at the bottom */}
+                      <span className="inline-block text-[9px] text-slate-400 font-bold mt-1">
+                        {items.length} fitur
+                      </span>
                     </button>
                   )
                 })}
@@ -499,7 +520,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
                     </Link>
                   )
                 })}
