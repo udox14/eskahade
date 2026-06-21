@@ -276,14 +276,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           
           {/* Left Side: Greeting & User Name */}
           <div className="space-y-3.5 flex-1 min-w-0">
-            {/* Category Portal Pill & Mobile Clock row */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 border border-emerald-200/40 px-2.5 py-1 rounded-lg">
-                Portal Utama
-              </span>
-              
-              {/* Mobile-only Clock & Date Pill */}
-              <div className="md:hidden flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-2.5 py-1 select-none">
+            {/* Mobile-only Clock & Date Pill */}
+            <div className="md:hidden flex items-center select-none mb-1">
+              <div className="flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-2.5 py-1">
                 <span className="text-[10px] font-bold text-slate-600 leading-none">
                   {now ? now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '—'}
                 </span>
