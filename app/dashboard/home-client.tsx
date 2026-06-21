@@ -113,35 +113,55 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/ehb/keuangan':                          'Susun RAB dan kelola anggaran pelaksanaan EHB.',
 }
 
+// ── Accent per grup ──────────────────────────────────────────────────────────
+const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
+  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
+  'Data Santri':  { dot: 'bg-sky-400',      line: 'bg-sky-100',      label: 'text-sky-600',     iconHover: 'group-hover:text-sky-600' },
+  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
+  'Asrama':       { dot: 'bg-lime-500',     line: 'bg-lime-100',     label: 'text-lime-700',    iconHover: 'group-hover:text-lime-700' },
+  'Perizinan & Disiplin': { dot: 'bg-red-400', line: 'bg-red-100',   label: 'text-red-600',     iconHover: 'group-hover:text-red-600' },
+  'Akademik':     { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
+  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
+  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
+  'Absensi Akademik': { dot: 'bg-teal-400', line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
+  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
+  'Keuangan Pusat': { dot: 'bg-emerald-500', line: 'bg-emerald-100', label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
+  'Keuangan Santri': { dot: 'bg-cyan-500',  line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
+  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
+  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
+  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
+  'EHB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
+  'Operasional':  { dot: 'bg-cyan-500',    line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
+  'PSB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
+}
+
 // ── Metadata Kategori Menu (SPA Native Feel) ──────────────────────────────────
-const GROUP_META: Record<string, { label: string; icon: React.ElementType; bgSoft: string; textAccent: string; borderAccent: string }> = {
-  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard,    bgSoft: 'bg-slate-50',      textAccent: 'text-slate-600',     borderAccent: 'border-slate-100' },
-  'Data Santri':  { label: 'Data Santri',          icon: Users,              bgSoft: 'bg-sky-50',        textAccent: 'text-sky-600',       borderAccent: 'border-sky-100' },
-  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck,          bgSoft: 'bg-orange-50',     textAccent: 'text-orange-600',    borderAccent: 'border-orange-100' },
-  'Asrama':       { label: 'Asrama',               icon: Home,               bgSoft: 'bg-lime-50',       textAccent: 'text-lime-600',      borderAccent: 'border-lime-100' },
-  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert,      bgSoft: 'bg-red-50',        textAccent: 'text-red-600',       borderAccent: 'border-red-100' },
-  'Akademik':     { label: 'Akademik',             icon: BookOpen,           bgSoft: 'bg-blue-50',       textAccent: 'text-blue-600',      borderAccent: 'border-blue-100' },
-  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle,            bgSoft: 'bg-indigo-50',     textAccent: 'text-indigo-600',    borderAccent: 'border-indigo-100' },
-  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet,    bgSoft: 'bg-violet-50',     textAccent: 'text-violet-600',    borderAccent: 'border-violet-100' },
-  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays,       bgSoft: 'bg-teal-50',       textAccent: 'text-teal-600',      borderAccent: 'border-teal-100' },
-  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck,     bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
-  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet,             bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
-  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins,              bgSoft: 'bg-cyan-50',       textAccent: 'text-cyan-600',      borderAccent: 'border-cyan-100' },
-  'Keuangan':     { label: 'Keuangan',             icon: CreditCard,         bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
-  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase,          bgSoft: 'bg-cyan-50',       textAccent: 'text-cyan-600',      borderAccent: 'border-cyan-100' },
-  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart,       bgSoft: 'bg-amber-50',      textAccent: 'text-amber-600',     borderAccent: 'border-amber-100' },
-  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList,      bgSoft: 'bg-indigo-50',     textAccent: 'text-indigo-600',    borderAccent: 'border-indigo-100' },
-  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus,           bgSoft: 'bg-rose-50',       textAccent: 'text-rose-600',      borderAccent: 'border-rose-100' },
-  'Master Data':  { label: 'Master Data',          icon: Database,           bgSoft: 'bg-rose-50',       textAccent: 'text-rose-600',      borderAccent: 'border-rose-100' },
+const GROUP_META: Record<string, { label: string; icon: React.ElementType; textAccent: string }> = {
+  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard,    textAccent: 'text-slate-600' },
+  'Data Santri':  { label: 'Data Santri',          icon: Users,              textAccent: 'text-sky-600' },
+  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck,          textAccent: 'text-orange-600' },
+  'Asrama':       { label: 'Asrama',               icon: Home,               textAccent: 'text-lime-600' },
+  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert,      textAccent: 'text-red-600' },
+  'Akademik':     { label: 'Akademik',             icon: BookOpen,           textAccent: 'text-blue-600' },
+  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle,            textAccent: 'text-indigo-600' },
+  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet,    textAccent: 'text-violet-600' },
+  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays,       textAccent: 'text-teal-600' },
+  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck,     textAccent: 'text-emerald-600' },
+  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet,             textAccent: 'text-emerald-600' },
+  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins,              textAccent: 'text-cyan-600' },
+  'Keuangan':     { label: 'Keuangan',             icon: CreditCard,         textAccent: 'text-emerald-600' },
+  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase,          textAccent: 'text-cyan-600' },
+  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart,       textAccent: 'text-amber-600' },
+  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList,      textAccent: 'text-indigo-600' },
+  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus,           textAccent: 'text-rose-600' },
+  'Master Data':  { label: 'Master Data',          icon: Database,           textAccent: 'text-rose-600' },
 }
 
 function getGroupMeta(name: string) {
   return GROUP_META[name] ?? {
     label: name,
     icon: Settings,
-    bgSoft: 'bg-slate-50',
-    textAccent: 'text-slate-600',
-    borderAccent: 'border-slate-100'
+    textAccent: 'text-slate-600'
   }
 }
 
@@ -349,8 +369,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                       href={fitur.href}
                       className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
                     >
-                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm border", meta.bgSoft, meta.borderAccent)}>
-                        <FeatureIcon className={cn("w-5 h-5", meta.textAccent)} />
+                      {/* Clean direct icon (no badge container) */}
+                      <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -370,7 +391,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           </div>
         )}
 
-        {/* ── VIEW 2: CATEGORY SELECTION (default state) ── */}
+        {/* ── VIEW 2: CATEGORY SELECTION (default state - clean horizontal list) ── */}
         {searchQuery.trim() === '' && activeGroup === null && (
           <div className="space-y-3.5 animate-in fade-in duration-200">
             <div className="flex items-center gap-2 px-1">
@@ -386,7 +407,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                 <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
                 {groups.map(group => {
                   const meta = getGroupMeta(group)
                   const GroupIcon = meta.icon
@@ -396,19 +417,22 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                     <button
                       key={group}
                       onClick={() => setActiveGroup(group)}
-                      className="group flex flex-col items-center gap-2.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 text-center active:scale-95 cursor-pointer"
+                      className="group flex items-center gap-3 p-3.5 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left active:scale-[0.97] cursor-pointer"
                     >
-                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 shadow-sm border", meta.bgSoft, meta.borderAccent)}>
-                        <GroupIcon className={cn("w-6 h-6", meta.textAccent)} />
+                      {/* Stylized direct icon on the left (no enclosing box/badge) */}
+                      <div className="shrink-0 flex items-center justify-center w-8 h-8">
+                        <GroupIcon className={cn("w-7 h-7 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
                       </div>
 
-                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 leading-tight line-clamp-2 w-full">
-                        {group === '_standalone' ? 'Menu Utama' : group}
-                      </span>
-
-                      <span className="text-[9px] bg-slate-50 border border-slate-100 text-slate-400 rounded-full px-1.5 py-0.5 font-bold tracking-tight">
-                        {items.length} fitur
-                      </span>
+                      {/* Text content on the right */}
+                      <div className="flex-1 min-w-0 leading-tight">
+                        <span className="block text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors truncate">
+                          {group === '_standalone' ? 'Menu Utama' : group}
+                        </span>
+                        <span className="inline-block text-[9px] text-slate-400 font-bold mt-0.5">
+                          {items.length} fitur
+                        </span>
+                      </div>
                     </button>
                   )
                 })}
@@ -439,14 +463,13 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                 </div>
               </div>
 
-              {/* Sub-menu Hero Banner */}
-              <div className={cn("p-4 rounded-3xl border flex items-center gap-3.5 shadow-sm overflow-hidden relative select-none", meta.bgSoft, meta.borderAccent)}>
-                <div className="absolute -right-4 -bottom-4 opacity-5 pointer-events-none">
-                  <GroupIcon className={cn("w-24 h-24", meta.textAccent)} />
-                </div>
-                
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-white/80 backdrop-blur-sm border", meta.borderAccent)}>
-                  <GroupIcon className={cn("w-6 h-6", meta.textAccent)} />
+              {/* Sub-menu Banner with simple clean left border accent */}
+              <div className="p-4 bg-white border border-slate-200 rounded-3xl flex items-center gap-3.5 shadow-sm overflow-hidden relative select-none pl-6">
+                {/* Left accent bar instead of colored badge */}
+                <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", GROUP_ACCENT[activeGroup]?.dot || 'bg-slate-400')} />
+
+                <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                  <GroupIcon className={cn("w-8 h-8", meta.textAccent)} strokeWidth={1.8} />
                 </div>
                 <div className="leading-tight">
                   <h2 className="text-base sm:text-lg font-black text-slate-800">
@@ -468,8 +491,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                       href={fitur.href}
                       className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                        <FeatureIcon className={cn("w-5 h-5 text-slate-500 transition-colors", meta.textAccent)} />
+                      {/* Clean direct icon (no badge) */}
+                      <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
