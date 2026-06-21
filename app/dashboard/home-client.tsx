@@ -136,34 +136,46 @@ const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; i
 }
 
 // ── Metadata Kategori Menu (SPA Native Feel) ──────────────────────────────────
-const GROUP_META: Record<string, { label: string; icon: React.ElementType; textAccent: string; cardBg: string }> = {
-  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard,    textAccent: 'text-slate-600',   cardBg: 'bg-gradient-to-br from-slate-50 to-slate-100/80 border-slate-200/50' },
-  'Data Santri':  { label: 'Data Santri',          icon: Users,              textAccent: 'text-sky-600',     cardBg: 'bg-gradient-to-br from-sky-50 to-sky-100/80 border-sky-200/50' },
-  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck,          textAccent: 'text-orange-600',  cardBg: 'bg-gradient-to-br from-orange-50 to-orange-100/80 border-orange-200/50' },
-  'Asrama':       { label: 'Asrama',               icon: Home,               textAccent: 'text-lime-600',    cardBg: 'bg-gradient-to-br from-lime-50 to-lime-100/80 border-lime-200/50' },
-  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert,      textAccent: 'text-red-600',     cardBg: 'bg-gradient-to-br from-red-50 to-red-100/80 border-red-200/50' },
-  'Akademik':     { label: 'Akademik',             icon: BookOpen,           textAccent: 'text-blue-600',    cardBg: 'bg-gradient-to-br from-blue-50 to-blue-100/80 border-blue-200/50' },
-  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle,            textAccent: 'text-indigo-600',  cardBg: 'bg-gradient-to-br from-indigo-50 to-indigo-100/80 border-indigo-200/50' },
-  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet,    textAccent: 'text-violet-600',  cardBg: 'bg-gradient-to-br from-violet-50 to-violet-100/80 border-violet-200/50' },
-  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays,       textAccent: 'text-teal-600',    cardBg: 'bg-gradient-to-br from-teal-50 to-teal-100/80 border-teal-200/50' },
-  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck,     textAccent: 'text-emerald-600', cardBg: 'bg-gradient-to-br from-emerald-50 to-emerald-100/80 border-emerald-200/50' },
-  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet,             textAccent: 'text-emerald-600', cardBg: 'bg-gradient-to-br from-emerald-50 to-emerald-100/80 border-emerald-200/50' },
-  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins,              textAccent: 'text-cyan-600',    cardBg: 'bg-gradient-to-br from-cyan-50 to-cyan-100/80 border-cyan-200/50' },
-  'Keuangan':     { label: 'Keuangan',             icon: CreditCard,         textAccent: 'text-emerald-600', cardBg: 'bg-gradient-to-br from-emerald-50 to-emerald-100/80 border-emerald-200/50' },
-  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase,          textAccent: 'text-cyan-600',    cardBg: 'bg-gradient-to-br from-cyan-50 to-cyan-100/80 border-cyan-200/50' },
-  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart,       textAccent: 'text-amber-600',   cardBg: 'bg-gradient-to-br from-amber-50 to-amber-100/80 border-amber-200/50' },
-  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList,      textAccent: 'text-indigo-600',  cardBg: 'bg-gradient-to-br from-indigo-50 to-indigo-100/80 border-indigo-200/50' },
-  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus,           textAccent: 'text-rose-600',    cardBg: 'bg-gradient-to-br from-rose-50 to-rose-100/80 border-rose-200/50' },
-  'Master Data':  { label: 'Master Data',          icon: Database,           textAccent: 'text-rose-600',    cardBg: 'bg-gradient-to-br from-rose-50 to-rose-100/80 border-rose-200/50' },
+const GROUP_META: Record<string, { label: string; icon: React.ElementType }> = {
+  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard },
+  'Data Santri':  { label: 'Data Santri',          icon: Users },
+  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck },
+  'Asrama':       { label: 'Asrama',               icon: Home },
+  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert },
+  'Akademik':     { label: 'Akademik',             icon: BookOpen },
+  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle },
+  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet },
+  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays },
+  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck },
+  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet },
+  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins },
+  'Keuangan':     { label: 'Keuangan',             icon: CreditCard },
+  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase },
+  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart },
+  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList },
+  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus },
+  'Master Data':  { label: 'Master Data',          icon: Database },
 }
 
 function getGroupMeta(name: string) {
   return GROUP_META[name] ?? {
     label: name,
-    icon: Settings,
-    textAccent: 'text-slate-600',
-    cardBg: 'bg-gradient-to-br from-slate-50 to-slate-100/80 border-slate-200/50'
+    icon: Settings
   }
+}
+
+function getTimeKey(hour: number) {
+  if (hour >= 4  && hour < 11) return 'pagi'
+  if (hour >= 11 && hour < 15) return 'siang'
+  if (hour >= 15 && hour < 18) return 'sore'
+  return 'malam'
+}
+
+const THEME_STYLES: Record<string, { shades: string[]; text: string; border: string; hoverText: string }> = {
+  pagi:  { shades: ['bg-emerald-50/60', 'bg-emerald-100/50', 'bg-emerald-50/90', 'bg-emerald-100/70'], text: 'text-emerald-600', border: 'border-emerald-200/50', hoverText: 'group-hover:text-emerald-700' },
+  siang: { shades: ['bg-amber-50/60', 'bg-amber-100/50', 'bg-amber-50/90', 'bg-amber-100/70'], text: 'text-amber-600', border: 'border-amber-200/50', hoverText: 'group-hover:text-amber-700' },
+  sore:  { shades: ['bg-orange-50/60', 'bg-orange-100/50', 'bg-orange-50/90', 'bg-orange-100/70'], text: 'text-orange-600', border: 'border-orange-200/50', hoverText: 'group-hover:text-orange-700' },
+  malam: { shades: ['bg-blue-50/60', 'bg-blue-100/50', 'bg-blue-50/90', 'bg-blue-100/70'], text: 'text-blue-600', border: 'border-blue-200/50', hoverText: 'group-hover:text-blue-700' },
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -264,6 +276,8 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)
   const heroImage = getGreetingImage(hour)
+  const timeKey   = getTimeKey(hour)
+  const theme     = THEME_STYLES[timeKey]
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
   const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
   const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
@@ -400,7 +414,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                     >
                       {/* Clean direct icon (no badge container) */}
                       <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
+                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -430,30 +444,26 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                {groups.map(group => {
+                {groups.map((group, index) => {
                   const meta = getGroupMeta(group)
                   const GroupIcon = meta.icon
                   const items = grouped.get(group)!
+                  const bgClass = theme.shades[index % theme.shades.length]
 
                   return (
                     <button
                       key={group}
                       onClick={() => handleOpenGroup(group)}
                       className={cn(
-                        "group flex flex-col text-left p-4 sm:p-5 rounded-3xl border shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer relative overflow-hidden",
-                        meta.cardBg
+                        "group flex items-center text-left p-3.5 sm:p-4 rounded-2xl border shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer relative overflow-hidden",
+                        bgClass, theme.border
                       )}
                     >
-                      {/* Top row: Icon */}
-                      <div className="flex items-start w-full mb-5">
-                        <div className="shrink-0 flex items-center justify-center">
-                          <GroupIcon className={cn("w-7 h-7 sm:w-8 sm:h-8 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
-                        </div>
+                      <div className="shrink-0 flex items-center justify-center mr-3 sm:mr-4">
+                        <GroupIcon className={cn("w-6 h-6 sm:w-7 sm:h-7 transition-transform duration-200 group-hover:scale-110", theme.text)} strokeWidth={1.8} />
                       </div>
-
-                      {/* Text content at the bottom */}
-                      <div className="mt-auto w-full leading-tight">
-                        <span className="block text-sm sm:text-base font-bold text-slate-800 line-clamp-1 mb-0.5">
+                      <div className="flex-1 min-w-0 leading-tight">
+                        <span className={cn("block text-sm sm:text-base font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", theme.hoverText)}>
                           {group === '_standalone' ? 'Menu Utama' : group}
                         </span>
                         <span className="block text-[10px] sm:text-xs text-slate-500 font-medium">
@@ -504,7 +514,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                     >
                       {/* Clean direct icon (no badge) */}
                       <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
+                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
