@@ -62,7 +62,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/keamanan/verifikasi-panggilan':        'Tentukan daftar panggilan dari alfa pengajian dan berjamaah dengan konteks izin dan sakit.',
   '/dashboard/keamanan/verifikasi-berjamaah':        'Proses vonis final alfa berjamaah dari hasil pemanggilan.',
   '/dashboard/keamanan/denda-buku-pribadi':          'Catat denda kehilangan buku pribadi santri dan status pembayarannya.',
-  '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per bulan.',
+  '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per waktu.',
   '/dashboard/keamanan/rekap-absen-malam':           'Rekap absensi malam santri per bulan per asrama.',
   '/dashboard/keamanan/rekap-absen-berjamaah':       'Rekap shalat berjamaah santri (Shubuh, Ashar, Maghrib, Isya) per bulan.',
   '/dashboard/keamanan':                             'Input pelanggaran dan kelola catatan disiplin santri.',
@@ -260,9 +260,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
       {/* ── Hero Greeting Card ── */}
       <div 
-        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/80"
+        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/85 p-6 sm:p-8"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.78)), url('/hero-bg.png')`,
+          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.8)), url('/hero-bg.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -271,67 +271,63 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
         <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/5 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Content */}
-        <div className="relative z-10 p-5 sm:p-7 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        {/* Content (Asymmetric Flex Layout for Bold & Premium Feel) */}
+        <div className="relative z-10 flex flex-col md:flex-row md:items-start md:justify-between gap-6">
           
           {/* Left Side: Greeting & User Name */}
-          <div className="space-y-4 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Date Pill */}
-              <div className="inline-flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-3 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                <span className="text-[10px] font-bold text-slate-600 leading-none tracking-wide">
-                  {now ? formatTanggal(now) : '—'}
-                </span>
-              </div>
-              
-              {/* Digital Clock Pill */}
-              <div className="inline-flex items-center gap-1.5 bg-emerald-55/20 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                <span className="text-[10px] font-black text-emerald-700 leading-none tracking-wider font-mono">
-                  {now ? formatJam(now) : '—:—:—'}
-                </span>
-              </div>
-            </div>
+          <div className="space-y-3.5 flex-1 min-w-0">
+            {/* Category Portal Pill */}
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 border border-emerald-200/40 px-2.5 py-1 rounded-lg inline-block">
+              Portal Utama
+            </span>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 <span>{greeting.emoji}</span>
-                <span>{greeting.text}</span>
+                <span>{greeting.text},</span>
               </p>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-none break-words">
+              <h1 className="text-3xl sm:text-4.5xl font-black text-slate-800 tracking-tight leading-none break-words">
                 {userName}
-                <span className="text-emerald-505">.</span>
+                <span className="text-emerald-500">.</span>
               </h1>
-              <p className="text-slate-500 text-xs pt-0.5 font-semibold">{greeting.sub}</p>
-            </div>
-
-            {/* Role Info & Feature Count */}
-            <div className="flex items-center gap-2.5 pt-2">
-              <div className="w-8 h-8 rounded-full bg-slate-900/5 flex items-center justify-center shrink-0 border border-slate-900/10 text-base shadow-sm">
-                {roleEmoji}
-              </div>
-              <div className="leading-none">
-                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Akses Akun</p>
-                <p className="text-xs font-bold text-slate-700 truncate max-w-[200px] sm:max-w-xs">{roleLabel}</p>
-              </div>
-              
-              <div className="ml-auto inline-flex items-center gap-1.5 bg-white/95 border border-slate-200 rounded-full px-3.5 py-1 shadow-sm">
-                <span className="text-emerald-600 text-xs font-black">{totalFitur}</span>
-                <span className="text-slate-500 text-[10px] font-bold">layanan</span>
-              </div>
+              <p className="text-slate-400 text-xs sm:text-sm pt-1 font-semibold italic">
+                "{greeting.sub}"
+              </p>
             </div>
           </div>
 
-          {/* Right Side: Large Logo / School Emblem */}
-          <div className="hidden md:flex flex-col items-center justify-center shrink-0 p-2">
-            <div className="relative group p-3 bg-white/60 border border-slate-200/60 rounded-3xl backdrop-blur-sm shadow-xl">
-              <img src="/logo.png" alt="Logo"
-                className="w-16 h-16 object-contain opacity-95 drop-shadow-lg transition-transform duration-300 group-hover:scale-105" />
-            </div>
+          {/* Right Side: Large Digital Clock & Date Widget (Bold & Clean) */}
+          <div className="shrink-0 flex flex-col items-start md:items-end text-left md:text-right bg-white/70 border border-slate-200/50 p-4 sm:p-5 rounded-2xl shadow-sm backdrop-blur-md min-w-[170px] relative overflow-hidden select-none">
+            <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1 block">Waktu Saat Ini</span>
+            <span className="text-3xl sm:text-3.5xl font-black text-slate-800 font-mono tracking-wider leading-none">
+              {now ? formatJam(now) : '00.00.00'}
+            </span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2 block leading-none">
+              {now ? formatTanggal(now) : '—'}
+            </span>
           </div>
 
         </div>
+
+        {/* Bottom stats and role info bar */}
+        <div className="flex items-center gap-3 pt-4 mt-6 border-t border-slate-200/60 flex-wrap relative z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-7.5 h-7.5 rounded-full bg-slate-900/5 flex items-center justify-center shrink-0 border border-slate-900/10 text-xs shadow-sm">
+              {roleEmoji}
+            </div>
+            <div>
+              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black leading-none mb-0.5">Akses Akun</p>
+              <p className="text-xs font-bold text-slate-700 leading-none">{roleLabel}</p>
+            </div>
+          </div>
+          
+          <div className="ml-auto inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/40 rounded-full px-3.5 py-1 text-emerald-700 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+            <span className="text-emerald-700 text-xs font-black">{totalFitur}</span>
+            <span className="text-slate-500 text-[10px] font-bold">layanan aktif</span>
+          </div>
+        </div>
+
       </div>
 
       {/* ── Search Bar Redesigned ── */}
