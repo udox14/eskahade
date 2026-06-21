@@ -363,7 +363,7 @@ export default function KasirUPKPage() {
             <div key={catatStep} className="animate-in fade-in slide-in-from-right-4 duration-300">
               {catatStep === 'form' && (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <CatatPaneSantri
                       {...{ searchSantri, setSearchSantri, cariSantri, loading, hasilSantri, selectedSantri, pilihSantri, resetCatat }}
                       showNext={false}
@@ -371,7 +371,7 @@ export default function KasirUPKPage() {
                     />
                   </div>
                   {selectedSantri && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <KitabStep
                         items={filteredKatalog}
                         search={katalogSearch}
@@ -390,7 +390,7 @@ export default function KasirUPKPage() {
                 </div>
               )}
               {catatStep === 'review' && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <ReviewStep
                     items={selectedItems}
                     total={totalCatat}
@@ -408,14 +408,14 @@ export default function KasirUPKPage() {
 
           {/* DESKTOP panes */}
           <div className="hidden grid-cols-[360px_1fr_380px] gap-4 xl:grid">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
               <CatatPaneSantri
                 {...{ searchSantri, setSearchSantri, cariSantri, loading, hasilSantri, selectedSantri, pilihSantri, resetCatat }}
                 showNext={false}
                 onNext={() => {}}
               />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
               <KitabStep
                 items={filteredKatalog}
                 search={katalogSearch}
@@ -430,7 +430,7 @@ export default function KasirUPKPage() {
                 showFooter={false}
               />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
               <ReviewStep
                 items={selectedItems}
                 total={totalCatat}
@@ -477,7 +477,7 @@ export default function KasirUPKPage() {
 
           {/* DESKTOP panes */}
           <div className="hidden grid-cols-[380px_1fr_360px] gap-4 xl:grid">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
               <AntrianList
                 search={searchAntrian}
                 onSearchChange={setSearchAntrian}
@@ -488,7 +488,7 @@ export default function KasirUPKPage() {
                 loading={loading}
               />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
               <SerahStep
                 detail={selectedAntrian}
                 finalItems={finalItems}

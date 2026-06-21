@@ -1,37 +1,29 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { ClipboardList, Wallet } from 'lucide-react'
 
 type Mode = 'CATAT' | 'KASIR'
 
 export function ModeTabs({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
   return (
-    <div className="relative grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
-      <span
-        className={cn(
-          'absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl bg-white shadow-sm transition-transform duration-300 ease-out',
-          mode === 'KASIR' && 'translate-x-[calc(100%+0.5rem)]'
-        )}
-        aria-hidden
-      />
+    <div className="flex rounded-lg bg-slate-100 p-1">
       <button
         onClick={() => onChange('CATAT')}
         className={cn(
-          'relative z-10 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-colors',
-          mode === 'CATAT' ? 'text-green-700' : 'text-slate-500'
+          'flex-1 rounded-md px-4 py-2 text-sm font-bold transition',
+          mode === 'CATAT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
         )}
       >
-        <ClipboardList className="h-4 w-4" /> Pencatat
+        Pencatat
       </button>
       <button
         onClick={() => onChange('KASIR')}
         className={cn(
-          'relative z-10 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-colors',
-          mode === 'KASIR' ? 'text-green-700' : 'text-slate-500'
+          'flex-1 rounded-md px-4 py-2 text-sm font-bold transition',
+          mode === 'KASIR' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
         )}
       >
-        <Wallet className="h-4 w-4" /> Kasir
+        Kasir
       </button>
     </div>
   )
