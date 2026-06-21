@@ -9,6 +9,7 @@ export function SerahStep({
   finalItems,
   onToggle,
   onQty,
+  onSetQty,
   total,
   onPay,
   showPayButton,
@@ -17,6 +18,7 @@ export function SerahStep({
   finalItems: FinalItem[]
   onToggle: (itemId: string) => void
   onQty: (itemId: string, delta: number) => void
+  onSetQty: (itemId: string, qty: number) => void
   total: number
   onPay: () => void
   showPayButton: boolean
@@ -48,34 +50,54 @@ export function SerahStep({
           const final = finalItems.find((f) => f.itemId === row.id)
           const diserahkan = final?.diserahkan ?? true
           const qty = final?.qty ?? row.qty
+          const batal = qty === 0
           return (
-            <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-3">
+            <div
+              key={row.id}
+              className={cn('rounded-2xl border bg-white p-3', batal ? 'border-red-200 bg-red-50/40' : 'border-slate-200')}
+            >
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => onToggle(row.id)}
+                  disabled={batal}
                   className={cn(
                     'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border-2 transition active:scale-90',
-                    diserahkan ? 'border-green-600 bg-green-600 text-white' : 'border-red-200 bg-red-50 text-red-600'
+                    batal
+                      ? 'border-slate-200 bg-slate-100 text-slate-300'
+                      : diserahkan
+                        ? 'border-green-600 bg-green-600 text-white'
+                        : 'border-red-200 bg-red-50 text-red-600'
                   )}
                 >
                   {diserahkan ? <Check className="h-4 w-4" strokeWidth={3} /> : <X className="h-4 w-4" strokeWidth={3} />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-800">{row.nama_kitab}</p>
-                  <p className="text-xs text-slate-500">
-                    stok {row.jumlah_stok} · {diserahkan ? 'diserahkan' : 'masuk pesanan'}
+                  <p className={cn('truncate text-sm font-bold', batal ? 'text-slate-400 line-through' : 'text-slate-800')}>
+                    {row.nama_kitab}
                   </p>
-                  <p className="text-sm font-bold text-green-700">{rupiah(row.harga_jual)}</p>
+                  <p className="text-xs text-slate-500">
+                    stok {row.jumlah_stok} · {batal ? 'dibatalkan' : diserahkan ? 'diserahkan' : 'masuk pesanan'}
+                  </p>
+                  <p className={cn('text-sm font-bold', batal ? 'text-slate-400' : 'text-green-700')}>{rupiah(row.harga_jual)}</p>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-1 rounded-xl border border-slate-200">
-                  <button onClick={() => onQty(row.id, -1)} className="flex h-9 w-9 items-center justify-center text-slate-600 active:scale-90">
-                    <Minus className="h-4 w-4" />
+                {batal ? (
+                  <button
+                    onClick={() => onSetQty(row.id, 1)}
+                    className="flex-shrink-0 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 active:scale-95"
+                  >
+                    Pulihkan
                   </button>
-                  <span className="w-7 text-center text-sm font-bold tabular-nums">{qty}</span>
-                  <button onClick={() => onQty(row.id, 1)} className="flex h-9 w-9 items-center justify-center text-slate-600 active:scale-90">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex flex-shrink-0 items-center gap-1 rounded-xl border border-slate-200">
+                    <button onClick={() => onQty(row.id, -1)} className="flex h-9 w-9 items-center justify-center text-slate-600 active:scale-90">
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-7 text-center text-sm font-bold tabular-nums">{qty}</span>
+                    <button onClick={() => onQty(row.id, 1)} className="flex h-9 w-9 items-center justify-center text-slate-600 active:scale-90">
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )

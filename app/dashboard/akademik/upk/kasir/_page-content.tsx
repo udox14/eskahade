@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   buatAntrianUPK,
   cariSantriUPK,
@@ -11,6 +11,7 @@ import {
 } from './actions'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   type Antrian,
   type AntrianDetail,
@@ -29,7 +30,7 @@ import { AntrianList } from './_components/antrian-list'
 import { SerahStep } from './_components/serah-step'
 import { BayarPanel, BayarSheet } from './_components/bayar-sheet'
 
-type CatatStep = 'santri' | 'kitab' | 'review'
+type CatatStep = 'form' | 'review'
 type KasirStep = 'list' | 'serah'
 
 export default function KasirUPKPage() {
@@ -45,7 +46,7 @@ export default function KasirUPKPage() {
   const [katalogSearch, setKatalogSearch] = useState('')
   const [catatan, setCatatan] = useState('')
   const [lastNomor, setLastNomor] = useState<number | null>(null)
-  const [catatStep, setCatatStep] = useState<CatatStep>('santri')
+  const [catatStep, setCatatStep] = useState<CatatStep>('form')
 
   // Kasir
   const [searchAntrian, setSearchAntrian] = useState('')
@@ -67,7 +68,9 @@ export default function KasirUPKPage() {
 
   const filteredKatalog = useMemo(() => {
     const keyword = katalogSearch.toLowerCase().trim()
-    if (!keyword) return katalog
+    // Tanpa pencarian: hanya kitab sesuai marhalah santri.
+    // Dengan pencarian: cari di semua kitab (marhalah lain ikut muncul).
+    if (!keyword) return katalog.filter((item) => item.is_marhalah)
     return katalog.filter(
       (item) =>
         item.nama_kitab.toLowerCase().includes(keyword) || (item.marhalah_nama || '').toLowerCase().includes(keyword)
@@ -77,7 +80,7 @@ export default function KasirUPKPage() {
   const pilihUnit = (nextUnit: UnitUPK) => {
     setUnit(nextUnit)
     setMode('CATAT')
-    setCatatStep('santri')
+    setCatatStep('form')
     setKasirStep('list')
   }
 
@@ -88,7 +91,7 @@ export default function KasirUPKPage() {
     setKatalog([])
     setKatalogSearch('')
     setCatatan('')
-    setCatatStep('santri')
+    setCatatStep('form')
   }
 
   const cariSantri = async () => {
@@ -109,7 +112,6 @@ export default function KasirUPKPage() {
     const data = await getKatalogKasir(santri.marhalah_id)
     setKatalog(data.map((item: KatalogItem) => ({ ...item, qty: 1, selected: item.is_default })))
     setLoading(false)
-    setCatatStep('kitab')
     if (!santri.marhalah_id) toast.warning('Santri ini belum punya marhalah aktif.')
   }
 
@@ -175,7 +177,7 @@ export default function KasirUPKPage() {
   const updateFinalItem = (itemId: string, patch: Partial<FinalItem>) => {
     setFinalItems((prev) =>
       prev.map((item) =>
-        item.itemId === itemId ? { ...item, ...patch, qty: Math.max(1, patch.qty ?? item.qty) } : item
+        item.itemId === itemId ? { ...item, ...patch, qty: Math.max(0, patch.qty ?? item.qty) } : item
       )
     )
   }
@@ -188,6 +190,10 @@ export default function KasirUPKPage() {
   const qtySerah = (itemId: string, delta: number) => {
     const cur = finalItems.find((f) => f.itemId === itemId)
     updateFinalItem(itemId, { qty: (cur?.qty ?? 1) + delta })
+  }
+
+  const setQtySerah = (itemId: string, qty: number) => {
+    updateFinalItem(itemId, { qty })
   }
 
   const prosesBayar = async () => {
@@ -217,6 +223,80 @@ export default function KasirUPKPage() {
     if (next === 'KASIR') loadAntrian()
   }
 
+  // ── Sinkron tombol back HP / gesture dengan view internal ──
+  // depth: 0 = pilih unit, 1 = utama, 2 = review/serah, 3 = sheet bayar
+  let depth = 0
+  if (unit) {
+    depth = 1
+    if (mode === 'CATAT' && catatStep === 'review') depth = 2
+    if (mode === 'KASIR' && kasirStep === 'serah') depth = 2
+    if (mode === 'KASIR' && bayarOpen) depth = 3
+  }
+
+  const stateRef = useRef({ unit, mode, catatStep, kasirStep, bayarOpen })
+  stateRef.current = { unit, mode, catatStep, kasirStep, bayarOpen }
+
+  const stepBack = () => {
+    const s = stateRef.current
+    if (s.mode === 'KASIR' && s.bayarOpen) {
+      setBayarOpen(false)
+      return
+    }
+    if (s.mode === 'KASIR' && s.kasirStep === 'serah') {
+      setKasirStep('list')
+      setSelectedAntrian(null)
+      return
+    }
+    if (s.mode === 'CATAT' && s.catatStep === 'review') {
+      setCatatStep('form')
+      return
+    }
+    if (s.unit) {
+      setUnit(null)
+      resetCatat()
+      setLastNomor(null)
+    }
+  }
+
+  const syncedRef = useRef(0)
+  const ignoreCountRef = useRef(0)
+  const fromPopRef = useRef(false)
+
+  useEffect(() => {
+    const onPop = () => {
+      if (ignoreCountRef.current > 0) {
+        ignoreCountRef.current--
+        return
+      }
+      fromPopRef.current = true
+      stepBack()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (depth > syncedRef.current) {
+      while (syncedRef.current < depth) {
+        syncedRef.current++
+        window.history.pushState({ kasirDepth: syncedRef.current }, '')
+      }
+    } else if (depth < syncedRef.current) {
+      if (fromPopRef.current) {
+        // browser sudah mundur sendiri (OS back)
+        syncedRef.current = depth
+        fromPopRef.current = false
+      } else {
+        // back dari tombol dalam app → buang entri history yang tersisa
+        const drop = syncedRef.current - depth
+        syncedRef.current = depth
+        ignoreCountRef.current += drop
+        window.history.go(-drop)
+      }
+    }
+  }, [depth])
+
   if (!unit) {
     return (
       <div className="pb-6">
@@ -228,8 +308,7 @@ export default function KasirUPKPage() {
   // tombol back per langkah (mobile)
   const mobileBack = () => {
     if (mode === 'CATAT') {
-      if (catatStep === 'kitab') setCatatStep('santri')
-      else if (catatStep === 'review') setCatatStep('kitab')
+      if (catatStep === 'review') setCatatStep('form')
     } else {
       if (kasirStep === 'serah') {
         setKasirStep('list')
@@ -238,32 +317,34 @@ export default function KasirUPKPage() {
     }
   }
   const showMobileBack =
-    (mode === 'CATAT' && catatStep !== 'santri' && lastNomor === null) ||
-    (mode === 'KASIR' && kasirStep !== 'list')
+    (mode === 'CATAT' && catatStep === 'review' && lastNomor === null) ||
+    (mode === 'KASIR' && kasirStep === 'serah')
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-4 pb-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => {
-            setUnit(null)
-            resetCatat()
-            setLastNomor(null)
-          }}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition active:scale-90 hover:bg-slate-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-bold uppercase tracking-wide text-slate-400">
-            Kasir UPK {unit === 'PUTRA' ? 'Putra' : 'Putri'}
-          </p>
-        </div>
-        <div className="w-full max-w-[240px]">
-          <ModeTabs mode={mode} onChange={switchMode} />
-        </div>
-      </div>
+      <DashboardPageHeader
+        title={`Kasir UPK ${unit === 'PUTRA' ? 'Putra' : 'Putri'}`}
+        description="Catat pesanan santri lalu proses pembayaran."
+        className="border-b pb-4"
+        action={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setUnit(null)
+                resetCatat()
+                setLastNomor(null)
+              }}
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition active:scale-90 hover:bg-slate-200"
+              title="Ganti unit"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="w-full min-w-[200px] sm:w-[240px]">
+              <ModeTabs mode={mode} onChange={switchMode} />
+            </div>
+          </div>
+        }
+      />
 
       {/* langkah-back mobile */}
       {showMobileBack && (
@@ -280,39 +361,47 @@ export default function KasirUPKPage() {
           {/* MOBILE wizard */}
           <div className="xl:hidden">
             <div key={catatStep} className="animate-in fade-in slide-in-from-right-4 duration-300">
-              {catatStep === 'santri' && (
-                <CatatPaneSantri
-                  {...{ searchSantri, setSearchSantri, cariSantri, loading, hasilSantri, selectedSantri, pilihSantri, resetCatat }}
-                  showNext
-                  onNext={() => setCatatStep('kitab')}
-                />
-              )}
-              {catatStep === 'kitab' && (
-                <KitabStep
-                  items={filteredKatalog}
-                  search={katalogSearch}
-                  onSearchChange={setKatalogSearch}
-                  loading={loading}
-                  hasSantri={!!selectedSantri}
-                  onToggle={toggleItem}
-                  onQty={ubahQty}
-                  selectedCount={selectedItems.length}
-                  total={totalCatat}
-                  onNext={() => setCatatStep('review')}
-                  showFooter
-                />
+              {catatStep === 'form' && (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <CatatPaneSantri
+                      {...{ searchSantri, setSearchSantri, cariSantri, loading, hasilSantri, selectedSantri, pilihSantri, resetCatat }}
+                      showNext={false}
+                      onNext={() => {}}
+                    />
+                  </div>
+                  {selectedSantri && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <KitabStep
+                        items={filteredKatalog}
+                        search={katalogSearch}
+                        onSearchChange={setKatalogSearch}
+                        loading={loading}
+                        hasSantri={!!selectedSantri}
+                        onToggle={toggleItem}
+                        onQty={ubahQty}
+                        selectedCount={selectedItems.length}
+                        total={totalCatat}
+                        onNext={() => setCatatStep('review')}
+                        showFooter
+                      />
+                    </div>
+                  )}
+                </div>
               )}
               {catatStep === 'review' && (
-                <ReviewStep
-                  items={selectedItems}
-                  total={totalCatat}
-                  catatan={catatan}
-                  onCatatanChange={setCatatan}
-                  onSubmit={simpanAntrian}
-                  loading={loading}
-                  lastNomor={lastNomor}
-                  onNewCatat={mulaiCatatBaru}
-                />
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <ReviewStep
+                    items={selectedItems}
+                    total={totalCatat}
+                    catatan={catatan}
+                    onCatatanChange={setCatatan}
+                    onSubmit={simpanAntrian}
+                    loading={loading}
+                    lastNomor={lastNomor}
+                    onNewCatat={mulaiCatatBaru}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -377,6 +466,7 @@ export default function KasirUPKPage() {
                   finalItems={finalItems}
                   onToggle={toggleSerah}
                   onQty={qtySerah}
+                  onSetQty={setQtySerah}
                   total={totalKasir}
                   onPay={() => setBayarOpen(true)}
                   showPayButton
@@ -404,6 +494,7 @@ export default function KasirUPKPage() {
                 finalItems={finalItems}
                 onToggle={toggleSerah}
                 onQty={qtySerah}
+                onSetQty={setQtySerah}
                 total={totalKasir}
                 onPay={() => {}}
                 showPayButton={false}

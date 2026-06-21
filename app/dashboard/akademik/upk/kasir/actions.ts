@@ -172,6 +172,7 @@ export async function getKatalogKasir(marhalahId?: number | null) {
     toko_nama: row.toko_nama,
     jumlah_stok: (row.stok_lama || 0) + (row.stok_baru || 0),
     is_default: marhalahId ? !!row.is_default_flag : false,
+    is_marhalah: marhalahId ? !!row.linked_flag : true,
   }))
 }
 
@@ -304,9 +305,9 @@ export async function selesaikanAntrianUPK(payload: {
 
   for (const row of itemRows) {
     const final = finalById.get(row.id)
-    const qty = Math.max(1, toInt(final?.qty ?? row.qty))
+    const qty = Math.max(0, toInt(final?.qty ?? row.qty))
     const diserahkan = final?.diserahkan ?? true
-    if (diserahkan && row.katalog_id) {
+    if (qty > 0 && diserahkan && row.katalog_id) {
       const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [row.katalog_id])
       const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
       if (tersedia < qty) {
@@ -317,9 +318,20 @@ export async function selesaikanAntrianUPK(payload: {
 
   for (const row of itemRows) {
     const final = finalById.get(row.id)
-    const qty = Math.max(1, toInt(final?.qty ?? row.qty))
-    const subtotal = qty * toInt(row.harga_jual)
+    const qty = Math.max(0, toInt(final?.qty ?? row.qty))
     const diserahkan = final?.diserahkan ?? true
+
+    // qty 0 = item dibatalkan
+    if (qty === 0) {
+      await execute(`
+        UPDATE upk_antrian_item
+        SET qty = 0, subtotal = 0, status_serah = 'BATAL', masuk_pesanan = 0, updated_at = ?
+        WHERE id = ?
+      `, [now(), row.id])
+      continue
+    }
+
+    const subtotal = qty * toInt(row.harga_jual)
     totalTagihan += subtotal
 
     await execute(`
