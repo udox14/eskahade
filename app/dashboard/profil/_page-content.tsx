@@ -7,6 +7,7 @@ import {
   User, Camera, Save, Lock, Phone, Mail, Shield,
   Loader2, CheckCircle, Eye, EyeOff, Building2, Smartphone
 } from 'lucide-react'
+import { Button, TextInput, ActionIcon, Switch } from '@mantine/core'
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', wali_kelas: 'Wali Kelas', pengurus_asrama: 'Pengurus Asrama',
@@ -74,7 +75,7 @@ export default function ProfilPage() {
       if (data) {
         setProfil(data); setNama(data.full_name || ''); setPhone(data.phone || '')
         setAvatarPreview(data.avatar_url || null)
-        setShowBottomNav(data.show_bottomnav !== 0) // null atau 1 → aktif, 0 → nonaktif
+        setShowBottomNav(data.show_bottomnav !== 0)
       }
       setLoading(false)
     })
@@ -146,13 +147,14 @@ export default function ProfilPage() {
   const initials = (profil?.full_name || '?').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
   const profileRole = profil?.role || ''
   const pwStrength = pwNew.length === 0 ? 0 : pwNew.length < 6 ? 1 : pwNew.length < 10 ? 2 : 3
+  const eyeIcon = <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setShowPw(v => !v)}>{showPw ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}</ActionIcon>
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
 
   return (
     <>
       {toast && <Toast msg={toast.msg} type={toast.type} />}
-      <div className="max-w-xl mx-auto space-y-5 pb-20">
+      <div className="space-y-5 pb-20">
 
         {/* KARTU IDENTITAS */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
@@ -201,30 +203,29 @@ export default function ProfilPage() {
             <User className="w-4 h-4 text-emerald-600" /> Informasi Akun
           </h3>
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Nama Lengkap</label>
-              <input value={nama} onChange={e => setNama(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="Nama lengkap" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Email</label>
-              <input value={profil?.email || ''} disabled
-                className="w-full border border-slate-100 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 text-slate-400 cursor-not-allowed" />
-              <p className="text-[10px] text-slate-400 mt-1">Email tidak dapat diubah</p>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1 flex items-center gap-1"><Phone className="w-3 h-3" />No. HP / WhatsApp</label>
-              <input value={phone} onChange={e => setPhone(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="08xxxxxxxxxx" type="tel" />
-            </div>
+            <TextInput
+              label="Nama Lengkap"
+              value={nama}
+              onChange={e => setNama(e.target.value)}
+              placeholder="Nama lengkap"
+            />
+            <TextInput
+              label="Email"
+              value={profil?.email || ''}
+              disabled
+              description="Email tidak dapat diubah"
+            />
+            <TextInput
+              label={<span className="flex items-center gap-1"><Phone className="w-3 h-3"/>No. HP / WhatsApp</span>}
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="08xxxxxxxxxx"
+              type="tel"
+            />
           </div>
-          <button onClick={handleSaveInfo} disabled={savingInfo}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
-            {savingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <Button onClick={handleSaveInfo} loading={savingInfo} color="teal" fullWidth leftSection={!savingInfo ? <Save className="w-4 h-4"/> : undefined}>
             Simpan Perubahan
-          </button>
+          </Button>
         </div>
 
         {/* TAMPILAN */}
@@ -237,8 +238,11 @@ export default function ProfilPage() {
               <p className="text-sm font-semibold text-slate-700">Bottom Navigation Bar</p>
               <p className="text-xs text-slate-400 mt-0.5">Tampilkan navigasi bawah saat menggunakan HP</p>
             </div>
-            <button
-              onClick={async () => {
+            <Switch
+              checked={showBottomNav}
+              disabled={togglingNav}
+              color="teal"
+              onChange={async () => {
                 const next = !showBottomNav
                 setTogglingNav(true)
                 setShowBottomNav(next)
@@ -246,15 +250,7 @@ export default function ProfilPage() {
                 setTogglingNav(false)
                 showToast(`Bottom nav ${next ? 'diaktifkan' : 'dinonaktifkan'}`, 'success')
               }}
-              disabled={togglingNav}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                showBottomNav ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            >
-              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                showBottomNav ? 'translate-x-5' : 'translate-x-0'
-              }`} />
-            </button>
+            />
           </div>
         </div>
 
@@ -269,18 +265,15 @@ export default function ProfilPage() {
               { label: 'Password Baru', val: pwNew, set: setPwNew },
               { label: 'Konfirmasi Password Baru', val: pwConfirm, set: setPwConfirm },
             ] as { label: string; val: string; set: (v: string) => void }[]).map(({ label, val, set }) => (
-              <div key={label}>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">{label}</label>
-                <div className="relative">
-                  <input type={showPw ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent pr-10 transition-all"
-                    placeholder="••••••••" />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+              <TextInput
+                key={label}
+                label={label}
+                type={showPw ? 'text' : 'password'}
+                value={val}
+                onChange={e => set(e.target.value)}
+                placeholder="••••••••"
+                rightSection={eyeIcon}
+              />
             ))}
             {pwNew && (
               <div className="space-y-1 pt-1">
@@ -297,11 +290,9 @@ export default function ProfilPage() {
               </div>
             )}
           </div>
-          <button onClick={handleChangePassword} disabled={savingPw}
-            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
-            {savingPw ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+          <Button onClick={handleChangePassword} loading={savingPw} color="yellow" fullWidth leftSection={!savingPw ? <CheckCircle className="w-4 h-4"/> : undefined}>
             Ganti Password
-          </button>
+          </Button>
         </div>
 
       </div>
