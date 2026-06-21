@@ -37,8 +37,8 @@ import {
   Search,
   Save,
   Upload,
-  X,
 } from 'lucide-react'
+import { Button, ActionIcon, TextInput, NativeSelect, SegmentedControl, Modal, Textarea } from '@mantine/core'
 import { toast } from '@/lib/toast'
 
 type PrintKind = 'rapor' | 'identitas'
@@ -46,7 +46,6 @@ type PrintKind = 'rapor' | 'identitas'
 type TtdValue = { url: string; x: number; y: number; w: number; nama?: string }
 
 // Re-encode gambar lewat canvas -> PNG (jaga transparansi) + perkecil.
-// Hasilkan base64 bersih & kecil, hindari file mentah besar yang gagal upload.
 const reencodeToPng = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -70,7 +69,6 @@ const reencodeToPng = (file: File): Promise<string> =>
     reader.readAsDataURL(file)
   })
 
-// Editor TTD: upload gambar + geser posisi X/Y + ukuran, dengan preview live.
 function TtdEditorModal({
   open,
   title,
@@ -94,13 +92,10 @@ function TtdEditorModal({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Reset form tiap modal dibuka.
   useEffect(() => {
     if (open) setForm(initial)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
-
-  if (!open) return null
 
   const set = (patch: Partial<TtdValue>) => setForm(prev => ({ ...prev, ...patch }))
 
@@ -155,80 +150,71 @@ function TtdEditorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
-            <h2 className="text-lg font-bold text-slate-800">{previewName}</h2>
-            <p className="text-xs text-slate-500">{subtitle}</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700" aria-label="Tutup modal">
-            <X className="h-5 w-5" />
-          </button>
+    <Modal
+      opened={open}
+      onClose={onClose}
+      title={
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+          <h2 className="text-base font-bold text-slate-800">{previewName}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
+      }
+      size="lg"
+      centered
+    >
+      <div className="space-y-4">
+        {/* Preview */}
+        <div className="relative mx-auto flex h-[130px] w-[240px] flex-col justify-end overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
+          {form.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={form.url} alt="Preview TTD" style={ttdImgStyle} />
+          ) : null}
+          <p className="z-[1] border-t border-black pt-[2px] text-[11px] font-bold uppercase">{(editableName ? form.nama : previewName) || 'Nama'}</p>
         </div>
 
-        <div className="space-y-4 p-5">
-          {/* Preview */}
-          <div className="relative mx-auto flex h-[130px] w-[240px] flex-col justify-end overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
-            {form.url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.url} alt="Preview TTD" style={ttdImgStyle} />
-            ) : null}
-            <p className="z-[1] border-t border-black pt-[2px] text-[11px] font-bold uppercase">{(editableName ? form.nama : previewName) || 'Nama'}</p>
-          </div>
+        {editableName && (
+          <TextInput
+            label="Nama Pimpinan"
+            value={form.nama ?? ''}
+            onChange={e => set({ nama: e.target.value })}
+            placeholder="Nama lengkap pimpinan"
+          />
+        )}
 
-          {editableName && (
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Pimpinan</label>
-              <input
-                value={form.nama ?? ''}
-                onChange={e => set({ nama: e.target.value })}
-                placeholder="Nama lengkap pimpinan"
-                className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {form.url ? 'Ganti Gambar Tanda Tangan' : 'Upload Gambar Tanda Tangan'}
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+        </label>
 
-          {/* Upload */}
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {form.url ? 'Ganti Gambar Tanda Tangan' : 'Upload Gambar Tanda Tangan'}
-            <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
-          </label>
-
-          {/* Sliders */}
-          <div>
-            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
-              <span>Geser Horizontal (X)</span><span>{form.x}px</span>
-            </div>
-            <input type="range" min={-180} max={180} value={form.x} onChange={e => set({ x: Number(e.target.value) })} className="w-full accent-blue-600" />
+        <div>
+          <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+            <span>Geser Horizontal (X)</span><span>{form.x}px</span>
           </div>
-          <div>
-            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
-              <span>Geser Vertikal (Y)</span><span>{form.y}px</span>
-            </div>
-            <input type="range" min={-140} max={140} value={form.y} onChange={e => set({ y: Number(e.target.value) })} className="w-full accent-blue-600" />
-          </div>
-          <div>
-            <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
-              <span>Ukuran (Lebar)</span><span>{form.w}px</span>
-            </div>
-            <input type="range" min={30} max={240} value={form.w} onChange={e => set({ w: Number(e.target.value) })} className="w-full accent-blue-600" />
-          </div>
+          <input type="range" min={-180} max={180} value={form.x} onChange={e => set({ x: Number(e.target.value) })} className="w-full accent-blue-600" />
         </div>
-
-        <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
-          <button onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
-            Batal
-          </button>
-          <button onClick={save} disabled={saving || uploading} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Simpan
-          </button>
+        <div>
+          <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+            <span>Geser Vertikal (Y)</span><span>{form.y}px</span>
+          </div>
+          <input type="range" min={-140} max={140} value={form.y} onChange={e => set({ y: Number(e.target.value) })} className="w-full accent-blue-600" />
+        </div>
+        <div>
+          <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
+            <span>Ukuran (Lebar)</span><span>{form.w}px</span>
+          </div>
+          <input type="range" min={30} max={240} value={form.w} onChange={e => set({ w: Number(e.target.value) })} className="w-full accent-blue-600" />
         </div>
       </div>
-    </div>
+
+      <div className="flex justify-end gap-3 mt-5 border-t pt-4">
+        <Button onClick={onClose} variant="default">Batal</Button>
+        <Button onClick={save} loading={saving || uploading} color="blue" leftSection={!saving ? <Save className="h-4 w-4" /> : undefined}>
+          Simpan
+        </Button>
+      </div>
+    </Modal>
   )
 }
 
@@ -277,7 +263,6 @@ export default function CetakRaporPage() {
   const [kitabLoading, setKitabLoading] = useState(false)
   const [kitabSaving, setKitabSaving] = useState(false)
   const [kitabOptions, setKitabOptions] = useState<any[]>([])
-  // mapel_id -> kitab_id ('' = gabung semua judul)
   const [kitabSelections, setKitabSelections] = useState<Record<number, string>>({})
 
   const [paperSize, setPaperSize] = useState<'A4' | 'F4'>('F4')
@@ -303,15 +288,12 @@ export default function CetakRaporPage() {
   }, [kelasList, selectedKelas])
   const paginatedDaftar = usePagination(daftar, pageSize, currentPage)
 
-  // Dua ukuran kertas yang dipakai di lapangan: A4 & F4 (folio).
   const PAPER = {
     A4: { w: 210, h: 297 },
     F4: { w: 215, h: 330 },
   } as const
   const paper = PAPER[paperSize]
 
-  // @page dipaksa ke ukuran terpilih supaya printer tidak menebak / menskala.
-  // Lebar & tinggi sheet diset eksak per kertas, lalu di-zoom agar pas 1 halaman.
   const pageStyle = `
     @page { size: ${paper.w}mm ${paper.h}mm; margin: 0; }
     @media print {
@@ -319,7 +301,7 @@ export default function CetakRaporPage() {
       .sheet-wrap {
         width: 100%;
         display: flex;
-        justify-content: center;       /* center horizontal => margin kiri = kanan */
+        justify-content: center;
         align-items: flex-start;
         overflow: hidden;
         break-inside: avoid;
@@ -376,10 +358,6 @@ export default function CetakRaporPage() {
     setCurrentPage(1)
   }, [selectedKelas, selectedSemester])
 
-  // Skala tiap sheet agar muat 1 halaman kertas terpilih (96dpi), tetap center.
-  // Pakai CSS `zoom` (bukan `transform: scale`): zoom me-reflow layout sehingga
-  // Chrome mencetak teks sebagai vektor (selectable, file kecil). `transform`
-  // memaksa Chrome meraster sheet jadi bitmap => PDF berupa gambar & berat.
   const fitSheetsToPage = () => {
     const root = printRef.current
     if (!root) return
@@ -392,12 +370,10 @@ export default function CetakRaporPage() {
       el.style.removeProperty('zoom')
       el.style.transform = 'none'
       el.style.width = `${paper.w}mm`
-      el.style.minHeight = '0'   // buang floor 297mm biar ukur tinggi konten asli
+      el.style.minHeight = '0'
       const w = el.scrollWidth
       const h = el.scrollHeight
-      // -2px epsilon supaya pembulatan tidak memicu halaman kedua
       const scale = Math.min(1, (PXW - 2) / w, (PXH - 2) / h)
-      // zoom me-reflow box-nya sendiri, jadi wrapper otomatis ikut tinggi hasil.
       if (scale < 1) el.style.setProperty('zoom', String(scale))
       wrap.style.height = ''
     })
@@ -649,13 +625,9 @@ export default function CetakRaporPage() {
       }
 
       const headers = [
-        'No',
-        'NIS',
-        'Nama Santri',
+        'No', 'NIS', 'Nama Santri',
         ...dataLeger.mapel.map((m: any) => m.nama),
-        'Jumlah',
-        'Rata-rata',
-        'Ranking',
+        'Jumlah', 'Rata-rata', 'Ranking',
       ]
       const rows = dataLeger.siswa.map((s: any, idx: number) => {
         const rowData: any[] = [idx + 1, s.nis, s.nama]
@@ -688,73 +660,42 @@ export default function CetakRaporPage() {
           <h1 className="text-2xl font-bold text-slate-800">Cetak Rapor Santri</h1>
           <p className="text-sm text-slate-500">Pilih kelas, lalu cetak rapor atau identitas per santri.</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              onClick={openTitimangsaModal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-            >
-              <CalendarCog className="h-3.5 w-3.5" /> Titimangsa: {titimangsa.tempat}{titimangsa.tanggal ? `, ${titimangsa.tanggal}` : ' (tgl cetak)'}
-            </button>
-            <button
-              onClick={() => setPimpinanTtdOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-            >
-              <PenLine className="h-3.5 w-3.5" /> TTD Pimpinan
-            </button>
+            <Button onClick={openTitimangsaModal} variant="default" size="xs" leftSection={<CalendarCog className="h-3.5 w-3.5" />}>
+              Titimangsa: {titimangsa.tempat}{titimangsa.tanggal ? `, ${titimangsa.tanggal}` : ' (tgl cetak)'}
+            </Button>
+            <Button onClick={() => setPimpinanTtdOpen(true)} variant="default" size="xs" leftSection={<PenLine className="h-3.5 w-3.5" />}>
+              TTD Pimpinan
+            </Button>
           </div>
         </div>
         {hasData ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Ukuran Kertas</span>
-              <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
-                {(['A4', 'F4'] as const).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setPaperSize(p)}
-                    className={[
-                      'px-4 py-1.5 text-sm font-bold transition-colors',
-                      paperSize === p ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100',
-                    ].join(' ')}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                value={paperSize}
+                onChange={v => setPaperSize(v as 'A4' | 'F4')}
+                data={[{ label: 'A4', value: 'A4' }, { label: 'F4', value: 'F4' }]}
+                size="xs"
+              />
               <span className="text-xs text-slate-400">{paperSize === 'F4' ? '215 × 330 mm' : '210 × 297 mm'}</span>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            <button
-              onClick={openKitabModal}
-              className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
-            >
-              <BookOpen className="h-4 w-4" /> Atur Kitab Rapor
-            </button>
-            <button
-              onClick={() => waliTtd ? setWaliTtdOpen(true) : toast.warning('Kelas ini belum punya wali kelas.')}
-              className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
-            >
-              <PenLine className="h-4 w-4" /> TTD Wali Kelas
-            </button>
-            <button
-              onClick={() => queuePrint('rapor', dataRapor, `Rapor_${selectedKelasName}_Smt${selectedSemester}`)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-green-800"
-            >
-              <Printer className="h-4 w-4" /> Cetak Semua Rapor
-            </button>
-            <button
-              onClick={() => queuePrint('identitas', dataIdentitas, `Identitas_${selectedKelasName}`)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-900"
-            >
-              <IdCard className="h-4 w-4" /> Cetak Semua Identitas
-            </button>
-            <button
-              onClick={handleExportLeger}
-              disabled={isExporting}
-              className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-              Leger Excel
-            </button>
+              <Button onClick={openKitabModal} color="yellow" leftSection={<BookOpen className="h-4 w-4" />}>
+                Atur Kitab Rapor
+              </Button>
+              <Button onClick={() => waliTtd ? setWaliTtdOpen(true) : toast.warning('Kelas ini belum punya wali kelas.')} color="indigo" leftSection={<PenLine className="h-4 w-4" />}>
+                TTD Wali Kelas
+              </Button>
+              <Button onClick={() => queuePrint('rapor', dataRapor, `Rapor_${selectedKelasName}_Smt${selectedSemester}`)} color="green" leftSection={<Printer className="h-4 w-4" />}>
+                Cetak Semua Rapor
+              </Button>
+              <Button onClick={() => queuePrint('identitas', dataIdentitas, `Identitas_${selectedKelasName}`)} color="dark" leftSection={<IdCard className="h-4 w-4" />}>
+                Cetak Semua Identitas
+              </Button>
+              <Button onClick={handleExportLeger} loading={isExporting} color="teal" leftSection={!isExporting ? <FileSpreadsheet className="h-4 w-4" /> : undefined}>
+                Leger Excel
+              </Button>
             </div>
           </div>
         ) : null}
@@ -762,55 +703,41 @@ export default function CetakRaporPage() {
 
       <div className="flex flex-none flex-col items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:hidden md:flex-row">
         <div className="w-full md:w-auto">
-          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-slate-700">
-            <CalendarDays className="h-4 w-4 text-slate-400" /> Tahun Ajaran
-          </label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 outline-none focus:ring-2 focus:ring-blue-500 md:w-44"
+          <NativeSelect
+            label={<span className="flex items-center gap-1"><CalendarDays className="h-4 w-4 text-slate-400" /> Tahun Ajaran</span>}
             value={selectedTA ?? ''}
-            onChange={(e) => setSelectedTA(Number(e.target.value))}
-          >
-            <option value="">-- Pilih --</option>
-            {tahunAjaranList.map(ta => (
-              <option key={ta.id} value={ta.id}>
-                {ta.nama}{ta.is_active ? ' (Aktif)' : ''}
-              </option>
-            ))}
-          </select>
+            onChange={e => setSelectedTA(Number(e.target.value))}
+            data={[{ label: '-- Pilih --', value: '' }, ...tahunAjaranList.map(ta => ({ label: `${ta.nama}${ta.is_active ? ' (Aktif)' : ''}`, value: String(ta.id) }))]}
+            w={176}
+          />
         </div>
-
         <div className="w-full md:w-auto">
-          <label className="mb-1 block text-sm font-medium text-slate-700">Kelas</label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 outline-none focus:ring-2 focus:ring-blue-500 md:w-48"
+          <NativeSelect
+            label="Kelas"
             value={selectedKelas}
-            onChange={(e) => setSelectedKelas(e.target.value)}
-          >
-            <option value="">-- Pilih --</option>
-            {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
-          </select>
+            onChange={e => setSelectedKelas(e.target.value)}
+            data={[{ label: '-- Pilih --', value: '' }, ...kelasList.map(k => ({ label: k.nama_kelas, value: k.id }))]}
+            w={192}
+          />
         </div>
-
         <div className="w-full md:w-auto">
-          <label className="mb-1 block text-sm font-medium text-slate-700">Semester</label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 outline-none focus:ring-2 focus:ring-blue-500 md:w-32"
+          <NativeSelect
+            label="Semester"
             value={selectedSemester}
-            onChange={(e) => setSelectedSemester(e.target.value)}
-          >
-            <option value="1">Ganjil</option>
-            <option value="2">Genap</option>
-          </select>
+            onChange={e => setSelectedSemester(e.target.value)}
+            data={[{ label: 'Ganjil', value: '1' }, { label: 'Genap', value: '2' }]}
+            w={128}
+          />
         </div>
-
-        <button
+        <Button
           onClick={handleLoad}
-          disabled={!selectedKelas || loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2 font-medium text-white transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50 md:w-auto"
+          loading={loading}
+          disabled={!selectedKelas}
+          color="blue"
+          leftSection={!loading ? <Search className="h-4 w-4" /> : undefined}
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Tampilkan
-        </button>
+        </Button>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-white shadow-sm print:hidden">
@@ -860,27 +787,18 @@ export default function CetakRaporPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => printRaporOne(row)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> Cetak Rapor
-                      </button>
+                      <Button onClick={() => printRaporOne(row)} color="blue" size="xs" leftSection={<Printer className="h-3.5 w-3.5" />}>
+                        Cetak Rapor
+                      </Button>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openEditIdentitas(row)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" /> Edit
-                        </button>
-                        <button
-                          onClick={() => printIdentitasOne(row)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800"
-                        >
-                          <IdCard className="h-3.5 w-3.5" /> Cetak
-                        </button>
+                        <Button onClick={() => openEditIdentitas(row)} variant="default" size="xs" leftSection={<Pencil className="h-3.5 w-3.5" />}>
+                          Edit
+                        </Button>
+                        <Button onClick={() => printIdentitasOne(row)} color="dark" size="xs" leftSection={<IdCard className="h-3.5 w-3.5" />}>
+                          Cetak
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -931,240 +849,139 @@ export default function CetakRaporPage() {
         </div>
       </div>
 
-      {editIdentitasOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Edit Identitas Rapor</p>
-                <h2 className="text-lg font-bold text-slate-800">{identitasForm.nama_lengkap || 'Santri'}</h2>
-                <p className="text-xs text-slate-500">Perubahan disimpan ke data utama santri.</p>
-              </div>
-              <button
-                onClick={() => setEditIdentitasOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                aria-label="Tutup modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">NIS</label>
-                  <input value={identitasForm.nis || ''} onChange={e => setIdentitasField('nis', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Lengkap</label>
-                  <input value={identitasForm.nama_lengkap || ''} onChange={e => setIdentitasField('nama_lengkap', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">NIK</label>
-                  <input value={identitasForm.nik || ''} onChange={e => setIdentitasField('nik', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Jenis Kelamin</label>
-                  <select value={identitasForm.jenis_kelamin || 'L'} onChange={e => setIdentitasField('jenis_kelamin', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tempat Lahir</label>
-                  <input value={identitasForm.tempat_lahir || ''} onChange={e => setIdentitasField('tempat_lahir', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tanggal Lahir</label>
-                  <input type="date" value={identitasForm.tanggal_lahir || ''} onChange={e => setIdentitasField('tanggal_lahir', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tahun Masuk</label>
-                  <input type="number" value={identitasForm.tahun_masuk || ''} onChange={e => setIdentitasField('tahun_masuk', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">No. Telepon Orang Tua</label>
-                  <input value={identitasForm.no_wa_ortu || ''} onChange={e => setIdentitasField('no_wa_ortu', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Ayah</label>
-                  <input value={identitasForm.nama_ayah || ''} onChange={e => setIdentitasField('nama_ayah', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nama Ibu</label>
-                  <input value={identitasForm.nama_ibu || ''} onChange={e => setIdentitasField('nama_ibu', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Alamat Ringkas</label>
-                  <textarea value={identitasForm.alamat || ''} onChange={e => setIdentitasField('alamat', e.target.value)} rows={2} className="w-full resize-none rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Alamat Lengkap</label>
-                  <textarea value={identitasForm.alamat_lengkap || ''} onChange={e => setIdentitasField('alamat_lengkap', e.target.value)} rows={2} className="w-full resize-none rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kecamatan</label>
-                  <input value={identitasForm.kecamatan || ''} onChange={e => setIdentitasField('kecamatan', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kab/Kota</label>
-                  <input value={identitasForm.kab_kota || ''} onChange={e => setIdentitasField('kab_kota', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Provinsi</label>
-                  <input value={identitasForm.provinsi || ''} onChange={e => setIdentitasField('provinsi', e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
-              <button onClick={() => setEditIdentitasOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
-                Batal
-              </button>
-              <button
-                onClick={handleSaveIdentitas}
-                disabled={identitySaving}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {identitySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Simpan Identitas
-              </button>
-            </div>
+      {/* Edit Identitas Modal */}
+      <Modal
+        opened={editIdentitasOpen}
+        onClose={() => setEditIdentitasOpen(false)}
+        title={
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Edit Identitas Rapor</p>
+            <h2 className="text-base font-bold text-slate-800">{identitasForm.nama_lengkap || 'Santri'}</h2>
+            <p className="text-xs text-slate-500">Perubahan disimpan ke data utama santri.</p>
           </div>
+        }
+        size="xl"
+        centered
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <TextInput label="NIS" value={identitasForm.nis || ''} onChange={e => setIdentitasField('nis', e.target.value)} />
+          <TextInput label="Nama Lengkap" value={identitasForm.nama_lengkap || ''} onChange={e => setIdentitasField('nama_lengkap', e.target.value)} />
+          <TextInput label="NIK" value={identitasForm.nik || ''} onChange={e => setIdentitasField('nik', e.target.value)} />
+          <NativeSelect
+            label="Jenis Kelamin"
+            value={identitasForm.jenis_kelamin || 'L'}
+            onChange={e => setIdentitasField('jenis_kelamin', e.target.value)}
+            data={[{ label: 'Laki-laki', value: 'L' }, { label: 'Perempuan', value: 'P' }]}
+          />
+          <TextInput label="Tempat Lahir" value={identitasForm.tempat_lahir || ''} onChange={e => setIdentitasField('tempat_lahir', e.target.value)} />
+          <TextInput label="Tanggal Lahir" type="date" value={identitasForm.tanggal_lahir || ''} onChange={e => setIdentitasField('tanggal_lahir', e.target.value)} />
+          <TextInput label="Tahun Masuk" type="number" value={identitasForm.tahun_masuk || ''} onChange={e => setIdentitasField('tahun_masuk', e.target.value)} />
+          <TextInput label="No. Telepon Orang Tua" value={identitasForm.no_wa_ortu || ''} onChange={e => setIdentitasField('no_wa_ortu', e.target.value)} />
+          <TextInput label="Nama Ayah" value={identitasForm.nama_ayah || ''} onChange={e => setIdentitasField('nama_ayah', e.target.value)} />
+          <TextInput label="Nama Ibu" value={identitasForm.nama_ibu || ''} onChange={e => setIdentitasField('nama_ibu', e.target.value)} />
+          <Textarea label="Alamat Ringkas" value={identitasForm.alamat || ''} onChange={e => setIdentitasField('alamat', e.target.value)} minRows={2} resize="none" className="md:col-span-2" />
+          <Textarea label="Alamat Lengkap" value={identitasForm.alamat_lengkap || ''} onChange={e => setIdentitasField('alamat_lengkap', e.target.value)} minRows={2} resize="none" className="md:col-span-2" />
+          <TextInput label="Kecamatan" value={identitasForm.kecamatan || ''} onChange={e => setIdentitasField('kecamatan', e.target.value)} />
+          <TextInput label="Kab/Kota" value={identitasForm.kab_kota || ''} onChange={e => setIdentitasField('kab_kota', e.target.value)} />
+          <TextInput label="Provinsi" value={identitasForm.provinsi || ''} onChange={e => setIdentitasField('provinsi', e.target.value)} />
         </div>
-      )}
+        <div className="flex justify-end gap-3 mt-5 border-t pt-4">
+          <Button onClick={() => setEditIdentitasOpen(false)} variant="default">Batal</Button>
+          <Button onClick={handleSaveIdentitas} loading={identitySaving} color="blue" leftSection={!identitySaving ? <Save className="h-4 w-4" /> : undefined}>
+            Simpan Identitas
+          </Button>
+        </div>
+      </Modal>
 
-      {kitabModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
-          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Atur Kitab Rapor</p>
-                <h2 className="text-lg font-bold text-slate-800">{selectedKelasName}</h2>
-                <p className="text-xs text-slate-500">Pilih satu kitab per mapel. &quot;Gabung semua judul&quot; = tampilkan seluruh kitab.</p>
-              </div>
-              <button
-                onClick={() => setKitabModalOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                aria-label="Tutup modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto p-5">
-              {kitabLoading ? (
-                <div className="flex min-h-[160px] items-center justify-center text-slate-400">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
-              ) : kitabOptions.length === 0 ? (
-                <div className="flex min-h-[160px] flex-col items-center justify-center text-center text-slate-400">
-                  <BookOpen className="mb-3 h-10 w-10 text-slate-300" />
-                  <p className="font-medium">Tidak ada mapel berkitab ganda.</p>
-                  <p className="text-sm">Semua mapel hanya punya satu kitab, tidak perlu diatur.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {kitabOptions.map((m: any) => (
-                    <div key={m.mapel_id} className="grid grid-cols-1 gap-1 sm:grid-cols-[1fr_1.4fr] sm:items-center">
-                      <label className="text-sm font-bold text-slate-700">{m.mapel_nama}</label>
-                      <select
-                        value={kitabSelections[m.mapel_id] ?? ''}
-                        onChange={e => setKitabSelections(prev => ({ ...prev, [m.mapel_id]: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Gabung semua judul</option>
-                        {m.opsi.map((k: any) => (
-                          <option key={k.kitab_id} value={k.kitab_id}>{k.nama_kitab}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
-              <button onClick={() => setKitabModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
-                Batal
-              </button>
-              <button
-                onClick={handleSaveKitab}
-                disabled={kitabSaving || kitabLoading || kitabOptions.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {kitabSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Simpan
-              </button>
-            </div>
+      {/* Kitab Modal */}
+      <Modal
+        opened={kitabModalOpen}
+        onClose={() => setKitabModalOpen(false)}
+        title={
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Atur Kitab Rapor</p>
+            <h2 className="text-base font-bold text-slate-800">{selectedKelasName}</h2>
+            <p className="text-xs text-slate-500">Pilih satu kitab per mapel. &quot;Gabung semua judul&quot; = tampilkan seluruh kitab.</p>
           </div>
-        </div>
-      )}
-
-      {titimangsaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm print:hidden">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b bg-slate-50 px-5 py-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Titimangsa Rapor</p>
-                <h2 className="text-lg font-bold text-slate-800">Tempat &amp; Tanggal Terbit</h2>
-                <p className="text-xs text-slate-500">Berlaku untuk semua kelas (universal).</p>
-              </div>
-              <button
-                onClick={() => setTitimangsaModalOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                aria-label="Tutup modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Diberikan di (Tempat)</label>
-                <input
-                  value={titimangsaForm.tempat}
-                  onChange={e => setTitimangsaForm(prev => ({ ...prev, tempat: e.target.value }))}
-                  placeholder="Sukahideng"
-                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+        }
+        size="lg"
+        centered
+      >
+        {kitabLoading ? (
+          <div className="flex min-h-[160px] items-center justify-center text-slate-400">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        ) : kitabOptions.length === 0 ? (
+          <div className="flex min-h-[160px] flex-col items-center justify-center text-center text-slate-400">
+            <BookOpen className="mb-3 h-10 w-10 text-slate-300" />
+            <p className="font-medium">Tidak ada mapel berkitab ganda.</p>
+            <p className="text-sm">Semua mapel hanya punya satu kitab, tidak perlu diatur.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {kitabOptions.map((m: any) => (
+              <div key={m.mapel_id} className="grid grid-cols-1 gap-1 sm:grid-cols-[1fr_1.4fr] sm:items-center">
+                <label className="text-sm font-bold text-slate-700">{m.mapel_nama}</label>
+                <NativeSelect
+                  value={kitabSelections[m.mapel_id] ?? ''}
+                  onChange={e => setKitabSelections(prev => ({ ...prev, [m.mapel_id]: e.target.value }))}
+                  data={[{ label: 'Gabung semua judul', value: '' }, ...m.opsi.map((k: any) => ({ label: k.nama_kitab, value: String(k.kitab_id) }))]}
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Tanggal Terbit</label>
-                <input
-                  type="date"
-                  value={titimangsaForm.tanggal}
-                  onChange={e => setTitimangsaForm(prev => ({ ...prev, tanggal: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="mt-1 text-xs text-slate-400">Kosongkan untuk memakai tanggal saat mencetak.</p>
-                {titimangsaForm.tanggal && (
-                  <button
-                    onClick={() => setTitimangsaForm(prev => ({ ...prev, tanggal: '' }))}
-                    className="mt-1 text-xs font-bold text-blue-600 hover:underline"
-                  >
-                    Kosongkan tanggal
-                  </button>
-                )}
-              </div>
-            </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 mt-5 border-t pt-4">
+          <Button onClick={() => setKitabModalOpen(false)} variant="default">Batal</Button>
+          <Button onClick={handleSaveKitab} loading={kitabSaving} disabled={kitabLoading || kitabOptions.length === 0} color="blue" leftSection={!kitabSaving ? <Save className="h-4 w-4" /> : undefined}>
+            Simpan
+          </Button>
+        </div>
+      </Modal>
 
-            <div className="flex justify-end gap-3 border-t bg-slate-50 px-5 py-4">
-              <button onClick={() => setTitimangsaModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
-                Batal
-              </button>
-              <button
-                onClick={handleSaveTitimangsa}
-                disabled={titimangsaSaving}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {titimangsaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Simpan
-              </button>
-            </div>
+      {/* Titimangsa Modal */}
+      <Modal
+        opened={titimangsaModalOpen}
+        onClose={() => setTitimangsaModalOpen(false)}
+        title={
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Titimangsa Rapor</p>
+            <h2 className="text-base font-bold text-slate-800">Tempat &amp; Tanggal Terbit</h2>
+            <p className="text-xs text-slate-500">Berlaku untuk semua kelas (universal).</p>
+          </div>
+        }
+        size="sm"
+        centered
+      >
+        <div className="space-y-4">
+          <TextInput
+            label="Diberikan di (Tempat)"
+            value={titimangsaForm.tempat}
+            onChange={e => setTitimangsaForm(prev => ({ ...prev, tempat: e.target.value }))}
+            placeholder="Sukahideng"
+          />
+          <div>
+            <TextInput
+              label="Tanggal Terbit"
+              type="date"
+              value={titimangsaForm.tanggal}
+              onChange={e => setTitimangsaForm(prev => ({ ...prev, tanggal: e.target.value }))}
+              description="Kosongkan untuk memakai tanggal saat mencetak."
+            />
+            {titimangsaForm.tanggal && (
+              <Button onClick={() => setTitimangsaForm(prev => ({ ...prev, tanggal: '' }))} variant="subtle" color="blue" size="compact-xs" mt="xs">
+                Kosongkan tanggal
+              </Button>
+            )}
           </div>
         </div>
-      )}
+        <div className="flex justify-end gap-3 mt-5 border-t pt-4">
+          <Button onClick={() => setTitimangsaModalOpen(false)} variant="default">Batal</Button>
+          <Button onClick={handleSaveTitimangsa} loading={titimangsaSaving} color="blue" leftSection={!titimangsaSaving ? <Save className="h-4 w-4" /> : undefined}>
+            Simpan
+          </Button>
+        </div>
+      </Modal>
 
       <TtdEditorModal
         open={pimpinanTtdOpen}
