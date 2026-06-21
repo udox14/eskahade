@@ -276,19 +276,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           
           {/* Left Side: Greeting & User Name */}
           <div className="space-y-3.5 flex-1 min-w-0">
-            {/* Mobile-only Clock & Date Pill */}
-            <div className="md:hidden flex items-center select-none mb-1">
-              <div className="flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-2.5 py-1">
-                <span className="text-[10px] font-bold text-slate-600 leading-none">
-                  {now ? now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '—'}
-                </span>
-                <span className="w-px h-2.5 bg-slate-300 shrink-0" />
-                <span className="text-[10px] font-black text-emerald-600 font-mono leading-none tracking-wider">
-                  {now ? formatJam(now).substring(0, 5) : '00:00'}
-                </span>
-              </div>
-            </div>
-
             <div className="space-y-1.5">
               <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 <span>{greeting.emoji}</span>
