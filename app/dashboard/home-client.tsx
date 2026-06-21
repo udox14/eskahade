@@ -268,69 +268,57 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
       {/* ── Hero Greeting Card ── */}
       <div 
-        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/80 p-5 sm:p-7"
+        className="relative overflow-hidden rounded-[2rem] bg-white select-none shadow-sm border border-slate-200/60 p-6 sm:p-8 min-h-[200px] sm:min-h-[260px] flex items-center w-full"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82)), url('/hero-bg.png')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundImage: `url('${heroImage}')`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'right bottom',
+          backgroundRepeat: 'no-repeat'
         }}
       >
-        {/* Glow orbs */}
-        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Content (Responsive flex layout matching mockup) */}
-        <div className="relative z-10 flex items-end justify-between gap-4">
+        {/* Content */}
+        <div className="relative z-10 flex w-full">
           
           {/* Left Side: Greeting & User Name */}
-          <div className="space-y-4 flex-1 min-w-0">
-            <div className="space-y-1">
-              <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
+          <div className="space-y-5 flex-1 min-w-0 max-w-[75%] sm:max-w-[60%]">
+            <div className="space-y-1.5">
+              <p className="text-slate-600 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5 drop-shadow-sm">
                 <span>{greeting.emoji}</span>
                 <span>{greeting.text},</span>
               </p>
-              <h1 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight leading-none break-words">
+              <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight leading-none break-words drop-shadow-sm">
                 {userName}
                 <span className="text-emerald-500">.</span>
               </h1>
-              <p className="text-slate-400 text-xs sm:text-sm pt-1 font-semibold italic">
-                "{greeting.sub}"
+              <p className="text-slate-500 text-xs sm:text-sm pt-1 font-medium drop-shadow-sm">
+                {greeting.sub}
               </p>
             </div>
 
             {/* Mockup Pills row */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
               {/* Role Card */}
-              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
-                <div className="w-5.5 h-5.5 rounded-full bg-blue-500/10 flex items-center justify-center text-[10px]">
+              <div className="flex items-center gap-2 bg-white/80 border border-slate-200/60 px-3.5 py-2 rounded-2xl shadow-sm backdrop-blur-md">
+                <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center text-[11px]">
                   {roleEmoji}
                 </div>
                 <div className="leading-none text-left">
-                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
-                  <p className="text-xs font-bold text-slate-700 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
+                  <p className="text-[8px] text-slate-500 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
+                  <p className="text-xs font-bold text-slate-800 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
                 </div>
               </div>
 
               {/* stats Card */}
-              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+              <div className="flex items-center gap-2 bg-white/80 border border-slate-200/60 px-3.5 py-2 rounded-2xl shadow-sm backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
                 <div className="leading-none text-left">
-                  <p className="text-xs font-bold text-slate-700 leading-none">
+                  <p className="text-xs font-bold text-slate-800 leading-none">
                     <span className="text-emerald-600 font-black">{totalFitur}</span>
                   </p>
-                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mt-0.5">layanan aktif</p>
+                  <p className="text-[8px] text-slate-500 uppercase tracking-widest font-black mt-0.5">layanan aktif</p>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Right Side: 3D Muslim Illustration with Laptop */}
-          <div className="w-28 h-28 sm:w-44 sm:h-44 shrink-0 flex items-end justify-end select-none pointer-events-none mb-[-20px] mr-[-10px] sm:mb-[-28px] sm:mr-[-15px]">
-            <img 
-              src={heroImage} 
-              alt="Illustration" 
-              className="max-w-full max-h-full object-contain object-bottom" 
-            />
           </div>
 
         </div>
