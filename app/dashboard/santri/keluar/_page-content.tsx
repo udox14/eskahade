@@ -16,6 +16,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { Modal, Button, TextInput, Textarea, NativeSelect, SegmentedControl, ActionIcon } from '@mantine/core'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTgl(s: string | null) {
@@ -70,87 +71,75 @@ function ModalKeluar({ santri, onClose, onSuccess }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
-        <form onSubmit={handleSubmit}>
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-slate-100">
-            <div>
-              <h3 className="font-bold text-slate-900">Tetapkan Keluar</h3>
-              <p className="text-sm text-slate-500 mt-0.5">{santri.nama_lengkap}</p>
-            </div>
-            <button type="button" onClick={onClose}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+    <Modal
+      opened={true}
+      onClose={onClose}
+      title={
+        <div>
+          <p className="font-bold text-slate-900">Tetapkan Keluar</p>
+          <p className="text-sm text-slate-500 mt-0.5">{santri.nama_lengkap}</p>
+        </div>
+      }
+      size="sm"
+      centered
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          {/* Info santri */}
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
+            <p className="text-slate-500 text-xs font-medium mb-1">Data Santri</p>
+            <p className="font-semibold text-slate-800">{santri.nama_lengkap}</p>
+            <p className="text-slate-500 text-xs">{santri.nis} · {santri.asrama || '—'} / {santri.kamar || '—'}</p>
           </div>
 
-          {/* Body */}
-          <div className="p-5 space-y-4">
-            {/* Info santri */}
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
-              <p className="text-slate-500 text-xs font-medium mb-1">Data Santri</p>
-              <p className="font-semibold text-slate-800">{santri.nama_lengkap}</p>
-              <p className="text-slate-500 text-xs">{santri.nis} · {santri.asrama || '—'} / {santri.kamar || '—'}</p>
-            </div>
+          <TextInput
+            type="date"
+            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal Keluar</span>}
+            value={tanggal}
+            onChange={e => setTanggal(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+          />
 
-            {/* Tanggal keluar */}
+          <Textarea
+            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alasan Keluar <span className="text-slate-400 font-normal ml-1">(Opsional)</span></span>}
+            value={alasan}
+            onChange={e => setAlasan(e.target.value)}
+            placeholder="Contoh: Pindah ke pesantren lain, urusan keluarga, dsb..."
+            rows={3}
+            resize="none"
+          />
+
+          {/* Opsi buat surat */}
+          <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
+              className="w-4 h-4 rounded accent-rose-600" />
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Tanggal Keluar
-              </label>
-              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
+              <p className="text-xs text-slate-400">Otomatis muncul di Layanan Surat sebagai Surat Berhenti</p>
             </div>
+          </label>
 
-            {/* Alasan */}
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Alasan Keluar <span className="text-slate-400 font-normal ml-1">(Opsional)</span>
-              </label>
-              <textarea value={alasan} onChange={e => setAlasan(e.target.value)}
-                placeholder="Contoh: Pindah ke pesantren lain, urusan keluarga, dsb..."
-                rows={3}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none" />
-            </div>
-
-            {/* Opsi buat surat */}
-            <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
-                className="w-4 h-4 rounded accent-rose-600" />
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
-                <p className="text-xs text-slate-400">Otomatis muncul di Layanan Surat sebagai Surat Berhenti</p>
-              </div>
-            </label>
-
-            {/* Warning */}
-            <div className="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p>Santri akan hilang dari semua fitur absensi, SPP, uang jajan, dll. Bisa dikembalikan aktif kapan saja.</p>
-            </div>
+          <div className="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>Santri akan hilang dari semua fitur absensi, SPP, uang jajan, dll. Bisa dikembalikan aktif kapan saja.</p>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="p-5 pt-0 flex gap-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              Batal
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-              {saving ? 'Menyimpan...' : 'Tetapkan Keluar'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
+          <Button type="button" onClick={onClose} variant="default" className="flex-1">
+            Batal
+          </Button>
+          <Button type="submit" loading={saving} color="pink" className="flex-1"
+            leftSection={!saving ? <LogOut className="w-4 h-4" /> : undefined}>
+            Tetapkan Keluar
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
-// ── Modal Cetak Surat ─────────────────────────────────────────────────────────
+// ── Modal ACC Pengajuan ───────────────────────────────────────────────────────
 function ModalSetujuiPengajuan({ pengajuan, onClose, onSuccess }: {
   pengajuan: PengajuanKeluar
   onClose: () => void
@@ -177,75 +166,70 @@ function ModalSetujuiPengajuan({ pengajuan, onClose, onSuccess }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden">
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-center justify-between p-5 border-b border-slate-100">
-            <div>
-              <h3 className="font-bold text-slate-900">ACC Santri Keluar</h3>
-              <p className="text-sm text-slate-500 mt-0.5">{pengajuan.nama_lengkap || '-'}</p>
-            </div>
-            <button type="button" onClick={onClose}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+    <Modal
+      opened={true}
+      onClose={onClose}
+      title={
+        <div>
+          <p className="font-bold text-slate-900">ACC Santri Keluar</p>
+          <p className="text-sm text-slate-500 mt-0.5">{pengajuan.nama_lengkap || '-'}</p>
+        </div>
+      }
+      size="sm"
+      centered
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
+            <p className="text-slate-500 text-xs font-medium mb-1">Penandaan dari Asrama</p>
+            <p className="font-semibold text-slate-800">{pengajuan.penanda_nama || 'Pengurus asrama'}</p>
+            <p className="text-slate-500 text-xs">
+              {pengajuan.asrama} / {pengajuan.kamar || '—'} · {fmtTgl(pengajuan.tanggal_tandai)}
+            </p>
+            {pengajuan.catatan ? <p className="text-xs text-slate-600 mt-2">{pengajuan.catatan}</p> : null}
           </div>
 
-          <div className="p-5 space-y-4">
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-sm">
-              <p className="text-slate-500 text-xs font-medium mb-1">Penandaan dari Asrama</p>
-              <p className="font-semibold text-slate-800">{pengajuan.penanda_nama || 'Pengurus asrama'}</p>
-              <p className="text-slate-500 text-xs">
-                {pengajuan.asrama} / {pengajuan.kamar || '—'} · {fmtTgl(pengajuan.tanggal_tandai)}
-              </p>
-              {pengajuan.catatan ? <p className="text-xs text-slate-600 mt-2">{pengajuan.catatan}</p> : null}
-            </div>
+          <TextInput
+            type="date"
+            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal Keluar</span>}
+            value={tanggal}
+            onChange={e => setTanggal(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+          />
 
+          <Textarea
+            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alasan Keluar</span>}
+            value={alasan}
+            onChange={e => setAlasan(e.target.value)}
+            rows={3}
+            resize="none"
+          />
+
+          <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
+              className="w-4 h-4 rounded accent-rose-600" />
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Tanggal Keluar
-              </label>
-              <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
+              <p className="text-xs text-slate-400">Otomatis muncul sebagai surat berhenti</p>
             </div>
+          </label>
+        </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Alasan Keluar
-              </label>
-              <textarea value={alasan} onChange={e => setAlasan(e.target.value)}
-                rows={3}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none" />
-            </div>
-
-            <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={buatSurat} onChange={e => setBuatSurat(e.target.checked)}
-                className="w-4 h-4 rounded accent-rose-600" />
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Catat ke Log Surat</p>
-                <p className="text-xs text-slate-400">Otomatis muncul sebagai surat berhenti</p>
-              </div>
-            </label>
-          </div>
-
-          <div className="p-5 pt-0 flex gap-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              Batal
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-              {saving ? 'Menyimpan...' : 'ACC dan Keluarkan'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
+          <Button type="button" onClick={onClose} variant="default" className="flex-1">
+            Batal
+          </Button>
+          <Button type="submit" loading={saving} color="pink" className="flex-1"
+            leftSection={!saving ? <UserCheck className="w-4 h-4" /> : undefined}>
+            ACC dan Keluarkan
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
+// ── Modal Cetak Surat — KEEP as fixed inset-0 (print layout) ─────────────────
 function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -256,7 +240,6 @@ function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => vo
   }, [santriId])
 
   const handleCetak = async () => {
-    // Catat ke log surat dulu
     if (data) {
       await catatSuratBerhenti(santriId, `Keluar per ${data.tanggal_keluar || '—'}. ${data.alasan_keluar || ''}`)
     }
@@ -300,13 +283,11 @@ function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => vo
             className="w-full bg-white shadow-xl print:shadow-none"
             style={{ minHeight: '297mm', fontFamily: 'serif', padding: '2.5cm 2cm', fontSize: '14px', lineHeight: '1.8' }}>
 
-            {/* Kop */}
             <div style={{ marginBottom: '12px' }}>
               <img src="/kop-pesantren.png" alt="Kop" style={{ width: '100%', maxHeight: '150px', objectFit: 'contain' }} />
             </div>
             <hr style={{ borderTop: '3px solid black', marginBottom: '16px' }} />
 
-            {/* Judul */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>
                 SURAT PENGUNDURAN DIRI
@@ -375,7 +356,6 @@ function ModalSurat({ santriId, onClose }: { santriId: string; onClose: () => vo
               ))}
             </div>
 
-            {/* TTD Pimpinan */}
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
               <div style={{ textAlign: 'center', minWidth: '280px' }}>
                 <p style={{ fontWeight: 'bold' }}>Mengetahui,</p>
@@ -428,38 +408,43 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[140px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-500">
-              <option value="SEMUA">Semua Asrama</option>
-              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <NativeSelect
+              value={asrama}
+              onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              data={[{ label: 'Semua Asrama', value: 'SEMUA' }, ...asramaList.map(a => ({ label: a, value: a }))]}
+            />
           </div>
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
             className="flex-1 min-w-[180px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input type="text" placeholder="Nama atau NIS..."
-                value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
+            <TextInput
+              placeholder="Nama atau NIS..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              leftSection={<Search className="w-3.5 h-3.5" />}
+            />
           </form>
-          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 transition-colors self-end">
-            <Filter className="w-4 h-4" />
-            {loading ? 'Memuat...' : 'Tampilkan'}
-          </button>
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+          <Button
+            onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }}
+            loading={loading}
+            color="pink"
+            leftSection={!loading ? <Filter className="w-4 h-4" /> : undefined}
+            className="self-end"
+          >
+            Tampilkan
+          </Button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 self-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
-            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
-              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
-              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <NativeSelect
+              value={String(pageSize)}
+              onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              data={[10, 20, 50, 100].map(v => ({ label: String(v), value: String(v) }))}
+              styles={{ input: { border: 'none', background: 'transparent', fontWeight: 700, fontSize: '0.875rem', color: '#374151' } }}
+            />
           </div>
         </div>
       </div>
 
-      {/* Empty / Loading */}
       {!hasLoaded && !loading && (
         <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
           <Users className="w-10 h-10 text-slate-200" />
@@ -472,7 +457,6 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
         </div>
       )}
 
-      {/* Tabel */}
       {hasLoaded && !loading && (
         <>
           <div className="flex items-center justify-between text-xs text-slate-500">
@@ -509,10 +493,15 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">{r.tahun_masuk || '—'}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => setModalSantri(r)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors ml-auto">
-                            <LogOut className="w-3.5 h-3.5" /> Tetapkan Keluar
-                          </button>
+                          <Button
+                            onClick={() => setModalSantri(r)}
+                            size="xs"
+                            color="pink"
+                            variant="light"
+                            leftSection={<LogOut className="w-3.5 h-3.5" />}
+                          >
+                            Tetapkan Keluar
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -528,15 +517,18 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
                       <p className="font-semibold text-slate-800 truncate">{r.nama_lengkap}</p>
                       <p className="text-xs text-slate-400">{r.nis} · {r.asrama || '—'} / {r.kamar || '—'}</p>
                     </div>
-                    <button onClick={() => setModalSantri(r)}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors">
-                      <LogOut className="w-3.5 h-3.5" /> Keluar
-                    </button>
+                    <Button
+                      onClick={() => setModalSantri(r)}
+                      size="xs"
+                      color="pink"
+                      leftSection={<LogOut className="w-3.5 h-3.5" />}
+                    >
+                      Keluar
+                    </Button>
                   </div>
                 ))}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2">
                   <button onClick={() => load(page-1)} disabled={page<=1||loading}
@@ -555,7 +547,6 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
         </>
       )}
 
-      {/* Modal tetapkan keluar */}
       {modalSantri && (
         <ModalKeluar santri={modalSantri} onClose={() => setModalSantri(null)}
           onSuccess={() => { setModalSantri(null); load(page) }} />
@@ -564,7 +555,7 @@ function TabAktif({ asramaList }: { asramaList: string[] }) {
   )
 }
 
-// ── Tab Santri Keluar ─────────────────────────────────────────────────────────
+// ── Tab Pengajuan Asrama ──────────────────────────────────────────────────────
 function TabPengajuan({ asramaList }: { asramaList: string[] }) {
   const confirm = useConfirm()
   const [rows, setRows] = useState<PengajuanKeluar[]>([])
@@ -611,33 +602,39 @@ function TabPengajuan({ asramaList }: { asramaList: string[] }) {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[140px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
-              <option value="SEMUA">Semua Asrama</option>
-              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <NativeSelect
+              value={asrama}
+              onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              data={[{ label: 'Semua Asrama', value: 'SEMUA' }, ...asramaList.map(a => ({ label: a, value: a }))]}
+            />
           </div>
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
             className="flex-1 min-w-[180px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input type="text" placeholder="Nama atau NIS..."
-                value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-            </div>
+            <TextInput
+              placeholder="Nama atau NIS..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              leftSection={<Search className="w-3.5 h-3.5" />}
+            />
           </form>
-          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors self-end">
-            <Filter className="w-4 h-4" />
-            {loading ? 'Memuat...' : 'Tampilkan'}
-          </button>
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+          <Button
+            onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }}
+            loading={loading}
+            color="yellow"
+            leftSection={!loading ? <Filter className="w-4 h-4" /> : undefined}
+            className="self-end"
+          >
+            Tampilkan
+          </Button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 self-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
-            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
-              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
-              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <NativeSelect
+              value={String(pageSize)}
+              onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              data={[10, 20, 50, 100].map(v => ({ label: String(v), value: String(v) }))}
+              styles={{ input: { border: 'none', background: 'transparent', fontWeight: 700, fontSize: '0.875rem', color: '#374151' } }}
+            />
           </div>
         </div>
       </div>
@@ -691,14 +688,15 @@ function TabPengajuan({ asramaList }: { asramaList: string[] }) {
                         <td className="px-4 py-3 text-xs text-slate-500 max-w-[280px] truncate" title={r.catatan || ''}>{r.catatan || '—'}</td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => setModalPengajuan(r)}
-                              className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
-                              ACC
-                            </button>
-                            <button onClick={() => handleReject(r)} disabled={rejectingId === r.id}
-                              className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                              {rejectingId === r.id ? 'Memproses...' : 'Tolak'}
-                            </button>
+                            <Button onClick={() => setModalPengajuan(r)} size="xs" color="pink">ACC</Button>
+                            <Button
+                              onClick={() => handleReject(r)}
+                              loading={rejectingId === r.id}
+                              size="xs"
+                              variant="default"
+                            >
+                              Tolak
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -717,10 +715,16 @@ function TabPengajuan({ asramaList }: { asramaList: string[] }) {
                     <p className="text-xs text-slate-500">Ditandai {fmtTgl(r.tanggal_tandai)} oleh {r.penanda_nama || 'pengurus asrama'}</p>
                     <p className="text-xs text-slate-600 bg-slate-50 rounded-xl p-2">{r.catatan || 'Tanpa catatan'}</p>
                     <div className="flex gap-2">
-                      <button onClick={() => setModalPengajuan(r)}
-                        className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">ACC</button>
-                      <button onClick={() => handleReject(r)} disabled={rejectingId === r.id}
-                        className="flex-1 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600">Tolak</button>
+                      <Button onClick={() => setModalPengajuan(r)} color="pink" size="xs" className="flex-1">ACC</Button>
+                      <Button
+                        onClick={() => handleReject(r)}
+                        loading={rejectingId === r.id}
+                        size="xs"
+                        variant="default"
+                        className="flex-1"
+                      >
+                        Tolak
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -755,6 +759,7 @@ function TabPengajuan({ asramaList }: { asramaList: string[] }) {
   )
 }
 
+// ── Tab Daftar Keluar ─────────────────────────────────────────────────────────
 function TabKeluar({ asramaList }: { asramaList: string[] }) {
   const [rows, setRows]         = useState<SantriKeluar[]>([])
   const [total, setTotal]       = useState(0)
@@ -764,7 +769,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   const [hasLoaded, setHasLoaded] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch]     = useState('')
-   const [asrama, setAsrama]     = useState('SEMUA')
+  const [asrama, setAsrama]     = useState('SEMUA')
   const [pageSize, setPageSize] = useState(20)
   const [suratId, setSuratId]   = useState<string | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -784,7 +789,7 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
   }, [search, asrama, pageSize])
 
   const handleRestore = async (r: SantriKeluar) => {
-    if (!await confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
+    if (!window.confirm(`Kembalikan ${r.nama_lengkap} menjadi santri aktif?`)) return
     setRestoringId(r.id)
     const res = await aktifkanKembali(r.id)
     setRestoringId(null)
@@ -801,33 +806,39 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[140px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-            <select value={asrama} onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-500">
-              <option value="SEMUA">Semua Asrama</option>
-              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <NativeSelect
+              value={asrama}
+              onChange={e => { setAsrama(e.target.value); if (hasLoaded) load(1, search, e.target.value) }}
+              data={[{ label: 'Semua Asrama', value: 'SEMUA' }, ...asramaList.map(a => ({ label: a, value: a }))]}
+            />
           </div>
           <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); load(1, searchInput, asrama) }}
             className="flex-1 min-w-[180px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input type="text" placeholder="Nama atau NIS..."
-                value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500" />
-            </div>
+            <TextInput
+              placeholder="Nama atau NIS..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              leftSection={<Search className="w-3.5 h-3.5" />}
+            />
           </form>
-          <button onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-60 transition-colors self-end">
-            <Filter className="w-4 h-4" />
-            {loading ? 'Memuat...' : 'Tampilkan'}
-          </button>
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+          <Button
+            onClick={() => { setSearch(searchInput); load(1, searchInput, asrama) }}
+            loading={loading}
+            color="gray"
+            leftSection={!loading ? <Filter className="w-4 h-4" /> : undefined}
+            className="self-end"
+          >
+            Tampilkan
+          </Button>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 self-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
-            <select value={pageSize} onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
-              className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
-              {[10, 20, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <NativeSelect
+              value={String(pageSize)}
+              onChange={e => { const ps = Number(e.target.value); setPageSize(ps); load(1, search, asrama, ps) }}
+              data={[10, 20, 50, 100].map(v => ({ label: String(v), value: String(v) }))}
+              styles={{ input: { border: 'none', background: 'transparent', fontWeight: 700, fontSize: '0.875rem', color: '#374151' } }}
+            />
           </div>
         </div>
       </div>
@@ -858,7 +869,6 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
             </div>
           ) : (
             <>
-               {/* Desktop: Compact Table */}
               <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
@@ -888,16 +898,25 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
                         </td>
                         <td className="px-4 py-2">
                           <div className="flex justify-end gap-1.5">
-                            <button onClick={() => setSuratId(r.id)}
-                              className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-                              title="Cetak Surat">
+                            <ActionIcon
+                              onClick={() => setSuratId(r.id)}
+                              variant="subtle"
+                              color="gray"
+                              size="sm"
+                              title="Cetak Surat"
+                            >
                               <Printer className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
-                              className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1">
-                              {restoringId === r.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <RotateCcw className="w-3 h-3"/>}
+                            </ActionIcon>
+                            <Button
+                              onClick={() => handleRestore(r)}
+                              loading={restoringId === r.id}
+                              size="xs"
+                              color="teal"
+                              variant="light"
+                              leftSection={restoringId !== r.id ? <RotateCcw className="w-3 h-3" /> : undefined}
+                            >
                               Aktifkan
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -906,7 +925,6 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
                 </table>
               </div>
 
-              {/* Mobile: Compact Cards */}
               <div className="md:hidden space-y-2">
                 {rows.map(r => (
                   <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
@@ -923,15 +941,26 @@ function TabKeluar({ asramaList }: { asramaList: string[] }) {
                       {r.alasan_keluar || 'Tanpa alasan'}
                     </p>
                     <div className="flex gap-2">
-                      <button onClick={() => setSuratId(r.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">
-                        <Printer className="w-3.5 h-3.5" /> Surat
-                      </button>
-                      <button onClick={() => handleRestore(r)} disabled={restoringId === r.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold">
-                        {restoringId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <RotateCcw className="w-3.5 h-3.5"/>}
+                      <Button
+                        onClick={() => setSuratId(r.id)}
+                        variant="default"
+                        size="xs"
+                        className="flex-1"
+                        leftSection={<Printer className="w-3.5 h-3.5" />}
+                      >
+                        Surat
+                      </Button>
+                      <Button
+                        onClick={() => handleRestore(r)}
+                        loading={restoringId === r.id}
+                        size="xs"
+                        color="teal"
+                        variant="light"
+                        className="flex-1"
+                        leftSection={restoringId !== r.id ? <RotateCcw className="w-3.5 h-3.5" /> : undefined}
+                      >
                         Pulihkan
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -974,26 +1003,19 @@ export default function SantriKeluarPage() {
         description="Dewan santri bisa mengeksekusi keluar langsung, atau memproses penandaan keluar dari pengurus asrama."
       />
 
-      {/* Tab */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
-        {([
-          { key: 'aktif',  label: 'Tetapkan Keluar', icon: LogOut },
-          { key: 'pengajuan', label: 'Pengajuan Asrama', icon: Building2 },
-          { key: 'keluar', label: 'Daftar Keluar',   icon: UserX  },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              tab === t.key ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
-            }`}>
-            <t.icon className="w-4 h-4" />
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        value={tab}
+        onChange={v => setTab(v as 'aktif' | 'pengajuan' | 'keluar')}
+        data={[
+          { label: 'Tetapkan Keluar', value: 'aktif' },
+          { label: 'Pengajuan Asrama', value: 'pengajuan' },
+          { label: 'Daftar Keluar', value: 'keluar' },
+        ]}
+      />
 
-      {tab === 'aktif'  && <TabAktif  asramaList={asramaList} />}
+      {tab === 'aktif'     && <TabAktif     asramaList={asramaList} />}
       {tab === 'pengajuan' && <TabPengajuan asramaList={asramaList} />}
-      {tab === 'keluar' && <TabKeluar asramaList={asramaList} />}
+      {tab === 'keluar'    && <TabKeluar    asramaList={asramaList} />}
     </div>
   )
 }

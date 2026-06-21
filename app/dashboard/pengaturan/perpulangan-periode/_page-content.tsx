@@ -16,12 +16,12 @@ import {
   Loader2,
   Plus,
   Trash2,
-  X,
   XCircle,
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
+import { Button, TextInput, Modal } from '@mantine/core'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
@@ -111,38 +111,19 @@ function FormTambah({
     await onSuccess()
   }
 
-  const fieldClassName =
-    'w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
-
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white shadow-2xl">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Plus className="h-4 w-4 text-emerald-600" />
-            <h2 className="font-bold text-slate-800">Tambah Periode Baru</h2>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="mt-1 text-sm text-slate-500">Atur jadwal perpulangan dan jendela kedatangan untuk satu periode aktif.</p>
-      </div>
+    <Modal opened={open} onClose={onClose} title="Tambah Periode Baru" size="xl" centered>
+      <p className="mb-4 text-sm text-slate-500">
+        Atur jadwal perpulangan dan jendela kedatangan untuk satu periode aktif.
+      </p>
 
-      <div className="space-y-4 px-5 py-5">
-        <div>
-          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Nama Periode</label>
-          <input
-            value={form.nama_periode}
-            onChange={(e) => updateField('nama_periode', e.target.value)}
-            placeholder="Contoh: Liburan Semester Ganjil 2026"
-            className={fieldClassName}
-          />
-        </div>
+      <div className="space-y-4">
+        <TextInput
+          label="Nama Periode"
+          value={form.nama_periode}
+          onChange={(e) => updateField('nama_periode', e.target.value)}
+          placeholder="Contoh: Liburan Semester Ganjil 2026"
+        />
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
@@ -151,24 +132,18 @@ function FormTambah({
               <p className="text-sm font-bold text-amber-800">Jadwal Perpulangan</p>
             </div>
             <div className="grid gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-amber-700">Mulai</label>
-                <input
-                  type="date"
-                  value={form.tgl_mulai_pulang}
-                  onChange={(e) => updateField('tgl_mulai_pulang', e.target.value)}
-                  className={fieldClassName}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-amber-700">Selesai</label>
-                <input
-                  type="date"
-                  value={form.tgl_selesai_pulang}
-                  onChange={(e) => updateField('tgl_selesai_pulang', e.target.value)}
-                  className={fieldClassName}
-                />
-              </div>
+              <TextInput
+                label="Mulai"
+                type="date"
+                value={form.tgl_mulai_pulang}
+                onChange={(e) => updateField('tgl_mulai_pulang', e.target.value)}
+              />
+              <TextInput
+                label="Selesai"
+                type="date"
+                value={form.tgl_selesai_pulang}
+                onChange={(e) => updateField('tgl_selesai_pulang', e.target.value)}
+              />
             </div>
           </div>
 
@@ -178,48 +153,36 @@ function FormTambah({
               <p className="text-sm font-bold text-emerald-800">Jadwal Kedatangan</p>
             </div>
             <div className="grid gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-emerald-700">Mulai</label>
-                <input
-                  type="date"
-                  value={form.tgl_mulai_datang}
-                  onChange={(e) => updateField('tgl_mulai_datang', e.target.value)}
-                  className={fieldClassName}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-emerald-700">Selesai</label>
-                <input
-                  type="date"
-                  value={form.tgl_selesai_datang}
-                  onChange={(e) => updateField('tgl_selesai_datang', e.target.value)}
-                  className={fieldClassName}
-                />
-              </div>
+              <TextInput
+                label="Mulai"
+                type="date"
+                value={form.tgl_mulai_datang}
+                onChange={(e) => updateField('tgl_mulai_datang', e.target.value)}
+              />
+              <TextInput
+                label="Selesai"
+                type="date"
+                value={form.tgl_selesai_datang}
+                onChange={(e) => updateField('tgl_selesai_datang', e.target.value)}
+              />
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="mr-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-          >
-            Batal
-          </button>
-          <button
+        <div className="flex justify-end gap-2">
+          <Button variant="default" onClick={onClose}>Batal</Button>
+          <Button
             onClick={handleSubmit}
-            disabled={loading || !form.nama_periode.trim()}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            loading={loading}
+            disabled={!form.nama_periode.trim()}
+            color="teal"
+            leftSection={!loading ? <Plus className="h-4 w-4" /> : undefined}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Simpan Periode
-          </button>
+          </Button>
         </div>
       </div>
-        </section>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -319,36 +282,38 @@ function PeriodCard({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               onClick={handleToggle}
-              disabled={loadingToggle}
-              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition ${
-                periode.is_active
-                  ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
-              } disabled:cursor-not-allowed disabled:opacity-60`}
+              loading={loadingToggle}
+              variant={periode.is_active ? 'default' : 'filled'}
+              color={periode.is_active ? undefined : 'teal'}
+              size="xs"
+              leftSection={!loadingToggle ? (periode.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />) : undefined}
             >
-              {loadingToggle ? <Loader2 className="h-4 w-4 animate-spin" /> : periode.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
               {periode.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={() => setShowExtend((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+              variant="light"
+              color="blue"
+              size="xs"
+              leftSection={<CalendarClock className="h-4 w-4" />}
             >
-              <CalendarClock className="h-4 w-4" />
               Perpanjang Datang
-            </button>
+            </Button>
 
             {!periode.is_active ? (
-              <button
+              <Button
                 onClick={handleDelete}
-                disabled={loadingDelete}
-                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                loading={loadingDelete}
+                color="pink"
+                variant="light"
+                size="xs"
+                leftSection={!loadingDelete ? <Trash2 className="h-4 w-4" /> : undefined}
               >
-                {loadingDelete ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Hapus
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -370,22 +335,23 @@ function PeriodCard({
 
         {showExtend ? (
           <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-blue-700">Selesai Kedatangan Baru</label>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <input
+              <TextInput
+                label="Selesai Kedatangan Baru"
                 type="date"
                 value={tglBaru}
                 onChange={(e) => setTglBaru(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="flex-1"
               />
-              <button
+              <Button
                 onClick={handleExtend}
-                disabled={loadingExtend}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                loading={loadingExtend}
+                color="blue"
+                leftSection={!loadingExtend ? <CalendarClock className="h-4 w-4" /> : undefined}
+                className="self-end"
               >
-                {loadingExtend ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
                 Simpan
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -426,13 +392,13 @@ export default function PeriodePerpulanganPage() {
       </section>
 
       <div className="flex justify-end">
-        <button
+        <Button
           onClick={() => setOpenTambah(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+          color="teal"
+          leftSection={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
           Tambah Periode
-        </button>
+        </Button>
       </div>
 
       <FormTambah

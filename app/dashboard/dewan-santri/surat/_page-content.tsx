@@ -3,6 +3,7 @@
 import React from 'react'
 
 import { useCallback, useState, useRef, useEffect } from 'react'
+import { Button, ActionIcon, TextInput, Textarea, NativeSelect, Badge } from '@mantine/core'
 import { cariSantri, cekTunggakanSantri, catatSuratKeluar, getRiwayatSurat, hapusRiwayatSurat, getSantriById } from './actions'
 import { useSearchParams } from 'next/navigation'
 import { SuratView } from './surat-view'
@@ -64,8 +65,7 @@ type RiwayatSurat = {
 export default function LayananSuratPage() {
   const confirm = useConfirm()
   const searchParams = useSearchParams()
-  // State Navigasi Generator
-  const [step, setStep] = useState(1) 
+  const [step, setStep] = useState(1)
   const [jenisSurat, setJenisSurat] = useState<JenisSurat | null>(null)
 
   useEffect(() => {
@@ -90,8 +90,7 @@ export default function LayananSuratPage() {
       })
     }
   }, [searchParams])
-  
-  // State Data Generator
+
   const [search, setSearch] = useState('')
   const [hasilCari, setHasilCari] = useState<SantriSurat[]>([])
   const [selectedSantri, setSelectedSantri] = useState<SantriSurat | null>(null)
@@ -100,15 +99,13 @@ export default function LayananSuratPage() {
   const [loading, setLoading] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
 
-  // State Riwayat
   const [riwayat, setRiwayat] = useState<RiwayatSurat[]>([])
   const [filterBulan, setFilterBulan] = useState(new Date().getMonth() + 1)
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear())
   const [loadingRiwayat, setLoadingRiwayat] = useState(true)
 
   const printRef = useRef<HTMLDivElement>(null)
-  
-  // Hook Print
+
   const triggerPrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Surat_${jenisSurat}_${selectedSantri?.nama_lengkap}`,
@@ -125,19 +122,15 @@ export default function LayananSuratPage() {
     setLoadingRiwayat(false)
   }, [filterBulan, filterTahun])
 
-  // Load Riwayat saat filter berubah
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadRiwayat()
   }, [loadRiwayat])
 
-  // STEP 1: PILIH JENIS
   const selectJenis = (jenis: JenisSurat) => {
     setJenisSurat(jenis)
     setStep(2)
   }
 
-  // STEP 2: CARI SANTRI
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (search.length < 3) return toast.warning("Ketik minimal 3 huruf")
@@ -149,7 +142,7 @@ export default function LayananSuratPage() {
 
   const selectSantri = async (s: SantriSurat) => {
     setSelectedSantri(s)
-    
+
     if (jenisSurat === 'TAGIHAN') {
        const tunggakan = await cekTunggakanSantri(s.id)
        setDataTunggakan(tunggakan)
@@ -157,38 +150,34 @@ export default function LayananSuratPage() {
     }
 
     if (jenisSurat === 'MONDOK' || jenisSurat === 'TAGIHAN') {
-       setStep(4) 
+       setStep(4)
     } else {
-       setStep(3) 
+       setStep(3)
     }
   }
 
-  // STEP 3: INPUT TAMBAHAN
   const handleInputTambahan = (e: React.FormEvent) => {
     e.preventDefault()
     setStep(4)
   }
 
-  // STEP 4: PROSES CETAK & CATAT
   const handlePrintProcess = async () => {
     if (!selectedSantri || !jenisSurat) return
     setIsPrinting(true)
-    
-    // 1. Catat ke Database dulu
+
     const info = jenisSurat === 'IZIN' ? (dataTambahan.alasan || 'Izin Pulang') :
-                 jenisSurat === 'TAGIHAN' ? `Tunggakan: ${dataTunggakan?.totalBulan ?? dataTunggakan?.items?.length ?? 0} bulan, Total Rp ${dataTunggakan?.total?.toLocaleString('id-ID')}` : 
+                 jenisSurat === 'TAGIHAN' ? `Tunggakan: ${dataTunggakan?.totalBulan ?? dataTunggakan?.items?.length ?? 0} bulan, Total Rp ${dataTunggakan?.total?.toLocaleString('id-ID')}` :
                  jenisSurat === 'BERHENTI' ? "Pengunduran Diri" : "Keterangan Aktif"
 
     try {
       const res = await catatSuratKeluar(selectedSantri.id, jenisSurat, info)
-      
+
       if ('error' in res) {
         toast.error("Gagal mencatat riwayat surat", { description: "Tapi proses cetak tetap dilanjutkan." })
       } else {
-        loadRiwayat() // Refresh tabel bawah
+        loadRiwayat()
       }
 
-      // 2. Trigger Print Dialog
       triggerPrint()
     } catch (error) {
       console.error(error)
@@ -197,10 +186,9 @@ export default function LayananSuratPage() {
     }
   }
 
-  // HAPUS RIWAYAT
   const handleDeleteRiwayat = async (id: string) => {
     if (!await confirm("Hapus catatan surat ini?")) return
-    
+
     const toastId = toast.loading("Menghapus...")
     const res = await hapusRiwayatSurat(id)
     toast.dismiss(toastId)
@@ -215,11 +203,13 @@ export default function LayananSuratPage() {
 
   return (
     <div className="space-y-12 pb-20">
-       
-       {/* HEADER (Sembunyikan saat print) */}
+
+       {/* HEADER */}
        <div className="flex items-center gap-4 print:hidden">
         {step > 1 && (
-            <button onClick={() => setStep(step - 1)} className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft className="w-6 h-6 text-slate-600"/></button>
+            <ActionIcon onClick={() => setStep(step - 1)} variant="subtle" color="gray" size="lg" radius="xl">
+              <ArrowLeft className="w-5 h-5"/>
+            </ActionIcon>
         )}
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Layanan Surat</h1>
@@ -227,10 +217,10 @@ export default function LayananSuratPage() {
         </div>
       </div>
 
-      {/* --- BAGIAN GENERATOR --- */}
+      {/* GENERATOR */}
       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 print:border-none print:p-0 print:bg-white">
-          
-          {/* STEP 1: PILIH JENIS (Sembunyikan saat print) */}
+
+          {/* STEP 1: PILIH JENIS */}
           {step === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in print:hidden">
                 <MenuCard title="Ket. Mondok" desc="Surat aktif santri" icon={FileText} color="bg-blue-600" onClick={() => selectJenis('MONDOK')} />
@@ -240,13 +230,21 @@ export default function LayananSuratPage() {
             </div>
           )}
 
-          {/* STEP 2: CARI SANTRI (Sembunyikan saat print) */}
+          {/* STEP 2: CARI SANTRI */}
           {step === 2 && (
             <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4 print:hidden">
                 <h3 className="font-bold text-lg mb-4 text-center">Cari Santri</h3>
                 <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nama / NIS..." className="flex-1 p-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"/>
-                    <button disabled={loading} className="bg-blue-600 text-white px-4 rounded-lg">{loading ? <Loader2 className="animate-spin w-5 h-5"/> : <Search className="w-5 h-5"/>}</button>
+                    <TextInput
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Nama / NIS..."
+                      className="flex-1"
+                      radius="xl"
+                    />
+                    <Button type="submit" loading={loading} color="blue" px="lg" radius="lg">
+                      {!loading && <Search className="w-5 h-5"/>}
+                    </Button>
                 </form>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                     {hasilCari.map(s => (
@@ -259,7 +257,7 @@ export default function LayananSuratPage() {
             </div>
           )}
 
-          {/* STEP 3: INPUT TAMBAHAN (Sembunyikan saat print) */}
+          {/* STEP 3: INPUT TAMBAHAN */}
           {step === 3 && (
             <div className="bg-white p-6 rounded-xl border shadow-sm max-w-xl mx-auto animate-in slide-in-from-right-4 print:hidden">
                 <h3 className="font-bold text-lg mb-4">Detail Surat {jenisSurat}</h3>
@@ -267,16 +265,36 @@ export default function LayananSuratPage() {
                     {jenisSurat === 'IZIN' && (
                         <>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-slate-500">Dari Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglMulai: e.target.value})} className="w-full p-2 border rounded"/></div>
-                                <div><label className="text-xs font-bold text-slate-500">Sampai Tanggal</label><input type="date" required onChange={e=>setDataTambahan({...dataTambahan, tglSelesai: e.target.value})} className="w-full p-2 border rounded"/></div>
+                                <TextInput
+                                  type="date"
+                                  label="Dari Tanggal"
+                                  required
+                                  onChange={e => setDataTambahan({...dataTambahan, tglMulai: e.target.value})}
+                                />
+                                <TextInput
+                                  type="date"
+                                  label="Sampai Tanggal"
+                                  required
+                                  onChange={e => setDataTambahan({...dataTambahan, tglSelesai: e.target.value})}
+                                />
                             </div>
-                            <div><label className="text-xs font-bold text-slate-500">Keperluan</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
+                            <Textarea
+                              label="Keperluan"
+                              required
+                              onChange={e => setDataTambahan({...dataTambahan, alasan: e.target.value})}
+                              rows={3}
+                            />
                         </>
                     )}
                     {jenisSurat === 'BERHENTI' && (
-                        <div><label className="text-xs font-bold text-slate-500">Alasan Berhenti</label><textarea required onChange={e=>setDataTambahan({...dataTambahan, alasan: e.target.value})} className="w-full p-2 border rounded" rows={3}></textarea></div>
+                        <Textarea
+                          label="Alasan Berhenti"
+                          required
+                          onChange={e => setDataTambahan({...dataTambahan, alasan: e.target.value})}
+                          rows={3}
+                        />
                     )}
-                    <button className="w-full bg-green-600 text-white py-2 rounded-lg font-bold">Lanjut Preview</button>
+                    <Button type="submit" color="green" fullWidth>Lanjut Preview</Button>
                 </form>
             </div>
           )}
@@ -284,20 +302,23 @@ export default function LayananSuratPage() {
           {/* STEP 4: PREVIEW */}
           {step === 4 && selectedSantri && jenisSurat && (
             <div className="flex flex-col items-center gap-4 animate-in fade-in">
-                {/* Tombol Aksi (Sembunyikan saat print) */}
                 <div className="flex gap-4 print:hidden">
-                    <button onClick={() => setStep(1)} disabled={isPrinting} className="px-4 py-2 border bg-white rounded-lg hover:bg-slate-50">Batal / Ganti</button>
-                    <button onClick={() => handlePrintProcess()} disabled={isPrinting} className="px-6 py-2 bg-green-700 text-white rounded-lg font-bold shadow hover:bg-green-800 flex items-center gap-2 disabled:opacity-50">
-                        {isPrinting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Printer className="w-4 h-4"/>} Cetak & Simpan
-                    </button>
+                    <Button onClick={() => setStep(1)} disabled={isPrinting} variant="outline" color="gray">Batal / Ganti</Button>
+                    <Button
+                      onClick={() => handlePrintProcess()}
+                      loading={isPrinting}
+                      color="green"
+                      leftSection={<Printer className="w-4 h-4"/>}
+                    >
+                      Cetak & Simpan
+                    </Button>
                 </div>
-                
-                {/* Dokumen yang akan dicetak */}
+
                 <div className="bg-slate-200 p-8 border rounded-xl overflow-auto max-w-full print:p-0 print:bg-white print:border-none print:w-full print:overflow-visible">
                     <div ref={printRef} className="bg-white shadow-2xl print:shadow-none print:w-full">
-                        <SuratView 
-                            jenis={jenisSurat} 
-                            dataSantri={selectedSantri} 
+                        <SuratView
+                            jenis={jenisSurat}
+                            dataSantri={selectedSantri}
                             dataTambahan={dataTambahan}
                             dataTunggakan={dataTunggakan || undefined}
                         />
@@ -307,23 +328,24 @@ export default function LayananSuratPage() {
           )}
       </div>
 
-      {/* --- BAGIAN RIWAYAT (TABEL BAWAH) (Sembunyikan saat print) --- */}
+      {/* RIWAYAT */}
       <div className="border-t pt-8 print:hidden">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <History className="w-6 h-6 text-orange-600"/> Agenda Surat Keluar
               </h2>
-              
-              {/* Filter */}
+
               <div className="flex gap-2">
-                  <select value={filterBulan} onChange={e => setFilterBulan(Number(e.target.value))} className="p-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                      {BULAN_LIST.map((b, i) => <option key={i} value={i+1}>{b}</option>)}
-                  </select>
-                  <select value={filterTahun} onChange={e => setFilterTahun(Number(e.target.value))} className="p-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="2024">2024</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
-                  </select>
+                  <NativeSelect
+                    value={String(filterBulan)}
+                    onChange={e => setFilterBulan(Number(e.target.value))}
+                    data={BULAN_LIST.map((b, i) => ({ label: b, value: String(i+1) }))}
+                  />
+                  <NativeSelect
+                    value={String(filterTahun)}
+                    onChange={e => setFilterTahun(Number(e.target.value))}
+                    data={['2024', '2025', '2026']}
+                  />
               </div>
           </div>
 
@@ -351,26 +373,31 @@ export default function LayananSuratPage() {
                                 <tr key={row.id} className="hover:bg-slate-50">
                                     <td className="px-6 py-3 font-mono text-xs text-slate-500">{format(new Date(row.created_at), 'dd/MM/yyyy HH:mm', {locale:id})}</td>
                                     <td className="px-6 py-3">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                                            row.jenis_surat === 'IZIN' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                            row.jenis_surat === 'TAGIHAN' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                            'bg-blue-50 text-blue-700 border-blue-200'
-                                        }`}>
-                                            {row.jenis_surat}
-                                        </span>
+                                        <Badge
+                                          color={
+                                            row.jenis_surat === 'IZIN' ? 'grape' :
+                                            row.jenis_surat === 'TAGIHAN' ? 'orange' :
+                                            'blue'
+                                          }
+                                          variant="light"
+                                          size="sm"
+                                        >
+                                          {row.jenis_surat}
+                                        </Badge>
                                     </td>
                                     <td className="px-6 py-3 font-bold text-slate-800">{row.nama_lengkap}</td>
                                     <td className="px-6 py-3 text-xs text-slate-500">{row.asrama}</td>
                                     <td className="px-6 py-3 text-xs italic text-slate-600 max-w-xs truncate">{row.detail_info}</td>
                                     <td className="px-6 py-3 text-xs text-slate-500">{row.admin_nama}</td>
                                     <td className="px-6 py-3 text-right">
-                                        <button 
-                                            onClick={() => handleDeleteRiwayat(row.id)}
-                                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors"
-                                            title="Hapus Arsip"
+                                        <ActionIcon
+                                          onClick={() => handleDeleteRiwayat(row.id)}
+                                          variant="subtle"
+                                          color="red"
+                                          title="Hapus Arsip"
                                         >
-                                            <Trash2 className="w-4 h-4"/>
-                                        </button>
+                                          <Trash2 className="w-4 h-4"/>
+                                        </ActionIcon>
                                     </td>
                                 </tr>
                             ))}

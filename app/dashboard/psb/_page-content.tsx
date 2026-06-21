@@ -22,6 +22,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
+import { Button, ActionIcon, TextInput, NativeSelect, SegmentedControl, Modal } from '@mantine/core'
 
 import {
   batalkanPembayaranPsb,
@@ -369,14 +370,9 @@ export default function PsbPageContent() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole(null)}
-                  className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
-                  aria-label="Kembali ke pilihan tugas"
-                >
+                <ActionIcon onClick={() => setSelectedRole(null)} variant="default" size="lg" radius="xl" aria-label="Kembali ke pilihan tugas">
                   <ArrowLeft className="h-4 w-4" />
-                </button>
+                </ActionIcon>
                 <div>
                   <h2 className="font-black text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
                   <p className="text-xs text-slate-500">
@@ -385,28 +381,28 @@ export default function PsbPageContent() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative min-w-0 sm:w-80">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={q}
-                    onChange={e => setQ(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Cari nama atau NIS..."
-                  />
-                </div>
+                <TextInput
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                  placeholder="Cari nama atau NIS..."
+                  leftSection={<Search className="h-4 w-4"/>}
+                  radius="xl"
+                  className="sm:w-80"
+                />
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-2">
                   <button onClick={() => setTahunTagihan(t => t - 1)} className="px-1 text-sm font-bold text-slate-500">-</button>
                   <span className="font-mono text-xs font-bold text-slate-800">{tahunTagihan}</span>
                   <button onClick={() => setTahunTagihan(t => t + 1)} className="px-1 text-sm font-bold text-slate-500">+</button>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => load(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  variant="default"
+                  size="sm"
+                  leftSection={<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}/>}
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                   Refresh
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -467,30 +463,28 @@ export default function PsbPageContent() {
         </div>
       )}
 
-      {showDadakanModal ? (
-        <DadakanModal
-          dadakan={dadakan}
-          busy={busyId === 'dadakan'}
-          setDadakan={setDadakan}
-          onClose={() => setShowDadakanModal(false)}
-          onSubmit={handleDadakan}
-        />
-      ) : null}
+      <DadakanModal
+        opened={showDadakanModal}
+        dadakan={dadakan}
+        busy={busyId === 'dadakan'}
+        setDadakan={setDadakan}
+        onClose={() => setShowDadakanModal(false)}
+        onSubmit={handleDadakan}
+      />
 
-      {paymentModalRow ? (
-        <PaymentModal
-          row={paymentModalRow}
-          tahunTagihan={tahunTagihan}
-          busy={busyId === paymentModalRow.id}
-          paymentItems={paymentItems}
-          bangunanNominal={bangunanNominal}
-          setBangunanNominal={setBangunanNominal}
-          togglePayment={togglePayment}
-          getPreviewItems={getPreviewItems}
-          onClose={() => setPaymentModalRow(null)}
-          onSubmit={() => handlePayment(paymentModalRow)}
-        />
-      ) : null}
+      <PaymentModal
+        opened={!!paymentModalRow}
+        row={paymentModalRow}
+        tahunTagihan={tahunTagihan}
+        busy={paymentModalRow ? busyId === paymentModalRow.id : false}
+        paymentItems={paymentItems}
+        bangunanNominal={bangunanNominal}
+        setBangunanNominal={setBangunanNominal}
+        togglePayment={togglePayment}
+        getPreviewItems={getPreviewItems}
+        onClose={() => setPaymentModalRow(null)}
+        onSubmit={() => paymentModalRow && handlePayment(paymentModalRow)}
+      />
     </div>
   )
 }
@@ -505,10 +499,9 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
       </div>
       <div className="flex justify-end">
         {canCreate ? (
-          <button onClick={onDadakan} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">
-            <UserPlus className="h-4 w-4" />
+          <Button onClick={onDadakan} color="blue" leftSection={<UserPlus className="h-4 w-4"/>}>
             Santri Dadakan
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -534,14 +527,15 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
                   <td className="px-4 py-3 text-slate-600">{row.kamar || '-'}</td>
                   <td className="px-4 py-3 font-semibold text-slate-700">{rupiah(paymentPaid(row))}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      disabled={busyId === row.id}
+                    <Button
+                      loading={busyId === row.id}
                       onClick={() => onVerify(row)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                      color="blue"
+                      size="xs"
+                      leftSection={busyId !== row.id ? <Check className="h-3.5 w-3.5"/> : undefined}
                     >
-                      {busyId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                       Verifikasi
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )) : <EmptyRow colSpan={7} text="Tidak ada santri yang menunggu verifikasi." />}
@@ -595,24 +589,24 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
                   <tr key={row.id} className="hover:bg-slate-50">
                     <SantriCells row={row} />
                     <td className="px-4 py-3">
-                      <select
+                      <NativeSelect
                         value={target}
                         onChange={e => setSelectedAsrama((prev: Record<string, string>) => ({ ...prev, [row.id]: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Pilih asrama</option>
-                        {stats.map((item: any) => <option key={item.asrama} value={item.asrama}>{item.asrama}</option>)}
-                      </select>
+                        data={[{ label: 'Pilih asrama', value: '' }, ...stats.map((item: any) => ({ label: item.asrama, value: item.asrama }))]}
+                        size="sm"
+                      />
                     </td>
                     <td className="px-4 py-3">{quota ? <AsramaStatusBadge status={quota.status} over={quota.over} /> : <span className="text-xs text-slate-400">Pilih asrama</span>}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        disabled={!target || busyId === row.id}
+                      <Button
+                        loading={busyId === row.id}
+                        disabled={!target}
                         onClick={() => onPlace(row)}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                        color="dark"
+                        size="xs"
                       >
                         Simpan Asrama
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 )
@@ -635,13 +629,11 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
           <p className="text-sm text-slate-500">Pengurus asrama hanya melihat santri dan kamar dari asrama binaannya.</p>
         </div>
         {!user?.asrama_binaan ? (
-          <select
+          <NativeSelect
             value={activeAsrama}
             onChange={e => setActiveAsrama(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {asramaList.map((asrama: string) => <option key={asrama} value={asrama}>{asrama}</option>)}
-          </select>
+            data={asramaList.map((asrama: string) => ({ label: asrama, value: asrama }))}
+          />
         ) : null}
       </div>
 
@@ -688,26 +680,29 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
                   <SantriCells row={row} />
                   <td className="px-4 py-3 font-semibold text-slate-700">{row.asrama || '-'}</td>
                   <td className="px-4 py-3">
-                    <select
+                    <NativeSelect
                       value={selectedKamar[row.id] ?? row.kamar ?? ''}
                       onChange={e => setSelectedKamar((prev: Record<string, string>) => ({ ...prev, [row.id]: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Pilih kamar</option>
-                      {roomOptions.map((room: any) => {
-                        const over = Number(room.terisi ?? 0) >= Number(room.kuota ?? 0)
-                        return <option key={room.nomor_kamar} value={room.nomor_kamar}>Kamar {room.nomor_kamar} - {room.terisi}/{room.kuota}{over ? ' over' : ''}</option>
-                      })}
-                    </select>
+                      data={[
+                        { label: 'Pilih kamar', value: '' },
+                        ...roomOptions.map((room: any) => {
+                          const over = Number(room.terisi ?? 0) >= Number(room.kuota ?? 0)
+                          return { label: `Kamar ${room.nomor_kamar} - ${room.terisi}/${room.kuota}${over ? ' over' : ''}`, value: room.nomor_kamar }
+                        })
+                      ]}
+                      size="sm"
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      disabled={!(selectedKamar[row.id] ?? row.kamar) || busyId === row.id}
+                    <Button
+                      loading={busyId === row.id}
+                      disabled={!(selectedKamar[row.id] ?? row.kamar)}
                       onClick={() => onPlace(row)}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                      color="dark"
+                      size="xs"
                     >
                       Simpan Kamar
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )) : <EmptyRow colSpan={6} text="Tidak ada santri yang menunggu penentuan kamar untuk asrama ini." />}
@@ -845,31 +840,37 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
                     <td className="px-4 py-3 text-right font-semibold text-rose-700">{rupiah(outstanding)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <button
-                          disabled={!canPay || busyId === row.id}
+                        <Button
+                          loading={busyId === row.id}
+                          disabled={!canPay}
                           onClick={() => onOpenPayment(row)}
-                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                          color="teal"
+                          size="xs"
+                          leftSection={busyId !== row.id ? <Banknote className="h-3.5 w-3.5"/> : undefined}
                         >
-                          <Banknote className="h-3.5 w-3.5" />
                           Input
-                        </button>
+                        </Button>
                         {row.pembayaran?.latestReceipt?.id ? (
-                          <button
-                            disabled={busyId === row.id}
+                          <Button
+                            loading={busyId === row.id}
                             onClick={() => onCancelPayment(row)}
-                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
+                            color="pink"
+                            variant="light"
+                            size="xs"
                           >
                             Batalkan
-                          </button>
+                          </Button>
                         ) : null}
                         {row.status === 'PAID' ? (
-                          <button
-                            disabled={busyId === row.id}
+                          <Button
+                            loading={busyId === row.id}
                             onClick={() => onDone(row)}
-                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:bg-slate-200 disabled:text-slate-500"
+                            color="teal"
+                            variant="light"
+                            size="xs"
                           >
                             Selesai
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     </td>
@@ -970,90 +971,63 @@ function EmptyRow({ colSpan, text }: { colSpan: number; text: string }) {
   )
 }
 
-function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
+function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit, opened }: any) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" aria-label="Tutup modal" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
-      <form onSubmit={onSubmit} className="relative z-10 w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <UserPlus className="h-4 w-4 text-blue-600" />
-              <h2 className="text-base font-bold text-slate-900">Santri Dadakan</h2>
-            </div>
-            <p className="text-xs leading-5 text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={<div className="flex items-center gap-2"><UserPlus className="h-4 w-4 text-blue-600"/><span className="font-bold">Santri Dadakan</span></div>}
+      size="sm"
+      centered
+    >
+      <p className="mb-4 text-xs leading-5 text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <TextInput
+          label="Nama Lengkap"
+          required
+          autoFocus
+          value={dadakan.nama_lengkap}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadakan((prev: any) => ({ ...prev, nama_lengkap: e.target.value }))}
+          placeholder="Nama santri"
+        />
+        <div>
+          <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Jenis Kelamin</p>
+          <SegmentedControl
+            value={dadakan.jenis_kelamin}
+            onChange={(v: string) => setDadakan((prev: any) => ({ ...prev, jenis_kelamin: v }))}
+            data={[{ label: 'Laki-laki', value: 'L' }, { label: 'Perempuan', value: 'P' }]}
+            fullWidth
+          />
         </div>
-
-        <div className="space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Nama Lengkap</span>
-            <input
-              required
-              autoFocus
-              value={dadakan.nama_lengkap}
-              onChange={e => setDadakan((prev: any) => ({ ...prev, nama_lengkap: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Nama santri"
-            />
-          </label>
-          <div>
-            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Jenis Kelamin</span>
-            <div className="grid grid-cols-2 gap-2">
-              {(['L', 'P'] as const).map(jk => (
-                <button
-                  type="button"
-                  key={jk}
-                  onClick={() => setDadakan((prev: any) => ({ ...prev, jenis_kelamin: jk }))}
-                  className={`rounded-lg border px-3 py-2 text-sm font-bold ${dadakan.jenis_kelamin === jk ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {jk === 'L' ? 'Laki-laki' : 'Perempuan'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sekolah</span>
-            <select
-              value={dadakan.sekolah}
-              onChange={e => setDadakan((prev: any) => ({ ...prev, sekolah: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Belum dipilih</option>
-              {SEKOLAH_LIST.map(item => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            Masukkan ke PSB
-          </button>
-        </div>
+        <NativeSelect
+          label="Sekolah"
+          value={dadakan.sekolah}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDadakan((prev: any) => ({ ...prev, sekolah: e.target.value }))}
+          data={[{ label: 'Belum dipilih', value: '' }, ...SEKOLAH_LIST.map(item => ({ label: item, value: item }))]}
+        />
+        <Button type="submit" loading={busy} color="blue" fullWidth leftSection={!busy ? <UserPlus className="h-4 w-4"/> : undefined}>
+          Masukkan ke PSB
+        </Button>
       </form>
-    </div>
+    </Modal>
   )
 }
 
-function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onClose, onSubmit }: any) {
-  const items = getPreviewItems(row)
+function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onClose, onSubmit, opened }: any) {
+  const items = row ? getPreviewItems(row) : []
   const total = items.reduce((sum: number, item: any) => sum + item.nominal, 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" aria-label="Tutup modal pembayaran" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-lg font-bold text-slate-900">Pembayaran PSB</h2>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">{row.nama_lengkap} - {row.nis}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
-        </div>
-
-        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[420px_1fr]">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={row ? <div><div className="flex items-center gap-2"><Wallet className="h-5 w-5 text-emerald-700"/><span className="text-lg font-bold text-slate-900">Pembayaran PSB</span></div><p className="mt-1 text-sm text-slate-500">{row.nama_lengkap} - {row.nis}</p></div> : null}
+      size="5xl"
+      centered
+      styles={{ body: { padding: 0, overflow: 'hidden' } }}
+    >
+      {row && (
+        <div className="grid max-h-[80vh] overflow-y-auto lg:grid-cols-[420px_1fr]">
           <div className="space-y-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Asrama / Kamar</p>
@@ -1095,20 +1069,22 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
               ))}
             </div>
 
-            <button
-              disabled={busy || items.length === 0}
+            <Button
+              loading={busy}
+              disabled={items.length === 0}
               onClick={onSubmit}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500"
+              color="teal"
+              fullWidth
+              leftSection={!busy ? <Printer className="h-4 w-4"/> : undefined}
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
               Simpan & Cetak Kuitansi
-            </button>
+            </Button>
           </div>
 
           <ReceiptPreview row={row} items={items} total={total} tahunTagihan={tahunTagihan} />
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 

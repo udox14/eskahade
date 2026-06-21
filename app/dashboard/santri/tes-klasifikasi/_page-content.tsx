@@ -4,11 +4,12 @@ import React, { useState, useCallback } from 'react'
 import { getSantriBaru, simpanTes, getAsramaList } from './actions'
 import {
   Search, Save, CheckCircle, Clock, GraduationCap,
-  RefreshCw, X, FileText, BookOpen, Hash, User,
-  ChevronLeft, ChevronRight, Filter, AlertCircle, Loader2
+  X, FileText, BookOpen, Hash, User,
+  ChevronLeft, ChevronRight, Filter, Loader2
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { Button, TextInput, NativeSelect, SegmentedControl, Modal } from '@mantine/core'
 
 type FilterStatus = 'SEMUA' | 'SUDAH' | 'BELUM'
 
@@ -42,7 +43,6 @@ export default function TesKlasifikasiPage() {
 
   function fmtNum(n: number) { return new Intl.NumberFormat('id-ID').format(n) }
 
-  // Load asrama list sekali saat mount
   React.useEffect(() => { getAsramaList().then(setAsramaList) }, [])
 
   const loadData = useCallback(async (pg = 1, s = search, f = filterStatus, a = filterAsrama) => {
@@ -79,12 +79,10 @@ export default function TesKlasifikasiPage() {
 
   const handleOpenForm = (santri: Santri) => {
     setSelectedSantri(santri)
-    document.body.style.overflow = 'hidden'
   }
 
   const handleCloseForm = () => {
     setSelectedSantri(null)
-    document.body.style.overflow = 'unset'
   }
 
   const handleSimpan = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -105,7 +103,6 @@ export default function TesKlasifikasiPage() {
   }
 
   const sudah  = rows.filter(r => r.status_tes === 'SUDAH').length
-  const belum  = rows.filter(r => r.status_tes === 'BELUM').length
 
   return (
     <div className="pb-16 space-y-5">
@@ -136,58 +133,50 @@ export default function TesKlasifikasiPage() {
           {/* Search */}
           <form onSubmit={handleSearch} className="flex-1 min-w-[200px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari Santri</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Nama atau NIS..."
-                  value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            </div>
+            <TextInput
+              placeholder="Nama atau NIS..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              leftSection={<Search className="w-3.5 h-3.5" />}
+            />
           </form>
 
           {/* Filter asrama */}
           <div className="min-w-[150px]">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-            <select value={filterAsrama} onChange={e => handleFilterAsrama(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option value="SEMUA">Semua Asrama</option>
-              {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <NativeSelect
+              value={filterAsrama}
+              onChange={e => handleFilterAsrama(e.target.value)}
+              data={[
+                { label: 'Semua Asrama', value: 'SEMUA' },
+                ...asramaList.map(a => ({ label: a, value: a })),
+              ]}
+            />
           </div>
 
           {/* Filter status */}
           <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Status Tes</label>
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-              {(['SEMUA', 'BELUM', 'SUDAH'] as FilterStatus[]).map(f => (
-                <button key={f} onClick={() => handleFilterStatus(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    filterStatus === f
-                      ? f === 'SUDAH' ? 'bg-white text-emerald-700 shadow-sm'
-                      : f === 'BELUM' ? 'bg-white text-amber-700 shadow-sm'
-                      : 'bg-white text-slate-800 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  {f === 'SEMUA' ? 'Semua' : f === 'SUDAH' ? 'Sudah Dites' : 'Belum Dites'}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              value={filterStatus}
+              onChange={v => handleFilterStatus(v as FilterStatus)}
+              data={[
+                { label: 'Semua', value: 'SEMUA' },
+                { label: 'Belum Dites', value: 'BELUM' },
+                { label: 'Sudah Dites', value: 'SUDAH' },
+              ]}
+            />
           </div>
 
-          {/* Tombol tampilkan */}
-          <button
+          <Button
             onClick={() => { setSearch(searchInput); loadData(1, searchInput, filterStatus, filterAsrama) }}
-            disabled={loading}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2 self-end"
+            loading={loading}
+            color="teal"
+            leftSection={!loading ? <Filter className="w-4 h-4" /> : undefined}
+            className="self-end"
           >
-            <Filter className="w-4 h-4" />
-            {loading ? 'Memuat...' : 'Tampilkan'}
-          </button>
+            Tampilkan
+          </Button>
         </div>
       </div>
 
@@ -199,10 +188,9 @@ export default function TesKlasifikasiPage() {
           </div>
           <p className="text-slate-500 font-medium">Data belum dimuat</p>
           <p className="text-sm text-slate-400">Tekan <strong>Tampilkan</strong> untuk melihat daftar santri baru</p>
-          <button onClick={() => loadData(1)}
-            className="mt-1 bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700">
+          <Button onClick={() => loadData(1)} color="teal" mt="xs">
             Tampilkan Sekarang
-          </button>
+          </Button>
         </div>
       ) : loading ? (
         <div className="flex justify-center py-20 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
@@ -229,7 +217,6 @@ export default function TesKlasifikasiPage() {
           <div className="grid grid-cols-1 gap-3 md:hidden">
             {rows.map(s => (
               <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {/* Indikator garis samping */}
                 <div className={`h-1 w-full ${s.status_tes === 'SUDAH' ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-3">
@@ -261,14 +248,14 @@ export default function TesKlasifikasiPage() {
                     </div>
                   )}
 
-                  <button onClick={() => handleOpenForm(s)}
-                    className={`w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
-                      s.status_tes === 'SUDAH'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
-                    }`}>
+                  <Button
+                    onClick={() => handleOpenForm(s)}
+                    fullWidth
+                    variant={s.status_tes === 'SUDAH' ? 'light' : 'filled'}
+                    color={s.status_tes === 'SUDAH' ? 'yellow' : 'teal'}
+                  >
                     {s.status_tes === 'SUDAH' ? 'Edit Penilaian' : 'Mulai Input Tes'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -322,14 +309,14 @@ export default function TesKlasifikasiPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleOpenForm(s)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-                          s.status_tes === 'SUDAH'
-                            ? 'border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
-                        }`}>
+                      <Button
+                        onClick={() => handleOpenForm(s)}
+                        size="xs"
+                        variant={s.status_tes === 'SUDAH' ? 'light' : 'filled'}
+                        color={s.status_tes === 'SUDAH' ? 'yellow' : 'teal'}
+                      >
                         {s.status_tes === 'SUDAH' ? 'Edit Nilai' : 'Input Tes'}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -370,44 +357,62 @@ export default function TesKlasifikasiPage() {
       )}
 
       {/* ── Modal Form Penilaian ── */}
-      {selectedSantri && (
-        <div className="fixed inset-0 bg-slate-900/60 flex flex-col md:items-center md:justify-center z-50 md:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 md:zoom-in-95">
-            <form onSubmit={handleSimpan} className="flex flex-col h-full">
+      <Modal
+        opened={!!selectedSantri}
+        onClose={handleCloseForm}
+        title={selectedSantri ? (
+          <div>
+            <p className="font-bold text-slate-800 text-sm">Form Tes Klasifikasi</p>
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+              <User className="w-3 h-3" />
+              <span className="font-semibold text-slate-700 truncate max-w-[200px]">{selectedSantri.nama}</span>
+              <span className="bg-slate-100 px-2 py-0.5 rounded-lg text-[10px] font-medium border border-slate-200">
+                {selectedSantri.asrama || '—'} / {selectedSantri.kamar || '—'}
+              </span>
+            </div>
+          </div>
+        ) : undefined}
+        size="xl"
+        centered
+      >
+        {selectedSantri && (
+          <form onSubmit={handleSimpan}>
+            <div className="space-y-5">
 
-              {/* Header Modal */}
-              <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-20 shrink-0">
-                <div>
-                  <h3 className="font-bold text-slate-800">Form Tes Klasifikasi</h3>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-                    <User className="w-3 h-3" />
-                    <span className="font-semibold text-slate-700 truncate max-w-[200px]">{selectedSantri.nama}</span>
-                    <span className="bg-slate-100 px-2 py-0.5 rounded-lg text-[10px] font-medium border border-slate-200">
-                      {selectedSantri.asrama || '—'} / {selectedSantri.kamar || '—'}
-                    </span>
-                  </div>
+              {/* A. Menulis */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><FileText className="w-3.5 h-3.5" /></span>
+                  A. Kemampuan Menulis Arab
+                </h4>
+                <div className="grid grid-cols-3 gap-2">
+                  {['BAIK', 'KURANG', 'TIDAK_BISA'].map(opt => (
+                    <label key={opt} className="cursor-pointer">
+                      <input type="radio" name="tulis_arab" value={opt}
+                        defaultChecked={selectedSantri.hasil?.tulis_arab === opt} required className="peer sr-only" />
+                      <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 transition-all hover:border-emerald-200 active:scale-95 text-xs font-bold">
+                        {opt.replace('_', ' ')}
+                      </div>
+                    </label>
+                  ))}
                 </div>
-                <button type="button" onClick={handleCloseForm}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
               </div>
 
-              {/* Body Modal */}
-              <div className="p-4 md:p-5 space-y-5 overflow-y-auto flex-1 bg-slate-50/50">
+              {/* B. Membaca */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><BookOpen className="w-3.5 h-3.5" /></span>
+                  B. Kemampuan Membaca Qur'an
+                </h4>
 
-                {/* A. Menulis */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><FileText className="w-3.5 h-3.5" /></span>
-                    A. Kemampuan Menulis Arab
-                  </h4>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-500">1. Kelancaran</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {['BAIK', 'KURANG', 'TIDAK_BISA'].map(opt => (
+                    {['LANCAR', 'TIDAK_LANCAR', 'TIDAK_BISA'].map(opt => (
                       <label key={opt} className="cursor-pointer">
-                        <input type="radio" name="tulis_arab" value={opt}
-                          defaultChecked={selectedSantri.hasil?.tulis_arab === opt} required className="peer sr-only" />
-                        <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 transition-all hover:border-emerald-200 active:scale-95 text-xs font-bold">
+                        <input type="radio" name="baca_kelancaran" value={opt}
+                          defaultChecked={selectedSantri.hasil?.baca_kelancaran === opt} required className="peer sr-only" />
+                        <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition-all hover:border-blue-200 active:scale-95 text-xs font-bold">
                           {opt.replace('_', ' ')}
                         </div>
                       </label>
@@ -415,101 +420,81 @@ export default function TesKlasifikasiPage() {
                   </div>
                 </div>
 
-                {/* B. Membaca */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><BookOpen className="w-3.5 h-3.5" /></span>
-                    B. Kemampuan Membaca Qur'an
-                  </h4>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-slate-500">1. Kelancaran</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['LANCAR', 'TIDAK_LANCAR', 'TIDAK_BISA'].map(opt => (
-                        <label key={opt} className="cursor-pointer">
-                          <input type="radio" name="baca_kelancaran" value={opt}
-                            defaultChecked={selectedSantri.hasil?.baca_kelancaran === opt} required className="peer sr-only" />
-                          <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition-all hover:border-blue-200 active:scale-95 text-xs font-bold">
-                            {opt.replace('_', ' ')}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-slate-500">2. Tajwid</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['BAIK', 'KURANG', 'BURUK'].map(opt => (
-                        <label key={opt} className="cursor-pointer">
-                          <input type="radio" name="baca_tajwid" value={opt}
-                            defaultChecked={selectedSantri.hasil?.baca_tajwid === opt} required className="peer sr-only" />
-                          <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition-all hover:border-blue-200 active:scale-95 text-xs font-bold">
-                            {opt}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                      <Hash className="w-3.5 h-3.5 text-slate-400" /> 3. Hafalan (Juz)
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                      <input type="number" name="hafalan_juz"
-                        defaultValue={selectedSantri.hasil?.hafalan_juz ?? 0}
-                        placeholder="0" min="0" max="30"
-                        className="w-12 text-center font-bold text-lg text-blue-700 outline-none bg-transparent" />
-                      <span className="text-xs text-slate-400 font-medium">Juz</span>
-                    </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-500">2. Tajwid</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['BAIK', 'KURANG', 'BURUK'].map(opt => (
+                      <label key={opt} className="cursor-pointer">
+                        <input type="radio" name="baca_tajwid" value={opt}
+                          defaultChecked={selectedSantri.hasil?.baca_tajwid === opt} required className="peer sr-only" />
+                        <div className="py-2.5 px-1 rounded-xl border-2 border-slate-200 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition-all hover:border-blue-200 active:scale-95 text-xs font-bold">
+                          {opt}
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                {/* C. Nahwu */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><BookOpen className="w-3.5 h-3.5" /></span>
-                    C. Pengalaman Belajar Nahwu
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="cursor-pointer">
-                      <input type="radio" name="nahwu_pengalaman" value="on"
-                        defaultChecked={!!selectedSantri.hasil?.nahwu_pengalaman} className="peer sr-only" />
-                      <div className="p-3 rounded-xl border-2 border-slate-200 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition-all hover:border-amber-200 active:scale-95">
-                        <span className="block text-sm font-black text-slate-800">SUDAH PERNAH</span>
-                        <span className="text-[10px] text-slate-500">→ Lanjut tes spesifik</span>
-                      </div>
-                    </label>
-                    <label className="cursor-pointer">
-                      <input type="radio" name="nahwu_pengalaman" value="off"
-                        defaultChecked={!selectedSantri.hasil?.nahwu_pengalaman} className="peer sr-only" />
-                      <div className="p-3 rounded-xl border-2 border-slate-200 text-center peer-checked:border-slate-500 peer-checked:bg-slate-100 transition-all hover:border-slate-300 active:scale-95">
-                        <span className="block text-sm font-black text-slate-800">BELUM PERNAH</span>
-                        <span className="text-[10px] text-slate-500">→ Masuk kelas dasar</span>
-                      </div>
-                    </label>
+                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <Hash className="w-3.5 h-3.5 text-slate-400" /> 3. Hafalan (Juz)
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <input type="number" name="hafalan_juz"
+                      defaultValue={selectedSantri.hasil?.hafalan_juz ?? 0}
+                      placeholder="0" min="0" max="30"
+                      className="w-12 text-center font-bold text-lg text-blue-700 outline-none bg-transparent" />
+                    <span className="text-xs text-slate-400 font-medium">Juz</span>
                   </div>
                 </div>
-
               </div>
 
-              {/* Footer Modal */}
-              <div className="p-4 md:p-5 border-t border-slate-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-2 sticky bottom-0 shrink-0">
-                <button type="button" onClick={handleCloseForm}
-                  className="w-full sm:w-auto px-5 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition-colors">
-                  Batal
-                </button>
-                <button type="submit" disabled={saving}
-                  className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-2.5 rounded-xl hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold text-sm shadow-sm transition-all active:scale-[0.98]">
-                  {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan & Hitung Hasil</>}
-                </button>
+              {/* C. Nahwu */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><BookOpen className="w-3.5 h-3.5" /></span>
+                  C. Pengalaman Belajar Nahwu
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="cursor-pointer">
+                    <input type="radio" name="nahwu_pengalaman" value="on"
+                      defaultChecked={!!selectedSantri.hasil?.nahwu_pengalaman} className="peer sr-only" />
+                    <div className="p-3 rounded-xl border-2 border-slate-200 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition-all hover:border-amber-200 active:scale-95">
+                      <span className="block text-sm font-black text-slate-800">SUDAH PERNAH</span>
+                      <span className="text-[10px] text-slate-500">→ Lanjut tes spesifik</span>
+                    </div>
+                  </label>
+                  <label className="cursor-pointer">
+                    <input type="radio" name="nahwu_pengalaman" value="off"
+                      defaultChecked={!selectedSantri.hasil?.nahwu_pengalaman} className="peer sr-only" />
+                    <div className="p-3 rounded-xl border-2 border-slate-200 text-center peer-checked:border-slate-500 peer-checked:bg-slate-100 transition-all hover:border-slate-300 active:scale-95">
+                      <span className="block text-sm font-black text-slate-800">BELUM PERNAH</span>
+                      <span className="text-[10px] text-slate-500">→ Masuk kelas dasar</span>
+                    </div>
+                  </label>
+                </div>
               </div>
 
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-5 pt-4 border-t border-slate-100">
+              <Button type="button" onClick={handleCloseForm} variant="default">
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                loading={saving}
+                color="teal"
+                leftSection={!saving ? <Save className="w-4 h-4" /> : undefined}
+              >
+                Simpan & Hitung Hasil
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
     </div>
   )
 }

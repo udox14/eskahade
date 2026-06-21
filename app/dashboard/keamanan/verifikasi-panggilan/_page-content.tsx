@@ -8,6 +8,7 @@ import {
 import { useReactToPrint } from '@/lib/pdf/client'
 import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { Button, TextInput, NativeSelect, SegmentedControl } from '@mantine/core'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getAntrianPanggilan,
@@ -444,15 +445,9 @@ export default function VerifikasiPanggilanPage() {
         description="Gabungkan alfa pengajian, berjamaah, izin pulang, dan sakit sebelum menentukan daftar panggilan."
         action={
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => preparePrint('tempelan')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
-              <Printer className="w-4 h-4" /> Cetak Tempelan
-            </button>
-            <button onClick={() => preparePrint('eksekutor')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
-              <FileText className="w-4 h-4" /> Cetak Eksekutor
-            </button>
-            <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-            </button>
+            <Button onClick={() => preparePrint('tempelan')} variant="default" leftSection={<Printer className="w-4 h-4" />}>Cetak Tempelan</Button>
+            <Button onClick={() => preparePrint('eksekutor')} variant="default" leftSection={<FileText className="w-4 h-4" />}>Cetak Eksekutor</Button>
+            <Button onClick={loadData} loading={loading} leftSection={<RefreshCw className="w-4 h-4" />} color="blue">{hasLoaded ? 'Perbarui' : 'Tampilkan'}</Button>
           </div>
         }
       />

@@ -5,6 +5,7 @@ import {
   AlertTriangle, ArrowLeft, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
   RotateCcw, Save, Search,
 } from 'lucide-react'
+import { Button, ActionIcon, TextInput, NativeSelect, Alert, Paper } from '@mantine/core'
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
@@ -291,17 +292,16 @@ export default function HafalanPageContent() {
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-2 pb-28 sm:px-4">
+    <div className="w-full px-2 pb-28 sm:px-4">
       {step === 'home' && (
         <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal." />
       )}
 
       {step !== 'home' && (
         <div className="sticky top-0 z-20 -mx-2 mb-4 border-b border-slate-100 bg-white/85 px-2 py-3 backdrop-blur sm:-mx-4 sm:px-4">
-          <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
-            <ArrowLeft className="h-4 w-4" />
+          <Button onClick={goBack} variant="subtle" color="teal" size="compact-sm" leftSection={<ArrowLeft className="h-4 w-4"/>} className="mb-1.5 font-bold">
             {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
-          </button>
+          </Button>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
             {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
@@ -314,13 +314,14 @@ export default function HafalanPageContent() {
       {step === 'home' && (
         <div className="mt-5 space-y-4">
           {kelasList.length > 1 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <label className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Kelas</label>
-              <select value={kelasId} onChange={e => setKelasId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="">Pilih kelas</option>
-                {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
-              </select>
-            </div>
+            <Paper withBorder p="md" radius="xl">
+              <NativeSelect
+                label="Kelas"
+                value={kelasId}
+                onChange={e => setKelasId(e.target.value)}
+                data={[{ label: 'Pilih kelas', value: '' }, ...kelasList.map(k => ({ label: k.nama_kelas, value: k.id }))]}
+              />
+            </Paper>
           ) : kelasList.length === 1 ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <p className="text-xs font-bold uppercase text-emerald-600">Kelas</p>
@@ -351,10 +352,13 @@ export default function HafalanPageContent() {
       {/* SANTRI */}
       {step === 'santri' && (
         <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={santriSearch} onChange={e => setSantriSearch(e.target.value)} placeholder="Cari nama / NIS" className="h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
+          <TextInput
+            value={santriSearch}
+            onChange={e => setSantriSearch(e.target.value)}
+            placeholder="Cari nama / NIS"
+            leftSection={<Search className="h-4 w-4"/>}
+            radius="xl"
+          />
           <div className="space-y-2">
             {filteredSantri.map((s: any) => {
               const done = persistedCount(s.riwayat_id)
@@ -420,13 +424,13 @@ export default function HafalanPageContent() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <button onClick={markSelectedBabComplete} disabled={!selectedBab.blok.some((b: any) => canEditBlok(b))} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">Hafal semua</button>
-              <button onClick={() => setDragMode(v => !v)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${dragMode ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+              <Button onClick={markSelectedBabComplete} disabled={!selectedBab.blok.some((b: any) => canEditBlok(b))} color="teal" variant="light" size="xs" radius="xl">Hafal semua</Button>
+              <Button onClick={() => setDragMode(v => !v)} color={dragMode ? 'teal' : 'gray'} variant={dragMode ? 'filled' : 'light'} size="xs" radius="xl">
                 {dragMode ? 'Mode Blok: ON' : 'Mode Blok'}
-              </button>
-              <button onClick={() => setShowTerjemah(v => !v)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${showTerjemah ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                <Languages className="h-3.5 w-3.5" /> Terjemah
-              </button>
+              </Button>
+              <Button onClick={() => setShowTerjemah(v => !v)} color={showTerjemah ? 'dark' : 'gray'} variant={showTerjemah ? 'filled' : 'light'} size="xs" radius="xl" leftSection={<Languages className="h-3.5 w-3.5"/>}>
+                Terjemah
+              </Button>
             </div>
             {dirty && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">Draft belum disimpan</span>}
           </div>
@@ -436,10 +440,9 @@ export default function HafalanPageContent() {
           </p>
 
           {dirty && (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p className="text-xs font-semibold leading-5">Belum tersimpan. Tekan Simpan Hafalan agar masuk database.</p>
-            </div>
+            <Alert color="yellow" icon={<AlertTriangle className="h-4 w-4"/>}>
+              <p className="text-xs font-semibold">Belum tersimpan. Tekan Simpan Hafalan agar masuk database.</p>
+            </Alert>
           )}
 
           {isJurumiyah && selectedBab.blok[0] ? (
@@ -515,13 +518,13 @@ export default function HafalanPageContent() {
 
       {/* Sticky save bar */}
       {selectedSantriId && step !== 'home' && step !== 'santri' && (
-        <div className="fixed inset-x-0 bottom-14 z-30 mx-auto flex max-w-3xl gap-2 px-3 sm:bottom-4">
-          <button onClick={resetAllDraft} disabled={!dirty || saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg disabled:opacity-50">
+        <div className="fixed inset-x-0 bottom-14 z-30 flex gap-2 px-3 sm:bottom-4">
+          <ActionIcon onClick={resetAllDraft} disabled={!dirty || saving} variant="default" size="xl" radius="xl" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
             <RotateCcw className="h-4 w-4" />
-          </button>
-          <button onClick={saveProgress} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Hafalan ({selectedCount})
-          </button>
+          </ActionIcon>
+          <Button onClick={saveProgress} loading={saving} color="teal" radius="xl" size="md" leftSection={!saving ? <Save className="h-4 w-4"/> : undefined} style={{ flex: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+            Simpan Hafalan ({selectedCount})
+          </Button>
         </div>
       )}
     </div>
