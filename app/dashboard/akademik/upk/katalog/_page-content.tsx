@@ -10,6 +10,7 @@ import {
   hapusKatalogUPK,
   hapusTokoUPK,
   importKatalogUPK,
+  simpanKatalogBatchUPK,
   simpanKatalogUPK,
   simpanTokoUPK,
 } from './actions'
@@ -113,6 +114,24 @@ const emptyKatalogForm: KatalogForm = {
 
 const emptyTokoForm: TokoForm = { id: '', nama: '', is_active: true }
 
+type BatchRow = {
+  checked: boolean
+  toko_id: string
+  stok_lama: string
+  harga_beli: string
+  harga_jual: string
+  catatan: string
+}
+
+const emptyBatchRow: BatchRow = {
+  checked: false,
+  toko_id: '',
+  stok_lama: '',
+  harga_beli: '',
+  harga_jual: '',
+  catatan: '',
+}
+
 function rupiah(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 }
@@ -144,6 +163,10 @@ export default function KatalogUPKPage() {
   const [isKatalogModalOpen, setIsKatalogModalOpen] = useState(false)
   const [isTokoModalOpen, setIsTokoModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false)
+  const [batchMarhalah, setBatchMarhalah] = useState('')
+  const [batchRows, setBatchRows] = useState<Record<string, BatchRow>>({})
+  const [batchSaving, setBatchSaving] = useState(false)
   const [importRows, setImportRows] = useState<ImportPreviewRow[]>([])
   const [isImporting, setIsImporting] = useState(false)
   const [page, setPage] = useState(1)
@@ -191,9 +214,90 @@ export default function KatalogUPKPage() {
 
   const resetForm = () => setForm(emptyKatalogForm)
 
-  const openTambahModal = () => {
-    resetForm()
-    setIsKatalogModalOpen(true)
+  const existingKitabIds = useMemo(
+    () => new Set(katalog.map(item => item.kitab_id).filter(Boolean) as number[]),
+    [katalog]
+  )
+
+  const batchKitabList = useMemo(
+    () => (batchMarhalah ? masterKitab.filter(k => String(k.marhalah_id) === batchMarhalah) : []),
+    [batchMarhalah, masterKitab]
+  )
+
+  const batchSelectedCount = useMemo(
+    () => Object.values(batchRows).filter(r => r.checked).length,
+    [batchRows]
+  )
+
+  const openBatchModal = () => {
+    setBatchMarhalah('')
+    setBatchRows({})
+    setIsBatchModalOpen(true)
+  }
+
+  const toggleBatchRow = (id: number) => {
+    setBatchRows(prev => {
+      const current = prev[id] ?? emptyBatchRow
+      return { ...prev, [id]: { ...current, checked: !current.checked } }
+    })
+  }
+
+  const setBatchField = (id: number, key: keyof BatchRow, value: string) => {
+    setBatchRows(prev => {
+      const current = prev[id] ?? emptyBatchRow
+      return { ...prev, [id]: { ...current, [key]: value } }
+    })
+  }
+
+  const toggleBatchAll = (checked: boolean) => {
+    setBatchRows(prev => {
+      const next = { ...prev }
+      batchKitabList.forEach(k => {
+        if (existingKitabIds.has(k.id)) return
+        const current = next[k.id] ?? emptyBatchRow
+        next[k.id] = { ...current, checked }
+      })
+      return next
+    })
+  }
+
+  const handleSubmitBatch = async () => {
+    const items = batchKitabList
+      .filter(k => batchRows[k.id]?.checked && !existingKitabIds.has(k.id))
+      .map(k => {
+        const row = batchRows[k.id]
+        return {
+          kitab_id: k.id,
+          nama_kitab: k.nama_kitab,
+          marhalah_id: Number(batchMarhalah),
+          toko_id: row.toko_id ? Number(row.toko_id) : null,
+          stok_lama: numberValue(row.stok_lama),
+          harga_beli: numberValue(row.harga_beli),
+          harga_jual: numberValue(row.harga_jual),
+          catatan: row.catatan,
+        }
+      })
+
+    if (!items.length) {
+      toast.warning('Ceklis minimal satu kitab dulu.')
+      return
+    }
+
+    setBatchSaving(true)
+    const result = await simpanKatalogBatchUPK(items)
+    setBatchSaving(false)
+
+    if ('error' in result) {
+      toast.error(result.error)
+      return
+    }
+
+    const parts = [`${result.inserted} ditambahkan`]
+    if (result.skipped) parts.push(`${result.skipped} dilewati`)
+    toast.success(`Batch selesai: ${parts.join(', ')}`)
+    setIsBatchModalOpen(false)
+    setBatchRows({})
+    loadKatalog()
   }
 
   const applySearch = () => {
@@ -394,8 +498,8 @@ export default function KatalogUPKPage() {
 
       <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
-            <button onClick={openTambahModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
-              <Plus className="w-4 h-4" /> Tambah Item
+            <button onClick={openBatchModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
+              <Plus className="w-4 h-4" /> Tambah Kitab
             </button>
             <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700">
               <FileSpreadsheet className="w-4 h-4" /> Import Excel
@@ -629,6 +733,157 @@ export default function KatalogUPKPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-6xl max-h-[92vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <PackagePlus className="w-4 h-4 text-amber-600" /> Tambah Kitab ke Katalog
+              </h2>
+              <button
+                onClick={() => { setIsBatchModalOpen(false); setBatchRows({}) }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 border-b bg-white flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Pilih Marhalah</label>
+                <select
+                  value={batchMarhalah}
+                  onChange={e => { setBatchMarhalah(e.target.value); setBatchRows({}) }}
+                  className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white font-bold text-slate-700"
+                >
+                  <option value="">Pilih marhalah dulu...</option>
+                  {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                </select>
+              </div>
+              {batchMarhalah && (
+                <div className="text-sm font-bold text-slate-500 pb-2.5">
+                  {batchSelectedCount} dipilih dari {batchKitabList.length} kitab
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {!batchMarhalah ? (
+                <div className="text-center py-20 text-slate-400">
+                  <BookOpen className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                  Pilih marhalah untuk menampilkan daftar kitab.
+                </div>
+              ) : batchKitabList.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">Tidak ada kitab pada marhalah ini di Manajemen Kitab.</div>
+              ) : (
+                <table className="w-full text-sm text-left min-w-[1000px]">
+                  <thead className="bg-slate-50 text-slate-600 font-bold border-b sticky top-0 z-10">
+                    <tr>
+                      <th className="px-3 py-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4"
+                          checked={batchSelectedCount > 0 && batchSelectedCount === batchKitabList.filter(k => !existingKitabIds.has(k.id)).length}
+                          onChange={e => toggleBatchAll(e.target.checked)}
+                        />
+                      </th>
+                      <th className="px-3 py-3">Kitab</th>
+                      <th className="px-3 py-3 w-44">Toko</th>
+                      <th className="px-3 py-3 w-28 text-right">Stok Lama</th>
+                      <th className="px-3 py-3 w-32 text-right">Harga Beli</th>
+                      <th className="px-3 py-3 w-32 text-right">Harga Jual</th>
+                      <th className="px-3 py-3 w-48">Catatan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {batchKitabList.map(k => {
+                      const sudahAda = existingKitabIds.has(k.id)
+                      const row = batchRows[k.id] ?? emptyBatchRow
+                      return (
+                        <tr key={k.id} className={sudahAda ? 'bg-slate-50 text-slate-400' : row.checked ? 'bg-amber-50' : 'hover:bg-slate-50'}>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4"
+                              disabled={sudahAda}
+                              checked={!sudahAda && row.checked}
+                              onChange={() => toggleBatchRow(k.id)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <p className="font-bold text-slate-800">{k.nama_kitab}</p>
+                            {sudahAda && <p className="text-[10px] font-bold text-amber-600 uppercase">Sudah di katalog</p>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={row.toko_id}
+                              disabled={sudahAda || !row.checked}
+                              onChange={e => setBatchField(k.id, 'toko_id', e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white disabled:bg-slate-100"
+                            >
+                              <option value="">Belum ditentukan</option>
+                              {tokoList.filter(t => t.is_active).map(t => (
+                                <option key={t.id} value={t.id}>{t.nama}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min="0" placeholder="0"
+                              value={row.stok_lama}
+                              disabled={sudahAda || !row.checked}
+                              onChange={e => setBatchField(k.id, 'stok_lama', e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm text-right disabled:bg-slate-100"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min="0" placeholder="0"
+                              value={row.harga_beli}
+                              disabled={sudahAda || !row.checked}
+                              onChange={e => setBatchField(k.id, 'harga_beli', e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm text-right disabled:bg-slate-100"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min="0" placeholder="0"
+                              value={row.harga_jual}
+                              disabled={sudahAda || !row.checked}
+                              onChange={e => setBatchField(k.id, 'harga_jual', e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm text-right disabled:bg-slate-100"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              value={row.catatan}
+                              disabled={sudahAda || !row.checked}
+                              onChange={e => setBatchField(k.id, 'catatan', e.target.value)}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-100"
+                              placeholder="Opsional"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t bg-slate-50 flex flex-col sm:flex-row justify-end gap-2">
+              <button type="button" onClick={() => { setIsBatchModalOpen(false); setBatchRows({}) }} className="px-4 py-2.5 border border-slate-200 rounded-lg font-bold text-sm text-slate-600 hover:bg-white">
+                Batal
+              </button>
+              <button onClick={handleSubmitBatch} disabled={batchSaving || batchSelectedCount === 0} className="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {batchSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Tambah {batchSelectedCount > 0 ? `${batchSelectedCount} ` : ''}Kitab
+              </button>
+            </div>
           </div>
         </div>
       )}

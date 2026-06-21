@@ -9,7 +9,7 @@ import {
   getMasterAssign, removeQuranSurah, unassignJenisFromMarhalah,
 } from './actions'
 
-const ARABIC_FONT = '"Scheherazade New", "Amiri", "Traditional Arabic", "Noto Naskh Arabic", serif'
+const ARABIC_FONT = '"Amiri Quran", "Scheherazade New", "Traditional Arabic", serif'
 
 type Catalog = { jenis: string; label: string; kitab: { key: string; label: string }[] }
 

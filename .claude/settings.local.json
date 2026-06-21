@@ -30,7 +30,9 @@
       "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Jurumiyah.docx\" ./_jrm.docx)",
       "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Hadits Akhlaq ibtidaiyah 1 - New Look.docx\" ./_h.docx)",
       "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Talkhish Riyadl Ibtidaiyah 2 - New Look.docx\" ./_t.docx)",
-      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Talkhish Riyadl Ibtidaiyah 2 - New Look.docx\" ./_t2.docx)"
+      "Bash(cp \"/c/Users/IAbdu/OneDrive/Desktop/Talkhish Riyadl Ibtidaiyah 2 - New Look.docx\" ./_t2.docx)",
+      "Bash(mv 0081_s*sidebar_nilai_rapor.sql 0081_sidebar_nilai_rapor.sql)",
+      "Read(//c/c/DATA/eskahade/**)"
     ]
   }
 }

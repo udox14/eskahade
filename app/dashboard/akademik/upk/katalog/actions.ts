@@ -266,6 +266,81 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
   return { success: true }
 }
 
+type BatchKatalogItem = {
+  kitab_id: number
+  nama_kitab: string
+  marhalah_id: number
+  toko_id: number | null
+  stok_lama: number
+  harga_beli: number
+  harga_jual: number
+  catatan: string
+}
+
+export async function simpanKatalogBatchUPK(
+  items: BatchKatalogItem[]
+): Promise<{ success: boolean; inserted: number; skipped: number } | { error: string }> {
+  const session = await getSession()
+  if (!items.length) return { error: 'Belum ada kitab yang dipilih.' }
+
+  const kitabIds = items.map((item) => item.kitab_id).filter(Boolean)
+  if (!kitabIds.length) return { error: 'Kitab tidak valid.' }
+
+  const existingRows = await query<{ kitab_id: number | null }>(
+    `SELECT kitab_id FROM upk_katalog WHERE kitab_id IN (${kitabIds.map(() => '?').join(',')})`,
+    kitabIds
+  )
+  const existingSet = new Set(existingRows.map((row) => row.kitab_id))
+
+  const timestamp = now()
+  let inserted = 0
+  let skipped = 0
+
+  for (const item of items) {
+    if (!item.kitab_id || !item.nama_kitab.trim() || !item.marhalah_id) {
+      skipped++
+      continue
+    }
+    if (existingSet.has(item.kitab_id)) {
+      skipped++
+      continue
+    }
+    if (item.stok_lama < 0 || item.harga_beli < 0 || item.harga_jual < 0) {
+      skipped++
+      continue
+    }
+
+    await execute(`
+      INSERT INTO upk_katalog
+        (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
+         harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    `, [item.kitab_id, item.nama_kitab.trim(), item.marhalah_id, item.toko_id,
+        item.stok_lama, 0, item.harga_beli, item.harga_jual,
+        item.catatan.trim() || null, timestamp, timestamp, timestamp])
+    existingSet.add(item.kitab_id)
+    inserted++
+  }
+
+  if (inserted === 0) return { error: 'Tidak ada kitab baru yang ditambahkan (mungkin sudah ada di katalog).' }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: 'create',
+    fiturHref: '/dashboard/akademik/upk/katalog',
+    logKind: 'create',
+    entityType: 'upk_katalog_batch',
+    entityId: 'batch-katalog',
+    entityLabel: 'Tambah katalog batch',
+    summary: `Menambahkan ${inserted} kitab ke katalog UPK`,
+    details: { inserted, skipped, total: items.length },
+  })
+
+  revalidatePath(KATALOG_PATH)
+  return { success: true, inserted, skipped }
+}
+
 export async function hapusKatalogUPK(id: number): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const target = await queryOne<{ id: number; nama_kitab: string; marhalah_id: number | null }>(

@@ -13,6 +13,7 @@ import {
 } from './actions'
 
 const ARABIC_FONT = '"Scheherazade New", "Amiri", "Traditional Arabic", "Noto Naskh Arabic", serif'
+const QURAN_FONT = '"Amiri Quran", "Scheherazade New", "Traditional Arabic", serif'
 
 export default function HafalanPageContent() {
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -304,7 +305,7 @@ export default function HafalanPageContent() {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
             {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
-            {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: ARABIC_FONT }}>{selectedBab.judul}</span></>}
+            {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
           </div>
         </div>
       )}
@@ -398,7 +399,7 @@ export default function HafalanPageContent() {
                 <button key={bab.id} onClick={() => setSelectedBabId(bab.id)}
                   className={`relative rounded-2xl border p-3 text-left transition hover:border-emerald-300 ${bab.is_editable ? 'border-slate-200 bg-white' : 'border-sky-100 bg-sky-50'}`}>
                   <div className="flex items-start justify-between gap-1">
-                    <p className="line-clamp-2 font-bold leading-tight text-slate-900" dir={isQuran ? 'rtl' : 'ltr'} style={isQuran ? { fontFamily: ARABIC_FONT } : undefined}>{bab.judul}</p>
+                    <p className="line-clamp-2 font-bold leading-tight text-slate-900" dir={isQuran ? 'rtl' : 'ltr'} style={isQuran ? { fontFamily: QURAN_FONT } : undefined}>{bab.judul}</p>
                     {!bab.is_editable && <span className="shrink-0 rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">Lama</span>}
                   </div>
                   <div className="mt-2 flex items-center gap-2">
@@ -497,7 +498,7 @@ export default function HafalanPageContent() {
                   </div>
                   <div className="min-w-0 flex-1">
                     {blok.teks?.arab ? (
-                      <p dir="rtl" style={{ fontFamily: ARABIC_FONT }} className="text-right text-2xl leading-[2.4] text-slate-900">{blok.teks.arab}</p>
+                      <p dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }} className="text-right text-2xl leading-[2.4] text-slate-900">{blok.teks.arab}</p>
                     ) : (
                       <p className="font-bold text-slate-800">{blok.label}{blok.deskripsi ? <span className="ml-1 text-xs font-normal text-slate-400">· {blok.deskripsi}</span> : null}</p>
                     )}
