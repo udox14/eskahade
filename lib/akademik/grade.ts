@@ -27,7 +27,15 @@ export function isKomposisiKelas(value: string | null | undefined): value is Kom
 export function normalizeGrade(raw: string | null | undefined): Grade | null {
   if (!raw) return null
   const text = String(raw).toUpperCase()
-  const match = text.match(/[ABC]/)
+  
+  // Cocokkan pola "GRADE A/B/C" secara eksplisit terlebih dahulu agar huruf 'A' pada kata "GRADE" tidak salah dicocokkan
+  const gradeMatch = text.match(/\bGRADE\s+([ABC])\b/)
+  if (gradeMatch) {
+    return gradeMatch[1] as Grade
+  }
+
+  // Fallback ke huruf A/B/C yang berdiri sendiri
+  const match = text.match(/\b[ABC]\b/)
   if (!match) return null
   const letter = match[0] as Grade
   return letter === 'A' || letter === 'B' || letter === 'C' ? letter : null
