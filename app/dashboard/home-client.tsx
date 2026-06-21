@@ -13,7 +13,8 @@ import {
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
-  Download, FileWarning, Shuffle, Home, UserX, DoorOpen
+  Download, FileWarning, Shuffle, Home, UserX, DoorOpen,
+  Search, ChevronLeft, X
 } from 'lucide-react'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
@@ -27,6 +28,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
   FileWarning, Shuffle, Home, UserX, DoorOpen,
 }
+
 function getIcon(name: string): React.ElementType {
   return ICON_MAP[name] ?? Settings
 }
@@ -111,26 +113,36 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/ehb/keuangan':                          'Susun RAB dan kelola anggaran pelaksanaan EHB.',
 }
 
-// ── Accent per grup — hanya dot + garis, bukan badge ─────────────────────────
-const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
-  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
-  'Data Santri':  { dot: 'bg-sky-400',      line: 'bg-sky-100',      label: 'text-sky-600',     iconHover: 'group-hover:text-sky-600' },
-  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
-  'Asrama':       { dot: 'bg-lime-500',     line: 'bg-lime-100',     label: 'text-lime-700',    iconHover: 'group-hover:text-lime-700' },
-  'Perizinan & Disiplin': { dot: 'bg-red-400', line: 'bg-red-100',   label: 'text-red-600',     iconHover: 'group-hover:text-red-600' },
-  'Akademik':     { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
-  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
-  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
-  'Absensi Akademik': { dot: 'bg-teal-400', line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
-  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
-  'Keuangan Pusat': { dot: 'bg-emerald-500', line: 'bg-emerald-100', label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
-  'Keuangan Santri': { dot: 'bg-cyan-500',  line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
-  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
-  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
-  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
-  'EHB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
-  'Operasional':  { dot: 'bg-cyan-500',    line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
-  'PSB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
+// ── Metadata Kategori Menu (SPA Native Feel) ──────────────────────────────────
+const GROUP_META: Record<string, { label: string; icon: React.ElementType; bgSoft: string; textAccent: string; borderAccent: string }> = {
+  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard,    bgSoft: 'bg-slate-50',      textAccent: 'text-slate-600',     borderAccent: 'border-slate-100' },
+  'Data Santri':  { label: 'Data Santri',          icon: Users,              bgSoft: 'bg-sky-50',        textAccent: 'text-sky-600',       borderAccent: 'border-sky-100' },
+  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck,          bgSoft: 'bg-orange-50',     textAccent: 'text-orange-600',    borderAccent: 'border-orange-100' },
+  'Asrama':       { label: 'Asrama',               icon: Home,               bgSoft: 'bg-lime-50',       textAccent: 'text-lime-600',      borderAccent: 'border-lime-100' },
+  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert,      bgSoft: 'bg-red-50',        textAccent: 'text-red-600',       borderAccent: 'border-red-100' },
+  'Akademik':     { label: 'Akademik',             icon: BookOpen,           bgSoft: 'bg-blue-50',       textAccent: 'text-blue-600',      borderAccent: 'border-blue-100' },
+  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle,            bgSoft: 'bg-indigo-50',     textAccent: 'text-indigo-600',    borderAccent: 'border-indigo-100' },
+  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet,    bgSoft: 'bg-violet-50',     textAccent: 'text-violet-600',    borderAccent: 'border-violet-100' },
+  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays,       bgSoft: 'bg-teal-50',       textAccent: 'text-teal-600',      borderAccent: 'border-teal-100' },
+  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck,     bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
+  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet,             bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
+  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins,              bgSoft: 'bg-cyan-50',       textAccent: 'text-cyan-600',      borderAccent: 'border-cyan-100' },
+  'Keuangan':     { label: 'Keuangan',             icon: CreditCard,         bgSoft: 'bg-emerald-50',    textAccent: 'text-emerald-600',   borderAccent: 'border-emerald-100' },
+  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase,          bgSoft: 'bg-cyan-50',       textAccent: 'text-cyan-600',      borderAccent: 'border-cyan-100' },
+  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart,       bgSoft: 'bg-amber-50',      textAccent: 'text-amber-600',     borderAccent: 'border-amber-100' },
+  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList,      bgSoft: 'bg-indigo-50',     textAccent: 'text-indigo-600',    borderAccent: 'border-indigo-100' },
+  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus,           bgSoft: 'bg-rose-50',       textAccent: 'text-rose-600',      borderAccent: 'border-rose-100' },
+  'Master Data':  { label: 'Master Data',          icon: Database,           bgSoft: 'bg-rose-50',       textAccent: 'text-rose-600',      borderAccent: 'border-rose-100' },
+}
+
+function getGroupMeta(name: string) {
+  return GROUP_META[name] ?? {
+    label: name,
+    icon: Settings,
+    bgSoft: 'bg-slate-50',
+    textAccent: 'text-slate-600',
+    borderAccent: 'border-slate-100'
+  }
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -180,36 +192,11 @@ function formatTanggal(date: Date) {
 
 interface Props { userName: string; userRole: string; userRoles?: string[]; fiturAkses: FiturAkses[] }
 
-// ── Feature Card — clean minimal, no icon badge ───────────────────────────────
-function FeatureCard({ fitur, accent }: { fitur: FiturAkses; accent: typeof GROUP_ACCENT[string] }) {
-  const Icon = getIcon(fitur.icon)
-  const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
-
-  return (
-    <Link href={fitur.href} title={desc}
-      className="group relative flex flex-col items-center gap-2 p-3 sm:p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-center active:scale-95"
-    >
-      {/* Icon — plain, no colored badge */}
-      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center transition-all duration-200 group-hover:bg-slate-100 group-hover:border-slate-200">
-        {React.createElement(Icon, {
-          className: cn('w-5 h-5 text-slate-500 transition-colors duration-200', accent.iconHover),
-        })}
-      </div>
-
-      {/* Label */}
-      <span className="text-[11px] sm:text-xs font-semibold text-slate-700 leading-tight line-clamp-2 w-full">
-        {fitur.title}
-      </span>
-
-      {/* Subtle hover arrow */}
-      <ChevronRight className="absolute top-2.5 right-2 w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-    </Link>
-  )
-}
-
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props) {
   const [now, setNow] = useState<Date | null>(null)
+  const [activeGroup, setActiveGroup] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const timer = window.setTimeout(() => setNow(new Date()), 0)
@@ -218,7 +205,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)
-  const firstName = userName.split(' ')[0]
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
   const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
   const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
@@ -233,12 +219,20 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   }
   const groups = GROUP_ORDER.filter(g => grouped.has(g))
 
+  // Search filter
+  const allFeatures = fiturAkses.filter(f => f.href !== '/dashboard')
+  const filteredFeatures = allFeatures.filter(fitur => {
+    const titleMatch = fitur.title.toLowerCase().includes(searchQuery.toLowerCase())
+    const descMatch = (FITUR_DESC[fitur.href] || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const groupMatch = fitur.group_name.toLowerCase().includes(searchQuery.toLowerCase())
+    return titleMatch || descMatch || groupMatch
+  })
+
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-6 pb-16">
 
       {/* ── Hero Greeting Card ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none">
-
+      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none shadow-xl">
         {/* Noise texture overlay */}
         <div className="absolute inset-0 opacity-[0.035]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
@@ -252,29 +246,28 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
         {/* Content */}
         <div className="relative z-10 p-5 sm:p-8">
-
           {/* Top: date pill + logo */}
           <div className="flex items-start justify-between gap-3 mb-5">
-            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
-              <span className="text-[11px] font-medium text-white/50 leading-none">
+            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <span className="text-[11px] font-medium text-white/70 leading-none">
                 {now ? formatTanggal(now) : '—'}
               </span>
             </div>
             <img src="/logo.png" alt="Logo"
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-80 shrink-0 drop-shadow-xl" />
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-85 shrink-0 drop-shadow-xl" />
           </div>
 
           {/* Greeting text */}
           <div className="space-y-1">
-            <p className="text-white/40 text-sm font-medium">
+            <p className="text-white/50 text-sm font-medium">
               {greeting.emoji} {greeting.text}
             </p>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
-              {firstName}
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-none break-words">
+              {userName}
               <span className="text-emerald-400">.</span>
             </h1>
-            <p className="text-white/30 text-sm pt-0.5">{greeting.sub}</p>
+            <p className="text-white/40 text-sm pt-0.5">{greeting.sub}</p>
           </div>
 
           {/* Divider */}
@@ -282,56 +275,217 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
           {/* Bottom: role + stats */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="text-base">{roleEmoji}</span>
               <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-0.5">Login sebagai</p>
-                <p className="text-sm font-bold text-white/80 leading-none">{roleLabel}</p>
+                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-1">Login sebagai</p>
+                <p className="text-sm font-bold text-white/90 leading-none">{roleLabel}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1.5">
-              <span className="text-emerald-400 text-xs font-bold">{totalFitur}</span>
-              <span className="text-white/40 text-xs">fitur aktif</span>
+            <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/20 rounded-full px-3.5 py-1.5 shadow-inner">
+              <span className="text-emerald-400 text-xs font-black">{totalFitur}</span>
+              <span className="text-white/60 text-xs font-medium">fitur aktif</span>
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* ── Menu Groups ── */}
-      {groups.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
-          <Settings className="w-10 h-10 opacity-20 mb-1" />
-          <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
-          <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
+      {/* ── Search Bar ── */}
+      <div className="relative animate-in fade-in duration-200">
+        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+          <Search className="h-4.5 w-4.5 text-slate-400" />
         </div>
-      ) : (
-        groups.map(group => {
-          const items  = grouped.get(group)!
-          const accent = GROUP_ACCENT[group] ?? GROUP_ACCENT['_standalone']
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Cari menu atau layanan..."
+          className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all duration-200 shadow-sm"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+          >
+            <X className="h-4.5 w-4.5" />
+          </button>
+        )}
+      </div>
+
+      {/* ── SPA Views Container ── */}
+      <div className="relative">
+        
+        {/* ── VIEW 1: SEARCH RESULTS ── */}
+        {searchQuery.trim() !== '' && (
+          <div className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Hasil Pencarian ({filteredFeatures.length})
+              </span>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
+              >
+                Bersihkan
+              </button>
+            </div>
+
+            {filteredFeatures.length === 0 ? (
+              <div className="flex flex-col items-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-400 text-center gap-2">
+                <Search className="w-8 h-8 opacity-20 mb-1" />
+                <p className="font-medium text-sm">Tidak menemukan "{searchQuery}"</p>
+                <p className="text-xs text-slate-500">Coba kata kunci lain atau cari per kategori.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {filteredFeatures.map(fitur => {
+                  const meta = getGroupMeta(fitur.group_name)
+                  const FeatureIcon = getIcon(fitur.icon)
+                  const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
+
+                  return (
+                    <Link
+                      key={fitur.href}
+                      href={fitur.href}
+                      className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
+                    >
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm border", meta.bgSoft, meta.borderAccent)}>
+                        <FeatureIcon className={cn("w-5 h-5", meta.textAccent)} />
+                      </div>
+                      <div className="flex-1 min-w-0 leading-tight">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate max-w-[120px]">
+                            {fitur.group_name === '_standalone' ? 'Menu Utama' : fitur.group_name}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── VIEW 2: CATEGORY SELECTION (default state) ── */}
+        {searchQuery.trim() === '' && activeGroup === null && (
+          <div className="space-y-3.5 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Kategori Menu ({groups.length})
+              </span>
+            </div>
+
+            {groups.length === 0 ? (
+              <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
+                <Settings className="w-10 h-10 opacity-20 mb-1" />
+                <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
+                <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                {groups.map(group => {
+                  const meta = getGroupMeta(group)
+                  const GroupIcon = meta.icon
+                  const items = grouped.get(group)!
+
+                  return (
+                    <button
+                      key={group}
+                      onClick={() => setActiveGroup(group)}
+                      className="group flex flex-col items-center gap-2.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 text-center active:scale-95 cursor-pointer"
+                    >
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 shadow-sm border", meta.bgSoft, meta.borderAccent)}>
+                        <GroupIcon className={cn("w-6 h-6", meta.textAccent)} />
+                      </div>
+
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 leading-tight line-clamp-2 w-full">
+                        {group === '_standalone' ? 'Menu Utama' : group}
+                      </span>
+
+                      <span className="text-[9px] bg-slate-50 border border-slate-100 text-slate-400 rounded-full px-1.5 py-0.5 font-bold tracking-tight">
+                        {items.length} fitur
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── VIEW 3: SUB-MENU DETAILS ── */}
+        {searchQuery.trim() === '' && activeGroup !== null && (() => {
+          const items = grouped.get(activeGroup)!
+          const meta = getGroupMeta(activeGroup)
+          const GroupIcon = meta.icon
 
           return (
-            <div key={group}>
-              {/* Section header */}
-              <div className="flex items-center gap-2 mb-2.5">
-                <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
-                <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', accent.label)}>
-                  {group === '_standalone' ? 'Menu Utama' : group}
-                </span>
-                <div className={cn('flex-1 h-px', accent.line)} />
-                <span className="text-[10px] text-slate-400 tabular-nums font-medium">{items.length}</span>
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+              {/* Navigation and active stats */}
+              <div className="flex items-center justify-between pb-1">
+                <button
+                  onClick={() => setActiveGroup(null)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm active:scale-95 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Kembali
+                </button>
+                <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1">
+                  <span className="text-emerald-600 text-[10px] font-bold tracking-tight uppercase">{items.length} fitur aktif</span>
+                </div>
               </div>
 
-              {/* Grid — 3 kolom di HP, makin banyak di desktop */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                {items.map(fitur => (
-                  <FeatureCard key={fitur.href} fitur={fitur} accent={accent} />
-                ))}
+              {/* Sub-menu Hero Banner */}
+              <div className={cn("p-4 rounded-3xl border flex items-center gap-3.5 shadow-sm overflow-hidden relative select-none", meta.bgSoft, meta.borderAccent)}>
+                <div className="absolute -right-4 -bottom-4 opacity-5 pointer-events-none">
+                  <GroupIcon className={cn("w-24 h-24", meta.textAccent)} />
+                </div>
+                
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-white/80 backdrop-blur-sm border", meta.borderAccent)}>
+                  <GroupIcon className={cn("w-6 h-6", meta.textAccent)} />
+                </div>
+                <div className="leading-tight">
+                  <h2 className="text-base sm:text-lg font-black text-slate-800">
+                    {activeGroup === '_standalone' ? 'Menu Utama' : activeGroup}
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">Daftar fitur dan layanan yang dapat Anda akses</p>
+                </div>
+              </div>
+
+              {/* Grid lists of submenu features */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {items.map(fitur => {
+                  const FeatureIcon = getIcon(fitur.icon)
+                  const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
+
+                  return (
+                    <Link
+                      key={fitur.href}
+                      href={fitur.href}
+                      className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                        <FeatureIcon className={cn("w-5 h-5 text-slate-500 transition-colors", meta.textAccent)} />
+                      </div>
+                      <div className="flex-1 min-w-0 leading-tight">
+                        <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           )
-        })
-      )}
+        })()}
+
+      </div>
+
     </div>
   )
 }
