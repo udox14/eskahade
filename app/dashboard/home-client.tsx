@@ -260,16 +260,16 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
       {/* ── Hero Greeting Card ── */}
       <div 
-        className="relative overflow-hidden rounded-3xl bg-slate-900 select-none shadow-xl border border-slate-800"
+        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/80"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78)), url('/bg-sampul-1.png')`,
+          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.78)), url('/hero-bg.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
         {/* Glow orbs */}
-        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/5 rounded-full blur-3xl pointer-events-none" />
 
         {/* Content */}
         <div className="relative z-10 p-5 sm:p-7 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -278,56 +278,56 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           <div className="space-y-4 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Pill */}
-              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                <span className="text-[10px] font-semibold text-white/80 leading-none tracking-wide">
+              <div className="inline-flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-3 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="text-[10px] font-bold text-slate-600 leading-none tracking-wide">
                   {now ? formatTanggal(now) : '—'}
                 </span>
               </div>
               
               {/* Digital Clock Pill */}
-              <div className="inline-flex items-center gap-1.5 bg-emerald-505/20 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
-                <span className="text-[10px] font-bold text-emerald-300 leading-none tracking-wider font-mono">
+              <div className="inline-flex items-center gap-1.5 bg-emerald-55/20 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <span className="text-[10px] font-black text-emerald-700 leading-none tracking-wider font-mono">
                   {now ? formatJam(now) : '—:—:—'}
                 </span>
               </div>
             </div>
 
             <div className="space-y-1">
-              <p className="text-white/60 text-xs sm:text-sm font-semibold tracking-wide flex items-center gap-1.5">
+              <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 <span>{greeting.emoji}</span>
                 <span>{greeting.text}</span>
               </p>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none break-words">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-none break-words">
                 {userName}
-                <span className="text-emerald-400">.</span>
+                <span className="text-emerald-505">.</span>
               </h1>
-              <p className="text-white/45 text-xs pt-0.5 font-medium">{greeting.sub}</p>
+              <p className="text-slate-500 text-xs pt-0.5 font-semibold">{greeting.sub}</p>
             </div>
 
             {/* Role Info & Feature Count */}
             <div className="flex items-center gap-2.5 pt-2">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 border border-white/10 text-base shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-slate-900/5 flex items-center justify-center shrink-0 border border-slate-900/10 text-base shadow-sm">
                 {roleEmoji}
               </div>
               <div className="leading-none">
-                <p className="text-[9px] text-white/40 uppercase tracking-widest font-bold mb-0.5">Akses Akun</p>
-                <p className="text-xs font-bold text-white/90 truncate max-w-[200px] sm:max-w-xs">{roleLabel}</p>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Akses Akun</p>
+                <p className="text-xs font-bold text-slate-700 truncate max-w-[200px] sm:max-w-xs">{roleLabel}</p>
               </div>
               
-              <div className="ml-auto inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1">
-                <span className="text-emerald-400 text-xs font-black">{totalFitur}</span>
-                <span className="text-white/50 text-[10px] font-semibold">layanan</span>
+              <div className="ml-auto inline-flex items-center gap-1.5 bg-white/95 border border-slate-200 rounded-full px-3.5 py-1 shadow-sm">
+                <span className="text-emerald-600 text-xs font-black">{totalFitur}</span>
+                <span className="text-slate-500 text-[10px] font-bold">layanan</span>
               </div>
             </div>
           </div>
 
           {/* Right Side: Large Logo / School Emblem */}
           <div className="hidden md:flex flex-col items-center justify-center shrink-0 p-2">
-            <div className="relative group p-3 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-sm shadow-2xl">
+            <div className="relative group p-3 bg-white/60 border border-slate-200/60 rounded-3xl backdrop-blur-sm shadow-xl">
               <img src="/logo.png" alt="Logo"
-                className="w-16 h-16 object-contain opacity-90 drop-shadow-2xl transition-transform duration-300 group-hover:scale-105" />
+                className="w-16 h-16 object-contain opacity-95 drop-shadow-lg transition-transform duration-300 group-hover:scale-105" />
             </div>
           </div>
 
