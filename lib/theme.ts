@@ -23,8 +23,8 @@ export const theme = createTheme({
   colors: {
     brand: brandGreen,
   },
-  fontFamily: "'Inter', sans-serif",
-  headings: { fontFamily: "'Inter', sans-serif" },
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  headings: { fontFamily: "'Plus Jakarta Sans', sans-serif" },
   defaultRadius: 'md',
   // Breakpoint diselaraskan ke skala Tailwind agar mapping responsif presisi.
   // Tailwind→Mantine (geser satu): sm→xs, md→sm, lg→md, xl→lg, 2xl→xl
