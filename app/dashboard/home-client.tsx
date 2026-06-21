@@ -276,10 +276,23 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           
           {/* Left Side: Greeting & User Name */}
           <div className="space-y-3.5 flex-1 min-w-0">
-            {/* Category Portal Pill */}
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 border border-emerald-200/40 px-2.5 py-1 rounded-lg inline-block">
-              Portal Utama
-            </span>
+            {/* Category Portal Pill & Mobile Clock row */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 border border-emerald-200/40 px-2.5 py-1 rounded-lg">
+                Portal Utama
+              </span>
+              
+              {/* Mobile-only Clock & Date Pill */}
+              <div className="md:hidden flex items-center gap-2 bg-slate-900/5 border border-slate-900/10 rounded-full px-2.5 py-1 select-none">
+                <span className="text-[10px] font-bold text-slate-600 leading-none">
+                  {now ? now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '—'}
+                </span>
+                <span className="w-px h-2.5 bg-slate-300 shrink-0" />
+                <span className="text-[10px] font-black text-emerald-600 font-mono leading-none tracking-wider">
+                  {now ? formatJam(now).substring(0, 5) : '00:00'}
+                </span>
+              </div>
+            </div>
 
             <div className="space-y-1.5">
               <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
@@ -288,7 +301,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
               </p>
               <h1 className="text-3xl sm:text-4.5xl font-black text-slate-800 tracking-tight leading-none break-words">
                 {userName}
-                <span className="text-emerald-500">.</span>
+                <span className="text-emerald-505">.</span>
               </h1>
               <p className="text-slate-400 text-xs sm:text-sm pt-1 font-semibold italic">
                 "{greeting.sub}"
@@ -296,8 +309,8 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
             </div>
           </div>
 
-          {/* Right Side: Large Digital Clock & Date Widget (Bold & Clean) */}
-          <div className="shrink-0 flex flex-col items-start md:items-end text-left md:text-right bg-white/70 border border-slate-200/50 p-4 sm:p-5 rounded-2xl shadow-sm backdrop-blur-md min-w-[170px] relative overflow-hidden select-none">
+          {/* Right Side: Large Digital Clock & Date Widget (Desktop Only) */}
+          <div className="hidden md:flex shrink-0 flex-col items-end text-right bg-white/70 border border-slate-200/50 p-4 sm:p-5 rounded-2xl shadow-sm backdrop-blur-md min-w-[170px] relative overflow-hidden select-none">
             <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1 block">Waktu Saat Ini</span>
             <span className="text-3xl sm:text-3.5xl font-black text-slate-800 font-mono tracking-wider leading-none">
               {now ? formatJam(now) : '00.00.00'}
