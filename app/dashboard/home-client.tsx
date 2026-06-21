@@ -210,6 +210,12 @@ function formatTanggal(date: Date) {
   })
 }
 
+function formatJam(date: Date) {
+  return date.toLocaleTimeString('id-ID', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  })
+}
+
 interface Props { userName: string; userRole: string; userRoles?: string[]; fiturAkses: FiturAkses[] }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -219,8 +225,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setNow(new Date()), 0)
-    return () => window.clearTimeout(timer)
+    setNow(new Date())
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
 
   const hour      = now?.getHours() ?? 9
@@ -252,80 +259,97 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
     <div className="space-y-6 pb-16">
 
       {/* ── Hero Greeting Card ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none shadow-xl">
-        {/* Noise texture overlay */}
-        <div className="absolute inset-0 opacity-[0.035]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px',
-        }} />
-
+      <div 
+        className="relative overflow-hidden rounded-3xl bg-slate-900 select-none shadow-xl border border-slate-800"
+        style={{
+          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78)), url('/bg-sampul-1.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
         {/* Glow orbs */}
-        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-8 right-1/3 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Content */}
-        <div className="relative z-10 p-5 sm:p-8">
-          {/* Top: date pill + logo */}
-          <div className="flex items-start justify-between gap-3 mb-5">
-            <div className="inline-flex items-center gap-2 bg-white/8 border border-white/10 rounded-full px-3 py-1.5 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-[11px] font-medium text-white/70 leading-none">
-                {now ? formatTanggal(now) : '—'}
-              </span>
-            </div>
-            <img src="/logo.png" alt="Logo"
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain opacity-85 shrink-0 drop-shadow-xl" />
-          </div>
-
-          {/* Greeting text */}
-          <div className="space-y-1">
-            <p className="text-white/50 text-sm font-medium">
-              {greeting.emoji} {greeting.text}
-            </p>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-none break-words">
-              {userName}
-              <span className="text-emerald-400">.</span>
-            </h1>
-            <p className="text-white/40 text-sm pt-0.5">{greeting.sub}</p>
-          </div>
-
-          {/* Divider */}
-          <div className="my-4 h-px bg-white/8" />
-
-          {/* Bottom: role + stats */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">{roleEmoji}</span>
-              <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-widest leading-none mb-1">Login sebagai</p>
-                <p className="text-sm font-bold text-white/90 leading-none">{roleLabel}</p>
+        <div className="relative z-10 p-5 sm:p-7 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          
+          {/* Left Side: Greeting & User Name */}
+          <div className="space-y-4 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Date Pill */}
+              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-[10px] font-semibold text-white/80 leading-none tracking-wide">
+                  {now ? formatTanggal(now) : '—'}
+                </span>
+              </div>
+              
+              {/* Digital Clock Pill */}
+              <div className="inline-flex items-center gap-1.5 bg-emerald-505/20 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+                <span className="text-[10px] font-bold text-emerald-300 leading-none tracking-wider font-mono">
+                  {now ? formatJam(now) : '—:—:—'}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/20 rounded-full px-3.5 py-1.5 shadow-inner">
-              <span className="text-emerald-400 text-xs font-black">{totalFitur}</span>
-              <span className="text-white/60 text-xs font-medium">fitur aktif</span>
+
+            <div className="space-y-1">
+              <p className="text-white/60 text-xs sm:text-sm font-semibold tracking-wide flex items-center gap-1.5">
+                <span>{greeting.emoji}</span>
+                <span>{greeting.text}</span>
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none break-words">
+                {userName}
+                <span className="text-emerald-400">.</span>
+              </h1>
+              <p className="text-white/45 text-xs pt-0.5 font-medium">{greeting.sub}</p>
+            </div>
+
+            {/* Role Info & Feature Count */}
+            <div className="flex items-center gap-2.5 pt-2">
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 border border-white/10 text-base shadow-sm">
+                {roleEmoji}
+              </div>
+              <div className="leading-none">
+                <p className="text-[9px] text-white/40 uppercase tracking-widest font-bold mb-0.5">Akses Akun</p>
+                <p className="text-xs font-bold text-white/90 truncate max-w-[200px] sm:max-w-xs">{roleLabel}</p>
+              </div>
+              
+              <div className="ml-auto inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1">
+                <span className="text-emerald-400 text-xs font-black">{totalFitur}</span>
+                <span className="text-white/50 text-[10px] font-semibold">layanan</span>
+              </div>
             </div>
           </div>
+
+          {/* Right Side: Large Logo / School Emblem */}
+          <div className="hidden md:flex flex-col items-center justify-center shrink-0 p-2">
+            <div className="relative group p-3 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-sm shadow-2xl">
+              <img src="/logo.png" alt="Logo"
+                className="w-16 h-16 object-contain opacity-90 drop-shadow-2xl transition-transform duration-300 group-hover:scale-105" />
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* ── Search Bar ── */}
-      <div className="relative animate-in fade-in duration-200">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-          <Search className="h-4.5 w-4.5 text-slate-400" />
+      {/* ── Search Bar Redesigned ── */}
+      <div className="relative group animate-in fade-in duration-200">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <Search className="h-4.5 w-4.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
         </div>
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari menu atau layanan..."
-          className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all duration-200 shadow-sm"
+          placeholder="Cari menu atau layanan di sini..."
+          className="w-full pl-11 pr-10 py-3.5 bg-slate-100 border border-transparent rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-250 focus:ring-4 focus:ring-emerald-500/5 transition-all duration-200 shadow-inner focus:shadow-sm"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -394,12 +418,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
         {/* ── VIEW 2: CATEGORY SELECTION (default state - clean horizontal list) ── */}
         {searchQuery.trim() === '' && activeGroup === null && (
           <div className="space-y-3.5 animate-in fade-in duration-200">
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Kategori Menu ({groups.length})
-              </span>
-            </div>
-
             {groups.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
                 <Settings className="w-10 h-10 opacity-20 mb-1" />
