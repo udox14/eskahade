@@ -7,6 +7,7 @@ import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, 
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
+import { Button, TextInput, NativeSelect, ActionIcon } from '@mantine/core'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -22,16 +23,12 @@ const WAKTU_COLOR: Record<Waktu, string> = {
 }
 const ITEMS_PER_PAGE = 20
 
-// --- Week helpers (Rabu s/d Selasa) ---
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]
 }
-// Cari Rabu sebelumnya (atau hari ini jika sudah Rabu)
 function getWednesdayOfWeek(d: Date): Date {
-  const day = d.getDay() // 0=Min,1=Sen,2=Sel,3=Rab,4=Kam,5=Jum,6=Sab
-  // Jarak ke Rabu terdekat sebelumnya: Rab=0, Kam=-1... Sel=+1... Min=+2 (maju ke belakang)
-  const diff = day >= 3 ? day - 3 : day + 4  // hari - 3, tapi kalau < 3 tambah 7 dulu
-  // diff = berapa hari sejak Rabu terakhir
+  const day = d.getDay()
+  const diff = day >= 3 ? day - 3 : day + 4
   const wednesday = new Date(d)
   wednesday.setDate(d.getDate() - diff)
   wednesday.setHours(0, 0, 0, 0)
@@ -46,7 +43,7 @@ function addDays(dateStr: string, n: number): string {
   return toDateStr(d)
 }
 function weekEnd(wednesday: string): string {
-  return addDays(wednesday, 6) // Selasa
+  return addDays(wednesday, 6)
 }
 function formatWeekLabel(wednesday: string): string {
   const start = new Date(wednesday)
@@ -75,8 +72,6 @@ export default function RekapAbsenBerjamaahPage() {
 
   const [santriList, setSantriList] = useState<any[]>([])
   const [detail, setDetail] = useState<Record<string, Record<string, any>>>({})
-
-  // pendingDeletes: set of "santriId|tanggal|waktu"
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
 
@@ -167,7 +162,6 @@ export default function RekapAbsenBerjamaahPage() {
       toast.info('Tidak ada data untuk diexport.')
       return
     }
-
     setExporting(true)
     const exportToast = toast.loading('Menyiapkan file Excel...')
     try {
@@ -179,49 +173,34 @@ export default function RekapAbsenBerjamaahPage() {
           label: `${formatDayLabel(tgl)} ${WAKTU_LABEL[waktu]}`,
         }))
       )
-
       const headers = [
-        'Nama Santri',
-        'NIS',
-        'Asrama',
-        'Kamar',
-        'Total Alfa',
+        'Nama Santri', 'NIS', 'Asrama', 'Kamar', 'Total Alfa',
         ...activeSessions.map(session => session.label),
       ]
-
       const rows = filteredSantri.map(s => {
         const rowData: any[] = [
-          s.nama_lengkap,
-          s.nis || '-',
-          asrama,
+          s.nama_lengkap, s.nis || '-', asrama,
           s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar',
         ]
         let total = 0
         const statusValues = activeSessions.map(session => {
           const isAlfa = detail[s.id]?.[session.tanggal]?.[session.waktu] === 'A'
           const isDeleted = pendingDeletes.has(`${s.id}|${session.tanggal}|${session.waktu}`)
-          if (isAlfa && !isDeleted) {
-            total += 1
-            return 'A'
-          }
+          if (isAlfa && !isDeleted) { total += 1; return 'A' }
           return ''
         })
         return [...rowData, total, ...statusValues]
       })
-
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
       ws['!cols'] = headers.map((h, i) => ({
         wch: Math.min(Math.max(h.length, ...rows.map(r => String(r[i] || '').length)) + 2, i < 5 ? 32 : 18),
       }))
-
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Berjamaah')
-
       const tglAwal = weekWednesday.split('-').reverse().join('-')
       const tglAkhir = weekEnd(weekWednesday).split('-').reverse().join('-')
       const namaAsrama = asrama.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '')
       XLSX.writeFile(wb, `Rekap_Absen_Berjamaah_${namaAsrama}_${tglAwal}_sd_${tglAkhir}.xlsx`)
-
       toast.success('Berhasil export ke Excel')
     } catch (err) {
       console.error(err)
@@ -234,10 +213,8 @@ export default function RekapAbsenBerjamaahPage() {
 
   const isPutri = ASRAMA_PUTRI.includes(asrama)
   const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
-
   const daysArr = Array.from({ length: 7 }, (_, i) => addDays(weekWednesday, i))
 
-  // Filter
   const filteredSantri = santriList.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
     const matchSearch = !searchQuery
@@ -249,12 +226,11 @@ export default function RekapAbsenBerjamaahPage() {
   const totalPages = Math.ceil(filteredSantri.length / ITEMS_PER_PAGE)
   const paginated = filteredSantri.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
-  // Count total active alfa (excluding pending deletes)
   const totalAlfa = filteredSantri.reduce((sum, s) => {
     const d = detail[s.id] || {}
     return sum + Object.entries(d).reduce((daySum, [tgl, dayData]) => {
       return daySum + WAKTU.filter(w => {
-        return dayData[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)
+        return (dayData as any)[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)
       }).length
     }, 0)
   }, 0)
@@ -264,14 +240,13 @@ export default function RekapAbsenBerjamaahPage() {
     return daysArr.filter(tgl => {
       const dayData = d[tgl]
       if (!dayData) return false
-      return WAKTU.some(w => dayData[w] === 'A')
+      return WAKTU.some(w => (dayData as any)[w] === 'A')
     })
   }
 
   return (
     <div className="space-y-4 pb-20">
 
-      {/* HEADER */}
       <div className="flex flex-col gap-3 border-b pb-4">
         <div className="flex justify-between items-start gap-4">
           <DashboardPageHeader
@@ -280,94 +255,99 @@ export default function RekapAbsenBerjamaahPage() {
             className="flex-1"
           />
           {hasLoaded && !loading && !isPutri && (
-            <button
+            <Button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-xl font-bold text-xs hover:bg-teal-100 active:scale-95 transition"
+              leftSection={<Upload className="w-3.5 h-3.5" />}
+              color="teal"
+              variant="light"
+              size="sm"
             >
-              <Upload className="w-3.5 h-3.5"/> Import Excel
-            </button>
+              Import Excel
+            </Button>
           )}
         </div>
 
-        {/* CONTROLS */}
         <div className="space-y-2">
-          {/* Baris 1: Week navigator full-width */}
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-2 shadow-sm w-full">
-            <button onClick={() => setWeekWednesday(m => addDays(m, -7))} className="p-1.5 hover:bg-slate-100 rounded-lg shrink-0">
-              <ChevronLeft className="w-4 h-4"/>
-            </button>
+            <ActionIcon
+              onClick={() => setWeekWednesday(m => addDays(m, -7))}
+              variant="subtle"
+              color="gray"
+              size="sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </ActionIcon>
             <span className="text-sm font-bold text-slate-700 text-center flex-1">{formatWeekLabel(weekWednesday)}</span>
-            <button
+            <ActionIcon
               onClick={() => setWeekWednesday(m => addDays(m, 7))}
               disabled={weekWednesday >= thisWeekWednesday()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 shrink-0"
+              variant="subtle"
+              color="gray"
+              size="sm"
             >
-              <ChevronRight className="w-4 h-4"/>
-            </button>
+              <ChevronRight className="w-4 h-4" />
+            </ActionIcon>
           </div>
 
-          {/* Baris 2: Asrama + Kamar + Tampilkan */}
           <div className="flex gap-2 items-center">
             {sessionInfo?.asrama_binaan
               ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
-                  <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
+                  <Home className="w-3.5 h-3.5" /> {sessionInfo.asrama_binaan}
                 </span>
-              : <select value={asrama} onChange={e => setAsrama(e.target.value)}
-                  className="flex-1 border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm">
-                  {ASRAMA_LIST.map(a => <option key={a}>{a}</option>)}
-                </select>
+              : <NativeSelect
+                  value={asrama}
+                  onChange={e => setAsrama(e.target.value)}
+                  data={ASRAMA_LIST.map(a => ({ label: a, value: a }))}
+                  className="flex-1"
+                  size="sm"
+                />
             }
-
-            <select
+            <NativeSelect
               value={filterKamar}
               onChange={e => { setFilterKamar(e.target.value); setPage(1) }}
               disabled={availableKamars.length === 0}
-              className="flex-1 border rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 bg-white shadow-sm disabled:opacity-50"
-            >
-              <option value="Semua">Semua Kamar</option>
-              {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
-            </select>
-
-            <button
+              data={[
+                { label: 'Semua Kamar', value: 'Semua' },
+                ...availableKamars.map(k => ({ label: k === 'Tanpa Kamar' ? k : `Kamar ${k}`, value: k })),
+              ]}
+              className="flex-1"
+              size="sm"
+            />
+            <Button
               onClick={load}
-              disabled={loading}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
-                !hasLoaded ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              loading={loading}
+              leftSection={loading ? null : <Search className="w-3.5 h-3.5" />}
+              color={!hasLoaded ? 'teal' : 'gray'}
+              variant={!hasLoaded ? 'filled' : 'light'}
+              size="sm"
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
               {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* EMPTY / LOADING */}
       {!hasLoaded && !loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="w-16 h-16 rounded-full bg-teal-50 flex items-center justify-center">
-            <Flame className="w-8 h-8 text-teal-300"/>
+            <Flame className="w-8 h-8 text-teal-300" />
           </div>
           <div>
             <p className="font-bold text-slate-500">Data belum dimuat</p>
             <p className="text-sm text-slate-400 mt-1">Pilih asrama & minggu lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
-          <button onClick={load}
-            className="bg-teal-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 active:scale-95 transition shadow">
-            Tampilkan Sekarang
-          </button>
+          <Button onClick={load} color="teal">Tampilkan Sekarang</Button>
         </div>
       )}
 
       {loading && (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-400"/>
+          <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
         </div>
       )}
 
       {hasLoaded && !loading && !roomFeatureBlocked && (
         <>
-          {/* SUMMARY + SEARCH */}
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <div className="flex gap-2">
               <div className="bg-white border rounded-xl px-3 py-2 text-center shadow-sm min-w-[80px]">
@@ -385,76 +365,75 @@ export default function RekapAbsenBerjamaahPage() {
                 </div>
               )}
             </div>
-
             <div className="flex gap-2 items-center flex-1 min-w-[200px] justify-end">
-              <button
+              <Button
                 onClick={handleExportExcel}
-                disabled={exporting || filteredSantri.length === 0}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs hover:bg-emerald-100 active:scale-95 transition disabled:opacity-50"
+                loading={exporting}
+                disabled={filteredSantri.length === 0}
+                leftSection={<FileSpreadsheet className="w-3.5 h-3.5" />}
+                color="green"
+                variant="light"
+                size="sm"
               >
-                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <FileSpreadsheet className="w-3.5 h-3.5"/>}
                 Export Excel
-              </button>
-              <div className="relative flex-1 max-w-[200px]">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                <input
-                  type="text"
-                  placeholder="Cari santri..."
-                  value={searchQuery}
-                  onChange={e => { setSearchQuery(e.target.value); setPage(1) }}
-                  className="w-full pl-8 pr-3 py-2 text-xs border rounded-xl outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
+              </Button>
+              <TextInput
+                placeholder="Cari santri..."
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setPage(1) }}
+                leftSection={<Search className="w-3.5 h-3.5" />}
+                size="sm"
+                className="flex-1 max-w-[200px]"
+              />
             </div>
           </div>
 
-          {/* SAVE BANNER */}
           {pendingDeletes.size > 0 && (
             <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 gap-3">
               <p className="text-sm font-bold text-orange-700">
                 {pendingDeletes.size} alfa ditandai untuk dihapus
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  variant="default"
+                  size="xs"
+                  leftSection={<X className="w-3 h-3" />}
                   onClick={() => setPendingDeletes(new Set())}
-                  className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border rounded-xl hover:bg-slate-50 flex items-center gap-1"
                 >
-                  <X className="w-3 h-3"/> Batal
-                </button>
-                <button
+                  Batal
+                </Button>
+                <Button
+                  color="orange"
+                  size="xs"
+                  loading={saving}
+                  leftSection={<Save className="w-3 h-3" />}
                   onClick={handleSave}
-                  disabled={saving}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60"
                 >
-                  {saving ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
                   Simpan Perubahan
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
-          {/* NO DATA */}
           {filteredSantri.length === 0 && (
             <div className="py-16 text-center text-slate-400 bg-white border rounded-2xl">
-              <Flame className="w-8 h-8 mx-auto text-slate-200 mb-3"/>
+              <Flame className="w-8 h-8 mx-auto text-slate-200 mb-3" />
               <p className="font-semibold">Tidak ada santri alfa minggu ini</p>
               <p className="text-sm mt-1">Coba pilih minggu lain atau impor data absensi.</p>
             </div>
           )}
 
-          {/* SANTRI CARDS */}
           {paginated.length > 0 && (
             <div className="space-y-3">
               {paginated.map(s => {
                 const alfaDays = getSantriAlfaDays(s.id)
                 const activeAlfaCount = alfaDays.reduce((sum, tgl) => {
                   const dayData = detail[s.id]?.[tgl] || {}
-                  return sum + WAKTU.filter(w => dayData[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)).length
+                  return sum + WAKTU.filter(w => (dayData as any)[w] === 'A' && !pendingDeletes.has(`${s.id}|${tgl}|${w}`)).length
                 }, 0)
 
                 return (
                   <div key={s.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition ${activeAlfaCount === 0 ? 'opacity-60' : ''}`}>
-                    {/* Card Header */}
                     <div className="flex justify-between items-center px-4 py-3 bg-slate-50 border-b">
                       <div>
                         <p className="font-bold text-slate-800 text-sm">{s.nama_lengkap}</p>
@@ -466,22 +445,18 @@ export default function RekapAbsenBerjamaahPage() {
                         </span>
                       </div>
                     </div>
-
-                    {/* Days */}
                     <div className="divide-y">
                       {alfaDays.map(tgl => {
                         const dayData = detail[s.id]?.[tgl] || {}
-                        const alfaWaktus = WAKTU.filter(w => dayData[w] === 'A')
+                        const alfaWaktus = WAKTU.filter(w => (dayData as any)[w] === 'A')
                         if (alfaWaktus.length === 0) return null
-
                         return (
                           <div key={tgl} className="px-4 py-3 flex items-center gap-3">
                             <p className="text-xs text-slate-500 font-semibold w-24 shrink-0">{formatDayLabel(tgl)}</p>
                             <div className="flex flex-wrap gap-2">
                               {WAKTU.map(w => {
-                                const isAlfa = dayData[w] === 'A'
+                                const isAlfa = (dayData as any)[w] === 'A'
                                 if (!isAlfa) {
-                                  // Slot kosong agar posisi fixed
                                   return <div key={w} className="px-3 py-1.5 rounded-full text-xs font-bold opacity-0 pointer-events-none select-none">{WAKTU_LABEL[w]}</div>
                                 }
                                 const delKey = `${s.id}|${tgl}|${w}`
@@ -499,8 +474,8 @@ export default function RekapAbsenBerjamaahPage() {
                                   >
                                     {WAKTU_LABEL[w]}
                                     {markedForDelete
-                                      ? <X className="w-3 h-3 shrink-0"/>
-                                      : <Trash2 className="w-3 h-3 shrink-0"/>
+                                      ? <X className="w-3 h-3 shrink-0" />
+                                      : <Trash2 className="w-3 h-3 shrink-0" />
                                     }
                                   </button>
                                 )
@@ -516,26 +491,29 @@ export default function RekapAbsenBerjamaahPage() {
             </div>
           )}
 
-          {/* PAGINATION */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 pt-2">
-              <button
+              <Button
+                variant="default"
+                size="xs"
+                leftSection={<ChevronLeft className="w-3.5 h-3.5" />}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-slate-50 disabled:opacity-30 flex items-center gap-1"
               >
-                <ChevronLeft className="w-3.5 h-3.5"/> Prev
-              </button>
+                Prev
+              </Button>
               <span className="text-xs text-slate-500 font-semibold">
                 {page} / {totalPages} &nbsp;·&nbsp; {filteredSantri.length} santri
               </span>
-              <button
+              <Button
+                variant="default"
+                size="xs"
+                rightSection={<ChevronRight className="w-3.5 h-3.5" />}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1.5 text-xs font-bold border rounded-lg hover:bg-slate-50 disabled:opacity-30 flex items-center gap-1"
               >
-                Next <ChevronRight className="w-3.5 h-3.5"/>
-              </button>
+                Next
+              </Button>
             </div>
           )}
         </>
