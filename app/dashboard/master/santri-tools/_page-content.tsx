@@ -8,22 +8,25 @@ import {
   getSekolahList,
 } from './actions'
 import {
-  ArrowUpCircle, ShieldCheck, Loader2, Search, CheckSquare,
-  Square, AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
-  GraduationCap, Banknote, RefreshCw, Users, Filter,
+  ArrowUpCircle, ShieldCheck, Search, CheckSquare,
+  Square, AlertTriangle, X, ChevronDown, ChevronUp, Banknote,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import {
+  Alert, Badge, Box, Button, Center, Checkbox, Flex, Grid, Group, Loader, Modal,
+  NativeSelect, Paper, SegmentedControl, SimpleGrid, Stack, Text, TextInput, UnstyledButton,
+} from '@mantine/core'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ['', 'AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const JENIS_BIAYA_LIST = ['KESEHATAN', 'EHB', 'EKSKUL', 'BANGUNAN']
 
-const STATUS_COLOR: Record<string, string> = {
-  naik: 'bg-green-100 text-green-700',
-  lulus_sltp: 'bg-blue-100 text-blue-700',
-  lulus_slta: 'bg-purple-100 text-purple-700',
-  tidak_diketahui: 'bg-slate-100 text-slate-500',
+const STATUS_MCOLOR: Record<string, string> = {
+  naik: 'green',
+  lulus_sltp: 'blue',
+  lulus_slta: 'grape',
+  tidak_diketahui: 'gray',
 }
 const STATUS_LABEL: Record<string, string> = {
   naik: 'Naik Kelas',
@@ -57,18 +60,17 @@ export default function SantriToolsPage() {
   const [pbLoading, setPbLoading] = useState(false)
   const [pbSelected, setPbSelected] = useState<Set<string>>(new Set())
   const [pbTahun, setPbTahun] = useState(new Date().getFullYear())
-  // Modal detail pembayaran tahunan
   const [modalSantri, setModalSantri] = useState<any | null>(null)
 
   useEffect(() => {
     getSekolahList().then(setSekolahList)
   }, [])
 
-  // Auto-load data pembebasan saat tab pembebasan pertama kali dibuka
   useEffect(() => {
     if (tab === 'pembebasan' && pbData.length === 0 && !pbLoading) {
       loadPembebasan()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   // ── Naik Kelas ─────────────────────────────────────────────────────────
@@ -79,7 +81,6 @@ export default function SantriToolsPage() {
     const res = await previewNaikKelas({ asrama: filterAsrama || undefined, sekolah: filterSekolah || undefined, kelasSekolah: filterKelas || undefined })
     if ('error' in res) { toast.error(res.error as string); setLoadingPreview(false); return }
     setPreview(res)
-    // Auto-select semua yang bisa naik
     const autoSelect = new Set(res.filter(s => s.status !== 'tidak_diketahui').map(s => s.id))
     setSelectedIds(autoSelect)
     setLoadingPreview(false)
@@ -115,7 +116,6 @@ export default function SantriToolsPage() {
     setSelectedIds(new Set())
   }
 
-  // Group preview by status
   const grouped = preview ? {
     naik: preview.filter(s => s.status === 'naik'),
     lulus_sltp: preview.filter(s => s.status === 'lulus_sltp'),
@@ -159,7 +159,6 @@ export default function SantriToolsPage() {
     const res = await catatBebasPembayaran(santriId, jenis, pbTahun, '')
     if ('error' in res) { toast.error(res.error as string); return }
     toast.success(`${jenis} tahun ${pbTahun} dicatat bebas`)
-    // Update modal data
     const updated = await getSantriPembebasan({ asrama: pbAsrama || undefined, search: modalSantri?.nis, tahun: pbTahun })
     if (!('error' in updated) && updated.length) setModalSantri(updated[0])
     loadPembebasan()
@@ -175,94 +174,69 @@ export default function SantriToolsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
-
+    <div className="pb-20 space-y-6">
       {/* HEADER */}
-      <div className="border-b pb-4">
+      <Box pb="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
         <DashboardPageHeader
           title="Manajemen Santri"
           description="Operasi massal data santri, naik kelas sekolah, dan manajemen pembebasan."
         />
-      </div>
+      </Box>
 
       {/* TABS */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        <button onClick={() => setTab('naik_kelas')}
-          className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${
-            tab === 'naik_kelas' ? 'bg-white shadow text-indigo-700' : 'text-slate-500 hover:text-slate-700'
-          }`}>
-          <ArrowUpCircle className="w-4 h-4"/> Naik Kelas Sekolah
-        </button>
-        <button onClick={() => setTab('pembebasan')}
-          className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${
-            tab === 'pembebasan' ? 'bg-white shadow text-indigo-700' : 'text-slate-500 hover:text-slate-700'
-          }`}>
-          <ShieldCheck className="w-4 h-4"/> Pembebasan Pembayaran
-        </button>
-      </div>
+      <SegmentedControl
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+        data={[
+          { value: 'naik_kelas', label: <Group gap={6} wrap="nowrap"><ArrowUpCircle className="w-4 h-4" /> Naik Kelas Sekolah</Group> },
+          { value: 'pembebasan', label: <Group gap={6} wrap="nowrap"><ShieldCheck className="w-4 h-4" /> Pembebasan Pembayaran</Group> },
+        ]}
+      />
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          TAB 1: NAIK KELAS SEKOLAH
-      ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 1: NAIK KELAS SEKOLAH */}
       {tab === 'naik_kelas' && (
-        <div className="space-y-5">
-
-          {/* Info box */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5"/>
-            <div className="text-sm text-amber-800">
-              <p className="font-bold mb-1">Cara Kerja</p>
-              <p>Sistem akan menaikkan angka di depan kelas sekolah (+1). Contoh: <code className="bg-amber-100 px-1 rounded">7A → 8A</code>, <code className="bg-amber-100 px-1 rounded">9 → 10</code>.</p>
-              <p className="mt-1">Santri kelas <strong>12 dianggap lulus</strong> — kolom kelas sekolahnya akan dikosongkan. Santri kelas <strong>9 naik ke 10</strong> (lulus SLTP, masuk SLTA).</p>
-              <p className="mt-1 text-amber-600 font-semibold">Pastikan filter sudah tepat sebelum eksekusi. Preview dulu sebelum menyimpan!</p>
-            </div>
-          </div>
+        <Stack gap="md">
+          <Alert color="yellow" variant="light" radius="md" icon={<AlertTriangle className="w-5 h-5" />} title="Cara Kerja">
+            <Text size="sm" c="yellow.8">Sistem akan menaikkan angka di depan kelas sekolah (+1). Contoh: <code>7A → 8A</code>, <code>9 → 10</code>.</Text>
+            <Text size="sm" c="yellow.8" mt={4}>Santri kelas <strong>12 dianggap lulus</strong> — kolom kelas sekolahnya akan dikosongkan. Santri kelas <strong>9 naik ke 10</strong> (lulus SLTP, masuk SLTA).</Text>
+            <Text size="sm" fw={600} c="yellow.7" mt={4}>Pastikan filter sudah tepat sebelum eksekusi. Preview dulu sebelum menyimpan!</Text>
+          </Alert>
 
           {/* Filter */}
-          <div className="bg-white border rounded-xl p-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,160px)_auto] xl:items-end">
-            <div className="min-w-0">
-              <label className="text-xs font-bold text-slate-500 block mb-1">Asrama</label>
-              <select value={filterAsrama} onChange={e => setFilterAsrama(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
-                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a || '— Semua Asrama —'}</option>)}
-              </select>
-            </div>
-            <div className="min-w-0">
-              <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
-              <select value={filterSekolah} onChange={e => setFilterSekolah(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">— Semua Sekolah —</option>
-                {sekolahList.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="min-w-0">
-              <label className="text-xs font-bold text-slate-500 block mb-1">Filter Kelas (opsional)</label>
-              <input value={filterKelas} onChange={e => setFilterKelas(e.target.value)}
-                placeholder="mis: 7, 8A"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"/>
-            </div>
-            <div className="flex items-end">
-              <button onClick={handlePreview} disabled={loadingPreview}
-                className="w-full xl:w-auto flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60">
-                {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>}
-                Preview
-              </button>
-            </div>
-          </div>
+          <Paper withBorder radius="md" p="md">
+            <Grid gutter="md" align="flex-end">
+              <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+                <NativeSelect label="Asrama" value={filterAsrama} onChange={e => setFilterAsrama(e.currentTarget.value)}
+                  data={ASRAMA_LIST.map(a => ({ value: a, label: a || '— Semua Asrama —' }))}
+                  styles={{ label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)' } }} />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+                <NativeSelect label="Sekolah" value={filterSekolah} onChange={e => setFilterSekolah(e.currentTarget.value)}
+                  data={[{ value: '', label: '— Semua Sekolah —' }, ...sekolahList.map(s => ({ value: s, label: s }))]}
+                  styles={{ label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)' } }} />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+                <TextInput label="Filter Kelas (opsional)" value={filterKelas} onChange={e => setFilterKelas(e.currentTarget.value)} placeholder="mis: 7, 8A"
+                  styles={{ label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)' } }} />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+                <Button onClick={handlePreview} loading={loadingPreview} fullWidth color="indigo" fw={700} leftSection={!loadingPreview && <Search className="w-4 h-4" />}>Preview</Button>
+              </Grid.Col>
+            </Grid>
+          </Paper>
 
           {/* Preview hasil */}
           {preview && grouped && (
-            <div className="space-y-4">
-
+            <Stack gap="md">
               {/* Ringkasan */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
                 {Object.entries(grouped).map(([status, list]) => (
-                  <div key={status} className={`rounded-xl border p-3 text-center ${STATUS_COLOR[status]}`}>
-                    <p className="text-2xl font-black">{list.length}</p>
-                    <p className="text-xs font-bold mt-0.5">{STATUS_LABEL[status]}</p>
-                  </div>
+                  <Paper key={status} withBorder radius="md" p="sm" ta="center" bg={`${STATUS_MCOLOR[status]}.0`} style={{ borderColor: `var(--mantine-color-${STATUS_MCOLOR[status]}-2)` }}>
+                    <Text fz="xl" fw={900} c={`${STATUS_MCOLOR[status]}.7`}>{list.length}</Text>
+                    <Text size="xs" fw={700} mt={2} c={`${STATUS_MCOLOR[status]}.7`}>{STATUS_LABEL[status]}</Text>
+                  </Paper>
                 ))}
-              </div>
+              </SimpleGrid>
 
               {/* Tabel per group */}
               {(['naik', 'lulus_sltp', 'lulus_slta'] as const).map(status => {
@@ -270,261 +244,205 @@ export default function SantriToolsPage() {
                 if (!list.length) return null
                 const listIds = list.map(s => s.id)
                 const allSel = listIds.every(id => selectedIds.has(id))
+                const color = STATUS_MCOLOR[status]
                 return (
-                  <div key={status} className="bg-white border rounded-xl overflow-hidden">
-                    <div className={`px-4 py-3 flex items-center justify-between border-b ${STATUS_COLOR[status]}`}>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => toggleAll(listIds)} className="hover:opacity-70">
-                          {allSel ? <CheckSquare className="w-4 h-4"/> : <Square className="w-4 h-4"/>}
-                        </button>
-                        <span className="font-bold text-sm">{STATUS_LABEL[status]} ({list.length})</span>
-                      </div>
-                      <span className="text-xs font-semibold opacity-70">
-                        {listIds.filter(id => selectedIds.has(id)).length} dipilih
-                      </span>
-                    </div>
-                    <div className="divide-y max-h-64 overflow-y-auto">
+                  <Paper key={status} withBorder radius="md" style={{ overflow: 'hidden' }}>
+                    <Group justify="space-between" px="md" py="sm" bg={`${color}.1`} style={{ borderBottom: `1px solid var(--mantine-color-${color}-2)` }}>
+                      <Group gap="sm">
+                        <UnstyledButton onClick={() => toggleAll(listIds)} c={`${color}.8`}>
+                          {allSel ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                        </UnstyledButton>
+                        <Text fw={700} size="sm" c={`${color}.8`}>{STATUS_LABEL[status]} ({list.length})</Text>
+                      </Group>
+                      <Text size="xs" fw={600} c={`${color}.7`}>{listIds.filter(id => selectedIds.has(id)).length} dipilih</Text>
+                    </Group>
+                    <Box style={{ maxHeight: 256, overflowY: 'auto' }}>
                       {list.map(s => (
-                        <div key={s.id} onClick={() => toggleSelect(s.id)}
-                          className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors ${selectedIds.has(s.id) ? 'bg-indigo-50' : ''}`}>
-                          {selectedIds.has(s.id)
-                            ? <CheckSquare className="w-4 h-4 text-indigo-600 shrink-0"/>
-                            : <Square className="w-4 h-4 text-slate-300 shrink-0"/>}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate">{s.nama_lengkap}</p>
-                            <p className="text-[10px] text-slate-400">{s.nis} · {s.asrama} · {s.sekolah || '-'}</p>
+                        <Group key={s.id} onClick={() => toggleSelect(s.id)} gap="sm" px="md" py="xs" wrap="nowrap"
+                          style={{ cursor: 'pointer', borderTop: '1px solid var(--mantine-color-gray-1)', background: selectedIds.has(s.id) ? 'var(--mantine-color-indigo-0)' : undefined }}>
+                          {selectedIds.has(s.id) ? <CheckSquare className="w-4 h-4 shrink-0" color="var(--mantine-color-indigo-6)" /> : <Square className="w-4 h-4 shrink-0" color="var(--mantine-color-gray-3)" />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text size="sm" fw={600} c="dark.7" truncate>{s.nama_lengkap}</Text>
+                            <Text fz={10} c="gray.5">{s.nis} · {s.asrama} · {s.sekolah || '-'}</Text>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 text-sm">
-                            <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{s.kelas_sekolah}</span>
-                            <span className="text-slate-400">→</span>
-                            <span className={`font-mono px-2 py-0.5 rounded font-bold ${
-                              s.kelas_baru ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                            }`}>
-                              {s.kelas_baru ?? '(kosong)'}
-                            </span>
-                          </div>
-                        </div>
+                          <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                            <Badge variant="light" color="gray" radius="sm" styles={{ label: { fontFamily: 'monospace' } }}>{s.kelas_sekolah}</Badge>
+                            <Text c="gray.4">→</Text>
+                            <Badge variant="light" radius="sm" color={s.kelas_baru ? 'green' : 'red'} styles={{ label: { fontFamily: 'monospace' } }}>{s.kelas_baru ?? '(kosong)'}</Badge>
+                          </Group>
+                        </Group>
                       ))}
-                    </div>
-                  </div>
+                    </Box>
+                  </Paper>
                 )
               })}
 
               {/* Tidak dikenali (collapsible) */}
               {grouped.tidak_diketahui.length > 0 && (
-                <div className="bg-white border rounded-xl overflow-hidden">
-                  <button onClick={() => setShowTidakDikenal(v => !v)}
-                    className="w-full px-4 py-3 flex items-center justify-between bg-slate-50 border-b hover:bg-slate-100 transition-colors">
-                    <span className="text-sm font-bold text-slate-500">
-                      Format Tidak Dikenal ({grouped.tidak_diketahui.length}) — tidak akan diproses
-                    </span>
-                    {showTidakDikenal ? <ChevronUp className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>}
-                  </button>
+                <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+                  <UnstyledButton onClick={() => setShowTidakDikenal(v => !v)} w="100%">
+                    <Group justify="space-between" px="md" py="sm" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }}>
+                      <Text size="sm" fw={700} c="dimmed">Format Tidak Dikenal ({grouped.tidak_diketahui.length}) — tidak akan diproses</Text>
+                      {showTidakDikenal ? <ChevronUp className="w-4 h-4" color="var(--mantine-color-gray-5)" /> : <ChevronDown className="w-4 h-4" color="var(--mantine-color-gray-5)" />}
+                    </Group>
+                  </UnstyledButton>
                   {showTidakDikenal && (
-                    <div className="divide-y max-h-48 overflow-y-auto">
+                    <Box style={{ maxHeight: 192, overflowY: 'auto' }}>
                       {grouped.tidak_diketahui.map(s => (
-                        <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-700 truncate">{s.nama_lengkap}</p>
-                            <p className="text-[10px] text-slate-400">{s.nis} · {s.asrama}</p>
+                        <Group key={s.id} gap="sm" px="md" py="xs" wrap="nowrap" style={{ borderTop: '1px solid var(--mantine-color-gray-1)' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text size="sm" fw={600} c="dark.6" truncate>{s.nama_lengkap}</Text>
+                            <Text fz={10} c="gray.5">{s.nis} · {s.asrama}</Text>
                           </div>
-                          <span className="font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs">"{s.kelas_sekolah}"</span>
-                        </div>
+                          <Badge variant="light" color="gray" radius="sm" styles={{ label: { fontFamily: 'monospace' } }}>&quot;{s.kelas_sekolah}&quot;</Badge>
+                        </Group>
                       ))}
-                    </div>
+                    </Box>
                   )}
-                </div>
+                </Paper>
               )}
 
               {/* Tombol Eksekusi */}
               {selectedIds.size > 0 && (
-                <div className="sticky bottom-4 z-10">
-                  <button onClick={handleEksekusi} disabled={eksekusiLoading}
-                    className="w-full bg-indigo-700 text-white py-4 rounded-xl shadow-2xl flex items-center justify-between px-6 hover:bg-indigo-800 transition-all active:scale-95 disabled:opacity-60">
-                    <div>
-                      <p className="text-xs text-indigo-200">Siap dinaikkan</p>
-                      <p className="text-xl font-black">{selectedIds.size} Santri</p>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/10 px-5 py-2.5 rounded-lg font-black text-sm">
-                      {eksekusiLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <ArrowUpCircle className="w-5 h-5"/>}
-                      {eksekusiLoading ? 'Memproses...' : 'EKSEKUSI NAIK KELAS'}
-                    </div>
-                  </button>
-                </div>
+                <Box style={{ position: 'sticky', bottom: 16, zIndex: 10 }}>
+                  <UnstyledButton onClick={handleEksekusi} disabled={eksekusiLoading} w="100%">
+                    <Group justify="space-between" px="lg" py="md" bg="indigo.7"
+                      style={{ borderRadius: 12, boxShadow: 'var(--mantine-shadow-xl)', opacity: eksekusiLoading ? 0.6 : 1 }}>
+                      <div>
+                        <Text size="xs" c="indigo.2">Siap dinaikkan</Text>
+                        <Text fz="xl" fw={900} c="white">{selectedIds.size} Santri</Text>
+                      </div>
+                      <Group gap="xs" px="md" py="sm" style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                        {eksekusiLoading ? <Loader size="sm" color="white" /> : <ArrowUpCircle className="w-5 h-5" color="#fff" />}
+                        <Text fw={900} size="sm" c="white">{eksekusiLoading ? 'Memproses...' : 'EKSEKUSI NAIK KELAS'}</Text>
+                      </Group>
+                    </Group>
+                  </UnstyledButton>
+                </Box>
               )}
-            </div>
+            </Stack>
           )}
-        </div>
+        </Stack>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          TAB 2: MANAJEMEN PEMBEBASAN
-      ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 2: MANAJEMEN PEMBEBASAN */}
       {tab === 'pembebasan' && (
-        <div className="space-y-5">
-
+        <Stack gap="md">
           {/* Filter */}
-          <div className="bg-white border rounded-xl p-4 flex flex-wrap gap-3 items-end">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Asrama</label>
-              <select value={pbAsrama} onChange={e => setPbAsrama(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
-                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a || '— Semua Asrama —'}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Cari Nama / NIS</label>
-              <input value={pbSearch} onChange={e => setPbSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && loadPembebasan()}
-                placeholder="Nama atau NIS..."
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-44"/>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Tahun Pembayaran</label>
-              <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
-                <button onClick={() => setPbTahun(t => t - 1)} className="px-3 py-2 hover:bg-slate-100 text-sm font-bold">-</button>
-                <span className="px-3 font-mono font-bold text-sm">{pbTahun}</span>
-                <button onClick={() => setPbTahun(t => t + 1)} className="px-3 py-2 hover:bg-slate-100 text-sm font-bold">+</button>
+          <Paper withBorder radius="md" p="md">
+            <Flex gap="md" wrap="wrap" align="flex-end">
+              <NativeSelect label="Asrama" value={pbAsrama} onChange={e => setPbAsrama(e.currentTarget.value)}
+                data={ASRAMA_LIST.map(a => ({ value: a, label: a || '— Semua Asrama —' }))}
+                styles={{ label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)' } }} />
+              <TextInput label="Cari Nama / NIS" value={pbSearch} onChange={e => setPbSearch(e.currentTarget.value)} onKeyDown={e => e.key === 'Enter' && loadPembebasan()} placeholder="Nama atau NIS..." w={176}
+                styles={{ label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)' } }} />
+              <div>
+                <Text size="xs" fw={700} c="dimmed" mb={4}>Tahun Pembayaran</Text>
+                <Group gap={0} wrap="nowrap" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, overflow: 'hidden' }}>
+                  <Button variant="subtle" color="gray" size="compact-md" onClick={() => setPbTahun(t => t - 1)}>−</Button>
+                  <Text px="sm" ff="monospace" fw={700} size="sm">{pbTahun}</Text>
+                  <Button variant="subtle" color="gray" size="compact-md" onClick={() => setPbTahun(t => t + 1)}>+</Button>
+                </Group>
               </div>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={pbHanyaBebas} onChange={e => setPbHanyaBebas(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
-              <span className="text-sm font-semibold text-slate-600">Hanya yg bebas SPP</span>
-            </label>
-            <button onClick={loadPembebasan} disabled={pbLoading}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60">
-              {pbLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>}
-              Tampilkan
-            </button>
-          </div>
+              <Checkbox checked={pbHanyaBebas} onChange={e => setPbHanyaBebas(e.currentTarget.checked)} label="Hanya yg bebas SPP" color="indigo" />
+              <Button onClick={loadPembebasan} loading={pbLoading} color="indigo" fw={700} leftSection={!pbLoading && <Search className="w-4 h-4" />}>Tampilkan</Button>
+            </Flex>
+          </Paper>
 
           {/* Bulk action */}
           {pbSelected.size > 0 && (
-            <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
-              <span className="text-sm font-bold text-indigo-700">{pbSelected.size} dipilih</span>
-              <button onClick={() => handleToggleBebas([...pbSelected], true)}
-                className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700">
-                <ShieldCheck className="w-3.5 h-3.5"/> Bebaskan SPP
-              </button>
-              <button onClick={() => handleToggleBebas([...pbSelected], false)}
-                className="flex items-center gap-1.5 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600">
-                <X className="w-3.5 h-3.5"/> Cabut Pembebasan
-              </button>
-              <button onClick={() => setPbSelected(new Set())} className="ml-auto text-xs text-slate-400 hover:text-slate-600">Batal pilih</button>
-            </div>
+            <Group gap="sm" px="md" py="sm" style={{ background: 'var(--mantine-color-indigo-0)', border: '1px solid var(--mantine-color-indigo-2)', borderRadius: 12 }}>
+              <Text size="sm" fw={700} c="indigo.7">{pbSelected.size} dipilih</Text>
+              <Button size="compact-sm" color="green" fw={700} leftSection={<ShieldCheck className="w-3.5 h-3.5" />} onClick={() => handleToggleBebas([...pbSelected], true)}>Bebaskan SPP</Button>
+              <Button size="compact-sm" color="red" fw={700} leftSection={<X className="w-3.5 h-3.5" />} onClick={() => handleToggleBebas([...pbSelected], false)}>Cabut Pembebasan</Button>
+              <UnstyledButton onClick={() => setPbSelected(new Set())} ml="auto"><Text size="xs" c="gray.5">Batal pilih</Text></UnstyledButton>
+            </Group>
           )}
 
           {/* Tabel santri */}
           {pbLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
-          ) : pbData.length === 0 && !pbLoading ? (
-            <div className="flex flex-col items-center py-20 gap-3 text-center">
-              <ShieldCheck className="w-12 h-12 text-slate-200"/>
-              <p className="text-slate-400 font-semibold">Belum ada data</p>
-              <p className="text-sm text-slate-400">Atur filter lalu tekan Tampilkan.</p>
-            </div>
+            <Center py={64}><Loader color="indigo" size="lg" /></Center>
+          ) : pbData.length === 0 ? (
+            <Stack align="center" py={80} gap="sm">
+              <ShieldCheck className="w-12 h-12" color="var(--mantine-color-gray-3)" />
+              <Text c="dimmed" fw={600}>Belum ada data</Text>
+              <Text size="sm" c="dimmed">Atur filter lalu tekan Tampilkan.</Text>
+            </Stack>
           ) : (
-            <div className="bg-white border rounded-xl overflow-hidden">
-              <div className="bg-slate-50 px-4 py-2.5 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => {
+            <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+              <Group justify="space-between" px="md" py="xs" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+                <Group gap="xs">
+                  <UnstyledButton onClick={() => {
                     const allIds = pbData.map(s => s.id)
                     const allSel = allIds.every(id => pbSelected.has(id))
                     setPbSelected(allSel ? new Set() : new Set(allIds))
-                  }} className="hover:opacity-70">
-                    {pbData.every(s => pbSelected.has(s.id))
-                      ? <CheckSquare className="w-4 h-4 text-indigo-600"/>
-                      : <Square className="w-4 h-4 text-slate-400"/>}
-                  </button>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{pbData.length} Santri</span>
-                </div>
-                <span className="text-xs text-slate-400">Klik nama untuk kelola pembayaran tahunan</span>
-              </div>
-              <div className="divide-y max-h-[500px] overflow-y-auto">
+                  }}>
+                    {pbData.every(s => pbSelected.has(s.id)) ? <CheckSquare className="w-4 h-4" color="var(--mantine-color-indigo-6)" /> : <Square className="w-4 h-4" color="var(--mantine-color-gray-5)" />}
+                  </UnstyledButton>
+                  <Text size="xs" fw={700} c="dimmed" tt="uppercase">{pbData.length} Santri</Text>
+                </Group>
+                <Text size="xs" c="gray.5">Klik nama untuk kelola pembayaran tahunan</Text>
+              </Group>
+              <Box style={{ maxHeight: 500, overflowY: 'auto' }}>
                 {pbData.map(s => (
-                  <div key={s.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors ${pbSelected.has(s.id) ? 'bg-indigo-50' : ''}`}>
-                    <button onClick={() => setPbSelected(prev => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n })}
-                      className="shrink-0 hover:opacity-70">
-                      {pbSelected.has(s.id)
-                        ? <CheckSquare className="w-4 h-4 text-indigo-600"/>
-                        : <Square className="w-4 h-4 text-slate-300"/>}
-                    </button>
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModalSantri(s)}>
-                      <p className="text-sm font-bold text-slate-800 truncate">{s.nama_lengkap}</p>
-                      <p className="text-[10px] text-slate-400">{s.nis} · {s.asrama} Kamar {s.kamar}</p>
-                    </div>
-                    {/* Badge bebas SPP */}
-                    <button
-                      onClick={() => handleToggleBebas([s.id], !s.bebas_spp)}
-                      className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
-                        s.bebas_spp
-                          ? 'bg-green-100 text-green-700 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
-                          : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-green-50 hover:text-green-600 hover:border-green-200'
-                      }`}
-                      title={s.bebas_spp ? 'Klik untuk cabut bebas SPP' : 'Klik untuk bebaskan SPP'}
-                    >
-                      <ShieldCheck className="w-3 h-3"/>
+                  <Group key={s.id} gap="sm" px="md" py="sm" wrap="nowrap" style={{ borderTop: '1px solid var(--mantine-color-gray-1)', background: pbSelected.has(s.id) ? 'var(--mantine-color-indigo-0)' : undefined }}>
+                    <UnstyledButton onClick={() => setPbSelected(prev => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n })} style={{ flexShrink: 0 }}>
+                      {pbSelected.has(s.id) ? <CheckSquare className="w-4 h-4" color="var(--mantine-color-indigo-6)" /> : <Square className="w-4 h-4" color="var(--mantine-color-gray-3)" />}
+                    </UnstyledButton>
+                    <Box style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setModalSantri(s)}>
+                      <Text size="sm" fw={700} c="dark.7" truncate>{s.nama_lengkap}</Text>
+                      <Text fz={10} c="gray.5">{s.nis} · {s.asrama} Kamar {s.kamar}</Text>
+                    </Box>
+                    <Button size="compact-xs" radius="xl" fw={700} style={{ flexShrink: 0 }}
+                      variant="light" color={s.bebas_spp ? 'green' : 'gray'}
+                      leftSection={<ShieldCheck className="w-3 h-3" />}
+                      onClick={() => handleToggleBebas([s.id], !s.bebas_spp)}>
                       {s.bebas_spp ? 'Bebas SPP' : 'Kena SPP'}
-                    </button>
-                    {/* Badge pembayaran tahunan yg sudah bebas */}
-                    <div className="shrink-0 flex gap-1 flex-wrap justify-end max-w-[140px]">
+                    </Button>
+                    <Group gap={4} justify="flex-end" wrap="wrap" style={{ flexShrink: 0, maxWidth: 140 }}>
                       {s.sudah_bayar.map((jenis: string) => (
-                        <span key={jenis} className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded">{jenis}</span>
+                        <Badge key={jenis} size="xs" variant="light" color="blue" radius="sm">{jenis}</Badge>
                       ))}
-                    </div>
-                  </div>
+                    </Group>
+                  </Group>
                 ))}
-              </div>
-            </div>
+              </Box>
+            </Paper>
           )}
 
           {/* Modal pembayaran tahunan */}
-          {modalSantri && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalSantri(null)}>
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="px-5 py-4 border-b flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-800">{modalSantri.nama_lengkap}</h3>
-                    <p className="text-xs text-slate-500">{modalSantri.nis} · Tahun {pbTahun}</p>
-                  </div>
-                  <button onClick={() => setModalSantri(null)} className="p-1.5 hover:bg-slate-100 rounded-full">
-                    <X className="w-5 h-5 text-slate-400"/>
-                  </button>
-                </div>
-                <div className="p-5 space-y-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Pembayaran Tahunan — Tahun {pbTahun}</p>
-                  {JENIS_BIAYA_LIST.map(jenis => {
-                    const sudahBebas = modalSantri.sudah_bayar.includes(jenis)
-                    return (
-                      <div key={jenis} className={`flex items-center justify-between p-3 rounded-xl border ${sudahBebas ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
-                        <div className="flex items-center gap-2">
-                          <Banknote className={`w-4 h-4 ${sudahBebas ? 'text-blue-500' : 'text-slate-400'}`}/>
-                          <span className="text-sm font-semibold text-slate-700">{jenis}</span>
-                          {sudahBebas && <span className="text-[10px] bg-blue-200 text-blue-700 px-1.5 py-0.5 rounded font-bold">BEBAS</span>}
-                        </div>
-                        {sudahBebas ? (
-                          <button onClick={() => handleHapusBebas(modalSantri.id, jenis)}
-                            className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1">
-                            <X className="w-3 h-3"/> Cabut
-                          </button>
-                        ) : (
-                          <button onClick={() => handleCatatBebas(modalSantri.id, jenis)}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3"/> Bebaskan
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="px-5 pb-5">
-                  <p className="text-[10px] text-slate-400">Pembebasan dicatat sebagai transaksi Rp 0. Hanya admin yang dapat mengubah ini.</p>
-                </div>
+          <Modal opened={!!modalSantri} onClose={() => setModalSantri(null)} centered size="md"
+            title={modalSantri ? (
+              <div>
+                <Text fw={700} c="dark.7">{modalSantri.nama_lengkap}</Text>
+                <Text size="xs" c="dimmed">{modalSantri.nis} · Tahun {pbTahun}</Text>
               </div>
-            </div>
-          )}
-
-        </div>
+            ) : null}>
+            {modalSantri && (
+              <Stack gap="sm">
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase">Pembayaran Tahunan — Tahun {pbTahun}</Text>
+                {JENIS_BIAYA_LIST.map(jenis => {
+                  const sudahBebas = modalSantri.sudah_bayar.includes(jenis)
+                  return (
+                    <Group key={jenis} justify="space-between" p="sm" style={{ borderRadius: 12, border: `1px solid var(--mantine-color-${sudahBebas ? 'blue' : 'gray'}-2)`, background: `var(--mantine-color-${sudahBebas ? 'blue' : 'gray'}-0)` }}>
+                      <Group gap="xs">
+                        <Banknote className="w-4 h-4" color={sudahBebas ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-gray-5)'} />
+                        <Text size="sm" fw={600} c="dark.6">{jenis}</Text>
+                        {sudahBebas && <Badge size="xs" color="blue" radius="sm">BEBAS</Badge>}
+                      </Group>
+                      {sudahBebas ? (
+                        <Button size="compact-xs" variant="subtle" color="red" fw={700} leftSection={<X className="w-3 h-3" />} onClick={() => handleHapusBebas(modalSantri.id, jenis)}>Cabut</Button>
+                      ) : (
+                        <Button size="compact-xs" variant="subtle" color="blue" fw={700} leftSection={<ShieldCheck className="w-3 h-3" />} onClick={() => handleCatatBebas(modalSantri.id, jenis)}>Bebaskan</Button>
+                      )}
+                    </Group>
+                  )
+                })}
+                <Text fz={10} c="gray.4">Pembebasan dicatat sebagai transaksi Rp 0. Hanya admin yang dapat mengubah ini.</Text>
+              </Stack>
+            )}
+          </Modal>
+        </Stack>
       )}
     </div>
   )

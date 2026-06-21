@@ -190,7 +190,7 @@ export default function CetakLaporanSensus() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       
       {/* KONTROL PANEL */}
       <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">

@@ -6,7 +6,7 @@ import { useState } from 'react'
 // HAPUS IMPORT XLSX STATIS
 import { simpanSantriKeKelas, simpanPenempatanBatch } from './actions'
 import { Save, Search, CheckSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle, Download, Loader2, AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner' 
+import { toast } from '@/lib/toast' 
 
 export function FormAturKelas({ kelasList, santriList }: { kelasList: any[], santriList: any[] }) {
   const [mode, setMode] = useState<'manual' | 'excel'>('manual')

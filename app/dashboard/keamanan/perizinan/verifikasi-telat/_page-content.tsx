@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type TelatItem = {
@@ -163,7 +163,7 @@ export default function VerifikasiTelatPage() {
   const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-4">
+    <div className="pb-16 space-y-4">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">

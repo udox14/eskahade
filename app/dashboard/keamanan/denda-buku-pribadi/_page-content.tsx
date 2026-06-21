@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { CheckCircle2, Eye, Filter, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Pagination from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
@@ -264,7 +264,7 @@ export default function DendaBukuPribadiPageContent() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Denda Buku Pribadi</h1>

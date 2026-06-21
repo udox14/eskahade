@@ -10,7 +10,7 @@ import {
   Filter, Download, RefreshCw,
   ChevronDown, ChevronUp, Check, Loader2, Users, Settings2
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -298,7 +298,7 @@ export default function ExportSantriPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-16 space-y-4">
+    <div className="pb-16 space-y-4">
 
       <DashboardPageHeader
         title="Export Data Santri"

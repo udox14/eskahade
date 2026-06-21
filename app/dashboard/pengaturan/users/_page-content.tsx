@@ -7,7 +7,7 @@ import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUse
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Pagination, { usePagination } from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -631,7 +631,7 @@ export default function ManajemenUserPage() {
   const { paged: pagedUsers, totalPages: totalPagesUsers, safePage: safePageUsers } = usePagination(filteredUsers, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       
       {/* HEADER */}
       <div className="border-b pb-4 space-y-4">

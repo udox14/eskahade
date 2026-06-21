@@ -8,7 +8,7 @@ import {
   MapPin, RefreshCw, Play, AlertTriangle, CheckCircle2,
   UserX, Loader2, ArrowLeft, Info, SlidersHorizontal, ArrowUp, ArrowDown
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -177,7 +177,7 @@ export default function PlottingEhbPage() {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
 
   if (!event) return (
-    <div className="max-w-4xl mx-auto py-10">
+    <div className="py-10">
       <div className="bg-amber-50 text-amber-800 p-4 rounded-lg flex items-center gap-3">
         <AlertTriangle className="w-5 h-5"/> Belum ada event EHB yang aktif. Silakan atur di menu Jadwal EHB.
       </div>
@@ -266,7 +266,7 @@ export default function PlottingEhbPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Auto Plotting Ruangan"
         description="Penempatan otomatis dengan cross seating yang tetap berurutan per kelas dan abjad."

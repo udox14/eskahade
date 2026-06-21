@@ -6,7 +6,7 @@ import { PemanggilanTelatView } from './pemanggilan-telat-view'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, ArrowLeft, Loader2, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 export default function CetakTelatPage() {
   const router = useRouter()

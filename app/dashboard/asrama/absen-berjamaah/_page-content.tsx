@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getSessionBerjamaah, getKamarsBerjamaah, getDataAbsenBerjamaahKamar, batchSaveAbsenBerjamaah } from './actions'
 import { Sun, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, ShieldOff } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 const WAKTU = ['shubuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const

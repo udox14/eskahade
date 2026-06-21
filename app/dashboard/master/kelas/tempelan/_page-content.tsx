@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { AlertTriangle, ArrowLeft, Eye, Loader2, Printer } from 'lucide-react'
-import { toast } from 'sonner'
+import { AlertTriangle, ArrowLeft, Eye, Printer } from 'lucide-react'
+import { Alert, Box, Button, Center, Grid, Group, Loader, NativeSelect, Paper, Text } from '@mantine/core'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getKelasTempelanList,
@@ -236,106 +237,78 @@ export default function TempelanKelasPage() {
   }
 
   if (loadingInit) {
-    return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+    return <Center p={80}><Loader color="blue" size="lg" /></Center>
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       <DashboardPageHeader
         title="Tempelan Kelas"
         description="Cetak tempelan nama kelas dan tempat untuk tahun ajaran aktif."
         action={(
-          <Link
-            href="/dashboard/master/kelas"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <Button component={Link} href="/dashboard/master/kelas" variant="default" fw={700} leftSection={<ArrowLeft className="h-4 w-4" />}>
             Kembali ke Kelas
-          </Link>
+          </Button>
         )}
       />
 
       {!tahunAktif ? (
-        <div className="bg-amber-50 text-amber-800 p-4 rounded-xl flex items-center gap-3 border border-amber-200">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          <p className="text-sm font-medium">Belum ada tahun ajaran aktif, jadi tempelan belum bisa disiapkan.</p>
-        </div>
+        <Alert color="yellow" variant="light" radius="md" icon={<AlertTriangle className="w-5 h-5" />}>
+          <Text size="sm" fw={500} c="yellow.8">Belum ada tahun ajaran aktif, jadi tempelan belum bisa disiapkan.</Text>
+        </Alert>
       ) : (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-3 flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-          <p className="text-sm font-bold text-blue-900">Tahun ajaran aktif: {tahunAktif.nama}</p>
-          <span className="text-xs text-blue-600 ml-auto">{totalLabel}</span>
-        </div>
+        <Alert color="blue" variant="light" radius="md">
+          <Group gap="sm">
+            <Text size="sm" fw={700} c="blue.9">Tahun ajaran aktif: {tahunAktif.nama}</Text>
+            <Text size="xs" c="blue.6" ml="auto">{totalLabel}</Text>
+          </Group>
+        </Alert>
       )}
 
-      <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-        <div className="border-b bg-slate-50 px-5 py-3">
-          <h2 className="text-sm font-bold text-slate-700">Siapkan Cetakan</h2>
-          <p className="mt-1 text-xs text-slate-500">Format F4 Landscape, margin narrow, bisa per kelas atau semua sekaligus.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
-          <div className="md:col-span-1">
-            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Pilih Kelas</label>
-            <select
+      <Paper withBorder radius="lg" shadow="sm" style={{ overflow: 'hidden' }}>
+        <Box px="lg" py="sm" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+          <Text size="sm" fw={700} c="dark.6">Siapkan Cetakan</Text>
+          <Text size="xs" c="dimmed" mt={4}>Format F4 Landscape, margin narrow, bisa per kelas atau semua sekaligus.</Text>
+        </Box>
+        <Grid gutter="md" p="lg" align="flex-end">
+          <Grid.Col span={{ base: 12, sm: 4 }}>
+            <NativeSelect
+              label="Pilih Kelas"
               value={selectedKelas}
-              onChange={(e) => {
-                setSelectedKelas(e.target.value)
-                setPreviewItem(null)
-                setHasLoadedPreview(false)
-              }}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            >
-              <option value="">-- Pilih kelas --</option>
-              {kelasList.map((kelas) => (
-                <option key={kelas.id} value={kelas.id}>
-                  {kelas.nama_kelas} {kelas.tempat ? `• ${kelas.tempat}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleLoadPreview}
-              disabled={loadingPreview || loadingBulk}
-              className="flex h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              {loadingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+              onChange={(e) => { setSelectedKelas(e.currentTarget.value); setPreviewItem(null); setHasLoadedPreview(false) }}
+              data={[{ value: '', label: '-- Pilih kelas --' }, ...kelasList.map((kelas) => ({ value: String(kelas.id), label: `${kelas.nama_kelas} ${kelas.tempat ? `• ${kelas.tempat}` : ''}` }))]}
+              styles={{ label: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--mantine-color-dimmed)' } }}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 4 }}>
+            <Button onClick={handleLoadPreview} loading={loadingPreview} disabled={loadingBulk} fullWidth color="blue" fw={700} leftSection={!loadingPreview && <Eye className="h-4 w-4" />}>
               Muat Preview
-            </button>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleLoadBulk}
-              disabled={loadingBulk || loadingPreview || !tahunAktif}
-              className="flex h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loadingBulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+            </Button>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 4 }}>
+            <Button onClick={handleLoadBulk} loading={loadingBulk} disabled={loadingPreview || !tahunAktif} fullWidth color="dark" fw={700} leftSection={!loadingBulk && <Printer className="h-4 w-4" />}>
               Cetak Semua
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </Grid.Col>
+        </Grid>
+      </Paper>
 
       {hasLoadedPreview && previewItem && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              Preview untuk <span className="font-bold text-slate-800">{previewItem.nama_kelas}</span>
-              <span className="ml-2 text-slate-400">· 1 lembar F4 Landscape</span>
-            </p>
-            <button
-              onClick={() => handlePrint()}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
-            >
-              <Printer className="h-4 w-4" />
+        <Box>
+          <Group justify="space-between" mb="md">
+            <Text size="sm" c="dimmed">
+              Preview untuk <Text span fw={700} c="dark.7">{previewItem.nama_kelas}</Text>
+              <Text span c="gray.4" ml="xs">· 1 lembar F4 Landscape</Text>
+            </Text>
+            <Button onClick={() => handlePrint()} color="teal" fw={700} leftSection={<Printer className="h-4 w-4" />}>
               Cetak Kelas Ini
-            </button>
-          </div>
+            </Button>
+          </Group>
 
-          <div className="max-h-[780px] overflow-auto rounded-2xl border bg-slate-100 p-4 flex justify-center">
+          <Box style={{ maxHeight: 780, overflow: 'auto', borderRadius: 16, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-gray-1)', padding: 16, display: 'flex', justifyContent: 'center' }}>
             <TempelanPreview item={previewItem} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       <div className="hidden">

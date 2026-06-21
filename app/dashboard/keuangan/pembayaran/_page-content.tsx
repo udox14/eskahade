@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { cariSantriKeuangan, getInfoTagihan, bayarTagihan, getMonitoringPembayaran, bayarLunasSetahun } from './actions'
-import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
+import { Search, Building2, Calendar, CheckCircle, Clock, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
+import {
+  ActionIcon, Badge, Button, Center, Flex, Grid, Group, Loader, NativeSelect, Paper, Progress,
+  Stack, Table, Text, TextInput, ThemeIcon, UnstyledButton,
+} from '@mantine/core'
+import { toast } from '@/lib/toast'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -14,13 +18,13 @@ export default function LoketPembayaranPage() {
   const confirm = useConfirm()
   // --- STATE UTAMA ---
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  
+
   // --- STATE MONITORING (TABEL) ---
   const [tahunTagihan, setTahunTagihan] = useState(new Date().getFullYear())
   const [filterAsrama, setFilterAsrama] = useState('SEMUA')
   const [filterKamar, setFilterKamar] = useState('SEMUA')
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   const [dataList, setDataList] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -61,16 +65,13 @@ export default function LoketPembayaranPage() {
   // ============================================================
   useEffect(() => {
     if (selectedSantri) {
-      // Saat santri dipilih (masuk view detail), push state baru ke history browser
       window.history.pushState({ view: 'DETAIL' }, '')
     }
   }, [selectedSantri])
 
   useEffect(() => {
-    // Tangkap event tombol back HP/browser
     const handlePopState = (e: PopStateEvent) => {
       if (!e.state || e.state.view !== 'DETAIL') {
-        // Kembali ke list
         setSelectedSantri(null)
         setInfoTagihan(null)
         setNominalCicil('')
@@ -90,10 +91,9 @@ export default function LoketPembayaranPage() {
     setNominalCicil('')
   }
 
-  // Bayar Lunas Tahunan (EHB, KES, EKS)
   const handleLunasTahunanSemua = async () => {
     if (!infoTagihan) return
-    if(!await confirm(`Lunasi seluruh tagihan tahunan (EHB, Kesehatan, Ekskul) untuk ${selectedSantri.nama_lengkap}?`)) return
+    if (!await confirm(`Lunasi seluruh tagihan tahunan (EHB, Kesehatan, Ekskul) untuk ${selectedSantri.nama_lengkap}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pelunasan...")
@@ -102,37 +102,35 @@ export default function LoketPembayaranPage() {
     toast.dismiss(toastId)
 
     if (res?.error) {
-        toast.warning(res.error)
+      toast.warning(res.error)
     } else {
-        toast.success("Lunas Berhasil!", { description: `Total Rp ${res.total?.toLocaleString()} diterima.` })
-        loadInfo()
+      toast.success("Lunas Berhasil!", { description: `Total Rp ${res.total?.toLocaleString()} diterima.` })
+      loadInfo()
     }
   }
 
-  // Bayar Lunas Bangunan (Sisa)
   const handleLunasBangunan = async () => {
     const sisa = infoTagihan.bangunan.sisa
     if (sisa <= 0) return toast.info("Sudah lunas.")
-    
+
     if (!await confirm(`Lunasi sisa Uang Bangunan sebesar Rp ${sisa.toLocaleString()}?`)) return
 
     setIsProcessing(true)
     const toastId = toast.loading("Memproses pelunasan bangunan...")
-    
+
     const res = await bayarTagihan(selectedSantri.id, 'BANGUNAN', sisa, null, 'Pelunasan Bangunan')
-    
+
     setIsProcessing(false)
     toast.dismiss(toastId)
 
     if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+      toast.error("Gagal", { description: res.error })
     } else {
-        toast.success("Bangunan Lunas!", { description: "Terima kasih." })
-        loadInfo()
+      toast.success("Bangunan Lunas!", { description: "Terima kasih." })
+      loadInfo()
     }
   }
 
-  // Bayar Bangunan (Cicilan Manual)
   const handleBayarBangunan = async () => {
     const bayar = parseInt(nominalCicil.replace(/\./g, ''))
     if (!bayar || bayar <= 0) return toast.warning("Nominal tidak valid")
@@ -147,15 +145,14 @@ export default function LoketPembayaranPage() {
     toast.dismiss(toastId)
 
     if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+      toast.error("Gagal", { description: res.error })
     } else {
-        toast.success("Berhasil!", { description: "Pembayaran cicilan diterima." })
-        setNominalCicil('')
-        loadInfo()
+      toast.success("Berhasil!", { description: "Pembayaran cicilan diterima." })
+      setNominalCicil('')
+      loadInfo()
     }
   }
 
-  // Bayar Tahunan (Per Item)
   const handleBayarTahunan = async (jenis: string, nominal: number) => {
     if (nominal <= 0) return toast.error("Tarif belum diatur untuk angkatan ini.")
     if (!await confirm(`Terima pembayaran ${jenis} Tahun ${tahunTagihan} sebesar Rp ${nominal.toLocaleString()}?`)) return
@@ -167,323 +164,282 @@ export default function LoketPembayaranPage() {
     toast.dismiss(toastId)
 
     if (res?.error) {
-        toast.error("Gagal", { description: res.error })
+      toast.error("Gagal", { description: res.error })
     } else {
-        toast.success("Lunas!", { description: `${jenis} tahun ${tahunTagihan} berhasil dibayar.` })
-        loadInfo()
+      toast.success("Lunas!", { description: `${jenis} tahun ${tahunTagihan} berhasil dibayar.` })
+      loadInfo()
     }
   }
 
   const handleBackToList = () => {
-    // Gunakan history.back() agar konsisten dengan tombol back HP
     window.history.back()
   }
 
   const { paged: pagedDataList, totalPages: totalPagesDataList, safePage: safePageDataList } = usePagination(dataList, pageSize, page)
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-20">
-      
+    <div className="space-y-8 pb-20">
       {/* HEADER GLOBAL */}
       <DashboardPageHeader
         title="Loket Keuangan Pusat"
         description="Penerimaan Uang Bangunan dan tagihan tahunan."
         action={(
-          <div className="flex items-center gap-2 bg-white border p-1 rounded-lg shadow-sm">
-              <button onClick={() => setTahunTagihan(t => t - 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">-</button>
-              <span className="font-mono font-bold text-indigo-700 px-2">{tahunTagihan}</span>
-              <button onClick={() => setTahunTagihan(t => t + 1)} className="px-3 py-1 hover:bg-slate-100 rounded font-bold text-slate-600">+</button>
-          </div>
+          <Group gap={0} wrap="nowrap"
+            style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, padding: 4, background: '#fff', boxShadow: 'var(--mantine-shadow-sm)' }}>
+            <Button variant="subtle" color="gray" size="compact-md" onClick={() => setTahunTagihan(t => t - 1)}>−</Button>
+            <Text ff="monospace" fw={700} c="indigo.7" px="xs">{tahunTagihan}</Text>
+            <Button variant="subtle" color="gray" size="compact-md" onClick={() => setTahunTagihan(t => t + 1)}>+</Button>
+          </Group>
         )}
       />
 
       {/* VIEW 1: TABEL MONITORING & PENCARIAN */}
       {!selectedSantri ? (
-         <div className="space-y-6">
-            
-            {/* Filter Bar */}
-            <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-end">
-                <div className="w-full md:flex-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari Nama / NIS</label>
-                    <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                        <input 
-                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                            placeholder="Ketik nama santri..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && loadMonitoring()}
-                        />
-                    </div>
-                </div>
+        <Stack gap="lg">
+          {/* Filter Bar */}
+          <Paper withBorder radius="md" p="md" shadow="sm">
+            <Flex direction={{ base: 'column', sm: 'row' }} gap="md" align={{ sm: 'flex-end' }}>
+              <div style={{ flex: 1, width: '100%' }}>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={4}>Cari Nama / NIS</Text>
+                <TextInput
+                  leftSection={<Search className="w-4 h-4" />}
+                  placeholder="Ketik nama santri..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.currentTarget.value)}
+                  onKeyDown={e => e.key === 'Enter' && loadMonitoring()}
+                />
+              </div>
+              <div style={{ width: '100%', maxWidth: 220 }}>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={4}>Asrama</Text>
+                <NativeSelect
+                  value={filterAsrama}
+                  onChange={e => { setFilterAsrama(e.currentTarget.value); setFilterKamar('SEMUA') }}
+                  data={[{ value: 'SEMUA', label: 'Semua Asrama' }, ...ASRAMA_LIST.map(a => ({ value: a, label: a }))]}
+                />
+              </div>
+              <div style={{ width: '100%', maxWidth: 140 }}>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={4}>Kamar</Text>
+                <NativeSelect
+                  value={filterKamar}
+                  onChange={e => setFilterKamar(e.currentTarget.value)}
+                  data={[{ value: 'SEMUA', label: 'Semua' }, ...Array.from({ length: 30 }, (_, i) => String(i + 1))]}
+                />
+              </div>
+              <Button onClick={loadMonitoring} loading={loadingList} color="indigo" fw={700}>
+                Tampilkan
+              </Button>
+            </Flex>
+          </Paper>
 
-                <div className="w-full md:w-1/4">
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Asrama</label>
-                    <select 
-                        className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={filterAsrama}
-                        onChange={e => { setFilterAsrama(e.target.value); setFilterKamar('SEMUA') }}
-                    >
-                        <option value="SEMUA">Semua Asrama</option>
-                        {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                </div>
-
-                <div className="w-full md:w-1/6">
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kamar</label>
-                    <select 
-                        className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={filterKamar}
-                        onChange={e => setFilterKamar(e.target.value)}
-                    >
-                        <option value="SEMUA">Semua</option>
-                        {Array.from({length: 30}, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                </div>
-
-                <button 
-                    onClick={loadMonitoring}
-                    disabled={loadingList}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 h-[38px]"
-                >
-                    {loadingList ? <Loader2 className="w-4 h-4 animate-spin"/> : "Tampilkan"}
-                </button>
-            </div>
-
-            {/* Tabel Santri */}
-            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                {!hasLoaded ? (
-                    <div className="py-20 text-center text-slate-400">
-                        <Filter className="w-12 h-12 mx-auto mb-3 text-slate-300"/>
-                        <p>Silakan gunakan filter di atas untuk menampilkan data.</p>
-                    </div>
-                ) : dataList.length === 0 ? (
-                    <div className="py-20 text-center text-slate-400">Data tidak ditemukan.</div>
-                ) : (
-                    <>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-bold border-b">
-                            <tr>
-                                <th className="px-6 py-3">Nama Santri</th>
-                                <th className="px-6 py-3 text-center">Bangunan</th>
-                                <th className="px-6 py-3 text-center">Tahunan {tahunTagihan}</th>
-                                <th className="px-6 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {pagedDataList.map((s) => (
-                                <tr key={s.id} onClick={() => handleSelect(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
-                                    <td className="px-6 py-3">
-                                        <p className="font-bold text-slate-800">{s.nama_lengkap}</p>
-                                        <p className="text-xs text-slate-500">{s.asrama} - Kamar {s.kamar}</p>
-                                    </td>
-                                    
-                                    {/* STATUS BANGUNAN */}
-                                    <td className="px-6 py-3 text-center">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                                            s.status_bangunan === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' :
-                                            s.status_bangunan === 'CICIL' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                            'bg-slate-100 text-slate-500 border-slate-200'
-                                        }`}>
-                                            {s.status_bangunan}
-                                        </span>
-                                    </td>
-
-                                    {/* STATUS TAHUNAN */}
-                                    <td className="px-6 py-3 text-center">
-                                        <div className="flex justify-center gap-1">
-                                            <BadgeItem label="EHB" active={s.lunas_ehb} />
-                                            <BadgeItem label="KES" active={s.lunas_kesehatan} />
-                                            <BadgeItem label="EKS" active={s.lunas_ekskul} />
-                                        </div>
-                                    </td>
-
-                                    <td className="px-6 py-3 text-right">
-                                        <span className="text-indigo-600 font-bold text-xs flex items-center justify-end gap-1 group-hover:underline">
-                                            Bayar <ArrowLeft className="w-3 h-3 rotate-180"/>
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    <Pagination
-                      currentPage={safePageDataList}
-                      totalPages={totalPagesDataList}
-                      pageSize={pageSize}
-                      total={dataList.length}
-                      onPageChange={setPage}
-                      onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-                    />
-                    </>
-                )}
-            </div>
-         </div>
-      ) : (
-         /* VIEW 2: FORM PEMBAYARAN DETAIL */
-         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-            
-            {/* Tombol Kembali */}
-            <button onClick={handleBackToList} className="text-slate-500 hover:text-indigo-600 flex items-center gap-2 text-sm font-bold mb-4">
-                <ArrowLeft className="w-4 h-4"/> Kembali ke Daftar
-            </button>
-
-            {/* INFO SANTRI */}
-            <div className="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600"><User className="w-6 h-6"/></div>
-                    <div>
-                        <h2 className="font-bold text-xl text-slate-800">{selectedSantri.nama_lengkap}</h2>
-                        <div className="flex gap-3 text-sm text-slate-500 mt-1">
-                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> Angkatan {selectedSantri.tahun_masuk_fix}</span>
-                            <span className="flex items-center gap-1"><Home className="w-3 h-3"/> {selectedSantri.asrama}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {loadingInfo ? (
-                <div className="py-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-500"/></div>
-            ) : infoTagihan && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    {/* KIRI: UANG BANGUNAN (CICILAN) */}
-                    <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                        <div className="bg-indigo-50 p-4 border-b border-indigo-100 flex justify-between items-center">
-                            <h3 className="font-bold text-indigo-900 flex items-center gap-2">
-                                <Building2 className="w-5 h-5"/> Uang Bangunan
-                            </h3>
-                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${infoTagihan.bangunan.status === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
-                                {infoTagihan.bangunan.status}
-                            </span>
-                        </div>
-                        <div className="p-6">
-                            <div className="mb-4">
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="text-slate-500">Terbayar</span>
-                                    <span className="font-bold text-slate-800">
-                                        {Math.round((infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100)}%
-                                    </span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-3">
-                                    <div className="bg-indigo-600 h-3 rounded-full transition-all duration-1000" style={{ width: `${(infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100}%` }}></div>
-                                </div>
-                            </div>
-                            
-                            <div className="flex justify-between text-sm mb-6 border-b pb-4">
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Total Wajib</p>
-                                    <p className="font-bold">Rp {infoTagihan.bangunan.total_wajib.toLocaleString()}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-slate-400 text-xs uppercase">Sisa Tagihan</p>
-                                    <p className="font-bold text-red-600">Rp {infoTagihan.bangunan.sisa.toLocaleString()}</p>
-                                </div>
-                            </div>
-
-                            {infoTagihan.bangunan.sisa > 0 ? (
-                                <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="number" 
-                                            placeholder="Nominal Cicilan..." 
-                                            className="flex-1 border p-2 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                                            value={nominalCicil}
-                                            onChange={e => setNominalCicil(e.target.value)}
-                                        />
-                                        <button 
-                                            onClick={handleBayarBangunan}
-                                            disabled={isProcessing}
-                                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 text-sm"
-                                        >
-                                            Bayar
-                                        </button>
-                                    </div>
-                                    
-                                    <button 
-                                        onClick={handleLunasBangunan}
-                                        disabled={isProcessing}
-                                        className="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <Zap className="w-4 h-4 text-yellow-300"/> LUNASI SEKARANG (100%)
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-center p-4 bg-green-50 text-green-700 rounded-lg font-bold border border-green-100">
-                                    LUNAS
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* KANAN: TAGIHAN TAHUNAN */}
-                    <div className="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
-                        <div className="bg-emerald-50 p-4 border-b border-emerald-100">
-                            <h3 className="font-bold text-emerald-900 flex items-center gap-2">
-                                <Calendar className="w-5 h-5"/> Tagihan Tahunan ({tahunTagihan})
-                            </h3>
-                        </div>
-                        <div className="divide-y flex-1">
-                            {['KESEHATAN', 'EHB', 'EKSKUL'].map(jenis => {
-                                const data = infoTagihan.tahunan[jenis]
-                                return (
-                                    <div key={jenis} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                        <div>
-                                            <p className="font-bold text-slate-700">{jenis === 'EHB' ? 'EHB (Ujian)' : jenis}</p>
-                                            <p className="text-xs text-slate-500">Tarif: Rp {data.nominal.toLocaleString()}</p>
-                                        </div>
-                                        
-                                        {data.lunas ? (
-                                            <span className="flex items-center gap-1 text-green-600 font-bold text-sm bg-green-50 px-3 py-1 rounded-full border border-green-200">
-                                                <CheckCircle className="w-4 h-4"/> LUNAS
-                                            </span>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleBayarTahunan(jenis, data.nominal)}
-                                                disabled={isProcessing || data.nominal === 0}
-                                                className="bg-white border border-red-200 text-red-600 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 shadow-sm flex items-center gap-1"
-                                            >
-                                                <Clock className="w-3 h-3"/> BAYAR
-                                            </button>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                        
-                        {/* FOOTER: LUNAS SEMUA TAHUNAN */}
-                        {(!infoTagihan.tahunan.EHB.lunas || !infoTagihan.tahunan.KESEHATAN.lunas || !infoTagihan.tahunan.EKSKUL.lunas) && (
-                            <div className="p-4 bg-emerald-50 border-t border-emerald-100 mt-auto">
-                                <button 
-                                    onClick={handleLunasTahunanSemua}
-                                    disabled={isProcessing}
-                                    className="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-sm"
-                                >
-                                    <Zap className="w-4 h-4 text-yellow-300"/> BAYAR LUNAS SEMUA (TAHUNAN)
-                                </button>
-                            </div>
-                        )}
-
-                        {Object.values(infoTagihan.tahunan).some((x: any) => x.nominal === 0) && (
-                            <div className="p-3 bg-yellow-50 text-yellow-700 text-xs text-center border-t border-yellow-100">
-                                *Jika tarif Rp 0, artinya belum diatur di menu Pengaturan Tarif untuk angkatan ini.
-                            </div>
-                        )}
-                    </div>
-
-                </div>
+          {/* Tabel Santri */}
+          <Paper withBorder radius="md" shadow="sm" style={{ overflow: 'hidden' }}>
+            {!hasLoaded ? (
+              <Stack align="center" py={80} gap="sm" c="dimmed">
+                <Filter className="w-12 h-12" color="var(--mantine-color-gray-4)" />
+                <Text c="dimmed">Silakan gunakan filter di atas untuk menampilkan data.</Text>
+              </Stack>
+            ) : dataList.length === 0 ? (
+              <Center py={80}><Text c="dimmed">Data tidak ditemukan.</Text></Center>
+            ) : (
+              <>
+                <Table.ScrollContainer minWidth={640}>
+                  <Table verticalSpacing="sm" horizontalSpacing="lg" fz="sm" highlightOnHover>
+                    <Table.Thead bg="gray.0">
+                      <Table.Tr>
+                        <Table.Th>Nama Santri</Table.Th>
+                        <Table.Th ta="center">Bangunan</Table.Th>
+                        <Table.Th ta="center">Tahunan {tahunTagihan}</Table.Th>
+                        <Table.Th ta="right">Aksi</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {pagedDataList.map((s) => (
+                        <Table.Tr key={s.id} onClick={() => handleSelect(s)} style={{ cursor: 'pointer' }}>
+                          <Table.Td>
+                            <Text fw={700} c="dark.7">{s.nama_lengkap}</Text>
+                            <Text size="xs" c="dimmed">{s.asrama} - Kamar {s.kamar}</Text>
+                          </Table.Td>
+                          <Table.Td ta="center">
+                            <Badge size="sm" variant="light" radius="sm"
+                              color={s.status_bangunan === 'LUNAS' ? 'green' : s.status_bangunan === 'CICIL' ? 'orange' : 'gray'}>
+                              {s.status_bangunan}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td ta="center">
+                            <Group justify="center" gap={4} wrap="nowrap">
+                              <BadgeItem label="EHB" active={s.lunas_ehb} />
+                              <BadgeItem label="KES" active={s.lunas_kesehatan} />
+                              <BadgeItem label="EKS" active={s.lunas_ekskul} />
+                            </Group>
+                          </Table.Td>
+                          <Table.Td ta="right">
+                            <Group justify="flex-end" gap={4} c="indigo.6">
+                              <Text size="xs" fw={700}>Bayar</Text>
+                              <ArrowLeft className="w-3 h-3" style={{ transform: 'rotate(180deg)' }} />
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
+                <Pagination
+                  currentPage={safePageDataList}
+                  totalPages={totalPagesDataList}
+                  pageSize={pageSize}
+                  total={dataList.length}
+                  onPageChange={setPage}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+                />
+              </>
             )}
+          </Paper>
+        </Stack>
+      ) : (
+        /* VIEW 2: FORM PEMBAYARAN DETAIL */
+        <Stack gap="lg">
+          {/* Tombol Kembali */}
+          <UnstyledButton onClick={handleBackToList}>
+            <Group gap="xs" c="dimmed">
+              <ArrowLeft className="w-4 h-4" />
+              <Text size="sm" fw={700}>Kembali ke Daftar</Text>
+            </Group>
+          </UnstyledButton>
 
-         </div>
+          {/* INFO SANTRI */}
+          <Paper withBorder radius="md" p="md" shadow="sm">
+            <Group gap="md">
+              <ThemeIcon size={48} radius="xl" variant="light" color="indigo"><User className="w-6 h-6" /></ThemeIcon>
+              <div>
+                <Text fw={700} fz="xl" c="dark.7">{selectedSantri.nama_lengkap}</Text>
+                <Group gap="md" mt={4} c="dimmed">
+                  <Group gap={4}><Calendar className="w-3 h-3" /><Text size="sm">Angkatan {selectedSantri.tahun_masuk_fix}</Text></Group>
+                  <Group gap={4}><Home className="w-3 h-3" /><Text size="sm">{selectedSantri.asrama}</Text></Group>
+                </Group>
+              </div>
+            </Group>
+          </Paper>
+
+          {loadingInfo ? (
+            <Center py={80}><Loader color="indigo" size="xl" /></Center>
+          ) : infoTagihan && (
+            <Grid gutter="lg">
+              {/* KIRI: UANG BANGUNAN (CICILAN) */}
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <Paper withBorder radius="md" shadow="sm" style={{ overflow: 'hidden', height: '100%' }}>
+                  <Group justify="space-between" p="md" bg="indigo.0" style={{ borderBottom: '1px solid var(--mantine-color-indigo-1)' }}>
+                    <Group gap="xs"><Building2 className="w-5 h-5" color="var(--mantine-color-indigo-9)" /><Text fw={700} c="indigo.9">Uang Bangunan</Text></Group>
+                    <Badge variant="light" radius="sm" color={infoTagihan.bangunan.status === 'LUNAS' ? 'green' : 'orange'}>
+                      {infoTagihan.bangunan.status}
+                    </Badge>
+                  </Group>
+                  <div style={{ padding: 24 }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <Group justify="space-between" mb={4}>
+                        <Text size="sm" c="dimmed">Terbayar</Text>
+                        <Text size="sm" fw={700} c="dark.7">
+                          {Math.round((infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100)}%
+                        </Text>
+                      </Group>
+                      <Progress value={(infoTagihan.bangunan.sudah_bayar / infoTagihan.bangunan.total_wajib) * 100} color="indigo" size="lg" />
+                    </div>
+
+                    <Group justify="space-between" mb="lg" pb="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+                      <div>
+                        <Text c="gray.5" size="xs" tt="uppercase">Total Wajib</Text>
+                        <Text fw={700}>Rp {infoTagihan.bangunan.total_wajib.toLocaleString()}</Text>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <Text c="gray.5" size="xs" tt="uppercase">Sisa Tagihan</Text>
+                        <Text fw={700} c="red.6">Rp {infoTagihan.bangunan.sisa.toLocaleString()}</Text>
+                      </div>
+                    </Group>
+
+                    {infoTagihan.bangunan.sisa > 0 ? (
+                      <Stack gap="xs">
+                        <Group gap="xs" wrap="nowrap">
+                          <TextInput
+                            type="number"
+                            placeholder="Nominal Cicilan..."
+                            style={{ flex: 1 }}
+                            value={nominalCicil}
+                            onChange={e => setNominalCicil(e.currentTarget.value)}
+                          />
+                          <Button onClick={handleBayarBangunan} disabled={isProcessing} color="indigo" fw={700}>Bayar</Button>
+                        </Group>
+                        <Button onClick={handleLunasBangunan} disabled={isProcessing} color="green" fw={700} fullWidth
+                          leftSection={<Zap className="w-4 h-4" color="var(--mantine-color-yellow-3)" />}>
+                          LUNASI SEKARANG (100%)
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <Center p="md" bg="green.0" style={{ borderRadius: 8, border: '1px solid var(--mantine-color-green-1)' }}>
+                        <Text fw={700} c="green.7">LUNAS</Text>
+                      </Center>
+                    )}
+                  </div>
+                </Paper>
+              </Grid.Col>
+
+              {/* KANAN: TAGIHAN TAHUNAN */}
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <Paper withBorder radius="md" shadow="sm" style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <Group p="md" bg="teal.0" style={{ borderBottom: '1px solid var(--mantine-color-teal-1)' }}>
+                    <Group gap="xs"><Calendar className="w-5 h-5" color="var(--mantine-color-teal-9)" /><Text fw={700} c="teal.9">Tagihan Tahunan ({tahunTagihan})</Text></Group>
+                  </Group>
+                  <div style={{ flex: 1 }}>
+                    {['KESEHATAN', 'EHB', 'EKSKUL'].map((jenis, i) => {
+                      const data = infoTagihan.tahunan[jenis]
+                      return (
+                        <Group key={jenis} justify="space-between" p="md"
+                          style={{ borderTop: i > 0 ? '1px solid var(--mantine-color-gray-2)' : undefined }}>
+                          <div>
+                            <Text fw={700} c="dark.6">{jenis === 'EHB' ? 'EHB (Ujian)' : jenis}</Text>
+                            <Text size="xs" c="dimmed">Tarif: Rp {data.nominal.toLocaleString()}</Text>
+                          </div>
+                          {data.lunas ? (
+                            <Badge size="lg" radius="xl" variant="light" color="green" leftSection={<CheckCircle className="w-4 h-4" />}>LUNAS</Badge>
+                          ) : (
+                            <Button size="compact-sm" variant="outline" color="red" fw={700}
+                              onClick={() => handleBayarTahunan(jenis, data.nominal)}
+                              disabled={isProcessing || data.nominal === 0}
+                              leftSection={<Clock className="w-3 h-3" />}>
+                              BAYAR
+                            </Button>
+                          )}
+                        </Group>
+                      )
+                    })}
+                  </div>
+
+                  {/* FOOTER: LUNAS SEMUA TAHUNAN */}
+                  {(!infoTagihan.tahunan.EHB.lunas || !infoTagihan.tahunan.KESEHATAN.lunas || !infoTagihan.tahunan.EKSKUL.lunas) && (
+                    <div style={{ padding: 16, background: 'var(--mantine-color-teal-0)', borderTop: '1px solid var(--mantine-color-teal-1)', marginTop: 'auto' }}>
+                      <Button onClick={handleLunasTahunanSemua} disabled={isProcessing} color="teal" fw={700} fullWidth
+                        leftSection={<Zap className="w-4 h-4" color="var(--mantine-color-yellow-3)" />}>
+                        BAYAR LUNAS SEMUA (TAHUNAN)
+                      </Button>
+                    </div>
+                  )}
+
+                  {Object.values(infoTagihan.tahunan).some((x: any) => x.nominal === 0) && (
+                    <Text p="sm" bg="yellow.0" size="xs" ta="center" c="yellow.8" style={{ borderTop: '1px solid var(--mantine-color-yellow-1)' }}>
+                      *Jika tarif Rp 0, artinya belum diatur di menu Pengaturan Tarif untuk angkatan ini.
+                    </Text>
+                  )}
+                </Paper>
+              </Grid.Col>
+            </Grid>
+          )}
+        </Stack>
       )}
-
     </div>
   )
 }
 
-function BadgeItem({ label, active }: { label: string, active: boolean }) {
-    return (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${active ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-            {label}
-        </span>
-    )
+function BadgeItem({ label, active }: { label: string; active: boolean }) {
+  return (
+    <Badge size="sm" variant="light" radius="sm" color={active ? 'green' : 'gray'}>
+      {label}
+    </Badge>
+  )
 }

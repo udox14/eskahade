@@ -6,7 +6,7 @@ import { useReactToPrint } from '@/lib/pdf/client'
 import {
   AlertTriangle, ArrowDown, ArrowUp, BookOpen, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   getActiveEventForKeuangan,
   getHonorItems,
@@ -1752,7 +1752,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
 
   if (!event) {
     return (
-      <div className="max-w-4xl mx-auto py-10">
+      <div className="py-10">
         <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5" />
           <p className="text-sm font-medium">Belum ada event EHB yang aktif. Silakan aktifkan event dulu di menu Jadwal.</p>
@@ -1762,7 +1762,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Keuangan EHB"
         description="Kelola rencana anggaran, transaksi, dan honorarium EHB untuk event aktif."

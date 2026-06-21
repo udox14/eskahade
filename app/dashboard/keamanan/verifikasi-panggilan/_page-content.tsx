@@ -6,7 +6,7 @@ import {
   LayoutGrid, Table2, Printer, FileText, Users, ChevronDown, CalendarDays
 } from 'lucide-react'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
@@ -438,7 +438,7 @@ export default function VerifikasiPanggilanPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-28 space-y-5">
+    <div className="pb-28 space-y-5">
       <DashboardPageHeader
         title="Verifikasi Panggilan"
         description="Gabungkan alfa pengajian, berjamaah, izin pulang, dan sakit sebelum menentukan daftar panggilan."

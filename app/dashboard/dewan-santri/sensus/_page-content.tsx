@@ -111,7 +111,7 @@ export default function SensusPage() {
   const perempuan = data?.jenis_kelamin?.P || 0
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">

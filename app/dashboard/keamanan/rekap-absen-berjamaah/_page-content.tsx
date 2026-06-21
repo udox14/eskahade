@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapBerjamaahAlfaRange, getKamarList, getSantriByAsrama, deleteAbsenBerjamaahRecords } from '../rekap-asrama/actions'
 import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
 import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X, FileSpreadsheet } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 
@@ -269,7 +269,7 @@ export default function RekapAbsenBerjamaahPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto pb-20">
+    <div className="space-y-4 pb-20">
 
       {/* HEADER */}
       <div className="flex flex-col gap-3 border-b pb-4">

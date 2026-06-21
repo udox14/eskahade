@@ -5,7 +5,7 @@ import { useReactToPrint } from '@/lib/pdf/client'
 import {
   AlertTriangle, ClipboardList, Loader2, Printer,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   getActiveEventForCetak,
   getSensusRuanganData,

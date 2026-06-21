@@ -30,7 +30,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'

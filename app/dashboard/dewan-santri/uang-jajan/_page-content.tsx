@@ -407,7 +407,7 @@ export default function MonitoringUangJajanPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-16 space-y-5">
+    <div className="pb-16 space-y-5">
       <div className="space-y-4">
         <DashboardPageHeader
           title="Monitoring Uang Jajan"

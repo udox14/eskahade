@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 import { getPsbMonitoring, type PsbStatus } from '../actions'
 

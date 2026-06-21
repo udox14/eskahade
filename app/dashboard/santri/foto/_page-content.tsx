@@ -5,7 +5,7 @@ import React from 'react'
 import { useState, useRef } from 'react'
 import { getSantriForFoto, uploadFotoSantri } from './actions'
 import { Search, Upload, RefreshCw, Loader2, Home, Filter } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
@@ -123,7 +123,7 @@ export default function ManajemenFotoPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       
       {/* HEADER & FILTER */}
       <div className="border-b pb-4">

@@ -15,7 +15,7 @@ import {
   Users, Info, X, Download, Filter, GraduationCap,
   ChevronRight, ChevronLeft, Calendar, BookOpen
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
@@ -335,7 +335,7 @@ export default function ArsipSantriPage() {
 
   // ── RENDER ──
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-28">
+    <div className="space-y-6 pb-28">
 
       {/* HEADER */}
       <div className="flex items-start gap-4 border-b pb-4">

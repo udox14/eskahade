@@ -1,11 +1,13 @@
 'use client'
 
 import React from 'react'
-
 import { useState, useEffect } from 'react'
 import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
-import { Save, DollarSign, History, Loader2, Edit } from 'lucide-react'
-import { toast } from 'sonner'
+import { Save, History, Edit } from 'lucide-react'
+import {
+  Button, Center, Grid, Group, Loader, NumberInput, Paper, Table, Text,
+} from '@mantine/core'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 export default function TarifPage() {
@@ -15,12 +17,12 @@ export default function TarifPage() {
     BANGUNAN: 0,
     KESEHATAN: 0,
     EHB: 0,
-    EKSKUL: 0
+    EKSKUL: 0,
   })
-  
+
   const [loading, setLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
+
   // State List
   const [listTarif, setListTarif] = useState<any[]>([])
 
@@ -32,10 +34,10 @@ export default function TarifPage() {
   // Auto Load saat Tahun diubah (Cek apakah sudah ada tarif?)
   useEffect(() => {
     async function checkExisting() {
-        setLoading(true)
-        const res = await getTarifByTahun(tahunInput)
-        setNominal(res)
-        setLoading(false)
+      setLoading(true)
+      const res = await getTarifByTahun(tahunInput)
+      setNominal(res)
+      setLoading(false)
     }
     checkExisting()
   }, [tahunInput])
@@ -48,162 +50,161 @@ export default function TarifPage() {
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    const toastId = toast.loading("Menyimpan tarif...")
+    const toastId = toast.loading('Menyimpan tarif...')
 
     const res = await simpanTarif(tahunInput, nominal)
-    
+
     setIsSaving(false)
     toast.dismiss(toastId)
 
     if ('error' in res) {
-        toast.error("Gagal", { description: (res as any).error })
+      toast.error('Gagal', { description: (res as any).error })
     } else {
-        toast.success("Tarif Berhasil Disimpan", { description: `Angkatan ${tahunInput} telah diperbarui.` })
-        refreshList()
+      toast.success('Tarif Berhasil Disimpan', { description: `Angkatan ${tahunInput} telah diperbarui.` })
+      refreshList()
     }
   }
 
   // Format Rupiah Helper
-  const rp = (val: number) => "Rp " + (val || 0).toLocaleString('id-ID')
+  const rp = (val: number) => 'Rp ' + (val || 0).toLocaleString('id-ID')
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-20">
-      
+    <div className="space-y-8 pb-20">
       {/* HEADER */}
       <DashboardPageHeader
         title="Pengaturan Tarif Angkatan"
         description="Tentukan besaran biaya masuk dan tahunan berdasarkan tahun masuk santri."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-         
-         {/* KOLOM KIRI: FORM INPUT */}
-         <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
-                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
-                    <Edit className="w-5 h-5 text-emerald-600"/> Edit / Baru
-                </h3>
-                
-                <form onSubmit={handleSimpan} className="space-y-5">
-                    
-                    {/* Tahun Selector */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
-                        <div className="grid grid-cols-[48px_minmax(0,1fr)_48px] gap-2 items-center">
-                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">-</button>
-                            <input 
-                                type="number" 
-                                className="w-full min-w-0 h-12 text-center font-bold text-lg border rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={tahunInput}
-                                onChange={(e) => setTahunInput(Number(e.target.value))}
-                            />
-                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">+</button>
-                        </div>
-                    </div>
+      <Grid gutter="xl">
+        {/* KOLOM KIRI: FORM INPUT */}
+        <Grid.Col span={{ base: 12, md: 4 }}>
+          <Paper withBorder radius="md" p="lg" shadow="sm" style={{ position: 'sticky', top: 96 }}>
+            <Group gap="xs" pb="md" mb="lg" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+              <Edit className="w-5 h-5" color="var(--mantine-color-teal-6)" />
+              <Text fw={700} c="dark.7">Edit / Baru</Text>
+            </Group>
 
-                    <hr className="border-dashed"/>
-
-                    {/* Input Biaya */}
-                    {loading ? (
-                        <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-                    ) : (
-                        <>
-                            <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({...nominal, BANGUNAN: v})} />
-                            <InputDuit label="Infaq Kesehatan (Tahunan)" value={nominal.KESEHATAN} onChange={v => setNominal({...nominal, KESEHATAN: v})} />
-                            <InputDuit label="Uang EHB (Tahunan)" value={nominal.EHB} onChange={v => setNominal({...nominal, EHB: v})} />
-                            <InputDuit label="Ekstrakurikuler (Tahunan)" value={nominal.EKSKUL} onChange={v => setNominal({...nominal, EKSKUL: v})} />
-                        </>
-                    )}
-
-                    <button 
-                        disabled={isSaving || loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
-                    >
-                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                        SIMPAN TARIF
-                    </button>
-
-                </form>
-            </div>
-         </div>
-
-         {/* KOLOM KANAN: TABEL RIWAYAT */}
-         <div className="lg:col-span-2">
-            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                <div className="p-5 bg-slate-50 border-b flex justify-between items-center">
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                        <History className="w-5 h-5"/> Daftar Tarif Tersimpan
-                    </h3>
+            <form onSubmit={handleSimpan}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {/* Tahun Selector */}
+                <div>
+                  <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={4}>Tahun Angkatan (Masuk)</Text>
+                  <Group gap="xs" wrap="nowrap" align="center">
+                    <Button variant="light" color="gray" size="lg" px={0} w={48} h={48}
+                      onClick={() => setTahunInput(t => t - 1)} aria-label="Kurangi tahun">−</Button>
+                    <NumberInput
+                      hideControls
+                      value={tahunInput}
+                      onChange={(v) => setTahunInput(Number(v) || 0)}
+                      styles={{ input: { textAlign: 'center', fontWeight: 700, fontSize: 18, height: 48 } }}
+                      style={{ flex: 1 }}
+                    />
+                    <Button variant="light" color="gray" size="lg" px={0} w={48} h={48}
+                      onClick={() => setTahunInput(t => t + 1)} aria-label="Tambah tahun">+</Button>
+                  </Group>
                 </div>
-                
-                {listTarif.length === 0 ? (
-                    <div className="p-10 text-center text-slate-400 italic">Belum ada data tarif yang diatur.</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-white text-slate-500 border-b uppercase text-xs">
-                                <tr>
-                                    <th className="px-6 py-4">Angkatan</th>
-                                    <th className="px-6 py-4 text-right">Bangunan</th>
-                                    <th className="px-6 py-4 text-right">Kesehatan</th>
-                                    <th className="px-6 py-4 text-right">EHB</th>
-                                    <th className="px-6 py-4 text-right">Ekskul</th>
-                                    <th className="px-4 py-4 text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {listTarif.map((item: any) => (
-                                    <tr key={item.tahun} className={`hover:bg-emerald-50 transition-colors ${item.tahun === tahunInput ? 'bg-emerald-50/50' : ''}`}>
-                                        <td className="px-6 py-4 font-bold text-lg text-emerald-800">{item.tahun}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.BANGUNAN)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.KESEHATAN)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EHB)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EKSKUL)}</td>
-                                        <td className="px-4 py-4 text-center">
-                                            <button 
-                                                onClick={() => setTahunInput(item.tahun)}
-                                                className="text-xs bg-white border border-emerald-200 text-emerald-600 px-3 py-1 rounded-full hover:bg-emerald-600 hover:text-white transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-         </div>
 
-      </div>
+                <hr style={{ border: 'none', borderTop: '1px dashed var(--mantine-color-gray-4)', margin: 0 }} />
+
+                {/* Input Biaya */}
+                {loading ? (
+                  <Center py={40}><Loader color="gray" /></Center>
+                ) : (
+                  <>
+                    <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({ ...nominal, BANGUNAN: v })} />
+                    <InputDuit label="Infaq Kesehatan (Tahunan)" value={nominal.KESEHATAN} onChange={v => setNominal({ ...nominal, KESEHATAN: v })} />
+                    <InputDuit label="Uang EHB (Tahunan)" value={nominal.EHB} onChange={v => setNominal({ ...nominal, EHB: v })} />
+                    <InputDuit label="Ekstrakurikuler (Tahunan)" value={nominal.EKSKUL} onChange={v => setNominal({ ...nominal, EKSKUL: v })} />
+                  </>
+                )}
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  color="teal"
+                  size="md"
+                  fw={700}
+                  loading={isSaving}
+                  disabled={loading}
+                  leftSection={<Save className="w-5 h-5" />}
+                >
+                  SIMPAN TARIF
+                </Button>
+              </div>
+            </form>
+          </Paper>
+        </Grid.Col>
+
+        {/* KOLOM KANAN: TABEL RIWAYAT */}
+        <Grid.Col span={{ base: 12, md: 8 }}>
+          <Paper withBorder radius="md" shadow="sm" style={{ overflow: 'hidden' }}>
+            <Group justify="space-between" p="md" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+              <Group gap="xs">
+                <History className="w-5 h-5" />
+                <Text fw={700} c="dark.6">Daftar Tarif Tersimpan</Text>
+              </Group>
+            </Group>
+
+            {listTarif.length === 0 ? (
+              <Center p={40}><Text c="dimmed" fs="italic">Belum ada data tarif yang diatur.</Text></Center>
+            ) : (
+              <Table.ScrollContainer minWidth={640}>
+                <Table verticalSpacing="md" horizontalSpacing="lg" fz="sm" highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Angkatan</Table.Th>
+                      <Table.Th ta="right">Bangunan</Table.Th>
+                      <Table.Th ta="right">Kesehatan</Table.Th>
+                      <Table.Th ta="right">EHB</Table.Th>
+                      <Table.Th ta="right">Ekskul</Table.Th>
+                      <Table.Th ta="center">Aksi</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {listTarif.map((item: any) => (
+                      <Table.Tr key={item.tahun} bg={item.tahun === tahunInput ? 'teal.0' : undefined}>
+                        <Table.Td fw={700} fz="lg" c="teal.8">{item.tahun}</Table.Td>
+                        <Table.Td ta="right" ff="monospace">{rp(item.BANGUNAN)}</Table.Td>
+                        <Table.Td ta="right" ff="monospace">{rp(item.KESEHATAN)}</Table.Td>
+                        <Table.Td ta="right" ff="monospace">{rp(item.EHB)}</Table.Td>
+                        <Table.Td ta="right" ff="monospace">{rp(item.EKSKUL)}</Table.Td>
+                        <Table.Td ta="center">
+                          <Button size="compact-xs" radius="xl" variant="outline" color="teal"
+                            onClick={() => setTahunInput(item.tahun)}>
+                            Edit
+                          </Button>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            )}
+          </Paper>
+        </Grid.Col>
+      </Grid>
     </div>
   )
 }
 
 // Sub Component: Input Duit
-function InputDuit({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) {
-    const displayValue = Number(value || 0).toLocaleString('id-ID')
-
-    return (
-        <div>
-            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-slate-400 font-bold">Rp</span>
-                </div>
-                <input 
-                    type="text"
-                    inputMode="numeric"
-                    className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
-                    value={displayValue}
-                    onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '')
-                        onChange(digits ? Number(digits) : 0)
-                    }}
-                    onFocus={(e) => e.target.select()}
-                />
-            </div>
-        </div>
-    )
+function InputDuit({ label, value, onChange }: { label: string; value: number; onChange: (val: number) => void }) {
+  return (
+    <NumberInput
+      label={label}
+      prefix="Rp "
+      thousandSeparator="."
+      decimalScale={0}
+      allowNegative={false}
+      hideControls
+      value={value}
+      onChange={(v) => onChange(typeof v === 'number' ? v : Number(v) || 0)}
+      onFocus={(e) => e.currentTarget.select()}
+      styles={{
+        label: { fontSize: 12, fontWeight: 700, color: 'var(--mantine-color-dimmed)', textTransform: 'uppercase' },
+        input: { fontFamily: 'monospace', textAlign: 'right' },
+      }}
+    />
+  )
 }

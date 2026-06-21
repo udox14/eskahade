@@ -14,7 +14,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -229,7 +229,7 @@ export default function SetupTahunAjaranContent({ state }: { state: SetupWizardS
   )
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-20">
+    <div className="space-y-6 pb-20">
       <DashboardPageHeader
         title="Setup Tahun Ajaran"
         description="Timeline pekerjaan awal tahun ajaran supaya admin tahu apa yang perlu dibereskan sebelum operasional berjalan."

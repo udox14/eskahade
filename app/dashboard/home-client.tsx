@@ -234,7 +234,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const groups = GROUP_ORDER.filter(g => grouped.has(g))
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 pb-16">
+    <div className="space-y-5 pb-16">
 
       {/* ── Hero Greeting Card ── */}
       <div className="relative overflow-hidden rounded-3xl bg-slate-900 select-none">

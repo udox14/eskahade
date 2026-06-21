@@ -5,7 +5,7 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getKelasByMarhalah, getSantriForKenaikan, importKenaikanKelas } from './actions'
 import { FileSpreadsheet, Upload, Save, Loader2, CheckCircle, AlertTriangle, Download, X, HelpCircle, LayoutList, CheckSquare, Square, Users, GraduationCap } from 'lucide-react'
-import { toast } from 'sonner' 
+import { toast } from '@/lib/toast' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
@@ -251,7 +251,7 @@ export default function KenaikanKelasPage() {
   const totalPlacementsReady = Object.keys(placements).filter(k => placements[k] !== '').length
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+    <div className="space-y-6 pb-24">
       
       {/* HEADER & TOGGLE MODE */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">

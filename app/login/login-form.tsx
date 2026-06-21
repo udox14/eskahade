@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Mail, Lock, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from '@/lib/toast'
 import Link from "next/link"
 import { login } from "./actions"
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { CalendarDays, Loader2, Save, Settings } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { simpanPengaturanSantriBaru } from './actions'
@@ -35,7 +35,7 @@ export default function PengaturanSantriBaruContent({ mulaiBerlaku, durasiBulan 
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 pb-20">
+    <div className="space-y-5 pb-20">
       <DashboardPageHeader
         title="Masa Santri Baru"
         description="Atur kapan label BARU mulai berlaku dan berapa lama santri ditandai sebagai BARU."

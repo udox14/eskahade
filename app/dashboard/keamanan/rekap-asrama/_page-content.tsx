@@ -6,7 +6,7 @@ import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search,
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -212,7 +212,7 @@ export default function RekapAsramaPage() {
   })
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-16">
+    <div className="space-y-5 pb-16">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">

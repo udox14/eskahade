@@ -5,7 +5,7 @@ import {
   AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Gavel,
   Loader2, RefreshCw, Users
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { getAntrianTelatPerpulangan, simpanVonisTelatPerpulangan, type TelatPerpulanganItem } from './actions'
 
@@ -126,7 +126,7 @@ export default function VerifikasiTelatPerpulanganPage() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-4">
+    <div className="pb-16 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">

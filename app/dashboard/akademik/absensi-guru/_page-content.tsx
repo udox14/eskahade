@@ -13,7 +13,7 @@ import {
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Save, Search, Smartphone, Table2, Upload, User, Filter } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'

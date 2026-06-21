@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { ArrowLeft, Loader2, Printer, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { getSantriTelatPerpulangan } from './actions'
 import { PemanggilanTelatView } from './pemanggilan-telat-view'
 

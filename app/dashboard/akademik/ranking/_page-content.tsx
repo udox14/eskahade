@@ -308,7 +308,7 @@ export default function JuaraUmumPage() {
   })
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-24">
+    <div className="space-y-6 pb-24">
 
       {/* HEADER */}
       <DashboardPageHeader

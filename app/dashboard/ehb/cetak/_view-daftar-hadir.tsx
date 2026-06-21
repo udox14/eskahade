@@ -10,7 +10,7 @@ import {
   getDaftarHadirSesi, getDaftarHadirData, getDaftarHadirSemuaData,
   type ActiveEvent, type RuanganOption, type DaftarHadirSesi, type DaftarHadirItem, type DaftarHadirSemuaItem,
 } from './actions'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { FONT, PageHeader } from './_shared'
 import { dayNameWib, nowWibString } from '../_date-utils'
 

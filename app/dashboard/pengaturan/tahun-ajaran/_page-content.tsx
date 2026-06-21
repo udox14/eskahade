@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { CalendarDays, Plus, CheckCircle, Circle, Trash2, Loader2, BookOpen, Users, AlertTriangle, ShieldCheck } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   getTahunAjaranList,
   tambahTahunAjaran,
@@ -70,7 +70,7 @@ export default function TahunAjaranPage() {
   const aktif = list.find(t => t.is_active)
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* HEADER */}
       <DashboardPageHeader

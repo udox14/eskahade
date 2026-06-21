@@ -19,7 +19,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type AggregateRow = {

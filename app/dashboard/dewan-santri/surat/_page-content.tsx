@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import { SuratView } from './surat-view'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, Search, FileText, ArrowLeft, Loader2, History, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -214,7 +214,7 @@ export default function LayananSuratPage() {
   }
 
   return (
-    <div className="space-y-12 max-w-5xl mx-auto pb-20">
+    <div className="space-y-12 pb-20">
        
        {/* HEADER (Sembunyikan saat print) */}
        <div className="flex items-center gap-4 print:hidden">

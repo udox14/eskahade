@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 import {
   AlertTriangle, BookOpenCheck, Copy, Crown, Download, FileSpreadsheet, Loader2, Plus, Printer, Save, Trash2, Upload, UserCog, Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   copyPanitiaFromEvent,
   getActiveEventForKepanitiaan,
@@ -569,7 +569,7 @@ export default function KepanitiaanPageContent() {
 
   if (loading) return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   if (!event) return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Kepanitiaan EHB"
         description="Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB."
@@ -583,7 +583,7 @@ export default function KepanitiaanPageContent() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Kepanitiaan EHB"
         description="Kelola susunan panitia, seksi pelaksana, dan pembuat soal EHB."

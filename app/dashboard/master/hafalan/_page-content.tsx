@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BookOpenCheck, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { ArrowLeft, BookOpenCheck, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import {
+  ActionIcon, Badge, Box, Button, Center, Group, Loader, NativeSelect, Paper, SimpleGrid, Stack, Text, ThemeIcon, UnstyledButton,
+} from '@mantine/core'
+import { toast } from '@/lib/toast'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   addJuzToMarhalah, addSurahToMarhalah, assignKitabToMarhalah, bersihkanResiduHafalan,
@@ -24,30 +28,31 @@ export default function MasterHafalanContent() {
   const active = useMemo(() => data?.marhalah.find((m: any) => m.id === activeId) || null, [data, activeId])
 
   if (loading || !data) {
-    return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
+    return <Center py={80}><Loader color="gray" size="lg" /></Center>
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-2 pb-24 sm:px-4">
+    <Box pb={96}>
       {active ? (
         <MarhalahDetail key={active.id} marhalah={active} data={data} onBack={() => setActiveId(null)} reload={load} />
       ) : (
         <MarhalahList data={data} onOpen={setActiveId} reload={load} />
       )}
-    </div>
+    </Box>
   )
 }
 
 // ── List marhalah ────────────────────────────────────────────────────────────
 
 function MarhalahList({ data, onOpen, reload }: { data: any; onOpen: (id: number) => void; reload: () => Promise<void> }) {
+  const confirm = useConfirm()
   const catalog: Catalog[] = data.catalog
   const [cleaning, setCleaning] = useState(false)
   const labelKitab = (jenis: string, key: string) =>
     catalog.find(c => c.jenis === jenis)?.kitab.find(k => k.key === key)?.label || key
 
   const bersihkan = async () => {
-    if (!window.confirm('Hapus semua assignment & materi residu lama (paket di luar konvensi baru)? Tidak bisa dibatalkan.')) return
+    if (!await confirm('Hapus semua assignment & materi residu lama (paket di luar konvensi baru)? Tidak bisa dibatalkan.')) return
     setCleaning(true)
     try {
       const res = await bersihkanResiduHafalan()
@@ -62,39 +67,44 @@ function MarhalahList({ data, onOpen, reload }: { data: any; onOpen: (id: number
   }
 
   return (
-    <div className="space-y-4 pt-1">
+    <Stack gap="md">
       <DashboardPageHeader
         title="Master Hafalan"
         description="Pilih marhalah, lalu assign kitab atau surat/juz Qur'an untuknya."
         action={
-          <button onClick={bersihkan} disabled={cleaning} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 sm:w-auto">
-            {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Bersihkan Residu
-          </button>
+          <Button onClick={bersihkan} loading={cleaning} variant="light" color="pink" fw={700}
+            fullWidth={false} leftSection={<Trash2 className="h-4 w-4" />}>
+            Bersihkan Residu
+          </Button>
         }
       />
-      <div className="space-y-2">
+      <Stack gap="xs">
         {data.marhalah.map((m: any) => {
           const a = data.assignments[m.id] || { quran: { surat: [] }, kitab: {} }
           const chips: string[] = []
           if (a.quran.surat?.length) chips.push(`Qur'an: ${a.quran.surat.length} surat`)
           for (const c of catalog) if (a.kitab[c.jenis]) chips.push(`${c.label}: ${labelKitab(c.jenis, a.kitab[c.jenis])}`)
           return (
-            <button key={m.id} onClick={() => onOpen(m.id)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
-              <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600"><BookOpenCheck className="h-5 w-5" /></div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-900">{m.nama}</p>
-                {chips.length ? (
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {chips.map((c, i) => <span key={i} className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{c}</span>)}
+            <UnstyledButton key={m.id} onClick={() => onOpen(m.id)}>
+              <Paper withBorder radius="lg" p="md" shadow="sm">
+                <Group gap="md" wrap="nowrap">
+                  <ThemeIcon variant="light" color="teal" radius="md" size="lg"><BookOpenCheck className="h-5 w-5" /></ThemeIcon>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={700} c="dark.8">{m.nama}</Text>
+                    {chips.length ? (
+                      <Group gap={6} mt={4}>
+                        {chips.map((c, i) => <Badge key={i} variant="light" color="gray" size="sm" radius="sm">{c}</Badge>)}
+                      </Group>
+                    ) : <Text size="xs" c="gray.5" mt={2}>Belum ada hafalan di-assign</Text>}
                   </div>
-                ) : <p className="mt-0.5 text-xs text-slate-400">Belum ada hafalan di-assign</p>}
-              </div>
-              <ChevronRight className="h-5 w-5 shrink-0 text-slate-300" />
-            </button>
+                  <ChevronRight className="h-5 w-5 shrink-0" color="var(--mantine-color-gray-4)" />
+                </Group>
+              </Paper>
+            </UnstyledButton>
           )
         })}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   )
 }
 
@@ -122,67 +132,74 @@ function MarhalahDetail({ marhalah, data, onBack, reload }: { marhalah: any; dat
   }
 
   return (
-    <div className="pt-1">
-      <div className="sticky top-0 z-20 -mx-2 mb-4 border-b border-slate-100 bg-white/85 px-2 py-3 backdrop-blur sm:-mx-4 sm:px-4">
-        <button onClick={onBack} className="mb-1 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700"><ArrowLeft className="h-4 w-4" /> Semua Marhalah</button>
-        <h1 className="text-xl font-bold text-slate-900">{marhalah.nama}</h1>
-      </div>
+    <Box>
+      <Box mb="md" py="sm"
+        style={{ position: 'sticky', top: 0, zIndex: 20, borderBottom: '1px solid var(--mantine-color-gray-1)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+        <UnstyledButton onClick={onBack} mb={4}>
+          <Group gap={6} c="teal.7"><ArrowLeft className="h-4 w-4" /><Text size="sm" fw={700}>Semua Marhalah</Text></Group>
+        </UnstyledButton>
+        <Text fz="xl" fw={700} c="dark.8">{marhalah.nama}</Text>
+      </Box>
 
       {/* Al-Qur'an */}
-      <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 flex items-center gap-2 font-bold text-emerald-800"><BookOpenCheck className="h-5 w-5" /> Al-Qur'an</h2>
+      <Paper component="section" withBorder radius="lg" p="md" shadow="sm" mb="md">
+        <Group gap="xs" mb="sm"><BookOpenCheck className="h-5 w-5" color="var(--mantine-color-teal-8)" /><Text fw={700} c="teal.8">Al-Qur'an</Text></Group>
 
         {assign.quran.surat?.length ? (
-          <div className="mb-3 flex flex-wrap gap-1.5">
+          <Group gap={6} mb="sm">
             {assign.quran.surat.map((s: any) => (
-              <span key={s.babId} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-800">
-                <span dir="rtl" style={{ fontFamily: ARABIC_FONT }}>{s.title}</span>
-                <span className="text-[11px] text-emerald-500">{s.ayat} ayat</span>
-                <button onClick={() => run(() => removeQuranSurah({ babId: s.babId }), 'Surat dilepas')} disabled={busy} className="text-emerald-400 hover:text-rose-500"><X className="h-3.5 w-3.5" /></button>
-              </span>
+              <Badge key={s.babId} variant="light" color="teal" size="lg" radius="md"
+                rightSection={
+                  <ActionIcon size="xs" variant="transparent" color="teal" disabled={busy} aria-label="Lepas surat"
+                    onClick={() => run(() => removeQuranSurah({ babId: s.babId }), 'Surat dilepas')}>
+                    <X className="h-3.5 w-3.5" />
+                  </ActionIcon>
+                }>
+                <Group gap={6} wrap="nowrap">
+                  <span dir="rtl" style={{ fontFamily: ARABIC_FONT, textTransform: 'none' }}>{s.title}</span>
+                  <Text span size="11px" c="teal.5">{s.ayat} ayat</Text>
+                </Group>
+              </Badge>
             ))}
-          </div>
-        ) : <p className="mb-3 text-xs text-slate-400">Belum ada surat/juz.</p>}
+          </Group>
+        ) : <Text size="xs" c="gray.5" mb="sm">Belum ada surat/juz.</Text>}
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="flex gap-2">
-            <select value={surah} onChange={e => setSurah(e.target.value)} className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm font-semibold">
-              {data.quranSurahs.map((s: any) => <option key={s.number} value={s.number}>{s.number}. {s.arabicName || s.name}</option>)}
-            </select>
-            <button onClick={() => run(() => addSurahToMarhalah({ marhalahId: marhalah.id, surahNumber: Number(surah) }), 'Surat di-assign')} disabled={busy} className="inline-flex h-10 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white disabled:opacity-50"><Plus className="h-4 w-4" /> Surat</button>
-          </div>
-          <div className="flex gap-2">
-            <select value={juz} onChange={e => setJuz(e.target.value)} className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm font-semibold">
-              {Array.from({ length: 30 }, (_, i) => 30 - i).map(n => <option key={n} value={n}>Juz {n}</option>)}
-            </select>
-            <button onClick={() => run(() => addJuzToMarhalah({ marhalahId: marhalah.id, juz: Number(juz) }), 'Juz di-assign')} disabled={busy} className="inline-flex h-10 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white disabled:opacity-50"><Plus className="h-4 w-4" /> Juz</button>
-          </div>
-        </div>
-      </section>
+        <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="xs">
+          <Group gap="xs" wrap="nowrap">
+            <NativeSelect style={{ flex: 1 }} value={surah} onChange={e => setSurah(e.currentTarget.value)}
+              data={data.quranSurahs.map((s: any) => ({ value: String(s.number), label: `${s.number}. ${s.arabicName || s.name}` }))} />
+            <Button color="teal" fw={700} disabled={busy} leftSection={<Plus className="h-4 w-4" />}
+              onClick={() => run(() => addSurahToMarhalah({ marhalahId: marhalah.id, surahNumber: Number(surah) }), 'Surat di-assign')}>Surat</Button>
+          </Group>
+          <Group gap="xs" wrap="nowrap">
+            <NativeSelect style={{ flex: 1 }} value={juz} onChange={e => setJuz(e.currentTarget.value)}
+              data={Array.from({ length: 30 }, (_, i) => 30 - i).map(n => ({ value: String(n), label: `Juz ${n}` }))} />
+            <Button color="teal" fw={700} disabled={busy} leftSection={<Plus className="h-4 w-4" />}
+              onClick={() => run(() => addJuzToMarhalah({ marhalahId: marhalah.id, juz: Number(juz) }), 'Juz di-assign')}>Juz</Button>
+          </Group>
+        </SimpleGrid>
+      </Paper>
 
       {/* Kitab non-quran */}
       {catalog.map(c => {
         const current = assign.kitab[c.jenis] || ''
         return (
-          <section key={c.jenis} className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 font-bold text-slate-800">{c.label}</h2>
-            <select
+          <Paper component="section" key={c.jenis} withBorder radius="lg" p="md" shadow="sm" mb="md">
+            <Text fw={700} c="dark.7" mb="sm">{c.label}</Text>
+            <NativeSelect
               value={current}
               disabled={busy}
               onChange={e => {
-                const v = e.target.value
+                const v = e.currentTarget.value
                 if (v) run(() => assignKitabToMarhalah({ marhalahId: marhalah.id, jenis: c.jenis, kitabKey: v }), 'Kitab di-assign')
                 else run(() => unassignJenisFromMarhalah({ marhalahId: marhalah.id, jenis: c.jenis }), 'Assign dilepas')
               }}
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
-            >
-              <option value="">— Tidak di-assign —</option>
-              {c.kitab.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
-            </select>
-            <p className="mt-2 text-xs text-slate-500">Pilih satu kitab — seluruh isinya otomatis jadi materi hafalan marhalah ini.</p>
-          </section>
+              data={[{ value: '', label: '— Tidak di-assign —' }, ...c.kitab.map(k => ({ value: k.key, label: k.label }))]}
+            />
+            <Text size="xs" c="dimmed" mt="xs">Pilih satu kitab — seluruh isinya otomatis jadi materi hafalan marhalah ini.</Text>
+          </Paper>
         )
       })}
-    </div>
+    </Box>
   )
 }
