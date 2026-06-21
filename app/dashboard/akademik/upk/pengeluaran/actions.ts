@@ -194,11 +194,13 @@ export async function getPinjamanModalOptions() {
 
 export async function getKatalogRoyaltiOptions() {
   return query<{ id: number; nama_kitab: string; marhalah_nama: string | null }>(`
-    SELECT uk.id, uk.nama_kitab, m.nama AS marhalah_nama
+    SELECT uk.id, uk.nama_kitab, GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama
     FROM upk_katalog uk
-    LEFT JOIN marhalah m ON m.id = uk.marhalah_id
+    LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
+    LEFT JOIN marhalah m ON m.id = km.marhalah_id
     WHERE uk.is_active = 1
-    ORDER BY m.urutan, uk.nama_kitab
+    GROUP BY uk.id
+    ORDER BY uk.nama_kitab
   `, [])
 }
 

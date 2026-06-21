@@ -14,7 +14,6 @@ type KatalogRow = {
   id: number
   kitab_id: number | null
   nama_kitab: string
-  marhalah_id: number
   toko_id: number | null
   stok_lama: number
   stok_baru: number
@@ -25,10 +24,16 @@ type KatalogRow = {
   stok_updated_at: string | null
   updated_at: string | null
   created_at: string
-  marhalah_nama: string | null
-  marhalah_urutan: number | null
   toko_nama: string | null
   master_nama_kitab: string | null
+}
+
+type KatalogMarhalahRow = {
+  katalog_id: number
+  marhalah_id: number
+  is_default: number
+  nama: string | null
+  urutan: number | null
 }
 
 type TokoRow = {
@@ -95,14 +100,12 @@ function toNullableInt(value: FormDataEntryValue | null) {
 
 export async function getKatalogUPK(search = '', filterMarhalah = '', filterStatus = 'SEMUA') {
   let sql = `
-    SELECT uk.id, uk.kitab_id, uk.nama_kitab, uk.marhalah_id, uk.toko_id,
+    SELECT uk.id, uk.kitab_id, uk.nama_kitab, uk.toko_id,
            uk.stok_lama, uk.stok_baru, uk.harga_beli, uk.harga_jual,
            uk.is_active, uk.catatan, uk.stok_updated_at, uk.updated_at, uk.created_at,
-           m.nama AS marhalah_nama, m.urutan AS marhalah_urutan,
            t.nama AS toko_nama,
            k.nama_kitab AS master_nama_kitab
     FROM upk_katalog uk
-    LEFT JOIN marhalah m ON m.id = uk.marhalah_id
     LEFT JOIN upk_toko t ON t.id = uk.toko_id
     LEFT JOIN kitab k ON k.id = uk.kitab_id
   `
@@ -115,16 +118,34 @@ export async function getKatalogUPK(search = '', filterMarhalah = '', filterStat
     params.push(like, like, like)
   }
   if (filterMarhalah) {
-    conditions.push('uk.marhalah_id = ?')
+    conditions.push('EXISTS (SELECT 1 FROM upk_katalog_marhalah km WHERE km.katalog_id = uk.id AND km.marhalah_id = ?)')
     params.push(filterMarhalah)
   }
   if (filterStatus === 'AKTIF') conditions.push('uk.is_active = 1')
   if (filterStatus === 'NONAKTIF') conditions.push('uk.is_active = 0')
 
   if (conditions.length) sql += ` WHERE ${conditions.join(' AND ')}`
-  sql += ' ORDER BY uk.is_active DESC, m.urutan, uk.nama_kitab'
+  sql += ' ORDER BY uk.is_active DESC, uk.nama_kitab'
 
   const rows = await query<KatalogRow>(sql, params)
+  if (!rows.length) return []
+
+  const ids = rows.map((row) => row.id)
+  const marhalahRows = await query<KatalogMarhalahRow>(
+    `SELECT km.katalog_id, km.marhalah_id, km.is_default, m.nama, m.urutan
+     FROM upk_katalog_marhalah km
+     LEFT JOIN marhalah m ON m.id = km.marhalah_id
+     WHERE km.katalog_id IN (${ids.map(() => '?').join(',')})
+     ORDER BY m.urutan`,
+    ids
+  )
+  const marhalahByKatalog = new Map<number, { marhalah_id: number; nama: string | null; is_default: boolean }[]>()
+  for (const mr of marhalahRows) {
+    const list = marhalahByKatalog.get(mr.katalog_id) ?? []
+    list.push({ marhalah_id: mr.marhalah_id, nama: mr.nama, is_default: !!mr.is_default })
+    marhalahByKatalog.set(mr.katalog_id, list)
+  }
+
   return rows.map((row) => {
     const jumlahStok = (row.stok_lama || 0) + (row.stok_baru || 0)
     const modal = jumlahStok * (row.harga_beli || 0)
@@ -132,6 +153,7 @@ export async function getKatalogUPK(search = '', filterMarhalah = '', filterStat
     return {
       ...row,
       is_active: !!row.is_active,
+      marhalah: marhalahByKatalog.get(row.id) ?? [],
       jumlah_stok: jumlahStok,
       modal,
       laba_kotor: labaKotor,
@@ -170,33 +192,44 @@ export async function getMasterKitabOptions() {
   `, params)
 }
 
-export async function simpanKatalogUPK(formData: FormData): Promise<{ success: boolean } | { error: string }> {
+export async function simpanKatalogUPK(payload: {
+  id?: number | null
+  kitab_id?: number | null
+  nama_kitab: string
+  toko_id?: number | null
+  stok_lama: number
+  harga_beli: number
+  harga_jual: number
+  is_active: boolean
+  catatan: string
+  marhalah: { marhalah_id: number; is_default: boolean }[]
+}): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  const id = toNullableInt(formData.get('id'))
-  const kitabId = toNullableInt(formData.get('kitab_id'))
-  const namaKitab = String(formData.get('nama_kitab') ?? '').trim()
-  const marhalahId = toNullableInt(formData.get('marhalah_id'))
-  const tokoId = toNullableInt(formData.get('toko_id'))
-  const stokLama = toInt(formData.get('stok_lama'))
-  const hargaBeli = toInt(formData.get('harga_beli'))
-  const hargaJual = toInt(formData.get('harga_jual'))
-  const isActive = formData.get('is_active') === 'on' ? 1 : 0
-  const catatan = String(formData.get('catatan') ?? '').trim()
+  const id = payload.id && payload.id > 0 ? payload.id : null
+  const kitabId = payload.kitab_id && payload.kitab_id > 0 ? payload.kitab_id : null
+  const namaKitab = payload.nama_kitab.trim()
+  const tokoId = payload.toko_id && payload.toko_id > 0 ? payload.toko_id : null
+  const stokLama = Number(payload.stok_lama) || 0
+  const hargaBeli = Number(payload.harga_beli) || 0
+  const hargaJual = Number(payload.harga_jual) || 0
+  const isActive = payload.is_active ? 1 : 0
+  const catatan = payload.catatan.trim()
+
+  // dedupe marhalah, max 1 default per item tetap diizinkan banyak default
+  const marhalahMap = new Map<number, boolean>()
+  for (const m of payload.marhalah) {
+    if (m.marhalah_id > 0) marhalahMap.set(m.marhalah_id, m.is_default || marhalahMap.get(m.marhalah_id) || false)
+  }
+  const marhalahList = Array.from(marhalahMap.entries()).map(([marhalah_id, is_default]) => ({ marhalah_id, is_default }))
 
   if (!namaKitab) return { error: 'Nama kitab wajib diisi.' }
-  if (!marhalahId) return { error: 'Marhalah wajib dipilih.' }
+  if (!marhalahList.length) return { error: 'Pilih minimal satu marhalah.' }
   if (stokLama < 0) return { error: 'Stok tidak boleh minus.' }
   if (hargaBeli < 0 || hargaJual < 0) return { error: 'Harga tidak boleh minus.' }
 
-  const duplicate = kitabId
-    ? await queryOne<{ id: number }>(
-        'SELECT id FROM upk_katalog WHERE kitab_id = ? AND (? IS NULL OR id <> ?) LIMIT 1',
-        [kitabId, id, id]
-      )
-    : null
-  if (duplicate) return { error: 'Kitab dari master tersebut sudah ada di Katalog UPK.' }
-
   const timestamp = now()
+  let katalogId = id
+
   if (id) {
     const currentStock = await queryOne<KatalogStockSnapshot>(
       'SELECT stok_lama, stok_updated_at FROM upk_katalog WHERE id = ?',
@@ -207,60 +240,53 @@ export async function simpanKatalogUPK(formData: FormData): Promise<{ success: b
 
     await execute(`
       UPDATE upk_katalog
-      SET kitab_id = ?, nama_kitab = ?, marhalah_id = ?, toko_id = ?,
+      SET kitab_id = ?, nama_kitab = ?, toko_id = ?,
           stok_lama = ?, harga_beli = ?, harga_jual = ?,
           is_active = ?, catatan = ?, stok_updated_at = ?, updated_at = ?
       WHERE id = ?
-    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, hargaBeli, hargaJual,
+    `, [kitabId, namaKitab, tokoId, stokLama, hargaBeli, hargaJual,
         isActive, catatan || null, stockUpdatedAt, timestamp, id])
-    await logActivity({
-      actor: actorFromSession(session),
-      module: 'akademik_upk_katalog',
-      action: 'update',
-      fiturHref: '/dashboard/akademik/upk/katalog',
-      logKind: 'update',
-      entityType: 'upk_katalog',
-      entityId: String(id),
-      entityLabel: namaKitab,
-      summary: `Memperbarui katalog UPK ${namaKitab}`,
-      details: {
-        marhalah_id: marhalahId,
-        toko_id: tokoId,
-        stok_lama: stokLama,
-        harga_beli: hargaBeli,
-        harga_jual: hargaJual,
-        is_active: isActive === 1,
-      },
-    })
   } else {
     await execute(`
       INSERT INTO upk_katalog
-        (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
+        (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
          harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [kitabId, namaKitab, marhalahId, tokoId, stokLama, 0, hargaBeli, hargaJual,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [kitabId, namaKitab, tokoId, stokLama, 0, hargaBeli, hargaJual,
         isActive, catatan || null, timestamp, timestamp, timestamp])
-    const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog WHERE nama_kitab = ? AND marhalah_id = ? ORDER BY id DESC LIMIT 1', [namaKitab, marhalahId])
-    await logActivity({
-      actor: actorFromSession(session),
-      module: 'akademik_upk_katalog',
-      action: 'create',
-      fiturHref: '/dashboard/akademik/upk/katalog',
-      logKind: 'create',
-      entityType: 'upk_katalog',
-      entityId: created ? String(created.id) : null,
-      entityLabel: namaKitab,
-      summary: `Menambahkan katalog UPK ${namaKitab}`,
-      details: {
-        marhalah_id: marhalahId,
-        toko_id: tokoId,
-        stok_lama: stokLama,
-        harga_beli: hargaBeli,
-        harga_jual: hargaJual,
-        is_active: isActive === 1,
-      },
-    })
+    const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog ORDER BY id DESC LIMIT 1')
+    katalogId = created?.id ?? null
   }
+
+  if (!katalogId) return { error: 'Gagal menyimpan katalog.' }
+
+  await execute('DELETE FROM upk_katalog_marhalah WHERE katalog_id = ?', [katalogId])
+  for (const m of marhalahList) {
+    await execute(
+      'INSERT INTO upk_katalog_marhalah (katalog_id, marhalah_id, is_default) VALUES (?, ?, ?)',
+      [katalogId, m.marhalah_id, m.is_default ? 1 : 0]
+    )
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: id ? 'update' : 'create',
+    fiturHref: '/dashboard/akademik/upk/katalog',
+    logKind: id ? 'update' : 'create',
+    entityType: 'upk_katalog',
+    entityId: String(katalogId),
+    entityLabel: namaKitab,
+    summary: `${id ? 'Memperbarui' : 'Menambahkan'} katalog UPK ${namaKitab}`,
+    details: {
+      marhalah: marhalahList,
+      toko_id: tokoId,
+      stok_lama: stokLama,
+      harga_beli: hargaBeli,
+      harga_jual: hargaJual,
+      is_active: isActive === 1,
+    },
+  })
 
   revalidatePath(KATALOG_PATH)
   return { success: true }
@@ -312,12 +338,19 @@ export async function simpanKatalogBatchUPK(
 
     await execute(`
       INSERT INTO upk_katalog
-        (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
+        (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
          harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-    `, [item.kitab_id, item.nama_kitab.trim(), item.marhalah_id, item.toko_id,
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    `, [item.kitab_id, item.nama_kitab.trim(), item.toko_id,
         item.stok_lama, 0, item.harga_beli, item.harga_jual,
         item.catatan.trim() || null, timestamp, timestamp, timestamp])
+    const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog ORDER BY id DESC LIMIT 1')
+    if (created?.id) {
+      await execute(
+        'INSERT INTO upk_katalog_marhalah (katalog_id, marhalah_id, is_default) VALUES (?, ?, 1)',
+        [created.id, item.marhalah_id]
+      )
+    }
     existingSet.add(item.kitab_id)
     inserted++
   }
@@ -343,10 +376,11 @@ export async function simpanKatalogBatchUPK(
 
 export async function hapusKatalogUPK(id: number): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
-  const target = await queryOne<{ id: number; nama_kitab: string; marhalah_id: number | null }>(
-    'SELECT id, nama_kitab, marhalah_id FROM upk_katalog WHERE id = ?',
+  const target = await queryOne<{ id: number; nama_kitab: string }>(
+    'SELECT id, nama_kitab FROM upk_katalog WHERE id = ?',
     [id]
   )
+  await execute('DELETE FROM upk_katalog_marhalah WHERE katalog_id = ?', [id])
   await execute('DELETE FROM upk_katalog WHERE id = ?', [id])
   await logActivity({
     actor: actorFromSession(session),
@@ -358,9 +392,6 @@ export async function hapusKatalogUPK(id: number): Promise<{ success: boolean } 
     entityId: String(id),
     entityLabel: target?.nama_kitab ?? `Katalog ${id}`,
     summary: `Menghapus katalog UPK ${target?.nama_kitab ?? id}`,
-    details: {
-      marhalah_id: target?.marhalah_id ?? null,
-    },
   })
   revalidatePath(KATALOG_PATH)
   return { success: true }
@@ -370,12 +401,16 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
   const session = await getSession()
   if (!rows.length) return { error: 'File Excel belum berisi data.' }
 
-  const [marhalahRows, tokoRows, masterRows, katalogRows] = await Promise.all([
+  const [marhalahRows, tokoRows, masterRows, katalogRows, linkRows] = await Promise.all([
     query<MarhalahRow>('SELECT id, nama FROM marhalah', []),
     query<TokoRow>('SELECT id, nama, is_active, created_at, updated_at FROM upk_toko', []),
     getMasterKitabOptions(),
-    query<{ id: number; kitab_id: number | null; nama_kitab: string; marhalah_id: number }>(
-      'SELECT id, kitab_id, nama_kitab, marhalah_id FROM upk_katalog',
+    query<{ id: number; kitab_id: number | null; nama_kitab: string }>(
+      'SELECT id, kitab_id, nama_kitab FROM upk_katalog',
+      []
+    ),
+    query<{ katalog_id: number; marhalah_id: number }>(
+      'SELECT katalog_id, marhalah_id FROM upk_katalog_marhalah',
       []
     ),
   ])
@@ -383,14 +418,25 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
   const marhalahByName = new Map(marhalahRows.map(m => [keyText(m.nama), m]))
   const tokoByName = new Map(tokoRows.map(t => [keyText(t.nama), t]))
   const masterByNameAndMarhalah = new Map(masterRows.map(k => [`${keyText(k.nama_kitab)}|||${k.marhalah_id}`, k]))
-  const katalogByKitabId = new Map(katalogRows.filter(k => k.kitab_id).map(k => [k.kitab_id, k]))
-  const katalogByNameAndMarhalah = new Map(katalogRows.map(k => [`${keyText(k.nama_kitab)}|||${k.marhalah_id}`, k]))
+  const katalogByName = new Map(katalogRows.map(k => [keyText(k.nama_kitab), k]))
+  const linkSet = new Set(linkRows.map(l => `${l.katalog_id}|||${l.marhalah_id}`))
 
   let inserted = 0
   let updated = 0
   let failed = 0
   const errors: string[] = []
   const timestamp = now()
+
+  const ensureLink = async (katalogId: number, marhalahId: number) => {
+    const key = `${katalogId}|||${marhalahId}`
+    if (linkSet.has(key)) return false
+    await execute(
+      'INSERT INTO upk_katalog_marhalah (katalog_id, marhalah_id, is_default) VALUES (?, ?, 1)',
+      [katalogId, marhalahId]
+    )
+    linkSet.add(key)
+    return true
+  }
 
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]
@@ -428,11 +474,10 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
     }
 
     const master = masterByNameAndMarhalah.get(`${keyText(namaKitab)}|||${marhalah.id}`)
-    const existing = master?.id
-      ? katalogByKitabId.get(master.id) ?? katalogByNameAndMarhalah.get(`${keyText(namaKitab)}|||${marhalah.id}`)
-      : katalogByNameAndMarhalah.get(`${keyText(namaKitab)}|||${marhalah.id}`)
+    const existing = katalogByName.get(keyText(namaKitab))
 
     if (existing) {
+      // 1 item per nama kitab = stok bersama; baris hanya menambah/menyetel marhalah
       const currentStock = await queryOne<KatalogStockSnapshot>(
         'SELECT stok_lama, stok_updated_at FROM upk_katalog WHERE id = ?',
         [existing.id]
@@ -442,29 +487,29 @@ export async function importKatalogUPK(rows: ImportRow[]): Promise<{ success: bo
 
       await execute(`
         UPDATE upk_katalog
-        SET kitab_id = ?, nama_kitab = ?, marhalah_id = ?, toko_id = ?,
+        SET kitab_id = COALESCE(?, kitab_id), nama_kitab = ?, toko_id = ?,
             stok_lama = ?, harga_beli = ?, harga_jual = ?,
             is_active = 1, catatan = ?, stok_updated_at = ?, updated_at = ?
         WHERE id = ?
-      `, [master?.id ?? existing.kitab_id ?? null, namaKitab, marhalah.id, tokoId,
+      `, [master?.id ?? existing.kitab_id ?? null, namaKitab, tokoId,
           stokLama, hargaBeli, hargaJual, catatan || null, stockUpdatedAt, timestamp, existing.id])
+      await ensureLink(existing.id, marhalah.id)
       updated++
     } else {
       await execute(`
         INSERT INTO upk_katalog
-          (kitab_id, nama_kitab, marhalah_id, toko_id, stok_lama, stok_baru,
+          (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
            harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-      `, [master?.id ?? null, namaKitab, marhalah.id, tokoId, stokLama, 0,
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+      `, [master?.id ?? null, namaKitab, tokoId, stokLama, 0,
           hargaBeli, hargaJual, catatan || null, timestamp, timestamp, timestamp])
 
-      const insertedRow = await queryOne<{ id: number; kitab_id: number | null; nama_kitab: string; marhalah_id: number }>(
-        'SELECT id, kitab_id, nama_kitab, marhalah_id FROM upk_katalog WHERE lower(nama_kitab) = lower(?) AND marhalah_id = ? ORDER BY id DESC LIMIT 1',
-        [namaKitab, marhalah.id]
+      const insertedRow = await queryOne<{ id: number; kitab_id: number | null; nama_kitab: string }>(
+        'SELECT id, kitab_id, nama_kitab FROM upk_katalog ORDER BY id DESC LIMIT 1'
       )
       if (insertedRow) {
-        if (insertedRow.kitab_id) katalogByKitabId.set(insertedRow.kitab_id, insertedRow)
-        katalogByNameAndMarhalah.set(`${keyText(insertedRow.nama_kitab)}|||${insertedRow.marhalah_id}`, insertedRow)
+        katalogByName.set(keyText(insertedRow.nama_kitab), insertedRow)
+        await ensureLink(insertedRow.id, marhalah.id)
       }
       inserted++
     }

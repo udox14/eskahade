@@ -44,13 +44,13 @@ type SantriKasirRow = {
 type KatalogKasirRow = {
   id: number
   nama_kitab: string
-  marhalah_id: number | null
   stok_lama: number
   stok_baru: number
   harga_jual: number
   is_active: number
   marhalah_nama: string | null
-  marhalah_urutan: number | null
+  is_default_flag: number
+  linked_flag: number
   toko_nama: string | null
 }
 
@@ -146,24 +146,32 @@ export async function cariSantriUPK(unit: UnitUPK, keyword: string) {
 }
 
 export async function getKatalogKasir(marhalahId?: number | null) {
+  const target = marhalahId ?? -1
   const rows = await query<KatalogKasirRow>(`
-    SELECT uk.id, uk.nama_kitab, uk.marhalah_id, uk.stok_lama, uk.stok_baru,
+    SELECT uk.id, uk.nama_kitab, uk.stok_lama, uk.stok_baru,
            uk.harga_jual, uk.is_active,
-           m.nama AS marhalah_nama, m.urutan AS marhalah_urutan,
-           t.nama AS toko_nama
+           t.nama AS toko_nama,
+           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama,
+           MAX(CASE WHEN km.marhalah_id = ? THEN km.is_default ELSE 0 END) AS is_default_flag,
+           MAX(CASE WHEN km.marhalah_id = ? THEN 1 ELSE 0 END) AS linked_flag
     FROM upk_katalog uk
-    LEFT JOIN marhalah m ON m.id = uk.marhalah_id
+    LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
+    LEFT JOIN marhalah m ON m.id = km.marhalah_id
     LEFT JOIN upk_toko t ON t.id = uk.toko_id
     WHERE uk.is_active = 1
-    ORDER BY
-      CASE WHEN uk.marhalah_id = ? THEN 0 ELSE 1 END,
-      m.urutan, uk.nama_kitab
-  `, [marhalahId ?? -1])
+    GROUP BY uk.id
+    ORDER BY linked_flag DESC, uk.nama_kitab
+  `, [target, target])
 
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    nama_kitab: row.nama_kitab,
+    marhalah_id: marhalahId ?? null,
+    marhalah_nama: row.marhalah_nama,
+    harga_jual: row.harga_jual,
+    toko_nama: row.toko_nama,
     jumlah_stok: (row.stok_lama || 0) + (row.stok_baru || 0),
-    is_default: marhalahId ? row.marhalah_id === marhalahId : false,
+    is_default: marhalahId ? !!row.is_default_flag : false,
   }))
 }
 

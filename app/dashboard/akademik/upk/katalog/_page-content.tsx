@@ -35,11 +35,12 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
+type MarhalahSel = { marhalah_id: number; is_default: boolean }
+
 type KatalogForm = {
   id: string
   kitab_id: string
   nama_kitab: string
-  marhalah_id: string
   toko_id: string
   stok_lama: string
   stok_baru: string
@@ -47,6 +48,7 @@ type KatalogForm = {
   harga_jual: string
   is_active: boolean
   catatan: string
+  marhalah: MarhalahSel[]
 }
 
 type TokoForm = {
@@ -77,7 +79,6 @@ type KatalogItem = {
   id: number
   kitab_id: number | null
   nama_kitab: string
-  marhalah_id: number
   toko_id: number | null
   stok_lama: number
   stok_baru: number
@@ -86,7 +87,7 @@ type KatalogItem = {
   is_active: boolean
   catatan: string | null
   stok_updated_at: string | null
-  marhalah_nama: string | null
+  marhalah: { marhalah_id: number; nama: string | null; is_default: boolean }[]
   toko_nama: string | null
   jumlah_stok: number
   modal: number
@@ -102,14 +103,14 @@ const emptyKatalogForm: KatalogForm = {
   id: '',
   kitab_id: '',
   nama_kitab: '',
-  marhalah_id: '',
   toko_id: '',
-  stok_lama: '0',
+  stok_lama: '',
   stok_baru: '0',
-  harga_beli: '0',
-  harga_jual: '0',
+  harga_beli: '',
+  harga_jual: '',
   is_active: true,
   catatan: '',
+  marhalah: [],
 }
 
 const emptyTokoForm: TokoForm = { id: '', nama: '', is_active: true }
@@ -306,11 +307,28 @@ export default function KatalogUPKPage() {
 
   const handlePilihMaster = (id: string) => {
     const selected = masterKitab.find(k => String(k.id) === id)
+    setForm(prev => {
+      const next: KatalogForm = { ...prev, kitab_id: id, nama_kitab: selected?.nama_kitab ?? prev.nama_kitab }
+      // auto-tambah marhalah master kalau belum ada
+      if (selected?.marhalah_id && !prev.marhalah.some(m => m.marhalah_id === selected.marhalah_id)) {
+        next.marhalah = [...prev.marhalah, { marhalah_id: selected.marhalah_id, is_default: prev.marhalah.length === 0 }]
+      }
+      return next
+    })
+  }
+
+  const toggleFormMarhalah = (marhalahId: number) => {
+    setForm(prev => {
+      const exists = prev.marhalah.some(m => m.marhalah_id === marhalahId)
+      if (exists) return { ...prev, marhalah: prev.marhalah.filter(m => m.marhalah_id !== marhalahId) }
+      return { ...prev, marhalah: [...prev.marhalah, { marhalah_id: marhalahId, is_default: false }] }
+    })
+  }
+
+  const toggleFormDefault = (marhalahId: number) => {
     setForm(prev => ({
       ...prev,
-      kitab_id: id,
-      nama_kitab: selected?.nama_kitab ?? prev.nama_kitab,
-      marhalah_id: selected?.marhalah_id ? String(selected.marhalah_id) : prev.marhalah_id,
+      marhalah: prev.marhalah.map(m => m.marhalah_id === marhalahId ? { ...m, is_default: !m.is_default } : m),
     }))
   }
 
@@ -319,7 +337,6 @@ export default function KatalogUPKPage() {
       id: String(item.id),
       kitab_id: item.kitab_id ? String(item.kitab_id) : '',
       nama_kitab: item.nama_kitab ?? '',
-      marhalah_id: item.marhalah_id ? String(item.marhalah_id) : '',
       toko_id: item.toko_id ? String(item.toko_id) : '',
       stok_lama: String(item.stok_lama ?? 0),
       stok_baru: String(item.stok_baru ?? 0),
@@ -327,15 +344,30 @@ export default function KatalogUPKPage() {
       harga_jual: String(item.harga_jual ?? 0),
       is_active: !!item.is_active,
       catatan: item.catatan ?? '',
+      marhalah: item.marhalah.map(m => ({ marhalah_id: m.marhalah_id, is_default: m.is_default })),
     })
     setIsKatalogModalOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!form.marhalah.length) {
+      toast.warning('Pilih minimal satu marhalah.')
+      return
+    }
     setSaving(true)
-    const formData = new FormData(e.currentTarget)
-    const result = await simpanKatalogUPK(formData)
+    const result = await simpanKatalogUPK({
+      id: form.id ? Number(form.id) : null,
+      kitab_id: form.kitab_id ? Number(form.kitab_id) : null,
+      nama_kitab: form.nama_kitab,
+      toko_id: form.toko_id ? Number(form.toko_id) : null,
+      stok_lama: numberValue(form.stok_lama),
+      harga_beli: numberValue(form.harga_beli),
+      harga_jual: numberValue(form.harga_jual),
+      is_active: form.is_active,
+      catatan: form.catatan,
+      marhalah: form.marhalah,
+    })
     setSaving(false)
 
     if ('error' in result) {
@@ -557,7 +589,14 @@ export default function KatalogUPKPage() {
                       <tr key={item.id} className={!item.is_active ? 'bg-slate-50 text-slate-400' : 'hover:bg-slate-50'}>
                         <td className="px-4 py-3">
                           <p className="font-bold text-slate-800">{item.nama_kitab}</p>
-                          <p className="text-xs text-slate-500">{item.marhalah_nama || '-'}{item.kitab_id ? ' - dari master kitab' : ' - manual'}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.marhalah.length === 0 && <span className="text-xs text-slate-400">Tanpa marhalah</span>}
+                            {item.marhalah.map(m => (
+                              <span key={m.marhalah_id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${m.is_default ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                {m.is_default ? '★ ' : ''}{m.nama || '-'}
+                              </span>
+                            ))}
+                          </div>
                           {item.catatan && <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.catatan}</p>}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{item.toko_nama || '-'}</td>
@@ -643,34 +682,40 @@ export default function KatalogUPKPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Marhalah</label>
-                  <select
-                    name="marhalah_id"
-                    required
-                    value={form.marhalah_id}
-                    onChange={e => setField('marhalah_id', e.target.value)}
-                    className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white"
-                  >
-                    <option value="">Pilih</option>
-                    {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                  </select>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Marhalah & Default Kasir</label>
+                <p className="text-[11px] text-slate-400 mb-2">Ceklis marhalah tempat kitab ini dijual. Centang ★ kalau mau auto-terpilih di kasir untuk marhalah itu. Stok tetap satu pool.</p>
+                <div className="border border-slate-200 rounded-lg divide-y max-h-56 overflow-y-auto">
+                  {marhalahList.map(m => {
+                    const sel = form.marhalah.find(x => x.marhalah_id === m.id)
+                    return (
+                      <div key={m.id} className={`flex items-center gap-3 px-3 py-2 text-sm ${sel ? 'bg-amber-50/60' : ''}`}>
+                        <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                          <input type="checkbox" className="w-4 h-4" checked={!!sel} onChange={() => toggleFormMarhalah(m.id)} />
+                          <span className="font-bold text-slate-700">{m.nama}</span>
+                        </label>
+                        <label className={`flex items-center gap-1.5 text-xs font-bold ${sel ? 'text-amber-700 cursor-pointer' : 'text-slate-300'}`}>
+                          <input type="checkbox" className="w-4 h-4" disabled={!sel} checked={!!sel?.is_default} onChange={() => toggleFormDefault(m.id)} />
+                          ★ Default
+                        </label>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Toko</label>
-                  <select
-                    name="toko_id"
-                    value={form.toko_id}
-                    onChange={e => setField('toko_id', e.target.value)}
-                    className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white"
-                  >
-                    <option value="">Belum ditentukan</option>
-                    {tokoList.filter(t => t.is_active || String(t.id) === form.toko_id).map(t => (
-                      <option key={t.id} value={t.id}>{t.nama}{!t.is_active ? ' (nonaktif)' : ''}</option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Toko</label>
+                <select
+                  value={form.toko_id}
+                  onChange={e => setField('toko_id', e.target.value)}
+                  className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="">Belum ditentukan</option>
+                  {tokoList.filter(t => t.is_active || String(t.id) === form.toko_id).map(t => (
+                    <option key={t.id} value={t.id}>{t.nama}{!t.is_active ? ' (nonaktif)' : ''}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

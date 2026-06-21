@@ -100,17 +100,20 @@ function statusPembayaran(total: number, dibayar: number) {
 
 export async function getKatalogBelanja() {
   const rows = await query<KatalogBelanjaRow>(`
-    SELECT uk.id, uk.nama_kitab, uk.marhalah_id, uk.harga_beli, uk.harga_jual,
+    SELECT uk.id, uk.nama_kitab, uk.harga_beli, uk.harga_jual,
            uk.stok_lama, uk.stok_baru, uk.toko_id,
-           m.nama AS marhalah_nama, t.nama AS toko_nama
+           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama, t.nama AS toko_nama
     FROM upk_katalog uk
-    LEFT JOIN marhalah m ON m.id = uk.marhalah_id
+    LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
+    LEFT JOIN marhalah m ON m.id = km.marhalah_id
     LEFT JOIN upk_toko t ON t.id = uk.toko_id
     WHERE uk.is_active = 1
-    ORDER BY m.urutan, uk.nama_kitab
+    GROUP BY uk.id
+    ORDER BY uk.nama_kitab
   `, [])
   return rows.map(row => ({
     ...row,
+    marhalah_id: null,
     jumlah_stok: (row.stok_lama || 0) + (row.stok_baru || 0),
   }))
 }
@@ -125,18 +128,19 @@ export async function getTokoBelanja() {
 export async function hitungRencanaBelanja(persenTarget: number) {
   const persen = Math.max(1, Math.min(100, toInt(persenTarget)))
   const rows = await query<RencanaHitungRow>(`
-    SELECT uk.id AS katalog_id, uk.nama_kitab, uk.marhalah_id, uk.stok_lama, uk.stok_baru, uk.harga_beli,
+    SELECT uk.id AS katalog_id, uk.nama_kitab, uk.stok_lama, uk.stok_baru, uk.harga_beli,
            t.nama AS toko_nama,
-           m.nama AS marhalah_nama, COUNT(DISTINCT s.id) AS jumlah_santri
+           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama, COUNT(DISTINCT s.id) AS jumlah_santri
     FROM upk_katalog uk
-    LEFT JOIN marhalah m ON m.id = uk.marhalah_id
+    LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
+    LEFT JOIN marhalah m ON m.id = km.marhalah_id
     LEFT JOIN upk_toko t ON t.id = uk.toko_id
-    LEFT JOIN kelas k ON k.marhalah_id = uk.marhalah_id
+    LEFT JOIN kelas k ON k.marhalah_id = km.marhalah_id
     LEFT JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
     WHERE uk.is_active = 1
     GROUP BY uk.id
-    ORDER BY m.urutan, uk.nama_kitab
+    ORDER BY uk.nama_kitab
   `, [])
 
   return rows.map((row) => {
@@ -147,7 +151,7 @@ export async function hitungRencanaBelanja(persenTarget: number) {
     return {
       katalog_id: row.katalog_id,
       nama_kitab: row.nama_kitab,
-      marhalah_id: row.marhalah_id,
+      marhalah_id: null,
       marhalah_nama: row.marhalah_nama,
       toko_nama: row.toko_nama,
       jumlah_santri: jumlahSantri,
