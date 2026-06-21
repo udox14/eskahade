@@ -5,7 +5,7 @@ import { getActiveEventLight, getSusulanList, markSusulanDone } from './actions'
 import { 
   CheckCircle2, AlertTriangle, Loader2, Search, CheckSquare, ClipboardList, BarChart3, BookOpen, FileSpreadsheet, X
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { shortDateWib } from '../_date-utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -159,7 +159,7 @@ export default function SusulanEhbPage() {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
 
   if (!event) return (
-    <div className="max-w-4xl mx-auto py-10">
+    <div className="py-10">
       <div className="bg-amber-50 text-amber-800 p-4 rounded-lg flex items-center gap-3">
         <AlertTriangle className="w-5 h-5" /> Belum ada event EHB yang aktif.
       </div>
@@ -182,7 +182,7 @@ export default function SusulanEhbPage() {
   const totalMapelRekap = rekapGroups.reduce((sum, group) => sum + group.items.length, 0)
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Daftar Susulan EHB"
         description="Daftar santri yang tidak hadir ujian dan belum menyelesaikan susulan."

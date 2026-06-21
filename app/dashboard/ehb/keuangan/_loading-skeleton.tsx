@@ -2,7 +2,7 @@ import { Wallet } from 'lucide-react'
 
 export default function KeuanganLoadingSkeleton() {
   return (
-    <div className="max-w-7xl mx-auto pb-20 space-y-6 animate-pulse">
+    <div className="pb-20 space-y-6 animate-pulse">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-3">

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CalendarDays, ClipboardList, Loader2, Save, Table2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getNilaiHarianInitialData,
@@ -103,7 +103,7 @@ export default function NilaiHarianContent() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+    <div className="space-y-5 pb-20">
       <DashboardPageHeader
         title="Nilai Harian"
         description="Input sesi penilaian harian dan lihat rekap nilai per santri."

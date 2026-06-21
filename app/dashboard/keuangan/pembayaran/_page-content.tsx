@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cariSantriKeuangan, getInfoTagihan, bayarTagihan, getMonitoringPembayaran, bayarLunasSetahun } from './actions'
 import { Search, Wallet, Building2, Calendar, CheckCircle, Clock, Loader2, Home, User, Zap, Filter, ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -181,7 +181,7 @@ export default function LoketPembayaranPage() {
 
   const { paged: pagedDataList, totalPages: totalPagesDataList, safePage: safePageDataList } = usePagination(dataList, pageSize, page)
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-20">
+    <div className="space-y-8 pb-20">
       
       {/* HEADER GLOBAL */}
       <DashboardPageHeader

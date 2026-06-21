@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
 import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -383,7 +383,7 @@ export default function ManajemenGuruPage() {
   ), 0)
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Manajemen Guru & Jadwal"

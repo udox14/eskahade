@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { Loader2, Plus, Save, Trash2, Users } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getKepengurusanAsramaData, saveKepengurusanAsrama } from './actions'
 
@@ -206,7 +206,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
   ] as const
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+    <div className="space-y-5 pb-20">
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
         <DashboardPageHeader
           title="Kepengurusan Asrama"

@@ -5,7 +5,7 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif } from './actions'
 import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -131,7 +131,7 @@ export default function MasterKitabPage() {
   const { paged: pagedKitabList, totalPages: totalPagesKitabList, safePage: safePageKitabList } = usePagination(kitabList, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">

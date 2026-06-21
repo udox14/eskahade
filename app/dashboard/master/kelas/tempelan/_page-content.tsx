@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { AlertTriangle, ArrowLeft, Eye, Loader2, Printer } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getKelasTempelanList,
@@ -240,7 +240,7 @@ export default function TempelanKelasPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       <DashboardPageHeader
         title="Tempelan Kelas"
         description="Cetak tempelan nama kelas dan tempat untuk tahun ajaran aktif."

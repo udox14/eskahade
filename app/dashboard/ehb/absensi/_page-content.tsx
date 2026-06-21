@@ -8,7 +8,7 @@ import {
   Calendar, MapPin, Users, Loader2, ChevronLeft, ChevronRight, 
   AlertTriangle, Search,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { fullDateWib, shortDateWib } from '../_date-utils'
 
 type SesiAktif = {

@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { Upload, Download, Save, CheckCircle, Loader2, UserPlus, FileSpreadsheet } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { importSantriMassal, tambahSantriSatuSatu, getKelasList } from './actions'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { KATEGORI_SANTRI_DASAR } from '@/lib/santri/kategori'
@@ -165,7 +165,7 @@ export default function InputSantriPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* HEADER */}
       <DashboardPageHeader

@@ -38,7 +38,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -1100,7 +1100,7 @@ export default function SantriNonaktifPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-16 space-y-5">
+    <div className="pb-16 space-y-5">
       <DashboardPageHeader
         title="Status Santri"
         description="Kelola alur santri aktif, nonaktif sementara, lalu alumni final."

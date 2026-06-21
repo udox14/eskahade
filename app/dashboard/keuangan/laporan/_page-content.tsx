@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { getLaporanKeuangan } from './actions'
 import { FileText, Calendar, Download, Loader2, TrendingUp, Building2, HeartPulse, BookOpen, Trophy, AlertCircle, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -60,7 +60,7 @@ export default function LaporanKeuanganPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-8 pb-20">
 
       {/* HEADER */}
       <DashboardPageHeader

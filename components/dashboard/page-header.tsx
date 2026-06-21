@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import { Box, Flex, Text, Title } from '@mantine/core'
 
 type DashboardPageHeaderProps = {
   title: string
@@ -16,16 +16,26 @@ export function DashboardPageHeader({
   className,
 }: DashboardPageHeaderProps) {
   return (
-    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between', className)}>
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-[1.75rem]">
+    <Flex
+      className={className}
+      direction={{ base: 'column', xs: 'row' }}
+      gap="xs"
+      align={{ base: 'stretch', xs: 'flex-start' }}
+      justify={{ xs: 'space-between' }}
+    >
+      <Box style={{ minWidth: 0 }}>
+        <Title order={1} fw={700} lh={1.2} c="dark.8" fz={{ base: '1.5rem', xs: '1.75rem' }}>
           {title}
-        </h1>
-        <p className="mt-1 text-sm leading-5 text-slate-500">
+        </Title>
+        <Text mt={4} size="sm" c="dimmed" lh={1.4}>
           {description}
-        </p>
-      </div>
-      {action ? <div className="w-full sm:w-auto sm:shrink-0">{action}</div> : null}
-    </div>
+        </Text>
+      </Box>
+      {action ? (
+        <Box w={{ base: '100%', xs: 'auto' }} style={{ flexShrink: 0 }}>
+          {action}
+        </Box>
+      ) : null}
+    </Flex>
   )
 }

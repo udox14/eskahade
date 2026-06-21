@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Eye, Filter, RotateCcw } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 import Pagination from '@/components/ui/pagination'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'

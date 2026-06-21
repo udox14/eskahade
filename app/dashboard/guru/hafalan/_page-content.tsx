@@ -5,7 +5,7 @@ import {
   AlertTriangle, ArrowLeft, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
   RotateCcw, Save, Search,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getAvailableHafalanTypes, getHafalanInitialData, getHafalanInputData,

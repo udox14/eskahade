@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CalendarDays, Filter, Loader2, Plus, Save, Search, Settings2, Sparkles, Trash2, UsersRound, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { generateGuruKitabDefaults, getGuruKitabSetup, saveGuruKitabAssignments, type GuruKitabSaveRow } from './actions'
@@ -260,7 +260,7 @@ export default function GuruKitabPageContent() {
   const activeOverrideClass = overrideModal ? kelasList.find(kelas => kelas.id === overrideModal.kelasId) : null
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+    <div className="space-y-5 pb-20">
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Pembagian Kitab Guru"

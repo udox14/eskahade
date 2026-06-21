@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AspectRatio, Box, Center, Image, Modal, Text, UnstyledButton } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
 
 type SantriPhotoAvatarProps = {
   src?: string | null
@@ -13,63 +12,15 @@ type SantriPhotoAvatarProps = {
   className?: string
 }
 
-const sizeClassMap = {
-  sm: 'w-10 h-[3.35rem]',
-  md: 'w-12 h-16',
+// Dimensi portrait (sm: 40×53.6px, md: 48×64px) — sama dengan versi Tailwind lama
+const sizeMap = {
+  sm: { w: 40, h: 53.6 },
+  md: { w: 48, h: 64 },
 } as const
 
 function getInitials(name: string) {
   const parts = String(name || '?').trim().split(/\s+/).filter(Boolean)
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || '?'
-}
-
-function SantriPhotoLightbox({
-  src,
-  alt,
-  open,
-  onClose,
-}: {
-  src: string
-  alt: string
-  open: boolean
-  onClose: () => void
-}) {
-  useEffect(() => {
-    if (!open) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
-
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <button
-        type="button"
-        aria-label="Tutup preview foto"
-        onClick={onClose}
-        className="absolute inset-0 cursor-zoom-out"
-      />
-      <div className="relative z-10 w-full max-w-md">
-        <button
-          type="button"
-          aria-label="Tutup"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-10 rounded-full bg-white/90 p-2 text-slate-700 shadow-lg transition hover:bg-white"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <div className="overflow-hidden rounded-xl bg-white shadow-2xl">
-          <div className="aspect-[3/4] w-full bg-slate-100">
-            <img src={src} alt={alt} className="h-full w-full object-cover" />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function SantriPhotoAvatar({
@@ -80,44 +31,64 @@ export function SantriPhotoAvatar({
   clickable = true,
   className,
 }: SantriPhotoAvatarProps) {
-  const [open, setOpen] = useState(false)
+  const [opened, { open, close }] = useDisclosure(false)
   const hasPhoto = Boolean(src)
   const canOpen = hasPhoto && clickable
+  const { w, h } = sizeMap[size]
 
   const frame = (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm',
-        sizeClassMap[size],
-        className
-      )}
+    <Box
+      className={className}
+      w={w}
+      h={h}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 8,
+        border: '1px solid var(--mantine-color-gray-3)',
+        background: 'var(--mantine-color-gray-1)',
+        boxShadow: 'var(--mantine-shadow-sm)',
+        flexShrink: 0,
+      }}
     >
       {hasPhoto ? (
-        <img src={src!} alt={alt || name} className="h-full w-full object-cover" />
+        <Image src={src!} alt={alt || name} w={w} h={h} fit="cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-[11px] font-black uppercase tracking-wide text-slate-500">
-          {getInitials(name)}
-        </div>
+        <Center
+          w="100%"
+          h="100%"
+          style={{
+            background: 'linear-gradient(to bottom right, var(--mantine-color-gray-2), var(--mantine-color-gray-1))',
+          }}
+        >
+          <Text size="11px" fw={900} tt="uppercase" c="gray.6" style={{ letterSpacing: '0.05em' }}>
+            {getInitials(name)}
+          </Text>
+        </Center>
       )}
-    </div>
+    </Box>
   )
 
   if (!canOpen) return frame
 
   return (
     <>
-      <button
-        type="button"
+      <UnstyledButton
         onClick={(event) => {
           event.stopPropagation()
-          setOpen(true)
+          open()
         }}
-        className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         aria-label={`Lihat foto ${name}`}
+        style={{ flexShrink: 0, borderRadius: 8 }}
       >
         {frame}
-      </button>
-      <SantriPhotoLightbox src={src!} alt={alt || name} open={open} onClose={() => setOpen(false)} />
+      </UnstyledButton>
+
+      <Modal opened={opened} onClose={close} centered size="md" padding={0} title={null} radius="md">
+        <AspectRatio ratio={3 / 4}>
+          <Image src={src!} alt={alt || name} fit="cover" />
+        </AspectRatio>
+      </Modal>
     </>
   )
 }

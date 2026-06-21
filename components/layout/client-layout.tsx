@@ -101,7 +101,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
 
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
-          <div className="max-w-7xl mx-auto w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+          <div className="w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
             {showSetupReturn ? (
               <div className="no-print sticky top-0 z-30 flex justify-end">
                 <Link

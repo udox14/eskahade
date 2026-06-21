@@ -11,7 +11,7 @@ import {
   RefreshCw, Printer, X, AlertTriangle, CheckCircle, Loader2,
   FileText, CalendarDays, LogOut, RotateCcw, Users, Building2
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -968,7 +968,7 @@ export default function SantriKeluarPage() {
   useEffect(() => { getAsramaList().then(setAsramaList) }, [])
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-5">
+    <div className="pb-16 space-y-5">
       <DashboardPageHeader
         title="Santri Keluar"
         description="Dewan santri bisa mengeksekusi keluar langsung, atau memproses penandaan keluar dari pengurus asrama."

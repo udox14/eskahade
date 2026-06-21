@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { ArrowLeft, Crown, LogOut, MapPin, MessageCircle, Phone, Save, School, Users, X } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -381,7 +381,7 @@ export default function KamarClient({
 
   if (selectedKamar) {
     return (
-      <div className="mx-auto max-w-7xl space-y-5 pb-20">
+      <div className="space-y-5 pb-20">
         <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <button
@@ -718,7 +718,7 @@ export default function KamarClient({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-20">
+    <div className="space-y-5 pb-20">
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
         <DashboardPageHeader
           title="Kamar Asrama"

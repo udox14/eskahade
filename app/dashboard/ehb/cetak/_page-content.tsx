@@ -55,23 +55,23 @@ const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.Element
 export default function CetakEhbPage() {
   const [view, setView] = useState<View>('menu')
 
-  if (view === 'kartu-peserta') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><KartuPesertaView onBack={() => setView('menu')} /></div>
-  if (view === 'nomor-peserta') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><NomorPesertaView onBack={() => setView('menu')} /></div>
-  if (view === 'daftar-hadir')  return <div className="max-w-6xl mx-auto pb-20 space-y-6"><DaftarHadirView onBack={() => setView('menu')} /></div>
-  if (view === 'daftar-hadir-pengawas')  return <div className="max-w-6xl mx-auto pb-20 space-y-6"><DaftarHadirPengawasView onBack={() => setView('menu')} /></div>
-  if (view === 'tempelan-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanRuanganView onBack={() => setView('menu')} /></div>
-  if (view === 'tempelan-humas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanHumasView onBack={() => setView('menu')} /></div>
-  if (view === 'tempelan-pengepakan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><TempelanPengepakanView onBack={() => setView('menu')} /></div>
-  if (view === 'sampul-absensi') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><SampulAbsensiView onBack={() => setView('menu')} /></div>
-  if (view === 'sensus-ruangan') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><SensusRuanganView onBack={() => setView('menu')} /></div>
-  if (view === 'jadwal-mengawas') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalMengawasView onBack={() => setView('menu')} /></div>
-  if (view === 'jadwal-ehb') return <div className="max-w-6xl mx-auto pb-20 space-y-6"><JadwalEhbView onBack={() => setView('menu')} /></div>
+  if (view === 'kartu-peserta') return <div className="pb-20 space-y-6"><KartuPesertaView onBack={() => setView('menu')} /></div>
+  if (view === 'nomor-peserta') return <div className="pb-20 space-y-6"><NomorPesertaView onBack={() => setView('menu')} /></div>
+  if (view === 'daftar-hadir')  return <div className="pb-20 space-y-6"><DaftarHadirView onBack={() => setView('menu')} /></div>
+  if (view === 'daftar-hadir-pengawas')  return <div className="pb-20 space-y-6"><DaftarHadirPengawasView onBack={() => setView('menu')} /></div>
+  if (view === 'tempelan-ruangan') return <div className="pb-20 space-y-6"><TempelanRuanganView onBack={() => setView('menu')} /></div>
+  if (view === 'tempelan-humas') return <div className="pb-20 space-y-6"><TempelanHumasView onBack={() => setView('menu')} /></div>
+  if (view === 'tempelan-pengepakan') return <div className="pb-20 space-y-6"><TempelanPengepakanView onBack={() => setView('menu')} /></div>
+  if (view === 'sampul-absensi') return <div className="pb-20 space-y-6"><SampulAbsensiView onBack={() => setView('menu')} /></div>
+  if (view === 'sensus-ruangan') return <div className="pb-20 space-y-6"><SensusRuanganView onBack={() => setView('menu')} /></div>
+  if (view === 'jadwal-mengawas') return <div className="pb-20 space-y-6"><JadwalMengawasView onBack={() => setView('menu')} /></div>
+  if (view === 'jadwal-ehb') return <div className="pb-20 space-y-6"><JadwalEhbView onBack={() => setView('menu')} /></div>
 
   const activeMenu = MENU_ITEMS.find(m => m.view === view)
-  if (view !== 'menu' && activeMenu) return <div className="max-w-6xl mx-auto pb-20 space-y-6"><PlaceholderView label={activeMenu.label} onBack={() => setView('menu')} /></div>
+  if (view !== 'menu' && activeMenu) return <div className="pb-20 space-y-6"><PlaceholderView label={activeMenu.label} onBack={() => setView('menu')} /></div>
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
       <DashboardPageHeader
         title="Cetak Administrasi EHB"
         description="Pilih dokumen administrasi yang akan dicetak."

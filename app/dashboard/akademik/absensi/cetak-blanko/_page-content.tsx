@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getKelasForCetak, getDataBlanko, getMarhalahForCetak, getDataBlankoMassal } from './actions'
 import { Printer, Loader2, Search, FileText, Layers, List } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { format } from 'date-fns'
 import { useReactToPrint } from '@/lib/pdf/client'
 
@@ -216,7 +216,7 @@ export default function CetakBlankoPage() {
   const hasData = singleData || (massalData && massalData.length > 0)
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       
       {/* STYLE PRINT (Global) */}
       <style dangerouslySetInnerHTML={{__html: `

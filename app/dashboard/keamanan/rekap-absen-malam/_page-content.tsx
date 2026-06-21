@@ -160,7 +160,7 @@ export default function RekapAbsenMalamPage() {
   const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-16">
+    <div className="space-y-5 pb-16">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">

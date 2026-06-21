@@ -31,7 +31,7 @@ import {
   simpanCatatanWali,
 } from './actions'
 import { KEPRIBADIAN_FIELDS } from './constants'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 type TabType = 'akademik' | 'kepribadian' | 'catatan'
 
@@ -251,7 +251,7 @@ export default function InputNilaiPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-20 px-4">
+    <div className="space-y-5 pb-20 px-4">
       {/* HEADER & TABS */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-4 rounded-2xl border shadow-sm">
         <div className="flex items-center gap-4">

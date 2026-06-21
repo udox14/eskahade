@@ -12,7 +12,7 @@ import {
   Square, AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
   GraduationCap, Banknote, RefreshCw, Users, Filter,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
@@ -175,7 +175,7 @@ export default function SantriToolsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
+    <div className="pb-20 space-y-6">
 
       {/* HEADER */}
       <div className="border-b pb-4">

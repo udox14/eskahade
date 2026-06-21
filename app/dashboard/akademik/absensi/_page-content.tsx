@@ -5,7 +5,7 @@ import { getKelasList, getAbsensiData, simpanAbsensi, getAbsensiGlobalA, getAsra
 import { Save, Calendar, Loader2, Trash2, FileSpreadsheet, X, Filter, ChevronDown, Smartphone, Table2, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { toast } from 'sonner' // IMPORT WAJIB
+import { toast } from '@/lib/toast' // IMPORT WAJIB
 
 // Tipe Data untuk Navigasi Grid
 type SessionType = 'shubuh' | 'ashar' | 'maghrib'

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BookOpenCheck, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   addJuzToMarhalah, addSurahToMarhalah, assignKitabToMarhalah, bersihkanResiduHafalan,

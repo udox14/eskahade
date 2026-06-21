@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { ArrowLeft, Eye, Loader2, Printer } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getPembagianTugasMengajarData, type PembagianTugasMengajarRow } from '../actions'
 
@@ -249,7 +249,7 @@ export default function CetakPembagianTugasPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
       <DashboardPageHeader
         title="Cetak Pembagian Tugas Mengajar"
         description="Format F4 landscape, margin narrow, lengkap dengan tanda tangan persetujuan."

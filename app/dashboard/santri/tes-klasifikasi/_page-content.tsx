@@ -7,7 +7,7 @@ import {
   RefreshCw, X, FileText, BookOpen, Hash, User,
   ChevronLeft, ChevronRight, Filter, AlertCircle, Loader2
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type FilterStatus = 'SEMUA' | 'SUDAH' | 'BELUM'
@@ -108,7 +108,7 @@ export default function TesKlasifikasiPage() {
   const belum  = rows.filter(r => r.status_tes === 'BELUM').length
 
   return (
-    <div className="max-w-6xl mx-auto pb-16 space-y-5">
+    <div className="pb-16 space-y-5">
 
       {/* ── Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
