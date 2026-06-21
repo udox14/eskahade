@@ -18,6 +18,7 @@ import {
 import { toast } from '@/lib/toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { Button, TextInput, NativeSelect, SegmentedControl, ActionIcon } from '@mantine/core'
 
 const PAGE_SIZE_OPTIONS = [10, 50, 100, 0]
 const ARCHIVE_BATCH_SIZE = 10
@@ -56,38 +57,38 @@ function PaginationBar({
         {total === 0 ? 'Tidak ada data' : `Menampilkan ${start}-${end} dari ${total} santri`}
       </p>
       <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
           Tampilkan
-          <select
+          <NativeSelect
             value={pageSize}
             disabled={loading}
             onChange={e => onPageSizeChange(Number(e.target.value))}
-            className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-60"
-          >
-            {PAGE_SIZE_OPTIONS.map(size => (
-              <option key={size} value={size}>{size === 0 ? 'SEMUA' : size}</option>
-            ))}
-          </select>
-        </label>
+            size="xs"
+            style={{ width: 80 }}
+            data={PAGE_SIZE_OPTIONS.map(size => ({ label: size === 0 ? 'SEMUA' : String(size), value: String(size) }))}
+          />
+        </div>
         {pageSize !== 0 && totalPages > 1 && (
           <div className="flex items-center gap-2">
-            <button
+            <ActionIcon
               onClick={() => onPageChange(page - 1)}
               disabled={loading || page <= 1}
-              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              variant="default"
+              size="sm"
               title="Halaman sebelumnya"
             >
               <ChevronLeft className="w-4 h-4" />
-            </button>
+            </ActionIcon>
             <span className="text-xs font-bold text-slate-600 min-w-16 text-center">{page} / {totalPages}</span>
-            <button
+            <ActionIcon
               onClick={() => onPageChange(page + 1)}
               disabled={loading || page >= totalPages}
-              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              variant="default"
+              size="sm"
               title="Halaman berikutnya"
             >
               <ChevronRight className="w-4 h-4" />
-            </button>
+            </ActionIcon>
           </div>
         )}
       </div>
@@ -136,7 +137,6 @@ export default function ArsipSantriPage() {
   const [isHapusMassal, setIsHapusMassal] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  // ── INIT — hanya load opsi filter, data dimuat saat user klik Tampilkan ──
   useEffect(() => { loadFilterOptions() }, [])
 
   const loadFilterOptions = async () => {
@@ -144,7 +144,6 @@ export default function ArsipSantriPage() {
     setOptsSantri(os)
   }
 
-  // ── LOAD SANTRI AKTIF ──
   const loadSantri = async (page: number, filter: typeof filterSantri, pageSize = santriPageSize) => {
     setHasLoadedSantri(true)
     setLoadingSantri(true)
@@ -162,7 +161,6 @@ export default function ArsipSantriPage() {
     debounceRef.current = setTimeout(() => loadSantri(1, next), 350)
   }
 
-  // ── LOAD GRUP ARSIP (LEVEL 1) ──
   const loadGrup = async () => {
     setHasLoadedGrup(true)
     setLoadingGrup(true)
@@ -172,7 +170,6 @@ export default function ArsipSantriPage() {
     setLoadingGrup(false)
   }
 
-  // ── BUKA GRUP → LEVEL 2 ──
   const bukaGrup = async (grup: Grup) => {
     setActiveGrup(grup)
     setSelectedRestore(new Set())
@@ -204,7 +201,6 @@ export default function ArsipSantriPage() {
     debounceRef.current = setTimeout(() => loadSantriGrup(1, next), 350)
   }
 
-  // ── SELECT HELPERS ──
   const toggleSelectArsip = (id: string) => setSelectedArsip(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleSelectAllSantri = () => {
     if (selectedArsip.size === santriList.length && santriList.length > 0) setSelectedArsip(new Set())
@@ -218,7 +214,6 @@ export default function ArsipSantriPage() {
 
   const activeFilterCount = Object.entries(filterSantri).filter(([k, v]) => k !== 'search' && v).length
 
-  // ── ACTIONS ──
   const handleArsipkan = async () => {
     if (selectedArsip.size === 0) return toast.warning("Pilih santri yang akan dijadikan alumni")
     if (!await confirm(`Jadikan ${selectedArsip.size} santri sebagai ALUMNI?\n\nData historis tetap disimpan di D1. Santri hanya disembunyikan dari daftar aktif.`)) return
@@ -265,7 +260,6 @@ export default function ArsipSantriPage() {
     if ('error' in res) { toast.error("Gagal", { description: res.error }); return }
     const msg = (res?.gagal ?? 0) > 0 ? `${res?.berhasil} berhasil, ${res?.gagal} gagal` : `${res?.berhasil} santri berhasil direstore`
     toast.success("Restore Selesai!", { description: msg })
-    // Refresh grup & level 2
     loadSantriGrup(1, filterSantriArsip)
     loadGrup()
   }
@@ -281,7 +275,6 @@ export default function ArsipSantriPage() {
     toast.success(`${res?.count} catatan arsip dihapus`)
     loadSantriGrup(1, filterSantriArsip)
     loadGrup()
-    // Kalau grup sudah kosong, kembali ke level 1
     if ((santriArsipTotal - (res?.count ?? 0)) <= 0) setActiveGrup(null)
   }
 
@@ -298,7 +291,6 @@ export default function ArsipSantriPage() {
     const ids = selectedRestore.size > 0 ? Array.from(selectedRestore) as string[] : undefined
     setIsDownloading(true)
     const toastId = toast.loading("Menyiapkan data...")
-    // Kalau tidak ada yang dipilih, download semua dalam grup ini
     const res = await getArsipForDownload(ids, ids || !activeGrup ? undefined : {
       angkatan: activeGrup?.angkatan ?? null,
       catatan: activeGrup?.catatan ?? null,
@@ -326,22 +318,20 @@ export default function ArsipSantriPage() {
     toast.success(`${exportData.length} data berhasil didownload`)
   }
 
-  // ── LABEL GRUP ──
   const labelGrup = (g: Grup) => {
     if (g.catatan) return g.catatan
     if (g.angkatan) return `Angkatan ${g.angkatan}`
     return `Backup ${g.tanggal_arsip}`
   }
 
-  // ── RENDER ──
   return (
     <div className="space-y-6 pb-28">
 
       {/* HEADER */}
       <div className="flex items-start gap-4 border-b pb-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-slate-600" />
-        </button>
+        <ActionIcon onClick={() => router.back()} variant="subtle" color="gray" size="lg" title="Kembali">
+          <ArrowLeft className="w-5 h-5" />
+        </ActionIcon>
         <DashboardPageHeader
           title="Arsip Alumni"
           description="Jadikan santri alumni tanpa menghapus data historis."
@@ -350,15 +340,24 @@ export default function ArsipSantriPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-        <button onClick={() => setTab('ARSIPKAN')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'ARSIPKAN' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <GraduationCap className="w-4 h-4" /> Jadikan Alumni
-        </button>
-        <button onClick={() => setTab('DAFTAR_ARSIP')} className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${tab === 'DAFTAR_ARSIP' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <RotateCcw className="w-4 h-4" /> Daftar Arsip & Restore
-          {grupList.length > 0 && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{grupList.length}</span>}
-        </button>
-      </div>
+      <SegmentedControl
+        value={tab}
+        onChange={v => setTab(v as 'ARSIPKAN' | 'DAFTAR_ARSIP')}
+        data={[
+          { label: 'Jadikan Alumni', value: 'ARSIPKAN' },
+          {
+            label: (
+              <span className="flex items-center gap-1">
+                Daftar Arsip & Restore
+                {grupList.length > 0 && (
+                  <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1">{grupList.length}</span>
+                )}
+              </span>
+            ),
+            value: 'DAFTAR_ARSIP',
+          },
+        ]}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-xl">
@@ -383,71 +382,86 @@ export default function ArsipSantriPage() {
           <div className="bg-white border rounded-xl p-4 space-y-3 shadow-sm">
             <div className="flex flex-col md:flex-row gap-3">
               <div className="flex-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Catatan Arsip (Opsional)</label>
-                <input value={catatanArsip} onChange={e => setCatatanArsip(e.target.value)} placeholder="Contoh: Wisuda Angkatan 2024" className="w-full p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+                <TextInput
+                  label={<span className="text-xs font-bold text-slate-500 uppercase">Catatan Arsip (Opsional)</span>}
+                  value={catatanArsip}
+                  onChange={e => setCatatanArsip(e.target.value)}
+                  placeholder="Contoh: Wisuda Angkatan 2024"
+                />
               </div>
-              <div className="relative md:w-64">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari</label>
-                <Search className="absolute left-3 bottom-2.5 text-slate-400 w-4 h-4" />
-                <input value={filterSantri.search} onChange={e => handleFilterSantriChange('search', e.target.value)} placeholder="Nama / NIS..." className="w-full pl-9 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
+              <div className="md:w-64">
+                <TextInput
+                  label={<span className="text-xs font-bold text-slate-500 uppercase">Cari</span>}
+                  value={filterSantri.search}
+                  onChange={e => handleFilterSantriChange('search', e.target.value)}
+                  placeholder="Nama / NIS..."
+                  leftSection={<Search className="w-4 h-4" />}
+                />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button onClick={() => setShowFilterSantri(p => !p)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border transition-colors ${showFilterSantri || activeFilterCount > 0 ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                   <Filter className="w-4 h-4" /> Filter
                   {activeFilterCount > 0 && <span className="bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFilterCount}</span>}
                 </button>
-                <button onClick={() => loadSantri(1, filterSantri)} disabled={loadingSantri}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 disabled:opacity-60 flex items-center gap-2">
-                  {loadingSantri ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                <Button
+                  onClick={() => loadSantri(1, filterSantri)}
+                  loading={loadingSantri}
+                  color="grape"
+                  leftSection={!loadingSantri ? <Search className="w-4 h-4" /> : undefined}
+                >
                   Tampilkan
-                </button>
+                </Button>
               </div>
             </div>
             {showFilterSantri && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t animate-in fade-in">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Asrama</label>
-                  <select value={filterSantri.asrama} onChange={e => handleFilterSantriChange('asrama', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
-                    <option value="">Semua</option>
-                    {optsSantri.asramaList.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Kamar</label>
-                  <select value={filterSantri.status_kamar} onChange={e => handleFilterSantriChange('status_kamar', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
-                    <option value="">Semua</option>
-                    <option value="TANPA_KAMAR">Tanpa Kamar</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
-                  <select value={filterSantri.sekolah} onChange={e => handleFilterSantriChange('sekolah', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
-                    <option value="">Semua</option>
-                    {optsSantri.sekolahList.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Kelas Sekolah</label>
-                  <input value={filterSantri.kelas_sekolah} onChange={e => handleFilterSantriChange('kelas_sekolah', e.target.value)} placeholder="Contoh: 9A" className="w-full p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-400" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Kelas Pesantren</label>
-                  <select value={filterSantri.kelas_pesantren} onChange={e => handleFilterSantriChange('kelas_pesantren', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
-                    <option value="">Semua</option>
-                    {optsSantri.kelasList.map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Tahun Masuk</label>
-                  <select value={filterSantri.tahun_masuk} onChange={e => handleFilterSantriChange('tahun_masuk', e.target.value)} className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-purple-400">
-                    <option value="">Semua</option>
-                    {optsSantri.tahunList.map(t => <option key={t} value={String(t)}>{t}</option>)}
-                  </select>
-                </div>
+                <NativeSelect
+                  label={<span className="text-xs font-bold text-slate-500">Asrama</span>}
+                  value={filterSantri.asrama}
+                  onChange={e => handleFilterSantriChange('asrama', e.target.value)}
+                  data={[{ label: 'Semua', value: '' }, ...optsSantri.asramaList.map(a => ({ label: a, value: a }))]}
+                />
+                <NativeSelect
+                  label={<span className="text-xs font-bold text-slate-500">Kamar</span>}
+                  value={filterSantri.status_kamar}
+                  onChange={e => handleFilterSantriChange('status_kamar', e.target.value)}
+                  data={[{ label: 'Semua', value: '' }, { label: 'Tanpa Kamar', value: 'TANPA_KAMAR' }]}
+                />
+                <NativeSelect
+                  label={<span className="text-xs font-bold text-slate-500">Sekolah</span>}
+                  value={filterSantri.sekolah}
+                  onChange={e => handleFilterSantriChange('sekolah', e.target.value)}
+                  data={[{ label: 'Semua', value: '' }, ...optsSantri.sekolahList.map(s => ({ label: s, value: s }))]}
+                />
+                <TextInput
+                  label={<span className="text-xs font-bold text-slate-500">Kelas Sekolah</span>}
+                  value={filterSantri.kelas_sekolah}
+                  onChange={e => handleFilterSantriChange('kelas_sekolah', e.target.value)}
+                  placeholder="Contoh: 9A"
+                />
+                <NativeSelect
+                  label={<span className="text-xs font-bold text-slate-500">Kelas Pesantren</span>}
+                  value={filterSantri.kelas_pesantren}
+                  onChange={e => handleFilterSantriChange('kelas_pesantren', e.target.value)}
+                  data={[{ label: 'Semua', value: '' }, ...optsSantri.kelasList.map(k => ({ label: k, value: k }))]}
+                />
+                <NativeSelect
+                  label={<span className="text-xs font-bold text-slate-500">Tahun Masuk</span>}
+                  value={filterSantri.tahun_masuk}
+                  onChange={e => handleFilterSantriChange('tahun_masuk', e.target.value)}
+                  data={[{ label: 'Semua', value: '' }, ...optsSantri.tahunList.map(t => ({ label: String(t), value: String(t) }))]}
+                />
                 {activeFilterCount > 0 && (
-                  <button onClick={() => { const e = { search: filterSantri.search, asrama: '', status_kamar: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e) }} className="col-span-full text-xs text-red-500 hover:text-red-700 flex items-center gap-1 justify-end">
-                    <X className="w-3 h-3" /> Reset filter
-                  </button>
+                  <Button
+                    onClick={() => { const e = { search: filterSantri.search, asrama: '', status_kamar: '', sekolah: '', kelas_sekolah: '', kelas_pesantren: '', tahun_masuk: '' }; setFilterSantri(e); loadSantri(1, e) }}
+                    variant="transparent"
+                    color="red"
+                    size="xs"
+                    className="col-span-full justify-end"
+                    leftSection={<X className="w-3 h-3" />}
+                  >
+                    Reset filter
+                  </Button>
                 )}
               </div>
             )}
@@ -545,11 +559,14 @@ export default function ArsipSantriPage() {
                 <div className="flex flex-col items-center py-14 gap-3 text-center">
                   <Archive className="w-10 h-10 text-slate-200" />
                   <p className="text-slate-500 text-sm">Klik <strong>Tampilkan Arsip</strong> untuk memuat data</p>
-                  <button onClick={loadGrup} disabled={loadingGrup}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2">
-                    {loadingGrup ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                  <Button
+                    onClick={loadGrup}
+                    loading={loadingGrup}
+                    color="blue"
+                    leftSection={!loadingGrup ? <Archive className="w-4 h-4" /> : undefined}
+                  >
                     Tampilkan Arsip
-                  </button>
+                  </Button>
                 </div>
               ) : loadingGrup ? (
                 <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
@@ -605,20 +622,28 @@ export default function ArsipSantriPage() {
 
               {/* Filter + aksi */}
               <div className="flex flex-col md:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input value={filterSantriArsip.search} onChange={e => handleFilterSantriArsipChange('search', e.target.value)} placeholder="Cari nama / NIS..." className="w-full pl-9 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-400" />
-                </div>
+                <TextInput
+                  className="flex-1"
+                  value={filterSantriArsip.search}
+                  onChange={e => handleFilterSantriArsipChange('search', e.target.value)}
+                  placeholder="Cari nama / NIS..."
+                  leftSection={<Search className="w-4 h-4" />}
+                />
                 {optsArsipAsrama.length > 1 && (
-                  <select value={filterSantriArsip.asrama} onChange={e => handleFilterSantriArsipChange('asrama', e.target.value)} className="p-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-green-400">
-                    <option value="">Semua Asrama</option>
-                    {optsArsipAsrama.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
+                  <NativeSelect
+                    value={filterSantriArsip.asrama}
+                    onChange={e => handleFilterSantriArsipChange('asrama', e.target.value)}
+                    data={[{ label: 'Semua Asrama', value: '' }, ...optsArsipAsrama.map(a => ({ label: a, value: a }))]}
+                  />
                 )}
-                <button onClick={handleDownload} disabled={isDownloading} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 flex items-center gap-2 shadow-sm">
-                  {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <Button
+                  onClick={handleDownload}
+                  loading={isDownloading}
+                  variant="default"
+                  leftSection={!isDownloading ? <Download className="w-4 h-4" /> : undefined}
+                >
                   {selectedRestore.size > 0 ? `Download Terpilih (${selectedRestore.size})` : 'Download Grup'}
-                </button>
+                </Button>
               </div>
 
               {/* Tabel santri arsip */}
@@ -666,9 +691,15 @@ export default function ArsipSantriPage() {
                                 </td>
                                 <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{a.asrama || '-'}</td>
                                 <td className="px-4 py-3">
-                                  <button onClick={() => handleHapusSatu(a.id, a.nama_lengkap)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Hapus catatan arsip">
+                                  <ActionIcon
+                                    onClick={() => handleHapusSatu(a.id, a.nama_lengkap)}
+                                    variant="subtle"
+                                    color="red"
+                                    size="sm"
+                                    title="Hapus catatan arsip"
+                                  >
                                     <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  </ActionIcon>
                                 </td>
                               </tr>
                             )
@@ -706,10 +737,14 @@ export default function ArsipSantriPage() {
                 <p className="text-xs text-slate-400">Status akan diubah menjadi alumni</p>
               </div>
             </div>
-            <button onClick={handleArsipkan} disabled={isArsipkan} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
-              {isArsipkan ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
+            <Button
+              onClick={handleArsipkan}
+              loading={isArsipkan}
+              color="grape"
+              leftSection={!isArsipkan ? <GraduationCap className="w-4 h-4" /> : undefined}
+            >
               Jadikan Alumni
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -725,14 +760,24 @@ export default function ArsipSantriPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleHapusMassal} disabled={isHapusMassal || isRestore} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
-                {isHapusMassal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <Button
+                onClick={handleHapusMassal}
+                loading={isHapusMassal}
+                disabled={isRestore}
+                color="red"
+                leftSection={!isHapusMassal ? <Trash2 className="w-4 h-4" /> : undefined}
+              >
                 Hapus Catatan
-              </button>
-              <button onClick={handleRestore} disabled={isRestore || isHapusMassal} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 disabled:opacity-50 active:scale-95">
-                {isRestore ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              </Button>
+              <Button
+                onClick={handleRestore}
+                loading={isRestore}
+                disabled={isHapusMassal}
+                color="green"
+                leftSection={!isRestore ? <RotateCcw className="w-4 h-4" /> : undefined}
+              >
                 Restore
-              </button>
+              </Button>
             </div>
           </div>
         </div>
