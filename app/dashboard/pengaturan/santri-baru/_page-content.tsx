@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CalendarDays, Loader2, Save, Settings } from 'lucide-react'
+import { CalendarDays, Save, Settings } from 'lucide-react'
 import { toast } from '@/lib/toast'
+import { Button, TextInput, NumberInput } from '@mantine/core'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { simpanPengaturanSantriBaru } from './actions'
@@ -14,7 +15,7 @@ type Props = {
 
 export default function PengaturanSantriBaruContent({ mulaiBerlaku, durasiBulan }: Props) {
   const [mulai, setMulai] = useState(mulaiBerlaku)
-  const [durasi, setDurasi] = useState(String(durasiBulan))
+  const [durasi, setDurasi] = useState(durasiBulan)
   const [pending, startTransition] = useTransition()
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -22,14 +23,14 @@ export default function PengaturanSantriBaruContent({ mulaiBerlaku, durasiBulan 
     startTransition(async () => {
       const result = await simpanPengaturanSantriBaru({
         mulaiBerlaku: mulai,
-        durasiBulan: Number(durasi),
+        durasiBulan: durasi,
       })
       if ('error' in result) {
         toast.error(result.error)
         return
       }
       setMulai(result.mulaiBerlaku)
-      setDurasi(String(result.durasiBulan))
+      setDurasi(result.durasiBulan)
       toast.success('Pengaturan santri baru disimpan')
     })
   }
@@ -53,46 +54,29 @@ export default function PengaturanSantriBaruContent({ mulaiBerlaku, durasiBulan 
         </div>
 
         <div className="grid gap-4 p-5 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Mulai Berlaku</span>
-            <div className="relative">
-              <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={mulai}
-                onChange={(event) => setMulai(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Durasi</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={24}
-                value={durasi}
-                onChange={(event) => setDurasi(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-              <span className="shrink-0 text-sm font-semibold text-slate-500">bulan</span>
-            </div>
-          </label>
+          <TextInput
+            label="Mulai Berlaku"
+            type="date"
+            value={mulai}
+            onChange={e => setMulai(e.target.value)}
+            leftSection={<CalendarDays className="h-4 w-4" />}
+            required
+          />
+          <NumberInput
+            label="Durasi"
+            value={durasi}
+            onChange={v => setDurasi(Number(v))}
+            min={1}
+            max={24}
+            suffix=" bulan"
+            required
+          />
         </div>
 
         <div className="border-t bg-slate-50 px-5 py-4">
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-indigo-300"
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <Button type="submit" loading={pending} color="indigo" leftSection={!pending ? <Save className="h-4 w-4" /> : undefined}>
             Simpan Pengaturan
-          </button>
+          </Button>
         </div>
       </form>
     </div>
