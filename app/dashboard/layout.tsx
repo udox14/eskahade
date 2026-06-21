@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { getFiturForRoles, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
 import { ensureOperasionalSchema } from '@/lib/operasional'
 
+import { capitalizeEachWord } from '@/lib/utils';
+
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({
@@ -23,7 +25,7 @@ export default async function DashboardLayout({
   console.log('[layout] session OK, roles:', getEffectiveRoles(session), 'id:', session.id?.substring(0, 8))
 
   // Ambil data user dari DB — pakai try-catch agar tidak crash kalau kolom belum ada
-  let userName = session.full_name || 'User'
+  let userName = capitalizeEachWord(session.full_name || 'User')
   let displayRoles = session.roles && session.roles.length > 0 ? session.roles : [session.role]
   let accessRoles = getEffectiveRoles(session)
   let avatarUrl: string | null = null
@@ -35,7 +37,7 @@ export default async function DashboardLayout({
       [session.id]
     );
     if (user) {
-      userName = user.full_name || userName
+      userName = capitalizeEachWord(user.full_name || userName)
       // Parse multi-role dari DB
       let rawRoles = session.roles && session.roles.length > 0 ? session.roles : [session.role]
       try {
