@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { ArrowLeft, Eye, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Eye, Printer } from 'lucide-react'
+import { Box, Button, Center, Grid, Group, Loader, Paper, Text, TextInput } from '@mantine/core'
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getPembagianTugasMengajarData, type PembagianTugasMengajarRow } from '../actions'
@@ -245,7 +246,7 @@ export default function CetakPembagianTugasPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+    return <Center p={80}><Loader color="indigo" size="lg" /></Center>
   }
 
   return (
@@ -254,74 +255,52 @@ export default function CetakPembagianTugasPage() {
         title="Cetak Pembagian Tugas Mengajar"
         description="Format F4 landscape, margin narrow, lengkap dengan tanda tangan persetujuan."
         action={(
-          <Link
-            href="/dashboard/master/wali-kelas"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <Button component={Link} href="/dashboard/master/wali-kelas" variant="default" fw={700} leftSection={<ArrowLeft className="h-4 w-4" />}>
             Kembali ke Jadwal Guru
-          </Link>
+          </Button>
         )}
       />
 
-      <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-        <div className="border-b bg-slate-50 px-5 py-3">
-          <h2 className="text-sm font-bold text-slate-700">Pengaturan Cetak</h2>
-          <p className="mt-1 text-xs text-slate-500">Cetak ini selalu memuat semua kelas aktif. Nama penanda tangan bisa diisi manual sebelum preview atau print.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5">
-          <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-bold uppercase text-slate-500">Mode Cetak</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">Selalu mencetak semua kelas aktif</p>
-            <p className="mt-1 text-xs text-slate-500">Tidak ada filter parsial pada laporan ini.</p>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Pimpinan Pesantren</label>
-            <input
-              value={pimpinanPesantren}
-              onChange={(e) => setPimpinanPesantren(e.target.value)}
-              placeholder="Nama penanda tangan"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Wakil Pimpinan Bid. Akademik</label>
-            <input
-              value={wakilAkademik}
-              onChange={(e) => setWakilAkademik(e.target.value)}
-              placeholder="Nama penanda tangan"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="md:col-span-2 lg:col-span-4 flex items-center justify-end gap-3">
-            <button
-              onClick={handlePreview}
-              className="flex h-[40px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700"
-            >
-              <Eye className="h-4 w-4" />
-              Preview
-            </button>
-            <button
-              onClick={handleTriggerPrint}
-              className="flex h-[40px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700"
-            >
-              <Printer className="h-4 w-4" />
-              Cetak Semua
-            </button>
-          </div>
-        </div>
-      </div>
+      <Paper withBorder radius="lg" shadow="sm" style={{ overflow: 'hidden' }}>
+        <Box px="lg" py="sm" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+          <Text size="sm" fw={700} c="dark.6">Pengaturan Cetak</Text>
+          <Text size="xs" c="dimmed" mt={4}>Cetak ini selalu memuat semua kelas aktif. Nama penanda tangan bisa diisi manual sebelum preview atau print.</Text>
+        </Box>
+        <Grid gutter="md" p="lg">
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Paper withBorder radius="md" bg="gray.0" px="md" py="sm" h="100%">
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed">Mode Cetak</Text>
+              <Text size="sm" fw={600} c="dark.7" mt={4}>Selalu mencetak semua kelas aktif</Text>
+              <Text size="xs" c="dimmed" mt={4}>Tidak ada filter parsial pada laporan ini.</Text>
+            </Paper>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+            <TextInput label="Pimpinan Pesantren" placeholder="Nama penanda tangan" value={pimpinanPesantren} onChange={(e) => setPimpinanPesantren(e.currentTarget.value)}
+              styles={{ label: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--mantine-color-dimmed)' } }} />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+            <TextInput label="Wakil Pimpinan Bid. Akademik" placeholder="Nama penanda tangan" value={wakilAkademik} onChange={(e) => setWakilAkademik(e.currentTarget.value)}
+              styles={{ label: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--mantine-color-dimmed)' } }} />
+          </Grid.Col>
+          <Grid.Col span={12}>
+            <Group justify="flex-end" gap="sm">
+              <Button onClick={handlePreview} color="indigo" fw={700} leftSection={<Eye className="h-4 w-4" />}>Preview</Button>
+              <Button onClick={handleTriggerPrint} color="teal" fw={700} leftSection={<Printer className="h-4 w-4" />}>Cetak Semua</Button>
+            </Group>
+          </Grid.Col>
+        </Grid>
+      </Paper>
 
       {ready && (
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Menampilkan <span className="font-bold text-slate-800">{rows.length}</span> baris
-            <span className="ml-2 text-slate-400">· F4 Landscape · Narrow Margin</span>
-          </p>
-          <div className="max-h-[820px] overflow-auto rounded-2xl border bg-slate-100 p-4 flex justify-center">
+        <Box>
+          <Text size="sm" c="dimmed" mb="md">
+            Menampilkan <Text span fw={700} c="dark.7">{rows.length}</Text> baris
+            <Text span c="gray.4" ml="xs">· F4 Landscape · Narrow Margin</Text>
+          </Text>
+          <Box style={{ maxHeight: 820, overflow: 'auto', borderRadius: 16, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-gray-1)', padding: 16, display: 'flex', justifyContent: 'center' }}>
             <Preview rows={rows} pimpinanPesantren={pimpinanPesantren} wakilAkademik={wakilAkademik} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       <div className="hidden">
