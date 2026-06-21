@@ -12,8 +12,8 @@ import {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight, ChevronRight, LogOut, CalendarRange,
-  Download, FileWarning, Shuffle, Home, UserX, DoorOpen,
+  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
+  FileWarning, Shuffle, Home, UserX, DoorOpen,
   Search, ChevronLeft, X
 } from 'lucide-react'
 
@@ -62,7 +62,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/keamanan/verifikasi-panggilan':        'Tentukan daftar panggilan dari alfa pengajian dan berjamaah dengan konteks izin dan sakit.',
   '/dashboard/keamanan/verifikasi-berjamaah':        'Proses vonis final alfa berjamaah dari hasil pemanggilan.',
   '/dashboard/keamanan/denda-buku-pribadi':          'Catat denda kehilangan buku pribadi santri dan status pembayarannya.',
-  '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per waktu.',
+  '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per bulan.',
   '/dashboard/keamanan/rekap-absen-malam':           'Rekap absensi malam santri per bulan per asrama.',
   '/dashboard/keamanan/rekap-absen-berjamaah':       'Rekap shalat berjamaah santri (Shubuh, Ashar, Maghrib, Isya) per bulan.',
   '/dashboard/keamanan':                             'Input pelanggaran dan kelola catatan disiplin santri.',
@@ -75,7 +75,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/ranking':                     'Lihat peringkat dan prestasi santri per kelas.',
   '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
   '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
-  '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode dan filter.',
+  '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode and filter.',
   '/dashboard/akademik/absensi/verifikasi':          'Verifikasi dan proses sidang alfa santri mingguan.',
   '/dashboard/akademik/absensi/vonis-final':         'Proses vonis final alfa pengajian dari hasil pemanggilan.',
   '/dashboard/akademik/absensi/cetak':               'Cetak surat pemanggilan untuk santri yang banyak alfa.',
@@ -204,6 +204,13 @@ function getGreeting(hour: number) {
   return { text: 'Selamat Malam', sub: 'Istirahat yang cukup ya.', emoji: '🌙' }
 }
 
+function getGreetingImage(hour: number) {
+  if (hour >= 4  && hour < 11) return '/hero_pagi.png'
+  if (hour >= 11 && hour < 15) return '/hero_siang.png'
+  if (hour >= 15 && hour < 18) return '/hero_sore.png'
+  return '/hero_malam.png'
+}
+
 function formatTanggal(date: Date) {
   return date.toLocaleDateString('id-ID', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -232,6 +239,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
   const hour      = now?.getHours() ?? 9
   const greeting  = getGreeting(hour)
+  const heroImage = getGreetingImage(hour)
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
   const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
   const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
@@ -260,9 +268,9 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
 
       {/* ── Hero Greeting Card ── */}
       <div 
-        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/85 p-6 sm:p-8"
+        className="relative overflow-hidden rounded-3xl bg-slate-100 select-none shadow-md border border-slate-200/80 p-5 sm:p-7"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.8)), url('/hero-bg.png')`,
+          backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.82)), url('/hero-bg.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -271,58 +279,61 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
         <div className="absolute -top-16 -left-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 right-12 w-48 h-48 bg-emerald-400/5 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Content (Asymmetric Flex Layout for Bold & Premium Feel) */}
-        <div className="relative z-10 flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+        {/* Content (Responsive flex layout matching mockup) */}
+        <div className="relative z-10 flex items-end justify-between gap-4">
           
           {/* Left Side: Greeting & User Name */}
-          <div className="space-y-3.5 flex-1 min-w-0">
-            <div className="space-y-1.5">
+          <div className="space-y-4 flex-1 min-w-0">
+            <div className="space-y-1">
               <p className="text-slate-500 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 <span>{greeting.emoji}</span>
                 <span>{greeting.text},</span>
               </p>
-              <h1 className="text-3xl sm:text-4.5xl font-black text-slate-800 tracking-tight leading-none break-words">
+              <h1 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight leading-none break-words">
                 {userName}
-                <span className="text-emerald-505">.</span>
+                <span className="text-emerald-500">.</span>
               </h1>
               <p className="text-slate-400 text-xs sm:text-sm pt-1 font-semibold italic">
                 "{greeting.sub}"
               </p>
             </div>
+
+            {/* Mockup Pills row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Role Card */}
+              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
+                <div className="w-5.5 h-5.5 rounded-full bg-blue-500/10 flex items-center justify-center text-[10px]">
+                  {roleEmoji}
+                </div>
+                <div className="leading-none text-left">
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
+                  <p className="text-xs font-bold text-slate-700 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
+                </div>
+              </div>
+
+              {/* stats Card */}
+              <div className="flex items-center gap-2 bg-white/70 border border-slate-200/50 px-3 py-1.5 rounded-2xl shadow-sm backdrop-blur-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <div className="leading-none text-left">
+                  <p className="text-xs font-bold text-slate-700 leading-none">
+                    <span className="text-emerald-600 font-black">{totalFitur}</span>
+                  </p>
+                  <p className="text-[7.5px] text-slate-400 uppercase tracking-widest font-black mt-0.5">layanan aktif</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right Side: Large Digital Clock & Date Widget (Desktop Only) */}
-          <div className="hidden md:flex shrink-0 flex-col items-end text-right bg-white/70 border border-slate-200/50 p-4 sm:p-5 rounded-2xl shadow-sm backdrop-blur-md min-w-[170px] relative overflow-hidden select-none">
-            <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1 block">Waktu Saat Ini</span>
-            <span className="text-3xl sm:text-3.5xl font-black text-slate-800 font-mono tracking-wider leading-none">
-              {now ? formatJam(now) : '00.00.00'}
-            </span>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2 block leading-none">
-              {now ? formatTanggal(now) : '—'}
-            </span>
+          {/* Right Side: 3D Muslim Illustration with Laptop */}
+          <div className="w-28 h-28 sm:w-44 sm:h-44 shrink-0 flex items-end justify-end select-none pointer-events-none mb-[-20px] mr-[-10px] sm:mb-[-28px] sm:mr-[-15px]">
+            <img 
+              src={heroImage} 
+              alt="Illustration" 
+              className="max-w-full max-h-full object-contain object-bottom" 
+            />
           </div>
 
         </div>
-
-        {/* Bottom stats and role info bar */}
-        <div className="flex items-center gap-3 pt-4 mt-6 border-t border-slate-200/60 flex-wrap relative z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-7.5 h-7.5 rounded-full bg-slate-900/5 flex items-center justify-center shrink-0 border border-slate-900/10 text-xs shadow-sm">
-              {roleEmoji}
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black leading-none mb-0.5">Akses Akun</p>
-              <p className="text-xs font-bold text-slate-700 leading-none">{roleLabel}</p>
-            </div>
-          </div>
-          
-          <div className="ml-auto inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/40 rounded-full px-3.5 py-1 text-emerald-700 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-            <span className="text-emerald-700 text-xs font-black">{totalFitur}</span>
-            <span className="text-slate-500 text-[10px] font-bold">layanan aktif</span>
-          </div>
-        </div>
-
       </div>
 
       {/* ── Search Bar Redesigned ── */}
@@ -397,7 +408,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
                     </Link>
                   )
                 })}
@@ -416,7 +426,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                 <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                 {groups.map(group => {
                   const meta = getGroupMeta(group)
                   const GroupIcon = meta.icon
@@ -426,22 +436,24 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                     <button
                       key={group}
                       onClick={() => setActiveGroup(group)}
-                      className="group flex items-center gap-3 p-3.5 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left active:scale-[0.97] cursor-pointer"
+                      className="group flex flex-col items-center justify-between p-3.5 bg-white border border-slate-200/80 rounded-2xl hover:border-slate-350 hover:shadow-md transition-all duration-200 text-center active:scale-95 cursor-pointer min-h-[110px]"
                     >
-                      {/* Stylized direct icon on the left (no enclosing box/badge) */}
+                      {/* Stylized direct icon on the top (no badge) */}
                       <div className="shrink-0 flex items-center justify-center w-8 h-8">
                         <GroupIcon className={cn("w-7 h-7 transition-transform duration-200 group-hover:scale-110", meta.textAccent)} strokeWidth={1.8} />
                       </div>
 
-                      {/* Text content on the right */}
-                      <div className="flex-1 min-w-0 leading-tight">
-                        <span className="block text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors truncate">
+                      {/* Text content in the middle */}
+                      <div className="flex-1 min-w-0 leading-tight mt-1 flex flex-col justify-center">
+                        <span className="block text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors line-clamp-2">
                           {group === '_standalone' ? 'Menu Utama' : group}
                         </span>
-                        <span className="inline-block text-[9px] text-slate-400 font-bold mt-0.5">
-                          {items.length} fitur
-                        </span>
                       </div>
+
+                      {/* Item count at the bottom */}
+                      <span className="inline-block text-[9px] text-slate-400 font-bold mt-1">
+                        {items.length} fitur
+                      </span>
                     </button>
                   )
                 })}
@@ -508,7 +520,6 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                         <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors shrink-0 ml-1" />
                     </Link>
                   )
                 })}
