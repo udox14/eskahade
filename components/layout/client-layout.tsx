@@ -89,7 +89,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         )}
       >
         {/* HEADER */}
-        <div className="no-print sticky top-0 z-40 w-full h-12 bg-white border-b border-slate-100 flex items-center px-4 md:px-6 transition-all">
+        <div className="no-print sticky top-0 z-40 w-full h-12 bg-white border-b border-slate-100 flex items-center px-4 md:px-8 transition-all">
           <div className="w-full">
             <Header 
                 userName={userName} 

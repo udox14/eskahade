@@ -76,7 +76,7 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
-    <header className="flex items-center justify-between w-full h-full px-3 md:px-5">
+    <header className="flex items-center justify-between w-full h-full px-0">
 
       {/* ── KIRI ── */}
       <div className="flex items-center gap-3 min-w-0">
