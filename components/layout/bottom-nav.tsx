@@ -82,6 +82,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
   // Cek dua kondisi: admin harus aktifkan global, DAN user tidak matikan sendiri
   if (!globalEnabled || !userShowBottomNav) return null
 
+  // Saring fitur aktif untuk bottom nav, maks 4 (selain dashboard)
   const navItems = fiturAkses
     .filter(f => f.href !== '/dashboard' && f.is_active && f.is_bottomnav)
     .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
@@ -92,45 +93,89 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
     .find(item => pathname === item.href || pathname.startsWith(item.href + '/'))
     ?.href
 
-  const menuActive = pathname === '/dashboard' && !activeHref
+  // Halaman dashboard aktif jika pathname === '/dashboard' atau berada di sub-halaman dashboard dan tidak ada item bottom nav lain yang aktif
+  const menuActive = pathname === '/dashboard' || (pathname.startsWith('/dashboard') && !activeHref)
+
+  // Bagi fitur secara simetris di sisi kiri dan kanan tombol MENU
+  const midIndex = Math.ceil(navItems.length / 2)
+  const leftItems = navItems.slice(0, midIndex)
+  const rightItems = navItems.slice(midIndex)
+
+  const renderNavItem = (item: FiturAkses) => {
+    const Icon = getIcon(item.icon)
+    const active = activeHref === item.href
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className="flex flex-col items-center justify-center gap-1 w-full h-full text-slate-500 transition-all duration-200 group active:scale-95"
+      >
+        <div className={cn(
+          "p-1.5 rounded-xl transition-all duration-300",
+          active 
+            ? "bg-emerald-50 text-emerald-600 scale-105 shadow-sm shadow-emerald-600/5" 
+            : "text-slate-400 group-hover:text-slate-600"
+        )}>
+          <Icon className="w-[20px] h-[20px]" strokeWidth={active ? 2.2 : 1.8} />
+        </div>
+        <span className={cn(
+          "text-[9.5px] font-semibold tracking-wide transition-colors duration-200 truncate max-w-[72px] px-1",
+          active ? "text-emerald-700 font-bold" : "text-slate-500"
+        )}>
+          {item.title}
+        </span>
+      </Link>
+    )
+  }
 
   return (
-    <nav className="md:hidden no-print shrink-0 w-full bg-white border-t border-slate-200 flex items-stretch h-14">
+    <nav className="md:hidden no-print shrink-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.04)] h-16 relative z-40">
+      <div className="grid grid-cols-5 h-full max-w-md mx-auto relative px-2">
+        {/* Slot 1: Left Item 1 */}
+        <div className="flex items-center justify-center">
+          {leftItems[0] && renderNavItem(leftItems[0])}
+        </div>
 
-      {navItems.map((item) => {
-        const Icon = getIcon(item.icon)
-        const active = activeHref === item.href
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-              active ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            )}
-          >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={active ? 2.2 : 1.8} />
-            <span className="text-[9px] leading-none font-medium truncate max-w-full px-1">
-              {item.title}
+        {/* Slot 2: Left Item 2 */}
+        <div className="flex items-center justify-center">
+          {leftItems[1] && renderNavItem(leftItems[1])}
+        </div>
+
+        {/* Slot 3: Center MENU (Stand-out) */}
+        <div className="flex items-center justify-center relative">
+          <div className="flex flex-col items-center justify-end h-full pb-1.5 relative w-full">
+            <Link
+              href="/dashboard"
+              className={cn(
+                "absolute -top-4 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 shadow-md",
+                menuActive
+                  ? "bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-emerald-500/40 scale-105 border-2 border-white"
+                  : "bg-white border border-slate-200 text-slate-600 shadow-slate-200/50 hover:border-emerald-200 hover:text-emerald-600"
+              )}
+              title="Menu Utama"
+            >
+              <Menu className="w-5.5 h-5.5" weight="bold" />
+            </Link>
+            <span className={cn(
+              "text-[9.5px] font-bold tracking-wider transition-colors duration-200",
+              menuActive ? "text-emerald-700" : "text-slate-500"
+            )}>
+              MENU
             </span>
-          </Link>
-        )
-      })}
+          </div>
+        </div>
 
-      {/* Slot ke-5: selalu Menu → /dashboard */}
-      <Link
-        href="/dashboard"
-        className={cn(
-          'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-          menuActive
-            ? 'text-emerald-600 bg-emerald-50'
-            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-        )}
-      >
-        <Menu className="w-[18px] h-[18px]" strokeWidth={1.8} />
-        <span className="text-[9px] leading-none font-medium">Menu</span>
-      </Link>
+        {/* Slot 4: Right Item 1 */}
+        <div className="flex items-center justify-center">
+          {rightItems[0] && renderNavItem(rightItems[0])}
+        </div>
 
+        {/* Slot 5: Right Item 2 */}
+        <div className="flex items-center justify-center">
+          {rightItems[1] && renderNavItem(rightItems[1])}
+        </div>
+      </div>
     </nav>
   )
 }

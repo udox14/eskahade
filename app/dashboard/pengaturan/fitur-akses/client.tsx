@@ -576,22 +576,30 @@ function TabBottomNav({
   onToggleBottomNav: (f: FiturItem) => void
   onSetUrutan: (f: FiturItem, urutan: number) => void
 }) {
-  // Hitung berapa fitur is_bottomnav per role
+  const [selectedRole, setSelectedRole] = useState<string>('sekpen')
+
+  // Hitung berapa fitur is_bottomnav per role (kecuali dashboard)
   const roleCount: Record<string, number> = {}
   for (const f of fiturList) {
-    if (!f.is_bottomnav) continue
+    if (!f.is_bottomnav || f.href === '/dashboard' || !f.is_active) continue
     for (const role of f.roles) {
       roleCount[role] = (roleCount[role] ?? 0) + 1
     }
   }
 
-  const bottomNavItems = fiturList
+  // Filter fitur yang dimiliki role terpilih
+  const roleFiturs = fiturList.filter(
+    f => f.roles.includes(selectedRole) && f.is_active && f.href !== '/dashboard'
+  )
+
+  // Bagi fitur yang aktif di bottom nav dan yang tidak
+  const activeItems = roleFiturs
     .filter(f => f.is_bottomnav)
     .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
 
-  const otherItems = fiturList
-    .filter(f => !f.is_bottomnav && f.is_active)
-    .sort((a, b) => a.bottomnav_urutan - b.bottomnav_urutan)
+  const otherItems = roleFiturs
+    .filter(f => !f.is_bottomnav)
+    .sort((a, b) => a.title.localeCompare(b.title))
 
   return (
     <div className="space-y-5">
@@ -624,150 +632,187 @@ function TabBottomNav({
       <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
         <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
         <span>
-          Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu &quot;Menu&quot;</strong> yang mengarah ke halaman Dashboard.
+          Slot 1, 2, 4, dan 5 diisi fitur yang ditandai di sini. <strong>Slot ke-3 (tengah) selalu &quot;MENU&quot;</strong> yang mengarah ke halaman Dashboard.
           Tiap role hanya melihat fitur yang ia miliki sekaligus ditandai bottom nav. Maksimal <strong>4 fitur aktif per role</strong>.
         </span>
       </div>
 
-      {/* Warning jika ada role yang melebihi 4 */}
-      {Object.entries(roleCount).some(([, c]) => c > 4) && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
-          <span>
-            <strong>Peringatan:</strong> Beberapa role memiliki lebih dari 4 item bottom nav.
-            Hanya 4 item pertama (urutan terkecil) yang akan ditampilkan. Sesuaikan urutan atau nonaktifkan item berlebih.
-          </span>
-        </div>
-      )}
-
-      {/* Ringkasan per role */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Object.entries(ROLE_LABEL).map(([role, label]) => {
-          const count = roleCount[role] ?? 0
-          const over = count > 4
-          return (
-            <div key={role} className={cn(
-              "rounded-xl border px-3 py-2.5 text-xs",
-              over ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"
-            )}>
-              <span className={cn("font-semibold block mb-0.5", ROLE_COLOR[role].split(' ')[1])}>
-                {label}
-              </span>
-              <span className={cn("text-slate-500", over && "text-amber-600 font-medium")}>
-                {count} / 4 slot terpakai
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Fitur yang sudah di bottom nav */}
-      {bottomNavItems.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
-            Aktif di Bottom Nav ({bottomNavItems.length} fitur)
-          </p>
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-50">
-            {bottomNavItems.map(fitur => {
-              const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
-              return (
-                <div key={fitur.id} className="flex items-center gap-3 px-5 py-3">
-                  {/* Urutan selector */}
-                  <select
-                    value={fitur.bottomnav_urutan}
-                    disabled={isLoading || pending}
-                    onChange={e => onSetUrutan(fitur, Number(e.target.value))}
-                    className="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 bg-slate-50 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
-                  >
-                    <option value={1}>1</option>
-                    <option value={2}>2</option>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                  </select>
-
-                  {/* Nama & href */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
-                    <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
-                  </div>
-
-                  {/* Role badges */}
-                  <div className="hidden sm:flex flex-wrap gap-1 max-w-[180px]">
-                    {fitur.roles.slice(0, 3).map(role => (
-                      <span key={role} className={cn(
-                        "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
-                        ROLE_COLOR[role] ?? 'bg-slate-100 text-slate-600 border-slate-200'
-                      )}>
-                        {ROLE_LABEL[role] ?? role}
-                      </span>
-                    ))}
-                    {fitur.roles.length > 3 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
-                        +{fitur.roles.length - 3}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Toggle off button */}
-                  <button
-                    onClick={() => onToggleBottomNav(fitur)}
-                    disabled={isLoading || pending}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40 shrink-0"
-                  >
-                    <ToggleRight className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Aktif</span>
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Fitur lain yang bisa ditambahkan */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
-          Fitur Lainnya — klik untuk tambahkan ke bottom nav
+      {/* Grid Ringkasan Per Role sekaligus selector */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">
+          Pilih Role untuk Dikonfigurasi
         </p>
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-50">
-          {otherItems.length === 0 && (
-            <p className="text-sm text-slate-400 px-5 py-4 text-center">Semua fitur sudah ditambahkan ke bottom nav.</p>
-          )}
-          {otherItems.map(fitur => {
-            const isLoading = loadingId === `bottomnav-${fitur.id}`
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Object.entries(ROLE_LABEL).map(([role, label]) => {
+            const count = roleCount[role] ?? 0
+            const over = count > 4
+            const isSelected = selectedRole === role
             return (
-              <div key={fitur.id} className="flex items-center gap-3 px-5 py-3 opacity-60 hover:opacity-100 transition-opacity">
-                <div className="w-14 text-xs text-slate-300 text-center">—</div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-slate-700">{fitur.title}</span>
-                  <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
-                </div>
-                <div className="hidden sm:flex flex-wrap gap-1 max-w-[180px]">
-                  {fitur.roles.slice(0, 3).map(role => (
-                    <span key={role} className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
-                      ROLE_COLOR[role] ?? 'bg-slate-100 text-slate-600 border-slate-200'
-                    )}>
-                      {ROLE_LABEL[role] ?? role}
-                    </span>
-                  ))}
-                  {fitur.roles.length > 3 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
-                      +{fitur.roles.length - 3}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => onToggleBottomNav(fitur)}
-                  disabled={isLoading || pending}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-40 shrink-0"
-                >
-                  <ToggleRight className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Tambahkan</span>
-                </button>
-              </div>
+              <button
+                key={role}
+                onClick={() => setSelectedRole(role)}
+                className={cn(
+                  "rounded-xl border px-3 py-2.5 text-left transition-all duration-200 relative group cursor-pointer",
+                  isSelected
+                    ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/20"
+                    : over 
+                      ? "bg-amber-50 border-amber-200 hover:border-amber-300"
+                      : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                )}
+              >
+                <span className={cn(
+                  "font-semibold block mb-0.5 text-xs transition-colors",
+                  isSelected 
+                    ? "text-emerald-700" 
+                    : ROLE_COLOR[role]?.split(' ')[1] ?? "text-slate-700"
+                )}>
+                  {label}
+                </span>
+                <span className={cn(
+                  "text-[10px] font-medium transition-colors",
+                  isSelected
+                    ? "text-emerald-600 font-semibold"
+                    : over
+                      ? "text-amber-600 font-bold"
+                      : "text-slate-500"
+                )}>
+                  {count} / 4 slot terpakai
+                </span>
+
+                {/* Check indicator */}
+                {isSelected && (
+                  <div className="absolute top-2.5 right-2.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                  </div>
+                )}
+              </button>
             )
           })}
+        </div>
+      </div>
+
+      {/* Detail panel untuk role terpilih */}
+      <div className="bg-slate-50/50 rounded-2xl border border-slate-200/80 p-5 mt-2 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/65 pb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm">
+              Pengaturan Bottom Nav — {ROLE_LABEL[selectedRole]}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Atur menu pintasan bawah yang muncul khusus untuk role <strong>{ROLE_LABEL[selectedRole]}</strong>.
+            </p>
+          </div>
+          <div className={cn(
+            "text-[11px] px-2.5 py-1 rounded-full border font-bold w-fit",
+            activeItems.length > 4 
+              ? "bg-amber-100 border-amber-200 text-amber-800" 
+              : "bg-emerald-100 border-emerald-200 text-emerald-800"
+          )}>
+            {activeItems.length} / 4 Slot Terpakai
+          </div>
+        </div>
+
+        {/* Warning jika melebihi 4 */}
+        {activeItems.length > 4 && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 animate-pulse">
+            <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+            <span>
+              <strong>Peringatan:</strong> Batas maksimal adalah 4 menu.
+              Hanya 4 menu pertama (urutan terkecil) yang akan ditampilkan pada aplikasi mobile. Silakan hapus atau sesuaikan urutan.
+            </span>
+          </div>
+        )}
+
+        {/* LIST ITEM AKTIF */}
+        <div className="space-y-3.5">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+            Menu Aktif di Bottom Nav ({activeItems.length})
+          </p>
+          
+          {activeItems.length === 0 ? (
+            <div className="bg-white border border-dashed border-slate-200 rounded-xl py-8 text-center text-slate-400 text-xs">
+              Belum ada menu bottom nav yang diaktifkan untuk role ini.
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-sm">
+              {activeItems.map(fitur => {
+                const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
+                return (
+                  <div key={fitur.id} className="flex items-center gap-3 px-4 py-3">
+                    {/* Urutan selector */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-slate-400 font-semibold">Urutan:</span>
+                      <select
+                        value={fitur.bottomnav_urutan}
+                        disabled={isLoading || pending}
+                        onChange={e => onSetUrutan(fitur, Number(e.target.value))}
+                        className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1 text-slate-700 bg-slate-50 focus:outline-none focus:border-emerald-400 disabled:opacity-40 font-bold"
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                      </select>
+                    </div>
+
+                    {/* Nama & href */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-bold text-slate-800 block sm:inline">{fitur.title}</span>
+                      <span className="text-[10px] text-slate-400 font-mono sm:ml-2 block sm:inline truncate">{fitur.href}</span>
+                    </div>
+
+                    {/* Hapus Button */}
+                    <button
+                      onClick={() => onToggleBottomNav(fitur)}
+                      disabled={isLoading || pending}
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40 shrink-0 font-medium cursor-pointer"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Hapus</span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* LIST ITEM YANG BISA DITAMBAHKAN */}
+        <div className="space-y-3.5">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+            Tambah Menu Lainnya ({otherItems.length})
+          </p>
+          
+          {otherItems.length === 0 ? (
+            <div className="bg-white border border-dashed border-slate-200 rounded-xl py-6 text-center text-slate-400 text-xs">
+              Semua fitur akses role ini sudah ada di bottom nav.
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-64 overflow-y-auto scrollbar-thin shadow-sm">
+              {otherItems.map(fitur => {
+                const isLoading = loadingId === `bottomnav-${fitur.id}`
+                return (
+                  <div key={fitur.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/50 transition-colors">
+                    <div className="w-16 shrink-0 hidden sm:block"></div> {/* Spacer to match the order alignment */}
+                    
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-semibold text-slate-700 block sm:inline">{fitur.title}</span>
+                      <span className="text-[10px] text-slate-400 font-mono sm:ml-2 block sm:inline truncate">{fitur.href}</span>
+                    </div>
+
+                    <button
+                      onClick={() => onToggleBottomNav(fitur)}
+                      disabled={isLoading || pending}
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40 shrink-0 font-medium cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Tambahkan</span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
