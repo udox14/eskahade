@@ -43,7 +43,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         )}
       >
         {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
-        <div className="h-full w-full bg-white text-slate-800">
+        <div className="h-full w-full bg-[#0f172a] text-white">
            <Sidebar 
              userRole={userRole}
              userRoles={userRoles}
@@ -65,7 +65,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
       {/* Drawer Sidebar */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-60 bg-white text-slate-800 shadow-2xl transform transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 w-60 bg-[#0f172a] text-white shadow-2xl transform transition-transform duration-300 md:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >

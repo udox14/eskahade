@@ -104,68 +104,58 @@ type ThemeStyle = {
   activeBg: string;
   activeText: string;
   activeIcon: string;
-  activeBorder: string;
-  indicator: string;
-  folderActiveBg: string;
-  folderOpenBg: string;
+  childActiveBg: string;
+  childActiveText: string;
+  childActiveIcon: string;
   roleBadge: string;
   roleLabel: string;
-  logoGlow: string;
-  glowText: string;
+  bulletColor: string;
 };
 
 const THEME_STYLES: Record<string, ThemeStyle> = {
   pagi: {
-    activeBg: "bg-emerald-50/80 shadow-sm",
-    activeText: "text-emerald-700 font-bold",
-    activeIcon: "text-emerald-600",
-    activeBorder: "border-emerald-500",
-    indicator: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]",
-    folderActiveBg: "bg-emerald-50/40 border-emerald-200/50",
-    folderOpenBg: "border-emerald-300/40 bg-emerald-50/20",
-    roleBadge: "bg-emerald-50 border-emerald-200/60 text-emerald-800",
-    roleLabel: "text-emerald-600/80",
-    logoGlow: "bg-emerald-500/5",
-    glowText: "text-emerald-600",
+    activeBg: "bg-emerald-500/10",
+    activeText: "text-emerald-400 font-bold",
+    activeIcon: "text-emerald-400",
+    childActiveBg: "bg-emerald-500/5",
+    childActiveText: "text-emerald-400 font-semibold",
+    childActiveIcon: "text-emerald-400",
+    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
+    roleLabel: "text-slate-500",
+    bulletColor: "bg-emerald-400",
   },
   siang: {
-    activeBg: "bg-amber-50/80 shadow-sm",
-    activeText: "text-amber-700 font-bold",
-    activeIcon: "text-amber-600",
-    activeBorder: "border-amber-500",
-    indicator: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]",
-    folderActiveBg: "bg-amber-50/40 border-amber-200/50",
-    folderOpenBg: "border-amber-300/40 bg-amber-50/20",
-    roleBadge: "bg-amber-50 border-amber-200/60 text-amber-800",
-    roleLabel: "text-amber-600/80",
-    logoGlow: "bg-amber-500/5",
-    glowText: "text-amber-600",
+    activeBg: "bg-amber-500/10",
+    activeText: "text-amber-400 font-bold",
+    activeIcon: "text-amber-400",
+    childActiveBg: "bg-amber-500/5",
+    childActiveText: "text-amber-400 font-semibold",
+    childActiveIcon: "text-amber-400",
+    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
+    roleLabel: "text-slate-500",
+    bulletColor: "bg-amber-400",
   },
   sore: {
-    activeBg: "bg-orange-50/80 shadow-sm",
-    activeText: "text-orange-700 font-bold",
-    activeIcon: "text-orange-600",
-    activeBorder: "border-orange-500",
-    indicator: "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]",
-    folderActiveBg: "bg-orange-50/40 border-orange-200/50",
-    folderOpenBg: "border-orange-300/40 bg-orange-50/20",
-    roleBadge: "bg-orange-50 border-orange-200/60 text-orange-800",
-    roleLabel: "text-orange-600/80",
-    logoGlow: "bg-orange-500/5",
-    glowText: "text-orange-600",
+    activeBg: "bg-orange-500/10",
+    activeText: "text-orange-400 font-bold",
+    activeIcon: "text-orange-400",
+    childActiveBg: "bg-orange-50/5",
+    childActiveText: "text-orange-400 font-semibold",
+    childActiveIcon: "text-orange-400",
+    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
+    roleLabel: "text-slate-500",
+    bulletColor: "bg-orange-400",
   },
   malam: {
-    activeBg: "bg-blue-50/80 shadow-sm",
-    activeText: "text-blue-700 font-bold",
-    activeIcon: "text-blue-600",
-    activeBorder: "border-blue-500",
-    indicator: "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]",
-    folderActiveBg: "bg-blue-50/40 border-blue-200/50",
-    folderOpenBg: "border-blue-300/40 bg-blue-50/20",
-    roleBadge: "bg-blue-50 border-blue-200/60 text-blue-800",
-    roleLabel: "text-blue-600/80",
-    logoGlow: "bg-blue-500/5",
-    glowText: "text-blue-600",
+    activeBg: "bg-blue-500/10",
+    activeText: "text-blue-400 font-bold",
+    activeIcon: "text-blue-400",
+    childActiveBg: "bg-blue-500/5",
+    childActiveText: "text-blue-400 font-semibold",
+    childActiveIcon: "text-blue-400",
+    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
+    roleLabel: "text-slate-500",
+    bulletColor: "bg-blue-400",
   },
 };
 
@@ -213,11 +203,9 @@ interface SidebarProps {
 export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [timeKey, setTimeKey] = useState<string>('pagi');
-  const [mounted, setMounted] = useState(false);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setMounted(true);
     const hr = new Date().getHours();
     if (hr >= 4 && hr < 11) setTimeKey('pagi');
     else if (hr >= 11 && hr < 15) setTimeKey('siang');
@@ -225,7 +213,6 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
     else setTimeKey('malam');
   }, []);
 
-  // Build grouped menu dari fiturAkses
   const groupMap = new Map<string, FiturAkses[]>();
   for (const f of fiturAkses) {
     if (!groupMap.has(f.group_name)) groupMap.set(f.group_name, []);
@@ -259,13 +246,13 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
   const roleLabels = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' '));
 
   return (
-    <div className="flex flex-col h-full w-full bg-white border-r border-slate-200/60 text-slate-600 relative transition-colors duration-500 select-none">
+    <div className="flex flex-col h-full w-full bg-[#0f172a] text-slate-400 relative select-none">
 
       <button
         onClick={toggleSidebar}
         className={cn(
           "absolute -right-3 top-16 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
-          "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-350"
+          "bg-[#0f172a] border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200 hover:border-slate-700"
         )}
         title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
       >
@@ -273,24 +260,23 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
       </button>
 
       <div className={cn(
-        "flex items-center justify-center border-b border-slate-200/60 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
+        "flex items-center justify-center border-b border-slate-800 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-12 px-0 justify-center" : "h-12 gap-2.5 px-4"
       )}>
-        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", style.logoGlow)} />
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain drop-shadow-sm relative z-10 hover:scale-105 transition-transform" />
+          <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
-            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-md relative z-10 shrink-0" />
+            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain relative z-10 shrink-0" />
             <div className="flex flex-col min-w-0 justify-center relative z-10">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.12em] leading-tight">Pondok Pesantren</span>
-              <h1 className="text-[14px] font-black font-serif text-slate-800 tracking-wide leading-tight drop-shadow-sm">SUKAHIDENG</h1>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.12em] leading-tight">Pondok Pesantren</span>
+              <h1 className="text-[14px] font-black font-serif text-white tracking-wide leading-tight drop-shadow-sm">SUKAHIDENG</h1>
             </div>
           </>
         )}
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors pb-10">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-800 hover:[&::-webkit-scrollbar-thumb]:bg-slate-700 transition-colors pb-10">
         {groupedMenu.map(({ group, items }) => {
 
           if (group === '_standalone') {
@@ -303,22 +289,22 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                     href={fitur.href}
                     onClick={onMobileClose}
                     className={cn(
-                      "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
+                      "w-full flex items-center transition-all duration-200 group relative outline-none rounded-xl overflow-hidden",
                       isCollapsed ? "justify-center p-2.5 mb-1" : "justify-start px-3 py-2 mb-0.5",
                       isActive
-                        ? `${style.activeBg} ${style.activeText} border-l-4 ${style.activeBorder}`
-                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50/80 hover:translate-x-0.5 border-l-4 border-transparent"
+                        ? `${style.activeBg} ${style.activeText}`
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                     )}
                   >
                     <div className="flex items-center space-x-3">
                       <Icon className={cn(
-                        "flex-shrink-0 transition-all duration-300 w-4 h-4",
-                        isActive ? style.activeIcon : "text-slate-400 group-hover:text-slate-700"
+                        "flex-shrink-0 transition-all duration-200 w-4 h-4",
+                        isActive ? style.activeIcon : "text-slate-400 group-hover:text-slate-200"
                       )} />
                       {!isCollapsed && (
                         <span className={cn(
-                          "text-xs tracking-normal transition-colors duration-300",
-                          isActive ? style.activeText : "text-slate-600 group-hover:text-slate-800"
+                          "text-xs tracking-normal transition-colors duration-200",
+                          isActive ? style.activeText : "text-slate-400 group-hover:text-slate-200"
                         )}>
                           {getMenuTitle(fitur.title)}
                         </span>
@@ -339,25 +325,25 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
               <button
                 onClick={() => toggleFolder(group)}
                 className={cn(
-                  "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
+                  "w-full flex items-center transition-all duration-250 group relative outline-none rounded-xl",
                   isCollapsed ? "justify-center p-2.5 mb-1" : "justify-between px-3 py-2 mb-0.5",
                   hasActiveChild && !isOpen && isCollapsed
-                    ? `${style.activeBg} border ${style.activeBorder}`
-                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-50/80 hover:translate-x-0.5",
+                    ? `${style.activeBg} border border-slate-800`
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40",
                   isOpen && !isCollapsed
-                    ? `${style.folderOpenBg} text-slate-800 border-l-2 ${style.activeBorder}`
-                    : "border-l-2 border-transparent"
+                    ? "bg-slate-800/30 text-slate-200"
+                    : ""
                 )}
               >
                 <div className="flex items-center space-x-3">
                   <GroupIcon className={cn(
-                    "flex-shrink-0 transition-all duration-300 w-4 h-4",
-                    hasActiveChild ? style.activeIcon : "text-slate-400 group-hover:text-slate-700"
+                    "flex-shrink-0 transition-all duration-200 w-4 h-4",
+                    hasActiveChild ? style.activeIcon : "text-slate-400 group-hover:text-slate-200"
                   )} />
                   {!isCollapsed && (
                     <span className={cn(
                       "font-semibold text-xs tracking-normal transition-colors",
-                      hasActiveChild || isOpen ? "text-slate-800" : "text-slate-600 group-hover:text-slate-800"
+                      hasActiveChild || isOpen ? "text-slate-200" : "text-slate-400 group-hover:text-slate-200"
                     )}>
                       {group}
                     </span>
@@ -365,8 +351,8 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                 </div>
                 {!isCollapsed && (
                   <div className={cn(
-                    "transition-transform duration-300",
-                    hasActiveChild ? style.activeText : "text-slate-400 group-hover:text-slate-600",
+                    "transition-transform duration-200",
+                    hasActiveChild ? style.activeText : "text-slate-500 group-hover:text-slate-300",
                     isOpen ? "rotate-180" : "rotate-0"
                   )}>
                     <ChevronDown size={14} />
@@ -376,10 +362,10 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
 
               {!isCollapsed && (
                 <div className={cn(
-                  "overflow-hidden transition-all duration-300 ease-in-out",
+                  "overflow-hidden transition-all duration-200 ease-in-out",
                   isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
                 )}>
-                  <div className="pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200 before:rounded-full">
+                  <div className="pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800 before:rounded-full">
                     {items.map((fitur) => {
                       const ItemIcon = getIcon(fitur.icon);
                       const isActive = pathname === fitur.href;
@@ -389,15 +375,15 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                           href={fitur.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-300 relative group overflow-hidden",
+                            "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-200 relative group overflow-hidden",
                             isActive
-                              ? `${style.activeText} ${style.activeBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${style.indicator}`
-                              : `text-slate-500 hover:text-slate-800 hover:bg-slate-50/60 font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-slate-250 before:rounded-full hover:before:bg-slate-400`
+                              ? `${style.childActiveText} ${style.childActiveBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:rounded-full ${style.bulletColor}`
+                              : `text-slate-400 hover:text-slate-200 hover:bg-slate-800/20 font-medium before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-1 before:bg-slate-750 before:rounded-full hover:before:bg-slate-500`
                           )}
                         >
                           <ItemIcon className={cn(
-                            "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-300",
-                            isActive ? `opacity-100 ${style.activeIcon} scale-110` : "text-slate-400 group-hover:text-slate-600 group-hover:scale-110"
+                            "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-200",
+                            isActive ? `opacity-100 ${style.childActiveIcon} scale-105` : "text-slate-400 group-hover:text-slate-600 group-hover:scale-105"
                           )} />
                           <span className="truncate">{getMenuTitle(fitur.title)}</span>
                         </Link>
@@ -413,19 +399,17 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
 
       {/* Footer */}
       {!isCollapsed && (
-        <div className="p-4 border-t border-slate-200/60 shrink-0 bg-slate-50/50 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-slate-100/50 rounded-full blur-2xl pointer-events-none" />
-
+        <div className="p-4 border-t border-slate-800 shrink-0 bg-slate-950/40 relative overflow-hidden">
           {/* Role badge */}
           <div className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 border relative z-10", style.roleBadge)}>
-            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 border border-slate-200/50 shadow-inner">
-              <UserCog className="w-3.5 h-3.5 text-slate-500" />
+            <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center shrink-0 border border-slate-700/30 shadow-inner">
+              <UserCog className="w-3.5 h-3.5 text-slate-400" />
             </div>
             <div className="flex flex-col min-w-0">
               <span className={cn("text-[9px] uppercase tracking-widest font-bold leading-none mb-0.5", style.roleLabel)}>
                 Akses
               </span>
-              <span className="text-xs font-bold text-slate-800 truncate capitalize leading-tight">
+              <span className="text-xs font-bold text-slate-200 truncate capitalize leading-tight">
                 {roleLabels.length <= 2
                   ? roleLabels.join(' • ')
                   : `${roleLabels[0]} +${roleLabels.length - 1}`
