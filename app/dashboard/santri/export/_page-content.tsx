@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { Button, TextInput } from '@mantine/core'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const KOLOM_GROUPS = [...new Set(KOLOM_TERSEDIA.map(k => k.group))]
@@ -383,11 +384,12 @@ export default function ExportSantriPage() {
           </div>
 
           <div className="col-span-2 sm:col-span-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kata dalam Alamat</label>
-            <input type="text" placeholder="Cth: Tasikmalaya"
+            <TextInput
+              label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kata dalam Alamat</span>}
+              placeholder="Cth: Tasikmalaya"
               value={filter.alamat_kata ?? ''}
               onChange={e => setF('alamat_kata', e.target.value || undefined)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            />
           </div>
 
         </div>
@@ -426,16 +428,24 @@ export default function ExportSantriPage() {
 
       {/* Tombol aksi */}
       <div className="flex flex-wrap gap-3">
-        <button onClick={handlePreview} disabled={loadingPreview || kolom.length === 0}
-          className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-colors">
-          {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+        <Button
+          onClick={handlePreview}
+          loading={loadingPreview}
+          disabled={kolom.length === 0}
+          variant="default"
+          leftSection={!loadingPreview ? <Users className="w-4 h-4" /> : undefined}
+        >
           Pratinjau Data
-        </button>
-        <button onClick={handleExport} disabled={exporting || kolom.length === 0}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 shadow-sm transition-colors">
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? 'Mengexport...' : 'Export Excel'}
-        </button>
+        </Button>
+        <Button
+          onClick={handleExport}
+          loading={exporting}
+          disabled={kolom.length === 0}
+          color="teal"
+          leftSection={!exporting ? <Download className="w-4 h-4" /> : undefined}
+        >
+          Export Excel
+        </Button>
       </div>
 
       {/* Preview tabel */}

@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { getLaporanSensus } from './actions'
 import { CheckSquare, Filter, Loader2, Printer, RotateCcw, Square, X } from 'lucide-react'
+import { Button, ActionIcon, TextInput, NativeSelect } from '@mantine/core'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useReactToPrint } from '@/lib/pdf/client'
@@ -199,24 +200,27 @@ export default function CetakLaporanSensus() {
               description="Laporan sensus penduduk format F4 landscape."
               className="flex-1"
           />
-          <div className="flex gap-2">
-              <select value={bulan} onChange={e=>setBulan(Number(e.target.value))} className="p-2 border rounded font-bold text-slate-700">
-                {Array.from({length:12},(_,i)=>i+1).map(b => (
-                    <option key={b} value={b}>{format(new Date(2024, b-1, 1), 'MMMM', {locale:id})}</option>
-                ))}
-              </select>
-              <select value={tahun} onChange={e=>setTahun(Number(e.target.value))} className="p-2 border rounded font-bold text-slate-700">
-                 <option value={2024}>2024</option>
-                 <option value={2025}>2025</option>
-                 <option value={2026}>2026</option>
-              </select>
-              <button onClick={handleGenerate} disabled={loading} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-blue-700 transition-colors">
-                  {loading ? <Loader2 className="animate-spin"/> : "Generate"}
-              </button>
+          <div className="flex flex-wrap gap-2">
+              <NativeSelect
+                value={String(bulan)}
+                onChange={e => setBulan(Number(e.target.value))}
+                data={Array.from({length:12},(_,i)=>i+1).map(b => ({ label: format(new Date(2024, b-1, 1), 'MMMM', {locale:id}), value: String(b) }))}
+                fw={600}
+              />
+              <NativeSelect
+                value={String(tahun)}
+                onChange={e => setTahun(Number(e.target.value))}
+                data={[{label:'2024',value:'2024'},{label:'2025',value:'2025'},{label:'2026',value:'2026'}]}
+                fw={600}
+                w={90}
+              />
+              <Button onClick={handleGenerate} loading={loading} color="blue">
+                Generate
+              </Button>
               {data && (
-                  <button onClick={() => handlePrint()} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold flex gap-2 items-center shadow hover:bg-green-700 transition-colors">
-                      <Printer className="w-4 h-4"/> Print PDF
-                  </button>
+                <Button onClick={() => handlePrint()} color="teal" leftSection={<Printer className="w-4 h-4"/>}>
+                  Print PDF
+                </Button>
               )}
           </div>
       </div>
@@ -232,42 +236,40 @@ export default function CetakLaporanSensus() {
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                <Filter className="h-4 w-4 text-slate-400" />
-                <input
-                  value={filterKeterangan}
-                  onChange={e => setFilterKeterangan(e.target.value)}
-                  placeholder="Cari kolom keterangan"
-                  className="w-full min-w-[220px] bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-                />
-                {filterKeterangan && (
-                  <button onClick={() => setFilterKeterangan('')} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <button onClick={restoreAll} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                <RotateCcw className="h-4 w-4" /> Reset
-              </button>
+              <TextInput
+                value={filterKeterangan}
+                onChange={e => setFilterKeterangan(e.target.value)}
+                placeholder="Cari kolom keterangan"
+                leftSection={<Filter className="h-4 w-4"/>}
+                rightSection={filterKeterangan ? (
+                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setFilterKeterangan('')}>
+                    <X className="h-4 w-4"/>
+                  </ActionIcon>
+                ) : null}
+                miw={240}
+              />
+              <Button onClick={restoreAll} variant="default" leftSection={<RotateCcw className="h-4 w-4"/>}>
+                Reset
+              </Button>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={selectFilteredMutasi} disabled={filteredMutasiRows.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-40">
-              <CheckSquare className="h-4 w-4" /> Pilih hasil filter ({selectedFilteredCount}/{filteredMutasiRows.length})
-            </button>
-            <button onClick={clearSelection} disabled={selectedMutasi.size === 0} className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-40">
-              <Square className="h-4 w-4" /> Kosongkan pilihan
-            </button>
-            <button onClick={excludeSelected} disabled={selectedMutasi.size === 0} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40">
+            <Button onClick={selectFilteredMutasi} disabled={filteredMutasiRows.length === 0} variant="light" color="gray" size="xs" leftSection={<CheckSquare className="h-4 w-4"/>}>
+              Pilih hasil filter ({selectedFilteredCount}/{filteredMutasiRows.length})
+            </Button>
+            <Button onClick={clearSelection} disabled={selectedMutasi.size === 0} variant="light" color="gray" size="xs" leftSection={<Square className="h-4 w-4"/>}>
+              Kosongkan pilihan
+            </Button>
+            <Button onClick={excludeSelected} disabled={selectedMutasi.size === 0} color="red" size="xs">
               Exclude pilihan ({selectedMutasi.size})
-            </button>
-            <button onClick={excludeFiltered} disabled={filteredMutasiRows.length === 0 || excludedFilteredCount === filteredMutasiRows.length} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-40">
+            </Button>
+            <Button onClick={excludeFiltered} disabled={filteredMutasiRows.length === 0 || excludedFilteredCount === filteredMutasiRows.length} variant="light" color="red" size="xs">
               Exclude hasil filter
-            </button>
-            <button onClick={restoreFiltered} disabled={excludedFilteredCount === 0} className="rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 hover:bg-green-100 disabled:opacity-40">
+            </Button>
+            <Button onClick={restoreFiltered} disabled={excludedFilteredCount === 0} variant="light" color="teal" size="xs">
               Masukkan lagi hasil filter ({excludedFilteredCount})
-            </button>
+            </Button>
           </div>
 
           <div className="max-h-72 overflow-auto rounded-lg border border-slate-200">
@@ -306,17 +308,19 @@ export default function CetakLaporanSensus() {
                       <td className="border-b px-3 py-2 text-slate-600">{row.ket || '-'}</td>
                       <td className="border-b px-3 py-2 text-slate-500">{format(new Date(row.tgl), 'dd/MM/yyyy')}</td>
                       <td className="border-b px-3 py-2">
-                        <button
+                        <Button
                           onClick={() => setExcludedMutasi(prev => {
                             const next = new Set(prev)
                             if (next.has(key)) next.delete(key)
                             else next.add(key)
                             return next
                           })}
-                          className={`rounded px-2 py-1 text-xs font-bold ${excluded ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+                          size="xs"
+                          variant="light"
+                          color={excluded ? 'red' : 'teal'}
                         >
                           {excluded ? 'Exclude' : 'Masuk'}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   )

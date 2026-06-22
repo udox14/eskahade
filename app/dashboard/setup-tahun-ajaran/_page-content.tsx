@@ -15,6 +15,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
+import { Button, Textarea } from '@mantine/core'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -98,42 +99,49 @@ function OverrideControls({ item }: { item: SetupWizardItemState }) {
       <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
         Catatan override
       </label>
-      <textarea
+      <Textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
         placeholder="Opsional, misalnya: PSB tahun ini tidak dipakai."
         rows={2}
-        className="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-emerald-500"
+        mt="xs"
+        resize="none"
       />
       <div className="mt-2 flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
-          disabled={pending || item.locked}
+          loading={pending}
+          disabled={item.locked}
           onClick={() => save('complete')}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-emerald-300"
+          color="teal"
+          size="xs"
+          leftSection={!pending ? <CheckCircle2 className="h-3.5 w-3.5"/> : undefined}
         >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
           Selesai manual
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          disabled={pending || item.locked}
+          loading={pending}
+          disabled={item.locked}
           onClick={() => save('skipped')}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:text-slate-300"
+          variant="default"
+          size="xs"
+          leftSection={<SkipForward className="h-3.5 w-3.5"/>}
         >
-          <SkipForward className="h-3.5 w-3.5" />
           Dilewati
-        </button>
+        </Button>
         {item.override ? (
-          <button
+          <Button
             type="button"
-            disabled={pending}
+            loading={pending}
             onClick={clear}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-white hover:text-slate-800"
+            variant="subtle"
+            color="gray"
+            size="xs"
+            leftSection={<RotateCcw className="h-3.5 w-3.5"/>}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
             Pakai otomatis
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

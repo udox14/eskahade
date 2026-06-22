@@ -15,8 +15,8 @@ import {
   Trash2,
   Upload,
   Wallet2,
-  X,
 } from 'lucide-react'
+import { Button, ActionIcon, TextInput, NativeSelect, Textarea, SegmentedControl, Modal } from '@mantine/core'
 import { toast } from '@/lib/toast'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { OperasionalPrintSheet } from '@/components/operasional/ledger-print-sheet'
@@ -288,30 +288,45 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
         description="Catat penerimaan, pengeluaran, dan cetak laporan kas operasional unit Anda."
         action={(
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-auto">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
               <Calendar className="h-4 w-4 text-slate-400" />
-              <select value={bulan} onChange={e => setBulan(Number(e.target.value) || 1)} className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none sm:flex-none">
-                {BULAN_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+              <NativeSelect
+                value={String(bulan)}
+                onChange={e => setBulan(Number(e.target.value) || 1)}
+                data={BULAN_OPTIONS.map(o => ({ label: o.label, value: String(o.value) }))}
+                size="xs"
+                variant="unstyled"
+                fw={600}
+              />
               <span className="text-slate-300">/</span>
-              <input type="number" value={tahun} onChange={e => setTahun(Number(e.target.value) || now.getFullYear())} className="w-24 min-w-0 bg-transparent text-sm font-semibold outline-none" />
+              <TextInput
+                type="number"
+                value={String(tahun)}
+                onChange={e => setTahun(Number(e.target.value) || now.getFullYear())}
+                size="xs"
+                variant="unstyled"
+                fw={600}
+                w={64}
+              />
             </div>
-            <button
+            <Button
               onClick={() => load(activeUnitId)}
-              disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+              loading={loading}
+              color="dark"
+              leftSection={!loading ? <RefreshCw className="h-4 w-4"/> : undefined}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Muat
-            </button>
+            </Button>
           </div>
         )}
       />
 
-      <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1">
-        <button onClick={() => setActiveTab('ledger')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${activeTab === 'ledger' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Ledger</button>
-        <button onClick={() => setActiveTab('print')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${activeTab === 'print' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Cetak</button>
-      </div>
+      <SegmentedControl
+        value={activeTab}
+        onChange={v => setActiveTab(v as 'ledger' | 'print')}
+        data={[{ label: 'Ledger', value: 'ledger' }, { label: 'Cetak', value: 'print' }]}
+        fullWidth
+      />
 
       {!data || loading ? (
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
@@ -322,14 +337,12 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
         <>
           {!data.scope.lockedUnitId ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Unit Ledger</label>
-              <select
+              <NativeSelect
+                label="Unit Ledger"
                 value={activeUnitId}
                 onChange={async e => await load(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900"
-              >
-                {data.scope.unitOptions.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
-              </select>
+                data={data.scope.unitOptions.map(unit => ({ label: unit.name, value: unit.id }))}
+              />
             </div>
           ) : null}
 
@@ -354,13 +367,9 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
                         <p className="font-medium text-slate-800">{form.id ? 'Ada transaksi yang sedang diedit' : 'Tambah transaksi lewat modal'}</p>
                         <p className="mt-1 text-sm text-slate-500">Form dipindahkan ke modal agar halaman utama lebih lapang dan fokus ke monitoring.</p>
                       </div>
-                      <button
-                        onClick={() => setTransactionModalOpen(true)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black lg:shrink-0"
-                      >
-                        <Plus className="h-4 w-4" />
+                      <Button onClick={() => setTransactionModalOpen(true)} color="dark" leftSection={<Plus className="h-4 w-4"/>} className="lg:shrink-0">
                         {form.id ? 'Lanjut Edit' : 'Tambah Transaksi'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -401,14 +410,8 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
                             ) : null}
                             {!row.is_system ? (
                               <>
-                                <button onClick={() => { setForm(mapRowToForm(row)); setTransactionModalOpen(true) }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Edit
-                                </button>
-                                <button onClick={() => handleDeleteTransaction(row.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Hapus
-                                </button>
+                                <Button size="xs" variant="default" onClick={() => { setForm(mapRowToForm(row)); setTransactionModalOpen(true) }} leftSection={<Pencil className="h-3.5 w-3.5"/>}>Edit</Button>
+                                <Button size="xs" color="pink" variant="light" onClick={() => handleDeleteTransaction(row.id)} leftSection={<Trash2 className="h-3.5 w-3.5"/>}>Hapus</Button>
                               </>
                             ) : (
                               <span className="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">Transaksi sistem</span>
@@ -456,12 +459,8 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
                                 <div className="flex justify-end gap-2">
                                   {!row.is_system ? (
                                     <>
-                                      <button onClick={() => { setForm(mapRowToForm(row)); setTransactionModalOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button onClick={() => handleDeleteTransaction(row.id)} className="rounded-lg border border-rose-200 p-2 text-rose-600 hover:bg-rose-50">
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
+                                      <ActionIcon variant="default" size="sm" onClick={() => { setForm(mapRowToForm(row)); setTransactionModalOpen(true) }}><Pencil className="h-3.5 w-3.5"/></ActionIcon>
+                                      <ActionIcon variant="light" color="pink" size="sm" onClick={() => handleDeleteTransaction(row.id)}><Trash2 className="h-3.5 w-3.5"/></ActionIcon>
                                     </>
                                   ) : (
                                     <span className="text-xs font-semibold text-slate-400">Sistem</span>
@@ -518,14 +517,12 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
                   <p className="text-sm text-slate-500">Format F4 portrait dengan tampilan laporan yang lebih formal.</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <button onClick={() => setSignatureModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                    <Pencil className="h-4 w-4" />
+                  <Button onClick={() => setSignatureModalOpen(true)} variant="default" leftSection={<Pencil className="h-4 w-4"/>}>
                     Tanda Tangan
-                  </button>
-                  <button onClick={() => handlePrint()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black">
-                    <Printer className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={() => handlePrint()} color="dark" leftSection={<Printer className="h-4 w-4"/>}>
                     Cetak
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -546,40 +543,43 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
 
       <AppModal open={transactionModalOpen} onClose={() => setTransactionModalOpen(false)} title={form.id ? 'Edit Transaksi Operasional' : 'Tambah Transaksi Operasional'} maxWidth="max-w-3xl">
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Tanggal"><input type="date" value={form.tanggal} onChange={e => setForm(prev => ({ ...prev, tanggal: e.target.value }))} className={inputClass} /></Field>
-          <Field label="Tipe">
-            <select value={form.tipe} onChange={e => setForm(prev => ({ ...prev, tipe: e.target.value as OperasionalTipe }))} className={inputClass}>
-              <option value="PENGELUARAN">Pengeluaran</option>
-              <option value="PEMASUKAN">Pemasukan</option>
-              <option value="PENYESUAIAN">Penyesuaian</option>
-            </select>
-          </Field>
+          <TextInput label="Tanggal" type="date" value={form.tanggal} onChange={e => setForm(prev => ({ ...prev, tanggal: e.target.value }))} />
+          <NativeSelect
+            label="Tipe"
+            value={form.tipe}
+            onChange={e => setForm(prev => ({ ...prev, tipe: e.target.value as OperasionalTipe }))}
+            data={[{ label: 'Pengeluaran', value: 'PENGELUARAN' }, { label: 'Pemasukan', value: 'PEMASUKAN' }, { label: 'Penyesuaian', value: 'PENYESUAIAN' }]}
+          />
           {form.tipe === 'PEMASUKAN' ? (
-            <Field label="Sumber Pemasukan">
-              <select value={form.sumberPemasukan} onChange={e => setForm(prev => ({ ...prev, sumberPemasukan: e.target.value as 'LAINNYA' | 'ALOKASI_BENDAHARA' }))} className={inputClass}>
-                <option value="LAINNYA">Lainnya</option>
-                <option value="ALOKASI_BENDAHARA">Alokasi Bendahara</option>
-              </select>
-            </Field>
+            <NativeSelect
+              label="Sumber Pemasukan"
+              value={form.sumberPemasukan}
+              onChange={e => setForm(prev => ({ ...prev, sumberPemasukan: e.target.value as 'LAINNYA' | 'ALOKASI_BENDAHARA' }))}
+              data={[{ label: 'Lainnya', value: 'LAINNYA' }, { label: 'Alokasi Bendahara', value: 'ALOKASI_BENDAHARA' }]}
+            />
           ) : null}
-          <Field label="Kategori">
-            <select value={form.kategori} onChange={e => setForm(prev => ({ ...prev, kategori: e.target.value }))} className={inputClass}>
-              {KATEGORI_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </Field>
-          <Field label="Uraian" className="md:col-span-2"><input value={form.uraian} onChange={e => setForm(prev => ({ ...prev, uraian: e.target.value }))} className={inputClass} /></Field>
+          <NativeSelect
+            label="Kategori"
+            value={form.kategori}
+            onChange={e => setForm(prev => ({ ...prev, kategori: e.target.value }))}
+            data={KATEGORI_OPTIONS.map(o => ({ label: o, value: o }))}
+          />
+          <TextInput label="Uraian" value={form.uraian} onChange={e => setForm(prev => ({ ...prev, uraian: e.target.value }))} className="md:col-span-2" />
           {form.tipe === 'PENGELUARAN' ? (
             <>
-              <Field label="Qty"><input value={form.qty} onChange={e => setForm(prev => ({ ...prev, qty: e.target.value }))} className={inputClass} type="number" min="0" step="0.01" /></Field>
-              <Field label="Harga Satuan"><input value={form.hargaSatuan} onChange={e => setForm(prev => ({ ...prev, hargaSatuan: e.target.value }))} className={inputClass} type="number" min="0" /></Field>
+              <TextInput label="Qty" value={form.qty} onChange={e => setForm(prev => ({ ...prev, qty: e.target.value }))} type="number" min={0} step={0.01} />
+              <TextInput label="Harga Satuan" value={form.hargaSatuan} onChange={e => setForm(prev => ({ ...prev, hargaSatuan: e.target.value }))} type="number" min={0} />
             </>
           ) : (
-            <Field label="Nominal" className="md:col-span-2"><input value={form.nominal} onChange={e => setForm(prev => ({ ...prev, nominal: e.target.value }))} className={inputClass} type="number" /></Field>
+            <TextInput label="Nominal" value={form.nominal} onChange={e => setForm(prev => ({ ...prev, nominal: e.target.value }))} type="number" className="md:col-span-2" />
           )}
-          <Field label={form.tipe === 'PENGELUARAN' ? 'Dibayarkan Kepada' : 'Sumber / Pihak Terkait'}>
-            <input value={form.partnerName} onChange={e => setForm(prev => ({ ...prev, partnerName: e.target.value }))} className={inputClass} />
-          </Field>
-          <Field label="Foto Kuitansi (Opsional)">
+          <TextInput
+            label={form.tipe === 'PENGELUARAN' ? 'Dibayarkan Kepada' : 'Sumber / Pihak Terkait'}
+            value={form.partnerName}
+            onChange={e => setForm(prev => ({ ...prev, partnerName: e.target.value }))}
+          />
+          <div>
+            <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Foto Kuitansi (Opsional)</p>
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:border-slate-400">
               {uploadingReceipt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               <span>{uploadingReceipt ? 'Memproses...' : 'Upload kuitansi'}</span>
@@ -591,17 +591,16 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
                 Lihat kuitansi
               </a>
             ) : null}
-          </Field>
-          <Field label="Catatan" className="md:col-span-2"><textarea value={form.catatan} onChange={e => setForm(prev => ({ ...prev, catatan: e.target.value }))} className={`${inputClass} min-h-24`} /></Field>
+          </div>
+          <Textarea label="Catatan" value={form.catatan} onChange={e => setForm(prev => ({ ...prev, catatan: e.target.value }))} minRows={3} className="md:col-span-2" />
         </div>
         <div className="mt-5 flex gap-2">
-          <button onClick={handleSaveTransaction} disabled={!canSaveTransaction} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <Button onClick={handleSaveTransaction} loading={saving} disabled={!canSaveTransaction} color="dark" leftSection={!saving ? <Save className="h-4 w-4"/> : undefined}>
             {form.id ? 'Simpan Perubahan' : 'Simpan Transaksi'}
-          </button>
-          <button onClick={() => { setForm(makeEmptyForm()); setTransactionModalOpen(false) }} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+          </Button>
+          <Button onClick={() => { setForm(makeEmptyForm()); setTransactionModalOpen(false) }} variant="default">
             Batal
-          </button>
+          </Button>
         </div>
       </AppModal>
 
@@ -611,20 +610,19 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
             <div key={index} className="rounded-xl border border-slate-200 p-3">
               <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Kolom {index}</p>
               <div className="space-y-3">
-                <Field label="Label"><input value={prefs[`slot${index}_label` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_label`]: e.target.value }))} className={inputClass} /></Field>
-                <Field label="Nama"><input value={prefs[`slot${index}_nama` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_nama`]: e.target.value }))} className={inputClass} /></Field>
-                <Field label="Jabatan"><input value={prefs[`slot${index}_jabatan` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_jabatan`]: e.target.value }))} className={inputClass} /></Field>
+                <TextInput label="Label" value={prefs[`slot${index}_label` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_label`]: e.target.value }))} />
+                <TextInput label="Nama" value={prefs[`slot${index}_nama` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_nama`]: e.target.value }))} />
+                <TextInput label="Jabatan" value={prefs[`slot${index}_jabatan` as keyof OperasionalPrintPreference] as string} onChange={e => setPrefs(prev => ({ ...prev, [`slot${index}_jabatan`]: e.target.value }))} />
               </div>
             </div>
           ))}
           <div className="flex gap-2">
-            <button onClick={handleSavePrefs} disabled={savingPrefs} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">
-              {savingPrefs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button onClick={handleSavePrefs} loading={savingPrefs} color="dark" leftSection={!savingPrefs ? <Save className="h-4 w-4"/> : undefined}>
               Simpan Preferensi
-            </button>
-            <button onClick={() => setSignatureModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+            </Button>
+            <Button onClick={() => setSignatureModalOpen(false)} variant="default">
               Tutup
-            </button>
+            </Button>
           </div>
         </div>
       </AppModal>
@@ -656,15 +654,6 @@ function InfoRow({ label, value, valueClassName = '' }: { label: string; value: 
   )
 }
 
-function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">{label}</label>
-      {children}
-    </div>
-  )
-}
-
 function AppModal({
   open,
   onClose,
@@ -678,23 +667,13 @@ function AppModal({
   children: React.ReactNode
   maxWidth?: string
 }) {
-  if (!open) return null
+  const size = maxWidth === 'max-w-3xl' ? 'xl' : 'md'
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className={`max-h-[92vh] w-full ${maxWidth} overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl`}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
-          <h2 className="pr-3 text-base font-semibold text-slate-900 sm:text-lg">{title}</h2>
-          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-[calc(92vh-72px)] overflow-y-auto p-4 sm:p-5">{children}</div>
-      </div>
-    </div>
+    <Modal opened={open} onClose={onClose} title={<span className="text-base font-semibold">{title}</span>} size={size} centered>
+      {children}
+    </Modal>
   )
 }
-
-const inputClass = 'w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900'
 
 function formatCurrency(value: number) {
   return `Rp ${new Intl.NumberFormat('id-ID').format(value || 0)}`
