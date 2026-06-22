@@ -57,7 +57,37 @@ import {
   MagnifyingGlass as Search,
   CaretLeft as ChevronLeft,
   CaretRight as ChevronRight,
-  X
+  X,
+  // New unique icons:
+  ChalkboardTeacher,
+  SignIn,
+  Eye,
+  ListChecks,
+  Chalkboard,
+  ChartPie,
+  IdentificationBadge,
+  Notebook,
+  ChartLine,
+  ShieldCheck,
+  UserCirclePlus,
+  PresentationChart,
+  Table,
+  Sun,
+  Bed,
+  UsersThree,
+  IdentificationCard,
+  Columns,
+  HandCoins,
+  Cardholder,
+  Wrench,
+  CalendarBlank,
+  ListDashes,
+  Bank,
+  PiggyBank,
+  PlusCircle,
+  MinusCircle,
+  Bookmark,
+  Books
 } from "@phosphor-icons/react";
 
 const CalendarRange = Calendar;
@@ -73,6 +103,12 @@ const ICON_MAP: Record<string, React.ElementType> = {
   ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
   FileWarning, Shuffle, Home, UserX, DoorOpen,
+  // Mapping new unique icons:
+  ChalkboardTeacher, SignIn, Eye, ListChecks, Chalkboard, ChartPie,
+  IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
+  PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
+  Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
+  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books
 }
 
 function getIcon(name: string): React.ElementType {

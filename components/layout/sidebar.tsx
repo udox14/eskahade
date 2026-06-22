@@ -55,7 +55,37 @@ import {
   Shuffle,
   House as Home,
   UserMinus,
-  Door as DoorOpen
+  Door as DoorOpen,
+  // New unique icons:
+  ChalkboardTeacher,
+  SignIn,
+  Eye,
+  ListChecks,
+  Chalkboard,
+  ChartPie,
+  IdentificationBadge,
+  Notebook,
+  ChartLine,
+  ShieldCheck,
+  UserCirclePlus,
+  PresentationChart,
+  Table,
+  Sun,
+  Bed,
+  UsersThree,
+  IdentificationCard,
+  Columns,
+  HandCoins,
+  Cardholder,
+  Wrench,
+  CalendarBlank,
+  ListDashes,
+  Bank,
+  PiggyBank,
+  PlusCircle,
+  MinusCircle,
+  Bookmark,
+  Books
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -76,6 +106,12 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
   FileWarning, Shuffle, Home, UserX, UserMinus,
   DoorOpen,
+  // Mapping new unique icons:
+  ChalkboardTeacher, SignIn, Eye, ListChecks, Chalkboard, ChartPie,
+  IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
+  PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
+  Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
+  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books
 };
 
 function getIcon(name: string): React.ElementType {
