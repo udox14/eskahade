@@ -6,3 +6,16 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+/**
+ * Mengubah huruf pertama setiap kata menjadi huruf kapital, sisanya huruf kecil.
+ * Contoh: "MUHAMMAD AL FATIH" -> "Muhammad Al Fatih"
+ */
+export function capitalizeEachWord(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
