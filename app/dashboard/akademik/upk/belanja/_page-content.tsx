@@ -13,6 +13,7 @@ import {
   simpanBelanja,
   simpanRencanaBelanja,
   hapusBelanja,
+  getMarhalahBelanja,
 } from './actions'
 import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,6 +29,7 @@ type KatalogItem = {
   stok_lama: number
   stok_baru: number
   jumlah_stok: number
+  marhalah_ids: string
 }
 
 type RencanaItem = {
@@ -98,6 +100,8 @@ export default function BelanjaUPKPage() {
   const [rencanaList, setRencanaList] = useState<RencanaListItem[]>([])
   const [belanjaList, setBelanjaList] = useState<BelanjaListItem[]>([])
   const [hutangList, setHutangList] = useState<HutangListItem[]>([])
+  const [marhalahList, setMarhalahList] = useState<{ id: number; nama: string }[]>([])
+  const [selectedMarhalahId, setSelectedMarhalahId] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [persenTarget, setPersenTarget] = useState(75)
   const [groupRencanaByToko, setGroupRencanaByToko] = useState(true)
@@ -119,11 +123,30 @@ export default function BelanjaUPKPage() {
   const totalBelanja = belanjaCart.reduce((sum, item) => sum + item.qty * item.harga_beli_input, 0)
   const totalHutang = hutangList.reduce((sum, item) => sum + (item.sisa_hutang || 0), 0)
 
+  const openBelanjaModal = () => {
+    setBelanjaSearch('')
+    setSelectedMarhalahId('')
+    setIsBelanjaModalOpen(true)
+  }
+
+  const closeBelanjaModal = () => {
+    setIsBelanjaModalOpen(false)
+  }
+
   const filteredKatalog = useMemo(() => {
+    let result = katalog
+    if (selectedMarhalahId) {
+      result = result.filter(item => {
+        const ids = (item.marhalah_ids || '').split(',').map(s => s.trim()).filter(Boolean)
+        return ids.includes(selectedMarhalahId)
+      })
+    }
     const keyword = belanjaSearch.toLowerCase().trim()
-    if (!keyword) return katalog
-    return katalog.filter(item => item.nama_kitab.toLowerCase().includes(keyword) || (item.marhalah_nama || '').toLowerCase().includes(keyword))
-  }, [belanjaSearch, katalog])
+    if (keyword) {
+      result = result.filter(item => item.nama_kitab.toLowerCase().includes(keyword) || (item.marhalah_nama || '').toLowerCase().includes(keyword))
+    }
+    return result
+  }, [belanjaSearch, selectedMarhalahId, katalog])
 
   const groupedRencana = useMemo(() => {
     if (!groupRencanaByToko) return [{ toko: 'Semua Toko', items: rencanaHitung }]
@@ -158,18 +181,20 @@ export default function BelanjaUPKPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [k, t, r, b, h] = await Promise.all([
+    const [k, t, r, b, h, m] = await Promise.all([
       getKatalogBelanja(),
       getTokoBelanja(),
       getRencanaList(),
       getBelanjaList(),
       getHutangBelanja(),
+      getMarhalahBelanja(),
     ])
     setKatalog(k)
     setTokoList(t)
     setRencanaList(r)
     setBelanjaList(b)
     setHutangList(h)
+    setMarhalahList(m)
     setLoading(false)
   }, [])
 
@@ -242,7 +267,7 @@ export default function BelanjaUPKPage() {
     })
     if ('error' in result) return toast.error(result.error)
     toast.success('Belanja disimpan dan stok baru bertambah')
-    setIsBelanjaModalOpen(false)
+    closeBelanjaModal()
     setBelanjaCart([])
     setDibayar('')
     setCatatanBelanja('')
@@ -393,7 +418,7 @@ export default function BelanjaUPKPage() {
       {tab === 'BELANJA' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setIsBelanjaModalOpen(true)} className="px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Tambah Belanja</button>
+            <button onClick={openBelanjaModal} className="px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Tambah Belanja</button>
           </div>
           <div className="bg-white border rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
@@ -467,11 +492,28 @@ export default function BelanjaUPKPage() {
           <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
               <h2 className="font-bold text-slate-800 flex items-center gap-2"><Store className="w-4 h-4 text-blue-600" /> Tambah Belanja</h2>
-              <button onClick={() => setIsBelanjaModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+              <button onClick={closeBelanjaModal} className="p-2 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
               <div className="space-y-3">
-                <input value={belanjaSearch} onChange={e => setBelanjaSearch(e.target.value)} className="w-full px-3 py-2.5 border rounded-lg text-sm" placeholder="Cari kitab..." />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    value={belanjaSearch}
+                    onChange={e => setBelanjaSearch(e.target.value)}
+                    className="flex-1 px-3 py-2.5 border rounded-lg text-sm"
+                    placeholder="Cari kitab..."
+                  />
+                  <select
+                    value={selectedMarhalahId}
+                    onChange={e => setSelectedMarhalahId(e.target.value)}
+                    className="px-3 py-2.5 border rounded-lg text-sm bg-white sm:w-48"
+                  >
+                    <option value="">Semua Marhalah</option>
+                    {marhalahList.map(m => (
+                      <option key={m.id} value={m.id}>{m.nama}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="border rounded-lg overflow-hidden divide-y max-h-[58vh] overflow-y-auto">
                   {filteredKatalog.map(item => {
                     const inCart = belanjaCart.some(row => row.id === item.id)

@@ -18,6 +18,7 @@ type KatalogBelanjaRow = {
   marhalah_nama: string | null
   toko_id: number | null
   toko_nama: string | null
+  marhalah_ids: string | null
 }
 
 type RencanaPayloadItem = {
@@ -102,7 +103,9 @@ export async function getKatalogBelanja() {
   const rows = await query<KatalogBelanjaRow>(`
     SELECT uk.id, uk.nama_kitab, uk.harga_beli, uk.harga_jual,
            uk.stok_lama, uk.stok_baru, uk.toko_id,
-           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama, t.nama AS toko_nama
+           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama,
+           GROUP_CONCAT(DISTINCT km.marhalah_id) AS marhalah_ids,
+           t.nama AS toko_nama
     FROM upk_katalog uk
     LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
     LEFT JOIN marhalah m ON m.id = km.marhalah_id
@@ -114,6 +117,7 @@ export async function getKatalogBelanja() {
   return rows.map(row => ({
     ...row,
     marhalah_id: null,
+    marhalah_ids: row.marhalah_ids || '',
     jumlah_stok: (row.stok_lama || 0) + (row.stok_baru || 0),
   }))
 }
@@ -123,6 +127,10 @@ export async function getTokoBelanja() {
     'SELECT id, nama FROM upk_toko WHERE is_active = 1 ORDER BY nama',
     []
   )
+}
+
+export async function getMarhalahBelanja() {
+  return query<{ id: number; nama: string }>('SELECT id, nama FROM marhalah ORDER BY urutan', [])
 }
 
 export async function hitungRencanaBelanja(persenTarget: number) {
