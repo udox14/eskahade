@@ -26,6 +26,7 @@ type KatalogRow = {
   created_at: string
   toko_nama: string | null
   master_nama_kitab: string | null
+  is_consignment: number
 }
 
 type KatalogMarhalahRow = {
@@ -103,6 +104,7 @@ export async function getKatalogUPK(search = '', filterMarhalah = '', filterStat
     SELECT uk.id, uk.kitab_id, uk.nama_kitab, uk.toko_id,
            uk.stok_lama, uk.stok_baru, uk.harga_beli, uk.harga_jual,
            uk.is_active, uk.catatan, uk.stok_updated_at, uk.updated_at, uk.created_at,
+           uk.is_consignment,
            t.nama AS toko_nama,
            k.nama_kitab AS master_nama_kitab
     FROM upk_katalog uk
@@ -153,6 +155,7 @@ export async function getKatalogUPK(search = '', filterMarhalah = '', filterStat
     return {
       ...row,
       is_active: !!row.is_active,
+      is_consignment: !!row.is_consignment,
       marhalah: marhalahByKatalog.get(row.id) ?? [],
       jumlah_stok: jumlahStok,
       modal,
@@ -192,7 +195,7 @@ export async function getMasterKitabOptions() {
   `, params)
 }
 
-export async function simpanKatalogUPK(payload: {
+export async function simpanKatalog(payload: {
   id?: number | null
   kitab_id?: number | null
   nama_kitab: string
@@ -203,6 +206,7 @@ export async function simpanKatalogUPK(payload: {
   is_active: boolean
   catatan: string
   marhalah: { marhalah_id: number; is_default: boolean }[]
+  is_consignment?: boolean
 }): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const id = payload.id && payload.id > 0 ? payload.id : null
@@ -213,6 +217,7 @@ export async function simpanKatalogUPK(payload: {
   const hargaBeli = Number(payload.harga_beli) || 0
   const hargaJual = Number(payload.harga_jual) || 0
   const isActive = payload.is_active ? 1 : 0
+  const isConsignment = payload.is_consignment ? 1 : 0
   const catatan = payload.catatan.trim()
 
   // dedupe marhalah, max 1 default per item tetap diizinkan banyak default
@@ -242,18 +247,18 @@ export async function simpanKatalogUPK(payload: {
       UPDATE upk_katalog
       SET kitab_id = ?, nama_kitab = ?, toko_id = ?,
           stok_lama = ?, harga_beli = ?, harga_jual = ?,
-          is_active = ?, catatan = ?, stok_updated_at = ?, updated_at = ?
+          is_active = ?, catatan = ?, is_consignment = ?, stok_updated_at = ?, updated_at = ?
       WHERE id = ?
     `, [kitabId, namaKitab, tokoId, stokLama, hargaBeli, hargaJual,
-        isActive, catatan || null, stockUpdatedAt, timestamp, id])
+        isActive, catatan || null, isConsignment, stockUpdatedAt, timestamp, id])
   } else {
     await execute(`
       INSERT INTO upk_katalog
         (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
-         harga_beli, harga_jual, is_active, catatan, stok_updated_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         harga_beli, harga_jual, is_active, catatan, is_consignment, stok_updated_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [kitabId, namaKitab, tokoId, stokLama, 0, hargaBeli, hargaJual,
-        isActive, catatan || null, timestamp, timestamp, timestamp])
+        isActive, catatan || null, isConsignment, timestamp, timestamp, timestamp])
     const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog ORDER BY id DESC LIMIT 1')
     katalogId = created?.id ?? null
   }

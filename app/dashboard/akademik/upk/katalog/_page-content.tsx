@@ -11,7 +11,7 @@ import {
   hapusTokoUPK,
   importKatalogUPK,
   simpanKatalogBatchUPK,
-  simpanKatalogUPK,
+  simpanKatalog as simpanKatalogUPK,
   simpanTokoUPK,
 } from './actions'
 import {
@@ -49,6 +49,7 @@ type KatalogForm = {
   is_active: boolean
   catatan: string
   marhalah: MarhalahSel[]
+  is_consignment: boolean
 }
 
 type TokoForm = {
@@ -93,6 +94,7 @@ type KatalogItem = {
   modal: number
   laba_kotor: number
   laba_bersih: number
+  is_consignment: boolean
 }
 
 type ImportPreviewRow = {
@@ -111,6 +113,7 @@ const emptyKatalogForm: KatalogForm = {
   is_active: true,
   catatan: '',
   marhalah: [],
+  is_consignment: false,
 }
 
 const emptyTokoForm: TokoForm = { id: '', nama: '', is_active: true }
@@ -343,6 +346,7 @@ export default function KatalogUPKPage() {
       harga_beli: String(item.harga_beli ?? 0),
       harga_jual: String(item.harga_jual ?? 0),
       is_active: !!item.is_active,
+      is_consignment: !!item.is_consignment,
       catatan: item.catatan ?? '',
       marhalah: item.marhalah.map(m => ({ marhalah_id: m.marhalah_id, is_default: m.is_default })),
     })
@@ -367,6 +371,7 @@ export default function KatalogUPKPage() {
       is_active: form.is_active,
       catatan: form.catatan,
       marhalah: form.marhalah,
+      is_consignment: form.is_consignment,
     })
     setSaving(false)
 
@@ -596,6 +601,11 @@ export default function KatalogUPKPage() {
                                 {m.is_default ? '★ ' : ''}{m.nama || '-'}
                               </span>
                             ))}
+                            {!!item.is_consignment && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                Konsinyasi
+                              </span>
+                            )}
                           </div>
                           {item.catatan && <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.catatan}</p>}
                         </td>
@@ -763,10 +773,16 @@ export default function KatalogUPKPage() {
                 <textarea name="catatan" value={form.catatan} onChange={e => setField('catatan', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm min-h-20" placeholder="Edisi, kualitas cetak, info toko, atau catatan harga" />
               </div>
 
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                <input name="is_active" type="checkbox" checked={form.is_active} onChange={e => setField('is_active', e.target.checked)} className="w-4 h-4" />
-                Aktif dan bisa dipakai di kasir
-              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input name="is_active" type="checkbox" checked={form.is_active} onChange={e => setField('is_active', e.target.checked)} className="w-4 h-4" />
+                  Aktif dan bisa dipakai di kasir
+                </label>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input name="is_consignment" type="checkbox" checked={form.is_consignment} onChange={e => setField('is_consignment', e.target.checked)} className="w-4 h-4" />
+                  Kitab Konsinyasi (Sisa stok bisa dikembalikan ke toko)
+                </label>
+              </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t">
                 <button type="button" onClick={() => { resetForm(); setIsKatalogModalOpen(false) }} className="px-4 py-2.5 border border-slate-200 rounded-lg font-bold text-sm text-slate-600 hover:bg-slate-50">

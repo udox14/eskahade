@@ -14,8 +14,10 @@ import {
   simpanRencanaBelanja,
   hapusBelanja,
   getMarhalahBelanja,
+  getBelanjaItems,
+  returBelanjaItem,
 } from './actions'
-import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
+import { CheckCircle, ChevronRight, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -116,6 +118,9 @@ export default function BelanjaUPKPage() {
   const [catatanBelanja, setCatatanBelanja] = useState('')
   const [bayarHutangId, setBayarHutangId] = useState('')
   const [nominalHutang, setNominalHutang] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [belanjaItems, setBelanjaItems] = useState<Record<string, any[]>>({})
+  const [loadingItems, setLoadingItems] = useState<Record<string, boolean>>({})
   const rencanaPrintRef = useRef<HTMLDivElement>(null)
   const belanjaPrintRef = useRef<HTMLDivElement>(null)
 
@@ -131,6 +136,25 @@ export default function BelanjaUPKPage() {
 
   const closeBelanjaModal = () => {
     setIsBelanjaModalOpen(false)
+  }
+
+  const toggleExpand = async (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(id)
+    if (!belanjaItems[id]) {
+      setLoadingItems(prev => ({ ...prev, [id]: true }))
+      try {
+        const items = await getBelanjaItems(id)
+        setBelanjaItems(prev => ({ ...prev, [id]: items }))
+      } catch (err: any) {
+        toast.error(err.message || 'Gagal memuat detail belanja')
+      } finally {
+        setLoadingItems(prev => ({ ...prev, [id]: false }))
+      }
+    }
   }
 
   const filteredKatalog = useMemo(() => {
@@ -298,6 +322,44 @@ export default function BelanjaUPKPage() {
     }
   }
 
+  const handleRetur = async (belanjaId: string, item: any) => {
+    const maxQty = item.qty - (item.qty_retur || 0)
+    if (maxQty <= 0) {
+      toast.error('Semua item telah diretur.')
+      return
+    }
+
+    const input = window.prompt(`Masukkan jumlah kitab "${item.nama_kitab}" yang ingin dikembalikan (maksimal ${maxQty}):`, String(maxQty))
+    if (input === null) return
+
+    const qtyToReturn = parseInt(input, 10)
+    if (isNaN(qtyToReturn) || qtyToReturn <= 0) {
+      toast.error('Jumlah retur tidak valid.')
+      return
+    }
+
+    if (qtyToReturn > maxQty) {
+      toast.error(`Jumlah retur melebihi batas maksimal (${maxQty}).`)
+      return
+    }
+
+    if (!await confirm(`Apakah Anda yakin ingin mengembalikan sebanyak ${qtyToReturn} kitab "${item.nama_kitab}" ke toko? Stok kitab di katalog akan berkurang.`)) return
+
+    try {
+      const res = await returBelanjaItem(item.id, qtyToReturn)
+      if ('error' in res) {
+        toast.error(res.error)
+      } else {
+        toast.success(`Berhasil meretur ${qtyToReturn} kitab "${item.nama_kitab}"`)
+        const updatedItems = await getBelanjaItems(belanjaId)
+        setBelanjaItems(prev => ({ ...prev, [belanjaId]: updatedItems }))
+        loadData()
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal melakukan retur.')
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-6">
       <DashboardPageHeader
@@ -424,11 +486,20 @@ export default function BelanjaUPKPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] text-sm text-left">
                 <thead className="bg-slate-50 border-b text-slate-600">
-                  <tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Toko</th><th className="px-4 py-3">Jenis</th><th className="px-4 py-3 text-center">Item</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Dibayar</th><th className="px-4 py-3 text-right">Hutang</th><th className="px-4 py-3 text-right">Aksi</th></tr>
+                  <tr><th className="w-8 px-4 py-3"></th><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Toko</th><th className="px-4 py-3">Jenis</th><th className="px-4 py-3 text-center">Item</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Dibayar</th><th className="px-4 py-3 text-right">Hutang</th><th className="px-4 py-3 text-right">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y">
-                  {belanjaList.map(row => (
+                  {belanjaList.flatMap(row => [
                     <tr key={row.id}>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleExpand(row.id)}
+                          className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                          title="Detail Item"
+                        >
+                          <ChevronRight className={`w-4 h-4 transition-transform ${expandedId === row.id ? 'rotate-90' : ''}`} />
+                        </button>
+                      </td>
                       <td className="px-4 py-3">{row.tanggal}</td>
                       <td className="px-4 py-3 font-bold">{row.toko_nama || '-'}</td>
                       <td className="px-4 py-3">{row.jenis}</td>
@@ -445,9 +516,75 @@ export default function BelanjaUPKPage() {
                           <Trash className="w-4 h-4" />
                         </button>
                       </td>
-                    </tr>
-                  ))}
-                  {!belanjaList.length && <tr><td colSpan={8} className="text-center py-14 text-slate-400">Belum ada data belanja.</td></tr>}
+                    </tr>,
+                    ...(expandedId === row.id ? [(
+                      <tr key={`expand-${row.id}`} className="bg-slate-50/50">
+                        <td colSpan={9} className="px-8 py-4">
+                          {loadingItems[row.id] ? (
+                            <div className="flex items-center gap-2 text-slate-500 text-xs py-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memuat detail...
+                            </div>
+                          ) : (
+                            <div className="border rounded-lg bg-white overflow-hidden max-w-4xl shadow-sm">
+                              <table className="w-full text-xs text-left">
+                                <thead className="bg-slate-100 border-b text-slate-600 font-bold">
+                                  <tr>
+                                    <th className="px-4 py-2">Nama Kitab</th>
+                                    <th className="px-4 py-2">Marhalah</th>
+                                    <th className="px-4 py-2 text-center">Qty</th>
+                                    <th className="px-4 py-2 text-right">Harga Satuan</th>
+                                    <th className="px-4 py-2 text-right">Subtotal</th>
+                                    <th className="px-4 py-2 text-center w-24">Aksi</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                  {belanjaItems[row.id]?.map(item => (
+                                    <tr key={item.id}>
+                                      <td className="px-4 py-2 font-bold text-slate-800">
+                                        {item.nama_kitab}
+                                        {item.is_consignment === 1 && (
+                                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                                            Konsinyasi
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2 text-slate-500">{item.marhalah_nama || '-'}</td>
+                                      <td className="px-4 py-2 text-center font-bold">
+                                        {item.qty}
+                                        {item.qty_retur > 0 && (
+                                          <span className="text-red-500 font-normal text-[10px] block">
+                                            (Retur: {item.qty_retur})
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-mono">{rupiah(item.harga_beli)}</td>
+                                      <td className="px-4 py-2 text-right font-mono font-bold text-slate-700">{rupiah(item.subtotal)}</td>
+                                      <td className="px-4 py-2 text-center">
+                                        {item.is_consignment === 1 && item.qty - (item.qty_retur || 0) > 0 ? (
+                                          <button
+                                            onClick={() => handleRetur(row.id, item)}
+                                            className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-700 rounded text-[10px] font-bold border border-red-200 transition-colors"
+                                          >
+                                            Retur
+                                          </button>
+                                        ) : (
+                                          <span className="text-slate-400 text-[10px]">-</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                  {(!belanjaItems[row.id] || belanjaItems[row.id].length === 0) && (
+                                    <tr><td colSpan={6} className="text-center py-4 text-slate-400">Tidak ada item.</td></tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )] : [])
+                  ])}
+                  {!belanjaList.length && <tr><td colSpan={9} className="text-center py-14 text-slate-400">Belum ada data belanja.</td></tr>}
                 </tbody>
               </table>
             </div>

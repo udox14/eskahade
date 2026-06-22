@@ -412,3 +412,127 @@ export async function hapusBelanja(id: string): Promise<{ success: true } | { er
   revalidatePath('/dashboard/akademik/upk/katalog')
   return { success: true }
 }
+
+export async function getBelanjaItems(belanjaId: string) {
+  return query<{
+    id: string
+    katalog_id: number | null
+    nama_kitab: string
+    marhalah_nama: string | null
+    qty: number
+    qty_retur: number
+    harga_beli: number
+    subtotal: number
+    is_consignment: number
+  }>(`
+    SELECT bi.id, bi.katalog_id, bi.nama_kitab, bi.marhalah_nama, bi.qty, bi.qty_retur, bi.harga_beli, bi.subtotal,
+           COALESCE(uk.is_consignment, 0) AS is_consignment
+    FROM upk_belanja_item bi
+    LEFT JOIN upk_katalog uk ON uk.id = bi.katalog_id
+    WHERE bi.belanja_id = ?
+    ORDER BY bi.nama_kitab
+  `, [belanjaId])
+}
+
+export async function returBelanjaItem(belanjaItemId: string, qtyToReturn: number): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  const bi = await queryOne<{
+    id: string
+    belanja_id: string
+    katalog_id: number | null
+    nama_kitab: string
+    qty: number
+    qty_retur: number
+    harga_beli: number
+  }>('SELECT * FROM upk_belanja_item WHERE id = ?', [belanjaItemId])
+
+  if (!bi) return { error: 'Item belanja tidak ditemukan.' }
+
+  const parent = await queryOne<{
+    id: string
+    total: number
+    dibayar: number
+    sisa_hutang: number
+    toko_nama: string | null
+    tanggal: string
+  }>('SELECT * FROM upk_belanja WHERE id = ?', [bi.belanja_id])
+
+  if (!parent) return { error: 'Data belanja tidak ditemukan.' }
+
+  const qty = Math.max(0, toInt(qtyToReturn))
+  if (qty <= 0) return { error: 'Jumlah retur harus lebih dari 0.' }
+
+  const maxQty = bi.qty - (bi.qty_retur || 0)
+  if (qty > maxQty) return { error: `Jumlah retur (${qty}) melebihi batas maksimal (${maxQty}).` }
+
+  const katalog = bi.katalog_id
+    ? await queryOne<{ id: number; stok_lama: number; stok_baru: number; is_consignment: number }>('SELECT * FROM upk_katalog WHERE id = ?', [bi.katalog_id])
+    : null
+
+  if (bi.katalog_id && !katalog) return { error: 'Katalog item tidak ditemukan.' }
+
+  if (katalog) {
+    const totalStok = (katalog.stok_lama || 0) + (katalog.stok_baru || 0)
+    if (qty > totalStok) return { error: `Stok saat ini (${totalStok}) tidak mencukupi untuk diretur sebanyak ${qty}.` }
+
+    let remainingToReduce = qty
+    let newStokBaru = katalog.stok_baru
+    let newStokLama = katalog.stok_lama
+
+    if (newStokBaru >= remainingToReduce) {
+      newStokBaru -= remainingToReduce
+      remainingToReduce = 0
+    } else {
+      remainingToReduce -= newStokBaru
+      newStokBaru = 0
+    }
+
+    if (remainingToReduce > 0) {
+      newStokLama = Math.max(0, newStokLama - remainingToReduce)
+    }
+
+    await execute(`
+      UPDATE upk_katalog
+      SET stok_baru = ?, stok_lama = ?, stok_updated_at = ?, updated_at = ?
+      WHERE id = ?
+    `, [newStokBaru, newStokLama, now(), now(), bi.katalog_id])
+  }
+
+  const newQtyRetur = (bi.qty_retur || 0) + qty
+  await execute('UPDATE upk_belanja_item SET qty_retur = ?, updated_at = ? WHERE id = ?', [newQtyRetur, now(), belanjaItemId])
+
+  const returnedValue = qty * bi.harga_beli
+  const newTotal = Math.max(0, parent.total - returnedValue)
+  const newSisaHutang = Math.max(0, parent.sisa_hutang - returnedValue)
+  const newStatus = statusPembayaran(newTotal, parent.dibayar)
+
+  await execute(`
+    UPDATE upk_belanja
+    SET total = ?, sisa_hutang = ?, status_pembayaran = ?, updated_at = ?
+    WHERE id = ?
+  `, [newTotal, newSisaHutang, newStatus, now(), bi.belanja_id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'update',
+    fiturHref: BELANJA_PATH,
+    logKind: 'update',
+    entityType: 'upk_belanja_item',
+    entityId: belanjaItemId,
+    entityLabel: `${bi.nama_kitab} (Retur)`,
+    summary: `Mencatat retur belanja kitab ${bi.nama_kitab} sebanyak ${qty} pcs`,
+    details: {
+      belanja_id: bi.belanja_id,
+      kitab: bi.nama_kitab,
+      qty_returned: qty,
+      value_returned: returnedValue,
+      parent_total_after: newTotal,
+      parent_hutang_after: newSisaHutang,
+    },
+  })
+
+  revalidatePath(BELANJA_PATH)
+  revalidatePath('/dashboard/akademik/upk/katalog')
+  return { success: true }
+}
