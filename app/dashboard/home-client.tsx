@@ -379,7 +379,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
       >
         {/* ── Hero Greeting Card ── */}
         <div 
-          className="relative overflow-hidden bg-white select-none rounded-[2rem] shadow-sm p-4 sm:p-8 min-h-0 sm:min-h-[220px] flex items-center w-full"
+          className="relative overflow-hidden bg-white select-none rounded-[2rem] shadow-sm p-5 sm:p-8 w-full aspect-[16/10] sm:aspect-auto sm:min-h-[220px] flex items-center"
           style={{
             backgroundImage: `url('${heroImage}')`,
             backgroundSize: 'contain',
