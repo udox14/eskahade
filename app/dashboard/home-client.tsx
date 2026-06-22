@@ -302,7 +302,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   })
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="max-w-6xl mx-auto w-full space-y-6 pb-16">
 
       {/* ── Hero Greeting Card ── */}
       <div 
@@ -443,7 +443,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                 <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {groups.map((group, index) => {
                   const meta = getGroupMeta(group)
                   const GroupIcon = meta.icon
@@ -455,18 +455,18 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                       key={group}
                       onClick={() => handleOpenGroup(group)}
                       className={cn(
-                        "group flex items-center text-left p-3.5 sm:p-4 rounded-2xl border shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer relative overflow-hidden",
+                        "group flex items-center text-left p-3.5 rounded-2xl border shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer relative overflow-hidden",
                         bgClass, theme.border
                       )}
                     >
-                      <div className="shrink-0 flex items-center justify-center mr-3 sm:mr-4">
-                        <GroupIcon className={cn("w-6 h-6 sm:w-7 sm:h-7 transition-transform duration-200 group-hover:scale-110", theme.text)} strokeWidth={1.8} />
+                      <div className="shrink-0 flex items-center justify-center mr-3">
+                        <GroupIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
-                        <span className={cn("block text-sm sm:text-base font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", theme.hoverText)}>
+                        <span className={cn("block text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", theme.hoverText)}>
                           {group === '_standalone' ? 'Menu Utama' : group}
                         </span>
-                        <span className="block text-[10px] sm:text-xs text-slate-500 font-medium">
+                        <span className="block text-[10px] sm:text-[11px] text-slate-500 font-medium">
                           {items.length} fitur
                         </span>
                       </div>
