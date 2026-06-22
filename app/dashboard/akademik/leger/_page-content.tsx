@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getKelasListForLeger, getLegerData, hitungDanSimpanLeger, getTahunAjaranList } from './actions'
 import { FileSpreadsheet, Loader2, Search, Trophy, Calculator, CalendarDays } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 

@@ -100,63 +100,106 @@ function sortGroupItems(group: string, items: FiturAkses[]) {
   });
 }
 
-type ThemeStyle = {
-  activeBg: string;
+type ThemeKey = 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
+
+type ThemeColor = {
+  bg: string;
+  toggleBtn: string;
+  glowText: string;
   activeText: string;
-  activeIcon: string;
-  childActiveBg: string;
-  childActiveText: string;
-  childActiveIcon: string;
+  activeBg: string;
+  activeBorder: string;
+  hoverBg: string;
+  mutedText: string;
+  folderActiveBg: string;
+  folderOpenBg: string;
+  indicator: string;
+  glowBg: string;
   roleBadge: string;
   roleLabel: string;
-  bulletColor: string;
 };
 
-const THEME_STYLES: Record<string, ThemeStyle> = {
-  pagi: {
-    activeBg: "bg-emerald-500/10",
-    activeText: "text-emerald-400 font-bold",
-    activeIcon: "text-emerald-400",
-    childActiveBg: "bg-emerald-500/5",
-    childActiveText: "text-emerald-400 font-semibold",
-    childActiveIcon: "text-emerald-400",
-    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
-    roleLabel: "text-slate-500",
-    bulletColor: "bg-emerald-400",
+const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
+  emerald: {
+    bg: "bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950",
+    toggleBtn: "bg-emerald-900 border-emerald-500/30 text-emerald-400 hover:bg-emerald-700 hover:text-emerald-100 hover:border-emerald-400",
+    glowText: "text-emerald-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
+    activeBorder: "border-emerald-400",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-emerald-100/60",
+    folderActiveBg: "bg-black/20 border-emerald-500/20",
+    folderOpenBg: "border-emerald-500/30",
+    indicator: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
+    glowBg: "bg-emerald-400/10",
+    roleBadge: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
+    roleLabel: "text-emerald-400/70",
   },
-  siang: {
-    activeBg: "bg-amber-500/10",
-    activeText: "text-amber-400 font-bold",
-    activeIcon: "text-amber-400",
-    childActiveBg: "bg-amber-500/5",
-    childActiveText: "text-amber-400 font-semibold",
-    childActiveIcon: "text-amber-400",
-    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
-    roleLabel: "text-slate-500",
-    bulletColor: "bg-amber-400",
+  blue: {
+    bg: "bg-gradient-to-b from-blue-950 via-blue-900 to-slate-950",
+    toggleBtn: "bg-blue-900 border-blue-500/30 text-blue-400 hover:bg-blue-700 hover:text-blue-100 hover:border-blue-400",
+    glowText: "text-blue-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
+    activeBorder: "border-blue-400",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-blue-100/60",
+    folderActiveBg: "bg-black/20 border-blue-500/20",
+    folderOpenBg: "border-blue-500/30",
+    indicator: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
+    glowBg: "bg-blue-400/10",
+    roleBadge: "bg-blue-500/20 border-blue-400/30 text-blue-300",
+    roleLabel: "text-blue-400/70",
   },
-  sore: {
-    activeBg: "bg-orange-500/10",
-    activeText: "text-orange-400 font-bold",
-    activeIcon: "text-orange-400",
-    childActiveBg: "bg-orange-50/5",
-    childActiveText: "text-orange-400 font-semibold",
-    childActiveIcon: "text-orange-400",
-    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
-    roleLabel: "text-slate-500",
-    bulletColor: "bg-orange-400",
+  purple: {
+    bg: "bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950",
+    toggleBtn: "bg-purple-900 border-purple-500/30 text-purple-400 hover:bg-purple-700 hover:text-purple-100 hover:border-purple-400",
+    glowText: "text-purple-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
+    activeBorder: "border-purple-400",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-purple-100/60",
+    folderActiveBg: "bg-black/20 border-purple-500/20",
+    folderOpenBg: "border-purple-500/30",
+    indicator: "bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)]",
+    glowBg: "bg-purple-400/10",
+    roleBadge: "bg-purple-500/20 border-purple-400/30 text-purple-300",
+    roleLabel: "text-purple-400/70",
   },
-  malam: {
-    activeBg: "bg-blue-500/10",
-    activeText: "text-blue-400 font-bold",
-    activeIcon: "text-blue-400",
-    childActiveBg: "bg-blue-500/5",
-    childActiveText: "text-blue-400 font-semibold",
-    childActiveIcon: "text-blue-400",
-    roleBadge: "bg-slate-800/40 border-slate-700/40 text-slate-300",
-    roleLabel: "text-slate-500",
-    bulletColor: "bg-blue-400",
+  rose: {
+    bg: "bg-gradient-to-b from-rose-950 via-rose-900 to-slate-950",
+    toggleBtn: "bg-rose-900 border-rose-500/30 text-rose-400 hover:bg-rose-700 hover:text-rose-100 hover:border-rose-400",
+    glowText: "text-rose-400",
+    activeText: "text-white",
+    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
+    activeBorder: "border-rose-400",
+    hoverBg: "hover:bg-black/10",
+    mutedText: "text-rose-100/60",
+    folderActiveBg: "bg-black/20 border-rose-500/20",
+    folderOpenBg: "border-rose-500/30",
+    indicator: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]",
+    glowBg: "bg-rose-400/10",
+    roleBadge: "bg-rose-500/20 border-rose-400/30 text-rose-300",
+    roleLabel: "text-rose-400/70",
   },
+  slate: {
+    bg: "bg-gradient-to-b from-slate-950 via-slate-900 to-black",
+    toggleBtn: "bg-slate-900 border-slate-500/30 text-slate-400 hover:bg-slate-800 hover:text-slate-100 hover:border-slate-400",
+    glowText: "text-slate-300",
+    activeText: "text-white",
+    activeBg: "bg-black/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]",
+    activeBorder: "border-slate-400",
+    hoverBg: "hover:bg-white/5",
+    mutedText: "text-slate-400",
+    folderActiveBg: "bg-black/30 border-slate-500/20",
+    folderOpenBg: "border-slate-500/30",
+    indicator: "bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.8)]",
+    glowBg: "bg-slate-400/10",
+    roleBadge: "bg-slate-500/20 border-slate-400/30 text-slate-300",
+    roleLabel: "text-slate-400/70",
+  }
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -202,17 +245,17 @@ interface SidebarProps {
 
 export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isCollapsed, toggleSidebar, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  const [timeKey, setTimeKey] = useState<string>('pagi');
+  const [theme, setTheme] = useState<ThemeKey>('emerald');
+  const [mounted, setMounted] = useState(false);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const hr = new Date().getHours();
-    if (hr >= 4 && hr < 11) setTimeKey('pagi');
-    else if (hr >= 11 && hr < 15) setTimeKey('siang');
-    else if (hr >= 15 && hr < 18) setTimeKey('sore');
-    else setTimeKey('malam');
+    setMounted(true);
+    const savedTheme = localStorage.getItem('app-theme') as ThemeKey;
+    if (savedTheme && THEME_COLORS[savedTheme]) setTheme(savedTheme);
   }, []);
 
+  // Build grouped menu dari fiturAkses
   const groupMap = new Map<string, FiturAkses[]>();
   for (const f of fiturAkses) {
     if (!groupMap.has(f.group_name)) groupMap.set(f.group_name, []);
@@ -232,6 +275,11 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  const changeTheme = (newTheme: ThemeKey) => {
+    setTheme(newTheme);
+    localStorage.setItem('app-theme', newTheme);
+  };
+
   const toggleFolder = (title: string) => {
     if (isCollapsed) {
       toggleSidebar();
@@ -241,18 +289,18 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
     }
   };
 
-  const style = THEME_STYLES[timeKey];
+  const c = mounted ? THEME_COLORS[theme] : THEME_COLORS['emerald'];
   const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole];
   const roleLabels = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' '));
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#0f172a] text-slate-400 relative select-none">
+    <div className={cn("flex flex-col h-full w-full text-white/90 relative transition-colors duration-500", c.bg)}>
 
       <button
         onClick={toggleSidebar}
         className={cn(
           "absolute -right-3 top-16 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
-          "bg-[#0f172a] border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200 hover:border-slate-700"
+          c.toggleBtn
         )}
         title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
       >
@@ -260,23 +308,24 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
       </button>
 
       <div className={cn(
-        "flex items-center justify-center border-b border-slate-800 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
+        "flex items-center justify-center border-b border-white/5 shrink-0 transition-all duration-300 overflow-hidden relative w-full",
         isCollapsed ? "h-12 px-0 justify-center" : "h-12 gap-2.5 px-4"
       )}>
+        <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)} />
         {isCollapsed ? (
-          <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain relative z-10 hover:scale-105 transition-transform" />
+          <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
         ) : (
           <>
-            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain relative z-10 shrink-0" />
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-xl relative z-10 shrink-0" />
             <div className="flex flex-col min-w-0 justify-center relative z-10">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.12em] leading-tight">Pondok Pesantren</span>
-              <h1 className="text-[14px] font-black font-serif text-white tracking-wide leading-tight drop-shadow-sm">SUKAHIDENG</h1>
+              <span className={cn("text-[9px] font-semibold uppercase tracking-[0.12em] leading-tight transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
+              <h1 className="text-[15px] font-black font-serif text-white tracking-wide leading-tight drop-shadow-md">SUKAHIDENG</h1>
             </div>
           </>
         )}
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-800 hover:[&::-webkit-scrollbar-thumb]:bg-slate-700 transition-colors pb-10">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
         {groupedMenu.map(({ group, items }) => {
 
           if (group === '_standalone') {
@@ -289,22 +338,23 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                     href={fitur.href}
                     onClick={onMobileClose}
                     className={cn(
-                      "w-full flex items-center transition-all duration-200 group relative outline-none rounded-xl overflow-hidden",
+                      "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
                       isCollapsed ? "justify-center p-2.5 mb-1" : "justify-start px-3 py-2 mb-0.5",
                       isActive
-                        ? `${style.activeBg} ${style.activeText}`
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                        ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
+                        : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1 border-l-4 border-transparent`
                     )}
                   >
                     <div className="flex items-center space-x-3">
                       <Icon className={cn(
-                        "flex-shrink-0 transition-all duration-200 w-4 h-4",
-                        isActive ? style.activeIcon : "text-slate-400 group-hover:text-slate-200"
+                        "flex-shrink-0 transition-all duration-300",
+                        isCollapsed ? "w-4 h-4" : "w-4 h-4",
+                        isActive ? c.activeText : `${c.mutedText} group-hover:text-white`
                       )} />
                       {!isCollapsed && (
                         <span className={cn(
-                          "text-xs tracking-normal transition-colors duration-200",
-                          isActive ? style.activeText : "text-slate-400 group-hover:text-slate-200"
+                          "text-xs tracking-normal transition-colors duration-300",
+                          isActive ? "text-white" : `${c.mutedText} group-hover:text-white`
                         )}>
                           {getMenuTitle(fitur.title)}
                         </span>
@@ -325,25 +375,26 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
               <button
                 onClick={() => toggleFolder(group)}
                 className={cn(
-                  "w-full flex items-center transition-all duration-250 group relative outline-none rounded-xl",
+                  "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
                   isCollapsed ? "justify-center p-2.5 mb-1" : "justify-between px-3 py-2 mb-0.5",
                   hasActiveChild && !isOpen && isCollapsed
-                    ? `${style.activeBg} border border-slate-800`
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40",
+                    ? `${c.folderActiveBg} text-white shadow-lg border`
+                    : `${c.mutedText} ${c.hoverBg} hover:text-white hover:translate-x-1`,
                   isOpen && !isCollapsed
-                    ? "bg-slate-800/30 text-slate-200"
-                    : ""
+                    ? `bg-black/20 text-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] border-l-2 ${c.folderOpenBg}`
+                    : "border-l-2 border-transparent"
                 )}
               >
                 <div className="flex items-center space-x-3">
                   <GroupIcon className={cn(
-                    "flex-shrink-0 transition-all duration-200 w-4 h-4",
-                    hasActiveChild ? style.activeIcon : "text-slate-400 group-hover:text-slate-200"
+                    "flex-shrink-0 transition-all duration-300",
+                    isCollapsed ? "w-4 h-4" : "w-4 h-4",
+                    hasActiveChild ? c.glowText : `opacity-80 group-hover:text-white group-hover:opacity-100`
                   )} />
                   {!isCollapsed && (
                     <span className={cn(
                       "font-semibold text-xs tracking-normal transition-colors",
-                      hasActiveChild || isOpen ? "text-slate-200" : "text-slate-400 group-hover:text-slate-200"
+                      hasActiveChild || isOpen ? "text-white" : `${c.mutedText} group-hover:text-white`
                     )}>
                       {group}
                     </span>
@@ -351,21 +402,21 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                 </div>
                 {!isCollapsed && (
                   <div className={cn(
-                    "transition-transform duration-200",
-                    hasActiveChild ? style.activeText : "text-slate-500 group-hover:text-slate-300",
+                    "transition-transform duration-300",
+                    hasActiveChild ? c.activeText : `opacity-40 group-hover:text-white group-hover:opacity-100`,
                     isOpen ? "rotate-180" : "rotate-0"
                   )}>
-                    <ChevronDown size={14} />
+                    <ChevronDown size={16} />
                   </div>
                 )}
               </button>
 
               {!isCollapsed && (
                 <div className={cn(
-                  "overflow-hidden transition-all duration-200 ease-in-out",
+                  "overflow-hidden transition-all duration-300 ease-in-out",
                   isOpen ? "max-h-[1000px] opacity-100 mb-4 mt-2" : "max-h-0 opacity-0"
                 )}>
-                  <div className="pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800 before:rounded-full">
+                  <div className="pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/10 before:rounded-full">
                     {items.map((fitur) => {
                       const ItemIcon = getIcon(fitur.icon);
                       const isActive = pathname === fitur.href;
@@ -375,15 +426,15 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                           href={fitur.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-200 relative group overflow-hidden",
+                            "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-300 relative group overflow-hidden",
                             isActive
-                              ? `${style.childActiveText} ${style.childActiveBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:rounded-full ${style.bulletColor}`
-                              : `text-slate-400 hover:text-slate-200 hover:bg-slate-800/20 font-medium before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-1 before:bg-slate-750 before:rounded-full hover:before:bg-slate-500`
+                              ? `text-white ${c.activeBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${c.indicator}`
+                              : `${c.mutedText} hover:text-white ${c.hoverBg} font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-white/20 before:rounded-full hover:before:bg-white/60`
                           )}
                         >
                           <ItemIcon className={cn(
-                            "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-200",
-                            isActive ? `opacity-100 ${style.childActiveIcon} scale-105` : "text-slate-400 group-hover:text-slate-600 group-hover:scale-105"
+                            "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-300",
+                            isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
                           )} />
                           <span className="truncate">{getMenuTitle(fitur.title)}</span>
                         </Link>
@@ -399,17 +450,42 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
 
       {/* Footer */}
       {!isCollapsed && (
-        <div className="p-4 border-t border-slate-800 shrink-0 bg-slate-950/40 relative overflow-hidden">
+        <div className="p-4 border-t border-white/10 shrink-0 bg-black/20 backdrop-blur-md relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Theme switcher */}
+          <div className="flex items-center justify-center gap-2 mb-3 relative z-10">
+            <Palette className="w-3.5 h-3.5 text-white/30" />
+            {(Object.keys(THEME_COLORS) as ThemeKey[]).map(t => (
+              <button
+                key={t}
+                onClick={() => changeTheme(t)}
+                title={t.charAt(0).toUpperCase() + t.slice(1)}
+                className={cn(
+                  "w-3.5 h-3.5 rounded-full border-2 transition-all duration-300",
+                  theme === t ? "border-white scale-125" : "border-transparent opacity-40 hover:opacity-100 hover:scale-110"
+                )}
+                style={{
+                  backgroundColor:
+                    t === 'emerald' ? '#10b981' :
+                    t === 'blue'    ? '#3b82f6' :
+                    t === 'purple'  ? '#a855f7' :
+                    t === 'rose'    ? '#f43f5e' : '#475569'
+                }}
+              />
+            ))}
+          </div>
+
           {/* Role badge */}
-          <div className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 border relative z-10", style.roleBadge)}>
-            <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center shrink-0 border border-slate-700/30 shadow-inner">
-              <UserCog className="w-3.5 h-3.5 text-slate-400" />
+          <div className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 border relative z-10", c.roleBadge)}>
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+              <UserCog className="w-3.5 h-3.5 text-white/70" />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className={cn("text-[9px] uppercase tracking-widest font-bold leading-none mb-0.5", style.roleLabel)}>
+              <span className={cn("text-[9px] uppercase tracking-widest font-semibold leading-none mb-0.5", c.roleLabel)}>
                 Akses
               </span>
-              <span className="text-xs font-bold text-slate-200 truncate capitalize leading-tight">
+              <span className="text-xs font-bold text-white truncate capitalize leading-tight">
                 {roleLabels.length <= 2
                   ? roleLabels.join(' • ')
                   : `${roleLabels[0]} +${roleLabels.length - 1}`

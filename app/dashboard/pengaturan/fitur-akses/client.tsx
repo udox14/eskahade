@@ -4,8 +4,6 @@ import { useState, useTransition } from 'react'
 import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
 import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { toast } from '@/lib/toast'
-import { Button, Switch, NativeSelect, Alert, ActionIcon, SegmentedControl } from '@mantine/core'
 import type { CrudAction } from '@/lib/auth/crud'
 
 const ALL_ROLES = [
@@ -230,17 +228,22 @@ function TabPerFitur({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button
+                      <button
                         onClick={() => onToggleActive(fitur)}
-                        loading={loadingId === `active-${fitur.id}`}
                         disabled={loadingId === `active-${fitur.id}` || pending}
-                        size="xs"
-                        variant="light"
-                        color={fitur.is_active ? 'green' : 'red'}
-                        leftSection={!loadingId || loadingId !== `active-${fitur.id}` ? (fitur.is_active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />) : undefined}
+                        className={cn(
+                          "flex items-center gap-1.5 ml-auto text-xs font-medium px-3 py-1.5 rounded-lg border transition-all duration-200",
+                          loadingId === `active-${fitur.id}` && "opacity-50 cursor-wait",
+                          fitur.is_active
+                            ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                        )}
                       >
-                        {fitur.is_active ? 'Aktif' : 'Nonaktif'}
-                      </Button>
+                        {fitur.is_active
+                          ? <><ToggleRight className="w-4 h-4" /> Aktif</>
+                          : <><ToggleLeft className="w-4 h-4" /> Nonaktif</>
+                        }
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -257,6 +260,7 @@ function TabPerFitur({
 function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
   const [selectedRole, setSelectedRole] = useState<string>('sekpen')
 
+  // Kelompokkan fitur yang dimiliki role terpilih, per grup
   const fiturForRole = fiturList.filter(f => f.roles.includes(selectedRole))
   const grouped = new Map<string, FiturItem[]>()
   for (const f of fiturForRole) {
@@ -332,6 +336,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
         </div>
       </div>
 
+      {/* Daftar fitur per grup untuk role terpilih */}
       {fiturForRole.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl px-6 py-12 text-center text-slate-400 text-sm">
           Role ini belum punya akses ke fitur apapun.
@@ -355,14 +360,19 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
                       !fitur.is_active && "opacity-50"
                     )}
                   >
+                    {/* Status dot */}
                     <div className={cn(
                       "w-2 h-2 rounded-full shrink-0",
                       fitur.is_active ? "bg-green-400" : "bg-red-300"
                     )} />
+
+                    {/* Nama fitur */}
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
                       <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
                     </div>
+
+                    {/* Badge status */}
                     <span className={cn(
                       "text-xs px-2 py-0.5 rounded-full border font-medium shrink-0",
                       fitur.is_active
@@ -379,6 +389,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
         </div>
       )}
 
+      {/* Fitur yang TIDAK dimiliki role ini */}
       {(() => {
         const tidakPunya = fiturList.filter(f => !f.roles.includes(selectedRole) && f.is_active)
         if (tidakPunya.length === 0) return null
@@ -468,9 +479,12 @@ function TabCrudMatrix({
         })}
       </div>
 
-      <Alert color="yellow" icon={<Info className="w-4 h-4" />} variant="light">
-        <strong>R</strong> tetap diatur dari tab Per Fitur. Di sini admin mengatur <strong>C/U/D</strong> untuk role terpilih. Admin selalu full CRUD.
-      </Alert>
+      <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+        <span>
+          <strong>R</strong> tetap diatur dari tab Per Fitur. Di sini admin mengatur <strong>C/U/D</strong> untuk role terpilih. Admin selalu full CRUD.
+        </span>
+      </div>
 
       {groups.map(group => (
         <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
@@ -513,17 +527,21 @@ function TabCrudMatrix({
                       const disabled = selectedRole === 'admin' || loadingId === key || pending
                       return (
                         <td key={item.action} className="px-3 py-3.5 text-center">
-                          <ActionIcon
-                            size="md"
-                            variant={value ? 'light' : 'subtle'}
-                            color={value ? 'green' : 'gray'}
-                            disabled={disabled}
-                            loading={loadingId === key}
+                          <button
                             onClick={() => onToggleCrud(fitur, selectedRole, item.action, value)}
+                            disabled={disabled}
                             title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : item.title}
+                            className={cn(
+                              "inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-black transition-all",
+                              loadingId === key && "opacity-50 cursor-wait",
+                              disabled && selectedRole === 'admin' && "cursor-not-allowed",
+                              value
+                                ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                : "bg-slate-50 border-slate-200 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                            )}
                           >
-                            <span className="text-xs font-black">{item.label}</span>
-                          </ActionIcon>
+                            {item.label}
+                          </button>
                         </td>
                       )
                     })}
@@ -558,6 +576,7 @@ function TabBottomNav({
   onToggleBottomNav: (f: FiturItem) => void
   onSetUrutan: (f: FiturItem, urutan: number) => void
 }) {
+  // Hitung berapa fitur is_bottomnav per role
   const roleCount: Record<string, number> = {}
   for (const f of fiturList) {
     if (!f.is_bottomnav) continue
@@ -588,24 +607,37 @@ function TabBottomNav({
               : 'Bottom nav disembunyikan dari semua user, apapun preferensi mereka.'}
           </p>
         </div>
-        <Switch
-          checked={globalEnabled}
-          onChange={() => onToggleGlobal()}
+        <button
+          onClick={onToggleGlobal}
           disabled={togglingGlobal}
-          size="md"
-        />
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+            globalEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            globalEnabled ? 'translate-x-5' : 'translate-x-0'
+          }`} />
+        </button>
       </div>
 
-      <Alert color="teal" icon={<Smartphone className="w-4 h-4" />} variant="light">
-        Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu &quot;Menu&quot;</strong> yang mengarah ke halaman Dashboard.
-        Tiap role hanya melihat fitur yang ia miliki sekaligus ditandai bottom nav. Maksimal <strong>4 fitur aktif per role</strong>.
-      </Alert>
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
+        <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
+        <span>
+          Slot 1–4 diisi fitur yang ditandai di sini. <strong>Slot ke-5 selalu &quot;Menu&quot;</strong> yang mengarah ke halaman Dashboard.
+          Tiap role hanya melihat fitur yang ia miliki sekaligus ditandai bottom nav. Maksimal <strong>4 fitur aktif per role</strong>.
+        </span>
+      </div>
 
+      {/* Warning jika ada role yang melebihi 4 */}
       {Object.entries(roleCount).some(([, c]) => c > 4) && (
-        <Alert color="yellow" icon={<ShieldAlert className="w-4 h-4" />} variant="light">
-          <strong>Peringatan:</strong> Beberapa role memiliki lebih dari 4 item bottom nav.
-          Hanya 4 item pertama (urutan terkecil) yang akan ditampilkan. Sesuaikan urutan atau nonaktifkan item berlebih.
-        </Alert>
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+          <span>
+            <strong>Peringatan:</strong> Beberapa role memiliki lebih dari 4 item bottom nav.
+            Hanya 4 item pertama (urutan terkecil) yang akan ditampilkan. Sesuaikan urutan atau nonaktifkan item berlebih.
+          </span>
+        </div>
       )}
 
       {/* Ringkasan per role */}
@@ -629,6 +661,7 @@ function TabBottomNav({
         })}
       </div>
 
+      {/* Fitur yang sudah di bottom nav */}
       {bottomNavItems.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
@@ -639,21 +672,26 @@ function TabBottomNav({
               const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
               return (
                 <div key={fitur.id} className="flex items-center gap-3 px-5 py-3">
-                  <div style={{ width: 60 }}>
-                    <NativeSelect
-                      value={String(fitur.bottomnav_urutan)}
-                      disabled={isLoading || pending}
-                      onChange={e => onSetUrutan(fitur, Number(e.target.value))}
-                      data={['1', '2', '3', '4']}
-                      size="xs"
-                    />
-                  </div>
+                  {/* Urutan selector */}
+                  <select
+                    value={fitur.bottomnav_urutan}
+                    disabled={isLoading || pending}
+                    onChange={e => onSetUrutan(fitur, Number(e.target.value))}
+                    className="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 bg-slate-50 focus:outline-none focus:border-emerald-400 disabled:opacity-40"
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
 
+                  {/* Nama & href */}
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-slate-800">{fitur.title}</span>
                     <span className="text-xs text-slate-400 font-mono ml-2 hidden sm:inline">{fitur.href}</span>
                   </div>
 
+                  {/* Role badges */}
                   <div className="hidden sm:flex flex-wrap gap-1 max-w-[180px]">
                     {fitur.roles.slice(0, 3).map(role => (
                       <span key={role} className={cn(
@@ -670,17 +708,15 @@ function TabBottomNav({
                     )}
                   </div>
 
-                  <Button
+                  {/* Toggle off button */}
+                  <button
                     onClick={() => onToggleBottomNav(fitur)}
-                    loading={isLoading}
                     disabled={isLoading || pending}
-                    size="xs"
-                    variant="light"
-                    color="teal"
-                    leftSection={!isLoading ? <ToggleRight className="w-3.5 h-3.5" /> : undefined}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40 shrink-0"
                   >
+                    <ToggleRight className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Aktif</span>
-                  </Button>
+                  </button>
                 </div>
               )
             })}
@@ -688,6 +724,7 @@ function TabBottomNav({
         </div>
       )}
 
+      {/* Fitur lain yang bisa ditambahkan */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">
           Fitur Lainnya — klik untuk tambahkan ke bottom nav
@@ -720,16 +757,14 @@ function TabBottomNav({
                     </span>
                   )}
                 </div>
-                <Button
+                <button
                   onClick={() => onToggleBottomNav(fitur)}
-                  loading={isLoading}
                   disabled={isLoading || pending}
-                  size="xs"
-                  variant="default"
-                  leftSection={!isLoading ? <ToggleRight className="w-3.5 h-3.5" /> : undefined}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-40 shrink-0"
                 >
+                  <ToggleRight className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Tambahkan</span>
-                </Button>
+                </button>
               </div>
             )
           })}
@@ -748,6 +783,12 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'crud' | 'bottomnav'>('fitur')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   function updateLocal(id: number, updater: (f: FiturItem) => FiturItem) {
     setFiturList(prev => prev.map(f => f.id === id ? updater(f) : f))
@@ -787,9 +828,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await toggleFiturActive(fitur.id, fitur.is_active)
         updateLocal(fitur.id, f => ({ ...f, is_active: !f.is_active }))
-        toast.success(`Fitur "${fitur.title}" ${fitur.is_active ? 'dinonaktifkan' : 'diaktifkan'}`)
+        showToast(`Fitur "${fitur.title}" ${fitur.is_active ? 'dinonaktifkan' : 'diaktifkan'}`)
       } catch {
-        toast.error('Gagal mengubah status fitur')
+        showToast('Gagal mengubah status fitur', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -801,9 +842,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
     try {
       await toggleBottomNavGlobal(globalEnabled)
       setGlobalEnabled(v => !v)
-      toast.success(`Bottom nav ${globalEnabled ? 'dinonaktifkan' : 'diaktifkan'} untuk semua user`)
+      showToast(`Bottom nav ${globalEnabled ? 'dinonaktifkan' : 'diaktifkan'} untuk semua user`)
     } catch {
-      toast.error('Gagal mengubah setting global')
+      showToast('Gagal mengubah setting global', 'error')
     } finally {
       setTogglingGlobal(false)
     }
@@ -816,9 +857,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await toggleFiturBottomNav(fitur.id, fitur.is_bottomnav)
         updateLocal(fitur.id, f => ({ ...f, is_bottomnav: !f.is_bottomnav }))
-        toast.success(`"${fitur.title}" ${fitur.is_bottomnav ? 'dihapus dari' : 'ditambahkan ke'} bottom nav`)
+        showToast(`"${fitur.title}" ${fitur.is_bottomnav ? 'dihapus dari' : 'ditambahkan ke'} bottom nav`)
       } catch {
-        toast.error('Gagal mengubah bottom nav')
+        showToast('Gagal mengubah bottom nav', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -832,9 +873,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await setBottomNavUrutan(fitur.id, urutan)
         updateLocal(fitur.id, f => ({ ...f, bottomnav_urutan: urutan }))
-        toast.success(`Urutan "${fitur.title}" diubah ke ${urutan}`)
+        showToast(`Urutan "${fitur.title}" diubah ke ${urutan}`)
       } catch {
-        toast.error('Gagal mengubah urutan')
+        showToast('Gagal mengubah urutan', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -851,14 +892,14 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
         if (hasRole) {
           await removeRoleFromFitur(fitur.id, role)
           updateLocal(fitur.id, f => ({ ...f, roles: f.roles.filter(r => r !== role) }))
-          toast.success(`Role "${ROLE_LABEL[role]}" dihapus dari "${fitur.title}"`)
+          showToast(`Role "${ROLE_LABEL[role]}" dihapus dari "${fitur.title}"`)
         } else {
           await addRoleToFitur(fitur.id, role)
           updateLocal(fitur.id, f => ({ ...f, roles: [...f.roles, role] }))
-          toast.success(`Role "${ROLE_LABEL[role]}" ditambahkan ke "${fitur.title}"`)
+          showToast(`Role "${ROLE_LABEL[role]}" ditambahkan ke "${fitur.title}"`)
         }
       } catch {
-        toast.error('Gagal mengubah akses role')
+        showToast('Gagal mengubah akses role', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -873,9 +914,9 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       try {
         await toggleCrudPermission(fitur.href, role, action, currentValue)
         updateCrudLocal(fitur.href, role, action, !currentValue)
-        toast.success(`${action.toUpperCase()} "${fitur.title}" untuk ${ROLE_LABEL[role]} ${currentValue ? 'dinonaktifkan' : 'diaktifkan'}`)
+        showToast(`${action.toUpperCase()} "${fitur.title}" untuk ${ROLE_LABEL[role]} ${currentValue ? 'dinonaktifkan' : 'diaktifkan'}`)
       } catch {
-        toast.error('Gagal mengubah izin CRUD')
+        showToast('Gagal mengubah izin CRUD', 'error')
       } finally {
         setLoadingId(null)
       }
@@ -885,22 +926,78 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   return (
     <div className="space-y-5">
 
-      <Alert color="blue" icon={<Info className="w-4 h-4" />} variant="light">
-        Perubahan akses tersimpan langsung ke database dan berlaku dalam <strong>±5 menit</strong> setelah cache diperbarui.
-        Role <strong>Admin</strong> tidak bisa dicabut aksesnya dari fitur apapun.
-      </Alert>
+      {/* Toast */}
+      {toast && (
+        <div className={cn(
+          "fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-sm text-sm font-medium animate-in slide-in-from-top-2 duration-300",
+          toast.type === 'success' ? "bg-green-600 text-white" : "bg-red-600 text-white"
+        )}>
+          {toast.msg}
+        </div>
+      )}
 
-      <SegmentedControl
-        value={activeTab}
-        onChange={(v) => setActiveTab(v as typeof activeTab)}
-        data={[
-          { value: 'fitur', label: 'Per Fitur' },
-          { value: 'role', label: 'Per Role' },
-          { value: 'bottomnav', label: 'Bottom Nav' },
-          { value: 'crud', label: 'CRUD' },
-        ]}
-      />
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+        <span>
+          Perubahan akses tersimpan langsung ke database dan berlaku dalam <strong>±5 menit</strong> setelah cache diperbarui.
+          Role <strong>Admin</strong> tidak bisa dicabut aksesnya dari fitur apapun.
+        </span>
+      </div>
 
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('fitur')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'fitur'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <LayoutGrid className="w-4 h-4" />
+          Per Fitur
+        </button>
+        <button
+          onClick={() => setActiveTab('role')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'role'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Users className="w-4 h-4" />
+          Per Role
+        </button>
+        <button
+          onClick={() => setActiveTab('bottomnav')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'bottomnav'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Smartphone className="w-4 h-4" />
+          Bottom Nav
+        </button>
+        <button
+          onClick={() => setActiveTab('crud')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'crud'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          CRUD
+        </button>
+      </div>
+
+      {/* Tab content */}
       {activeTab === 'fitur' ? (
         <TabPerFitur
           fiturList={fiturList}

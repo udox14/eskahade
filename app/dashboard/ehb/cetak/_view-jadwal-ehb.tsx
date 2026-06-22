@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { AlertTriangle, Calendar, Loader2, Printer, RotateCcw, SlidersHorizontal } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import {
   getActiveEventForCetak,
   getJadwalEhbCetakData,

@@ -10,7 +10,7 @@ import {
   UserCheck, Plus, Edit2, Trash2, Loader2, AlertTriangle, 
   X, Users, Printer
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import { fullDateWib } from '../_date-utils'
@@ -221,7 +221,7 @@ export default function PengawasEhbPage() {
   if (loading && activeTab === 'daftar') return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
 
   if (!event) return (
-    <div className="py-10">
+    <div className="max-w-4xl mx-auto py-10">
       <div className="bg-amber-50 text-amber-800 p-4 rounded-lg flex items-center gap-3">
         <AlertTriangle className="w-5 h-5"/> Belum ada event EHB yang aktif. Silakan atur di menu Jadwal EHB.
       </div>
@@ -229,7 +229,7 @@ export default function PengawasEhbPage() {
   )
 
   return (
-    <div className="pb-20 space-y-6">
+    <div className="max-w-6xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Pengaturan Pengawas"
         description="Kelola daftar pengawas ujian dan jadwal tugas mereka."

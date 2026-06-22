@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Trash2 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { deleteSantri } from './actions'

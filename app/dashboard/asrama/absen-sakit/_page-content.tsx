@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { usePagination } from '@/components/ui/pagination'
 import {
@@ -561,7 +561,7 @@ export default function DataSakitPage() {
   const selectedActiveRow = selectedSantri ? rows.find(row => row.santri_id === selectedSantri.id) : null
 
   return (
-    <div className="pb-24 space-y-6">
+    <div className="max-w-6xl mx-auto pb-24 space-y-6">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <DashboardPageHeader
           title="Data Sakit"

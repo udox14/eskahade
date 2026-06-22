@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 
 const POLL_INTERVAL = 5 * 60 * 1000 // cek setiap 5 menit
 

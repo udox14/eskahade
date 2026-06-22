@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getSessionInfo, getKamarsMalam, getDataAbsenMalamKamar, batchSaveAbsenMalam, tandaiSantriKembaliDariAbsenMalam } from './actions'
 import { Moon, Home, ChevronLeft, ChevronRight, Loader2, Lock, Save, CheckCircle, LogIn, MessageSquareText } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 

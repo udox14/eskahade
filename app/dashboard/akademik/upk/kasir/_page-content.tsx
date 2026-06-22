@@ -10,7 +10,7 @@ import {
   selesaikanAntrianUPK,
 } from './actions'
 import { ArrowLeft } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   type Antrian,

@@ -10,7 +10,7 @@ import {
   getKartuPesertaData, getSantriListForCetak,
   type ActiveEvent, type KartuData, type MarhalahOption, type KelasOption, type PesertaOption,
 } from './actions'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { 
   FONT, parseJamGroup, PageHeader, HeaderCetak, TataTertibCetak 
 } from './_shared'

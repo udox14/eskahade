@@ -13,7 +13,7 @@ import {
   AlertTriangle, Trash2, Filter, Download, BarChart2, List, Edit2, TrendingUp, Settings, Save
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import Pagination from '@/components/ui/pagination' 
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import * as XLSX from 'xlsx'
@@ -724,7 +724,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       {/* HEADER */}
       <div className="flex items-start gap-4">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">

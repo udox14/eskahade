@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { Upload, X, AlertCircle, ArrowRight, Save, CheckCircle, Loader2, ChevronDown, Search } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { importAbsenBerjamaahFingerprint } from './actions'
 
 interface PresentLog {

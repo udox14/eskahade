@@ -1,14 +1,6 @@
 import React from 'react'
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-// Mantine CSS diimpor SETELAH globals.css agar menang atas Tailwind preflight
-import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
-import '@mantine/dates/styles.css';
-import { MantineProvider, ColorSchemeScript, mantineHtmlProps } from '@mantine/core';
-import { ModalsProvider } from '@mantine/modals';
-import { Notifications } from '@mantine/notifications';
-import { theme } from '@/lib/theme';
 import { Toaster } from "sonner";
 import { VersionWatcher } from '@/components/version-watcher'
 
@@ -54,12 +46,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" {...mantineHtmlProps}>
+    <html lang="id">
       <head>
-        <ColorSchemeScript defaultColorScheme="light" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         {/* Font Arab gaya mushaf (naskh) untuk teks hafalan */}
         <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Amiri+Quran&display=swap" rel="stylesheet" />
         {/* PWA meta tags tambahan untuk iOS Safari */}
@@ -101,17 +92,10 @@ export default function RootLayout({
           `
         }} />
       </head>
-      <body style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-        <MantineProvider theme={theme} defaultColorScheme="light">
-          <ModalsProvider>
-            {children}
-          </ModalsProvider>
-          {/* Notifikasi Mantine (dipakai page yang sudah migrasi) */}
-          <Notifications position="top-center" />
-          {/* sonner tetap aktif untuk page yang BELUM migrasi */}
-          <Toaster position="top-center" richColors />
-          <VersionWatcher />
-        </MantineProvider>
+      <body style={{ fontFamily: "'Inter', sans-serif" }}>
+        {children}
+        <Toaster position="top-center" richColors />
+        <VersionWatcher />
       </body>
     </html>
   );

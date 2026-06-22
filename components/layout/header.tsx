@@ -162,10 +162,8 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }
             )}
           >
             {/* Info nama — desktop */}
-            <div className="hidden md:flex flex-col items-end leading-none max-w-[180px]">
-              <span className="text-xs font-bold text-slate-800 truncate w-full text-right" title={userName}>
-                {userName}
-              </span>
+            <div className="hidden md:flex flex-col items-end leading-none">
+              <span className="text-xs font-bold text-slate-800">{firstName}</span>
               <span className={cn('text-[10px] font-semibold mt-0.5', roleColor)}>
                 {roleLabel}
               </span>

@@ -38,12 +38,11 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { Modal, Button, TextInput, Textarea, NativeSelect, SegmentedControl, ActionIcon } from '@mantine/core'
 
 type SantriRow = {
   id: string
@@ -181,61 +180,68 @@ function FilterBar({
       <div className="flex flex-wrap gap-3 items-end">
         <div className="min-w-[140px]">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-          <NativeSelect
+          <select
             value={asrama}
             onChange={e => setAsrama(e.target.value)}
-            data={[{ label: 'Semua Asrama', value: 'SEMUA' }, ...asramaList.map(a => ({ label: a, value: a }))]}
-          />
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
+            <option value="SEMUA">Semua Asrama</option>
+            {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
         </div>
         <div className="min-w-[140px]">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Kamar</label>
-          <NativeSelect
+          <select
             value={kamar}
             onChange={e => setKamar(e.target.value)}
-            data={[
-              { label: 'Semua Kamar', value: 'SEMUA' },
-              { label: 'Tanpa Kamar', value: 'TANPA_KAMAR' },
-              ...kamarList.map(k => ({ label: `Kamar ${k}`, value: k })),
-            ]}
-          />
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
+            <option value="SEMUA">Semua Kamar</option>
+            <option value="TANPA_KAMAR">Tanpa Kamar</option>
+            {kamarList.map(k => <option key={k} value={k}>Kamar {k}</option>)}
+          </select>
         </div>
         <div className="min-w-[140px]">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Kelas Formal</label>
-          <NativeSelect
+          <select
             value={kelasSekolah}
             onChange={e => setKelasSekolah(e.target.value)}
-            data={[
-              { label: 'Semua Kelas', value: 'SEMUA' },
-              ...kelasSekolahList.map(k => ({ label: `Kelas ${k}`, value: k })),
-            ]}
-          />
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
+            <option value="SEMUA">Semua Kelas</option>
+            {kelasSekolahList.map(k => <option key={k} value={k}>Kelas {k}</option>)}
+          </select>
         </div>
         <form onSubmit={e => { e.preventDefault(); onApply() }} className="flex-1 min-w-[180px]">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari</label>
-          <TextInput
-            placeholder="Nama atau NIS..."
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            leftSection={<Search className="w-3.5 h-3.5" />}
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Nama atau NIS..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
         </form>
-        <Button
+        <button
           onClick={onApply}
-          loading={loading}
-          color="yellow"
-          leftSection={!loading ? <Filter className="w-4 h-4" /> : undefined}
-          className="self-end"
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors self-end"
         >
-          Tampilkan
-        </Button>
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 self-end">
+          <Filter className="w-4 h-4" />
+          {loading ? 'Memuat...' : 'Tampilkan'}
+        </button>
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Baris:</span>
-          <NativeSelect
-            value={String(pageSize)}
+          <select
+            value={pageSize}
             onChange={e => setPageSize(Number(e.target.value))}
-            data={[10, 20, 50, 100, 0].map(v => ({ label: v === 0 ? 'Semua' : String(v), value: String(v) }))}
-            styles={{ input: { border: 'none', background: 'transparent', fontWeight: 700, fontSize: '0.875rem', color: '#374151' } }}
-          />
+            className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none"
+          >
+            {[10, 20, 50, 100, 0].map(v => <option key={v} value={v}>{v === 0 ? 'Semua' : v}</option>)}
+          </select>
         </div>
       </div>
     </div>
@@ -268,71 +274,78 @@ function NonaktifModal({
   }
 
   return (
-    <Modal
-      opened={true}
-      onClose={onClose}
-      title={
-        <div>
-          <p className="font-bold text-slate-900">Nonaktifkan Sementara</p>
-          <p className="text-sm text-slate-500 mt-0.5">{fmtNum(count)} santri dipilih</p>
-        </div>
-      }
-      size="md"
-      centered
-    >
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <TextInput
-              type="date"
-              label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mulai Nonaktif</span>}
-              value={tanggalMulai}
-              onChange={e => setTanggalMulai(e.target.value)}
-              required
-            />
-            <TextInput
-              type="date"
-              label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rencana Aktif</span>}
-              value={tanggalRencanaAktif}
-              onChange={e => setTanggalRencanaAktif(e.target.value)}
-            />
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-900">Nonaktifkan Sementara</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{fmtNum(count)} santri dipilih</p>
+            </div>
+            <button type="button" onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <TextInput
-            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alasan</span>}
-            value={alasan}
-            onChange={e => setAlasan(e.target.value)}
-            required
-          />
-          <Textarea
-            label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catatan</span>}
-            value={catatan}
-            onChange={e => setCatatan(e.target.value)}
-            rows={3}
-            placeholder="Opsional"
-            resize="none"
-          />
-          <div className="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-            <CalendarDays className="w-4 h-4 shrink-0 mt-0.5" />
-            <p>Santri akan tidak muncul di kegiatan yang hanya mengambil status aktif. Data induk, kelas, asrama, dan riwayat tetap disimpan.</p>
-          </div>
-        </div>
 
-        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
-          <Button type="button" onClick={onClose} variant="default" className="flex-1">
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            color="yellow"
-            className="flex-1"
-            leftSection={!saving ? <UserMinus className="w-4 h-4" /> : undefined}
-          >
-            Nonaktifkan
-          </Button>
-        </div>
-      </form>
-    </Modal>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Mulai Nonaktif</span>
+                <input
+                  type="date"
+                  value={tanggalMulai}
+                  onChange={e => setTanggalMulai(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Rencana Aktif</span>
+                <input
+                  type="date"
+                  value={tanggalRencanaAktif}
+                  onChange={e => setTanggalRencanaAktif(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Alasan</span>
+              <input
+                value={alasan}
+                onChange={e => setAlasan(e.target.value)}
+                required
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Catatan</span>
+              <textarea
+                value={catatan}
+                onChange={e => setCatatan(e.target.value)}
+                rows={3}
+                placeholder="Opsional"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+              />
+            </label>
+            <div className="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+              <CalendarDays className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>Santri akan tidak muncul di kegiatan yang hanya mengambil status aktif. Data induk, kelas, asrama, dan riwayat tetap disimpan.</p>
+            </div>
+          </div>
+
+          <div className="p-5 pt-0 flex gap-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Batal
+            </button>
+            <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
+              {saving ? 'Menyimpan...' : 'Nonaktifkan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -370,74 +383,85 @@ function AlumniModal({
   }
 
   return (
-    <Modal
-      opened={true}
-      onClose={onClose}
-      title={
-        <div>
-          <p className="font-bold text-slate-900">Jadikan Alumni</p>
-          <p className="text-sm text-slate-500 mt-0.5">{fmtNum(count)} santri nonaktif dipilih</p>
-        </div>
-      }
-      size="md"
-      centered
-    >
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          <SegmentedControl
-            value={mode}
-            onChange={v => setMode(v as 'existing' | 'new')}
-            fullWidth
-            data={[
-              { label: 'Grup Lama', value: 'existing', disabled: groups.length === 0 },
-              { label: 'Grup Baru', value: 'new' },
-            ]}
-          />
-
-          {mode === 'existing' ? (
-            <NativeSelect
-              label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Grup Arsip</span>}
-              value={groupKey}
-              onChange={e => setGroupKey(e.target.value)}
-              required
-              data={groups.map(group => ({
-                label: `${group.catatan || (group.angkatan ? `Angkatan ${group.angkatan}` : `Arsip ${group.tanggal_arsip}`)} - ${fmtTgl(group.tanggal_arsip)} (${fmtNum(group.jumlah)})`,
-                value: group.key,
-              }))}
-            />
-          ) : (
-            <TextInput
-              label={<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catatan Grup Baru</span>}
-              value={catatan}
-              onChange={e => setCatatan(e.target.value)}
-              required
-              placeholder="Contoh: Wisuda Angkatan 2026"
-            />
-          )}
-
-          <div className="flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-800">
-            <GraduationCap className="w-4 h-4 shrink-0 mt-0.5" />
-            <p>Santri akan dipindahkan dari daftar nonaktif ke Arsip Alumni. Log nonaktif aktif akan ditutup otomatis.</p>
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-900">Jadikan Alumni</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{fmtNum(count)} santri nonaktif dipilih</p>
+            </div>
+            <button type="button" onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        </div>
 
-        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
-          <Button type="button" onClick={onClose} variant="default" className="flex-1">
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            disabled={mode === 'existing' && !groupKey}
-            color="grape"
-            className="flex-1"
-            leftSection={!saving ? <GraduationCap className="w-4 h-4" /> : undefined}
-          >
-            Jadikan Alumni
-          </Button>
-        </div>
-      </form>
-    </Modal>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setMode('existing')}
+                disabled={groups.length === 0}
+                className={`rounded-xl px-3 py-2 text-sm font-bold transition-colors disabled:opacity-40 ${mode === 'existing' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'}`}
+              >
+                Grup Lama
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('new')}
+                className={`rounded-xl px-3 py-2 text-sm font-bold transition-colors ${mode === 'new' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'}`}
+              >
+                Grup Baru
+              </button>
+            </div>
+
+            {mode === 'existing' ? (
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Pilih Grup Arsip</span>
+                <select
+                  value={groupKey}
+                  onChange={e => setGroupKey(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {groups.map(group => (
+                    <option key={group.key} value={group.key}>
+                      {group.catatan || (group.angkatan ? `Angkatan ${group.angkatan}` : `Arsip ${group.tanggal_arsip}`)} - {fmtTgl(group.tanggal_arsip)} ({fmtNum(group.jumlah)})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Catatan Grup Baru</span>
+                <input
+                  value={catatan}
+                  onChange={e => setCatatan(e.target.value)}
+                  required
+                  placeholder="Contoh: Wisuda Angkatan 2026"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </label>
+            )}
+
+            <div className="flex gap-2.5 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-800">
+              <GraduationCap className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>Santri akan dipindahkan dari daftar nonaktif ke Arsip Alumni. Log nonaktif aktif akan ditutup otomatis.</p>
+            </div>
+          </div>
+
+          <div className="p-5 pt-0 flex gap-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Batal
+            </button>
+            <button type="submit" disabled={saving || (mode === 'existing' && !groupKey)} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
+              {saving ? 'Menyimpan...' : 'Jadikan Alumni'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -897,15 +921,10 @@ export default function SantriNonaktifPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span><strong className="text-slate-700">{fmtNum(groups.reduce((sum, group) => sum + group.jumlah, 0))}</strong> total alumni</span>
-            <Button
-              onClick={loadGroups}
-              loading={loadingGroups}
-              variant="default"
-              size="xs"
-              leftSection={!loadingGroups ? <RotateCcw className="w-3.5 h-3.5" /> : undefined}
-            >
+            <button onClick={loadGroups} disabled={loadingGroups} className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-60">
+              {loadingGroups ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
               Refresh
-            </Button>
+            </button>
           </div>
           {groups.map(group => (
             <button
@@ -952,83 +971,61 @@ export default function SantriNonaktifPage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
           <div className="flex flex-wrap gap-3 items-end">
             <form
-              onSubmit={e => { e.preventDefault(); openArchiveGroup(activeGroup, 1) }}
+              onSubmit={e => {
+                e.preventDefault()
+                openArchiveGroup(activeGroup, 1)
+              }}
               className="flex-1 min-w-[180px]"
             >
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari Alumni</label>
-              <TextInput
-                value={archiveSearch}
-                onChange={e => setArchiveSearch(e.target.value)}
-                placeholder="Nama atau NIS..."
-                leftSection={<Search className="w-3.5 h-3.5" />}
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  value={archiveSearch}
+                  onChange={e => setArchiveSearch(e.target.value)}
+                  placeholder="Nama atau NIS..."
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
             </form>
             {activeGroup.asramaList.length > 1 && (
               <div className="min-w-[150px]">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-                <NativeSelect
+                <select
                   value={archiveAsrama}
                   onChange={e => {
                     setArchiveAsrama(e.target.value)
                     openArchiveGroup(activeGroup, 1, archiveSearch, e.target.value)
                   }}
-                  data={[
-                    { label: 'Semua Asrama', value: 'SEMUA' },
-                    ...activeGroup.asramaList.map(asramaItem => ({ label: asramaItem, value: asramaItem })),
-                  ]}
-                />
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="SEMUA">Semua Asrama</option>
+                  {activeGroup.asramaList.map(asramaItem => <option key={asramaItem} value={asramaItem}>{asramaItem}</option>)}
+                </select>
               </div>
             )}
-            <Button
-              onClick={() => openArchiveGroup(activeGroup, 1)}
-              loading={loadingArchiveRows}
-              color="grape"
-              leftSection={!loadingArchiveRows ? <Filter className="w-4 h-4" /> : undefined}
-              className="self-end"
-            >
+            <button onClick={() => openArchiveGroup(activeGroup, 1)} disabled={loadingArchiveRows} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 disabled:opacity-60 transition-colors">
+              {loadingArchiveRows ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
               Tampilkan
-            </Button>
-            <Button
-              onClick={handleArchiveDownload}
-              loading={archiveBusy}
-              variant="default"
-              leftSection={<Download className="w-4 h-4" />}
-              className="self-end"
-            >
-              {selectedArchiveIds.length > 0 ? `Download (${fmtNum(selectedArchiveIds.length)})` : 'Download Grup'}
-            </Button>
+            </button>
+            <button onClick={handleArchiveDownload} disabled={archiveBusy} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-60 transition-colors">
+              <Download className="w-4 h-4" /> {selectedArchiveIds.length > 0 ? `Download (${fmtNum(selectedArchiveIds.length)})` : 'Download Grup'}
+            </button>
           </div>
         </div>
 
         {selectedArchiveIds.length > 0 && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-xs text-slate-500">{fmtNum(selectedArchiveIds.length)} dipilih</span>
-            <Button
-              onClick={() => setSelectedArchiveIds([])}
-              variant="default"
-              size="sm"
-              leftSection={<X className="w-4 h-4" />}
-            >
-              Batal Pilih
-            </Button>
-            <Button
-              onClick={() => handleArchiveDelete()}
-              loading={archiveBusy}
-              color="red"
-              size="sm"
-              leftSection={<Trash2 className="w-4 h-4" />}
-            >
-              Hapus Catatan
-            </Button>
-            <Button
-              onClick={handleArchiveRestore}
-              loading={archiveBusy}
-              color="green"
-              size="sm"
-              leftSection={<RotateCcw className="w-4 h-4" />}
-            >
-              Restore
-            </Button>
+            <button onClick={() => setSelectedArchiveIds([])} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">
+              <X className="w-4 h-4" /> Batal Pilih
+            </button>
+            <button onClick={() => handleArchiveDelete()} disabled={archiveBusy} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 disabled:opacity-60 transition-colors">
+              <Trash2 className="w-4 h-4" /> Hapus Catatan
+            </button>
+            <button onClick={handleArchiveRestore} disabled={archiveBusy} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+              <RotateCcw className="w-4 h-4" /> Restore
+            </button>
           </div>
         )}
 
@@ -1076,16 +1073,9 @@ export default function SantriNonaktifPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{row.asrama || '-'}</td>
                     <td className="px-4 py-3 text-right">
-                      <ActionIcon
-                        onClick={() => handleArchiveDelete(row.id)}
-                        disabled={archiveBusy}
-                        variant="subtle"
-                        color="red"
-                        size="sm"
-                        title="Hapus catatan arsip"
-                      >
+                      <button onClick={() => handleArchiveDelete(row.id)} disabled={archiveBusy} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50" title="Hapus catatan arsip">
                         <Trash2 className="w-4 h-4" />
-                      </ActionIcon>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1110,83 +1100,82 @@ export default function SantriNonaktifPage() {
   }
 
   return (
-    <div className="pb-16 space-y-5">
+    <div className="max-w-6xl mx-auto pb-16 space-y-5">
       <DashboardPageHeader
         title="Status Santri"
         description="Kelola alur santri aktif, nonaktif sementara, lalu alumni final."
       />
 
       <div className="flex flex-wrap gap-2 items-center justify-between">
-        <SegmentedControl
-          value={tab}
-          onChange={v => setTab(v as TabKey)}
-          data={[
-            { label: 'Nonaktifkan', value: 'aktif' },
-            { label: 'Daftar Nonaktif', value: 'nonaktif' },
-            { label: 'Alumni', value: 'alumni' },
-          ]}
-        />
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
+          {([
+            { key: 'aktif', label: 'Nonaktifkan', icon: UserMinus },
+            { key: 'nonaktif', label: 'Daftar Nonaktif', icon: UserCheck },
+            { key: 'alumni', label: 'Alumni', icon: Archive },
+          ] as const).map(item => (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                tab === item.key ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </button>
+          ))}
+        </div>
 
         {tab !== 'alumni' && (selectedIds.length > 0 || (tab === 'nonaktif' && hasLoaded && total > 0)) && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-xs text-slate-500">{fmtNum(selectedIds.length)} dipilih</span>
             {tab === 'nonaktif' && total > 0 && !allFilteredSelected && (
-              <Button
+              <button
                 onClick={selectAllFiltered}
-                loading={selectingAll}
-                color="teal"
-                variant="light"
-                size="sm"
-                leftSection={!selectingAll ? <CheckCircle className="w-4 h-4" /> : undefined}
+                disabled={selectingAll || loading}
+                className="flex items-center gap-2 px-4 py-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-100 disabled:opacity-60 transition-colors"
               >
+                {selectingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 Pilih Semua ({fmtNum(total)})
-              </Button>
+              </button>
             )}
             {selectedIds.length > 0 && (
-              <Button
+              <button
                 onClick={clearSelection}
-                variant="default"
-                size="sm"
-                leftSection={<X className="w-4 h-4" />}
+                className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
               >
-                Batal Pilih
-              </Button>
+                <X className="w-4 h-4" /> Batal Pilih
+              </button>
             )}
             {tab === 'aktif' ? (
-              <Button
+              <button
                 onClick={() => setShowModal(true)}
                 disabled={selectedIds.length === 0}
-                color="yellow"
-                size="sm"
-                leftSection={<UserMinus className="w-4 h-4" />}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-colors"
               >
-                Nonaktifkan
-              </Button>
+                <UserMinus className="w-4 h-4" /> Nonaktifkan
+              </button>
             ) : (
               <>
-                <Button
+                <button
                   onClick={() => {
                     if (!groupsLoaded) loadGroups()
                     setShowAlumniModal(true)
                   }}
-                  loading={archiving}
-                  disabled={selectedIds.length === 0}
-                  color="grape"
-                  size="sm"
-                  leftSection={!archiving ? <GraduationCap className="w-4 h-4" /> : undefined}
+                  disabled={archiving || selectedIds.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 disabled:opacity-60 transition-colors"
                 >
+                  {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
                   Jadikan Alumni
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={handleRestore}
-                  loading={restoring}
-                  disabled={selectedIds.length === 0}
-                  color="teal"
-                  size="sm"
-                  leftSection={!restoring ? <RotateCcw className="w-4 h-4" /> : undefined}
+                  disabled={restoring || selectedIds.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 transition-colors"
                 >
+                  {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                   Aktifkan Kembali
-                </Button>
+                </button>
               </>
             )}
           </div>

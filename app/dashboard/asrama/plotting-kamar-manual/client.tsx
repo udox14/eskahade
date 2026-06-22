@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import {
   CheckCircle,
   Crown,
@@ -381,7 +381,7 @@ ${printRooms.map(({ cfg, ketua, members }) => {
   }
 
   return (
-    <div className="space-y-5 pb-20">
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
       <div className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
         <DashboardPageHeader
           title="Plotting Kamar Manual"

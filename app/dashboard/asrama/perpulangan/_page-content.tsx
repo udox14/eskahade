@@ -28,7 +28,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 

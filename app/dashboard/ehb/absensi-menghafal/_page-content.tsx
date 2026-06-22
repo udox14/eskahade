@@ -16,7 +16,7 @@ import {
   Users,
   ClipboardList,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { fullDateWib, shortDateWib } from '../_date-utils'
 import {
   getActiveEventLight,

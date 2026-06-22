@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CalendarDays, Plus, CheckCircle, Circle, Trash2, BookOpen, Users, AlertTriangle, ShieldCheck } from 'lucide-react'
-import { toast } from '@/lib/toast'
-import { Button, ActionIcon, TextInput } from '@mantine/core'
+import { CalendarDays, Plus, CheckCircle, Circle, Trash2, Loader2, BookOpen, Users, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   getTahunAjaranList,
   tambahTahunAjaran,
@@ -44,20 +43,20 @@ export default function TahunAjaranPage() {
     }
   }
 
-  const handleAktifkan = async (id: number, namaTA: string) => {
-    if (!await confirm(`Aktifkan tahun ajaran "${namaTA}"?\n\nSemua kelas baru yang dibuat akan otomatis masuk ke tahun ajaran ini.`)) return
+  const handleAktifkan = async (id: number, nama: string) => {
+    if (!await confirm(`Aktifkan tahun ajaran "${nama}"?\n\nSemua kelas baru yang dibuat akan otomatis masuk ke tahun ajaran ini.`)) return
     setLoadingAktif(id)
     const res = await aktifkanTahunAjaran(id)
     setLoadingAktif(null)
     if ('error' in res) toast.error(res.error)
     else {
-      toast.success(`Tahun ajaran "${namaTA}" sekarang aktif.`)
+      toast.success(`Tahun ajaran "${nama}" sekarang aktif.`)
       loadData()
     }
   }
 
-  const handleHapus = async (id: number, namaTA: string) => {
-    if (!await confirm(`Hapus tahun ajaran "${namaTA}"?\nPastikan tidak ada kelas terkait.`)) return
+  const handleHapus = async (id: number, nama: string) => {
+    if (!await confirm(`Hapus tahun ajaran "${nama}"?\nPastikan tidak ada kelas terkait.`)) return
     setLoadingHapus(id)
     const res = await hapusTahunAjaran(id)
     setLoadingHapus(null)
@@ -71,12 +70,15 @@ export default function TahunAjaranPage() {
   const aktif = list.find(t => t.is_active)
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+
+      {/* HEADER */}
       <DashboardPageHeader
         title="Tahun Ajaran"
         description="Kelola tahun ajaran. Hanya satu yang bisa aktif dalam satu waktu, dan kelas baru otomatis terhubung ke tahun ajaran aktif."
       />
 
+      {/* INFO AKTIF */}
       {aktif && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
           <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -89,29 +91,30 @@ export default function TahunAjaranPage() {
         </div>
       )}
 
+      {/* FORM TAMBAH */}
       <div className="bg-white border rounded-xl shadow-sm p-6">
         <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">Tambah Tahun Ajaran Baru</h2>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <TextInput
+          <input
             value={nama}
             onChange={e => setNama(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleTambah()}
             placeholder="Contoh: 2025/2026"
-            className="flex-1 min-w-0"
+            className="flex-1 min-w-0 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500"
           />
-          <Button
+          <button
             onClick={handleTambah}
-            loading={isSaving}
-            disabled={!nama.trim()}
-            color="green"
-            leftSection={!isSaving ? <Plus className="w-4 h-4" /> : undefined}
+            disabled={isSaving || !nama.trim()}
+            className="w-full sm:w-auto bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors"
           >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Tambah
-          </Button>
+          </button>
         </div>
         <p className="text-xs text-slate-400 mt-2">Format yang disarankan: <span className="font-mono">2025/2026</span></p>
       </div>
 
+      {/* DAFTAR TAHUN AJARAN */}
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b bg-slate-50">
           <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Daftar Tahun Ajaran</h2>
@@ -119,7 +122,7 @@ export default function TahunAjaranPage() {
 
         {loading ? (
           <div className="p-12 flex justify-center">
-            <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
           </div>
         ) : list.length === 0 ? (
           <div className="p-12 text-center">
@@ -133,6 +136,7 @@ export default function TahunAjaranPage() {
                 key={ta.id}
                 className={`px-6 py-4 flex items-center gap-4 transition-colors ${ta.is_active ? 'bg-green-50/60' : 'hover:bg-slate-50'}`}
               >
+                {/* STATUS ICON */}
                 <div className="flex-shrink-0">
                   {ta.is_active
                     ? <CheckCircle className="w-6 h-6 text-green-600" />
@@ -140,6 +144,7 @@ export default function TahunAjaranPage() {
                   }
                 </div>
 
+                {/* INFO */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`font-bold text-base ${ta.is_active ? 'text-green-800' : 'text-slate-700'}`}>
@@ -163,30 +168,33 @@ export default function TahunAjaranPage() {
                   </div>
                 </div>
 
+                {/* ACTIONS */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {!ta.is_active && (
-                    <Button
+                    <button
                       onClick={() => handleAktifkan(ta.id, ta.nama)}
-                      loading={loadingAktif === ta.id}
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      leftSection={loadingAktif !== ta.id ? <CheckCircle className="w-3 h-3" /> : undefined}
+                      disabled={loadingAktif === ta.id}
+                      className="text-xs font-bold text-green-700 border border-green-300 bg-white hover:bg-green-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
+                      {loadingAktif === ta.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <CheckCircle className="w-3 h-3" />
+                      }
                       Aktifkan
-                    </Button>
+                    </button>
                   )}
                   {!ta.is_active && (
-                    <ActionIcon
+                    <button
                       onClick={() => handleHapus(ta.id, ta.nama)}
-                      loading={loadingHapus === ta.id}
-                      color="red"
-                      variant="light"
-                      size="sm"
+                      disabled={loadingHapus === ta.id}
+                      className="text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 p-1.5 rounded-lg transition-colors disabled:opacity-50"
                       title="Hapus tahun ajaran"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </ActionIcon>
+                      {loadingHapus === ta.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />
+                      }
+                    </button>
                   )}
                 </div>
               </div>
@@ -195,6 +203,7 @@ export default function TahunAjaranPage() {
         )}
       </div>
 
+      {/* CATATAN */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
         <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-amber-800 space-y-1">
@@ -207,6 +216,7 @@ export default function TahunAjaranPage() {
           </ul>
         </div>
       </div>
+
     </div>
   )
 }

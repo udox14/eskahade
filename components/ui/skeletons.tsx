@@ -1,111 +1,109 @@
-// Reusable skeleton components untuk Suspense fallbacks (Mantine)
-
-import { Group, Paper, SimpleGrid, Skeleton, Stack } from '@mantine/core'
+// Reusable skeleton components untuk Suspense fallbacks
 
 export function StatCardSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <SimpleGrid cols={{ base: 2, lg: 4 }} spacing="md">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[...Array(count)].map((_, i) => (
-        <Paper key={i} withBorder radius="lg" p="lg">
-          <Skeleton height={12} width={80} radius="sm" mb={12} />
-          <Skeleton height={32} width={64} radius="sm" mb={8} />
-          <Skeleton height={12} width={48} radius="sm" />
-        </Paper>
+        <div key={i} className="bg-white border border-gray-200 rounded-2xl p-5 animate-pulse">
+          <div className="h-3 w-20 bg-gray-200 rounded mb-3" />
+          <div className="h-8 w-16 bg-gray-200 rounded mb-2" />
+          <div className="h-3 w-12 bg-gray-100 rounded" />
+        </div>
       ))}
-    </SimpleGrid>
+    </div>
   )
 }
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden animate-pulse">
       {/* Header */}
-      <Group gap="md" px="lg" py="sm" bg="gray.0" wrap="nowrap">
+      <div className="flex gap-4 px-5 py-3.5 bg-gray-50 border-b border-gray-200">
         {[...Array(cols)].map((_, i) => (
-          <Skeleton key={i} height={12} radius="sm" style={{ flex: 1 }} />
+          <div key={i} className="h-3 bg-gray-200 rounded flex-1" />
         ))}
-      </Group>
+      </div>
       {/* Rows */}
       {[...Array(rows)].map((_, i) => (
-        <Group key={i} gap="md" px="lg" py="md" wrap="nowrap" style={{ borderTop: '1px solid var(--mantine-color-gray-1)' }}>
-          <Skeleton height={16} width={144} radius="sm" />
-          <Skeleton height={16} width={80} radius="sm" />
-          <Skeleton height={16} radius="sm" style={{ flex: 1 }} />
-          <Skeleton height={16} width={96} radius="sm" />
-          <Skeleton height={24} width={56} radius="xl" />
-        </Group>
+        <div key={i} className="flex gap-4 px-5 py-4 border-b border-gray-100 last:border-0">
+          <div className="h-4 bg-gray-100 rounded w-36" />
+          <div className="h-4 bg-gray-100 rounded w-20" />
+          <div className="h-4 bg-gray-100 rounded flex-1" />
+          <div className="h-4 bg-gray-100 rounded w-24" />
+          <div className="h-6 bg-gray-200 rounded-full w-14" />
+        </div>
       ))}
-    </Paper>
+    </div>
   )
 }
 
 export function CardListSkeleton({ count = 5 }: { count?: number }) {
   return (
-    <Stack gap="xs">
+    <div className="space-y-2 animate-pulse">
       {[...Array(count)].map((_, i) => (
-        <Paper key={i} withBorder radius="md" p="md">
-          <Group justify="space-between" mb="sm" align="flex-start">
-            <Stack gap={6}>
-              <Skeleton height={16} width={160} radius="sm" />
-              <Skeleton height={12} width={96} radius="sm" />
-            </Stack>
-            <Skeleton height={20} width={56} radius="xl" />
-          </Group>
-          <Skeleton height={12} radius="sm" mb="sm" />
-          <Group gap="xs" grow>
-            <Skeleton height={32} radius="md" />
-            <Skeleton height={32} radius="md" />
-          </Group>
-        </Paper>
+        <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex justify-between mb-3">
+            <div className="space-y-1.5">
+              <div className="h-4 w-40 bg-gray-200 rounded" />
+              <div className="h-3 w-24 bg-gray-100 rounded" />
+            </div>
+            <div className="h-5 w-14 bg-gray-200 rounded-full" />
+          </div>
+          <div className="h-3 w-full bg-gray-100 rounded mb-3" />
+          <div className="flex gap-2">
+            <div className="h-8 flex-1 bg-gray-100 rounded-lg" />
+            <div className="h-8 flex-1 bg-gray-100 rounded-lg" />
+          </div>
+        </div>
       ))}
-    </Stack>
+    </div>
   )
 }
 
 export function DashboardHeroSkeleton() {
-  return <Skeleton height={176} radius="lg" />
+  return (
+    <div className="bg-slate-200 rounded-3xl p-8 md:p-10 animate-pulse h-44" />
+  )
 }
 
 export function DetailSkeleton() {
   return (
-    <Stack gap="lg">
+    <div className="space-y-6 animate-pulse max-w-5xl mx-auto">
       {/* Header */}
-      <Group gap="md">
-        <Skeleton height={40} circle />
-        <Stack gap={8}>
-          <Skeleton height={24} width={192} radius="sm" />
-          <Skeleton height={16} width={128} radius="sm" />
-        </Stack>
-      </Group>
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-gray-200 rounded-full" />
+        <div className="space-y-2">
+          <div className="h-6 w-48 bg-gray-200 rounded" />
+          <div className="h-4 w-32 bg-gray-100 rounded" />
+        </div>
+      </div>
       {/* Card info */}
-      <Paper withBorder radius="lg" p="lg">
-        <Group gap="xl" align="flex-start" wrap="nowrap">
-          <Skeleton height={96} width={96} circle />
-          <Stack gap="sm" style={{ flex: 1 }}>
-            <Skeleton height={24} width={192} radius="sm" />
-            <Skeleton height={16} width={128} radius="sm" />
-            <SimpleGrid cols={2} spacing="sm">
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+        <div className="flex gap-6">
+          <div className="w-24 h-24 bg-gray-200 rounded-full shrink-0" />
+          <div className="flex-1 space-y-3">
+            <div className="h-6 w-48 bg-gray-200 rounded" />
+            <div className="h-4 w-32 bg-gray-100 rounded" />
+            <div className="grid grid-cols-2 gap-3">
               {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} height={16} radius="sm" />
+                <div key={i} className="h-4 bg-gray-100 rounded" />
               ))}
-            </SimpleGrid>
-          </Stack>
-        </Group>
-      </Paper>
+            </div>
+          </div>
+        </div>
+      </div>
       {/* Tabs */}
-      <Group gap="xs">
+      <div className="flex gap-2">
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} height={36} width={96} radius="md" />
+          <div key={i} className="h-9 w-24 bg-gray-200 rounded-lg" />
         ))}
-      </Group>
+      </div>
       {/* Content */}
-      <Paper withBorder radius="md" p="lg">
-        <Stack gap="sm">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} height={16} radius="sm" />
-          ))}
-        </Stack>
-      </Paper>
-    </Stack>
+      <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-4 bg-gray-100 rounded w-full" />
+        ))}
+      </div>
+    </div>
   )
 }

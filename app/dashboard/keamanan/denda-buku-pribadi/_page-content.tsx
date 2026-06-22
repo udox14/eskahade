@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { CheckCircle2, Eye, Filter, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { toast } from '@/lib/toast'
-import { Button, TextInput, NativeSelect, Modal, ActionIcon } from '@mantine/core'
+import { toast } from 'sonner'
 import Pagination from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
@@ -265,13 +264,18 @@ export default function DendaBukuPribadiPageContent() {
   }
 
   return (
-    <div className="pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Denda Buku Pribadi</h1>
           <p className="text-sm text-slate-500 mt-1">Catat kehilangan buku pribadi. Nominal otomatis naik Rp25.000 setiap kejadian.</p>
         </div>
-        <Button onClick={openCatatModal} color="pink" leftSection={<Plus className="w-4 h-4" />}>Catat Kehilangan</Button>
+        <button
+          onClick={openCatatModal}
+          className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow-sm"
+        >
+          <Plus className="w-4 h-4" /> Catat Kehilangan
+        </button>
       </div>
 
       <section className="bg-white border rounded-2xl p-5 space-y-4">

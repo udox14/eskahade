@@ -27,7 +27,7 @@ export default function StatusSetoranPage() {
   const fmtRp = (n: number) => `Rp ${new Intl.NumberFormat('id-ID').format(Number(n || 0))}`
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-4xl mx-auto pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">

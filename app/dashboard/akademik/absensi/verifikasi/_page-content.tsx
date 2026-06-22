@@ -6,7 +6,7 @@ import {
   Gavel, CheckCircle, Loader2, AlertTriangle,
   Save, ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Calendar, Users
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type VonisType = 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
@@ -199,7 +199,7 @@ export default function VerifikasiAbsenPage() {
   const totalDrafts = Object.keys(drafts).length
 
   return (
-    <div className="pb-32 space-y-6">
+    <div className="max-w-5xl mx-auto pb-32 space-y-6">
       {/* Header Utama */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>

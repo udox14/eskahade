@@ -12,7 +12,7 @@ import {
   LayoutList, Plus, Edit2, Trash2, MapPin, Users, Loader2, X,
   ArrowRightLeft, UserPlus, Search, AlertTriangle
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -276,7 +276,7 @@ export default function RuanganEhbPage() {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
 
   if (!event) return (
-    <div className="py-10">
+    <div className="max-w-4xl mx-auto py-10">
       <div className="bg-amber-50 text-amber-800 p-4 rounded-lg flex items-center gap-3">
         <AlertTriangle className="w-5 h-5" /> Belum ada event EHB yang aktif. Silakan atur di menu Jadwal EHB.
       </div>
@@ -284,7 +284,7 @@ export default function RuanganEhbPage() {
   )
 
   return (
-    <div className="pb-20 space-y-6">
+    <div className="max-w-6xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Ruangan EHB"
         description="Kelola daftar ruangan ujian dan peserta di dalamnya."

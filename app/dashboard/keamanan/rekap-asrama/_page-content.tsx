@@ -6,8 +6,7 @@ import { BarChart3, Moon, Sun, Home, Loader2, ChevronLeft, ChevronRight, Search,
 import ImportBerjamaahModal from './ImportBerjamaahModal'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
-import { toast } from '@/lib/toast'
-import { Button, TextInput, NativeSelect, ActionIcon, SegmentedControl } from '@mantine/core'
+import { toast } from 'sonner'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
@@ -64,17 +63,19 @@ export default function RekapAsramaPage() {
   const [bjSantri, setBjSantri] = useState<any[]>([])
   const [bjDetail, setBjDetail] = useState<Record<string, Record<string, any>>>({})
 
+  // Refs untuk akses nilai terbaru di dalam load() tanpa stale closure
   const sessionInfoRef = useRef<any>(null)
   const asramaRef = useRef(asrama)
   const bulanRef = useRef(bulan)
 
-  useEffect(() => {
+  useEffect(() => { 
     asramaRef.current = asrama
     setFilterKamar('Semua')
     getKamarList(asrama).then(k => setAvailableKamars(k))
   }, [asrama])
   useEffect(() => { bulanRef.current = bulan }, [bulan])
 
+  // Flag untuk auto-load setelah session tersedia
   const [sessionReady, setSessionReady] = useState(false)
 
   useEffect(() => {
@@ -89,6 +90,8 @@ export default function RekapAsramaPage() {
     })
   }, [])
 
+  // Auto-load untuk pengurus_asrama setelah session + asrama siap
+  // Pakai ref (bukan state) karena state belum ter-update saat useEffect jalan
   useEffect(() => {
     if (sessionReady && sessionInfoRef.current?.asrama_binaan) {
       load()
@@ -103,6 +106,7 @@ export default function RekapAsramaPage() {
       const currentBulan = bulanRef.current
       const si = sessionInfoRef.current
       const hideHaid = !si?.isPutri || si?.role === 'keamanan'
+      const isPutriAsrama = ASRAMA_PUTRI.includes(currentAsrama)
 
       const [malam, bj] = await Promise.all([
         getRekapAbsenMalam(currentAsrama, currentBulan),
@@ -117,7 +121,7 @@ export default function RekapAsramaPage() {
       setHasLoaded(true)
     } catch (error: any) {
       console.error(error)
-      toast.error("Gagal memuat rekap asrama.", { description: error?.message || "Unknown error" })
+      alert("Gagal memuat rekap asrama. Silakan coba lagi. Error: " + (error?.message || "Unknown error"))
     } finally {
       setLoading(false)
     }
@@ -128,32 +132,44 @@ export default function RekapAsramaPage() {
       toast.info('Tidak ada data absen malam untuk diexport.')
       return
     }
+
     setExportingMalam(true)
     const exportToast = toast.loading('Menyiapkan file Excel...')
     try {
       const XLSX = await import('xlsx')
       const headers = [
-        'Nama Santri', 'NIS', 'Asrama', 'Kamar', 'Total Alfa',
+        'Nama Santri',
+        'NIS',
+        'Asrama',
+        'Kamar',
+        'Total Alfa',
         ...daysArr.map(tanggal => formatTanggalPendek(tanggal)),
       ]
+
       const rows = filteredMalamSantri.map(s => {
         const detail = malamDetail[s.id] || {}
         const statusValues = daysArr.map(tanggal => detail[tanggal] === 'ALFA' ? 'A' : '')
         return [
-          s.nama_lengkap, s.nis || '-', asrama,
+          s.nama_lengkap,
+          s.nis || '-',
+          asrama,
           s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar',
           malamAlfa[s.id] || 0,
           ...statusValues,
         ]
       })
+
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
       ws['!cols'] = headers.map((h, i) => ({
         wch: Math.min(Math.max(h.length, ...rows.map(r => String(r[i] || '').length)) + 2, i < 5 ? 32 : 12),
       }))
+
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absen Malam')
+
       const namaAsrama = asrama.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '')
       XLSX.writeFile(wb, `Rekap_Absen_Malam_${namaAsrama}_${bulan}.xlsx`)
+
       toast.success('Berhasil export ke Excel')
     } catch (err) {
       console.error(err)
@@ -188,7 +204,7 @@ export default function RekapAsramaPage() {
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
     return matchKamar && matchSearch
   })
-
+  
   const filteredBjSantri = bjSantri.filter(s => {
     const matchKamar = filterKamar === 'Semua' || (s.kamar || 'Tanpa Kamar') === filterKamar
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
@@ -196,8 +212,9 @@ export default function RekapAsramaPage() {
   })
 
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-5 max-w-7xl mx-auto pb-16">
 
+      {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
         <DashboardPageHeader
           title="Rekap Absen Asrama"
@@ -205,121 +222,122 @@ export default function RekapAsramaPage() {
           className="flex-1"
         />
         <div className="flex items-center gap-2 flex-wrap">
+
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <ActionIcon
-              onClick={() => setBulan(b => prevBulan(b))}
-              variant="subtle"
-              color="gray"
-              size="sm"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </ActionIcon>
+            <button onClick={() => setBulan(b => prevBulan(b))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+              <ChevronLeft className="w-4 h-4"/>
+            </button>
             <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <ActionIcon
-              onClick={() => setBulan(b => nextBulan(b))}
-              disabled={bulan >= bulanIni()}
-              variant="subtle"
-              color="gray"
-              size="sm"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </ActionIcon>
+            <button onClick={() => setBulan(b => nextBulan(b))} disabled={bulan >= bulanIni()}
+              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+              <ChevronRight className="w-4 h-4"/>
+            </button>
           </div>
 
           {sessionInfo?.asrama_binaan
             ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
-                <Home className="w-3.5 h-3.5" /> {sessionInfo.asrama_binaan}
+                <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
               </span>
-            : <NativeSelect
-                value={asrama}
-                onChange={e => setAsrama(e.target.value)}
-                data={ASRAMA_LIST.map(a => ({ label: a, value: a }))}
-              />
+            : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm">
+                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
           }
 
-          <NativeSelect
+          <select
             value={filterKamar}
             onChange={e => setFilterKamar(e.target.value)}
             disabled={availableKamars.length === 0}
-            data={[
-              { label: 'Semua Kamar', value: 'Semua' },
-              ...availableKamars.map(k => ({ label: k === 'Tanpa Kamar' ? k : `Kamar ${k}`, value: k })),
-            ]}
-          />
-
-          <Button
-            onClick={load}
-            loading={loading}
-            leftSection={loading ? null : <Search className="w-4 h-4" />}
-            color={!hasLoaded ? 'indigo' : 'gray'}
-            variant={!hasLoaded ? 'filled' : 'light'}
+            className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
-            {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-          </Button>
+            <option value="Semua">Semua Kamar</option>
+            {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+          </select>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+              : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
+            }
+          </button>
         </div>
       </div>
 
+      {/* TABS & FILTER */}
       {hasLoaded && !loading && (
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <SegmentedControl
-            value={tab}
-            onChange={v => setTab(v as 'malam' | 'berjamaah')}
-            data={[
-              { label: <span className="flex items-center gap-2"><Moon className="w-4 h-4" />Absen Malam</span>, value: 'malam' },
-              { label: <span className="flex items-center gap-2"><Sun className="w-4 h-4" />Berjamaah</span>, value: 'berjamaah' },
-            ]}
-          />
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+            <button onClick={() => setTab('malam')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'malam' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Moon className="w-4 h-4"/> Absen Malam
+            </button>
+            <button onClick={() => setTab('berjamaah')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'berjamaah' ? 'bg-white shadow text-teal-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Sun className="w-4 h-4"/> Berjamaah
+            </button>
+          </div>
+          
           <div className="flex gap-2 w-full flex-wrap sm:w-auto sm:flex-nowrap">
             {tab === 'malam' && (
-              <Button
+              <button
                 onClick={handleExportMalamExcel}
-                loading={exportingMalam}
-                disabled={filteredMalamSantri.length === 0}
-                leftSection={<FileSpreadsheet className="w-4 h-4" />}
-                color="green"
-                variant="light"
+                disabled={exportingMalam || filteredMalamSantri.length === 0}
+                className="flex shrink-0 items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-100 active:scale-95 transition text-sm disabled:opacity-50"
                 title="Export Excel Rekap Absen Malam"
               >
+                {exportingMalam ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileSpreadsheet className="w-4 h-4"/>}
                 <span className="hidden lg:block">Export Excel</span>
-              </Button>
+              </button>
             )}
             {tab === 'berjamaah' && !isPutri && (
-              <Button
-                onClick={() => setShowImportModal(true)}
-                leftSection={<Upload className="w-4 h-4" />}
-                color="indigo"
-                variant="light"
+              <button 
+                onClick={() => setShowImportModal(true)} 
+                className="flex shrink-0 items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-bold shadow-sm hover:bg-indigo-100 active:scale-95 transition text-sm"
                 title="Import Excel Mesin Fingerprint"
               >
+                <Upload className="w-4 h-4"/>
                 <span className="hidden lg:block">Import Excel</span>
-              </Button>
+              </button>
             )}
-            <TextInput
-              placeholder="Cari nama santri..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              leftSection={<Search className="w-4 h-4" />}
-              className="flex-1 min-w-[200px] sm:w-64"
-            />
+            <div className="relative flex-1 min-w-[200px] sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari nama santri..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
         </div>
       )}
 
+      {/* KONTEN */}
       {!hasLoaded && !loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
-            <BarChart3 className="w-10 h-10 text-indigo-300" />
+            <BarChart3 className="w-10 h-10 text-indigo-300"/>
           </div>
           <div>
             <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
             <p className="text-sm text-slate-400 mt-1">Pilih asrama & bulan lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
-          <Button onClick={load} color="indigo">Tampilkan Sekarang</Button>
+          <button onClick={load}
+            className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow">
+            Tampilkan Sekarang
+          </button>
         </div>
 
       ) : loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-400" />
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-400"/>
         </div>
 
       ) : roomFeatureBlocked ? (
@@ -328,6 +346,7 @@ export default function RekapAsramaPage() {
         </div>
       ) : (
         <>
+          {/* ABSEN MALAM */}
           {tab === 'malam' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -400,6 +419,7 @@ export default function RekapAsramaPage() {
             </div>
           )}
 
+          {/* ABSEN BERJAMAAH */}
           {tab === 'berjamaah' && (
             <div className="space-y-4">
               {filteredBjSantri.length === 0 ? (

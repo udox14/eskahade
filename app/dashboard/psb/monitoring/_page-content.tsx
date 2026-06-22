@@ -3,9 +3,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Loader2, Search } from 'lucide-react'
-import { toast } from '@/lib/toast'
-import { Button, TextInput, NativeSelect, Pagination as MantinePagination } from '@mantine/core'
+import { BarChart3, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { getPsbMonitoring, type PsbStatus } from '../actions'
 
@@ -74,29 +73,41 @@ export default function PsbMonitoringContent() {
 
       <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
         <div className="grid gap-2 md:grid-cols-[1fr_160px_190px_190px_auto]">
-          <TextInput
-            value={filters.q}
-            onChange={e => setFilters(prev => ({ ...prev, q: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && load()}
-            placeholder="Cari nama atau NIS"
-            leftSection={<Search className="h-4 w-4"/>}
-          />
-          <NativeSelect
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={filters.q}
+              onChange={e => setFilters(prev => ({ ...prev, q: e.target.value }))}
+              onKeyDown={e => e.key === 'Enter' && load()}
+              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Cari nama atau NIS"
+            />
+          </div>
+          <select
             value={filters.sekolah}
             onChange={e => setFilters(prev => ({ ...prev, sekolah: e.target.value }))}
-            data={[{ label: 'Semua sekolah', value: '' }, ...(data?.sekolahList?.map((item: string) => ({ label: item, value: item })) ?? [])]}
-          />
-          <NativeSelect
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Semua sekolah</option>
+            {data?.sekolahList?.map((item: string) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select
             value={filters.asrama}
             onChange={e => setFilters(prev => ({ ...prev, asrama: e.target.value }))}
-            data={[{ label: 'Semua asrama', value: '' }, ...(data?.asramaList?.map((item: string) => ({ label: item, value: item })) ?? [])]}
-          />
-          <NativeSelect
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Semua asrama</option>
+            {data?.asramaList?.map((item: string) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select
             value={filters.status}
             onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-            data={[{ label: 'Semua status', value: '' }, ...STATUS_LIST.map(status => ({ label: STATUS_LABEL[status], value: status }))]}
-          />
-          <Button onClick={() => { setPage(1); load() }} color="dark">Tampilkan</Button>
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Semua status</option>
+            {STATUS_LIST.map(status => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
+          </select>
+          <button onClick={() => { setPage(1); load() }} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Tampilkan</button>
         </div>
       </div>
 
@@ -172,27 +183,36 @@ export default function PsbMonitoringContent() {
 
             <div className="flex flex-col gap-3 border-t bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">
-                Menampilkan <b>{rows.length ? (safePage - 1) * pageSize + 1 : 0}</b>–<b>{Math.min(safePage * pageSize, rows.length)}</b> dari <b>{rows.length}</b> santri
+                Menampilkan <b>{rows.length ? (safePage - 1) * pageSize + 1 : 0}</b>-<b>{Math.min(safePage * pageSize, rows.length)}</b> dari <b>{rows.length}</b> santri
               </p>
               <div className="flex items-center gap-2">
-                <NativeSelect
-                  value={String(pageSize)}
+                <select
+                  value={pageSize}
                   onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
-                  size="xs"
-                  data={[
-                    { label: '10 / halaman', value: '10' },
-                    { label: '20 / halaman', value: '20' },
-                    { label: '50 / halaman', value: '50' },
-                    { label: '100 / halaman', value: '100' },
-                  ]}
-                />
-                <MantinePagination
-                  value={safePage}
-                  onChange={setPage}
-                  total={totalPages}
-                  withEdges
-                  size="sm"
-                />
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-600 outline-none"
+                >
+                  <option value={10}>10 / halaman</option>
+                  <option value={20}>20 / halaman</option>
+                  <option value={50}>50 / halaman</option>
+                  <option value={100}>100 / halaman</option>
+                </select>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="min-w-16 text-center text-xs font-bold text-slate-600">
+                  {safePage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </>

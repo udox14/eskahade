@@ -5,8 +5,6 @@ import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenM
 import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
-import { toast } from '@/lib/toast'
-import { Button, TextInput, NativeSelect, ActionIcon, SegmentedControl } from '@mantine/core'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 
@@ -96,26 +94,26 @@ export default function RekapAbsenMalamPage() {
       setHasLoaded(true)
     } catch (error: any) {
       console.error(error)
-      toast.error("Gagal memuat rekap absen malam.", { description: error?.message || "Unknown error" })
+      alert("Gagal memuat rekap absen malam. Error: " + (error?.message || "Unknown error"))
     } finally {
       setLoading(false)
     }
   }
 
   const handleCancelAlfa = async (santriId: string, nama: string, tanggalStr: string) => {
-    const ok = window.confirm(`Apakah Anda yakin ingin membatalkan status ALFA untuk ${nama} pada tanggal ${formatTanggal(tanggalStr)}?`)
-    if (!ok) return
+    const confirm = window.confirm(`Apakah Anda yakin ingin membatalkan status ALFA untuk ${nama} pada tanggal ${formatTanggal(tanggalStr)}?`)
+    if (!confirm) return
 
     setLoading(true)
     try {
       const res = await deleteAbsenMalamRecord(santriId, tanggalStr)
       if ('error' in res) {
-        toast.error(res.error)
+        alert(res.error)
         return
       }
       await load()
     } catch (e: any) {
-      toast.error("Gagal membatalkan alfa", { description: e?.message || String(e) })
+      alert("Gagal membatalkan alfa: " + (e?.message || e))
     } finally {
       setLoading(false)
     }
@@ -162,8 +160,9 @@ export default function RekapAbsenMalamPage() {
   const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-5 max-w-7xl mx-auto pb-16">
 
+      {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
         <DashboardPageHeader
           title="Rekap Absen Malam"
@@ -172,114 +171,127 @@ export default function RekapAbsenMalamPage() {
         />
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <ActionIcon
-              onClick={() => handleBulanChange(prevBulan(bulan))}
-              variant="subtle"
-              color="gray"
-              size="sm"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </ActionIcon>
+            <button onClick={() => handleBulanChange(prevBulan(bulan))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+              <ChevronLeft className="w-4 h-4"/>
+            </button>
             <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <ActionIcon
-              onClick={() => handleBulanChange(nextBulan(bulan))}
-              disabled={bulan >= bulanIni()}
-              variant="subtle"
-              color="gray"
-              size="sm"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </ActionIcon>
+            <button onClick={() => handleBulanChange(nextBulan(bulan))} disabled={bulan >= bulanIni()}
+              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+              <ChevronRight className="w-4 h-4"/>
+            </button>
           </div>
 
           {sessionInfo?.asrama_binaan
             ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
-                <Home className="w-3.5 h-3.5" /> {sessionInfo.asrama_binaan}
+                <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
               </span>
-            : <NativeSelect
-                value={asrama}
-                onChange={e => setAsrama(e.target.value)}
-                data={ASRAMA_LIST.map(a => ({ label: a, value: a }))}
-              />
+            : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm">
+                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
           }
 
-          <TextInput
-            type="date"
-            value={tanggal}
-            onChange={e => handleTanggalChange(e.target.value)}
-            leftSection={<CalendarDays className="h-4 w-4" />}
-            rightSection={tanggal
-              ? <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="xs"
-                  onClick={() => setTanggal('')}
-                  title="Tampilkan semua tanggal bulan ini"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </ActionIcon>
-              : null
-            }
-            title="Filter tanggal"
-          />
+          <div className="flex items-center gap-1 bg-white border rounded-xl px-3 py-2 shadow-sm">
+            <CalendarDays className="h-4 w-4 text-slate-400" />
+            <input
+              type="date"
+              value={tanggal}
+              onChange={e => handleTanggalChange(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+              title="Filter tanggal"
+            />
+            {tanggal ? (
+              <button
+                type="button"
+                onClick={() => setTanggal('')}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title="Tampilkan semua tanggal bulan ini"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
 
-          <NativeSelect
+          <select
             value={filterKamar}
             onChange={e => setFilterKamar(e.target.value)}
             disabled={availableKamars.length === 0}
-            data={[
-              { label: 'Semua Kamar', value: 'Semua' },
-              ...availableKamars.map(k => ({ label: k === 'Tanpa Kamar' ? k : `Kamar ${k}`, value: k })),
-            ]}
-          />
-
-          <Button
-            onClick={load}
-            loading={loading}
-            leftSection={loading ? null : <Search className="w-4 h-4" />}
-            color={!hasLoaded ? 'indigo' : 'gray'}
-            variant={!hasLoaded ? 'filled' : 'light'}
+            className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
-            {hasLoaded ? 'Perbarui' : 'Tampilkan'}
-          </Button>
+            <option value="Semua">Semua Kamar</option>
+            {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+          </select>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+              : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
+            }
+          </button>
         </div>
       </div>
 
+      {/* TABS & FILTER */}
       {hasLoaded && !loading && (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <SegmentedControl
-            value={activeTab}
-            onChange={v => setActiveTab(v as 'bulan' | 'riwayat')}
-            data={[
-              { label: <span className="flex items-center gap-2"><Moon className="h-4 w-4" />Rekap Bulan Ini</span>, value: 'bulan' },
-              { label: <span className="flex items-center gap-2"><History className="h-4 w-4" />Riwayat Semua Alfa</span>, value: 'riwayat' },
-            ]}
-          />
-          <TextInput
-            placeholder="Cari nama santri..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            leftSection={<Search className="w-4 h-4" />}
-            className="w-full sm:w-64"
-          />
+          <div className="flex w-fit gap-1 rounded-xl bg-slate-100 p-1">
+            <button
+              onClick={() => setActiveTab('bulan')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                activeTab === 'bulan' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Moon className="h-4 w-4" />
+              Rekap Bulan Ini
+            </button>
+            <button
+              onClick={() => setActiveTab('riwayat')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                activeTab === 'riwayat' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <History className="h-4 w-4" />
+              Riwayat Semua Alfa
+            </button>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari nama santri..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
         </div>
       )}
 
+      {/* KONTEN */}
       {!hasLoaded && !loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
-            <Moon className="w-10 h-10 text-indigo-300" />
+            <Moon className="w-10 h-10 text-indigo-300"/>
           </div>
           <div>
             <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
             <p className="text-sm text-slate-400 mt-1">Pilih asrama, bulan atau tanggal, lalu tekan <strong>Tampilkan</strong>.</p>
           </div>
-          <Button onClick={load} color="indigo">Tampilkan Sekarang</Button>
+          <button onClick={load}
+            className="mt-1 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow">
+            Tampilkan Sekarang
+          </button>
         </div>
 
       ) : loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-400" />
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-400"/>
         </div>
 
       ) : roomFeatureBlocked ? (
@@ -308,54 +320,54 @@ export default function RekapAbsenMalamPage() {
           </div>
 
           {activeTab === 'riwayat' && (
-            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-              <div className="bg-slate-900 text-white px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-bold">Riwayat Semua Alfa</p>
-                  <p className="text-xs text-slate-400">Tidak tergantung bulan yang sedang dibuka.</p>
-                </div>
-                <span className="text-xs text-slate-400">{filteredRiwayatAlfa.length} santri</span>
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-slate-900 text-white px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold">Riwayat Semua Alfa</p>
+                <p className="text-xs text-slate-400">Tidak tergantung bulan yang sedang dibuka.</p>
               </div>
-              {filteredRiwayatAlfa.length === 0 ? (
-                <div className="py-10 text-center text-slate-400">
-                  Belum ada riwayat ALFA absen malam untuk filter ini.
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {filteredRiwayatAlfa.map((santri: any) => (
-                    <div key={santri.id} className="px-4 py-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
-                          <p className="text-xs text-slate-400">{santri.nis || '-'} / Kamar {santri.kamar || '-'}</p>
-                        </div>
-                        <span className="w-fit rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-600">
-                          {santri.total_alfa}x ALFA
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {santri.tanggal.map((item: any) => (
-                          <span key={`${santri.id}-${item.tanggal}`} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 pl-2 pr-1.5 py-1 text-xs font-semibold text-red-700">
-                            <span>
-                              {formatTanggal(item.tanggal)}
-                              {item.keterangan ? ` - ${item.keterangan}` : ''}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleCancelAlfa(santri.id, santri.nama_lengkap, item.tanggal)}
-                              className="rounded-md p-0.5 hover:bg-red-200 hover:text-red-900 transition-colors cursor-pointer"
-                              title={`Batalkan Alfa tanggal ${item.tanggal}`}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <span className="text-xs text-slate-400">{filteredRiwayatAlfa.length} santri</span>
             </div>
+            {filteredRiwayatAlfa.length === 0 ? (
+              <div className="py-10 text-center text-slate-400">
+                Belum ada riwayat ALFA absen malam untuk filter ini.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {filteredRiwayatAlfa.map((santri: any) => (
+                  <div key={santri.id} className="px-4 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-bold text-sm text-slate-800">{santri.nama_lengkap}</p>
+                        <p className="text-xs text-slate-400">{santri.nis || '-'} / Kamar {santri.kamar || '-'}</p>
+                      </div>
+                      <span className="w-fit rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-600">
+                        {santri.total_alfa}x ALFA
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {santri.tanggal.map((item: any) => (
+                        <span key={`${santri.id}-${item.tanggal}`} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 pl-2 pr-1.5 py-1 text-xs font-semibold text-red-700">
+                          <span>
+                            {formatTanggal(item.tanggal)}
+                            {item.keterangan ? ` - ${item.keterangan}` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelAlfa(santri.id, santri.nama_lengkap, item.tanggal)}
+                            className="rounded-md p-0.5 hover:bg-red-200 hover:text-red-900 transition-colors cursor-pointer"
+                            title={`Batalkan Alfa tanggal ${item.tanggal}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           )}
 
           {activeTab === 'bulan' && (filteredSantri.length === 0 ? (

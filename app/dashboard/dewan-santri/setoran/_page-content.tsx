@@ -1,14 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Button, ActionIcon, TextInput, NativeSelect, Modal, Alert, SegmentedControl, Pagination as MantinePagination, Group } from '@mantine/core'
 import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, Eye, Check, Search, Save, FileText, Download, CalendarDays
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download, CalendarDays
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import dynamic from 'next/dynamic'
 
@@ -443,79 +442,71 @@ export default function MonitoringSetoranPage() {
         </div>
 
         {!userAsrama && (
-          <NativeSelect
+          <select
             value={filterAsrama}
             onChange={e => setFilterAsrama(e.target.value)}
-            data={[
-              { label: 'Semua Asrama', value: 'SEMUA' },
-              { label: 'Sudah Setor', value: 'SUDAH_SETOR' },
-              { label: 'Belum Setor', value: 'BELUM_SETOR' },
-              ...(hasLoaded && data.length > 0 ? data.map(r => ({ label: r.unit_setor, value: r.unit_setor })) : []),
-            ]}
-          />
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="SEMUA">Semua Asrama</option>
+            <option value="SUDAH_SETOR">Sudah Setor</option>
+            <option value="BELUM_SETOR">Belum Setor</option>
+            {hasLoaded && data.length > 0 && (
+              <>
+                <option disabled>──────────</option>
+                {data.map(r => (
+                  <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                ))}
+              </>
+            )}
+          </select>
         )}
 
         <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 flex-1 min-w-[220px]">
           <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
           <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</span>
-          <TextInput
+          <input
             type="month"
             value={billingStartInput}
             onChange={e => setBillingStartInput(e.target.value)}
-            className="flex-1 min-w-0"
-            size="sm"
+            className="h-9 flex-1 min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <ActionIcon type="submit" loading={savingBillingStart} color="dark" size="lg" radius="md" title="Simpan mulai tagihan">
-            <Save className="w-3.5 h-3.5"/>
-          </ActionIcon>
+          <button type="submit" disabled={savingBillingStart} className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
+            {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          </button>
         </form>
 
-        <Group gap="xs" className="w-full sm:w-auto sm:ml-auto" wrap="wrap">
-          <Button
-            onClick={() => load()}
-            loading={loading}
-            leftSection={!loading ? <RefreshCw className="w-3.5 h-3.5"/> : undefined}
-            color={!hasLoaded ? 'blue' : 'gray'}
-            variant={!hasLoaded ? 'filled' : 'light'}
-            className="flex-1 sm:flex-none"
-          >
+        <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+          <button onClick={() => load()} disabled={loading} className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Memuat...' : (_setoranCache && _setoranCache.tahun === tahun && _setoranCache.bulan === bulan ? 'Tarik Data (Cache)' : 'Tarik Data')}
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
             onClick={() => setIsSetoranWindowModalOpen(true)}
-            leftSection={<CalendarDays className="w-3.5 h-3.5"/>}
-            color={setoranWindow ? 'indigo' : 'gray'}
-            variant={setoranWindow ? 'light' : 'outline'}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap ${setoranWindow ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
             title="Atur tanggal mulai setoran"
-            className="flex-1 sm:flex-none"
           >
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
             {setoranWindow ? format(new Date(setoranWindow), 'd MMM') : 'Mulai Setor'}
-          </Button>
-        </Group>
+          </button>
+        </div>
       </div>
 
       {/* Tabs Menu */}
-      <SegmentedControl
-        value={activeTab}
-        onChange={v => setActiveTab(v as typeof activeTab)}
-        data={[
-          { label: 'Setoran Unit', value: 'setoran' },
-          { label: 'Daftar Penunggak', value: 'penunggak' },
-          { label: 'Bebas SPP', value: 'bebas' },
-        ]}
-        fullWidth
-        mb="md"
-      />
+      <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1 mb-6">
+        <button onClick={() => setActiveTab('setoran')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'setoran' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Setoran Unit</button>
+        <button onClick={() => setActiveTab('penunggak')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'penunggak' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daftar Penunggak</button>
+        <button onClick={() => setActiveTab('bebas')} className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'bebas' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bebas SPP</button>
+      </div>
 
       {activeTab === 'setoran' && (
         <>
           {hasLoaded && <MonitoringPrintControls hasLoaded={hasLoaded} data={data} bulan={bulan} tahun={tahun} nominal={nominal} tahunAjaran={tahunAjaranDisplay} />}
 
           {selectedBeforeBillingStart && hasLoaded && (
-            <Alert color="blue" mb="md">
-              Periode {BULAN_NAMA[bulan]} {tahun} berstatus <strong>BELUM ADA TAGIHAN</strong>. Awal tagihan aktif dimulai {BULAN_NAMA[billingStart.bulan]} {billingStart.tahun}.
-            </Alert>
+            <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Periode {BULAN_NAMA[bulan]} {tahun} berstatus <span className="font-bold">BELUM ADA TAGIHAN</span>. Awal tagihan aktif dimulai {BULAN_NAMA[billingStart.bulan]} {billingStart.tahun}.
+            </div>
           )}
 
           {/* ── Ringkasan Total - Sleek Version ── */}
@@ -634,36 +625,45 @@ export default function MonitoringSetoranPage() {
           {/* Filter Bar */}
           <div className="bg-white border rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-end">
-              <NativeSelect
-                label={<span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Unit / Asrama</span>}
-                value={selectedAsramaPenunggak}
-                onChange={e => { setSelectedAsramaPenunggak(e.target.value); setSearchPenunggak(''); }}
-                data={[
-                  { label: '-- Pilih Asrama --', value: '' },
-                  ...data.map((r: AsramaRow) => ({ label: r.unit_setor, value: r.unit_setor })),
-                  { label: 'Semua Asrama', value: 'SEMUA' },
-                ]}
-              />
+              <div className="flex flex-col">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Unit / Asrama</label>
+                <select
+                  value={selectedAsramaPenunggak}
+                  onChange={e => { setSelectedAsramaPenunggak(e.target.value); setSearchPenunggak(''); }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                >
+                  <option value="">-- Pilih Asrama --</option>
+                  {data.map(r => (
+                    <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                  ))}
+                  <option value="SEMUA">Semua Asrama</option>
+                </select>
+              </div>
 
               {selectedAsramaPenunggak && (
-                <TextInput
-                  label={<span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cari Nama</span>}
-                  leftSection={<Search className="w-4 h-4"/>}
-                  placeholder="Cari santri..."
-                  value={searchPenunggak}
-                  onChange={e => { setSearchPenunggak(e.target.value); setPagePenunggak(1); }}
-                  className="flex-1 sm:flex-none"
-                />
+                <div className="flex flex-col flex-1 sm:flex-none">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cari Nama</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Cari santri..."
+                      value={searchPenunggak}
+                      onChange={e => { setSearchPenunggak(e.target.value); setPagePenunggak(1); }}
+                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                    />
+                  </div>
+                </div>
               )}
 
-              <Button
+              <button
                 type="button"
                 onClick={() => setIsExportModalOpen(true)}
-                leftSection={<Download className="w-4 h-4"/>}
-                color="teal"
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-sm transition-all h-10"
               >
+                <Download className="w-4 h-4" />
                 Export Excel
-              </Button>
+              </button>
             </div>
 
             {selectedAsramaPenunggak && (
@@ -745,30 +745,38 @@ export default function MonitoringSetoranPage() {
               {/* Pagination Footer for Penunggak */}
               {filteredPenunggak.length > 0 && (
                 <div className="bg-slate-50 border-t px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <Group gap="xs" align="center">
-                    <span className="text-sm text-slate-600">Tampilkan:</span>
-                    <NativeSelect
-                      value={String(pageSizePenunggak)}
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>Tampilkan:</span>
+                    <select 
+                      value={pageSizePenunggak} 
                       onChange={e => { setPageSizePenunggak(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPagePenunggak(1); }}
-                      data={[
-                        { label: '25', value: '25' },
-                        { label: '50', value: '50' },
-                        { label: '100', value: '100' },
-                        { label: 'Semua', value: 'all' },
-                      ]}
-                      size="xs"
-                    />
-                    <span className="text-sm text-slate-600">dari {filteredPenunggak.length} penunggak</span>
-                  </Group>
-
+                      className="bg-white border rounded px-2 py-1 outline-none focus:border-blue-400"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value="all">Semua</option>
+                    </select>
+                    <span>dari {filteredPenunggak.length} penunggak</span>
+                  </div>
+                  
                   {pageSizePenunggak !== 'all' && totalPagesPenunggak > 1 && (
-                    <MantinePagination
-                      value={pagePenunggak}
-                      onChange={setPagePenunggak}
-                      total={totalPagesPenunggak}
-                      withEdges
-                      size="sm"
-                    />
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPagePenunggak(p => Math.max(1, p - 1))} disabled={pagePenunggak === 1} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronLeft className="w-5 h-5"/></button>
+                      <div className="flex items-center">
+                        {Array.from({ length: Math.min(5, totalPagesPenunggak) }, (_, i) => {
+                          let p = pagePenunggak <= 3 ? i + 1 : pagePenunggak >= totalPagesPenunggak - 2 ? totalPagesPenunggak - 4 + i : pagePenunggak - 2 + i
+                          if (p < 1) p = 1
+                          if (p > totalPagesPenunggak) p = totalPagesPenunggak
+                          return (
+                            <button key={p} onClick={() => setPagePenunggak(p)} className={`w-8 h-8 rounded-md text-sm font-bold mx-0.5 ${pagePenunggak === p ? 'bg-blue-600 text-white' : 'hover:bg-slate-200 text-slate-700'}`}>
+                              {p}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button onClick={() => setPagePenunggak(p => Math.min(totalPagesPenunggak, p + 1))} disabled={pagePenunggak === totalPagesPenunggak} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
                   )}
                 </div>
               )}
@@ -782,26 +790,35 @@ export default function MonitoringSetoranPage() {
           {/* Filter Bar */}
           <div className="bg-white border rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
-              <NativeSelect
-                label={<span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Unit / Asrama</span>}
-                value={selectedAsramaBebas}
-                onChange={e => { setSelectedAsramaBebas(e.target.value); setSearchBebas(''); }}
-                data={[
-                  { label: '-- Pilih Asrama --', value: '' },
-                  ...data.map((r: AsramaRow) => ({ label: r.unit_setor, value: r.unit_setor })),
-                  { label: 'Semua Asrama', value: 'SEMUA' },
-                ]}
-              />
+              <div className="flex flex-col">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Unit / Asrama</label>
+                <select
+                  value={selectedAsramaBebas}
+                  onChange={e => { setSelectedAsramaBebas(e.target.value); setSearchBebas(''); }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Pilih Asrama --</option>
+                  {data.map(r => (
+                    <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                  ))}
+                  <option value="SEMUA">Semua Asrama</option>
+                </select>
+              </div>
 
               {selectedAsramaBebas && (
-                <TextInput
-                  label={<span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cari Nama</span>}
-                  leftSection={<Search className="w-4 h-4"/>}
-                  placeholder="Cari santri..."
-                  value={searchBebas}
-                  onChange={e => { setSearchBebas(e.target.value); setPageBebas(1); }}
-                  className="flex-1 sm:flex-none"
-                />
+                <div className="flex flex-col flex-1 sm:flex-none">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cari Nama</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Cari santri..."
+                      value={searchBebas}
+                      onChange={e => { setSearchBebas(e.target.value); setPageBebas(1); }}
+                      className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -876,30 +893,38 @@ export default function MonitoringSetoranPage() {
               {/* Pagination Footer for Bebas */}
               {filteredBebas.length > 0 && (
                 <div className="bg-slate-50 border-t px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <Group gap="xs" align="center">
-                    <span className="text-sm text-slate-600">Tampilkan:</span>
-                    <NativeSelect
-                      value={String(pageSizeBebas)}
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>Tampilkan:</span>
+                    <select 
+                      value={pageSizeBebas} 
                       onChange={e => { setPageSizeBebas(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPageBebas(1); }}
-                      data={[
-                        { label: '25', value: '25' },
-                        { label: '50', value: '50' },
-                        { label: '100', value: '100' },
-                        { label: 'Semua', value: 'all' },
-                      ]}
-                      size="xs"
-                    />
-                    <span className="text-sm text-slate-600">dari {filteredBebas.length} santri</span>
-                  </Group>
-
+                      className="bg-white border rounded px-2 py-1 outline-none focus:border-blue-400"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value="all">Semua</option>
+                    </select>
+                    <span>dari {filteredBebas.length} santri</span>
+                  </div>
+                  
                   {pageSizeBebas !== 'all' && totalPagesBebas > 1 && (
-                    <MantinePagination
-                      value={pageBebas}
-                      onChange={setPageBebas}
-                      total={totalPagesBebas}
-                      withEdges
-                      size="sm"
-                    />
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPageBebas(p => Math.max(1, p - 1))} disabled={pageBebas === 1} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronLeft className="w-5 h-5"/></button>
+                      <div className="flex items-center">
+                        {Array.from({ length: Math.min(5, totalPagesBebas) }, (_, i) => {
+                          let p = pageBebas <= 3 ? i + 1 : pageBebas >= totalPagesBebas - 2 ? totalPagesBebas - 4 + i : pageBebas - 2 + i
+                          if (p < 1) p = 1
+                          if (p > totalPagesBebas) p = totalPagesBebas
+                          return (
+                            <button key={p} onClick={() => setPageBebas(p)} className={`w-8 h-8 rounded-md text-sm font-bold mx-0.5 ${pageBebas === p ? 'bg-blue-600 text-white' : 'hover:bg-slate-200 text-slate-700'}`}>
+                              {p}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button onClick={() => setPageBebas(p => Math.min(totalPagesBebas, p + 1))} disabled={pageBebas === totalPagesBebas} className="p-1 rounded hover:bg-slate-200 disabled:opacity-40"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
                   )}
                 </div>
               )}
@@ -909,194 +934,215 @@ export default function MonitoringSetoranPage() {
       )}
 
       {/* ── Modal Detail Kompak ── */}
-      <Modal
-        opened={isModalOpen && activeRow !== null}
-        onClose={() => setIsModalOpen(false)}
-        title={activeRow ? <><span className="text-lg font-bold text-slate-900">{activeRow.unit_setor}</span><p className="text-xs text-slate-500">Laporan Rekapitulasi SPP Fisik</p></> : null}
-        size="sm"
-        centered
-      >
-        {activeRow && (
-          <div>
-            <div className="flex flex-wrap gap-2 mb-6">
-              <NanoChip label="Bebas SPP" value={activeRow.bebas_spp} />
-              <NanoChip label="Tidak Ada Tagihan" value={activeRow.tidak_ada_tagihan} color="text-blue-600 bg-blue-50 border-blue-100" />
-              <NanoChip label="Wajib SPP" value={activeRow.wajib_bayar} />
-              <NanoChip label="Telah Lunas" value={activeRow.bayar_bulan_ini} color="text-emerald-600 bg-emerald-50 border-emerald-100" />
-              <NanoChip label="Penunggak" value={activeRow.penunggak} color="text-rose-600 bg-rose-50 border-rose-100" />
-              <NanoChip label="Bayar Tunggakan" value={activeRow.bayar_tunggakan_lalu} />
+      {isModalOpen && activeRow && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm sm:max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4">
+            
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+               <div>
+                 <h2 className="text-lg font-bold text-slate-900">{activeRow.unit_setor}</h2>
+                 <p className="text-xs text-slate-500 mt-0.5">Laporan Rekapitulasi SPP Fisik</p>
+               </div>
+               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors"><X className="w-4 h-4"/></button>
             </div>
 
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2 mb-4">Validasi Setoran Tunai</h3>
+            <div className="p-5">
+               {/* Nano Grid Stats */}
+               <div className="flex flex-wrap gap-2 mb-6">
+                  <NanoChip label="Bebas SPP" value={activeRow.bebas_spp} />
+                  <NanoChip label="Tidak Ada Tagihan" value={activeRow.tidak_ada_tagihan} color="text-blue-600 bg-blue-50 border-blue-100" />
+                  <NanoChip label="Wajib SPP" value={activeRow.wajib_bayar} />
+                  <NanoChip label="Telah Lunas" value={activeRow.bayar_bulan_ini} color="text-emerald-600 bg-emerald-50 border-emerald-100" />
+                  <NanoChip label="Penunggak" value={activeRow.penunggak} color="text-rose-600 bg-rose-50 border-rose-100" />
+                  <NanoChip label="Bayar Tunggakan" value={activeRow.bayar_tunggakan_lalu} />
+               </div>
 
-              {activeRow.belum_ada_tagihan ? (
-                <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-center">
-                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3"><CalendarCheck className="w-5 h-5"/></div>
-                  <p className="text-lg font-bold text-blue-800 leading-tight mb-1">Belum Ada Tagihan</p>
-                  <p className="text-xs text-blue-600/80">Periode ini berada sebelum awal tagihan SPP yang ditetapkan.</p>
-                </div>
-              ) : activeRow.tanggal_setor && !isEditingForm ? (
-                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 text-center">
-                  <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3"><CheckCircle2 className="w-5 h-5"/></div>
-                  <p className="text-2xl font-bold text-emerald-700 leading-tight mb-1">{fmtRp(activeRow.jumlah_aktual ?? activeRow.total_nominal)}</p>
-                  <p className="text-xs text-emerald-600/80 mb-3">Diserahkan oleh {activeRow.nama_penyetor || '-'} pada {format(new Date(activeRow.tanggal_setor), 'd MMM yyyy')}</p>
-                  <button onClick={() => setIsEditingForm(true)} className="text-xs font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900 transition-colors">Revisi Nominal / Laporan</button>
-                </div>
-              ) : (
-                <form onSubmit={e=>{e.preventDefault(); handleSimpanSetoran();}} className="space-y-4">
-                  <TextInput
-                    label="Diserahkan Oleh"
-                    required
-                    placeholder="Nama pengurus..."
-                    value={formPenyetor}
-                    onChange={e => setFormPenyetor(e.target.value)}
-                  />
-                  <TextInput
-                    label={<span className="flex justify-between w-full">Total Uang Fisik <span className="text-slate-400 font-normal">Target: {fmtRp(activeRow.total_nominal)}</span></span>}
-                    required
-                    value={fmt(Number(formJumlah.replace(/\D/g, '')))}
-                    onChange={e => setFormJumlah(e.target.value)}
-                    leftSection={<span className="text-slate-400 text-sm">Rp</span>}
-                    fw={600}
-                  />
-                  {activeRow.nominal_tunggakan_lalu > 0 && (
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                      Target sistem berasal dari {fmtRp(activeRow.nominal_bulan_ini)} SPP bulan {BULAN_NAMA[bulan]} dan {fmtRp(activeRow.nominal_tunggakan_lalu)} pelunasan tunggakan yang tercatat bulan ini.
+               {/* Area Form Setoran */}
+               <div>
+                  <h3 className="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2 mb-4">Validasi Setoran Tunai</h3>
+                  
+                  {activeRow.belum_ada_tagihan ? (
+                    <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3"><CalendarCheck className="w-5 h-5"/></div>
+                      <p className="text-lg font-bold text-blue-800 leading-tight mb-1">Belum Ada Tagihan</p>
+                      <p className="text-xs text-blue-600/80">Periode ini berada sebelum awal tagihan SPP yang ditetapkan.</p>
                     </div>
+                  ) : activeRow.tanggal_setor && !isEditingForm ? (
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3"><CheckCircle2 className="w-5 h-5"/></div>
+                      <p className="text-2xl font-bold text-emerald-700 leading-tight mb-1">{fmtRp(activeRow.jumlah_aktual ?? activeRow.total_nominal)}</p>
+                      <p className="text-xs text-emerald-600/80 mb-3">Diserahkan oleh {activeRow.nama_penyetor || '-'} pada {format(new Date(activeRow.tanggal_setor), 'd MMM yyyy')}</p>
+                      <button onClick={() => setIsEditingForm(true)} className="text-xs font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900 transition-colors">Revisi Nominal / Laporan</button>
+                    </div>
+                  ) : (
+                    <form onSubmit={e=>{e.preventDefault(); handleSimpanSetoran();}} className="space-y-4">
+                       <div className="grid grid-cols-1 gap-4">
+                         <div>
+                           <label className="text-[11px] font-medium text-slate-500 mb-1.5 block">Diserahkan Oleh</label>
+                           <input type="text" required placeholder="Nama pengurus..." value={formPenyetor} onChange={e => setFormPenyetor(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"/>
+                         </div>
+                         <div>
+                           <label className="text-[11px] font-medium text-slate-500 mb-1.5 block flex justify-between">
+                              Total Uang Fisik <span className="text-slate-400">Target sistem: {fmtRp(activeRow.total_nominal)}</span>
+                           </label>
+                           <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
+                              <input type="text" required value={fmt(Number(formJumlah.replace(/\D/g, '')))} onChange={e => setFormJumlah(e.target.value)} className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"/>
+                           </div>
+                         </div>
+                       </div>
+                       {activeRow.nominal_tunggakan_lalu > 0 && (
+                         <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                           Target sistem berasal dari {fmtRp(activeRow.nominal_bulan_ini)} SPP bulan {BULAN_NAMA[bulan]} dan {fmtRp(activeRow.nominal_tunggakan_lalu)} pelunasan tunggakan yang tercatat bulan ini.
+                         </div>
+                       )}
+                       <div className="flex gap-2 pt-2">
+                         {isEditingForm && <button type="button" onClick={() => setIsEditingForm(false)} className="px-4 py-2 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1">Batal</button>}
+                         <button type="submit" disabled={savingSetoran} className={`px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors flex justify-center items-center gap-2 ${isEditingForm ? 'flex-1' : 'w-full'} disabled:opacity-50`}>
+                           {savingSetoran ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4"/>} 
+                           {savingSetoran ? 'Menyimpan...' : 'Pelunasan Valid'}
+                         </button>
+                       </div>
+                    </form>
                   )}
-                  <div className="flex gap-2 pt-2">
-                    {isEditingForm && (
-                      <Button type="button" onClick={() => setIsEditingForm(false)} variant="outline" color="gray" className="flex-1">Batal</Button>
-                    )}
-                    <Button
-                      type="submit"
-                      loading={savingSetoran}
-                      color="dark"
-                      leftSection={!savingSetoran ? <Check className="w-4 h-4"/> : undefined}
-                      className={isEditingForm ? 'flex-1' : 'w-full'}
-                    >
-                      {savingSetoran ? 'Menyimpan...' : 'Pelunasan Valid'}
-                    </Button>
-                  </div>
-                </form>
-              )}
+               </div>
             </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ── Modal Mulai Setor ── */}
-      <Modal
-        opened={isSetoranWindowModalOpen}
-        onClose={() => setIsSetoranWindowModalOpen(false)}
-        title={<><span className="text-lg font-bold text-slate-900">Mulai Setor</span><p className="text-xs text-slate-500">Tanggal asrama mulai bisa setor — {BULAN_NAMA[bulan]} {tahun}</p></>}
-        size="sm"
-        centered
-      >
-        <form
-          onSubmit={async (e) => {
-            const ok = await handleSimpanSetoranWindow(e)
-            if (ok) setIsSetoranWindowModalOpen(false)
-          }}
-          className="space-y-4"
-        >
-          <TextInput
-            type="date"
-            label="Tanggal Mulai Setor"
-            value={setoranWindowInput}
-            onChange={e => setSetoranWindowInput(e.target.value)}
-            autoFocus
-            description={`Setelah tanggal ini asrama dapat melaporkan setoran tunai untuk ${BULAN_NAMA[bulan]} ${tahun}.`}
-          />
-          <div className="flex gap-2 pt-1">
-            <Button type="button" onClick={() => setIsSetoranWindowModalOpen(false)} variant="outline" color="gray" className="flex-1">
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              loading={savingSetoranWindow}
-              disabled={!setoranWindowInput}
-              color="indigo"
-              leftSection={!savingSetoranWindow ? <Save className="w-4 h-4"/> : undefined}
-              className="flex-1"
-            >
-              {savingSetoranWindow ? 'Menyimpan...' : 'Simpan'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ── Modal Export Excel ── */}
-      <Modal
-        opened={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        title={<><span className="text-lg font-bold text-slate-900">Export Excel Penunggak</span><p className="text-xs text-slate-500">Konfigurasi data export excel</p></>}
-        size="sm"
-        centered
-      >
-        <div className="space-y-4">
-          <NativeSelect
-            label="Pilihan Asrama"
-            value={exportAsrama}
-            onChange={e => setExportAsrama(e.target.value)}
-            data={[
-              { label: 'Semua Asrama', value: 'SEMUA' },
-              ...data.map(r => ({ label: r.unit_setor, value: r.unit_setor }))
-            ]}
-          />
-
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Filter Periode</p>
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="radio"
-                  name="exportPeriode"
-                  value="BULAN_INI"
-                  checked={exportPeriode === 'BULAN_INI'}
-                  onChange={() => setExportPeriode('BULAN_INI')}
-                  className="mt-0.5"
-                />
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Hanya Bulan Ini</p>
-                  <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak khusus pada bulan {BULAN_NAMA[bulan]} {tahun}.</p>
-                </div>
-              </label>
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="radio"
-                  name="exportPeriode"
-                  value="SEMUA_BULAN"
-                  checked={exportPeriode === 'SEMUA_BULAN'}
-                  onChange={() => setExportPeriode('SEMUA_BULAN')}
-                  className="mt-0.5"
-                />
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Semua Bulan (Akumulasi)</p>
-                  <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak pada bulan mana pun hingga bulan {BULAN_NAMA[bulan]} {tahun}.</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button type="button" onClick={() => setIsExportModalOpen(false)} disabled={exportingExcel} variant="outline" color="gray" className="flex-1">
-              Batal
-            </Button>
-            <Button
-              type="button"
-              onClick={handleExportExcelPenunggak}
-              loading={exportingExcel}
-              color="teal"
-              leftSection={!exportingExcel ? <Download className="w-4 h-4"/> : undefined}
-              className="flex-1"
-            >
-              {exportingExcel ? 'Exporting...' : 'Export Excel'}
-            </Button>
           </div>
         </div>
-      </Modal>
+      )}
+
+      {/* ── Modal Mulai Setor ── */}
+      {isSetoranWindowModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Mulai Setor</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Tanggal asrama mulai bisa setor — {BULAN_NAMA[bulan]} {tahun}</p>
+              </div>
+              <button onClick={() => setIsSetoranWindowModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors"><X className="w-4 h-4"/></button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                const ok = await handleSimpanSetoranWindow(e)
+                if (ok) setIsSetoranWindowModalOpen(false)
+              }}
+              className="p-5 space-y-4"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Tanggal Mulai Setor</label>
+                <input
+                  type="date"
+                  value={setoranWindowInput}
+                  onChange={e => setSetoranWindowInput(e.target.value)}
+                  className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1.5">Setelah tanggal ini asrama dapat melaporkan setoran tunai untuk {BULAN_NAMA[bulan]} {tahun}.</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setIsSetoranWindowModalOpen(false)} className="px-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1 transition-colors">
+                  Batal
+                </button>
+                <button type="submit" disabled={savingSetoranWindow || !setoranWindowInput} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex justify-center items-center gap-2 flex-1 disabled:opacity-50">
+                  {savingSetoranWindow ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                  {savingSetoranWindow ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Export Excel ── */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm sm:max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4">
+            
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+               <div>
+                 <h2 className="text-lg font-bold text-slate-900">Export Excel Penunggak</h2>
+                 <p className="text-xs text-slate-500 mt-0.5">Konfigurasi data export excel</p>
+               </div>
+               <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded-full transition-colors"><X className="w-4 h-4"/></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+               {/* Pilihan Asrama */}
+               <div>
+                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Pilihan Asrama</label>
+                 <select
+                   value={exportAsrama}
+                   onChange={e => setExportAsrama(e.target.value)}
+                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                 >
+                   <option value="SEMUA">Semua Asrama</option>
+                   {data.map(r => (
+                     <option key={r.unit_setor} value={r.unit_setor}>{r.unit_setor}</option>
+                   ))}
+                 </select>
+               </div>
+
+               {/* Pilihan Periode */}
+               <div>
+                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Filter Periode</label>
+                 <div className="grid grid-cols-1 gap-2">
+                   <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                     <input
+                       type="radio"
+                       name="exportPeriode"
+                       value="BULAN_INI"
+                       checked={exportPeriode === 'BULAN_INI'}
+                       onChange={() => setExportPeriode('BULAN_INI')}
+                       className="mt-0.5 focus:ring-blue-500 text-blue-600 border-slate-300"
+                     />
+                     <div>
+                       <p className="text-sm font-bold text-slate-800">Hanya Bulan Ini</p>
+                       <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak khusus pada bulan {BULAN_NAMA[bulan]} {tahun}.</p>
+                     </div>
+                   </label>
+                   
+                   <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                     <input
+                       type="radio"
+                       name="exportPeriode"
+                       value="SEMUA_BULAN"
+                       checked={exportPeriode === 'SEMUA_BULAN'}
+                       onChange={() => setExportPeriode('SEMUA_BULAN')}
+                       className="mt-0.5 focus:ring-blue-500 text-blue-600 border-slate-300"
+                     />
+                     <div>
+                       <p className="text-sm font-bold text-slate-800">Semua Bulan (Akumulasi)</p>
+                       <p className="text-xs text-slate-500">Mengekspor data santri yang menunggak pada bulan mana pun hingga bulan {BULAN_NAMA[bulan]} {tahun}.</p>
+                     </div>
+                   </label>
+                 </div>
+               </div>
+
+               {/* Buttons */}
+               <div className="flex gap-2 pt-2">
+                 <button
+                   type="button"
+                   onClick={() => setIsExportModalOpen(false)}
+                   disabled={exportingExcel}
+                   className="px-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 flex-1 transition-colors"
+                 >
+                   Batal
+                 </button>
+                 <button
+                   type="button"
+                   onClick={handleExportExcelPenunggak}
+                   disabled={exportingExcel}
+                   className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex justify-center items-center gap-2 flex-1 disabled:opacity-50"
+                 >
+                   {exportingExcel ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>} 
+                   {exportingExcel ? 'Exporting...' : 'Export Excel'}
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@ import {
   CalendarDays, Settings, Users, BookOpen, Plus, Save, Trash2, 
   AlertTriangle, Loader2, CheckCircle2, ChevronDown, ChevronRight, X
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { formatDateRangeWib, fullDateWib, getDatesBetweenWib, parseDateKeyWib } from '../_date-utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -375,7 +375,7 @@ export default function JadwalEhbPage() {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
 
   return (
-    <div className="pb-20 space-y-6">
+    <div className="max-w-6xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Pengaturan Jadwal EHB"
         description="Kelola event EHB, sesi, dan jadwal pelajaran yang diujikan."

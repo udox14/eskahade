@@ -6,12 +6,3 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-export function capitalizeEachWord(str: string): string {
-  if (!str) return '';
-  return str
-    .toLowerCase()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}

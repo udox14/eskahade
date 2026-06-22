@@ -3,8 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Eye, Filter, RotateCcw } from 'lucide-react'
-import { toast } from '@/lib/toast'
-import { Button, TextInput, NativeSelect, SegmentedControl, Switch, Modal } from '@mantine/core'
+import { toast } from 'sonner'
 
 import Pagination from '@/components/ui/pagination'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -129,14 +128,20 @@ export default function PageContent({
         description="Audit trail aksi penting seperti login, perubahan akses, transaksi, dan perubahan data penting."
       />
 
-      <SegmentedControl
-        value={activeTab}
-        onChange={(v) => setActiveTab(v as 'log' | 'settings')}
-        data={[
-          { label: 'Log', value: 'log' },
-          { label: 'Pengaturan', value: 'settings' },
-        ]}
-      />
+      <div className="flex flex-wrap gap-2">
+        <TabButton
+          active={activeTab === 'log'}
+          onClick={() => setActiveTab('log')}
+        >
+          Log
+        </TabButton>
+        <TabButton
+          active={activeTab === 'settings'}
+          onClick={() => setActiveTab('settings')}
+        >
+          Pengaturan
+        </TabButton>
+      </div>
 
       {activeTab === 'settings' ? (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -166,24 +171,24 @@ export default function PageContent({
                     <td className="px-4 py-3 font-medium text-slate-900">{item.title}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">{item.fitur_href}</td>
                     <td className="px-4 py-3 text-center">
-                      <Switch
+                      <ConfigToggle
                         checked={item.log_create}
                         disabled={isPending}
-                        onChange={(e) => handleToggleConfig(item.fitur_href, 'create', e.currentTarget.checked)}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'create', nextValue)}
                       />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Switch
+                      <ConfigToggle
                         checked={item.log_update}
                         disabled={isPending}
-                        onChange={(e) => handleToggleConfig(item.fitur_href, 'update', e.currentTarget.checked)}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'update', nextValue)}
                       />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Switch
+                      <ConfigToggle
                         checked={item.log_delete}
                         disabled={isPending}
-                        onChange={(e) => handleToggleConfig(item.fitur_href, 'delete', e.currentTarget.checked)}
+                        onChange={(nextValue) => handleToggleConfig(item.fitur_href, 'delete', nextValue)}
                       />
                     </td>
                   </tr>
@@ -209,54 +214,71 @@ export default function PageContent({
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <TextInput
+              <input
                 value={formState.q}
-                onChange={(e) => setFormState(current => ({ ...current, q: e.target.value }))}
+                onChange={(event) => setFormState(current => ({ ...current, q: event.target.value }))}
                 placeholder="Cari objek, ID, atau ringkasan"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
-              <TextInput
+              <input
                 value={formState.actor}
-                onChange={(e) => setFormState(current => ({ ...current, actor: e.target.value }))}
+                onChange={(event) => setFormState(current => ({ ...current, actor: event.target.value }))}
                 placeholder="Cari user pelaku"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
-              <NativeSelect
+              <select
                 value={formState.module}
-                onChange={(e) => setFormState(current => ({ ...current, module: e.target.value }))}
-                data={[
-                  { label: 'Semua modul', value: '' },
-                  ...modules.map((m) => ({ label: prettifyLabel(m), value: m })),
-                ]}
-              />
-              <NativeSelect
+                onChange={(event) => setFormState(current => ({ ...current, module: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="">Semua modul</option>
+                {modules.map((module) => (
+                  <option key={module} value={module}>
+                    {prettifyLabel(module)}
+                  </option>
+                ))}
+              </select>
+              <select
                 value={formState.action}
-                onChange={(e) => setFormState(current => ({ ...current, action: e.target.value }))}
-                data={[
-                  { label: 'Semua aksi', value: '' },
-                  ...actions.map((a) => ({ label: prettifyLabel(a), value: a })),
-                ]}
-              />
-              <TextInput
+                onChange={(event) => setFormState(current => ({ ...current, action: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="">Semua aksi</option>
+                {actions.map((action) => (
+                  <option key={action} value={action}>
+                    {prettifyLabel(action)}
+                  </option>
+                ))}
+              </select>
+              <input
                 type="date"
                 value={formState.startDate}
-                onChange={(e) => setFormState(current => ({ ...current, startDate: e.target.value }))}
+                onChange={(event) => setFormState(current => ({ ...current, startDate: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
-              <TextInput
+              <input
                 type="date"
                 value={formState.endDate}
-                onChange={(e) => setFormState(current => ({ ...current, endDate: e.target.value }))}
+                onChange={(event) => setFormState(current => ({ ...current, endDate: event.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
               />
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="submit" color="blue">Terapkan filter</Button>
-              <Button
-                type="button"
-                variant="default"
-                onClick={resetFilters}
-                leftSection={<RotateCcw className="h-4 w-4" />}
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
+                Terapkan filter
+              </button>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <RotateCcw className="h-4 w-4" />
                 Reset
-              </Button>
+              </button>
             </div>
           </form>
 
@@ -314,15 +336,14 @@ export default function PageContent({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
+                        <button
                           type="button"
-                          size="xs"
-                          variant="default"
                           onClick={() => setSelected(row)}
-                          leftSection={<Eye className="h-3.5 w-3.5" />}
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         >
+                          <Eye className="h-3.5 w-3.5" />
                           Lihat
-                        </Button>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -342,17 +363,24 @@ export default function PageContent({
         </>
       )}
 
-      <Modal
-        opened={!!selected}
-        onClose={() => setSelected(null)}
-        title="Detail Log Aktivitas"
-        size="xl"
-        centered
-      >
-        {selected && (
-          <>
-            <p className="mb-4 text-sm text-slate-500">{selected.summary}</p>
-            <div className="grid gap-4 md:grid-cols-2">
+      {selected ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Detail Log Aktivitas</h2>
+                <p className="mt-1 text-sm text-slate-500">{selected.summary}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-2">
               <InfoItem label="Waktu" value={formatDateTime(selected.created_at)} />
               <InfoItem label="Status" value={selected.status} />
               <InfoItem label="User" value={selected.actor_name || '-'} />
@@ -363,15 +391,16 @@ export default function PageContent({
               <InfoItem label="Objek" value={selected.entity_label || '-'} />
               <InfoItem label="Entity ID" value={selected.entity_id || '-'} />
             </div>
-            <div className="mt-4 border-t border-slate-200 pt-4">
+
+            <div className="border-t border-slate-200 px-5 py-5">
               <div className="text-sm font-semibold text-slate-800">Metadata</div>
               <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">
                 {JSON.stringify(selected.details || {}, null, 2)}
               </pre>
             </div>
-          </>
-        )}
-      </Modal>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -382,5 +411,54 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-sm text-slate-900">{value}</div>
     </div>
+  )
+}
+
+function ConfigToggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onChange: (nextValue: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+        checked
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-slate-200 text-slate-600'
+      } ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:opacity-85'}`}
+    >
+      {checked ? 'ON' : 'OFF'}
+    </button>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+        active
+          ? 'bg-slate-900 text-white'
+          : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

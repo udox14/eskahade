@@ -691,7 +691,7 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
             {GRADE_COLS.map(col => {
               const list = byGrade(col.key)
               return (
-                <div key={col.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
+                <div key={col.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                   <div className={`px-4 py-3 border-b font-black uppercase tracking-wider text-sm flex items-center justify-between ${col.head}`}>
                     <span>{col.label}</span>
                     <span className="text-xs font-bold opacity-70">{list.length}</span>
@@ -713,7 +713,7 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
 
                   {/* Daftar chip santri di kolom ini — drag reorder / pindah grade (kanban) */}
                   <div
-                    className="p-3 space-y-2 flex-1 overflow-y-auto"
+                    className="p-3 space-y-2 min-h-[120px] flex-1"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => moveToColumn(col.key, null)}
                   >
@@ -783,14 +783,14 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
                 <ChevronDown className={`w-4 h-4 text-amber-600 ml-auto transition-transform ${poolOpen ? 'rotate-180' : ''}`} />
               </button>
               {poolOpen && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pt-0">
+                <div className="flex flex-wrap gap-2 p-4 pt-0">
                   {belum.map(s => (
-                    <div key={s.riwayat_id} className="bg-white border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-3 shadow-sm min-w-0">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-800 text-sm leading-tight truncate" title={s.nama}>{s.nama}</p>
-                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">{s.nis}</p>
+                    <div key={s.riwayat_id} className="bg-white border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm leading-tight">{s.nama}</p>
+                        <p className="text-[10px] font-mono text-slate-400">{s.nis}</p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex gap-1">
                         {(['A', 'B', 'C'] as Grade[]).map(g => (
                           <button
                             key={g}
@@ -801,7 +801,7 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
                           </button>
                         ))}
                       </div>
-                      {rowStatus[s.riwayat_id] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />}
+                      {rowStatus[s.riwayat_id] === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
                     </div>
                   ))}
                 </div>

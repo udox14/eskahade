@@ -5,9 +5,8 @@ import React from 'react'
 import { useState, useRef } from 'react'
 import { getSantriForFoto, uploadFotoSantri } from './actions'
 import { Search, Upload, RefreshCw, Loader2, Home, Filter } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { Button, TextInput, NativeSelect, ActionIcon } from '@mantine/core'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
 
@@ -124,7 +123,7 @@ export default function ManajemenFotoPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20">
       
       {/* HEADER & FILTER */}
       <div className="border-b pb-4">
@@ -139,43 +138,52 @@ export default function ManajemenFotoPage() {
           
           {/* Asrama */}
           <div className="w-full md:w-1/4">
-            <NativeSelect
-              label={<span className="text-xs font-bold text-slate-500 uppercase">Asrama</span>}
-              value={asrama}
-              onChange={(e) => { setAsrama(e.target.value); setKamar('SEMUA'); }}
-              data={ASRAMA_LIST.map(a => ({ label: a, value: a }))}
-            />
+             <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Asrama</label>
+             <select 
+                value={asrama} 
+                onChange={(e) => { setAsrama(e.target.value); setKamar('SEMUA'); }}
+                className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-pink-500 outline-none"
+             >
+                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+             </select>
           </div>
 
           {/* Kamar */}
           <div className="w-full md:w-1/6">
-            <NativeSelect
-              label={<span className="text-xs font-bold text-slate-500 uppercase">Kamar</span>}
-              value={kamar}
-              onChange={(e) => setKamar(e.target.value)}
-              disabled={asrama === 'SEMUA'}
-              data={[
-                { label: 'Semua', value: 'SEMUA' },
-                ...Array.from({length: 30}, (_, i) => i + 1).map(k => ({ label: String(k), value: String(k) })),
-              ]}
-            />
+             <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kamar</label>
+             <select 
+                value={kamar} 
+                onChange={(e) => setKamar(e.target.value)}
+                disabled={asrama === 'SEMUA'}
+                className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-pink-500 outline-none disabled:bg-slate-100"
+             >
+                <option value="SEMUA">Semua</option>
+                {Array.from({length: 30}, (_, i) => i + 1).map(k => (
+                    <option key={k} value={k}>{k}</option>
+                ))}
+             </select>
           </div>
 
           {/* Search */}
-          <div className="w-full md:flex-1">
-            <TextInput
-              placeholder="Cari Nama..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && loadData()}
-              leftSection={<Search className="w-4 h-4" />}
-            />
+          <div className="w-full md:flex-1 relative">
+             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+             <input 
+                 placeholder="Cari Nama..." 
+                 className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-pink-500 outline-none"
+                 value={search}
+                 onChange={e => setSearch(e.target.value)}
+                 onKeyDown={e => e.key === 'Enter' && loadData()}
+             />
           </div>
 
           {/* Tombol Tampilkan */}
-          <Button onClick={loadData} loading={loading} color="pink">
-            Tampilkan
-          </Button>
+          <button 
+             onClick={loadData}
+             disabled={loading}
+             className="bg-pink-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow hover:bg-pink-700 disabled:opacity-50 flex items-center gap-2 h-[38px]"
+          >
+             {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : "Tampilkan"}
+          </button>
       </div>
 
       {/* INPUT FILE TERSEMBUNYI */}
@@ -226,16 +234,24 @@ export default function ManajemenFotoPage() {
                          </div>
 
                          {/* TOMBOL AKSI */}
-                         <ActionIcon
+                         <button 
                             onClick={() => handleTriggerUpload(s.id)}
-                            loading={uploadingId === s.id}
-                            variant={s.foto_url ? 'light' : 'filled'}
-                            color={s.foto_url ? 'gray' : 'pink'}
-                            size="lg"
+                            disabled={uploadingId === s.id}
+                            className={`p-2 rounded-lg shadow-sm flex-shrink-0 transition-colors ${
+                                s.foto_url 
+                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
+                                : 'bg-pink-600 text-white hover:bg-pink-700'
+                            }`}
                             title={s.foto_url ? "Ganti Foto" : "Upload Foto"}
                          >
-                            {s.foto_url ? <RefreshCw className="w-5 h-5"/> : <Upload className="w-5 h-5"/>}
-                         </ActionIcon>
+                            {uploadingId === s.id ? (
+                                <Loader2 className="w-5 h-5 animate-spin"/>
+                            ) : s.foto_url ? (
+                                <RefreshCw className="w-5 h-5"/>
+                            ) : (
+                                <Upload className="w-5 h-5"/>
+                            )}
+                         </button>
 
                      </div>
                  ))}

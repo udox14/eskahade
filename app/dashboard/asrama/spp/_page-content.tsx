@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama, getSetoranInfoBulanIni, submitSetoranAsrama } from './actions'
 import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users, Send, Clock } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -1176,7 +1176,7 @@ export default function SPPPage() {
 
   // ── VIEW: PAYMENT ───────────────────────────────────────────────────────
   if (view === 'PAYMENT') return (
-    <div className="space-y-6 pb-20 animate-in slide-in-from-right-4">
+    <div className="space-y-6 max-w-4xl mx-auto pb-20 animate-in slide-in-from-right-4">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={handleBackToList} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-slate-600"/>

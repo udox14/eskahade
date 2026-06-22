@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CalendarDays, ClipboardList, Loader2, Save, Table2 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { Button, NativeSelect, TextInput, NumberInput, Textarea, SegmentedControl, Paper } from '@mantine/core'
 import {
   getNilaiHarianInitialData,
   getNilaiHarianInputData,
@@ -104,21 +103,22 @@ export default function NilaiHarianContent() {
   }
 
   return (
-    <div className="space-y-5 pb-20">
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
       <DashboardPageHeader
         title="Nilai Harian"
         description="Input sesi penilaian harian dan lihat rekap nilai per santri."
       />
 
-      <Paper withBorder p="md" radius="lg">
+      <div className="rounded-xl border bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           {kelasList.length > 1 && (
-            <NativeSelect
-              label="Kelas"
-              value={kelasId}
-              onChange={e => setKelasId(e.target.value)}
-              data={[{ label: 'Pilih kelas', value: '' }, ...kelasList.map(k => ({ label: k.nama_kelas, value: k.id }))]}
-            />
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kelas</label>
+              <select value={kelasId} onChange={e => setKelasId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="">Pilih kelas</option>
+                {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
+              </select>
+            </div>
           )}
           {kelasList.length === 1 && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
@@ -126,73 +126,55 @@ export default function NilaiHarianContent() {
               <p className="font-semibold text-emerald-900">{kelasList[0].nama_kelas}</p>
             </div>
           )}
-          <NativeSelect
-            label="Mapel"
-            value={mapelId}
-            onChange={e => setMapelId(e.target.value)}
-            data={[{ label: 'Pilih mapel', value: '' }, ...mapelList.map(m => ({ label: m.nama, value: String(m.id) }))]}
-          />
-          <div className="flex flex-col justify-end">
-            <SegmentedControl
-              value={tab}
-              onChange={v => setTab(v as TabKey)}
-              data={[{ label: 'Input', value: 'input' }, { label: 'Rekap', value: 'rekap' }]}
-              fullWidth
-            />
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Mapel</label>
+            <select value={mapelId} onChange={e => setMapelId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="">Pilih mapel</option>
+              {mapelList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+            </select>
+          </div>
+          <div className="flex rounded-lg bg-slate-100 p-1">
+            <button onClick={() => setTab('input')} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${tab === 'input' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>
+              Input
+            </button>
+            <button onClick={() => setTab('rekap')} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${tab === 'rekap' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>
+              Rekap
+            </button>
           </div>
         </div>
-      </Paper>
+      </div>
 
       {loading ? (
-        <Paper withBorder p="xl" className="text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></Paper>
+        <div className="rounded-xl border bg-white p-12 text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
       ) : !kelasId ? (
-        <Paper withBorder p="xl" className="text-center text-slate-400">Belum ada kelas yang bisa diakses.</Paper>
+        <div className="rounded-xl border bg-white p-12 text-center text-slate-400">Belum ada kelas yang bisa diakses.</div>
       ) : tab === 'input' ? (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-          <Paper withBorder p="md" radius="lg">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-bold text-slate-800"><ClipboardList className="h-4 w-4 text-emerald-600" /> Sesi</h2>
-              <Button onClick={resetSesi} variant="subtle" color="teal" size="compact-xs">Baru</Button>
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 font-bold text-slate-800"><ClipboardList className="h-4 w-4 text-emerald-600" /> Sesi</h2>
+                <button onClick={resetSesi} className="text-xs font-bold text-emerald-700 hover:underline">Baru</button>
+              </div>
+              <select value={sesiId} onChange={e => setSesiId(e.target.value)} className="mb-3 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
+                <option value="">Sesi baru</option>
+                {sesiList.map(s => <option key={s.id} value={s.id}>{s.nama_sesi} - {s.tanggal}</option>)}
+              </select>
+              <div className="space-y-3">
+                <input value={namaSesi} onChange={e => setNamaSesi(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" placeholder="Ulangan Harian 1" />
+                <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" />
+                <input type="number" value={kkm} onChange={e => setKkm(Number(e.target.value || 0))} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" placeholder="KKM" />
+                <textarea value={deskripsi} onChange={e => setDeskripsi(e.target.value)} className="min-h-20 w-full rounded-lg border border-slate-200 p-3 text-sm" placeholder="Deskripsi opsional" />
+              </div>
             </div>
-            <NativeSelect
-              value={sesiId}
-              onChange={e => setSesiId(e.target.value)}
-              data={[{ label: 'Sesi baru', value: '' }, ...sesiList.map(s => ({ label: `${s.nama_sesi} - ${s.tanggal}`, value: s.id }))]}
-              mb="sm"
-            />
-            <div className="space-y-3">
-              <TextInput
-                value={namaSesi}
-                onChange={e => setNamaSesi(e.target.value)}
-                placeholder="Ulangan Harian 1"
-              />
-              <TextInput
-                type="date"
-                value={tanggal}
-                onChange={e => setTanggal(e.target.value)}
-              />
-              <NumberInput
-                value={kkm}
-                onChange={v => setKkm(Number(v || 0))}
-                placeholder="KKM"
-                min={0}
-                max={100}
-              />
-              <Textarea
-                value={deskripsi}
-                onChange={e => setDeskripsi(e.target.value)}
-                placeholder="Deskripsi opsional"
-                minRows={3}
-              />
-            </div>
-          </Paper>
+          </div>
 
-          <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
             <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3">
               <h2 className="flex items-center gap-2 font-bold text-slate-800"><BookOpen className="h-4 w-4 text-emerald-600" /> Daftar Nilai</h2>
-              <Button onClick={handleSave} loading={saving} disabled={!mapelId} color="teal" size="sm" leftSection={!saving ? <Save className="h-4 w-4"/> : undefined}>
-                Simpan
-              </Button>
+              <button onClick={handleSave} disabled={saving || !mapelId} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan
+              </button>
             </div>
             <div className="space-y-3 p-3 md:hidden">
               {santri.map((row, idx) => (
@@ -216,9 +198,9 @@ export default function NilaiHarianContent() {
                 </div>
               ))}
               {santri.length > 0 && (
-                <Button onClick={handleSave} loading={saving} disabled={!mapelId} color="teal" radius="xl" size="md" fullWidth leftSection={!saving ? <Save className="h-4 w-4"/> : undefined} className="sticky bottom-16 z-10 shadow-lg">
-                  Simpan Nilai
-                </Button>
+                <button onClick={handleSave} disabled={saving || !mapelId} className="sticky bottom-16 z-10 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Nilai
+                </button>
               )}
               {santri.length === 0 && <div className="py-12 text-center text-slate-400">Belum ada santri aktif.</div>}
             </div>
@@ -241,10 +223,10 @@ export default function NilaiHarianContent() {
                 </tbody>
               </table>
             </div>
-          </Paper>
+          </div>
         </div>
       ) : (
-        <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="flex items-center gap-2 border-b bg-slate-50 px-4 py-3 font-bold text-slate-800">
             <Table2 className="h-4 w-4 text-emerald-600" /> Rekap Nilai Harian
           </div>
@@ -287,7 +269,7 @@ export default function NilaiHarianContent() {
             </table>
             {rekap.sesi.length === 0 && <div className="p-12 text-center text-slate-400">Belum ada sesi nilai harian.</div>}
           </div>
-        </Paper>
+        </div>
       )}
     </div>
   )

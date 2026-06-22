@@ -463,7 +463,7 @@ export default function LayananAsramaPage({
   const isAnyFieldSaving = Object.keys(savingFields).length > 0;
 
   return (
-    <div className="space-y-5 pb-20">
+    <div className="mx-auto max-w-7xl space-y-5 pb-20">
       <DashboardPageHeader
         title="Katering & Laundry"
         description="Pemetaan layanan makan dan laundry santri, lengkap dengan sebaran per penyedia."

@@ -9,7 +9,7 @@ import {
   getActiveEventForCetak, getRuanganListForCetak, getNomorPesertaData,
   type ActiveEvent, type RuanganOption, type NomorPesertaItem,
 } from './actions'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { FONT, PageHeader } from './_shared'
 
 // ── Nomor Peserta Print Component ─────────────────────────────────────────────

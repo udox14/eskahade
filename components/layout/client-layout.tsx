@@ -43,7 +43,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         )}
       >
         {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
-        <div className="h-full w-full bg-[#0f172a] text-white">
+        <div className="h-full w-full bg-slate-900 text-white">
            <Sidebar 
              userRole={userRole}
              userRoles={userRoles}
@@ -65,7 +65,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
       {/* Drawer Sidebar */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-60 bg-[#0f172a] text-white shadow-2xl transform transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 w-60 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -101,7 +101,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
 
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
-          <div className="w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+          <div className="max-w-7xl mx-auto w-full space-y-6 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
             {showSetupReturn ? (
               <div className="no-print sticky top-0 z-30 flex justify-end">
                 <Link

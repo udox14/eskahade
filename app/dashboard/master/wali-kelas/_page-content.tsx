@@ -2,12 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import { UserCheck, Save, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2 } from 'lucide-react'
-import {
-  ActionIcon, Alert, Badge, Box, Button, Center, FileButton, Flex, Grid, Group, Loader, Modal,
-  NativeSelect, Paper, SegmentedControl, SimpleGrid, Stack, Table, Text, TextInput, UnstyledButton,
-} from '@mantine/core'
-import { toast } from '@/lib/toast'
+import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -77,8 +73,6 @@ function buildGabunganSignature(gabungan: GabunganMap) {
     })
     .join('||')
 }
-
-const fieldLabelStyles = { label: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.03em', color: 'var(--mantine-color-dimmed)' } }
 
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
@@ -166,14 +160,32 @@ export default function ManajemenGuruPage() {
   const handleChangeWeekly = (kelasId: string, session: WeeklySessionKey, hariIndex: number, guruId: string) => {
     setLocalKelasList(prev => prev.map(k => {
       if (k.id !== kelasId) return k
-      return { ...k, weekly: { ...k.weekly, [session]: { ...k.weekly[session], [hariIndex]: guruId } } }
+      return {
+        ...k,
+        weekly: {
+          ...k.weekly,
+          [session]: {
+            ...k.weekly[session],
+            [hariIndex]: guruId,
+          },
+        },
+      }
     }))
   }
 
   const handleChangeGabungan = (kelasId: string, session: WeeklySessionKey, field: 'groupKey' | 'tempat', value: string) => {
     setLocalKelasList(prev => prev.map(k => {
       if (k.id !== kelasId) return k
-      return { ...k, gabungan: { ...k.gabungan, [session]: { ...(k.gabungan?.[session] || { groupKey: '', tempat: '' }), [field]: value } } }
+      return {
+        ...k,
+        gabungan: {
+          ...k.gabungan,
+          [session]: {
+            ...(k.gabungan?.[session] || { groupKey: '', tempat: '' }),
+            [field]: value,
+          },
+        },
+      }
     }))
   }
 
@@ -192,7 +204,10 @@ export default function ManajemenGuruPage() {
       SESSION_META.forEach(session => {
         const item = asli.gabungan?.[session.serverKey]
         if (item) {
-          asliGabungan[session.serverKey] = { groupKey: item.group_key || '', tempat: item.tempat || '' }
+          asliGabungan[session.serverKey] = {
+            groupKey: item.group_key || '',
+            tempat: item.tempat || '',
+          }
         }
       })
 
@@ -307,7 +322,8 @@ export default function ManajemenGuruPage() {
     XLSX.writeFile(wb, 'Template_Guru.xlsx')
   }
 
-  const handleUpload = async (file: File | null) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
     try {
       const XLSX = await import('xlsx')
@@ -353,9 +369,6 @@ export default function ManajemenGuruPage() {
     ? guruList.filter(g => g.nama_lengkap.toLowerCase().includes(guruSearch.toLowerCase()))
     : guruList, [guruList, guruSearch])
 
-  const guruOptions = useMemo(() => filteredForDropdown.map((g: any) => ({ value: String(g.id), label: g.nama_lengkap })), [filteredForDropdown])
-  const waliOptions = useMemo(() => [{ value: '', label: '- Belum diatur -' }, ...waliUserList.map((u: any) => ({ value: String(u.id), label: u.full_name || '(Tanpa nama)' }))], [waliUserList])
-
   const { paged: pagedGuruList, totalPages: totalPagesGuruList, safePage: safePageGuruList } = usePagination(guruList, pageSize, page)
   const activeScheduleClass = useMemo(
     () => scheduleModal ? localKelasList.find(k => k.id === scheduleModal.kelasId) : null,
@@ -370,214 +383,340 @@ export default function ManajemenGuruPage() {
   ), 0)
 
   return (
-    <div className="space-y-6 pb-20">
-      <Flex direction={{ base: 'column', sm: 'row' }} gap="md" align={{ sm: 'flex-start' }} justify={{ sm: 'space-between' }}
-        pb="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Manajemen Guru & Jadwal"
           description="Atur guru default, pembagian harian mingguan, dan wali kelas manual."
           action={(
-            <Button component={Link} href="/dashboard/master/wali-kelas/cetak" variant="default" fw={700} leftSection={<Printer className="h-4 w-4" />}>
+            <Link
+              href="/dashboard/master/wali-kelas/cetak"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4" />
               Cetak Tugas Mengajar
-            </Button>
+            </Link>
           )}
           className="flex-1"
         />
-        <SegmentedControl
-          value={tab}
-          onChange={(v) => setTab(v as 'JADWAL' | 'MASTER')}
-          data={[
-            { value: 'JADWAL', label: <Group gap={6} wrap="nowrap"><School className="w-4 h-4" /> Jadwal Kelas</Group> },
-            { value: 'MASTER', label: <Group gap={6} wrap="nowrap"><UserCheck className="w-4 h-4" /> Master Guru</Group> },
-          ]}
-        />
-      </Flex>
+        <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+          <button onClick={() => setTab('JADWAL')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'JADWAL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <School className="w-4 h-4" /> Jadwal Kelas
+          </button>
+          <button onClick={() => setTab('MASTER')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'MASTER' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <UserCheck className="w-4 h-4" /> Master Guru
+          </button>
+        </div>
+      </div>
 
       {tab === 'JADWAL' && (
-        <Stack gap="md">
-          <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" align={{ base: 'stretch', sm: 'flex-end' }} gap="sm">
-            <Flex direction={{ base: 'column', sm: 'row' }} gap="sm" w={{ base: '100%', sm: 'auto' }}>
-              <NativeSelect
-                leftSection={<Filter className="w-4 h-4" />}
-                w={{ base: '100%', sm: 240 }}
-                value={selectedMarhalah}
-                onChange={async (e) => {
-                  const value = e.currentTarget.value
-                  setSelectedMarhalah(value); setSearch(''); setJadwalLoaded(false); setKelasList([]); setLocalKelasList([])
-                  if (!value) return
-                  await loadKelasByFilter(value)
-                }}
-                data={[{ value: '', label: 'Pilih tingkat / marhalah...' }, { value: 'SEMUA', label: 'Tampilkan semua' }, ...marhalahList.map((m: any) => ({ value: String(m.id), label: m.nama }))]}
-              />
-              <TextInput leftSection={<Search className="w-4 h-4" />} w={{ base: '100%', sm: 224 }} disabled={!jadwalLoaded} placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.currentTarget.value)} />
-              <TextInput leftSection={<Search className="w-4 h-4" />} w={{ base: '100%', sm: 224 }} disabled={!jadwalLoaded} placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.currentTarget.value)} />
-            </Flex>
-            <Button onClick={handleSimpanSemua} loading={isSavingBatch} disabled={loading || !jadwalLoaded} color="indigo" fw={700} leftSection={!isSavingBatch && <Save className="w-4 h-4" />}>
+        <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-60">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <select
+                  value={selectedMarhalah}
+                  onChange={async (e) => {
+                    const value = e.target.value
+                    setSelectedMarhalah(value)
+                    setSearch('')
+                    setJadwalLoaded(false)
+                    setKelasList([])
+                    setLocalKelasList([])
+                    if (!value) return
+                    await loadKelasByFilter(value)
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+                >
+                  <option value="">Pilih tingkat / marhalah...</option>
+                  <option value="SEMUA">Tampilkan semua</option>
+                  {marhalahList.map((m: any) => <option key={m.id} value={String(m.id)}>{m.nama}</option>)}
+                </select>
+              </div>
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input disabled={!jadwalLoaded} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm disabled:bg-slate-50 disabled:text-slate-400" placeholder="Cari kelas..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="relative flex-1 sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input disabled={!jadwalLoaded} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm disabled:bg-slate-50 disabled:text-slate-400" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
+              </div>
+            </div>
+            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading || !jadwalLoaded} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+              {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               SIMPAN JADWAL
-            </Button>
-          </Flex>
+            </button>
+          </div>
 
-          <Alert color="indigo" variant="light" radius="lg" icon={<CalendarDays className="w-4 h-4" />} title="Pembagian Harian Mingguan">
-            <Text size="xs" c="dimmed">Kolom default tetap menjadi fallback. Jika sel harian dikosongkan, kelas akan otomatis memakai guru default sesi tersebut.</Text>
-          </Alert>
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2 font-bold text-indigo-900">
+              <CalendarDays className="w-4 h-4" />
+              Pembagian Harian Mingguan
+            </div>
+            <p className="mt-1 text-xs text-slate-600">Kolom default tetap menjadi fallback. Jika sel harian dikosongkan, kelas akan otomatis memakai guru default sesi tersebut.</p>
+          </div>
 
-          <Stack gap="md">
+          <div className="space-y-4">
             {loading ? (
-              <Paper withBorder radius="md" py={80} ta="center"><Loader color="gray" size="lg" mx="auto" /></Paper>
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
             ) : !jadwalLoaded ? (
-              <Paper withBorder radius="md" py={80} ta="center">
-                <Text fw={600} c="dimmed">Pilih tingkat / marhalah dulu</Text>
-                <Text size="sm" c="dimmed" mt={4}>Konten jadwal kelas akan dimuat setelah filter dipilih.</Text>
-              </Paper>
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center text-slate-400">
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-500">Pilih tingkat / marhalah dulu</p>
+                  <p className="text-sm">Konten jadwal kelas akan dimuat setelah filter dipilih.</p>
+                </div>
+              </div>
             ) : filteredLocalKelas.length === 0 ? (
-              <Paper withBorder radius="md" py={80} ta="center">
-                <Text fw={600} c="dimmed">Tidak ada kelas</Text>
-                <Text size="sm" c="dimmed" mt={4}>Coba pilih filter lain atau gunakan opsi tampilkan semua.</Text>
-              </Paper>
+              <div className="bg-white border rounded-xl shadow-sm py-20 text-center text-slate-400">
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-500">Tidak ada kelas</p>
+                  <p className="text-sm">Coba pilih filter lain atau gunakan opsi tampilkan semua.</p>
+                </div>
+              </div>
             ) : filteredLocalKelas.map(k => (
-              <Paper key={k.id} withBorder radius="lg" shadow="sm" style={{ overflow: 'hidden' }}>
-                <Box px="md" py="sm" bg="gray.0" style={{ borderBottom: '1px solid var(--mantine-color-gray-1)' }}>
-                  <Text fw={700} c="dark.7">{k.nama_kelas}</Text>
-                  <Text size="xs" c="dimmed">{k.marhalah_nama || 'Tanpa tingkat'}</Text>
-                </Box>
+              <div key={k.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="font-bold text-slate-800">{k.nama_kelas}</p>
+                  <p className="text-xs text-slate-500">{k.marhalah_nama || 'Tanpa tingkat'}</p>
+                </div>
 
-                <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm" p="md">
-                  <NativeSelect label="Wali Kelas" value={k.wali_kelas_id} onChange={e => handleChangeLocal(k.id, 'wali_kelas_id', e.currentTarget.value)} data={waliOptions} styles={fieldLabelStyles} />
-                  <NativeSelect label="Default Shubuh" value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.currentTarget.value)} data={[{ value: '', label: '- Kosong -' }, ...guruOptions]} styles={fieldLabelStyles} />
-                  <NativeSelect label="Default Ashar" value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.currentTarget.value)} data={[{ value: '', label: '- Kosong -' }, ...guruOptions]} styles={fieldLabelStyles} />
-                  <NativeSelect label="Default Maghrib" value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.currentTarget.value)} data={[{ value: '', label: '- Kosong -' }, ...guruOptions]}
-                    styles={{ ...fieldLabelStyles, input: { borderColor: 'var(--mantine-color-yellow-4)', background: 'var(--mantine-color-yellow-0)', fontWeight: 700 } }} />
-                </SimpleGrid>
+                <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Wali Kelas</label>
+                    <select value={k.wali_kelas_id} onChange={e => handleChangeLocal(k.id, 'wali_kelas_id', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Belum diatur -</option>
+                      {waliUserList.map((user: any) => <option key={user.id} value={user.id}>{user.full_name || '(Tanpa nama)'}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Shubuh</label>
+                    <select value={k.s} onChange={e => handleChangeLocal(k.id, 's', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Ashar</label>
+                    <select value={k.a} onChange={e => handleChangeLocal(k.id, 'a', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Default Maghrib</label>
+                    <select value={k.m} onChange={e => handleChangeLocal(k.id, 'm', e.target.value)} className="w-full rounded-xl border border-yellow-300 bg-yellow-50/40 px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-yellow-500 outline-none">
+                      <option value="">- Kosong -</option>
+                      {filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                    </select>
+                  </div>
+                </div>
 
-                <Box px="md" py="sm" style={{ borderTop: '1px solid var(--mantine-color-gray-1)' }}>
-                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                    <ScheduleTriggerButton icon={<UsersRound className="h-4 w-4" color="var(--mantine-color-indigo-6)" />} title="Kelas Gabungan" subtitle={`${countGabunganFilled(k)} sesi terisi`} onClick={() => setScheduleModal({ kelasId: k.id, tab: 'gabungan' })} />
-                    <ScheduleTriggerButton icon={<CalendarDays className="h-4 w-4" color="var(--mantine-color-indigo-6)" />} title="Override Harian" subtitle={`${countOverrideFilled(k)} sel diubah`} onClick={() => setScheduleModal({ kelasId: k.id, tab: 'override' })} />
-                  </SimpleGrid>
-                </Box>
-              </Paper>
+                <div className="border-t border-slate-100 px-4 py-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModal({ kelasId: k.id, tab: 'gabungan' })}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <UsersRound className="h-4 w-4 shrink-0 text-indigo-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-800">Kelas Gabungan</span>
+                          <span className="block truncate text-xs text-slate-500">{countGabunganFilled(k)} sesi terisi</span>
+                        </span>
+                      </span>
+                      <Settings2 className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModal({ kelasId: k.id, tab: 'override' })}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <CalendarDays className="h-4 w-4 shrink-0 text-indigo-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-800">Override Harian</span>
+                          <span className="block truncate text-xs text-slate-500">{countOverrideFilled(k)} sel diubah</span>
+                        </span>
+                      </span>
+                      <Settings2 className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
-          </Stack>
-        </Stack>
+          </div>
+        </div>
       )}
 
-      {/* SCHEDULE MODAL */}
-      <Modal
-        opened={!!(scheduleModal && activeScheduleClass)}
-        onClose={() => setScheduleModal(null)}
-        size={1100}
-        title={scheduleModal && activeScheduleClass ? (
-          <div>
-            <Text size="xs" fw={700} tt="uppercase" c="indigo.6">{activeScheduleClass.marhalah_nama || 'Tanpa tingkat'}</Text>
-            <Text fz="lg" fw={900} c="dark.8">{activeScheduleClass.nama_kelas}</Text>
-          </div>
-        ) : null}
-      >
-        {scheduleModal && activeScheduleClass && (
-          <Stack gap="md">
-            <SegmentedControl
-              value={scheduleModal.tab}
-              onChange={(v) => setScheduleModal(prev => prev ? { ...prev, tab: v as ScheduleModalTab } : prev)}
-              data={[
-                { value: 'gabungan', label: <Group gap={6} wrap="nowrap"><UsersRound className="h-4 w-4" /> Kelas Gabungan</Group> },
-                { value: 'override', label: <Group gap={6} wrap="nowrap"><CalendarDays className="h-4 w-4" /> Override Harian</Group> },
-              ]}
-            />
+      {scheduleModal && activeScheduleClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">{activeScheduleClass.marhalah_nama || 'Tanpa tingkat'}</p>
+                <h3 className="truncate text-lg font-black text-slate-900">{activeScheduleClass.nama_kelas}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModal(null)}
+                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                title="Tutup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-            {scheduleModal.tab === 'gabungan' ? (
-              <Stack gap="sm">
-                <div>
-                  <Text size="sm" fw={700} c="dark.6">Kelas Gabungan per Sesi</Text>
-                  <Text size="xs" c="dimmed">Isi kode yang sama pada beberapa kelas jika kelas itu digabung pada sesi tertentu. Jadwal gabungan mengikuti kelas pertama dalam kelompok.</Text>
+            <div className="border-b border-slate-100 px-5 pt-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModal(prev => prev ? { ...prev, tab: 'gabungan' } : prev)}
+                  className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2 text-sm font-bold ${
+                    scheduleModal.tab === 'gabungan'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  <UsersRound className="h-4 w-4" />
+                  Kelas Gabungan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModal(prev => prev ? { ...prev, tab: 'override' } : prev)}
+                  className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2 text-sm font-bold ${
+                    scheduleModal.tab === 'override'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Override Harian
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              {scheduleModal.tab === 'gabungan' ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">Kelas Gabungan per Sesi</p>
+                    <p className="text-xs text-slate-500">Isi kode yang sama pada beberapa kelas jika kelas itu digabung pada sesi tertentu. Jadwal gabungan mengikuti kelas pertama dalam kelompok.</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {SESSION_META.map(session => (
+                      <div key={session.serverKey} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <div className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{session.label}</div>
+                        <input
+                          value={activeScheduleClass.gabungan?.[session.serverKey]?.groupKey || ''}
+                          onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'groupKey', e.target.value)}
+                          placeholder="Kode gabungan"
+                          className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <input
+                          value={activeScheduleClass.gabungan?.[session.serverKey]?.tempat || ''}
+                          onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'tempat', e.target.value)}
+                          placeholder="Tempat"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-                  {SESSION_META.map(session => (
-                    <Paper key={session.serverKey} withBorder radius="md" bg="gray.0" p="sm">
-                      <Text size="11px" fw={900} tt="uppercase" c="dimmed" mb="xs">{session.label}</Text>
-                      <TextInput size="xs" mb="xs" placeholder="Kode gabungan"
-                        value={activeScheduleClass.gabungan?.[session.serverKey]?.groupKey || ''}
-                        onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'groupKey', e.currentTarget.value)} />
-                      <TextInput size="xs" placeholder="Tempat"
-                        value={activeScheduleClass.gabungan?.[session.serverKey]?.tempat || ''}
-                        onChange={e => handleChangeGabungan(activeScheduleClass.id, session.serverKey, 'tempat', e.currentTarget.value)} />
-                    </Paper>
-                  ))}
-                </SimpleGrid>
-              </Stack>
-            ) : (
-              <Stack gap="sm">
-                <div>
-                  <Text size="sm" fw={700} c="dark.6">Override Harian</Text>
-                  <Text size="xs" c="dimmed">Kosongkan sel untuk memakai guru default sesi. Sel abu-abu berarti sesi itu memang libur pengajian.</Text>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">Override Harian</p>
+                    <p className="text-xs text-slate-500">Kosongkan sel untuk memakai guru default sesi. Sel abu-abu berarti sesi itu memang libur pengajian.</p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[920px] w-full border-separate border-spacing-0">
+                      <thead>
+                        <tr>
+                          <th className="sticky left-0 z-10 bg-white border-b border-slate-200 px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Sesi</th>
+                          {HARI_LIST.map(day => (
+                            <th key={day.index} className="border-b border-slate-200 px-2 py-2 text-center text-xs font-bold uppercase text-slate-500">{day.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {SESSION_META.map(session => (
+                          <tr key={session.serverKey}>
+                            <td className="sticky left-0 z-10 bg-white border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-700">{session.label}</td>
+                            {HARI_LIST.map(day => {
+                              const disabled = isStructuralLibur(day.index, session.serverKey)
+                              return (
+                                <td key={`${session.serverKey}-${day.index}`} className="border-b border-slate-100 px-2 py-2">
+                                  <select
+                                    disabled={disabled}
+                                    value={activeScheduleClass.weekly[session.serverKey]?.[day.index] || ''}
+                                    onChange={e => handleChangeWeekly(activeScheduleClass.id, session.serverKey, day.index, e.target.value)}
+                                    className={`w-full rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 ${
+                                      disabled
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                        : 'border-slate-200 bg-white focus:ring-indigo-500'
+                                    }`}
+                                  >
+                                    <option value="">{disabled ? 'Libur' : 'Default'}</option>
+                                    {!disabled && filteredForDropdown.map((g: any) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
+                                  </select>
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <Table.ScrollContainer minWidth={920}>
-                  <Table withColumnBorders fz="xs">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Sesi</Table.Th>
-                        {HARI_LIST.map(day => <Table.Th key={day.index} ta="center">{day.label}</Table.Th>)}
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {SESSION_META.map(session => (
-                        <Table.Tr key={session.serverKey}>
-                          <Table.Td fw={700} c="dark.7">{session.label}</Table.Td>
-                          {HARI_LIST.map(day => {
-                            const disabled = isStructuralLibur(day.index, session.serverKey)
-                            return (
-                              <Table.Td key={`${session.serverKey}-${day.index}`}>
-                                <NativeSelect size="xs" disabled={disabled}
-                                  value={activeScheduleClass.weekly[session.serverKey]?.[day.index] || ''}
-                                  onChange={e => handleChangeWeekly(activeScheduleClass.id, session.serverKey, day.index, e.currentTarget.value)}
-                                  data={[{ value: '', label: disabled ? 'Libur' : 'Default' }, ...(disabled ? [] : guruOptions)]} />
-                              </Table.Td>
-                            )
-                          })}
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </Table.ScrollContainer>
-              </Stack>
-            )}
-          </Stack>
-        )}
-      </Modal>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {tab === 'MASTER' && (
-        <Stack gap="lg">
-          <Paper withBorder radius="md" p="lg" shadow="sm">
-            <Group gap="xs" mb="md" pb="xs" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-              <Plus className="w-5 h-5" color="var(--mantine-color-green-6)" /><Text fw={700} c="dark.7">Tambah Guru Baru (Manual)</Text>
-            </Group>
-            <form onSubmit={handleTambahGuru}>
-              <Flex direction={{ base: 'column', sm: 'row' }} gap="md" align={{ sm: 'flex-end' }}>
-                <TextInput label="Nama Lengkap" required value={newGuru.nama} onChange={e => setNewGuru({ ...newGuru, nama: e.currentTarget.value })} placeholder="Contoh: Ahmad" style={{ flex: 1, width: '100%' }} styles={fieldLabelStyles} />
-                <TextInput label="Gelar (Opsional)" value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.currentTarget.value })} placeholder="S.Pd." w={{ base: '100%', sm: 180 }} styles={fieldLabelStyles} />
-                <TextInput label="Kode (Opsional)" value={newGuru.kode} onChange={e => setNewGuru({ ...newGuru, kode: e.currentTarget.value })} placeholder="AHM" w={{ base: '100%', sm: 180 }} styles={fieldLabelStyles} />
-                <Button type="submit" color="green" fw={700} w={{ base: '100%', sm: 'auto' }}>Simpan</Button>
-              </Flex>
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-2">
+              <Plus className="w-5 h-5 text-green-600" /> Tambah Guru Baru (Manual)
+            </h3>
+            <form onSubmit={handleTambahGuru} className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="w-full md:flex-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap</label>
+                <input value={newGuru.nama} onChange={e => setNewGuru({ ...newGuru, nama: e.target.value })} className="w-full p-2 border rounded" placeholder="Contoh: Ahmad" required />
+              </div>
+              <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Gelar (Opsional)</label>
+                <input value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.target.value })} className="w-full p-2 border rounded" placeholder="S.Pd." />
+              </div>
+              <div className="w-full md:w-1/4">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kode (Opsional)</label>
+                <input value={newGuru.kode} onChange={e => setNewGuru({ ...newGuru, kode: e.target.value })} className="w-full p-2 border rounded" placeholder="AHM" />
+              </div>
+              <button className="bg-green-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-green-700 w-full md:w-auto">Simpan</button>
             </form>
-          </Paper>
+          </div>
 
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
-            <Paper radius="md" p="lg" bg="blue.0" style={{ border: '1px solid var(--mantine-color-blue-1)' }}>
-              <Stack align="center" gap="sm" ta="center">
-                <Download className="w-8 h-8" color="var(--mantine-color-blue-6)" />
-                <Text fw={700} c="blue.9">1. Template Data Guru</Text>
-                <Button onClick={handleDownloadTemplate} variant="white" color="blue" size="xs" fw={700}>Download .xlsx</Button>
-              </Stack>
-            </Paper>
-            <Paper radius="md" p="lg" bg="green.0" style={{ border: '1px solid var(--mantine-color-green-1)' }}>
-              <Stack align="center" gap="sm" ta="center">
-                <Upload className="w-8 h-8" color="var(--mantine-color-green-6)" />
-                <Text fw={700} c="green.9">2. Upload Excel</Text>
-                <FileButton onChange={handleUpload} accept=".xlsx">
-                  {(props) => <Button {...props} color="green" size="xs" fw={700}>Pilih File</Button>}
-                </FileButton>
-              </Stack>
-            </Paper>
-          </SimpleGrid>
+          <hr className="border-dashed" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-3">
+              <Download className="w-8 h-8 text-blue-600" />
+              <h3 className="font-bold text-blue-900">1. Template Data Guru</h3>
+              <button onClick={handleDownloadTemplate} className="bg-white text-blue-700 px-4 py-2 rounded shadow-sm font-bold text-xs border hover:bg-blue-50">Download .xlsx</button>
+            </div>
+            <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex flex-col items-center text-center space-y-3">
+              <Upload className="w-8 h-8 text-green-600" />
+              <h3 className="font-bold text-green-900">2. Upload Excel</h3>
+              <div className="relative">
+                <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <button className="bg-green-600 text-white px-4 py-2 rounded shadow-sm font-bold text-xs hover:bg-green-700">Pilih File</button>
+              </div>
+            </div>
+          </div>
 
           {excelData.length > 0 && (() => {
             const previewRows = excelData.map(d => {
@@ -588,79 +727,79 @@ export default function ManajemenGuruPage() {
             const dupCount = previewRows.filter(r => r.isDuplikat).length
             const newCount = previewRows.length - dupCount
             return (
-              <Paper withBorder radius="md" p="md">
-                <Group justify="space-between" mb="sm">
+              <div className="bg-white border rounded-xl p-4">
+                <div className="flex justify-between items-center mb-3">
                   <div>
-                    <Group gap="xs"><List className="w-4 h-4" /><Text fw={700} c="dark.6">Preview ({excelData.length} baris)</Text></Group>
-                    <Text size="xs" mt={2}>
-                      <Text span c="green.6" fw={700}>{newCount} baru</Text>
-                      {dupCount > 0 && <Text span c="red.5" fw={700} ml="xs">{dupCount} duplikat (dilewati)</Text>}
-                    </Text>
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><List className="w-4 h-4" /> Preview ({excelData.length} baris)</h3>
+                    <p className="text-xs mt-0.5">
+                      <span className="text-green-600 font-bold">{newCount} baru</span>
+                      {dupCount > 0 && <span className="text-red-500 font-bold ml-2">{dupCount} duplikat (dilewati)</span>}
+                    </p>
                   </div>
-                  <Button onClick={handleSimpanGuru} loading={isProcessing} disabled={newCount === 0} color="green" fw={700}>Simpan {newCount} Guru Baru</Button>
-                </Group>
-                <Paper withBorder radius="sm" style={{ maxHeight: 256, overflow: 'auto' }}>
-                  <Table fz="sm" stickyHeader>
-                    <Table.Thead><Table.Tr><Table.Th>Nama</Table.Th><Table.Th>Gelar</Table.Th><Table.Th ta="center">Status</Table.Th></Table.Tr></Table.Thead>
-                    <Table.Tbody>
+                  <button onClick={handleSimpanGuru} disabled={isProcessing || newCount === 0} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
+                    {isProcessing ? 'Menyimpan...' : `Simpan ${newCount} Guru Baru`}
+                  </button>
+                </div>
+                <div className="max-h-64 overflow-auto border rounded">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-100 sticky top-0">
+                      <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
+                    </thead>
+                    <tbody>
                       {previewRows.map((r, i) => (
-                        <Table.Tr key={i} bg={r.isDuplikat ? 'red.0' : undefined}>
-                          <Table.Td fw={500} c={r.isDuplikat ? 'red.4' : 'dark.7'} td={r.isDuplikat ? 'line-through' : undefined}>{r.nama}</Table.Td>
-                          <Table.Td c="dimmed">{r.gelar}</Table.Td>
-                          <Table.Td ta="center">
-                            <Badge size="sm" radius="xl" color={r.isDuplikat ? 'red' : 'green'} variant="light">{r.isDuplikat ? 'Duplikat' : 'Baru'}</Badge>
-                          </Table.Td>
-                        </Table.Tr>
+                        <tr key={i} className={`border-b ${r.isDuplikat ? 'bg-red-50' : ''}`}>
+                          <td className={`p-2 font-medium ${r.isDuplikat ? 'text-red-400 line-through' : 'text-slate-800'}`}>{r.nama}</td>
+                          <td className="p-2 text-slate-500">{r.gelar}</td>
+                          <td className="p-2 text-center">
+                            {r.isDuplikat
+                              ? <span className="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">Duplikat</span>
+                              : <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Baru</span>}
+                          </td>
+                        </tr>
                       ))}
-                    </Table.Tbody>
-                  </Table>
-                </Paper>
-              </Paper>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )
           })()}
 
-          <Paper withBorder radius="md" p="md" shadow="sm">
-            <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" align={{ base: 'flex-start', sm: 'center' }} gap="md" mb="md" pb="sm" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+          <div className="bg-white border rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-3">
               <div>
-                <Text fw={700} c="dark.6">Daftar Guru Terdaftar ({guruList.length})</Text>
-                <Text size="xs" c="dimmed">Pilih kotak centang untuk menghapus banyak data sekaligus.</Text>
+                <h3 className="font-bold text-slate-700">Daftar Guru Terdaftar ({guruList.length})</h3>
+                <p className="text-xs text-slate-500">Pilih kotak centang untuk menghapus banyak data sekaligus.</p>
               </div>
-              <Group gap="sm">
-                <UnstyledButton onClick={toggleSelectAllGuru}>
-                  <Group gap="xs" c="dark.5">
-                    {selectedGuruIds.length === guruList.length && guruList.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                    <Text size="sm" fw={500}>Pilih Semua</Text>
-                  </Group>
-                </UnstyledButton>
+              <div className="flex items-center gap-3">
+                <button onClick={toggleSelectAllGuru} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition">
+                  {selectedGuruIds.length === guruList.length && guruList.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  Pilih Semua
+                </button>
                 {selectedGuruIds.length > 0 && (
-                  <Button onClick={handleHapusBatch} loading={isDeletingBatch} color="red" size="compact-md" fw={700} leftSection={!isDeletingBatch && <Trash2 className="w-4 h-4" />}>
+                  <button onClick={handleHapusBatch} disabled={isDeletingBatch} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 disabled:opacity-50 shadow-sm">
+                    {isDeletingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     Hapus Terpilih ({selectedGuruIds.length})
-                  </Button>
+                  </button>
                 )}
-              </Group>
-            </Flex>
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm" style={{ maxHeight: 384, overflow: 'auto' }}>
-              {pagedGuruList.map(g => {
-                const sel = selectedGuruIds.includes(g.id)
-                return (
-                  <Paper key={g.id} withBorder radius="md" p="sm" onClick={() => toggleSelectGuru(g.id)}
-                    style={{ cursor: 'pointer', background: sel ? 'var(--mantine-color-red-0)' : 'var(--mantine-color-gray-0)', borderColor: sel ? 'var(--mantine-color-red-2)' : undefined }}>
-                    <Group justify="space-between" wrap="nowrap">
-                      <Group gap="sm" wrap="nowrap" style={{ overflow: 'hidden' }}>
-                        {sel ? <CheckSquare className="w-5 h-5 shrink-0" color="var(--mantine-color-red-5)" /> : <Square className="w-5 h-5 shrink-0" color="var(--mantine-color-gray-3)" />}
-                        <div style={{ overflow: 'hidden' }}>
-                          <Text size="sm" fw={700} truncate c={sel ? 'red.7' : 'dark.7'}>{g.nama_lengkap}</Text>
-                          <Text size="xs" c="dimmed">{g.gelar || '-'}</Text>
-                        </div>
-                      </Group>
-                      <ActionIcon variant="subtle" color="gray" onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} aria-label="Hapus guru">
-                        <Trash2 className="w-4 h-4" />
-                      </ActionIcon>
-                    </Group>
-                  </Paper>
-                )
-              })}
-            </SimpleGrid>
+              </div>
+            </div>
+            <div className="max-h-96 overflow-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {pagedGuruList.map(g => (
+                <div key={g.id} onClick={() => toggleSelectGuru(g.id)}
+                  className={`p-3 border border-slate-200 rounded-xl flex justify-between items-center cursor-pointer transition-all ${selectedGuruIds.includes(g.id) ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 hover:bg-white hover:shadow-sm'}`}>
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {selectedGuruIds.includes(g.id) ? <CheckSquare className="w-5 h-5 text-red-500 flex-shrink-0" /> : <Square className="w-5 h-5 text-slate-300 flex-shrink-0" />}
+                    <div className="truncate">
+                      <p className={`font-bold text-sm truncate ${selectedGuruIds.includes(g.id) ? 'text-red-700' : 'text-slate-800'}`}>{g.nama_lengkap}</p>
+                      <p className="text-xs text-slate-500">{g.gelar || '-'}</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} className="text-slate-300 hover:text-red-500 p-2 transition-opacity" title="Hapus Guru Ini">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
 
             <Pagination
               currentPage={safePageGuruList}
@@ -670,28 +809,9 @@ export default function ManajemenGuruPage() {
               onPageChange={setPage}
               onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
             />
-          </Paper>
-        </Stack>
+          </div>
+        </div>
       )}
     </div>
-  )
-}
-
-function ScheduleTriggerButton({ icon, title, subtitle, onClick }: { icon: React.ReactNode; title: string; subtitle: string; onClick: () => void }) {
-  return (
-    <UnstyledButton onClick={onClick}>
-      <Paper withBorder radius="md" bg="gray.0" px="md" py="sm">
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-            {icon}
-            <div style={{ minWidth: 0 }}>
-              <Text size="sm" fw={700} c="dark.7">{title}</Text>
-              <Text size="xs" c="dimmed" truncate>{subtitle}</Text>
-            </div>
-          </Group>
-          <Settings2 className="h-4 w-4 shrink-0" color="var(--mantine-color-gray-4)" />
-        </Group>
-      </Paper>
-    </UnstyledButton>
   )
 }

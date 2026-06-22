@@ -16,7 +16,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import {
   getAbsensiPengawasRows,
   getActiveEventForAbsensiPengawas,

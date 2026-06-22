@@ -42,7 +42,7 @@ import {
   Ban,
   Settings,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -421,7 +421,7 @@ export default function UangJajanPage() {
   }
 
   return (
-    <div className="space-y-6 pb-32">
+    <div className="mx-auto max-w-5xl space-y-6 pb-32">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <DashboardPageHeader
           title="Uang Jajan"

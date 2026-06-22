@@ -14,7 +14,7 @@ import {
   simpanRencanaBelanja,
 } from './actions'
 import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Wallet, X } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 type KatalogItem = {

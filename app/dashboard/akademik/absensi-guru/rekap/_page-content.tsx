@@ -249,7 +249,7 @@ export default function RekapAbsensiGuruPage() {
   const canPrint = canPrintSemua || canPrintGuru
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-6xl mx-auto pb-20">
       <div className="space-y-4 border-b pb-4">
         <DashboardPageHeader
           title="Rekap Kinerja Guru"

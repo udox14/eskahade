@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, NativeSelect, Modal, Paper, Badge, Text, Group } from '@mantine/core'
 import { getSensusData } from './actions'
-import { BarChart3, Users, Home, ArrowRightLeft, Loader2, User, Search } from 'lucide-react'
+import { BarChart3, Users, Home, ArrowRightLeft, Loader2, BookOpen, Bed, X, User, Search } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 const ASRAMA_LIST = ["SEMUA", "AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4"]
@@ -75,6 +74,7 @@ export default function SensusPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [modalKamar, setModalKamar] = useState<{ asrama: string; kamar: string; list: SantriKamar[] } | null>(null)
+  // Simpan asrama terakhir yang sudah di-fetch, untuk tahu kapan perlu re-fetch
   const [fetchedAsrama, setFetchedAsrama] = useState<string | null>(null)
 
   const loadData = async () => {
@@ -86,6 +86,7 @@ export default function SensusPage() {
 
   const isDirty = asrama !== fetchedAsrama
 
+  // Computed values (hanya kalau data ada)
   const total = data?.total ?? 0
   const asramaKeys = Object.keys(data?.distribusi_kamar || {}).sort()
   const jenjangSlices = data ? [
@@ -110,7 +111,7 @@ export default function SensusPage() {
   const perempuan = data?.jenis_kelamin?.P || 0
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -119,23 +120,29 @@ export default function SensusPage() {
           description={`Statistik demografi santri ${asrama !== 'SEMUA' ? `Asrama ${asrama}` : 'se-Pesantren'}.`}
           className="flex-1"
         />
-        <Group gap="xs" wrap="wrap">
-          <NativeSelect
-            leftSection={<Home className="w-4 h-4"/>}
-            value={asrama}
-            onChange={e => setAsrama(e.target.value)}
-            data={ASRAMA_LIST}
-          />
-          <Button
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+            <Home className="w-4 h-4 text-slate-400"/>
+            <select value={asrama} onChange={e => setAsrama(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer">
+              {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <button
             onClick={loadData}
-            loading={loading}
-            leftSection={!loading ? <Search className="w-4 h-4"/> : undefined}
-            color={isDirty || !data ? 'blue' : 'gray'}
-            variant={isDirty || !data ? 'filled' : 'light'}
+            disabled={loading}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm shadow-sm transition-all active:scale-95 ${
+              isDirty || !data
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
           >
-            {loading ? 'Menghitung...' : data ? (isDirty ? 'Perbarui' : 'Hitung Ulang') : 'Tampilkan'}
-          </Button>
-        </Group>
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin"/> Menghitung...</>
+              : <><Search className="w-4 h-4"/> {data ? (isDirty ? 'Perbarui' : 'Hitung Ulang') : 'Tampilkan'}</>
+            }
+          </button>
+        </div>
       </div>
 
       {/* EMPTY STATE */}
@@ -145,10 +152,13 @@ export default function SensusPage() {
             <BarChart3 className="w-10 h-10 text-blue-300"/>
           </div>
           <div>
-            <Text fw={700} c="dimmed">Data belum dimuat</Text>
-            <Text size="sm" c="dimmed" className="mt-1">Pilih filter lalu tekan <strong>Tampilkan</strong> untuk menghitung statistik santri.</Text>
+            <p className="text-lg font-bold text-slate-500">Data belum dimuat</p>
+            <p className="text-sm text-slate-400 mt-1">Pilih filter lalu tekan <strong>Tampilkan</strong> untuk menghitung statistik santri.</p>
           </div>
-          <Button onClick={loadData} color="blue" size="md" className="mt-2">Tampilkan Sekarang</Button>
+          <button onClick={loadData}
+            className="mt-2 bg-blue-600 text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all shadow">
+            Tampilkan Sekarang
+          </button>
         </div>
       )}
 
@@ -209,7 +219,7 @@ export default function SensusPage() {
           </div>
 
           {/* PENDIDIKAN FORMAL */}
-          <Paper withBorder p="lg" radius="xl">
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-blue-500 rounded-full inline-block"/>
               Pendidikan Formal
@@ -249,10 +259,10 @@ export default function SensusPage() {
                 </div>
               </div>
             </div>
-          </Paper>
+          </div>
 
           {/* MARHALAH */}
-          <Paper withBorder p="lg" radius="xl">
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-green-500 rounded-full inline-block"/>
               Sebaran Marhalah
@@ -265,10 +275,10 @@ export default function SensusPage() {
                 ))}
               </div>
             </div>
-          </Paper>
+          </div>
 
           {/* KAMAR */}
-          <Paper withBorder p="lg" radius="xl">
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide mb-5 flex items-center gap-2">
               <span className="w-1 h-4 bg-indigo-500 rounded-full inline-block"/>
               Kepadatan per Kamar
@@ -315,50 +325,51 @@ export default function SensusPage() {
                 )
               })}
             </div>
-          </Paper>
+          </div>
 
         </div>
       )}
 
       {/* MODAL SANTRI */}
-      <Modal
-        opened={modalKamar !== null}
-        onClose={() => setModalKamar(null)}
-        title={modalKamar && (
-          <div>
-            <Text fw={700} size="md">Kamar {modalKamar.kamar}</Text>
-            <Text size="xs" c="dimmed">Asrama {modalKamar.asrama} · {modalKamar.list.length} santri</Text>
-          </div>
-        )}
-        size="md"
-        centered
-        styles={{ body: { padding: 0 } }}
-      >
-        {modalKamar && (
-          <div className="overflow-y-auto max-h-[60vh] divide-y">
-            {modalKamar.list.length === 0
-              ? <div className="py-12 text-center text-slate-400 text-sm">Tidak ada data santri.</div>
-              : modalKamar.list
-                  .sort((a,b) => a.nama_lengkap.localeCompare(b.nama_lengkap))
-                  .map((s, i) => (
-                    <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                      <span className="w-5 text-[11px] text-slate-400 font-mono shrink-0 text-right">{i+1}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          {s.kelas_pesantren
-                            ? <Badge color="teal" variant="light" size="xs">{s.kelas_pesantren}</Badge>
-                            : <Badge color="gray" variant="light" size="xs">Belum masuk kelas</Badge>
-                          }
-                          <span className="text-[10px] text-slate-400">{s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` · Kelas ${s.kelas_sekolah}` : ''}</span>
+      {modalKamar && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setModalKamar(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-800">Kamar {modalKamar.kamar}</h3>
+                <p className="text-xs text-slate-500">Asrama {modalKamar.asrama} · {modalKamar.list.length} santri</p>
+              </div>
+              <button onClick={() => setModalKamar(null)} className="p-1.5 hover:bg-slate-100 rounded-full">
+                <X className="w-5 h-5 text-slate-400"/>
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 divide-y">
+              {modalKamar.list.length === 0
+                ? <div className="py-12 text-center text-slate-400 text-sm">Tidak ada data santri.</div>
+                : modalKamar.list
+                    .sort((a,b) => a.nama_lengkap.localeCompare(b.nama_lengkap))
+                    .map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                        <span className="w-5 text-[11px] text-slate-400 font-mono shrink-0 text-right">{i+1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {s.kelas_pesantren
+                              ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded">{s.kelas_pesantren}</span>
+                              : <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">Belum masuk kelas</span>
+                            }
+                            <span className="text-[10px] text-slate-400">{s.sekolah || 'Tidak sekolah'}{s.kelas_sekolah ? ` · Kelas ${s.kelas_sekolah}` : ''}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
-            }
+                    ))
+              }
+            </div>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </div>
   )
 }

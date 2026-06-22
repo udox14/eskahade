@@ -40,7 +40,7 @@ export default async function SantriDetailPage({ params }: Props) {
   const isAdmin = hasRole(session, 'admin')
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20">
       {/* Header — langsung tampil */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

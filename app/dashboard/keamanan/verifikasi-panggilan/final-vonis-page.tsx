@@ -5,7 +5,7 @@ import {
   AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Filter, Gavel,
   Loader2, RefreshCw, Save, Search, Users
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
@@ -258,7 +258,7 @@ export default function FinalVonisPage({
   }
 
   return (
-    <div className="pb-28 space-y-5">
+    <div className="max-w-6xl mx-auto pb-28 space-y-5">
       <DashboardPageHeader
         title={title}
         description={description}

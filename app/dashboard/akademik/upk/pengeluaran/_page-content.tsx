@@ -16,7 +16,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import {
   getHutangTokoOptions,

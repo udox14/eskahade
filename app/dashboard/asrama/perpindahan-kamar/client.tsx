@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import {
   Home, Settings, Play, CheckCircle, RotateCcw, Users, Crown,
   ChevronDown, ChevronUp, GripVertical, X, Plus, Trash2,
@@ -374,7 +374,7 @@ export default function PerpindahanClient({
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row gap-4 border-b pb-4 sm:items-start sm:justify-between">

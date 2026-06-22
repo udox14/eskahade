@@ -14,8 +14,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
-import { Button, Textarea } from '@mantine/core'
+import { toast } from 'sonner'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -99,49 +98,42 @@ function OverrideControls({ item }: { item: SetupWizardItemState }) {
       <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
         Catatan override
       </label>
-      <Textarea
+      <textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
         placeholder="Opsional, misalnya: PSB tahun ini tidak dipakai."
         rows={2}
-        mt="xs"
-        resize="none"
+        className="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-emerald-500"
       />
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button
+        <button
           type="button"
-          loading={pending}
-          disabled={item.locked}
+          disabled={pending || item.locked}
           onClick={() => save('complete')}
-          color="teal"
-          size="xs"
-          leftSection={!pending ? <CheckCircle2 className="h-3.5 w-3.5"/> : undefined}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-emerald-300"
         >
+          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
           Selesai manual
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
-          loading={pending}
-          disabled={item.locked}
+          disabled={pending || item.locked}
           onClick={() => save('skipped')}
-          variant="default"
-          size="xs"
-          leftSection={<SkipForward className="h-3.5 w-3.5"/>}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:text-slate-300"
         >
+          <SkipForward className="h-3.5 w-3.5" />
           Dilewati
-        </Button>
+        </button>
         {item.override ? (
-          <Button
+          <button
             type="button"
-            loading={pending}
+            disabled={pending}
             onClick={clear}
-            variant="subtle"
-            color="gray"
-            size="xs"
-            leftSection={<RotateCcw className="h-3.5 w-3.5"/>}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-white hover:text-slate-800"
           >
+            <RotateCcw className="h-3.5 w-3.5" />
             Pakai otomatis
-          </Button>
+          </button>
         ) : null}
       </div>
     </div>
@@ -237,7 +229,7 @@ export default function SetupTahunAjaranContent({ state }: { state: SetupWizardS
   )
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="mx-auto max-w-5xl space-y-6 pb-20">
       <DashboardPageHeader
         title="Setup Tahun Ajaran"
         description="Timeline pekerjaan awal tahun ajaran supaya admin tahu apa yang perlu dibereskan sebelum operasional berjalan."

@@ -6,10 +6,9 @@ import { useState } from 'react'
 import { Upload, Download, Save, AlertTriangle, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { importPenempatanKelas } from './actions'
-import { toast } from '@/lib/toast'
+import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { Button, ActionIcon } from '@mantine/core'
 
 export default function ImportKelasPage() {
   const confirm = useConfirm()
@@ -80,12 +79,12 @@ export default function ImportKelasPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 max-w-4xl mx-auto pb-20">
       <div className="flex items-start gap-4">
         {/* FIX: Ganti Link href ke button router.back() */}
-        <ActionIcon onClick={() => router.back()} variant="subtle" color="gray" size="lg">
-          <ArrowLeft className="w-5 h-5" />
-        </ActionIcon>
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-slate-600" />
+        </button>
         <DashboardPageHeader
           title="Import Batch Penempatan Kelas"
           description="Upload hasil rapat pembagian kelas dari Excel."
@@ -100,9 +99,9 @@ export default function ImportKelasPage() {
             <h3 className="font-semibold text-blue-900">1. Download Template</h3>
             <p className="text-sm text-blue-700">Hanya butuh 2 kolom: NIS dan Nama Kelas.</p>
           </div>
-          <Button onClick={downloadTemplate} variant="default" size="xs" leftSection={<Download className="w-4 h-4" />}>
-            Template.xlsx
-          </Button>
+          <button onClick={downloadTemplate} className="bg-white text-blue-700 px-3 py-2 rounded border border-blue-200 text-sm font-medium flex items-center gap-2 hover:bg-blue-50 transition-colors">
+            <Download className="w-4 h-4" /> Template.xlsx
+          </button>
         </div>
 
         {/* Step 2 */}
@@ -119,9 +118,10 @@ export default function ImportKelasPage() {
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600"/> Preview ({excelData.length} Data)
               </h3>
-              <Button onClick={handleSimpan} loading={isProcessing} color="green" leftSection={!isProcessing ? <Save className="w-4 h-4"/> : undefined}>
-                Eksekusi Penempatan
-              </Button>
+              <button onClick={handleSimpan} disabled={isProcessing} className="bg-green-700 text-white px-6 py-2 rounded hover:bg-green-800 disabled:opacity-50 flex items-center gap-2 font-bold shadow-sm">
+                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                {isProcessing ? "Memproses..." : "Eksekusi Penempatan"}
+              </button>
             </div>
             <div className="bg-slate-50 p-0 rounded-lg h-64 overflow-y-auto border border-slate-200">
               <table className="w-full text-sm text-left">
