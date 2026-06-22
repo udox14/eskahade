@@ -81,20 +81,7 @@ async function ensureFiturAksesReady() {
       ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11)
   `)
 
-  try {
-    await execute(`
-      UPDATE fitur_akses
-      SET is_bottomnav = 1, bottomnav_urutan = 3
-      WHERE href = '/dashboard/guru/nilai-harian'
-    `)
-    await execute(`
-      UPDATE fitur_akses
-      SET is_bottomnav = 1, bottomnav_urutan = 4
-      WHERE href = '/dashboard/guru/hafalan'
-    `)
-  } catch {
-    // Abaikan jika kolom bottomnav belum tersedia di database lama.
-  }
+  // Catatan: Seed awal diisi lewat migrasi database. Programmatic UPDATE dihapus agar kustomisasi admin tidak tertimpa saat startup.
 
   // Reorganisasi sidebar (idempoten): pindahkan row lama yang sudah ada di DB.
   try {

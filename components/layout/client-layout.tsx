@@ -35,7 +35,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
 
   return (
     <IconContext.Provider value={{ weight: "duotone" }}>
-      <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
+      <div className="relative flex h-[100dvh] w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
       
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 

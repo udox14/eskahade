@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "ESKAHADE",
   },
   formatDetection: { telephone: false },
@@ -31,8 +31,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#15803d" },
-    { media: "(prefers-color-scheme: dark)",  color: "#0a1a0f" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)",  color: "#ffffff" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -56,7 +56,7 @@ export default function RootLayout({
         {/* PWA meta tags tambahan untuk iOS Safari */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="ESKAHADE" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png" />

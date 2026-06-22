@@ -2,9 +2,67 @@
 
 import { useState, useTransition } from 'react'
 import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
-import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck } from 'lucide-react'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
+
+import {
+  SquaresFour as LayoutDashboard,
+  Users as PhosphorUsers,
+  BookOpen,
+  ShieldWarning as ShieldWarningIcon,
+  FileText,
+  Gear as Settings,
+  Database as DatabaseIcon,
+  CalendarCheck,
+  TrendUp as TrendingUp,
+  ArrowUp as ArrowUpCircle,
+  UserPlus,
+  Printer,
+  ClipboardText as ClipboardCheck,
+  UserCheck,
+  MapPin,
+  Book,
+  UserGear as UserCog,
+  Moon,
+  Stethoscope,
+  Clock,
+  Gavel,
+  CreditCard,
+  List as LayoutList,
+  FileXls as FileSpreadsheet,
+  Funnel as Filter,
+  Envelope as Mail,
+  ChartBar as BarChart3,
+  Briefcase,
+  Wallet,
+  Coins,
+  ShoppingCart,
+  Package,
+  Image as ImageIcon,
+  GraduationCap as School,
+  Palette,
+  Archive,
+  ForkKnife as Utensils,
+  Calendar,
+  ArrowsLeftRight as ArrowLeftRight,
+  Flame,
+  Clipboard as ClipboardList
+} from "@phosphor-icons/react";
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  LayoutDashboard, Users: PhosphorUsers, BookOpen, ShieldAlert: ShieldWarningIcon, FileText, Settings,
+  Database: DatabaseIcon, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
+  Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog,
+  Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
+  Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
+  ImageIcon, School, Palette, Archive, Utensils, CalendarDays: Calendar, ArrowLeftRight,
+  Flame, ClipboardList,
+}
+
+function getIcon(name: string): React.ElementType {
+  return ICON_MAP[name] ?? Settings
+}
 
 const ALL_ROLES = [
   'admin',
@@ -120,6 +178,7 @@ interface FiturItem {
   group_name: string
   title: string
   href: string
+  icon: string
   roles: string[]
   is_active: boolean
   is_bottomnav: boolean
@@ -601,6 +660,86 @@ function TabBottomNav({
     .filter(f => !f.is_bottomnav)
     .sort((a, b) => a.title.localeCompare(b.title))
 
+  // Bagi secara simetris ke kiri dan kanan untuk Mock Preview
+  const midIndex = Math.ceil(activeItems.length / 2)
+  const leftItems = activeItems.slice(0, midIndex)
+  const rightItems = activeItems.slice(midIndex)
+
+  // Handler geser urutan
+  const handleMove = (index: number, direction: 'left' | 'right') => {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= activeItems.length) return
+
+    const item1 = activeItems[index]
+    const item2 = activeItems[targetIndex]
+
+    // Set new sequential orders to guarantee uniqueness
+    const u1 = targetIndex + 1
+    const u2 = index + 1
+
+    onSetUrutan(item1, u1)
+    onSetUrutan(item2, u2)
+  }
+
+  const renderEmptySlot = () => (
+    <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-lg w-full h-[40px] opacity-40 select-none bg-slate-50">
+      <span className="text-[12px] font-bold text-slate-400">+</span>
+      <span className="text-[7.5px] font-medium text-slate-400">Kosong</span>
+    </div>
+  )
+
+  const renderPreviewItem = (item: FiturItem, index: number) => {
+    const Icon = getIcon(item.icon)
+    const isFirst = index === 0
+    const isLast = index === activeItems.length - 1
+    const isLoading = loadingId === `bottomnav-${item.id}` || loadingId === `urutan-${item.id}`
+
+    return (
+      <div className="group/item flex flex-col items-center justify-center gap-0.5 w-full h-full relative p-0.5 rounded-lg hover:bg-slate-50 transition-colors">
+        <div className="p-0.5 text-slate-500">
+          <Icon className="w-4.5 h-4.5" weight="duotone" />
+        </div>
+        <span className="text-[8px] font-semibold text-slate-500 truncate max-w-[48px] px-0.5">
+          {item.title}
+        </span>
+
+        {/* Action Controls Overlay on Hover */}
+        <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 shadow-sm border border-slate-100">
+          {!isFirst && (
+            <button
+              onClick={() => handleMove(index, 'left')}
+              disabled={isLoading || pending}
+              className="w-4.5 h-4.5 rounded bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 flex items-center justify-center cursor-pointer transition-colors disabled:opacity-30"
+              title="Geser Kiri"
+            >
+              <ArrowLeft className="w-2.5 h-2.5" />
+            </button>
+          )}
+          
+          <button
+            onClick={() => onToggleBottomNav(item)}
+            disabled={isLoading || pending}
+            className="w-4.5 h-4.5 rounded bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center cursor-pointer transition-colors disabled:opacity-30"
+            title="Hapus"
+          >
+            <Trash2 className="w-2.5 h-2.5" />
+          </button>
+
+          {!isLast && (
+            <button
+              onClick={() => handleMove(index, 'right')}
+              disabled={isLoading || pending}
+              className="w-4.5 h-4.5 rounded bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 flex items-center justify-center cursor-pointer transition-colors disabled:opacity-30"
+              title="Geser Kanan"
+            >
+              <ArrowRight className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       {/* Toggle Global */}
@@ -712,9 +851,69 @@ function TabBottomNav({
           </div>
         </div>
 
+        {/* LIVE SMARTPHONE PREVIEW */}
+        <div className="flex flex-col items-center justify-center bg-slate-100/30 rounded-xl py-6 border border-slate-200/50 shadow-inner">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+            Live Preview (Tampilan Mobile)
+          </p>
+          
+          {/* Smartphone Frame Mockup */}
+          <div className="w-[300px] border-[6px] border-slate-800 rounded-[28px] bg-slate-50 shadow-xl overflow-hidden relative flex flex-col justify-between h-[160px] ring-4 ring-slate-800/10">
+            {/* Phone Screen Mockup Content */}
+            <div className="p-3.5 flex-1 flex flex-col justify-start space-y-2 opacity-[0.15] select-none pointer-events-none">
+              <div className="h-2 w-1/3 bg-slate-400 rounded"></div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-6 bg-slate-300 rounded"></div>
+                <div className="h-6 bg-slate-300 rounded"></div>
+                <div className="h-6 bg-slate-300 rounded"></div>
+              </div>
+              <div className="h-5 bg-slate-300 rounded w-full"></div>
+            </div>
+
+            {/* Live Bottom Nav Mockup */}
+            <div className="bg-white border-t border-slate-100 h-14 w-full shrink-0 relative z-10">
+              <div className="grid grid-cols-5 h-full relative px-1 items-stretch">
+                {/* Slot 1 */}
+                <div className="flex items-center justify-center relative">
+                  {leftItems[0] ? renderPreviewItem(leftItems[0], 0) : renderEmptySlot()}
+                </div>
+
+                {/* Slot 2 */}
+                <div className="flex items-center justify-center relative">
+                  {leftItems[1] ? renderPreviewItem(leftItems[1], 1) : renderEmptySlot()}
+                </div>
+
+                {/* Slot 3: Center MENU */}
+                <div className="flex items-center justify-center relative">
+                  <div className="flex flex-col items-center justify-end h-full pb-1.5 relative w-full opacity-60">
+                    <div className="absolute -top-3.5 w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow border-2 border-white scale-90">
+                      <LayoutGrid className="w-4 h-4" />
+                    </div>
+                    <span className="text-[7.5px] font-black text-emerald-700 tracking-wider">MENU</span>
+                  </div>
+                </div>
+
+                {/* Slot 4 */}
+                <div className="flex items-center justify-center relative">
+                  {rightItems[0] ? renderPreviewItem(rightItems[0], 2) : renderEmptySlot()}
+                </div>
+
+                {/* Slot 5 */}
+                <div className="flex items-center justify-center relative">
+                  {rightItems[1] ? renderPreviewItem(rightItems[1], 3) : renderEmptySlot()}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-[10px] text-slate-400 mt-3 text-center px-4">
+            Arahkan kursor ke menu preview di atas untuk menggeser (<strong className="text-slate-600">← →</strong>) atau menghapus (<strong className="text-red-500">×</strong>).
+          </p>
+        </div>
+
         {/* Warning jika melebihi 4 */}
         {activeItems.length > 4 && (
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 animate-pulse">
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 animate-pulse">
             <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
             <span>
               <strong>Peringatan:</strong> Batas maksimal adalah 4 menu.
@@ -735,24 +934,31 @@ function TabBottomNav({
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-sm">
-              {activeItems.map(fitur => {
+              {activeItems.map((fitur, idx) => {
                 const isLoading = loadingId === `bottomnav-${fitur.id}` || loadingId === `urutan-${fitur.id}`
+                const isFirst = idx === 0
+                const isLast = idx === activeItems.length - 1
+                
                 return (
                   <div key={fitur.id} className="flex items-center gap-3 px-4 py-3">
-                    {/* Urutan selector */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] text-slate-400 font-semibold">Urutan:</span>
-                      <select
-                        value={fitur.bottomnav_urutan}
-                        disabled={isLoading || pending}
-                        onChange={e => onSetUrutan(fitur, Number(e.target.value))}
-                        className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1 text-slate-700 bg-slate-50 focus:outline-none focus:border-emerald-400 disabled:opacity-40 font-bold"
+                    {/* Reorder Buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleMove(idx, 'left')}
+                        disabled={isFirst || isLoading || pending}
+                        className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Geser Naik"
                       >
-                        <option value={1}>1</option>
-                        <option value={2}>2</option>
-                        <option value={3}>3</option>
-                        <option value={4}>4</option>
-                      </select>
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleMove(idx, 'right')}
+                        disabled={isLast || isLoading || pending}
+                        className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Geser Turun"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     {/* Nama & href */}
