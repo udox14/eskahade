@@ -70,7 +70,7 @@ export default function TahunAjaranPage() {
   const aktif = list.find(t => t.is_active)
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
 
       {/* HEADER */}
       <DashboardPageHeader

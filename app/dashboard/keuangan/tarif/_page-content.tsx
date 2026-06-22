@@ -67,7 +67,7 @@ export default function TarifPage() {
   const rp = (val: number) => "Rp " + (val || 0).toLocaleString('id-ID')
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-20">
+    <div className="space-y-8 max-w-7xl mx-auto pb-20">
       
       {/* HEADER */}
       <DashboardPageHeader

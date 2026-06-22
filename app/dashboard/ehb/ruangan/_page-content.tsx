@@ -284,7 +284,7 @@ export default function RuanganEhbPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Ruangan EHB"
         description="Kelola daftar ruangan ujian dan peserta di dalamnya."

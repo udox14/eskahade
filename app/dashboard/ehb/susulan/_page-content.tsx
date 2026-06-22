@@ -182,7 +182,7 @@ export default function SusulanEhbPage() {
   const totalMapelRekap = rekapGroups.reduce((sum, group) => sum + group.items.length, 0)
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Daftar Susulan EHB"
         description="Daftar santri yang tidak hadir ujian dan belum menyelesaikan susulan."

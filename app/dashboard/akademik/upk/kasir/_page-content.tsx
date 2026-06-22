@@ -321,7 +321,7 @@ export default function KasirUPKPage() {
     (mode === 'KASIR' && kasirStep === 'serah')
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-4 pb-6">
+    <div className="mx-auto w-full max-w-7xl space-y-4 pb-6">
       <DashboardPageHeader
         title={`Kasir UPK ${unit === 'PUTRA' ? 'Putra' : 'Putri'}`}
         description="Catat pesanan santri lalu proses pembayaran."

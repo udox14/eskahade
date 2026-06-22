@@ -49,7 +49,7 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4">
         <Link href={backHref} className="p-2 bg-white border hover:bg-gray-50 rounded-full transition-colors shadow-sm text-gray-600">
           <ArrowLeft className="w-5 h-5" />

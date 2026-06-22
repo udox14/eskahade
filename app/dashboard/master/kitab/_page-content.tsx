@@ -131,7 +131,7 @@ export default function MasterKitabPage() {
   const { paged: pagedKitabList, totalPages: totalPagesKitabList, safePage: safePageKitabList } = usePagination(kitabList, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">

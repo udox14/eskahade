@@ -103,7 +103,7 @@ export default function MasterKelasPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <DashboardPageHeader
           title="Manajemen Kelas & Ruangan"

@@ -229,7 +229,7 @@ export default function SetupTahunAjaranContent({ state }: { state: SetupWizardS
   )
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-20">
+    <div className="mx-auto max-w-7xl space-y-6 pb-20">
       <DashboardPageHeader
         title="Setup Tahun Ajaran"
         description="Timeline pekerjaan awal tahun ajaran supaya admin tahu apa yang perlu dibereskan sebelum operasional berjalan."

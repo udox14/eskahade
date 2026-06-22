@@ -181,7 +181,7 @@ export default function LoketPembayaranPage() {
 
   const { paged: pagedDataList, totalPages: totalPagesDataList, safePage: safePageDataList } = usePagination(dataList, pageSize, page)
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-20">
+    <div className="space-y-8 max-w-7xl mx-auto pb-20">
       
       {/* HEADER GLOBAL */}
       <DashboardPageHeader

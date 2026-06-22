@@ -1100,7 +1100,7 @@ export default function SantriNonaktifPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-16 space-y-5">
+    <div className="max-w-7xl mx-auto pb-16 space-y-5">
       <DashboardPageHeader
         title="Status Santri"
         description="Kelola alur santri aktif, nonaktif sementara, lalu alumni final."

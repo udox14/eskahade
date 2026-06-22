@@ -126,7 +126,7 @@ export default function VerifikasiTelatPerpulanganPage() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-4">
+    <div className="max-w-7xl mx-auto pb-16 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">

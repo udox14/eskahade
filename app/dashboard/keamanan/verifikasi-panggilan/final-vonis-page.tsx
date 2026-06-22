@@ -258,7 +258,7 @@ export default function FinalVonisPage({
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-28 space-y-5">
+    <div className="max-w-7xl mx-auto pb-28 space-y-5">
       <DashboardPageHeader
         title={title}
         description={description}

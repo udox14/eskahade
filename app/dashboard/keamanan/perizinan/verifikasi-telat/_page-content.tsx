@@ -163,7 +163,7 @@ export default function VerifikasiTelatPage() {
   const paged      = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-4">
+    <div className="max-w-7xl mx-auto pb-16 space-y-4">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">

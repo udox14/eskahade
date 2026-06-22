@@ -269,7 +269,7 @@ export default function RekapAbsenBerjamaahPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
 
       {/* HEADER */}
       <div className="flex flex-col gap-3 border-b pb-4">

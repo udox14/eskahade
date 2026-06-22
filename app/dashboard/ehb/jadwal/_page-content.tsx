@@ -375,7 +375,7 @@ export default function JadwalEhbPage() {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Pengaturan Jadwal EHB"
         description="Kelola event EHB, sesi, dan jadwal pelajaran yang diujikan."

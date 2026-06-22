@@ -291,7 +291,7 @@ export default function HafalanPageContent() {
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-2 pb-28 sm:px-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 pb-28">
       {step === 'home' && (
         <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal." />
       )}

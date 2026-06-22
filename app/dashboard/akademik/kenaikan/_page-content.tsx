@@ -251,7 +251,7 @@ export default function KenaikanKelasPage() {
   const totalPlacementsReady = Object.keys(placements).filter(k => placements[k] !== '').length
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+    <div className="space-y-6 max-w-7xl mx-auto pb-24">
       
       {/* HEADER & TOGGLE MODE */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">

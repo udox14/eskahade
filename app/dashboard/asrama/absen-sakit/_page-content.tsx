@@ -561,7 +561,7 @@ export default function DataSakitPage() {
   const selectedActiveRow = selectedSantri ? rows.find(row => row.santri_id === selectedSantri.id) : null
 
   return (
-    <div className="max-w-6xl mx-auto pb-24 space-y-6">
+    <div className="max-w-7xl mx-auto pb-24 space-y-6">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <DashboardPageHeader
           title="Data Sakit"

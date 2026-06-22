@@ -490,7 +490,7 @@ export default function SPPPage() {
 
   // ── VIEW: LIST ──────────────────────────────────────────────────────────
   if (view === 'LIST') return (
-    <div className="space-y-6 w-full pb-32 md:px-3">
+    <div className="space-y-6 w-full max-w-7xl mx-auto pb-32">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">

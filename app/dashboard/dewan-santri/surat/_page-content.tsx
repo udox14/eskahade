@@ -214,7 +214,7 @@ export default function LayananSuratPage() {
   }
 
   return (
-    <div className="space-y-12 max-w-5xl mx-auto pb-20">
+    <div className="space-y-12 max-w-7xl mx-auto pb-20">
        
        {/* HEADER (Sembunyikan saat print) */}
        <div className="flex items-center gap-4 print:hidden">

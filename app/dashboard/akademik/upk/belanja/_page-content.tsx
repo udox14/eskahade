@@ -256,7 +256,7 @@ export default function BelanjaUPKPage() {
   }
 
   return (
-    <div className="max-w-[1500px] mx-auto pb-24 space-y-6">
+    <div className="max-w-7xl mx-auto pb-24 space-y-6">
       <DashboardPageHeader
         title="Belanja"
         description="Rencana belanja, pembelian kitab, penambahan stok, dan hutang toko."

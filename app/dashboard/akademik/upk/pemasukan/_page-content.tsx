@@ -211,7 +211,7 @@ export default function PemasukanUPKPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-24">
+    <div className="space-y-6 max-w-7xl mx-auto pb-24">
       <DashboardPageHeader
         title="Pemasukan"
         description="Catatan uang fisik, setoran harian, dan pinjaman modal UPK."

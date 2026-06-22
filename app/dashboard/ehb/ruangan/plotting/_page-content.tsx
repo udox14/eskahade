@@ -266,7 +266,7 @@ export default function PlottingEhbPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Auto Plotting Ruangan"
         description="Penempatan otomatis dengan cross seating yang tetap berurutan per kelas dan abjad."

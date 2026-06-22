@@ -229,7 +229,7 @@ export default function PengawasEhbPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Pengaturan Pengawas"
         description="Kelola daftar pengawas ujian dan jadwal tugas mereka."

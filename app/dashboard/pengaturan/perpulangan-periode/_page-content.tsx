@@ -413,7 +413,7 @@ export default function PeriodePerpulanganPage() {
   const activeCount = useMemo(() => list.filter((item) => item.is_active).length, [list])
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-24">
+    <div className="mx-auto max-w-7xl space-y-6 pb-24">
       <DashboardPageHeader
         title="Periode Perpulangan"
         description="Kelola jadwal perpulangan dan kedatangan santri. Hanya satu periode yang boleh aktif pada saat yang sama."

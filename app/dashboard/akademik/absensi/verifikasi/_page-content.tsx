@@ -199,7 +199,7 @@ export default function VerifikasiAbsenPage() {
   const totalDrafts = Object.keys(drafts).length
 
   return (
-    <div className="max-w-5xl mx-auto pb-32 space-y-6">
+    <div className="max-w-7xl mx-auto pb-32 space-y-6">
       {/* Header Utama */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>

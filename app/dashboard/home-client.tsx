@@ -371,7 +371,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   })
 
   return (
-    <div className="max-w-6xl mx-auto w-full space-y-6 pb-16">
+    <div className="max-w-7xl mx-auto w-full space-y-6 pb-16">
 
       {/* ── Hero Greeting Card ── */}
       <div 
@@ -502,97 +502,116 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
           </div>
         )}
 
-        {/* ── VIEW 2: CATEGORY SELECTION (default state - clean horizontal list) ── */}
-        {searchQuery.trim() === '' && activeGroup === null && (
-          <div className="space-y-3.5 animate-in fade-in duration-200">
-            {groups.length === 0 ? (
-              <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
-                <Settings className="w-10 h-10 opacity-20 mb-1" />
-                <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
-                <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {groups.map((group) => {
-                  const meta = getGroupMeta(group)
-                  const GroupIcon = meta.icon
-                  const items = grouped.get(group)!
-                  const accent = GROUP_COLORS[group] ?? { bg: 'bg-slate-50 text-slate-500', text: 'text-slate-600', hoverText: 'group-hover:text-slate-800' }
+        {/* ── VIEW 2 & 3: CATEGORY SELECTION & SUB-MENU DETAILS (with smooth native sliding transitions) ── */}
+        {searchQuery.trim() === '' && (
+          <div className="relative w-full overflow-hidden min-h-[300px]">
+            {/* VIEW 2: CATEGORY SELECTION */}
+            <div
+              className={cn(
+                "w-full transition-all duration-300 ease-out transform",
+                activeGroup === null
+                  ? "relative opacity-100 translate-x-0"
+                  : "absolute top-0 left-0 opacity-0 -translate-x-8 pointer-events-none"
+              )}
+            >
+              {groups.length === 0 ? (
+                <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
+                  <Settings className="w-10 h-10 opacity-20 mb-1" />
+                  <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
+                  <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {groups.map((group) => {
+                    const meta = getGroupMeta(group)
+                    const GroupIcon = meta.icon
+                    const items = grouped.get(group)!
+                    const accent = GROUP_COLORS[group] ?? { bg: 'bg-slate-50 text-slate-500', text: 'text-slate-600', hoverText: 'group-hover:text-slate-800' }
 
-                  return (
-                    <button
-                      key={group}
-                      onClick={() => handleOpenGroup(group)}
-                      className="group flex items-center text-left p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:border-slate-300 hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 cursor-pointer relative overflow-hidden"
-                    >
-                      <div className={cn("shrink-0 w-9 h-9 flex items-center justify-center mr-3 transition-transform duration-300 group-hover:scale-110", accent.text)}>
-                        <GroupIcon size={22} className="w-5.5 h-5.5" />
+                    return (
+                      <button
+                        key={group}
+                        onClick={() => handleOpenGroup(group)}
+                        className="group flex items-center text-left p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:border-slate-300 hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 cursor-pointer relative overflow-hidden"
+                      >
+                        <div className={cn("shrink-0 w-9 h-9 flex items-center justify-center mr-3 transition-transform duration-300 group-hover:scale-110", accent.text)}>
+                          <GroupIcon size={22} className="w-5.5 h-5.5" />
+                        </div>
+                        <div className="flex-1 min-w-0 leading-tight">
+                          <span className={cn("block text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", accent.hoverText)}>
+                            {group === '_standalone' ? 'Menu Utama' : group}
+                          </span>
+                          <span className="block text-[10px] sm:text-[11px] text-slate-400 font-medium group-hover:text-slate-500 transition-colors">
+                            {items.length} fitur
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* VIEW 3: SUB-MENU DETAILS */}
+            <div
+              className={cn(
+                "w-full transition-all duration-300 ease-out transform",
+                activeGroup !== null
+                  ? "relative opacity-100 translate-x-0"
+                  : "absolute top-0 left-0 opacity-0 translate-x-8 pointer-events-none"
+              )}
+            >
+              {activeGroup !== null && (() => {
+                const items = grouped.get(activeGroup)!
+                const meta = getGroupMeta(activeGroup)
+                const GroupIcon = meta.icon
+
+                return (
+                  <div className="space-y-4">
+                    {/* Navigation and active stats */}
+                    <div className="flex items-center justify-between pb-1">
+                      <button
+                        onClick={handleCloseGroup}
+                        className="group/btn inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        <ChevronLeft className="w-4 h-4 group-hover/btn:-translate-x-0.5 transition-transform" />
+                        Kembali
+                      </button>
+                      <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1">
+                        <span className="text-emerald-600 text-[10px] font-bold tracking-tight uppercase">{items.length} fitur aktif</span>
                       </div>
-                      <div className="flex-1 min-w-0 leading-tight">
-                        <span className={cn("block text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", accent.hoverText)}>
-                          {group === '_standalone' ? 'Menu Utama' : group}
-                        </span>
-                        <span className="block text-[10px] sm:text-[11px] text-slate-400 font-medium group-hover:text-slate-500 transition-colors">
-                          {items.length} fitur
-                        </span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+                    </div>
+
+                    {/* Grid lists of submenu features */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {items.map(fitur => {
+                        const FeatureIcon = getIcon(fitur.icon)
+                        const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
+
+                        return (
+                          <Link
+                            key={fitur.href}
+                            href={fitur.href}
+                            className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
+                          >
+                            {/* Clean direct icon (no badge) */}
+                            <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                              <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} />
+                            </div>
+                            <div className="flex-1 min-w-0 leading-tight">
+                              <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
+                              <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         )}
-
-        {/* ── VIEW 3: SUB-MENU DETAILS ── */}
-        {searchQuery.trim() === '' && activeGroup !== null && (() => {
-          const items = grouped.get(activeGroup)!
-          const meta = getGroupMeta(activeGroup)
-          const GroupIcon = meta.icon
-
-          return (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-              {/* Navigation and active stats */}
-              <div className="flex items-center justify-between pb-1">
-                <button
-                  onClick={handleCloseGroup}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm active:scale-95 cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Kembali
-                </button>
-                <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1">
-                  <span className="text-emerald-600 text-[10px] font-bold tracking-tight uppercase">{items.length} fitur aktif</span>
-                </div>
-              </div>
-
-              {/* Grid lists of submenu features */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {items.map(fitur => {
-                  const FeatureIcon = getIcon(fitur.icon)
-                  const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
-
-                  return (
-                    <Link
-                      key={fitur.href}
-                      href={fitur.href}
-                      className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
-                    >
-                      {/* Clean direct icon (no badge) */}
-                      <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} />
-                      </div>
-                      <div className="flex-1 min-w-0 leading-tight">
-                        <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
-                        <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
 
       </div>
 

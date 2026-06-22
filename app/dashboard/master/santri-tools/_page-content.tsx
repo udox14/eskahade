@@ -175,7 +175,7 @@ export default function SantriToolsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
 
       {/* HEADER */}
       <div className="border-b pb-4">

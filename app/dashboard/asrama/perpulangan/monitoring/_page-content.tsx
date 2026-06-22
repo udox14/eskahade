@@ -409,7 +409,7 @@ export default function MonitoringPerpulanganPage() {
   const canTandaiTelat = ['admin', 'keamanan', 'dewan_santri'].includes(session?.role ?? '')
 
   return (
-    <div className="mx-auto max-w-lg space-y-5 pb-24 lg:max-w-6xl">
+    <div className="mx-auto max-w-lg space-y-5 pb-24 lg:max-w-7xl">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
         <DashboardPageHeader
           title="Monitoring Perpulangan"

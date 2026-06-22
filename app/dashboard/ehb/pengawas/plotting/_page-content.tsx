@@ -131,7 +131,7 @@ export default function PlottingPengawasPage() {
   const readyToRun = slotDibutuhkan > 0 && status.total > 0
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Auto Plotting Jadwal Pengawas"
         description="Penjadwalan otomatis pengawas EHB dengan mempertimbangkan status senioritas dan keadilan."

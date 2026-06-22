@@ -520,7 +520,7 @@ export default function AbsensiGuruPage() {
   const canRunImport = Boolean(importPreview && isImportPreviewSuccess(importPreview) && importPreview.canImport)
 
   return (
-    <div className="space-y-6 max-w-[95vw] mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
       {/* HEADER */}
       <div className="space-y-4 border-b pb-4">

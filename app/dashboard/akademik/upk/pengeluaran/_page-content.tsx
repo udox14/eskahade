@@ -290,7 +290,7 @@ export default function PengeluaranUPKPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-24">
+    <div className="space-y-6 max-w-7xl mx-auto pb-24">
       <DashboardPageHeader
         title="Pengeluaran"
         description="Catat kas keluar, bayar hutang toko, bayar pinjaman modal, dan royalti penulis."

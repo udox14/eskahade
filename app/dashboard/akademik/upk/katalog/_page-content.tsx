@@ -505,7 +505,7 @@ export default function KatalogUPKPage() {
   const { paged, safePage, totalPages } = usePagination(katalog, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-24">
+    <div className="space-y-6 max-w-7xl mx-auto pb-24">
       <DashboardPageHeader
         title="Katalog UPK"
         description="Master barang, stok, harga beli, harga jual, dan estimasi laba UPK."

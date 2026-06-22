@@ -968,7 +968,7 @@ export default function SantriKeluarPage() {
   useEffect(() => { getAsramaList().then(setAsramaList) }, [])
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 space-y-5">
+    <div className="max-w-7xl mx-auto pb-16 space-y-5">
       <DashboardPageHeader
         title="Santri Keluar"
         description="Dewan santri bisa mengeksekusi keluar langsung, atau memproses penandaan keluar dari pengurus asrama."

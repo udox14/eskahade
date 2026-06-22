@@ -35,7 +35,7 @@ export default function PengaturanSantriBaruContent({ mulaiBerlaku, durasiBulan 
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 pb-20">
+    <div className="mx-auto max-w-7xl space-y-6 pb-20">
       <DashboardPageHeader
         title="Masa Santri Baru"
         description="Atur kapan label BARU mulai berlaku dan berapa lama santri ditandai sebagai BARU."

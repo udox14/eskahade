@@ -98,7 +98,7 @@ export default function SantriKembaliPageContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-24 space-y-6">
+    <div className="max-w-7xl mx-auto pb-24 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Santri Kembali</h1>

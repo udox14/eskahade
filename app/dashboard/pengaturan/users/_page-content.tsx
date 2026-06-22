@@ -631,7 +631,7 @@ export default function ManajemenUserPage() {
   const { paged: pagedUsers, totalPages: totalPagesUsers, safePage: safePageUsers } = usePagination(filteredUsers, pageSize, page)
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
       {/* HEADER */}
       <div className="border-b pb-4 space-y-4">

@@ -240,7 +240,7 @@ export default function TempelanKelasPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <DashboardPageHeader
         title="Tempelan Kelas"
         description="Cetak tempelan nama kelas dan tempat untuk tahun ajaran aktif."

@@ -28,7 +28,7 @@ export default function MasterHafalanContent() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-2 pb-24 sm:px-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 pb-24">
       {active ? (
         <MarhalahDetail key={active.id} marhalah={active} data={data} onBack={() => setActiveId(null)} reload={load} />
       ) : (
