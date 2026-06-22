@@ -130,12 +130,14 @@ export async function hitungRencanaBelanja(persenTarget: number) {
   const rows = await query<RencanaHitungRow>(`
     SELECT uk.id AS katalog_id, uk.nama_kitab, uk.stok_lama, uk.stok_baru, uk.harga_beli,
            t.nama AS toko_nama,
-           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama, COUNT(DISTINCT s.id) AS jumlah_santri
+           GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama,
+           COUNT(DISTINCT s.id) AS jumlah_santri
     FROM upk_katalog uk
     LEFT JOIN upk_katalog_marhalah km ON km.katalog_id = uk.id
     LEFT JOIN marhalah m ON m.id = km.marhalah_id
     LEFT JOIN upk_toko t ON t.id = uk.toko_id
-    LEFT JOIN kelas k ON k.marhalah_id = km.marhalah_id
+    LEFT JOIN upk_katalog_marhalah km_def ON km_def.katalog_id = uk.id AND km_def.is_default = 1
+    LEFT JOIN kelas k ON k.marhalah_id = km_def.marhalah_id
     LEFT JOIN riwayat_pendidikan rp ON rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
     WHERE uk.is_active = 1
