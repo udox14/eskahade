@@ -12,10 +12,12 @@ import {
   hitungRencanaBelanja,
   simpanBelanja,
   simpanRencanaBelanja,
+  hapusBelanja,
 } from './actions'
-import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Wallet, X } from 'lucide-react'
+import { CheckCircle, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 
 type KatalogItem = {
   id: number
@@ -88,6 +90,7 @@ function todayInput() {
 }
 
 export default function BelanjaUPKPage() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'RENCANA' | 'BELANJA' | 'HUTANG'>('RENCANA')
   const [katalog, setKatalog] = useState<KatalogItem[]>([])
   const [tokoList, setTokoList] = useState<Toko[]>([])
@@ -255,6 +258,21 @@ export default function BelanjaUPKPage() {
     loadData()
   }
 
+  const handleDeleteBelanja = async (id: string) => {
+    if (!await confirm('Apakah Anda yakin ingin menghapus riwayat belanja ini? Stok baru dari kitab-kitab yang dibeli akan dikurangi.')) return
+    try {
+      const result = await hapusBelanja(id)
+      if ('error' in result) {
+        toast.error(result.error)
+      } else {
+        toast.success('Riwayat belanja berhasil dihapus')
+        loadData()
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus riwayat belanja')
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-6">
       <DashboardPageHeader
@@ -381,7 +399,7 @@ export default function BelanjaUPKPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] text-sm text-left">
                 <thead className="bg-slate-50 border-b text-slate-600">
-                  <tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Toko</th><th className="px-4 py-3">Jenis</th><th className="px-4 py-3 text-center">Item</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Dibayar</th><th className="px-4 py-3 text-right">Hutang</th></tr>
+                  <tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Toko</th><th className="px-4 py-3">Jenis</th><th className="px-4 py-3 text-center">Item</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Dibayar</th><th className="px-4 py-3 text-right">Hutang</th><th className="px-4 py-3 text-right">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y">
                   {belanjaList.map(row => (
@@ -393,9 +411,18 @@ export default function BelanjaUPKPage() {
                       <td className="px-4 py-3 text-right font-mono">{rupiah(row.total)}</td>
                       <td className="px-4 py-3 text-right font-mono text-emerald-700">{rupiah(row.dibayar)}</td>
                       <td className="px-4 py-3 text-right font-mono text-red-700">{rupiah(row.sisa_hutang)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleDeleteBelanja(row.id)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Hapus Belanja"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                  {!belanjaList.length && <tr><td colSpan={7} className="text-center py-14 text-slate-400">Belum ada data belanja.</td></tr>}
+                  {!belanjaList.length && <tr><td colSpan={8} className="text-center py-14 text-slate-400">Belum ada data belanja.</td></tr>}
                 </tbody>
               </table>
             </div>

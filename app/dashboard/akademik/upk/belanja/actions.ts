@@ -358,3 +358,49 @@ export async function bayarHutangBelanja(id: string, nominal: number): Promise<{
   revalidatePath(BELANJA_PATH)
   return { success: true }
 }
+
+export async function hapusBelanja(id: string): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  const belanjaRow = await queryOne<{ id: string; total: number; dibayar: number; toko_nama: string | null; tanggal: string }>('SELECT * FROM upk_belanja WHERE id = ?', [id])
+  if (!belanjaRow) return { error: 'Data belanja tidak ditemukan.' }
+
+  const items = await query<{ katalog_id: number; qty: number }>('SELECT katalog_id, qty FROM upk_belanja_item WHERE belanja_id = ?', [id])
+
+  for (const item of items) {
+    if (item.katalog_id) {
+      await execute(`
+        UPDATE upk_katalog
+        SET stok_baru = MAX(0, stok_baru - ?),
+            stok_updated_at = ?,
+            updated_at = ?
+        WHERE id = ?
+      `, [item.qty, now(), now(), item.katalog_id])
+    }
+  }
+
+  await execute('DELETE FROM upk_belanja WHERE id = ?', [id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'delete',
+    fiturHref: BELANJA_PATH,
+    logKind: 'delete',
+    entityType: 'upk_belanja',
+    entityId: id,
+    entityLabel: belanjaRow.toko_nama || `Belanja ${belanjaRow.tanggal}`,
+    summary: `Menghapus riwayat belanja UPK`,
+    details: {
+      id,
+      tanggal: belanjaRow.tanggal,
+      toko: belanjaRow.toko_nama,
+      total: belanjaRow.total,
+      dibayar: belanjaRow.dibayar,
+      items_reverted: items.length,
+    },
+  })
+
+  revalidatePath(BELANJA_PATH)
+  revalidatePath('/dashboard/akademik/upk/katalog')
+  return { success: true }
+}
