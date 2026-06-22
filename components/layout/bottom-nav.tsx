@@ -130,7 +130,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
   }
 
   return (
-    <nav className="md:hidden no-print shrink-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.04)] h-16 relative z-40">
+    <nav className="md:hidden no-print fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.04)] h-16 z-40">
       <div className="grid grid-cols-5 h-full max-w-md mx-auto relative px-2">
         {/* Slot 1: Left Item 1 */}
         <div className="flex items-center justify-center">

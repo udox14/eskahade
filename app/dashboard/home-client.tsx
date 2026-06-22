@@ -312,29 +312,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   const [now, setNow] = useState<Date | null>(null)
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [isScrolled, setIsScrolled] = useState(false)
 
-  useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement
-      if (target.scrollTop > 60) {
-        setIsScrolled(true)
-      } else {
-        setIsScrolled(false)
-      }
-    }
-
-    const mainElement = document.querySelector('main')
-    if (mainElement) {
-      mainElement.addEventListener('scroll', handleScroll)
-    }
-
-    return () => {
-      if (mainElement) {
-        mainElement.removeEventListener('scroll', handleScroll)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     setNow(new Date())
@@ -397,82 +375,50 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
     <div className="max-w-7xl mx-auto w-full space-y-6 pb-16">
       {/* ── Sticky Hero & Search Container ── */}
       <div 
-        className={cn(
-          "sticky top-12 z-30 transition-all duration-300 ease-in-out -mx-4 px-4 sm:-mx-8 sm:px-8 flex flex-col",
-          isScrolled 
-            ? "border-b border-slate-200 shadow-sm py-3 gap-2 border-opacity-30"
-            : "py-0 gap-6 mb-2"
-        )}
-        style={{
-          backgroundColor: isScrolled ? 'rgba(248, 250, 252, 0.95)' : 'transparent',
-          backdropFilter: isScrolled ? 'blur(8px)' : 'none',
-          WebkitBackdropFilter: isScrolled ? 'blur(8px)' : 'none',
-        }}
+        className="sticky top-[-16px] md:top-[-32px] z-30 bg-slate-50 -mx-4 px-4 pb-4 pt-1 sm:-mx-8 sm:px-8 sm:pb-6 flex flex-col gap-4 sm:gap-6"
       >
         {/* ── Hero Greeting Card ── */}
         <div 
-          className={cn(
-            "relative overflow-hidden bg-white select-none transition-all duration-300 ease-in-out flex items-center w-full",
-            isScrolled
-              ? "rounded-2xl border border-slate-200 bg-slate-100 shadow-none px-4 py-2 min-h-0 h-12 justify-between border-opacity-40"
-              : "rounded-[2rem] border border-slate-200 p-6 sm:p-8 min-h-[200px] sm:min-h-[260px] shadow-sm border-opacity-60"
-          )}
-          style={!isScrolled ? {
+          className="relative overflow-hidden bg-white select-none rounded-[2rem] shadow-sm p-4 sm:p-8 min-h-0 sm:min-h-[220px] flex items-center w-full"
+          style={{
             backgroundImage: `url('${heroImage}')`,
             backgroundSize: 'contain',
             backgroundPosition: 'right bottom',
             backgroundRepeat: 'no-repeat'
-          } : {
-            borderColor: 'rgba(226, 232, 240, 0.5)',
-            backgroundColor: 'rgba(241, 245, 249, 0.8)'
           }}
         >
-          {isScrolled ? (
-            <div className="flex items-center justify-between w-full animate-in fade-in duration-300">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{greeting.emoji}</span>
-                <span className="text-xs font-semibold text-slate-500">{greeting.text},</span>
-                <span className="text-xs font-bold text-slate-800 truncate max-w-[120px] sm:max-w-[200px]">{userName}</span>
+          <div className="relative z-10 flex w-full animate-in fade-in duration-300">
+            {/* Left Side: Greeting & User Name */}
+            <div className="space-y-4 sm:space-y-5 flex-1 min-w-0 max-w-[75%] sm:max-w-[60%]">
+              <div className="space-y-1 sm:space-y-1.5">
+                <p className="text-slate-600 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5 drop-shadow-sm">
+                  <span>{greeting.emoji}</span>
+                  <span>{greeting.text},</span>
+                </p>
+                <h1 className="text-2xl sm:text-4xl font-black text-slate-800 tracking-tight leading-none break-words drop-shadow-sm">
+                  {userName}
+                  <span className="text-emerald-500">.</span>
+                </h1>
+                <p className="text-slate-500 text-xs sm:text-sm pt-0.5 sm:pt-1 font-medium drop-shadow-sm">
+                  {greeting.sub}
+                </p>
               </div>
-              <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 flex items-center gap-1">
-                <span>{roleEmoji}</span>
-                <span>{roleLabel}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="relative z-10 flex w-full animate-in fade-in duration-300">
-              {/* Left Side: Greeting & User Name */}
-              <div className="space-y-5 flex-1 min-w-0 max-w-[75%] sm:max-w-[60%]">
-                <div className="space-y-1.5">
-                  <p className="text-slate-600 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5 drop-shadow-sm">
-                    <span>{greeting.emoji}</span>
-                    <span>{greeting.text},</span>
-                  </p>
-                  <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight leading-none break-words drop-shadow-sm">
-                    {userName}
-                    <span className="text-emerald-500">.</span>
-                  </h1>
-                  <p className="text-slate-500 text-xs sm:text-sm pt-1 font-medium drop-shadow-sm">
-                    {greeting.sub}
-                  </p>
-                </div>
 
-                {/* Mockup Pills row */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Role Card */}
-                  <div className="flex items-center gap-2 bg-white border border-slate-200 px-3.5 py-2 rounded-2xl shadow-sm backdrop-blur-md bg-opacity-80 border-opacity-60">
-                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[11px] bg-opacity-10">
-                      {roleEmoji}
-                    </div>
-                    <div className="leading-none text-left">
-                      <p className="text-[8px] text-slate-500 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
-                      <p className="text-xs font-bold text-slate-800 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
-                    </div>
+              {/* Mockup Pills row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Role Card */}
+                <div className="flex items-center gap-2 bg-white border border-slate-100 px-3.5 py-2 rounded-2xl shadow-sm backdrop-blur-md bg-opacity-80">
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[11px] bg-opacity-10">
+                    {roleEmoji}
+                  </div>
+                  <div className="leading-none text-left">
+                    <p className="text-[8px] text-slate-500 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
+                    <p className="text-xs font-bold text-slate-800 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* ── Search Bar Redesigned ── */}
