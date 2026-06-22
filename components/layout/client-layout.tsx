@@ -11,6 +11,7 @@ import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
+import { IconContext } from "@phosphor-icons/react";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -33,7 +34,8 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
   const showSetupReturn = returnTo === '/dashboard/setup-tahun-ajaran' && pathname !== '/dashboard/setup-tahun-ajaran';
 
   return (
-    <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
+    <IconContext.Provider value={{ weight: "duotone" }}>
+      <div className="relative flex h-screen w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
       
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 
@@ -127,5 +129,6 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         />
       </div>
     </div>
+    </IconContext.Provider>
   );
 }

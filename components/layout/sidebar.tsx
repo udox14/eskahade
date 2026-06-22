@@ -4,14 +4,67 @@ import React from 'react'
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
-  Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  ChevronLeft, ChevronRight, ChevronDown, Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog, Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet, Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package, Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays, ArrowLeftRight, Flame, ClipboardList, ToggleRight,
-  LogOut, CalendarRange, Download, FileWarning, Shuffle, Home, UserX, UserMinus, DoorOpen
-} from "lucide-react";
+  SquaresFour as LayoutDashboard,
+  Users,
+  BookOpen,
+  ShieldWarning as ShieldAlert,
+  FileText,
+  Gear as Settings,
+  Database,
+  CalendarCheck,
+  TrendUp as TrendingUp,
+  ArrowUp as ArrowUpCircle,
+  UserPlus,
+  CaretLeft as ChevronLeft,
+  CaretRight as ChevronRight,
+  CaretDown as ChevronDown,
+  Printer,
+  ClipboardText as ClipboardCheck,
+  UserCheck,
+  MapPin,
+  Book,
+  UserGear as UserCog,
+  Moon,
+  Stethoscope,
+  Clock,
+  Gavel,
+  CreditCard,
+  List as LayoutList,
+  FileXls as FileSpreadsheet,
+  Funnel as Filter,
+  Envelope as Mail,
+  ChartBar as BarChart3,
+  Briefcase,
+  Wallet,
+  Coins,
+  ShoppingCart,
+  Package,
+  Image as ImageIcon,
+  GraduationCap as School,
+  Palette,
+  Archive,
+  ForkKnife as Utensils,
+  Calendar,
+  ArrowsLeftRight as ArrowLeftRight,
+  Flame,
+  Clipboard as ClipboardList,
+  ToggleRight,
+  SignOut as LogOut,
+  Download,
+  Warning as FileWarning,
+  Shuffle,
+  House as Home,
+  UserMinus,
+  Door as DoorOpen
+} from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
+
+const CalendarRange = Calendar;
+const CalendarDays = Calendar;
+const UserX = UserMinus;
+
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,

@@ -5,14 +5,53 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import {
-  LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
-  Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog,
-  Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
-  Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
-  Image as ImageIcon, School, Palette, Archive, Utensils, CalendarDays,
-  ArrowLeftRight, Flame, ClipboardList, ToggleRight, Menu,
-} from 'lucide-react'
+  SquaresFour as LayoutDashboard,
+  Users,
+  BookOpen,
+  ShieldWarning as ShieldAlert,
+  FileText,
+  Gear as Settings,
+  Database,
+  CalendarCheck,
+  TrendUp as TrendingUp,
+  ArrowUp as ArrowUpCircle,
+  UserPlus,
+  Printer,
+  ClipboardText as ClipboardCheck,
+  UserCheck,
+  MapPin,
+  Book,
+  UserGear as UserCog,
+  Moon,
+  Stethoscope,
+  Clock,
+  Gavel,
+  CreditCard,
+  List as LayoutList,
+  FileXls as FileSpreadsheet,
+  Funnel as Filter,
+  Envelope as Mail,
+  ChartBar as BarChart3,
+  Briefcase,
+  Wallet,
+  Coins,
+  ShoppingCart,
+  Package,
+  Image as ImageIcon,
+  GraduationCap as School,
+  Palette,
+  Archive,
+  ForkKnife as Utensils,
+  Calendar,
+  ArrowsLeftRight as ArrowLeftRight,
+  Flame,
+  Clipboard as ClipboardList,
+  ToggleRight,
+  List as Menu
+} from "@phosphor-icons/react";
+
+const CalendarRange = Calendar;
+const CalendarDays = Calendar;
 import React from 'react'
 
 const ICON_MAP: Record<string, React.ElementType> = {

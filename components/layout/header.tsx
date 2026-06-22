@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from './actions'
-import { LogOut, Bell, User, Menu, Settings, ChevronDown } from 'lucide-react'
+import { SignOut as LogOut, Bell, User, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 

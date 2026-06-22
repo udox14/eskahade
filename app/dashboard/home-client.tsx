@@ -6,16 +6,62 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import {
-  LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
-  Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog,
-  Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
-  Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
-  Image as ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
-  FileWarning, Shuffle, Home, UserX, DoorOpen,
-  Search, ChevronLeft, X, ChevronRight
-} from 'lucide-react'
+  SquaresFour as LayoutDashboard,
+  Users,
+  BookOpen,
+  ShieldWarning as ShieldAlert,
+  FileText,
+  Gear as Settings,
+  Database,
+  CalendarCheck,
+  TrendUp as TrendingUp,
+  ArrowUp as ArrowUpCircle,
+  UserPlus,
+  Printer,
+  ClipboardText as ClipboardCheck,
+  UserCheck,
+  MapPin,
+  Book,
+  UserGear as UserCog,
+  Moon,
+  Stethoscope,
+  Clock,
+  Gavel,
+  CreditCard,
+  List as LayoutList,
+  FileXls as FileSpreadsheet,
+  Funnel as Filter,
+  Envelope as Mail,
+  ChartBar as BarChart3,
+  Briefcase,
+  Wallet,
+  Coins,
+  ShoppingCart,
+  Package,
+  Image as ImageIcon,
+  GraduationCap as School,
+  Archive,
+  ForkKnife as Utensils,
+  Calendar,
+  ArrowsLeftRight as ArrowLeftRight,
+  Flame,
+  Clipboard as ClipboardList,
+  ToggleRight,
+  SignOut as LogOut,
+  Download,
+  Warning as FileWarning,
+  Shuffle,
+  House as Home,
+  UserMinus as UserX,
+  Door as DoorOpen,
+  MagnifyingGlass as Search,
+  CaretLeft as ChevronLeft,
+  CaretRight as ChevronRight,
+  X
+} from "@phosphor-icons/react";
+
+const CalendarRange = Calendar;
+const CalendarDays = Calendar;
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -592,7 +638,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                       onClick={() => handleOpenGroup(group)}
                       className="group flex items-center text-left p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:border-slate-300 hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 cursor-pointer relative overflow-hidden"
                     >
-                      <div className={cn("shrink-0 w-10 h-10 rounded-xl flex items-center justify-center mr-3 transition-transform duration-300 group-hover:scale-105", accent.bg)}>
+                      <div className={cn("shrink-0 w-9 h-9 flex items-center justify-center mr-3 transition-transform duration-300 group-hover:scale-110", accent.text)}>
                         {renderGroupIcon(group)}
                       </div>
                       <div className="flex-1 min-w-0 leading-tight">
