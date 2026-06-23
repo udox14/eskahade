@@ -47,6 +47,8 @@ export type AntrianDetail = Antrian & {
     qty: number
     harga_jual: number
     subtotal: number
+    status_serah: string
+    masuk_pesanan: number
     jumlah_stok: number
   }>
 }

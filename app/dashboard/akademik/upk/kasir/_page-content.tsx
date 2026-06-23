@@ -168,7 +168,13 @@ export default function KasirUPKPage() {
     setLoading(false)
     if (!detail) return toast.error('Antrian tidak ditemukan.')
     setSelectedAntrian(detail)
-    setFinalItems(detail.items.map((item) => ({ itemId: item.id, qty: item.qty, diserahkan: true })))
+    setFinalItems(
+      detail.items.map((item) => ({
+        itemId: item.id,
+        qty: item.qty,
+        diserahkan: item.status_serah !== 'BELUM' && item.masuk_pesanan !== 1 && item.jumlah_stok > 0,
+      }))
+    )
     setUangBayar(String(detail.total_tagihan || detail.items.reduce((sum, item) => sum + item.subtotal, 0)))
     setKembalianDitahan(false)
     setKasirStep('serah')

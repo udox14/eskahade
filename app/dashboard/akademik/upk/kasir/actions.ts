@@ -218,11 +218,18 @@ export async function buatAntrianUPK(payload: {
   for (const item of payload.items) {
     const qty = Math.max(1, toInt(item.qty))
     const harga = Math.max(0, toInt(item.hargaJual))
+    const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [item.katalogId])
+    const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
+    const masukPesanan = tersedia <= 0
+
     await execute(`
       INSERT INTO upk_antrian_item
         (id, antrian_id, katalog_id, nama_kitab, marhalah_id, marhalah_nama, qty, harga_jual, subtotal, status_serah, masuk_pesanan, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUDAH', 0, ?, ?)
-    `, [generateId(), antrianId, item.katalogId, item.namaKitab, item.marhalahId, item.marhalahNama, qty, harga, qty * harga, now(), now()])
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      generateId(), antrianId, item.katalogId, item.namaKitab, item.marhalahId, item.marhalahNama,
+      qty, harga, qty * harga, masukPesanan ? 'BELUM' : 'SUDAH', masukPesanan ? 1 : 0, now(), now(),
+    ])
   }
 
   await logActivity({
@@ -306,20 +313,7 @@ export async function selesaikanAntrianUPK(payload: {
   for (const row of itemRows) {
     const final = finalById.get(row.id)
     const qty = Math.max(0, toInt(final?.qty ?? row.qty))
-    const diserahkan = final?.diserahkan ?? true
-    if (qty > 0 && diserahkan && row.katalog_id) {
-      const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [row.katalog_id])
-      const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
-      if (tersedia < qty) {
-        return { error: `Stok ${row.nama_kitab} tidak cukup. Tandai belum diserahkan agar masuk Pesanan.` }
-      }
-    }
-  }
-
-  for (const row of itemRows) {
-    const final = finalById.get(row.id)
-    const qty = Math.max(0, toInt(final?.qty ?? row.qty))
-    const diserahkan = final?.diserahkan ?? true
+    let diserahkan = final?.diserahkan ?? row.status_serah !== 'BELUM'
 
     // qty 0 = item dibatalkan
     if (qty === 0) {
@@ -333,6 +327,12 @@ export async function selesaikanAntrianUPK(payload: {
 
     const subtotal = qty * toInt(row.harga_jual)
     totalTagihan += subtotal
+
+    if (diserahkan && row.katalog_id) {
+      const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [row.katalog_id])
+      const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
+      if (tersedia < qty) diserahkan = false
+    }
 
     await execute(`
       UPDATE upk_antrian_item

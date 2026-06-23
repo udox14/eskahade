@@ -46,11 +46,12 @@ export function SerahStep({
           const diserahkan = final?.diserahkan ?? true
           const qty = final?.qty ?? row.qty
           const batal = qty === 0
+          const stokKosong = row.jumlah_stok <= 0
           return (
             <div key={row.id} className={cn('flex items-center gap-3 p-3', batal && 'bg-red-50/40')}>
               <button
                 onClick={() => onToggle(row.id)}
-                disabled={batal}
+                disabled={batal || stokKosong}
                 className={cn(
                   'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border',
                   batal
@@ -68,7 +69,7 @@ export function SerahStep({
                   {row.nama_kitab}
                 </p>
                 <p className="text-xs text-slate-500">
-                  stok {row.jumlah_stok} - {batal ? 'dibatalkan' : diserahkan ? 'diserahkan' : 'masuk pesanan'}
+                  stok {row.jumlah_stok} - {batal ? 'dibatalkan' : stokKosong ? 'otomatis masuk pesanan' : diserahkan ? 'diserahkan' : 'masuk pesanan'}
                 </p>
               </div>
 
