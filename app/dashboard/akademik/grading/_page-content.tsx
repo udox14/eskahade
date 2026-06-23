@@ -564,18 +564,36 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
 
   // Simpan grade satu santri seketika; update state lokal optimistik + indikator.
   const assign = async (riwayatId: string, grade: Grade | null) => {
-    setItems(prev => prev.map(i => i.riwayat_id === riwayatId ? { ...i, grade } : i))
+    const colIds = grade
+      ? [...byGrade(grade).map(s => s.riwayat_id).filter(id => id !== riwayatId), riwayatId]
+      : []
+
+    setItems(prev => prev.map(i => {
+      if (i.riwayat_id === riwayatId) return { ...i, grade, urutan: grade ? colIds.indexOf(riwayatId) : null }
+      const idx = colIds.indexOf(i.riwayat_id)
+      return idx >= 0 ? { ...i, urutan: idx } : i
+    }))
     setRowStatus(s => ({ ...s, [riwayatId]: 'saving' }))
     try {
       const res = await setGradeSantri(riwayatId, grade)
       if (res?.error) {
         setRowStatus(s => ({ ...s, [riwayatId]: 'error' }))
+        getGradingSekpen(selectedKelas).then(setItems)
         return
+      }
+      if (grade) {
+        const orderRes = await simpanUrutanGrade(colIds)
+        if (orderRes?.error) {
+          setRowStatus(s => ({ ...s, [riwayatId]: 'error' }))
+          getGradingSekpen(selectedKelas).then(setItems)
+          return
+        }
       }
       setRowStatus(s => ({ ...s, [riwayatId]: 'saved' }))
       setTimeout(() => setRowStatus(s => { const c = { ...s }; delete c[riwayatId]; return c }), 1500)
     } catch {
       setRowStatus(s => ({ ...s, [riwayatId]: 'error' }))
+      getGradingSekpen(selectedKelas).then(setItems)
     }
   }
 
@@ -583,10 +601,20 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
   const assignAllBelum = async (grade: Grade) => {
     const ids = belum.map(s => s.riwayat_id)
     if (ids.length === 0) return
-    setItems(prev => prev.map(i => i.grade === null ? { ...i, grade } : i))
+    const colIds = [...byGrade(grade).map(s => s.riwayat_id), ...ids]
+    setItems(prev => prev.map(i => {
+      const idx = colIds.indexOf(i.riwayat_id)
+      return idx >= 0 ? { ...i, grade, urutan: idx } : i
+    }))
     const res = await setGradeBanyak(ids, grade)
     if (res?.error) {
       alert(res.error)
+      getGradingSekpen(selectedKelas).then(setItems)
+      return
+    }
+    const orderRes = await simpanUrutanGrade(colIds)
+    if (orderRes?.error) {
+      alert(orderRes.error)
       getGradingSekpen(selectedKelas).then(setItems)
     }
   }
@@ -630,11 +658,15 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
       setRowStatus(s => ({ ...s, [id]: 'saved' }))
       setTimeout(() => setRowStatus(s => { const c = { ...s }; delete c[id]; return c }), 1500)
     }
-    simpanUrutanGrade(colIds)
+    const orderRes = await simpanUrutanGrade(colIds)
+    if (orderRes?.error) {
+      alert(orderRes.error)
+      getGradingSekpen(selectedKelas).then(setItems)
+    }
   }
 
   // Alternatif drag: geser satu posisi naik/turun dalam kolom.
-  const move = (grade: Grade, riwayatId: string, dir: 'up' | 'down') => {
+  const move = async (grade: Grade, riwayatId: string, dir: 'up' | 'down') => {
     const ids = byGrade(grade).map(s => s.riwayat_id)
     const i = ids.indexOf(riwayatId)
     const j = dir === 'up' ? i - 1 : i + 1
@@ -644,7 +676,11 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
       const idx = ids.indexOf(it.riwayat_id)
       return idx >= 0 ? { ...it, urutan: idx } : it
     }))
-    simpanUrutanGrade(ids)
+    const orderRes = await simpanUrutanGrade(ids)
+    if (orderRes?.error) {
+      alert(orderRes.error)
+      getGradingSekpen(selectedKelas).then(setItems)
+    }
   }
 
   return (

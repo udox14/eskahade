@@ -133,6 +133,7 @@ export async function setGradeBanyak(riwayatIds: string[], grade: Grade) {
   const session = await assertCrud(FITUR_HREF, 'update')
   if ('error' in session) return { error: session.error }
   if (!hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Khusus sekpen.' }
+  await ensureGradeUrutanColumn()
   const ids = (riwayatIds || []).filter(Boolean)
   if (ids.length === 0) return { error: 'Tidak ada santri.' }
 
@@ -194,10 +195,14 @@ export async function setGradeSantri(riwayatId: string, grade: Grade | null) {
   if ('error' in session) return { error: session.error }
   if (!hasAnyRole(session, ['admin', 'sekpen'])) return { error: 'Khusus sekpen.' }
   if (!riwayatId) return { error: 'Data tidak valid.' }
+  await ensureGradeUrutanColumn()
 
   const value = grade ? gradeLabel(grade) : null
   try {
-    await execute('UPDATE riwayat_pendidikan SET grade_lanjutan = ? WHERE id = ?', [value, riwayatId])
+    await execute(
+      'UPDATE riwayat_pendidikan SET grade_lanjutan = ?, grade_urutan = CASE WHEN ? IS NULL THEN NULL ELSE grade_urutan END WHERE id = ?',
+      [value, value, riwayatId]
+    )
   } catch {
     return { error: 'Gagal menyimpan grade.' }
   }
