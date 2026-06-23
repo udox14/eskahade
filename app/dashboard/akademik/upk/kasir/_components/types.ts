@@ -17,10 +17,18 @@ export type KatalogItem = {
   nama_kitab: string
   marhalah_id: number | null
   marhalah_nama: string | null
+  harga_beli: number
   harga_jual: number
   jumlah_stok: number
   is_default: boolean
   is_marhalah: boolean
+}
+
+export type GuruOption = {
+  id: number
+  nama_lengkap: string
+  gelar: string | null
+  kode_guru: string | null
 }
 
 export type CartItem = KatalogItem & {

@@ -5,7 +5,7 @@ import { CheckCircle, Loader2, X } from 'lucide-react'
 import { rupiah } from './types'
 import { Numpad } from './numpad'
 
-const QUICK = [50000, 100000]
+const QUICK = [100000, 150000, 200000]
 
 function BayarBody({
   total,
@@ -35,7 +35,7 @@ function BayarBody({
       {diff > 0 && <div className="rounded-lg bg-green-50 p-2 text-sm font-bold text-green-700">Kembalian: {rupiah(diff)}</div>}
       {diff < 0 && <div className="rounded-lg bg-red-50 p-2 text-sm font-bold text-red-700">Tunggakan: {rupiah(Math.abs(diff))}</div>}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {QUICK.map((v) => (
           <button
             key={v}

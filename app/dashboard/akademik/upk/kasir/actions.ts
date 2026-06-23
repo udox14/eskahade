@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 
 const KASIR_PATH = '/dashboard/akademik/upk/kasir'
 type UnitUPK = 'PUTRA' | 'PUTRI'
+type JenisTransaksiUPK = 'PENJUALAN' | 'GRATIS_SANTRI' | 'GRATIS_GURU'
 
 type CartItemPayload = {
   katalogId: number
@@ -14,6 +15,7 @@ type CartItemPayload = {
   marhalahId: number | null
   marhalahNama: string | null
   qty: number
+  hargaBeli?: number
   hargaJual: number
 }
 
@@ -46,12 +48,20 @@ type KatalogKasirRow = {
   nama_kitab: string
   stok_lama: number
   stok_baru: number
+  harga_beli: number
   harga_jual: number
   is_active: number
   marhalah_nama: string | null
   is_default_flag: number
   linked_flag: number
   toko_nama: string | null
+}
+
+type GuruKasirRow = {
+  id: number
+  nama_lengkap: string
+  gelar: string | null
+  kode_guru: string | null
 }
 
 type AntrianRow = {
@@ -73,6 +83,11 @@ type AntrianRow = {
   sisa_tunggakan: number
   status: string
   catatan: string | null
+  jenis_transaksi?: JenisTransaksiUPK
+  penerima_type?: string
+  guru_id?: number | null
+  harga_modal_total?: number
+  pengeluaran_id?: string | null
 }
 
 type AntrianListRow = AntrianRow & {
@@ -89,6 +104,8 @@ type AntrianItemRow = {
   qty: number
   harga_jual: number
   subtotal: number
+  harga_modal?: number
+  modal_subtotal?: number
   status_serah: string
   masuk_pesanan: number
   stok_lama: number | null
@@ -125,6 +142,31 @@ async function kurangiStok(katalogId: number, qty: number, meta: { antrianId: st
   `, [generateId(), katalogId, meta.antrianId, meta.itemId, today(), meta.unit, dariLama, dariBaru, dariLama + dariBaru, meta.catatan, (await getSession())?.id ?? null, now()])
 }
 
+async function kurangiStokDenganTipe(
+  katalogId: number,
+  qty: number,
+  meta: { antrianId: string; itemId: string; unit: UnitUPK; tipe: string; catatan: string }
+) {
+  if (qty <= 0) return
+  const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [katalogId])
+  if (!stok) return
+
+  const dariLama = Math.min(stok.stok_lama || 0, qty)
+  const sisa = qty - dariLama
+  const dariBaru = Math.min(stok.stok_baru || 0, sisa)
+
+  await execute(
+    'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
+    [dariLama, dariBaru, now(), now(), katalogId]
+  )
+
+  await execute(`
+    INSERT INTO upk_stok_mutasi
+      (id, katalog_id, antrian_id, antrian_item_id, tanggal, unit, tipe, qty_lama, qty_baru, total_qty, catatan, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [generateId(), katalogId, meta.antrianId, meta.itemId, today(), meta.unit, meta.tipe, dariLama, dariBaru, dariLama + dariBaru, meta.catatan, (await getSession())?.id ?? null, now()])
+}
+
 export async function cariSantriUPK(unit: UnitUPK, keyword: string) {
   const trimmed = keyword.trim()
   if (trimmed.length < 2) return []
@@ -145,11 +187,24 @@ export async function cariSantriUPK(unit: UnitUPK, keyword: string) {
   `, [genderFromUnit(unit), `%${trimmed}%`, `%${trimmed}%`])
 }
 
+export async function cariGuruUPK(keyword: string) {
+  const trimmed = keyword.trim()
+  if (trimmed.length < 2) return []
+
+  return query<GuruKasirRow>(`
+    SELECT id, nama_lengkap, gelar, kode_guru
+    FROM data_guru
+    WHERE nama_lengkap LIKE ? OR kode_guru LIKE ?
+    ORDER BY nama_lengkap
+    LIMIT 12
+  `, [`%${trimmed}%`, `%${trimmed}%`])
+}
+
 export async function getKatalogKasir(marhalahId?: number | null) {
   const target = marhalahId ?? -1
   const rows = await query<KatalogKasirRow>(`
     SELECT uk.id, uk.nama_kitab, uk.stok_lama, uk.stok_baru,
-           uk.harga_jual, uk.is_active,
+           uk.harga_beli, uk.harga_jual, uk.is_active,
            t.nama AS toko_nama,
            GROUP_CONCAT(DISTINCT m.nama) AS marhalah_nama,
            MAX(CASE WHEN km.marhalah_id = ? THEN km.is_default ELSE 0 END) AS is_default_flag,
@@ -168,12 +223,152 @@ export async function getKatalogKasir(marhalahId?: number | null) {
     nama_kitab: row.nama_kitab,
     marhalah_id: marhalahId ?? null,
     marhalah_nama: row.marhalah_nama,
+    harga_beli: row.harga_beli,
     harga_jual: row.harga_jual,
     toko_nama: row.toko_nama,
     jumlah_stok: (row.stok_lama || 0) + (row.stok_baru || 0),
     is_default: marhalahId ? !!row.is_default_flag : false,
     is_marhalah: marhalahId ? !!row.linked_flag : true,
   }))
+}
+
+export async function buatTransaksiGratisUPK(payload: {
+  unit: UnitUPK
+  jenis: 'GRATIS_SANTRI' | 'GRATIS_GURU'
+  santri?: {
+    id: string
+    nis: string
+    nama_lengkap: string
+    kelas_id: string | null
+    nama_kelas: string | null
+    marhalah_id: number | null
+    marhalah_nama: string | null
+  } | null
+  guru?: {
+    id: number
+    nama_lengkap: string
+    gelar: string | null
+    kode_guru: string | null
+  } | null
+  items: CartItemPayload[]
+  catatan?: string
+}): Promise<{ success: true; id: string; nomor: number } | { error: string }> {
+  const session = await getSession()
+  if (payload.jenis === 'GRATIS_SANTRI' && !payload.santri?.id) return { error: 'Pilih santri dulu.' }
+  if (payload.jenis === 'GRATIS_GURU' && !payload.guru?.id) return { error: 'Pilih guru dulu.' }
+  if (!payload.items.length) return { error: 'Pilih minimal satu kitab.' }
+
+  const tanggal = today()
+  const maxRow = await queryOne<{ nomor: number }>(
+    'SELECT MAX(nomor) AS nomor FROM upk_antrian WHERE tanggal = ? AND unit = ?',
+    [tanggal, payload.unit]
+  )
+  const nomor = (maxRow?.nomor || 0) + 1
+  const antrianId = generateId()
+  const penerimaNama = payload.jenis === 'GRATIS_GURU'
+    ? payload.guru?.nama_lengkap || 'Guru'
+    : payload.santri?.nama_lengkap || 'Santri'
+  const modalTotal = payload.items.reduce((sum, item) => {
+    const qty = Math.max(1, toInt(item.qty))
+    const modal = Math.max(0, toInt(item.hargaBeli))
+    return sum + qty * modal
+  }, 0)
+
+  const pengeluaranId = generateId()
+  await execute(`
+    INSERT INTO upk_pengeluaran
+      (id, tanggal, waktu_catat, kategori, penerima, nominal, catatan, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, 'KITAB_GRATIS', ?, ?, ?, ?, ?, ?)
+  `, [
+    pengeluaranId, tanggal, now(), penerimaNama, modalTotal,
+    `${payload.jenis === 'GRATIS_GURU' ? 'Kitab gratis guru' : 'Kitab gratis santri'} - transaksi ${String(nomor).padStart(3, '0')}${payload.catatan?.trim() ? `: ${payload.catatan.trim()}` : ''}`,
+    session?.id ?? null, now(), now(),
+  ])
+
+  await execute(`
+    INSERT INTO upk_antrian
+      (id, tanggal, nomor, unit, santri_id, nis, nama_santri, kelas_id, kelas_nama,
+       marhalah_id, marhalah_nama, total_tagihan, total_bayar, status, catatan,
+       created_by, cashier_by, paid_at, updated_at, jenis_transaksi, penerima_type, guru_id,
+       harga_modal_total, pengeluaran_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'SELESAI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    antrianId, tanggal, nomor, payload.unit,
+    payload.santri?.id ?? null,
+    payload.santri?.nis ?? payload.guru?.kode_guru ?? null,
+    penerimaNama,
+    payload.santri?.kelas_id ?? null,
+    payload.santri?.nama_kelas ?? null,
+    payload.santri?.marhalah_id ?? null,
+    payload.santri?.marhalah_nama ?? null,
+    payload.catatan?.trim() || null,
+    session?.id ?? null,
+    session?.id ?? null,
+    now(),
+    now(),
+    payload.jenis,
+    payload.jenis === 'GRATIS_GURU' ? 'GURU' : 'SANTRI',
+    payload.guru?.id ?? null,
+    modalTotal,
+    pengeluaranId,
+    now(),
+  ])
+
+  for (const item of payload.items) {
+    const qty = Math.max(1, toInt(item.qty))
+    const hargaModal = Math.max(0, toInt(item.hargaBeli))
+    const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [item.katalogId])
+    const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
+    const masukPesanan = tersedia < qty
+    const itemId = generateId()
+
+    await execute(`
+      INSERT INTO upk_antrian_item
+        (id, antrian_id, katalog_id, nama_kitab, marhalah_id, marhalah_nama, qty,
+         harga_jual, subtotal, harga_modal, modal_subtotal, status_serah, masuk_pesanan,
+         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)
+    `, [
+      itemId, antrianId, item.katalogId, item.namaKitab, item.marhalahId, item.marhalahNama,
+      qty, hargaModal, qty * hargaModal, masukPesanan ? 'BELUM' : 'SUDAH', masukPesanan ? 1 : 0,
+      now(), now(),
+    ])
+
+    if (!masukPesanan) {
+      await kurangiStokDenganTipe(item.katalogId, qty, {
+        antrianId,
+        itemId,
+        unit: payload.unit,
+        tipe: 'KITAB_GRATIS',
+        catatan: `${payload.jenis === 'GRATIS_GURU' ? 'Kitab gratis guru' : 'Kitab gratis santri'} ${String(nomor).padStart(3, '0')}`,
+      })
+    }
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_kasir',
+    action: 'free_transaction',
+    fiturHref: '/dashboard/akademik/upk/kasir',
+    logKind: 'create',
+    entityType: 'upk_antrian',
+    entityId: antrianId,
+    entityLabel: penerimaNama,
+    summary: `Mencatat kitab gratis UPK untuk ${penerimaNama}`,
+    details: {
+      nomor,
+      unit: payload.unit,
+      jenis: payload.jenis,
+      total_item: payload.items.length,
+      harga_modal_total: modalTotal,
+      pengeluaran_id: pengeluaranId,
+    },
+  })
+
+  revalidatePath(KASIR_PATH)
+  revalidatePath('/dashboard/akademik/upk/riwayat')
+  revalidatePath('/dashboard/akademik/upk/pengeluaran')
+  return { success: true, id: antrianId, nomor }
 }
 
 export async function buatAntrianUPK(payload: {

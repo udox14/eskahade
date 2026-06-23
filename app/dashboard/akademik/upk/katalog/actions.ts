@@ -65,9 +65,9 @@ type MarhalahRow = {
   nama: string
 }
 
-function toInt(value: FormDataEntryValue | null) {
-  const parsed = parseInt(String(value ?? '').replace(/\./g, ''), 10)
-  return Number.isFinite(parsed) ? parsed : 0
+async function hasColumn(table: 'upk_katalog' | 'upk_belanja_item', column: string) {
+  const columns = await query<{ name: string }>(`PRAGMA table_info(${table})`)
+  return columns.some((row) => row.name === column)
 }
 
 function toImportInt(value: unknown) {
@@ -100,11 +100,12 @@ function toNullableInt(value: FormDataEntryValue | null) {
 }
 
 export async function getKatalogUPK(search = '', filterMarhalah = '', filterStatus = 'SEMUA') {
+  const hasConsignment = await hasColumn('upk_katalog', 'is_consignment')
   let sql = `
     SELECT uk.id, uk.kitab_id, uk.nama_kitab, uk.toko_id,
            uk.stok_lama, uk.stok_baru, uk.harga_beli, uk.harga_jual,
            uk.is_active, uk.catatan, uk.stok_updated_at, uk.updated_at, uk.created_at,
-           uk.is_consignment,
+           ${hasConsignment ? 'uk.is_consignment' : '0 AS is_consignment'},
            t.nama AS toko_nama,
            k.nama_kitab AS master_nama_kitab
     FROM upk_katalog uk
@@ -219,6 +220,7 @@ export async function simpanKatalog(payload: {
   const isActive = payload.is_active ? 1 : 0
   const isConsignment = payload.is_consignment ? 1 : 0
   const catatan = payload.catatan.trim()
+  const hasConsignment = await hasColumn('upk_katalog', 'is_consignment')
 
   // dedupe marhalah, max 1 default per item tetap diizinkan banyak default
   const marhalahMap = new Map<number, boolean>()
@@ -243,22 +245,37 @@ export async function simpanKatalog(payload: {
     const stockChanged = !currentStock || currentStock.stok_lama !== stokLama
     const stockUpdatedAt = stockChanged ? timestamp : currentStock.stok_updated_at
 
+    const consignmentSet = hasConsignment ? ', is_consignment = ?' : ''
+    const params = [
+      kitabId, namaKitab, tokoId, stokLama, hargaBeli, hargaJual,
+      isActive, catatan || null,
+    ]
+    if (hasConsignment) params.push(isConsignment)
+    params.push(stockUpdatedAt, timestamp, id)
+
     await execute(`
       UPDATE upk_katalog
       SET kitab_id = ?, nama_kitab = ?, toko_id = ?,
           stok_lama = ?, harga_beli = ?, harga_jual = ?,
-          is_active = ?, catatan = ?, is_consignment = ?, stok_updated_at = ?, updated_at = ?
+          is_active = ?, catatan = ?${consignmentSet}, stok_updated_at = ?, updated_at = ?
       WHERE id = ?
-    `, [kitabId, namaKitab, tokoId, stokLama, hargaBeli, hargaJual,
-        isActive, catatan || null, isConsignment, stockUpdatedAt, timestamp, id])
+    `, params)
   } else {
+    const consignmentColumn = hasConsignment ? ', is_consignment' : ''
+    const consignmentPlaceholder = hasConsignment ? ', ?' : ''
+    const params = [
+      kitabId, namaKitab, tokoId, stokLama, 0, hargaBeli, hargaJual,
+      isActive, catatan || null,
+    ]
+    if (hasConsignment) params.push(isConsignment)
+    params.push(timestamp, timestamp, timestamp)
+
     await execute(`
       INSERT INTO upk_katalog
         (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
-         harga_beli, harga_jual, is_active, catatan, is_consignment, stok_updated_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [kitabId, namaKitab, tokoId, stokLama, 0, hargaBeli, hargaJual,
-        isActive, catatan || null, isConsignment, timestamp, timestamp, timestamp])
+         harga_beli, harga_jual, is_active, catatan${consignmentColumn}, stok_updated_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${consignmentPlaceholder}, ?, ?, ?)
+    `, params)
     const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog ORDER BY id DESC LIMIT 1')
     katalogId = created?.id ?? null
   }

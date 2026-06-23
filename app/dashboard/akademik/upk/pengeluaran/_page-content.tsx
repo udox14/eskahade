@@ -35,6 +35,7 @@ type KategoriPengeluaran =
   | 'BAYAR_HUTANG_TOKO'
   | 'BAYAR_PINJAMAN_MODAL'
   | 'ROYALTI_PENULIS'
+  | 'KITAB_GRATIS'
   | 'OPERASIONAL'
   | 'LAINNYA'
 
@@ -46,6 +47,7 @@ type Ringkasan = {
   hutang_toko: number
   hutang_modal: number
   royalti: number
+  kitab_gratis: number
   sisa_hutang_toko: number
   sisa_hutang_modal: number
 }
@@ -140,6 +142,7 @@ function kategoriLabel(kategori: KategoriPengeluaran) {
     BAYAR_HUTANG_TOKO: 'Bayar Hutang Toko',
     BAYAR_PINJAMAN_MODAL: 'Bayar Pinjaman Modal',
     ROYALTI_PENULIS: 'Royalti Penulis',
+    KITAB_GRATIS: 'Kitab Gratis',
     OPERASIONAL: 'Operasional',
     LAINNYA: 'Lainnya',
   }
@@ -333,9 +336,9 @@ export default function PengeluaranUPKPage() {
           <p className="text-xs text-slate-500">sisa {rupiah(ringkasan?.sisa_hutang_modal ?? 0)}</p>
         </div>
         <div className="bg-white border rounded-lg p-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase">Royalti Penulis</p>
-          <p className="text-lg font-extrabold text-purple-700">{rupiah(ringkasan?.royalti ?? 0)}</p>
-          <p className="text-xs text-slate-500">bagian laba kitab tertentu</p>
+          <p className="text-[11px] font-bold text-slate-400 uppercase">Kitab Gratis</p>
+          <p className="text-lg font-extrabold text-purple-700">{rupiah(ringkasan?.kitab_gratis ?? 0)}</p>
+          <p className="text-xs text-slate-500">berdasarkan harga modal</p>
         </div>
         <div className="bg-white border rounded-lg p-4 col-span-2 xl:col-span-1">
           <p className="text-[11px] font-bold text-slate-400 uppercase">Operasional</p>
@@ -448,6 +451,7 @@ export default function PengeluaranUPKPage() {
                     <option value="BAYAR_HUTANG_TOKO">Bayar Hutang Toko</option>
                     <option value="BAYAR_PINJAMAN_MODAL">Bayar Pinjaman Modal</option>
                     <option value="ROYALTI_PENULIS">Royalti Penulis</option>
+                    <option value="KITAB_GRATIS">Kitab Gratis</option>
                     <option value="OPERASIONAL">Operasional</option>
                     <option value="LAINNYA">Lainnya</option>
                   </select>

@@ -175,6 +175,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/upk/kasir':                   'Proses pembelian kitab dan kebutuhan santri.',
   '/dashboard/akademik/upk/katalog':                 'Kelola katalog, stok, toko, harga beli, dan harga jual UPK.',
   '/dashboard/akademik/upk/belanja':                 'Rencanakan belanja kitab, tambah stok, dan pantau hutang toko.',
+  '/dashboard/akademik/upk/riwayat':                 'Lihat transaksi UPK selesai dan lakukan void dengan alasan.',
   '/dashboard/pengaturan/users':                     'Kelola akun pengguna, reset password, dan hak akses.',
   '/dashboard/pengaturan/tahun-ajaran':              'Atur tahun ajaran aktif dan arsip tahun sebelumnya.',
   '/dashboard/master/santri-tools':                  'Alat bantu massal: naik kelas, arsip, dan reset data santri.',

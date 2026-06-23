@@ -16,6 +16,7 @@ export function KitabStep({
   total,
   onNext,
   showFooter,
+  priceMode = 'jual',
 }: {
   items: CartItem[]
   search: string
@@ -28,6 +29,7 @@ export function KitabStep({
   total: number
   onNext: () => void
   showFooter: boolean
+  priceMode?: 'jual' | 'modal'
 }) {
   return (
     <section className="flex h-full flex-col">
@@ -56,7 +58,9 @@ export function KitabStep({
         )}
         {hasSantri &&
           !loading &&
-          items.map((item) => (
+          items.map((item) => {
+            const displayPrice = priceMode === 'modal' ? item.harga_beli : item.harga_jual
+            return (
             <div key={item.id} className={cn('flex items-center gap-3 p-3', item.selected ? 'bg-blue-50/40' : 'bg-white')}>
               <button
                 onClick={() => onToggle(item.id)}
@@ -82,7 +86,10 @@ export function KitabStep({
                 </p>
               </div>
 
-              <p className="flex-shrink-0 font-mono text-sm font-bold text-emerald-700">{rupiah(item.harga_jual)}</p>
+              <div className="flex-shrink-0 text-right">
+                <p className="font-mono text-sm font-bold text-emerald-700">{rupiah(displayPrice)}</p>
+                {priceMode === 'modal' && <p className="text-[10px] font-bold uppercase text-slate-400">Modal</p>}
+              </div>
 
               <div className="flex flex-shrink-0 items-center overflow-hidden rounded-lg border">
                 <button onClick={() => onQty(item.id, -1)} className="p-2 hover:bg-slate-50">
@@ -94,7 +101,7 @@ export function KitabStep({
                 </button>
               </div>
             </div>
-          ))}
+          )})}
       </div>
 
       {showFooter && (

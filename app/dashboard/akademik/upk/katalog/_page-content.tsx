@@ -182,21 +182,33 @@ export default function KatalogUPKPage() {
   const labaBersih = labaKotor - modal
 
   const initData = useCallback(async () => {
-    const [marhalah, toko, kitab] = await Promise.all([
-      getMarhalahList(),
-      getTokoList(true),
-      getMasterKitabOptions(),
-    ])
-    setMarhalahList(marhalah)
-    setTokoList(toko)
-    setMasterKitab(kitab)
+    try {
+      const [marhalah, toko, kitab] = await Promise.all([
+        getMarhalahList(),
+        getTokoList(true),
+        getMasterKitabOptions(),
+      ])
+      setMarhalahList(marhalah)
+      setTokoList(toko)
+      setMasterKitab(kitab)
+    } catch (error) {
+      console.error('[UPK Katalog] Gagal memuat data awal', error)
+      toast.error('Gagal memuat data awal katalog.')
+    }
   }, [])
 
   const loadKatalog = useCallback(async () => {
     setLoading(true)
-    const data = await getKatalogUPK(submittedSearch, filterMarhalah, filterStatus)
-    setKatalog(data)
-    setLoading(false)
+    try {
+      const data = await getKatalogUPK(submittedSearch, filterMarhalah, filterStatus)
+      setKatalog(data)
+    } catch (error) {
+      console.error('[UPK Katalog] Gagal memuat katalog', error)
+      setKatalog([])
+      toast.error('Gagal memuat katalog UPK.')
+    } finally {
+      setLoading(false)
+    }
   }, [filterMarhalah, filterStatus, submittedSearch])
 
   const loadToko = async () => {

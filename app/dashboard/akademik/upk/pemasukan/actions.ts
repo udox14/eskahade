@@ -62,7 +62,7 @@ export async function getRingkasanPenjualanUPK(tanggal = today()) {
       COALESCE(SUM(sisa_tunggakan), 0) AS total_tunggakan,
       COALESCE(SUM(sisa_kembalian), 0) AS total_kembalian_ditahan
     FROM upk_antrian
-    WHERE tanggal = ? AND status = 'SELESAI'
+    WHERE tanggal = ? AND status = 'SELESAI' AND COALESCE(jenis_transaksi, 'PENJUALAN') = 'PENJUALAN'
   `, [tanggal])
 
   const pemasukan = await queryOne<{

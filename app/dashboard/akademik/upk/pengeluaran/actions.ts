@@ -14,6 +14,7 @@ type KategoriPengeluaran =
   | 'BAYAR_HUTANG_TOKO'
   | 'BAYAR_PINJAMAN_MODAL'
   | 'ROYALTI_PENULIS'
+  | 'KITAB_GRATIS'
   | 'OPERASIONAL'
   | 'LAINNYA'
 
@@ -75,6 +76,7 @@ function normalizeKategori(value: unknown): KategoriPengeluaran {
     value === 'BAYAR_HUTANG_TOKO' ||
     value === 'BAYAR_PINJAMAN_MODAL' ||
     value === 'ROYALTI_PENULIS' ||
+    value === 'KITAB_GRATIS' ||
     value === 'OPERASIONAL'
   ) return value
   return 'LAINNYA'
@@ -111,6 +113,7 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
     hutang_toko: number
     hutang_modal: number
     royalti: number
+    kitab_gratis: number
   }>(`
     SELECT
       COALESCE(SUM(nominal), 0) AS total,
@@ -118,7 +121,8 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
       COALESCE(SUM(CASE WHEN kategori = 'TRANSPORT' THEN nominal ELSE 0 END), 0) AS transport,
       COALESCE(SUM(CASE WHEN kategori = 'BAYAR_HUTANG_TOKO' THEN nominal ELSE 0 END), 0) AS hutang_toko,
       COALESCE(SUM(CASE WHEN kategori = 'BAYAR_PINJAMAN_MODAL' THEN nominal ELSE 0 END), 0) AS hutang_modal,
-      COALESCE(SUM(CASE WHEN kategori = 'ROYALTI_PENULIS' THEN nominal ELSE 0 END), 0) AS royalti
+      COALESCE(SUM(CASE WHEN kategori = 'ROYALTI_PENULIS' THEN nominal ELSE 0 END), 0) AS royalti,
+      COALESCE(SUM(CASE WHEN kategori = 'KITAB_GRATIS' THEN nominal ELSE 0 END), 0) AS kitab_gratis
     FROM upk_pengeluaran
     WHERE tanggal = ?
   `, [tanggal])
@@ -143,6 +147,7 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
     hutang_toko: toInt(harian?.hutang_toko),
     hutang_modal: toInt(harian?.hutang_modal),
     royalti: toInt(harian?.royalti),
+    kitab_gratis: toInt(harian?.kitab_gratis),
     sisa_hutang_toko: toInt(hutangToko?.total),
     sisa_hutang_modal: Math.max(0, toInt(hutangModal?.total)),
   }
