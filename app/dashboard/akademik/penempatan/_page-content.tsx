@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   getMarhalahList, getTahunAjaranAktif, getKelasUntukMarhalah, getPenempatanData, simpanPenempatan,
-  type KandidatPenempatan, type KelasTujuan,
+  type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan,
 } from './actions'
 import { gradeCocokKelas, type Grade } from '@/lib/akademik/grade'
 import {
@@ -28,6 +28,15 @@ function gradeBadgeClass(grade: Grade | null): string {
   return 'bg-slate-100 text-slate-500 border-slate-200'
 }
 
+function naturalCompare(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function labelSekolah(santri: KandidatPenempatan) {
+  if (String(santri.kategori_santri || '').toUpperCase() === 'SADESA') return 'SADESA'
+  return santri.sekolah || '-'
+}
+
 export default function PenempatanKelasPage() {
   const confirm = useConfirm()
   const [tahunAktif, setTahunAktif] = useState<any>(null)
@@ -40,6 +49,7 @@ export default function PenempatanKelasPage() {
   const [saving, setSaving] = useState(false)
 
   const [selectedGender, setSelectedGender] = useState<'L' | 'P'>('L')
+  const [selectedJenjang, setSelectedJenjang] = useState<JenjangPenempatan>('SLTP')
   const [statOpen, setStatOpen] = useState(false)
 
   // santri_id -> kelas_id tujuan
@@ -60,7 +70,7 @@ export default function PenempatanKelasPage() {
     setBulkKelas('')
     try {
       const [data, kelas] = await Promise.all([
-        getPenempatanData(selectedMarhalah, selectedGender),
+        getPenempatanData(selectedMarhalah, selectedGender, selectedJenjang),
         getKelasUntukMarhalah(selectedMarhalah, selectedGender),
       ])
       setKandidat(data)
@@ -74,14 +84,9 @@ export default function PenempatanKelasPage() {
     }
   }
 
-  // Opsi kelas untuk santri grade tertentu: yang cocok ditandai "disarankan" & diurutkan atas.
+  // Opsi kelas tetap urut natural (1-1, 1-2, ...); yang cocok grade hanya ditandai.
   const kelasOptionsFor = (grade: Grade | null) => {
-    return [...kelasTujuan].sort((a, b) => {
-      const ca = gradeCocokKelas(grade, a.grade) ? 0 : 1
-      const cb = gradeCocokKelas(grade, b.grade) ? 0 : 1
-      if (ca !== cb) return ca - cb
-      return a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
-    })
+    return [...kelasTujuan].sort((a, b) => naturalCompare(a.nama_kelas, b.nama_kelas))
   }
 
   const grouped = useMemo(() => {
@@ -217,6 +222,24 @@ export default function PenempatanKelasPage() {
             </button>
           </div>
         </div>
+        <div className="w-full md:w-auto">
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenjang Sekolah</label>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setSelectedJenjang('SLTP')}
+              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTP' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              SLTP
+            </button>
+            <button
+              onClick={() => setSelectedJenjang('SLTA')}
+              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTA' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              SLTA
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] font-medium text-slate-400">SLTP: MTS/MTSN/SMP. SLTA: MAN/SMK/SMA/SADESA.</p>
+        </div>
         <button
           onClick={handleTampilkan}
           disabled={!selectedMarhalah || loading}
@@ -319,7 +342,7 @@ export default function PenempatanKelasPage() {
         <div className="bg-indigo-50/60 p-4 border border-indigo-100 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sticky top-2 z-20 backdrop-blur">
           <div>
             <h3 className="font-bold text-indigo-900">Terapkan ke {selected.length} santri terpilih</h3>
-            <p className="text-xs text-indigo-700/70 font-medium mt-0.5">Ceklis santri lalu pilih kelas tujuan. Kelas yang cocok grade ditandai.</p>
+            <p className="text-xs text-indigo-700/70 font-medium mt-0.5">Ceklis santri lalu pilih kelas tujuan. Kelas diurutkan natural, dan yang cocok grade ditandai.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto bg-white p-2 rounded-xl border border-indigo-100 shadow-sm">
             <select
@@ -388,6 +411,7 @@ export default function PenempatanKelasPage() {
                         <th className="p-3 w-10"></th>
                         <th className="p-3">Nama & NIS</th>
                         <th className="p-3 text-center">Sumber</th>
+                        <th className="p-3 text-center">Sekolah</th>
                         <th className="p-3 text-center">Asal</th>
                         <th className="p-3 w-72">Kelas Tujuan</th>
                       </tr>
@@ -408,6 +432,11 @@ export default function PenempatanKelasPage() {
                             <td className="p-3 text-center">
                               <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.sumber === 'baru' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}`}>
                                 {s.sumber === 'baru' ? 'Baru' : 'Naik'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center text-slate-500 text-xs">
+                              <span className="inline-flex max-w-36 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-bold uppercase">
+                                {labelSekolah(s)}
                               </span>
                             </td>
                             <td className="p-3 text-center text-slate-500 text-xs">{s.asal}</td>

@@ -8,6 +8,20 @@ import { normalizeGrade } from '@/lib/akademik/grade'
 import { revalidatePath } from 'next/cache'
 
 const FITUR_HREF = '/dashboard/akademik/penempatan'
+export type JenjangPenempatan = 'SLTP' | 'SLTA'
+
+function naturalCompare(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function getJenjangPenempatan(kategoriSantri: string | null | undefined, sekolah: string | null | undefined): JenjangPenempatan | null {
+  if (String(kategoriSantri || '').trim().toUpperCase() === 'SADESA') return 'SLTA'
+
+  const value = String(sekolah || '').toUpperCase()
+  if (value.includes('MTSN') || value.includes('MTS') || value.includes('SMP')) return 'SLTP'
+  if (value.includes('MAN') || value.includes('SMK') || value.includes('SMA')) return 'SLTA'
+  return null
+}
 
 export async function getMarhalahList() {
   return getCachedMarhalahList()
@@ -56,9 +70,7 @@ export async function getKelasUntukMarhalah(marhalahId: string, jenisKelamin?: s
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     WHERE k.marhalah_id = ?${genderFilter}
   `, params)
-  return data.sort((a, b) =>
-    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  return data.sort((a, b) => naturalCompare(a.nama_kelas, b.nama_kelas))
 }
 
 export type KandidatPenempatan = {
@@ -69,6 +81,9 @@ export type KandidatPenempatan = {
   grade: 'A' | 'B' | 'C' | null
   asal: string // rekomendasi marhalah (baru) / kelas sekarang (lama)
   jenis_kelamin: string
+  sekolah: string | null
+  kategori_santri: string | null
+  jenjang: JenjangPenempatan | null
   urutan: number | null // urutan manual hasil grading (lama); null untuk baru
   riwayat_lama_id: string | null
 }
@@ -78,11 +93,12 @@ export type KandidatPenempatan = {
 //            target marhalah = rekomendasi_marhalah (match nama).
 //  - "lama": santri di kelas marhalah sebelumnya (urutan - 1), grade dari grade_lanjutan.
 // jenisKelamin (L/P) opsional untuk memfilter santri per gender.
-export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?: string): Promise<KandidatPenempatan[]> {
+export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?: string, jenjangPenempatan?: JenjangPenempatan): Promise<KandidatPenempatan[]> {
   if (!marhalahTargetId) return []
   await ensureGradeUrutanColumn()
 
   const gender = (jenisKelamin === 'L' || jenisKelamin === 'P') ? jenisKelamin : null
+  const jenjang = jenjangPenempatan === 'SLTA' ? 'SLTA' : 'SLTP'
 
   const marhalahList = await getCachedMarhalahList()
   const target = marhalahList.find((m: any) => String(m.id) === String(marhalahTargetId))
@@ -97,6 +113,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
   if (gender) { baruGender = ' AND s.jenis_kelamin = ?'; baruParams.push(gender) }
   const santriBaru = await query<any>(`
     SELECT s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
+           s.sekolah, s.kategori_santri,
            htk.rekomendasi_marhalah, htk.catatan_grade
     FROM santri s
     JOIN hasil_tes_klasifikasi htk ON htk.santri_id = s.id
@@ -109,18 +126,27 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
   `, baruParams)
 
   const kandidatBaru: KandidatPenempatan[] = santriBaru
-    .filter((s: any) => String(s.rekomendasi_marhalah || '').trim().toLowerCase() === targetNama)
-    .map((s: any) => ({
-      santri_id: s.santri_id,
-      nama: s.nama_lengkap,
-      nis: s.nis,
-      sumber: 'baru' as const,
-      grade: normalizeGrade(s.catatan_grade),
-      asal: s.rekomendasi_marhalah || '-',
-      jenis_kelamin: s.jenis_kelamin,
-      urutan: null,
-      riwayat_lama_id: null,
-    }))
+    .filter((s: any) =>
+      String(s.rekomendasi_marhalah || '').trim().toLowerCase() === targetNama &&
+      getJenjangPenempatan(s.kategori_santri, s.sekolah) === jenjang
+    )
+    .map((s: any) => {
+      const jenjangSantri = getJenjangPenempatan(s.kategori_santri, s.sekolah)
+      return {
+        santri_id: s.santri_id,
+        nama: s.nama_lengkap,
+        nis: s.nis,
+        sumber: 'baru' as const,
+        grade: normalizeGrade(s.catatan_grade),
+        asal: s.rekomendasi_marhalah || '-',
+        jenis_kelamin: s.jenis_kelamin,
+        sekolah: s.sekolah,
+        kategori_santri: s.kategori_santri,
+        jenjang: jenjangSantri,
+        urutan: null,
+        riwayat_lama_id: null,
+      }
+    })
 
   // ── Santri LAMA (naik dari marhalah sebelumnya) ──
   let kandidatLama: KandidatPenempatan[] = []
@@ -134,6 +160,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
     const santriLama = await query<any>(`
       SELECT rp.id AS riwayat_lama_id, rp.grade_lanjutan, rp.grade_urutan,
              s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
+             s.sekolah, s.kategori_santri,
              k.nama_kelas
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
@@ -143,17 +170,25 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
       ORDER BY (rp.grade_urutan IS NULL), rp.grade_urutan, s.nama_lengkap
     `, lamaParams)
 
-    kandidatLama = santriLama.map((s: any) => ({
-      santri_id: s.santri_id,
-      nama: s.nama_lengkap,
-      nis: s.nis,
-      sumber: 'lama' as const,
-      grade: normalizeGrade(s.grade_lanjutan),
-      asal: s.nama_kelas,
-      jenis_kelamin: s.jenis_kelamin,
-      urutan: s.grade_urutan ?? null,
-      riwayat_lama_id: s.riwayat_lama_id,
-    }))
+    kandidatLama = santriLama
+      .filter((s: any) => getJenjangPenempatan(s.kategori_santri, s.sekolah) === jenjang)
+      .map((s: any) => {
+        const jenjangSantri = getJenjangPenempatan(s.kategori_santri, s.sekolah)
+        return {
+          santri_id: s.santri_id,
+          nama: s.nama_lengkap,
+          nis: s.nis,
+          sumber: 'lama' as const,
+          grade: normalizeGrade(s.grade_lanjutan),
+          asal: s.nama_kelas,
+          jenis_kelamin: s.jenis_kelamin,
+          sekolah: s.sekolah,
+          kategori_santri: s.kategori_santri,
+          jenjang: jenjangSantri,
+          urutan: s.grade_urutan ?? null,
+          riwayat_lama_id: s.riwayat_lama_id,
+        }
+      })
   }
 
   return [...kandidatBaru, ...kandidatLama]

@@ -1,7 +1,7 @@
 'use server'
 
 import { query, execute, batch } from '@/lib/db'
-import { getCachedMapelAll } from '@/lib/cache/master'
+import { getCachedMapelAll, getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
@@ -9,6 +9,75 @@ import { normalizeGrade, gradeLabel, type Grade } from '@/lib/akademik/grade'
 import { revalidatePath } from 'next/cache'
 
 const FITUR_HREF = '/dashboard/akademik/grading'
+
+function naturalCompare(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+export async function getMarhalahList() {
+  return getCachedMarhalahList()
+}
+
+export type GradingKelasStat = {
+  kelas_id: string
+  nama_kelas: string
+  total_santri: number
+  grade_a: number
+  grade_b: number
+  grade_c: number
+  sudah_grading: number
+  belum_grading: number
+}
+
+export async function getStatistikGradingMarhalah(marhalahId: string): Promise<GradingKelasStat[]> {
+  if (!marhalahId) return []
+
+  const rows = await query<any>(`
+    SELECT
+      k.id AS kelas_id,
+      k.nama_kelas,
+      COUNT(rp.id) AS total_santri,
+      COALESCE(SUM(CASE
+        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'A'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE A%'
+        THEN 1 ELSE 0 END), 0) AS grade_a,
+      COALESCE(SUM(CASE
+        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'B'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE B%'
+        THEN 1 ELSE 0 END), 0) AS grade_b,
+      COALESCE(SUM(CASE
+        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'C'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE C%'
+        THEN 1 ELSE 0 END), 0) AS grade_c
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    LEFT JOIN riwayat_pendidikan rp
+      ON rp.kelas_id = k.id
+     AND rp.status_riwayat = 'aktif'
+    WHERE k.marhalah_id = ?
+    GROUP BY k.id, k.nama_kelas
+  `, [marhalahId])
+
+  return rows
+    .map((row: any) => {
+      const gradeA = Number(row.grade_a || 0)
+      const gradeB = Number(row.grade_b || 0)
+      const gradeC = Number(row.grade_c || 0)
+      const total = Number(row.total_santri || 0)
+      const sudah = gradeA + gradeB + gradeC
+      return {
+        kelas_id: row.kelas_id,
+        nama_kelas: row.nama_kelas,
+        total_santri: total,
+        grade_a: gradeA,
+        grade_b: gradeB,
+        grade_c: gradeC,
+        sudah_grading: sudah,
+        belum_grading: Math.max(total - sudah, 0),
+      }
+    })
+    .sort((a, b) => naturalCompare(a.nama_kelas, b.nama_kelas))
+}
 
 export async function getKelasList() {
   const session = await getSession()

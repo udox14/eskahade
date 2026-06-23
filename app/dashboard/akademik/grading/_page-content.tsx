@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect, useRef } from 'react'
-import { getKelasList, getDataGrading, simpanGradingBatch, getGradingSekpen, setGradeSantri, setGradeBanyak, simpanUrutanGrade, type GradingSekpenItem } from './actions'
-import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet, Check, X, LayoutGrid, List as ListIcon, ChevronDown, ChevronUp, GripVertical, CornerDownLeft } from 'lucide-react'
+import { getKelasList, getDataGrading, simpanGradingBatch, getGradingSekpen, setGradeSantri, setGradeBanyak, simpanUrutanGrade, getMarhalahList, getStatistikGradingMarhalah, type GradingSekpenItem, type GradingKelasStat } from './actions'
+import { Loader2, Save, Filter, BookOpen, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, Download, UploadCloud, FileSpreadsheet, Check, X, LayoutGrid, List as ListIcon, ChevronDown, ChevronUp, GripVertical, CornerDownLeft, BarChart3 } from 'lucide-react'
 import { type Grade } from '@/lib/akademik/grade'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -101,7 +101,32 @@ function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}
     }))
   }
 
-  // 4. Handler Simpan Batch
+  const saveGradingPayload = async (
+    payload: { riwayat_id: string; grade: string }[],
+    successMessage: string,
+    nextGradeById: Record<string, string>,
+  ) => {
+    setIsSaving(true)
+    try {
+      await simpanGradingBatch(payload)
+
+      setToastMsg(successMessage)
+      setTimeout(() => setToastMsg(""), 4000)
+
+      setDataGrading(prev => prev.map(item => (
+        nextGradeById[item.riwayat_id]
+          ? { ...item, grade_final: nextGradeById[item.riwayat_id] }
+          : item
+      )))
+      setPendingChanges({})
+    } catch (error) {
+      alert("Terjadi kesalahan saat menyimpan data.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 4. Handler Simpan Draft Perubahan
   const handleSimpanBatch = async () => {
     const totalChanges = Object.keys(pendingChanges).length
     if (totalChanges === 0) {
@@ -117,24 +142,28 @@ function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}
         grade: grade as string
       }))
 
-      await simpanGradingBatch(payload)
-      
-      setToastMsg(`Berhasil menyimpan ${totalChanges} grading!`)
-      setTimeout(() => setToastMsg(""), 4000)
-      
-      setDataGrading(prev => prev.map(item => {
-        if (pendingChanges[item.riwayat_id]) {
-          return { ...item, grade_final: pendingChanges[item.riwayat_id] }
-        }
-        return item
-      }))
-      setPendingChanges({})
-
+      await saveGradingPayload(payload, `Berhasil menyimpan ${totalChanges} grading!`, pendingChanges)
     } catch (error) {
-      alert("Terjadi kesalahan saat menyimpan data.")
-    } finally {
-      setIsSaving(false)
+      alert("Terjadi kesalahan saat menyiapkan data.")
     }
+  }
+
+  // Simpan semua keputusan final yang sedang tampil, termasuk rekomendasi yang belum pernah diubah.
+  const handleTerapkanSemua = async () => {
+    if (dataGrading.length === 0) return alert("Belum ada data santri untuk disimpan.")
+    if (!await confirm(`Terapkan dan simpan keputusan grading untuk semua ${dataGrading.length} santri di kelas ini?`)) return
+
+    const nextGradeById: Record<string, string> = {}
+    const payload = dataGrading.map(item => {
+      const grade = getDisplayGrade(item.riwayat_id, item.grade_final)
+      nextGradeById[item.riwayat_id] = grade
+      return {
+        riwayat_id: item.riwayat_id,
+        grade,
+      }
+    })
+
+    await saveGradingPayload(payload, `Berhasil menerapkan ${payload.length} grading!`, nextGradeById)
   }
 
   // --- EXCEL INTEGRATION ---
@@ -293,6 +322,20 @@ function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}
                     <li><b>Grade C:</b> Rata-rata &lt; 50</li>
                   </ul>
                </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-center gap-2 shrink-0 shadow-sm">
+              <button
+                onClick={handleTerapkanSemua}
+                disabled={isSaving || dataGrading.length === 0}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-black transition-colors disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Terapkan Semua
+              </button>
+              <p className="max-w-[220px] text-[11px] font-medium leading-snug text-slate-400">
+                Simpan semua keputusan final yang tampil, termasuk yang sama dengan rekomendasi.
+              </p>
             </div>
 
             {/* Excel Actions */}
@@ -521,11 +564,31 @@ const GRADE_COLS: { key: Grade; label: string; head: string; chip: string }[] = 
   { key: 'C', label: 'Grade C', head: 'bg-orange-50 text-orange-800 border-orange-200', chip: 'bg-orange-100 text-orange-800 border-orange-200' },
 ]
 
+function gradingStatusClass(row: GradingKelasStat) {
+  if (row.total_santri === 0) return 'bg-slate-100 text-slate-500 border-slate-200'
+  if (row.belum_grading === 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (row.sudah_grading > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
+  return 'bg-rose-50 text-rose-700 border-rose-200'
+}
+
+function gradingStatusLabel(row: GradingKelasStat) {
+  if (row.total_santri === 0) return 'Kosong'
+  if (row.belum_grading === 0) return 'Selesai'
+  if (row.sudah_grading > 0) return 'Sebagian'
+  return 'Belum'
+}
+
 function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
   const [kelasList, setKelasList] = useState<any[]>([])
+  const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [selectedKelas, setSelectedKelas] = useState('')
   const [items, setItems] = useState<GradingSekpenItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [statOpen, setStatOpen] = useState(false)
+  const [selectedStatMarhalah, setSelectedStatMarhalah] = useState('')
+  const [statRows, setStatRows] = useState<GradingKelasStat[]>([])
+  const [statLoading, setStatLoading] = useState(false)
+  const [statDirty, setStatDirty] = useState(false)
   // riwayat_id -> status simpan per-item
   const [rowStatus, setRowStatus] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
   // accordion pool "belum ada grade" (default terlipat — utamakan kolom)
@@ -534,11 +597,12 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
   const [dragId, setDragId] = useState<string | null>(null)
 
   useEffect(() => {
-    getKelasList().then(res => {
+    Promise.all([getKelasList(), getMarhalahList()]).then(([res, marhalah]) => {
       const sorted = res.sort((a: any, b: any) =>
         a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
       )
       setKelasList(sorted)
+      setMarhalahList(marhalah || [])
     })
   }, [])
 
@@ -561,6 +625,38 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
       if (ua !== ub) return ua - ub
       return a.nama.localeCompare(b.nama, undefined, { sensitivity: 'base' })
     })
+
+  const loadStatistik = async (marhalahId: string) => {
+    setSelectedStatMarhalah(marhalahId)
+    setStatOpen(true)
+    setStatLoading(true)
+    setStatDirty(false)
+    try {
+      const rows = await getStatistikGradingMarhalah(marhalahId)
+      setStatRows(rows)
+    } catch {
+      alert('Gagal memuat statistik grading.')
+      setStatRows([])
+    } finally {
+      setStatLoading(false)
+    }
+  }
+
+  const markStatsDirty = () => {
+    if (selectedStatMarhalah) setStatDirty(true)
+  }
+
+  const statTotals = statRows.reduce((acc, row) => ({
+    total: acc.total + row.total_santri,
+    a: acc.a + row.grade_a,
+    b: acc.b + row.grade_b,
+    c: acc.c + row.grade_c,
+    sudah: acc.sudah + row.sudah_grading,
+    belum: acc.belum + row.belum_grading,
+    selesai: acc.selesai + (row.total_santri > 0 && row.belum_grading === 0 ? 1 : 0),
+  }), { total: 0, a: 0, b: 0, c: 0, sudah: 0, belum: 0, selesai: 0 })
+
+  const selectedStatName = marhalahList.find(m => String(m.id) === String(selectedStatMarhalah))?.nama || 'Pilih marhalah'
 
   // Simpan grade satu santri seketika; update state lokal optimistik + indikator.
   const assign = async (riwayatId: string, grade: Grade | null) => {
@@ -589,6 +685,7 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
           return
         }
       }
+      markStatsDirty()
       setRowStatus(s => ({ ...s, [riwayatId]: 'saved' }))
       setTimeout(() => setRowStatus(s => { const c = { ...s }; delete c[riwayatId]; return c }), 1500)
     } catch {
@@ -616,7 +713,9 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
     if (orderRes?.error) {
       alert(orderRes.error)
       getGradingSekpen(selectedKelas).then(setItems)
+      return
     }
+    markStatsDirty()
   }
 
   // Drag ala kanban: drop ke kolom grade (targetId=chip tujuan, atau null=akhir kolom).
@@ -657,6 +756,7 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
       }
       setRowStatus(s => ({ ...s, [id]: 'saved' }))
       setTimeout(() => setRowStatus(s => { const c = { ...s }; delete c[id]; return c }), 1500)
+      markStatsDirty()
     }
     const orderRes = await simpanUrutanGrade(colIds)
     if (orderRes?.error) {
@@ -704,6 +804,118 @@ function GradingSekpenView({ toggle }: { toggle?: React.ReactNode } = {}) {
           </select>
         </div>
         {toggle}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => setStatOpen(o => !o)}
+          className="w-full flex items-center gap-2 px-5 py-3 text-left hover:bg-slate-50"
+        >
+          <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span className="text-sm font-bold text-slate-700">Statistik Grading</span>
+          <span className="text-xs text-slate-400 hidden sm:inline">- pilih marhalah untuk memuat rekap kelas</span>
+          {statDirty && (
+            <span className="ml-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase text-amber-700">
+              Perlu muat ulang
+            </span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${statOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {statOpen && (
+          <div className="border-t border-slate-100 px-5 pb-5 pt-4 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {marhalahList.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => loadStatistik(String(m.id))}
+                  disabled={statLoading && String(m.id) === String(selectedStatMarhalah)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-black transition-colors ${
+                    String(selectedStatMarhalah) === String(m.id)
+                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'
+                  }`}
+                >
+                  {statLoading && String(m.id) === String(selectedStatMarhalah) ? (
+                    <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.nama}</span>
+                  ) : m.nama}
+                </button>
+              ))}
+            </div>
+
+            {!selectedStatMarhalah ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
+                <p className="text-sm font-bold text-slate-500">Pilih marhalah untuk melihat statistik.</p>
+                <p className="mt-1 text-xs text-slate-400">Data kelas lain belum dimuat sampai tombolnya dipilih.</p>
+              </div>
+            ) : statLoading ? (
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-100 py-8 text-sm font-bold text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                Memuat statistik {selectedStatName}...
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-black uppercase text-slate-500">{selectedStatName}</span>
+                  <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{statRows.length} kelas</span>
+                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{statTotals.selesai} selesai</span>
+                  <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{statTotals.total} santri</span>
+                  <span className="rounded-lg bg-green-50 px-2.5 py-1 text-xs font-bold text-green-700">A {statTotals.a}</span>
+                  <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">B {statTotals.b}</span>
+                  <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700">C {statTotals.c}</span>
+                  <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Belum {statTotals.belum}</span>
+                  {statDirty && (
+                    <button
+                      onClick={() => loadStatistik(selectedStatMarhalah)}
+                      className="ml-auto rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700 hover:bg-amber-100"
+                    >
+                      Muat ulang
+                    </button>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full min-w-[720px] text-left text-sm">
+                    <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Kelas</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Total</th>
+                        <th className="px-4 py-3 text-center">A</th>
+                        <th className="px-4 py-3 text-center">B</th>
+                        <th className="px-4 py-3 text-center">C</th>
+                        <th className="px-4 py-3 text-center">Sudah</th>
+                        <th className="px-4 py-3 text-center">Belum</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {statRows.map(row => (
+                        <tr key={row.kelas_id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-bold text-slate-800">{row.nama_kelas}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${gradingStatusClass(row)}`}>
+                              {gradingStatusLabel(row)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-700">{row.total_santri}</td>
+                          <td className="px-4 py-3 text-center font-black text-green-700">{row.grade_a}</td>
+                          <td className="px-4 py-3 text-center font-black text-blue-700">{row.grade_b}</td>
+                          <td className="px-4 py-3 text-center font-black text-orange-700">{row.grade_c}</td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-700">{row.sudah_grading}</td>
+                          <td className={`px-4 py-3 text-center font-black ${row.belum_grading > 0 ? 'text-amber-700' : 'text-slate-300'}`}>{row.belum_grading}</td>
+                        </tr>
+                      ))}
+                      {statRows.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-8 text-center text-sm font-bold text-slate-400">Tidak ada kelas di marhalah ini.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {!selectedKelas ? (
