@@ -9,8 +9,8 @@ import { type Grade } from '@/lib/akademik/grade'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
-// Wrapper: sekpen/admin dapat view 3 kolom (default), bisa beralih ke tabel klasik.
-// Wali kelas tetap pakai tabel klasik (dropdown + veto + batch save).
+// Wrapper: sekpen/admin dapat view Kanban (default), bisa beralih ke Auto berbasis nilai rapor.
+// Wali kelas tetap pakai Auto (dropdown + veto + batch save).
 export default function GradingPage({ isSekpen = false }: { isSekpen?: boolean }) {
   const [view, setView] = useState<'kolom' | 'tabel'>(isSekpen ? 'kolom' : 'tabel')
 
@@ -22,13 +22,13 @@ export default function GradingPage({ isSekpen = false }: { isSekpen?: boolean }
         onClick={() => setView('kolom')}
         className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'kolom' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
       >
-        <LayoutGrid className="w-4 h-4" /> 3 Kolom
+        <LayoutGrid className="w-4 h-4" /> Kanban
       </button>
       <button
         onClick={() => setView('tabel')}
         className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${view === 'tabel' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
       >
-        <ListIcon className="w-4 h-4" /> Tabel
+        <ListIcon className="w-4 h-4" /> Auto
       </button>
     </div>
   )
@@ -270,7 +270,7 @@ function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}
       {/* HEADER */}
       <DashboardPageHeader
         title="Grading"
-        description="Sistem rekomendasi penentuan grade Nahwu dan Sharaf (A/B/C)."
+        description="Auto rekomendasi grade Nahwu dan Sharaf (A/B/C) dari nilai rapor."
       />
 
       {/* FILTER KELAS */}
@@ -317,8 +317,8 @@ function GradingWaliView({ headerExtra }: { headerExtra?: React.ReactNode } = {}
                <div className="text-sm text-indigo-900">
                   <p className="font-bold mb-1">Panduan Grading Otomatis:</p>
                   <ul className="list-disc pl-4 space-y-0.5 text-indigo-800/80">
-                    <li><b>Grade A:</b> Rata-rata $\ge$ 70</li>
-                    <li><b>Grade B:</b> 50 $\le$ Rata-rata &lt; 70</li>
+                    <li><b>Grade A:</b> Rata-rata &ge; 70</li>
+                    <li><b>Grade B:</b> 50 &le; Rata-rata &lt; 70</li>
                     <li><b>Grade C:</b> Rata-rata &lt; 50</li>
                   </ul>
                </div>

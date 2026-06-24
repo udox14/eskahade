@@ -65,6 +65,7 @@ export async function getKelasUntukMarhalah(marhalahId: string, jenisKelamin?: s
   const data = await query<KelasTujuan>(`
     SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin,
            (SELECT COUNT(*) FROM riwayat_pendidikan rp
+            JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
             WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif') AS jumlah
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1

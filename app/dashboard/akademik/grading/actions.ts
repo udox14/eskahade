@@ -36,24 +36,30 @@ export async function getStatistikGradingMarhalah(marhalahId: string): Promise<G
     SELECT
       k.id AS kelas_id,
       k.nama_kelas,
-      COUNT(rp.id) AS total_santri,
+      COUNT(s.id) AS total_santri,
       COALESCE(SUM(CASE
-        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'A'
-          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE A%'
+        WHEN s.id IS NOT NULL
+         AND (UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'A'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE A%')
         THEN 1 ELSE 0 END), 0) AS grade_a,
       COALESCE(SUM(CASE
-        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'B'
-          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE B%'
+        WHEN s.id IS NOT NULL
+         AND (UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'B'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE B%')
         THEN 1 ELSE 0 END), 0) AS grade_b,
       COALESCE(SUM(CASE
-        WHEN UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'C'
-          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE C%'
+        WHEN s.id IS NOT NULL
+         AND (UPPER(TRIM(COALESCE(rp.grade_lanjutan, ''))) = 'C'
+          OR UPPER(COALESCE(rp.grade_lanjutan, '')) LIKE '%GRADE C%')
         THEN 1 ELSE 0 END), 0) AS grade_c
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     LEFT JOIN riwayat_pendidikan rp
       ON rp.kelas_id = k.id
      AND rp.status_riwayat = 'aktif'
+    LEFT JOIN santri s
+      ON s.id = rp.santri_id
+     AND s.status_global = 'aktif'
     WHERE k.marhalah_id = ?
     GROUP BY k.id, k.nama_kelas
   `, [marhalahId])
@@ -107,6 +113,7 @@ export async function getDataGrading(kelasId: string) {
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+      AND s.status_global = 'aktif'
     ORDER BY s.nama_lengkap
   `, [kelasId])
 
@@ -184,6 +191,7 @@ export async function getGradingSekpen(kelasId: string): Promise<GradingSekpenIt
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ? AND rp.status_riwayat = 'aktif'
+      AND s.status_global = 'aktif'
     ORDER BY (rp.grade_urutan IS NULL), rp.grade_urutan, s.nama_lengkap
   `, [kelasId])
 
