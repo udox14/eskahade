@@ -1,10 +1,20 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { useReactToPrint } from '@/lib/pdf/client'
 import type { RekapAsramaPayload } from './actions'
+
+export type RekapOrientation = 'portrait' | 'landscape'
+
+const MM_TO_PX = 96 / 25.4
+const PAGE_MARGIN_MM = 10
+// Kertas F4 215mm x 330mm
+const PAGE_DIMS: Record<RekapOrientation, { w: number; h: number }> = {
+  landscape: { w: 330, h: 215 },
+  portrait: { w: 215, h: 330 },
+}
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('id-ID').format(value)
@@ -23,23 +33,33 @@ function safeDate(value: string | null) {
 
 export default function RekapAsramaDownload({
   payload,
+  orientation,
   onDone,
 }: {
   payload: RekapAsramaPayload | null
+  orientation: RekapOrientation
   onDone: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  const [ready, setReady] = useState(false)
+
+  const dims = PAGE_DIMS[orientation]
+  const availW = dims.w - PAGE_MARGIN_MM * 2
+  const availH = dims.h - PAGE_MARGIN_MM * 2
+
   const title = payload
     ? `Rekap_Setoran_SPP_${payload.meta.nama_asrama}_${payload.meta.nama_bulan}_${payload.meta.tahun}`
     : 'Rekap_Setoran_SPP'
 
   const handlePrint = useReactToPrint({
-    contentRef: ref,
+    contentRef: pageRef,
     documentTitle: title,
     onAfterPrint: onDone,
     onPrintError: onDone,
     pageStyle: `
-      @page { size: 330mm 215mm; margin: 12.7mm; }
+      @page { size: ${dims.w}mm ${dims.h}mm; margin: ${PAGE_MARGIN_MM}mm; }
       @media print {
         html, body {
           background: white !important;
@@ -50,18 +70,44 @@ export default function RekapAsramaDownload({
     `,
   })
 
+  // Ukur tinggi natural lalu hitung skala agar muat 1 halaman.
+  useLayoutEffect(() => {
+    if (!payload) { setReady(false); setScale(1); return }
+    setReady(false)
+    setScale(1)
+    const raf = requestAnimationFrame(() => {
+      const natH = innerRef.current?.scrollHeight ?? 0
+      const availHpx = availH * MM_TO_PX
+      const s = natH > 0 ? Math.min(1, availHpx / natH) : 1
+      setScale(s)
+      setReady(true)
+    })
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payload, orientation])
+
   useEffect(() => {
-    if (!payload) return
+    if (!payload || !ready) return
     const t = window.setTimeout(() => { void handlePrint() }, 80)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload])
+  }, [payload, ready])
 
   if (!payload) return null
 
   return (
     <div className="absolute left-[-99999px] top-0">
-      <RekapAsramaSheet ref={ref} payload={payload} />
+      <div
+        ref={pageRef}
+        style={{ width: `${availW}mm`, height: `${availH}mm`, overflow: 'hidden', background: '#fff' }}
+      >
+        <div
+          ref={innerRef}
+          style={{ width: `${availW}mm`, transformOrigin: 'top left', transform: `scale(${scale})` }}
+        >
+          <RekapAsramaSheet payload={payload} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -75,7 +121,7 @@ const RekapAsramaSheet = React.forwardRef<HTMLDivElement, { payload: RekapAsrama
         <style
           dangerouslySetInnerHTML={{
             __html: `
-              .rekap-asrama-print { width: 304mm; padding: 0; color: #111827; background: #fff; font-family: "Arial","Helvetica",sans-serif; }
+              .rekap-asrama-print { width: 100%; padding: 0; color: #111827; background: #fff; font-family: "Arial","Helvetica",sans-serif; }
               .rekap-asrama-print * { box-sizing: border-box; }
               .rekap-asrama-print .title { text-align: center; }
               .rekap-asrama-print .title h1 { font-size: 16px; font-weight: 800; text-transform: uppercase; margin: 0; letter-spacing: .04em; }

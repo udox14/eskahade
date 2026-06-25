@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow, getRekapAsramaSnapshot, type RekapAsramaPayload } from './actions'
+import type { RekapOrientation } from './_rekap-asrama-print'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
@@ -68,6 +69,8 @@ export default function MonitoringSetoranPage() {
   const [filterAsrama, setFilterAsrama] = useState('SEMUA')
   const [rekapPayload, setRekapPayload] = useState<RekapAsramaPayload | null>(null)
   const [rekapLoading, setRekapLoading] = useState<string | null>(null)
+  const [rekapModalUnit, setRekapModalUnit] = useState<string | null>(null)
+  const [rekapOrientation, setRekapOrientation] = useState<RekapOrientation>('landscape')
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -384,6 +387,7 @@ export default function MonitoringSetoranPage() {
       const res = await getRekapAsramaSnapshot(unit, tahun, bulan)
       if ('error' in res) { toast.error(res.error); return }
       setRekapPayload(res.payload)
+      setRekapModalUnit(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal membuat laporan rekap.')
     } finally {
@@ -482,7 +486,45 @@ export default function MonitoringSetoranPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-2 md:p-3 max-w-[100vw] overflow-hidden text-slate-800">
 
-      <RekapAsramaDownload payload={rekapPayload} onDone={() => setRekapPayload(null)} />
+      <RekapAsramaDownload payload={rekapPayload} orientation={rekapOrientation} onDone={() => setRekapPayload(null)} />
+
+      {rekapModalUnit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!rekapLoading) setRekapModalUnit(null) }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Download Rekap PDF</h3>
+                <p className="mt-0.5 text-xs text-slate-500">{rekapModalUnit} — {BULAN_NAMA[bulan]} {tahun}</p>
+              </div>
+              <button onClick={() => { if (!rekapLoading) setRekapModalUnit(null) }} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+
+            <label className="mt-4 block text-[11px] font-bold uppercase tracking-wider text-slate-400">Orientasi Kertas (F4)</label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(['landscape', 'portrait'] as const).map(o => (
+                <button
+                  key={o}
+                  onClick={() => setRekapOrientation(o)}
+                  className={`rounded-lg border px-3 py-3 text-sm font-semibold transition-colors ${rekapOrientation === o ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <div className={`mx-auto mb-1.5 rounded-sm border-2 ${rekapOrientation === o ? 'border-emerald-500' : 'border-slate-300'} ${o === 'landscape' ? 'h-6 w-8' : 'h-8 w-6'}`}></div>
+                  {o === 'landscape' ? 'Landscape' : 'Portrait'}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">Tabel & font otomatis menyesuaikan agar muat dalam satu lembar.</p>
+
+            <button
+              onClick={() => handleDownloadRekap(rekapModalUnit)}
+              disabled={rekapLoading === rekapModalUnit}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {rekapLoading === rekapModalUnit ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
+              Download PDF
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="mb-3">
@@ -671,9 +713,9 @@ export default function MonitoringSetoranPage() {
                           <div className="inline-flex items-center gap-1">
                             {row.tanggal_setor && !row.belum_ada_tagihan && !row.is_sadesa && (
                               <button
-                                onClick={() => handleDownloadRekap(row.unit_setor)}
+                                onClick={() => setRekapModalUnit(row.unit_setor)}
                                 disabled={rekapLoading === row.unit_setor}
-                                title="Download Rekap PDF (F4 landscape)"
+                                title="Download Rekap PDF (F4)"
                                 className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors disabled:opacity-50"
                               >
                                 {rekapLoading === row.unit_setor
