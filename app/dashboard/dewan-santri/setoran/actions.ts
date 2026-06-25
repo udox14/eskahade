@@ -5,6 +5,7 @@ import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { BULAN_SPP } from '@/lib/spp/tunggakan'
 
 const EXCLUDE_NON_SPP_ASRAMA_SQL = "AND UPPER(TRIM(COALESCE(asrama, ''))) <> 'AL-BAGHORY'"
 
@@ -469,6 +470,7 @@ export async function getDaftarBebasSpp(unitSetor?: string) {
     sekolah: string | null
     kelas_sekolah: string | null
     kelas_pesantren: string | null
+    tempat_makan: string | null
     unit_setor: string
   }>(`
     SELECT
@@ -481,12 +483,18 @@ export async function getDaftarBebasSpp(unitSetor?: string) {
       COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
       COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
       CASE
+        WHEN s.tempat_makan_id IS NULL THEN 'Belum diatur'
+        WHEN mj.id IS NULL THEN 'Penyedia terhapus'
+        ELSE mj.nama_jasa
+      END AS tempat_makan,
+      CASE
         WHEN s.kategori_santri = ? THEN ?
         ELSE COALESCE(s.asrama, 'LAINNYA')
       END AS unit_setor
     FROM santri s
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN kelas k ON k.id = rp.kelas_id
+    LEFT JOIN master_jasa mj ON mj.id = s.tempat_makan_id
     WHERE s.status_global = 'aktif'
       AND s.bebas_spp = 1
       ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
@@ -688,5 +696,348 @@ export async function getPenunggakExportData(
   })
 
   return result
+}
+
+// ===========================================================================
+// REKAP SETORAN KEUANGAN SPP ASRAMA — laporan per-asrama (PDF F4 landscape)
+// Snapshot-cached: cetak ulang baca payload tersimpan selama data tak berubah.
+// ===========================================================================
+
+export type RekapAsramaPayload = {
+  meta: {
+    unit_setor: string
+    nama_asrama: string
+    tahun: number
+    bulan: number
+    nama_bulan: string
+    tahun_ajaran_nama: string | null
+    tarif: number
+    generated_at: string
+  }
+  penduduk_kamar: { nomor_kamar: string; jumlah: number }[]
+  digratiskan: { nama: string; kamar: string | null; ket: string }[]
+  penunggak: { nama: string; kamar: string | null; tunggakan_label: string }[]
+  mutasi: { nama: string; kamar: string | null; ket: string }[]
+  ringkasan: {
+    jumlah_penduduk: number
+    jml_gratis: number
+    jml_wajib_bayar: number
+    jml_penunggak: number
+    jml_bayar: number
+    tarif: number
+    total: number
+    bayar_tunggakan_bln_lalu: number
+    tanggal_stor: string | null
+    nama_penyetor: string | null
+  }
+}
+
+type SetoranGateRow = {
+  status: string | null
+  tanggal_terima: string | null
+  nama_penyetor: string | null
+  jumlah_aktual: number | null
+  orang_tunggakan: number | null
+}
+
+function tunggakanRangeLabel(months: { tahun: number; bulan: number }[], tahunLaporan: number): string {
+  if (months.length === 0) return '-'
+  const sorted = [...months].sort((a, b) => (a.tahun * 100 + a.bulan) - (b.tahun * 100 + b.bulan))
+  const fmt = (m: { tahun: number; bulan: number }) => {
+    const nama = BULAN_SPP[m.bulan - 1] ?? `Bulan ${m.bulan}`
+    return m.tahun === tahunLaporan ? nama : `${nama} ${m.tahun}`
+  }
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  if (sorted.length === 1) return fmt(first)
+  return `${fmt(first)} - ${fmt(last)}`
+}
+
+async function buildRekapAsramaPayload(
+  unitSetor: string,
+  tahun: number,
+  bulan: number,
+  setoran: SetoranGateRow | null,
+  generatedAt: string
+): Promise<RekapAsramaPayload> {
+  const targetYm = tahun * 100 + bulan
+  const monthStart = `${tahun}-${String(bulan).padStart(2, '0')}-01`
+  const nextMo = bulan === 12 ? 1 : bulan + 1
+  const nextYr = bulan === 12 ? tahun + 1 : tahun
+  const monthEnd = `${nextYr}-${String(nextMo).padStart(2, '0')}-01`
+
+  const settings = await getSppSettings(tahun)
+  const tarif = settings.nominal
+  const billingStart = await getSppBillingStart()
+  const tahunAjaran = await queryOne<{ nama: string }>(
+    `SELECT nama FROM tahun_ajaran WHERE is_active = 1 ORDER BY id DESC LIMIT 1`
+  )
+
+  // --- Penduduk per kamar (fisik, semua santri aktif di asrama) ---
+  const pendudukKamar = await query<{ nomor_kamar: string; jumlah: number }>(
+    `SELECT kamar.nomor_kamar, COUNT(s.id) AS jumlah
+     FROM (
+       SELECT nomor_kamar FROM kamar_config WHERE asrama = ?
+       UNION
+       SELECT TRIM(kamar) AS nomor_kamar
+       FROM santri
+       WHERE status_global = 'aktif' AND asrama = ?
+         AND kamar IS NOT NULL AND TRIM(kamar) <> ''
+     ) kamar
+     LEFT JOIN santri s
+       ON s.asrama = ? AND s.status_global = 'aktif'
+      AND TRIM(COALESCE(s.kamar, '')) = kamar.nomor_kamar
+     GROUP BY kamar.nomor_kamar
+     ORDER BY CAST(kamar.nomor_kamar AS INTEGER), kamar.nomor_kamar`,
+    [unitSetor, unitSetor, unitSetor]
+  )
+
+  // --- Daftar santri aktif (untuk hitung penduduk, gratis, penunggak) ---
+  const santriList = await query<{ id: string; nama_lengkap: string; kamar: string | null; bebas_spp: number }>(
+    `SELECT id, nama_lengkap, kamar, COALESCE(bebas_spp, 0) AS bebas_spp
+     FROM santri
+     WHERE status_global = 'aktif' AND asrama = ?`,
+    [unitSetor]
+  )
+  const jumlahPenduduk = santriList.length
+
+  // --- Tagihan ditiadakan bulan ini (non bebas) ---
+  const ditiadakanRows = await query<{ santri_id: string; nama_lengkap: string; kamar: string | null }>(
+    `SELECT d.santri_id, s.nama_lengkap, s.kamar
+     FROM spp_tagihan_ditiadakan d
+     JOIN santri s ON s.id = d.santri_id
+     WHERE d.is_active = 1 AND d.tahun = ? AND d.bulan = ?
+       AND s.status_global = 'aktif' AND s.asrama = ? AND COALESCE(s.bebas_spp, 0) = 0`,
+    [tahun, bulan, unitSetor]
+  )
+  const ditiadakanSet = new Set(ditiadakanRows.map(r => r.santri_id))
+
+  // --- Daftar digratiskan = bebas_spp (KET Bebas) + ditiadakan bulan ini (KET Ditiadakan) ---
+  const digratiskan: RekapAsramaPayload['digratiskan'] = [
+    ...santriList
+      .filter(s => s.bebas_spp === 1)
+      .map(s => ({ nama: s.nama_lengkap, kamar: s.kamar, ket: 'Bebas' })),
+    ...ditiadakanRows.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Ditiadakan' })),
+  ].sort((a, b) => a.nama.localeCompare(b.nama))
+  const jmlGratis = digratiskan.length
+  const jmlWajibBayar = Math.max(0, jumlahPenduduk - jmlGratis)
+
+  // --- Pembayaran, waive, historis (scope asrama) untuk hitung penunggak ---
+  const payments = await query<{ santri_id: string; tahun: number; bulan: number }>(
+    `SELECT sl.santri_id, sl.tahun, sl.bulan
+     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
+     WHERE s.asrama = ? AND s.status_global = 'aktif'
+       AND (sl.tahun * 100 + sl.bulan) <= ?`,
+    [unitSetor, targetYm]
+  )
+  const paymentsMap = new Map<string, Set<number>>()
+  payments.forEach(p => {
+    if (!paymentsMap.has(p.santri_id)) paymentsMap.set(p.santri_id, new Set())
+    paymentsMap.get(p.santri_id)!.add(p.tahun * 100 + p.bulan)
+  })
+
+  const waives = await query<{ santri_id: string; tahun: number; bulan: number }>(
+    `SELECT std.santri_id, std.tahun, std.bulan
+     FROM spp_tagihan_ditiadakan std JOIN santri s ON s.id = std.santri_id
+     WHERE s.asrama = ? AND s.status_global = 'aktif' AND std.is_active = 1
+       AND (std.tahun * 100 + std.bulan) <= ?`,
+    [unitSetor, targetYm]
+  )
+  const waivesMap = new Map<string, Set<number>>()
+  waives.forEach(w => {
+    if (!waivesMap.has(w.santri_id)) waivesMap.set(w.santri_id, new Set())
+    waivesMap.get(w.santri_id)!.add(w.tahun * 100 + w.bulan)
+  })
+
+  const historis = await query<{ santri_id: string; tahun: number; bulan: number }>(
+    `SELECT th.santri_id, th.tahun, th.bulan
+     FROM spp_tunggakan_historis th JOIN santri s ON s.id = th.santri_id
+     WHERE s.asrama = ? AND s.status_global = 'aktif' AND th.status = 'BELUM_LUNAS'`,
+    [unitSetor]
+  )
+  const historisMap = new Map<string, { tahun: number; bulan: number }[]>()
+  historis.forEach(h => {
+    if (!historisMap.has(h.santri_id)) historisMap.set(h.santri_id, [])
+    historisMap.get(h.santri_id)!.push({ tahun: h.tahun, bulan: h.bulan })
+  })
+
+  // Bulan tagihan berjalan dari awal tagihan s/d periode laporan
+  const berjalanMonths: { tahun: number; bulan: number }[] = []
+  let curYr = billingStart.tahun
+  let curMo = billingStart.bulan
+  while ((curYr * 100 + curMo) <= targetYm) {
+    berjalanMonths.push({ tahun: curYr, bulan: curMo })
+    curMo++
+    if (curMo > 12) { curMo = 1; curYr++ }
+  }
+
+  // Penunggak = santri wajib bayar yang BELUM bayar bulan ini (selaras rincian stor),
+  // daftar memuat rincian seluruh bulan tunggakannya.
+  const penunggak: RekapAsramaPayload['penunggak'] = []
+  for (const s of santriList) {
+    if (s.bebas_spp === 1) continue
+    if (ditiadakanSet.has(s.id)) continue
+    const paid = paymentsMap.get(s.id) ?? new Set<number>()
+    const waived = waivesMap.get(s.id) ?? new Set<number>()
+    const currentUnpaid = !paid.has(targetYm) && !waived.has(targetYm)
+    if (!currentUnpaid) continue
+    const unpaid: { tahun: number; bulan: number }[] = [...(historisMap.get(s.id) ?? [])]
+    berjalanMonths.forEach(m => {
+      const key = m.tahun * 100 + m.bulan
+      if (!paid.has(key) && !waived.has(key)) unpaid.push(m)
+    })
+    penunggak.push({
+      nama: s.nama_lengkap,
+      kamar: s.kamar,
+      tunggakan_label: tunggakanRangeLabel(unpaid, tahun),
+    })
+  }
+  penunggak.sort((a, b) => a.nama.localeCompare(b.nama))
+  const jmlPenunggak = penunggak.length
+  const jmlBayar = Math.max(0, jmlWajibBayar - jmlPenunggak)
+
+  // --- Mutasi: santri keluar bulan ini ---
+  const mutasiRows = await query<{ nama_lengkap: string; kamar: string | null }>(
+    `SELECT nama_lengkap, kamar
+     FROM santri
+     WHERE asrama = ? AND status_global = 'keluar'
+       AND tanggal_keluar IS NOT NULL
+       AND tanggal_keluar >= ? AND tanggal_keluar < ?
+     ORDER BY nama_lengkap ASC`,
+    [unitSetor, monthStart, monthEnd]
+  )
+  const mutasi = mutasiRows.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Keluar' }))
+
+  return {
+    meta: {
+      unit_setor: unitSetor,
+      nama_asrama: unitSetor,
+      tahun,
+      bulan,
+      nama_bulan: BULAN_SPP[bulan - 1] ?? `Bulan ${bulan}`,
+      tahun_ajaran_nama: tahunAjaran?.nama ?? null,
+      tarif,
+      generated_at: generatedAt,
+    },
+    penduduk_kamar: pendudukKamar,
+    digratiskan,
+    penunggak,
+    mutasi,
+    ringkasan: {
+      jumlah_penduduk: jumlahPenduduk,
+      jml_gratis: jmlGratis,
+      jml_wajib_bayar: jmlWajibBayar,
+      jml_penunggak: jmlPenunggak,
+      jml_bayar: jmlBayar,
+      tarif,
+      total: jmlBayar * tarif,
+      bayar_tunggakan_bln_lalu: setoran?.orang_tunggakan ?? 0,
+      tanggal_stor: setoran?.tanggal_terima ?? null,
+      nama_penyetor: setoran?.nama_penyetor ?? null,
+    },
+  }
+}
+
+async function computeRekapSignature(
+  unitSetor: string,
+  tahun: number,
+  bulan: number,
+  setoran: SetoranGateRow | null
+): Promise<string> {
+  const targetYm = tahun * 100 + bulan
+  const settings = await getSppSettings(tahun)
+  const billingStart = await getSppBillingStart()
+
+  const santriSig = await queryOne<{ c: number; m: string | null }>(
+    `SELECT COUNT(*) AS c, MAX(updated_at) AS m
+     FROM santri WHERE asrama = ? AND status_global IN ('aktif','keluar')`,
+    [unitSetor]
+  )
+  const logSig = await queryOne<{ c: number; m: string | null }>(
+    `SELECT COUNT(*) AS c, MAX(sl.tanggal_bayar) AS m
+     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
+     WHERE s.asrama = ? AND (sl.tahun * 100 + sl.bulan) <= ?`,
+    [unitSetor, targetYm]
+  )
+  const ditSig = await queryOne<{ c: number; m: string | null }>(
+    `SELECT COUNT(*) AS c, MAX(d.updated_at) AS m
+     FROM spp_tagihan_ditiadakan d JOIN santri s ON s.id = d.santri_id
+     WHERE s.asrama = ? AND d.is_active = 1`,
+    [unitSetor]
+  )
+  const histSig = await queryOne<{ c: number; m: string | null }>(
+    `SELECT COUNT(*) AS c, MAX(h.updated_at) AS m
+     FROM spp_tunggakan_historis h JOIN santri s ON s.id = h.santri_id
+     WHERE s.asrama = ?`,
+    [unitSetor]
+  )
+
+  return [
+    `tarif:${settings.nominal}`,
+    `start:${billingStart.value}`,
+    `santri:${santriSig?.c ?? 0}/${santriSig?.m ?? ''}`,
+    `log:${logSig?.c ?? 0}/${logSig?.m ?? ''}`,
+    `dit:${ditSig?.c ?? 0}/${ditSig?.m ?? ''}`,
+    `hist:${histSig?.c ?? 0}/${histSig?.m ?? ''}`,
+    `setor:${setoran?.status ?? ''}|${setoran?.tanggal_terima ?? ''}|${setoran?.nama_penyetor ?? ''}|${setoran?.jumlah_aktual ?? ''}|${setoran?.orang_tunggakan ?? ''}`,
+  ].join(';')
+}
+
+export async function getRekapAsramaSnapshot(
+  unitSetor: string,
+  tahun: number,
+  bulan: number
+): Promise<{ payload: RekapAsramaPayload; cached: boolean } | { error: string }> {
+  const session = await getSession()
+  try {
+    assertMonitoringAccess(session)
+    const cleanUnit = String(unitSetor ?? '').trim().toUpperCase()
+    if (!cleanUnit) return { error: 'Unit setor tidak valid.' }
+    if (isAsramaTanpaKamar(cleanUnit)) {
+      return { error: 'Asrama ini tidak memiliki kewajiban SPP.' }
+    }
+
+    // Gate: setoran harus ada & dikonfirmasi
+    const setoran = await queryOne<SetoranGateRow>(
+      `SELECT status, tanggal_terima, nama_penyetor, jumlah_aktual, orang_tunggakan
+       FROM spp_setoran
+       WHERE tahun = ? AND bulan = ?
+         AND UPPER(TRIM(COALESCE(NULLIF(TRIM(unit_setor), ''), asrama, ''))) = ?
+       LIMIT 1`,
+      [tahun, bulan, cleanUnit]
+    )
+    if (!setoran || setoran.status !== 'dikonfirmasi') {
+      return { error: 'Laporan hanya bisa dicetak setelah setoran dikonfirmasi di Monitoring SPP.' }
+    }
+
+    const signature = await computeRekapSignature(cleanUnit, tahun, bulan, setoran)
+
+    const existing = await queryOne<{ source_signature: string; payload_json: string }>(
+      `SELECT source_signature, payload_json FROM spp_rekap_snapshot
+       WHERE unit_setor = ? AND tahun = ? AND bulan = ?`,
+      [cleanUnit, tahun, bulan]
+    )
+    if (existing && existing.source_signature === signature) {
+      return { payload: JSON.parse(existing.payload_json) as RekapAsramaPayload, cached: true }
+    }
+
+    const generatedAt = new Date().toISOString()
+    const payload = await buildRekapAsramaPayload(cleanUnit, tahun, bulan, setoran, generatedAt)
+
+    await execute(
+      `INSERT INTO spp_rekap_snapshot (unit_setor, tahun, bulan, source_signature, payload_json, generated_by, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(unit_setor, tahun, bulan) DO UPDATE SET
+         source_signature = excluded.source_signature,
+         payload_json     = excluded.payload_json,
+         generated_by     = excluded.generated_by,
+         generated_at     = excluded.generated_at`,
+      [cleanUnit, tahun, bulan, signature, JSON.stringify(payload), session?.id ?? null, generatedAt]
+    )
+
+    return { payload, cached: false }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal membuat laporan rekap.' }
+  }
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow } from './actions'
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow, getRekapAsramaSnapshot, type RekapAsramaPayload } from './actions'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
@@ -46,6 +46,7 @@ type CacheEntry = {
 }
 let _setoranCache: CacheEntry | null = null
 const MonitoringPrintControls = dynamic(() => import('./_print-controls'), { ssr: false })
+const RekapAsramaDownload = dynamic(() => import('./_rekap-asrama-print'), { ssr: false })
 
 export default function MonitoringSetoranPage() {
   const now = new Date()
@@ -65,6 +66,8 @@ export default function MonitoringSetoranPage() {
   const [savingSetoranWindow, setSavingSetoranWindow] = useState(false)
   const [isSetoranWindowModalOpen, setIsSetoranWindowModalOpen] = useState(false)
   const [filterAsrama, setFilterAsrama] = useState('SEMUA')
+  const [rekapPayload, setRekapPayload] = useState<RekapAsramaPayload | null>(null)
+  const [rekapLoading, setRekapLoading] = useState<string | null>(null)
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -258,7 +261,51 @@ export default function MonitoringSetoranPage() {
       setExportingExcel(false)
     }
   }
-  
+
+  const [exportingBebasExcel, setExportingBebasExcel] = useState(false)
+  const handleExportExcelBebas = async () => {
+    if (filteredBebas.length === 0) {
+      toast.error("Tidak ada data bebas SPP untuk diexport.")
+      return
+    }
+    setExportingBebasExcel(true)
+    try {
+      const excelRows = filteredBebas.map((row, idx) => ({
+        'No': idx + 1,
+        'Nama': row.nama_lengkap,
+        'Asrama': row.asrama || '-',
+        'Kamar': row.kamar || '-',
+        'Sekolah': row.sekolah || '-',
+        'Kelas Sekolah': row.kelas_sekolah || '-',
+        'Kelas Pesantren': row.kelas_pesantren || '-',
+        'Tempat Makan / Katering': row.tempat_makan || '-',
+      }))
+
+      const XLSX = await import('xlsx')
+      const worksheet = XLSX.utils.json_to_sheet(excelRows)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Bebas SPP')
+      worksheet['!cols'] = [
+        { wch: 6 },   // No
+        { wch: 30 },  // Nama
+        { wch: 18 },  // Asrama
+        { wch: 10 },  // Kamar
+        { wch: 15 },  // Sekolah
+        { wch: 15 },  // Kelas Sekolah
+        { wch: 18 },  // Kelas Pesantren
+        { wch: 25 },  // Tempat Makan
+      ]
+
+      const asramaSuffix = selectedAsramaBebas === 'SEMUA' ? 'Semua_Asrama' : selectedAsramaBebas.replace(/\s+/g, '_')
+      XLSX.writeFile(workbook, `Bebas_SPP_${asramaSuffix}.xlsx`)
+      toast.success("Data bebas SPP berhasil diexport ke Excel!")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengexport file Excel")
+    } finally {
+      setExportingBebasExcel(false)
+    }
+  }
+
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeRow, setActiveRow] = useState<AsramaRow | null>(null)
@@ -329,6 +376,19 @@ export default function MonitoringSetoranPage() {
   function nextBulan() {
     if (bulan === 12) { setBulan(1); setTahun(t => t + 1) }
     else setBulan(b => b + 1)
+  }
+
+  async function handleDownloadRekap(unit: string) {
+    setRekapLoading(unit)
+    try {
+      const res = await getRekapAsramaSnapshot(unit, tahun, bulan)
+      if ('error' in res) { toast.error(res.error); return }
+      setRekapPayload(res.payload)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gagal membuat laporan rekap.')
+    } finally {
+      setRekapLoading(null)
+    }
   }
 
   function openDetailModal(row: AsramaRow) {
@@ -421,7 +481,9 @@ export default function MonitoringSetoranPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 md:p-3 max-w-[100vw] overflow-hidden text-slate-800">
-      
+
+      <RekapAsramaDownload payload={rekapPayload} onDone={() => setRekapPayload(null)} />
+
       {/* ── Header ── */}
       <div className="mb-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Monitoring SPP</h1>
@@ -606,9 +668,23 @@ export default function MonitoringSetoranPage() {
                           )}
                         </td>
                         <td className="py-3 px-5 text-right">
-                          <button onClick={() => openDetailModal(row)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
-                            <Eye className="w-4 h-4"/>
-                          </button>
+                          <div className="inline-flex items-center gap-1">
+                            {row.tanggal_setor && !row.belum_ada_tagihan && !row.is_sadesa && (
+                              <button
+                                onClick={() => handleDownloadRekap(row.unit_setor)}
+                                disabled={rekapLoading === row.unit_setor}
+                                title="Download Rekap PDF (F4 landscape)"
+                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {rekapLoading === row.unit_setor
+                                  ? <RefreshCw className="w-4 h-4 animate-spin"/>
+                                  : <Download className="w-4 h-4"/>}
+                              </button>
+                            )}
+                            <button onClick={() => openDetailModal(row)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+                              <Eye className="w-4 h-4"/>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -823,8 +899,18 @@ export default function MonitoringSetoranPage() {
             </div>
 
             {selectedAsramaBebas && (
-              <div className="text-right w-full md:w-auto text-xs text-slate-500">
-                Menampilkan <span className="font-bold text-slate-700">{filteredBebas.length}</span> santri bebas SPP
+              <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                <div className="text-right text-xs text-slate-500">
+                  Menampilkan <span className="font-bold text-slate-700">{filteredBebas.length}</span> santri bebas SPP
+                </div>
+                <button
+                  onClick={handleExportExcelBebas}
+                  disabled={exportingBebasExcel || filteredBebas.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {exportingBebasExcel ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
+                  Export Excel
+                </button>
               </div>
             )}
           </div>
