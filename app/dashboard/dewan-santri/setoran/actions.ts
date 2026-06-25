@@ -782,22 +782,25 @@ async function buildRekapAsramaPayload(
        SELECT TRIM(kamar) AS nomor_kamar
        FROM santri
        WHERE status_global = 'aktif' AND asrama = ?
+         AND COALESCE(kategori_santri, '') <> ?
          AND kamar IS NOT NULL AND TRIM(kamar) <> ''
      ) kamar
      LEFT JOIN santri s
        ON s.asrama = ? AND s.status_global = 'aktif'
+      AND COALESCE(s.kategori_santri, '') <> ?
       AND TRIM(COALESCE(s.kamar, '')) = kamar.nomor_kamar
      GROUP BY kamar.nomor_kamar
      ORDER BY CAST(kamar.nomor_kamar AS INTEGER), kamar.nomor_kamar`,
-    [unitSetor, unitSetor, unitSetor]
+    [unitSetor, unitSetor, SADESA_CATEGORY, unitSetor, SADESA_CATEGORY]
   )
 
   // --- Daftar santri aktif (untuk hitung penduduk, gratis, penunggak) ---
   const santriList = await query<{ id: string; nama_lengkap: string; kamar: string | null; bebas_spp: number }>(
     `SELECT id, nama_lengkap, kamar, COALESCE(bebas_spp, 0) AS bebas_spp
      FROM santri
-     WHERE status_global = 'aktif' AND asrama = ?`,
-    [unitSetor]
+     WHERE status_global = 'aktif' AND asrama = ?
+       AND COALESCE(kategori_santri, '') <> ?`,
+    [unitSetor, SADESA_CATEGORY]
   )
   const jumlahPenduduk = santriList.length
 
@@ -807,8 +810,9 @@ async function buildRekapAsramaPayload(
      FROM spp_tagihan_ditiadakan d
      JOIN santri s ON s.id = d.santri_id
      WHERE d.is_active = 1 AND d.tahun = ? AND d.bulan = ?
-       AND s.status_global = 'aktif' AND s.asrama = ? AND COALESCE(s.bebas_spp, 0) = 0`,
-    [tahun, bulan, unitSetor]
+       AND s.status_global = 'aktif' AND s.asrama = ? AND COALESCE(s.bebas_spp, 0) = 0
+       AND COALESCE(s.kategori_santri, '') <> ?`,
+    [tahun, bulan, unitSetor, SADESA_CATEGORY]
   )
   const ditiadakanSet = new Set(ditiadakanRows.map(r => r.santri_id))
 
@@ -827,8 +831,9 @@ async function buildRekapAsramaPayload(
     `SELECT sl.santri_id, sl.tahun, sl.bulan
      FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
      WHERE s.asrama = ? AND s.status_global = 'aktif'
+       AND COALESCE(s.kategori_santri, '') <> ?
        AND (sl.tahun * 100 + sl.bulan) <= ?`,
-    [unitSetor, targetYm]
+    [unitSetor, SADESA_CATEGORY, targetYm]
   )
   const paymentsMap = new Map<string, Set<number>>()
   payments.forEach(p => {
@@ -840,8 +845,9 @@ async function buildRekapAsramaPayload(
     `SELECT std.santri_id, std.tahun, std.bulan
      FROM spp_tagihan_ditiadakan std JOIN santri s ON s.id = std.santri_id
      WHERE s.asrama = ? AND s.status_global = 'aktif' AND std.is_active = 1
+       AND COALESCE(s.kategori_santri, '') <> ?
        AND (std.tahun * 100 + std.bulan) <= ?`,
-    [unitSetor, targetYm]
+    [unitSetor, SADESA_CATEGORY, targetYm]
   )
   const waivesMap = new Map<string, Set<number>>()
   waives.forEach(w => {
@@ -852,8 +858,9 @@ async function buildRekapAsramaPayload(
   const historis = await query<{ santri_id: string; tahun: number; bulan: number }>(
     `SELECT th.santri_id, th.tahun, th.bulan
      FROM spp_tunggakan_historis th JOIN santri s ON s.id = th.santri_id
-     WHERE s.asrama = ? AND s.status_global = 'aktif' AND th.status = 'BELUM_LUNAS'`,
-    [unitSetor]
+     WHERE s.asrama = ? AND s.status_global = 'aktif' AND th.status = 'BELUM_LUNAS'
+       AND COALESCE(s.kategori_santri, '') <> ?`,
+    [unitSetor, SADESA_CATEGORY]
   )
   const historisMap = new Map<string, { tahun: number; bulan: number }[]>()
   historis.forEach(h => {
@@ -901,10 +908,11 @@ async function buildRekapAsramaPayload(
     `SELECT nama_lengkap, kamar
      FROM santri
      WHERE asrama = ? AND status_global = 'keluar'
+       AND COALESCE(kategori_santri, '') <> ?
        AND tanggal_keluar IS NOT NULL
        AND tanggal_keluar >= ? AND tanggal_keluar < ?
      ORDER BY nama_lengkap ASC`,
-    [unitSetor, monthStart, monthEnd]
+    [unitSetor, SADESA_CATEGORY, monthStart, monthEnd]
   )
   const mutasi = mutasiRows.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Keluar' }))
 
@@ -950,26 +958,28 @@ async function computeRekapSignature(
 
   const santriSig = await queryOne<{ c: number; m: string | null }>(
     `SELECT COUNT(*) AS c, MAX(updated_at) AS m
-     FROM santri WHERE asrama = ? AND status_global IN ('aktif','keluar')`,
-    [unitSetor]
+     FROM santri WHERE asrama = ? AND status_global IN ('aktif','keluar')
+       AND COALESCE(kategori_santri, '') <> ?`,
+    [unitSetor, SADESA_CATEGORY]
   )
   const logSig = await queryOne<{ c: number; m: string | null }>(
     `SELECT COUNT(*) AS c, MAX(sl.tanggal_bayar) AS m
      FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
-     WHERE s.asrama = ? AND (sl.tahun * 100 + sl.bulan) <= ?`,
-    [unitSetor, targetYm]
+     WHERE s.asrama = ? AND COALESCE(s.kategori_santri, '') <> ?
+       AND (sl.tahun * 100 + sl.bulan) <= ?`,
+    [unitSetor, SADESA_CATEGORY, targetYm]
   )
   const ditSig = await queryOne<{ c: number; m: string | null }>(
     `SELECT COUNT(*) AS c, MAX(d.updated_at) AS m
      FROM spp_tagihan_ditiadakan d JOIN santri s ON s.id = d.santri_id
-     WHERE s.asrama = ? AND d.is_active = 1`,
-    [unitSetor]
+     WHERE s.asrama = ? AND d.is_active = 1 AND COALESCE(s.kategori_santri, '') <> ?`,
+    [unitSetor, SADESA_CATEGORY]
   )
   const histSig = await queryOne<{ c: number; m: string | null }>(
     `SELECT COUNT(*) AS c, MAX(h.updated_at) AS m
      FROM spp_tunggakan_historis h JOIN santri s ON s.id = h.santri_id
-     WHERE s.asrama = ?`,
-    [unitSetor]
+     WHERE s.asrama = ? AND COALESCE(s.kategori_santri, '') <> ?`,
+    [unitSetor, SADESA_CATEGORY]
   )
 
   return [
