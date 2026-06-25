@@ -512,7 +512,7 @@ export default function MonitoringSetoranPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">Tabel & font otomatis menyesuaikan agar muat dalam satu lembar.</p>
+            <p className="mt-2 text-[11px] text-slate-400">Jika data panjang, laporan otomatis lanjut ke halaman berikutnya dengan header kolom yang sama.</p>
 
             <button
               onClick={() => handleDownloadRekap(rekapModalUnit)}
