@@ -178,10 +178,25 @@ export default function NilaiRaporPage() {
     }))
   }
 
+  const applyBulkLegerMapel = (mapelId: string | number, value: string) => {
+    const nilai = clampNilai(value)
+    setDataLeger((prev: any) => prev ? ({
+      ...prev,
+      siswa: prev.siswa.map((s: any) => ({
+        ...s,
+        nilai: { ...s.nilai, [mapelId]: nilai },
+      })),
+    }) : prev)
+  }
+
   const updateRowField = (setter: any, data: any[], idx: number, field: string, value: any) => {
     const next = [...data]
     next[idx] = { ...next[idx], [field]: value }
     setter(next)
+  }
+
+  const applyBulkKepribadian = (field: string, value: string) => {
+    setKepribadianData(prev => prev.map(row => ({ ...row, [field]: value })))
   }
 
   const handleSimpanLeger = async () => {
@@ -424,7 +439,7 @@ export default function NilaiRaporPage() {
       {loading ? (
         <div className="rounded-xl border bg-white py-20 text-center shadow-sm"><Loader2 className="mx-auto h-10 w-10 animate-spin text-blue-500" /></div>
       ) : mode === 'leger' ? (
-        <LegerMatrix dataLeger={dataLeger} updateLegerCell={updateLegerCell} onSave={handleSimpanLeger} saving={saving} />
+        <LegerMatrix dataLeger={dataLeger} updateLegerCell={updateLegerCell} applyBulkLegerMapel={applyBulkLegerMapel} onSave={handleSimpanLeger} saving={saving} />
       ) : mode === 'per-mapel' ? (
         <PerMapelPanel
           mapelPegangan={mapelPegangan}
@@ -436,7 +451,7 @@ export default function NilaiRaporPage() {
           saving={saving}
         />
       ) : mode === 'kepribadian' ? (
-        <KepribadianPanel data={kepribadianData} updateRowField={updateRowField} setData={setKepribadianData} onSave={handleSimpanKepribadian} saving={saving} />
+        <KepribadianPanel data={kepribadianData} updateRowField={updateRowField} setData={setKepribadianData} applyBulkKepribadian={applyBulkKepribadian} onSave={handleSimpanKepribadian} saving={saving} />
       ) : mode === 'catatan' ? (
         <CatatanPanel data={catatanData} updateRowField={updateRowField} setData={setCatatanData} onSave={handleSimpanCatatan} saving={saving} />
       ) : (
@@ -446,7 +461,7 @@ export default function NilaiRaporPage() {
   )
 }
 
-function LegerMatrix({ dataLeger, updateLegerCell, onSave, saving }: any) {
+function LegerMatrix({ dataLeger, updateLegerCell, applyBulkLegerMapel, onSave, saving }: any) {
   if (!dataLeger?.siswa?.length) return <EmptyState text="Data leger kosong. Pilih kelas lalu tampilkan data." />
   return (
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -457,47 +472,53 @@ function LegerMatrix({ dataLeger, updateLegerCell, onSave, saving }: any) {
         </button>
       </div>
       <div className="overflow-x-auto pb-4">
-        <table className="w-full border-collapse text-left text-sm">
+        <table className="w-full table-fixed border-collapse text-left text-xs">
           <thead className="sticky top-0 z-20 bg-slate-800 font-bold text-white shadow-sm">
             <tr>
-              <th className="w-10 border border-slate-600 p-2 text-center md:sticky md:left-0 md:z-30 md:bg-slate-800">No</th>
-              <th className="w-24 border border-slate-600 p-2 md:sticky md:left-10 md:z-30 md:bg-slate-800">NIS</th>
-              <th className="min-w-[220px] border border-slate-600 p-2 md:sticky md:left-[8.5rem] md:z-30 md:bg-slate-800 md:shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Nama Santri</th>
+              <th className="w-9 border border-slate-600 p-1 text-center md:sticky md:left-0 md:z-30 md:bg-slate-800">No</th>
+              <th className="w-40 border border-slate-600 p-2 md:sticky md:left-9 md:z-30 md:bg-slate-800 md:shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Nama Santri</th>
               {dataLeger.mapel.map((m: any) => (
-                <th key={m.id} className="relative h-36 w-14 border border-slate-600 pb-2 align-bottom">
-                  <div className="flex h-full w-full items-end justify-center">
-                    <span className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-xs tracking-wide">{m.nama}</span>
+                <th key={m.id} className="relative h-40 w-12 border border-slate-600 p-1 align-bottom">
+                  <div className="flex h-full w-full flex-col items-center justify-between gap-1">
+                    <input
+                      inputMode="numeric"
+                      type="text"
+                      maxLength={3}
+                      onChange={e => applyBulkLegerMapel(m.id, e.target.value)}
+                      placeholder="0"
+                      title={`Set semua ${m.nama}`}
+                      className="h-7 w-10 rounded border border-slate-500 bg-slate-700 px-1 text-center font-mono text-[11px] font-bold text-white outline-none placeholder:text-slate-400 focus:border-white focus:bg-slate-600"
+                    />
+                    <span className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] tracking-wide">{m.nama}</span>
                   </div>
                 </th>
               ))}
-              <th className="w-16 border border-slate-600 bg-orange-700 p-2 text-center">JML</th>
-              <th className="w-16 border border-slate-600 bg-blue-700 p-2 text-center">RATA</th>
-              <th className="w-16 border border-slate-600 bg-green-700 p-2 text-center">RANK</th>
+              <th className="w-12 border border-slate-600 bg-orange-700 p-1 text-center">JML</th>
+              <th className="w-12 border border-slate-600 bg-blue-700 p-1 text-center">RATA</th>
+              <th className="w-12 border border-slate-600 bg-green-700 p-1 text-center">RANK</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {dataLeger.siswa.map((s: any, idx: number) => (
               <tr key={s.id} className="group hover:bg-yellow-50">
-                <td className="border p-2 text-center md:sticky md:left-0 md:z-10 md:bg-white md:group-hover:bg-yellow-50">{idx + 1}</td>
-                <td className="border p-2 font-mono text-xs md:sticky md:left-10 md:z-10 md:bg-white md:group-hover:bg-yellow-50">{s.nis}</td>
-                <td className="whitespace-nowrap border p-2 font-bold text-slate-800 md:sticky md:left-[8.5rem] md:z-10 md:bg-white md:shadow-[2px_0_5px_rgba(0,0,0,0.1)] md:group-hover:bg-yellow-50">{s.nama}</td>
+                <td className="border p-1 text-center md:sticky md:left-0 md:z-10 md:bg-white md:group-hover:bg-yellow-50">{idx + 1}</td>
+                <td className="break-words border p-1.5 font-bold leading-tight text-slate-800 md:sticky md:left-9 md:z-10 md:bg-white md:shadow-[2px_0_5px_rgba(0,0,0,0.1)] md:group-hover:bg-yellow-50">{s.nama}</td>
                 {dataLeger.mapel.map((m: any) => (
-                  <td key={m.id} className="border p-1 text-center">
+                  <td key={m.id} className="border p-0.5 text-center">
                     <input
                       inputMode="numeric"
-                      type="number"
-                      min={0}
-                      max={100}
+                      type="text"
+                      maxLength={3}
                       value={s.nilai[m.id] ?? ''}
                       onChange={e => updateLegerCell(s.riwayat_id, m.id, e.target.value)}
                       placeholder="-"
-                      className="h-9 w-14 rounded-lg border border-transparent bg-transparent text-center font-mono text-xs font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      className="h-8 w-10 rounded border border-transparent bg-transparent px-0.5 text-center font-mono text-[11px] font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
                     />
                   </td>
                 ))}
-                <td className="border bg-orange-50 p-2 text-center font-bold text-orange-900">{s.jumlah}</td>
-                <td className="border bg-blue-50 p-2 text-center font-bold text-blue-900">{s.rata}</td>
-                <td className="border bg-green-50 p-2 text-center font-bold text-green-900">{s.rank <= 3 && <Trophy className="mr-1 inline h-3 w-3 text-yellow-500" />}{s.rank}</td>
+                <td className="border bg-orange-50 p-1 text-center font-bold text-orange-900">{s.jumlah}</td>
+                <td className="border bg-blue-50 p-1 text-center font-bold text-blue-900">{s.rata}</td>
+                <td className="border bg-green-50 p-1 text-center font-bold text-green-900">{s.rank <= 3 && <Trophy className="mr-1 inline h-3 w-3 text-yellow-500" />}{s.rank}</td>
               </tr>
             ))}
           </tbody>
@@ -509,6 +530,10 @@ function LegerMatrix({ dataLeger, updateLegerCell, onSave, saving }: any) {
 
 function PerMapelPanel({ mapelPegangan, selectedPegangan, setSelectedPegangan, data, setData, onSave, saving }: any) {
   if (!mapelPegangan.length) return <EmptyState text="Belum ada mapel pegangan untuk kelas ini. Atur dulu di menu Pembagian Kitab Guru." />
+  const applyBulkPerMapel = (value: string) => {
+    const nilai = clampNilai(value)
+    setData(data.map((row: any) => ({ ...row, nilai })))
+  }
   return (
     <div className="space-y-4 rounded-xl border bg-white p-4 shadow-sm">
       <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -522,25 +547,31 @@ function PerMapelPanel({ mapelPegangan, selectedPegangan, setSelectedPegangan, d
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Mapel
         </button>
       </div>
+      <div className="grid grid-cols-[1fr_84px] items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+        <div className="text-sm font-bold text-blue-900">Set nilai semua santri</div>
+        <input
+          inputMode="numeric"
+          type="text"
+          maxLength={3}
+          onChange={e => applyBulkPerMapel(e.target.value)}
+          placeholder="0"
+          className="h-11 w-full rounded-xl border border-blue-200 bg-white px-2 text-center text-base font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      </div>
       <div className="grid gap-3">
         {data.map((row: any, idx: number) => (
-          <div key={row.riwayat_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div>
-                <div className="font-bold uppercase text-slate-800">{row.nama}</div>
-                <div className="font-mono text-xs text-slate-400">{row.nis}</div>
-              </div>
-              <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
+          <div key={row.riwayat_id} className="grid grid-cols-[1fr_84px] items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="min-w-0">
+              <div className="break-words font-bold uppercase leading-tight text-slate-800">{idx + 1}. {row.nama}</div>
             </div>
             <input
               inputMode="numeric"
-              type="number"
-              min={0}
-              max={100}
+              type="text"
+              maxLength={3}
               value={row.nilai ?? ''}
               onChange={e => updateDataNilai(setData, data, idx, e.target.value)}
-              placeholder="Nilai kosong = 0"
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-center text-lg font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-200"
+              placeholder="0"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-2 text-center text-base font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>
         ))}
@@ -555,7 +586,7 @@ function updateDataNilai(setData: any, data: any[], idx: number, value: string) 
   setData(next)
 }
 
-function KepribadianPanel({ data, updateRowField, setData, onSave, saving }: any) {
+function KepribadianPanel({ data, updateRowField, setData, applyBulkKepribadian, onSave, saving }: any) {
   if (!data.length) return <EmptyState text="Pilih kelas untuk mengisi kepribadian." />
   return (
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -571,7 +602,25 @@ function KepribadianPanel({ data, updateRowField, setData, onSave, saving }: any
             <tr>
               <th className="w-12 px-3 py-2.5 text-center">No</th>
               <th className="min-w-[190px] px-3 py-2.5 text-left">Nama</th>
-              {KEPRIBADIAN_FIELDS.map(f => <th key={f.key} className="w-40 border-l px-2 py-2.5 text-center">{f.label}</th>)}
+              {KEPRIBADIAN_FIELDS.map(f => (
+                <th key={f.key} className="w-40 border-l px-2 py-2.5 text-center">
+                  <div className="space-y-1">
+                    <div>{f.label}</div>
+                    <select
+                      defaultValue=""
+                      onChange={e => {
+                        if (!e.target.value) return
+                        applyBulkKepribadian(f.key, e.target.value)
+                      }}
+                      className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                      title={`Set semua ${f.label}`}
+                    >
+                      <option value="">Massal</option>
+                      {KEPRIBADIAN_PREDIKAT.map(p => <option key={p.code} value={p.code}>{p.code} - {p.description}</option>)}
+                    </select>
+                  </div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y">

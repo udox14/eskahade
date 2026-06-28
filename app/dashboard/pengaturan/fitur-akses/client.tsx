@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
-import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
 
@@ -199,6 +199,29 @@ interface Props {
   crudPermissions: CrudPermissionItem[]
 }
 
+function getOrderedGroups(grouped: Map<string, FiturItem[]>) {
+  const ordered = GROUP_ORDER.filter(g => grouped.has(g))
+  const extra = Array.from(grouped.keys()).filter(g => !GROUP_ORDER.includes(g)).sort()
+  return [...ordered, ...extra]
+}
+
+function groupFiturList(fiturList: FiturItem[]) {
+  const grouped = new Map<string, FiturItem[]>()
+  for (const f of fiturList) {
+    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
+    grouped.get(f.group_name)!.push(f)
+  }
+  return grouped
+}
+
+function EmptySearchState({ label = 'Tidak ada fitur yang cocok.' }: { label?: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
+      {label}
+    </div>
+  )
+}
+
 // ── Tab: Per Fitur ────────────────────────────────────────────────────────────
 function TabPerFitur({
   fiturList,
@@ -213,28 +236,16 @@ function TabPerFitur({
   onToggleActive: (f: FiturItem) => void
   onToggleRole: (f: FiturItem, role: string) => void
 }) {
-  const grouped = new Map<string, FiturItem[]>()
-  for (const f of fiturList) {
-    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
-    grouped.get(f.group_name)!.push(f)
-  }
-  const groups = GROUP_ORDER.filter(g => grouped.has(g))
+  const grouped = groupFiturList(fiturList)
+  const groups = getOrderedGroups(grouped)
 
   return (
     <div className="space-y-4">
-      {/* Legend role */}
-      <div className="flex flex-wrap gap-2 items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
-        <span className="text-xs text-slate-500 font-semibold mr-1">Role:</span>
-        {ALL_ROLES.map(r => (
-          <span key={r} className={cn("text-xs px-2.5 py-1 rounded-full border font-medium", ROLE_COLOR[r])}>
-            {ROLE_LABEL[r]}
-          </span>
-        ))}
-      </div>
+      {fiturList.length === 0 && <EmptySearchState />}
 
       {groups.map(group => (
         <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center gap-2">
+          <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-slate-400" />
             <h2 className="font-semibold text-slate-700 text-sm">
               {group === '_standalone' ? 'Menu Utama' : group}
@@ -242,72 +253,63 @@ function TabPerFitur({
             <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Fitur</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Akses Role</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {grouped.get(group)!.map(fitur => (
-                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{fitur.title}</div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[180px]">{fitur.href}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {ALL_ROLES.map(role => {
-                          const hasRole = fitur.roles.includes(role)
-                          const isAdmin = role === 'admin'
-                          const isLoading = loadingId === `role-${fitur.id}-${role}`
-                          return (
-                            <button
-                              key={role}
-                              onClick={() => onToggleRole(fitur, role)}
-                              disabled={isAdmin || isLoading || pending}
-                              title={isAdmin ? 'Admin selalu punya akses' : hasRole ? `Cabut akses ${ROLE_LABEL[role]}` : `Beri akses ${ROLE_LABEL[role]}`}
-                              className={cn(
-                                "text-xs px-2.5 py-1 rounded-full border font-medium transition-all duration-200",
-                                isLoading && "opacity-50 cursor-wait",
-                                isAdmin
-                                  ? "cursor-not-allowed opacity-80 " + ROLE_COLOR[role]
-                                  : hasRole
-                                    ? cn(ROLE_COLOR[role], "hover:opacity-75 hover:scale-95")
-                                    : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200"
-                              )}
-                            >
-                              {isLoading ? '...' : ROLE_LABEL[role]}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
+          <div className="divide-y divide-slate-100">
+            {grouped.get(group)!.map(fitur => (
+              <div
+                key={fitur.id}
+                className={cn(
+                  "grid gap-3 px-4 py-3 transition-colors lg:grid-cols-[minmax(220px,1fr)_minmax(360px,2fr)_auto] lg:items-center",
+                  !fitur.is_active && "bg-slate-50/80 opacity-70"
+                )}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-800 text-sm">{fitur.title}</div>
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">{fitur.href}</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_ROLES.map(role => {
+                    const hasRole = fitur.roles.includes(role)
+                    const isAdmin = role === 'admin'
+                    const isLoading = loadingId === `role-${fitur.id}-${role}`
+                    return (
                       <button
-                        onClick={() => onToggleActive(fitur)}
-                        disabled={loadingId === `active-${fitur.id}` || pending}
+                        key={role}
+                        onClick={() => onToggleRole(fitur, role)}
+                        disabled={isAdmin || isLoading || pending}
+                        title={isAdmin ? 'Admin selalu punya akses' : hasRole ? `Cabut akses ${ROLE_LABEL[role]}` : `Beri akses ${ROLE_LABEL[role]}`}
                         className={cn(
-                          "flex items-center gap-1.5 ml-auto text-xs font-medium px-3 py-1.5 rounded-lg border transition-all duration-200",
-                          loadingId === `active-${fitur.id}` && "opacity-50 cursor-wait",
-                          fitur.is_active
-                            ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                            : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                          "text-[11px] px-2 py-1 rounded-full border font-semibold transition-all duration-200",
+                          isLoading && "opacity-50 cursor-wait",
+                          isAdmin
+                            ? "cursor-not-allowed opacity-80 " + ROLE_COLOR[role]
+                            : hasRole
+                              ? cn(ROLE_COLOR[role], "hover:opacity-75")
+                              : "bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"
                         )}
                       >
-                        {fitur.is_active
-                          ? <><ToggleRight className="w-4 h-4" /> Aktif</>
-                          : <><ToggleLeft className="w-4 h-4" /> Nonaktif</>
-                        }
+                        {isLoading ? '...' : ROLE_LABEL[role]}
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => onToggleActive(fitur)}
+                  disabled={loadingId === `active-${fitur.id}` || pending}
+                  className={cn(
+                    "inline-flex w-fit items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 lg:ml-auto",
+                    loadingId === `active-${fitur.id}` && "opacity-50 cursor-wait",
+                    fitur.is_active
+                      ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                      : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                  )}
+                >
+                  {fitur.is_active
+                    ? <><ToggleRight className="w-4 h-4" /> Aktif</>
+                    : <><ToggleLeft className="w-4 h-4" /> Nonaktif</>
+                  }
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       ))}
@@ -321,12 +323,8 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
 
   // Kelompokkan fitur yang dimiliki role terpilih, per grup
   const fiturForRole = fiturList.filter(f => f.roles.includes(selectedRole))
-  const grouped = new Map<string, FiturItem[]>()
-  for (const f of fiturForRole) {
-    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
-    grouped.get(f.group_name)!.push(f)
-  }
-  const groups = GROUP_ORDER.filter(g => grouped.has(g))
+  const grouped = groupFiturList(fiturForRole)
+  const groups = getOrderedGroups(grouped)
 
   const totalAktif   = fiturForRole.filter(f => f.is_active).length
   const totalNonaktif = fiturForRole.filter(f => !f.is_active).length
@@ -334,8 +332,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
   return (
     <div className="space-y-5">
 
-      {/* Role selector cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2">
         {ALL_ROLES.map(role => {
           const count = fiturList.filter(f => f.roles.includes(role) && f.is_active).length
           const isSelected = selectedRole === role
@@ -344,23 +341,15 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
               key={role}
               onClick={() => setSelectedRole(role)}
               className={cn(
-                "flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 text-center transition-all duration-200",
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all duration-200",
                 isSelected
-                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm scale-105`
-                  : `bg-white ${ROLE_BG_SOFT[role]} hover:scale-102 hover:shadow-sm`
+                  ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm`
+                  : `bg-white ${ROLE_BG_SOFT[role]} hover:shadow-sm`
               )}
             >
-              <span className={cn("text-xs font-bold", isSelected ? "text-white" : "text-slate-700")}>
-                {ROLE_LABEL_FULL[role]}
-              </span>
-              <span className={cn(
-                "text-lg font-black leading-none",
-                isSelected ? "text-white" : ROLE_COLOR[role].split(' ')[1]
-              )}>
+              <span>{ROLE_LABEL[role]}</span>
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px]", isSelected ? "bg-white/20 text-white" : "bg-white/80 text-slate-500")}>
                 {count}
-              </span>
-              <span className={cn("text-[10px]", isSelected ? "text-white/70" : "text-slate-400")}>
-                fitur aktif
               </span>
             </button>
           )
@@ -397,9 +386,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
 
       {/* Daftar fitur per grup untuk role terpilih */}
       {fiturForRole.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl px-6 py-12 text-center text-slate-400 text-sm">
-          Role ini belum punya akses ke fitur apapun.
-        </div>
+        <EmptySearchState label="Tidak ada fitur untuk role ini pada pencarian sekarang." />
       ) : (
         <div className="space-y-3">
           {groups.map(group => (
@@ -450,7 +437,7 @@ function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
 
       {/* Fitur yang TIDAK dimiliki role ini */}
       {(() => {
-        const tidakPunya = fiturList.filter(f => !f.roles.includes(selectedRole) && f.is_active)
+        const tidakPunya: FiturItem[] = []
         if (tidakPunya.length === 0) return null
         return (
           <details className="group">
@@ -503,12 +490,8 @@ function TabCrudMatrix({
     return row.can_delete
   }
 
-  const grouped = new Map<string, FiturItem[]>()
-  for (const f of fiturForRole) {
-    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
-    grouped.get(f.group_name)!.push(f)
-  }
-  const groups = GROUP_ORDER.filter(g => grouped.has(g))
+  const grouped = groupFiturList(fiturForRole)
+  const groups = getOrderedGroups(grouped)
   const actionLabels: { action: CrudAction; label: string; title: string }[] = [
     { action: 'create', label: 'C', title: 'Create / tambah / import / catat' },
     { action: 'update', label: 'U', title: 'Update / simpan / verifikasi / reset' },
@@ -517,7 +500,7 @@ function TabCrudMatrix({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2">
         {ALL_ROLES.map(role => {
           const isSelected = selectedRole === role
           return (
@@ -525,7 +508,7 @@ function TabCrudMatrix({
               key={role}
               onClick={() => setSelectedRole(role)}
               className={cn(
-                "flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-center transition-all duration-200 text-xs font-bold",
+                "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-center transition-all duration-200 text-xs font-bold",
                 isSelected
                   ? `bg-gradient-to-br ${ROLE_HEADER[role]} text-white border-transparent shadow-sm`
                   : `bg-white ${ROLE_BG_SOFT[role]} hover:shadow-sm`
@@ -545,6 +528,8 @@ function TabCrudMatrix({
         </span>
       </div>
 
+      {fiturForRole.length === 0 && <EmptySearchState label="Tidak ada izin CRUD untuk role ini pada pencarian sekarang." />}
+
       {groups.map(group => (
         <div key={group} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
@@ -555,59 +540,43 @@ function TabCrudMatrix({
             <span className="ml-auto text-xs text-slate-400">{grouped.get(group)!.length} fitur</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Fitur</th>
-                  <th className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-14">R</th>
-                  {actionLabels.map(item => (
-                    <th key={item.action} className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-14">
-                      {item.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {grouped.get(group)!.map(fitur => (
-                  <tr key={fitur.id} className={cn("transition-colors", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
-                    <td className="px-5 py-3.5">
-                      <div className="font-medium text-slate-800">{fitur.title}</div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5">{fitur.href}</div>
-                    </td>
-                    <td className="px-3 py-3.5 text-center">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-blue-50 border-blue-200 text-blue-700 text-xs font-black">
-                        R
-                      </span>
-                    </td>
-                    {actionLabels.map(item => {
-                      const value = hasCrud(fitur, selectedRole, item.action)
-                      const key = `crud-${fitur.href}-${selectedRole}-${item.action}`
-                      const disabled = selectedRole === 'admin' || loadingId === key || pending
-                      return (
-                        <td key={item.action} className="px-3 py-3.5 text-center">
-                          <button
-                            onClick={() => onToggleCrud(fitur, selectedRole, item.action, value)}
-                            disabled={disabled}
-                            title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : item.title}
-                            className={cn(
-                              "inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-black transition-all",
-                              loadingId === key && "opacity-50 cursor-wait",
-                              disabled && selectedRole === 'admin' && "cursor-not-allowed",
-                              value
-                                ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                                : "bg-slate-50 border-slate-200 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
-                            )}
-                          >
-                            {item.label}
-                          </button>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="divide-y divide-gray-50">
+            {grouped.get(group)!.map(fitur => (
+              <div key={fitur.id} className={cn("flex flex-col gap-3 px-4 py-3 transition-colors sm:flex-row sm:items-center", !fitur.is_active && "bg-slate-50/80 opacity-60")}>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-slate-800 text-sm">{fitur.title}</div>
+                  <div className="text-xs text-slate-400 font-mono mt-0.5 truncate">{fitur.href}</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-blue-50 border-blue-200 text-blue-700 text-xs font-black">
+                    R
+                  </span>
+                  {actionLabels.map(item => {
+                    const value = hasCrud(fitur, selectedRole, item.action)
+                    const key = `crud-${fitur.href}-${selectedRole}-${item.action}`
+                    const disabled = selectedRole === 'admin' || loadingId === key || pending
+                    return (
+                      <button
+                        key={item.action}
+                        onClick={() => onToggleCrud(fitur, selectedRole, item.action, value)}
+                        disabled={disabled}
+                        title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : item.title}
+                        className={cn(
+                          "inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-black transition-all",
+                          loadingId === key && "opacity-50 cursor-wait",
+                          disabled && selectedRole === 'admin' && "cursor-not-allowed",
+                          value
+                            ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                            : "bg-slate-50 border-slate-200 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}
@@ -1032,9 +1001,18 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   const [globalEnabled, setGlobalEnabled] = useState(initialGlobal)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
   const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'crud' | 'bottomnav'>('fitur')
+  const [searchQuery, setSearchQuery] = useState('')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const filteredFiturList = normalizedSearch
+    ? fiturList.filter(fitur => {
+        const haystack = `${fitur.title} ${fitur.href} ${fitur.group_name}`.toLowerCase()
+        return haystack.includes(normalizedSearch)
+      })
+    : fiturList
+  const showSearch = activeTab !== 'bottomnav'
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
@@ -1196,6 +1174,28 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
         </span>
       </div>
 
+      {showSearch && (
+        <div className="relative max-w-xl">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cari fitur, href, atau grup..."
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-10 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              title="Bersihkan pencarian"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Tab switcher */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
         <button
@@ -1251,17 +1251,17 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       {/* Tab content */}
       {activeTab === 'fitur' ? (
         <TabPerFitur
-          fiturList={fiturList}
+          fiturList={filteredFiturList}
           loadingId={loadingId}
           pending={pending}
           onToggleActive={handleToggleActive}
           onToggleRole={handleToggleRole}
         />
       ) : activeTab === 'role' ? (
-        <TabPerRole fiturList={fiturList} />
+        <TabPerRole fiturList={filteredFiturList} />
       ) : activeTab === 'crud' ? (
         <TabCrudMatrix
-          fiturList={fiturList}
+          fiturList={filteredFiturList}
           crudPermissions={crudPermissions}
           loadingId={loadingId}
           pending={pending}
