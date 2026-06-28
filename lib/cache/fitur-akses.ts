@@ -74,6 +74,7 @@ async function ensureFiturAksesReady() {
       ('Nilai & Rapor', 'Hafalan', '/dashboard/guru/hafalan', 'ClipboardCheck', '["admin","sekpen","akademik","guru"]', 1, 5),
       ('EHB', 'Absensi Menghafal', '/dashboard/ehb/absensi-menghafal', 'BookMarked', '["admin","pengurus_asrama","keamanan"]', 1, 4),
       ('EHB', 'Rekap Menghafal', '/dashboard/ehb/absensi-menghafal/rekap', 'ClipboardList', '["admin","pengurus_asrama","keamanan"]', 1, 5),
+      ('Keuangan Pusat', 'Keuangan Non-SPP', '/dashboard/keuangan/non-spp', 'HandCoins', '["admin","bendahara"]', 1, 0),
       ('Master Data', 'Setup Tahun Ajaran', '/dashboard/setup-tahun-ajaran', 'ClipboardList', '["admin"]', 1, 2),
       ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
@@ -88,6 +89,8 @@ async function ensureFiturAksesReady() {
     await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', urutan = 4 WHERE href = '/dashboard/guru/nilai-harian'")
     await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', urutan = 5 WHERE href = '/dashboard/guru/hafalan'")
     await execute("UPDATE fitur_akses SET group_name = 'Akademik', title = 'Ranking', urutan = 4 WHERE href = '/dashboard/akademik/ranking'")
+    await execute("UPDATE fitur_akses SET group_name = 'Keuangan Pusat', title = 'Keuangan Non-SPP', icon = 'HandCoins', roles = '[\"admin\",\"bendahara\"]', is_active = 1, urutan = 0 WHERE href = '/dashboard/keuangan/non-spp'")
+    await execute("UPDATE fitur_akses SET is_active = 0 WHERE href IN ('/dashboard/keuangan/pembayaran', '/dashboard/keuangan/tarif', '/dashboard/keuangan/laporan')")
   } catch {}
 
   fiturSchemaReady = true

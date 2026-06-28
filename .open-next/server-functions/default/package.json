@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",
+    "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

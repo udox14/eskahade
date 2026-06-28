@@ -107,8 +107,14 @@ function JenisKeluarModal({
 
   useEffect(() => {
     getGrupAlumni().then((g) => {
-      setGrupList(g as GrupAlumni[])
-      if (g.length === 0) setGrupMode('new')
+      const list = g as GrupAlumni[]
+      setGrupList(list)
+      if (list.length === 0) { setGrupMode('new'); return }
+      // Default: Grup Lama, pilih grup yg cocok (saat edit) atau yg terbaru.
+      const own = `${initial?.angkatan ?? 'null'}__${initial?.grup_alumni ?? ''}__${initial?.tanggal_arsip?.slice(0, 10) ?? ''}`
+      const match = list.find(x => x.key === own)
+      setGrupKey(match ? match.key : list[0].key) // list[0] = terbaru (ORDER BY tanggal_arsip DESC)
+      setGrupMode('existing')
     })
   }, [])
 
