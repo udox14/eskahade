@@ -17,10 +17,11 @@ function toHuruf(angka: number | null | undefined): string {
 // Kepribadian default
 // ─────────────────────────────────────────────
 const KEPRIBADIAN_DEFAULT = [
-  { label: 'Akhlak/Budi Pekerti', predikat: 'Baik' },
-  { label: 'Ketekunan Ibadah',    predikat: 'Baik' },
-  { label: 'Kerapihan',           predikat: 'Baik' },
-  { label: 'Kebersihan',          predikat: 'Baik' },
+  { label: 'Akhlak/Budi Pekerti', predikat: 'B - Baik' },
+  { label: 'Ketekunan Ibadah',    predikat: 'B - Baik' },
+  { label: 'Kerapihan',           predikat: 'B - Baik' },
+  { label: 'Kebersihan',          predikat: 'B - Baik' },
+  { label: 'Kemandirian',         predikat: 'B - Baik' },
 ]
 
 // ─────────────────────────────────────────────

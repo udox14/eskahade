@@ -18,6 +18,8 @@ import {
   getTahunAjaranOptions,
   searchSantriNonSpp,
   simpanTarifNonSpp,
+  simpanOpeningBalanceNonSpp,
+  voidOpeningBalanceNonSpp,
   voidPembayaranNonSpp,
 } from './actions'
 
@@ -247,9 +249,10 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
                     <td className="px-4 py-3">
                       <p className="font-extrabold text-slate-800">{row.nama_lengkap}</p>
                       <p className="text-xs text-slate-500">{row.nis || '-'} - {row.asrama || '-'} Kamar {row.kamar || '-'} - Angkatan {row.tahun_masuk_fix}</p>
+                      {row.is_legacy_settled && <p className="mt-1 text-[11px] font-bold text-indigo-700">Saldo awal migrasi lunas per {row.legacy_cutoff_tanggal}</p>}
                     </td>
-                    <td className="px-4 py-3 text-center"><StatusBadge status={row.bangunan.status} sisa={row.bangunan.sisa} /></td>
-                    {JENIS_TAHUNAN.map((jenis) => <td key={jenis} className="px-4 py-3 text-center"><StatusBadge status={row.tahunan[jenis].lunas ? 'LUNAS' : 'BELUM'} sisa={row.tahunan[jenis].sisa} /></td>)}
+                    <td className="px-4 py-3 text-center"><StatusBadge status={row.is_legacy_settled && row.bangunan.tarif <= 0 ? 'LUNAS AWAL' : row.bangunan.status} sisa={row.bangunan.sisa} /></td>
+                    {JENIS_TAHUNAN.map((jenis) => <td key={jenis} className="px-4 py-3 text-center"><StatusBadge status={row.is_legacy_settled && row.tahunan[jenis].tarif <= 0 ? 'LUNAS AWAL' : row.tahunan[jenis].lunas ? 'LUNAS' : 'BELUM'} sisa={row.tahunan[jenis].sisa} /></td>)}
                     <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">{rp(row.total_kurang)}</td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => setExpanded(expanded === row.id ? null : row.id)} className="rounded border border-slate-200 p-2 text-slate-500 hover:bg-slate-100" title="Detail inline">
@@ -288,7 +291,7 @@ function FilterInput({ search, setSearch, load }: { search: string; setSearch: (
 }
 
 function StatusBadge({ status, sisa }: { status: string; sisa: number }) {
-  const good = status === 'LUNAS'
+  const good = status === 'LUNAS' || status === 'LUNAS AWAL'
   const warn = status === 'CICIL'
   return (
     <div className="space-y-1">
@@ -321,10 +324,37 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
     onChanged()
   }
 
+  const markOpeningBalance = async (jenis: typeof JENIS_ALL[number]) => {
+    const current = jenis === 'BANGUNAN' ? row.opening_balance?.BANGUNAN : row.opening_balance?.[jenis]
+    const nominalText = prompt(`Nominal tagihan awal ${jenis}?`, current ? String(current) : '')
+    if (!nominalText) return
+    const nominal = intFromInput(nominalText)
+    const catatan = prompt('Catatan tagihan awal?', `Tagihan awal migrasi ${jenis}`) || undefined
+    const res = await simpanOpeningBalanceNonSpp({ santriId: row.id, tahunAjaranId, jenis, nominal, catatan })
+    if ('error' in res) return toast.error('Gagal menandai tagihan awal', { description: res.error })
+    toast.success('Tagihan awal tersimpan')
+    onChanged()
+  }
+
+  const voidOpeningBalance = async (openingBalanceId: string) => {
+    const alasan = prompt('Alasan void tagihan awal ini?')
+    if (!alasan) return
+    const res = await voidOpeningBalanceNonSpp({ openingBalanceId, alasan })
+    if ('error' in res) return toast.error('Gagal void tagihan awal', { description: res.error })
+    toast.success('Tagihan awal di-void')
+    onChanged()
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <h4 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-800"><WalletCards className="h-4 w-4 text-emerald-600" /> Input Inline</h4>
+        {row.is_legacy_settled && (
+          <div className="mb-3 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-800">
+            <p className="font-extrabold">Saldo awal migrasi dianggap lunas per {row.legacy_cutoff_tanggal}.</p>
+            <p>Tandai kategori sebagai tagihan awal hanya jika santri ini ternyata belum lunas.</p>
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-slate-100 p-3">
             <p className="font-bold text-slate-700">Bangunan</p>
@@ -337,7 +367,12 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
                   <button onClick={() => bayar('BANGUNAN')} disabled={saving === 'BANGUNAN'} className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Lunasi</button>
                 </div>
               </div>
-            ) : <p className="rounded bg-green-50 p-2 text-center text-xs font-bold text-green-700">Lunas</p>}
+            ) : (
+              <div className="space-y-2">
+                <p className="rounded bg-green-50 p-2 text-center text-xs font-bold text-green-700">{row.is_legacy_settled && row.bangunan.tarif <= 0 ? 'Lunas Awal/Migrasi' : 'Lunas'}</p>
+                {row.is_legacy_settled && <button onClick={() => markOpeningBalance('BANGUNAN')} className="w-full rounded border border-indigo-200 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">Tandai Belum Lunas</button>}
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-slate-100 p-3">
@@ -356,8 +391,12 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
                       <button onClick={() => voidPayment(item.paymentIds[0])} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-50">Void</button>
                     ) : (
                       <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{item.hasPsbPayment ? 'Flow PSB' : 'Lunas'}</span>
-                    ) : (
+                    ) : item.sisa > 0 ? (
                       <button onClick={() => bayar(jenis)} disabled={saving === jenis || item.sisa <= 0} className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Bayar</button>
+                    ) : row.is_legacy_settled ? (
+                      <button onClick={() => markOpeningBalance(jenis)} className="rounded border border-indigo-200 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-50">Tandai Belum</button>
+                    ) : (
+                      <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-500">-</span>
                     )}
                   </div>
                 )
@@ -365,6 +404,19 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
             </div>
           </div>
         </div>
+        {row.opening_balance_rows?.length > 0 && (
+          <div className="mt-3 rounded-lg border border-indigo-100 bg-white p-3">
+            <p className="mb-2 text-xs font-extrabold uppercase text-indigo-700">Tagihan Awal Aktif</p>
+            <div className="space-y-2">
+              {row.opening_balance_rows.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-bold text-slate-700">{item.jenis_biaya} - {rp(item.nominal_tagihan)}</span>
+                  <button onClick={() => voidOpeningBalance(item.id)} className="rounded border border-red-200 px-2 py-1 font-bold text-red-700 hover:bg-red-50">Void Tagihan</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <MiniLedger santriId={row.id} tahunAjaranId={tahunAjaranId} onVoid={onChanged} />
@@ -596,6 +648,12 @@ function LaporanTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: number;
           />
         ))}
       </div>
+      {data?.legacy && (
+        <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          <p className="font-extrabold">Saldo awal migrasi per {data.legacy.cutoffTanggal}</p>
+          <p>{data.legacy.settledCount} santri legacy dianggap lunas awal. {data.legacy.piutangCount} santri legacy memiliki tagihan awal aktif.</p>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex flex-col gap-2 border-b bg-slate-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">

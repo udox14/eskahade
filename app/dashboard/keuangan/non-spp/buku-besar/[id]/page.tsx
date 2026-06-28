@@ -26,6 +26,11 @@ export default async function BukuBesarDetailPage({ params }: Props) {
           <Link href="/dashboard/keuangan/non-spp" className="text-sm font-bold text-emerald-700 hover:underline">Kembali ke Keuangan Non-SPP</Link>
           <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Buku Besar {data.santri.nama_lengkap}</h1>
           <p className="text-sm text-slate-500">{data.santri.nis || '-'} - {data.santri.asrama || '-'} Kamar {data.santri.kamar || '-'} - Angkatan {data.santri.tahun_masuk_fix}</p>
+          {data.santri.is_legacy_settled && (
+            <p className="mt-2 inline-flex rounded border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+              Saldo awal migrasi dianggap lunas per {data.santri.legacy_cutoff_tanggal}
+            </p>
+          )}
         </div>
       </div>
 
@@ -109,6 +114,41 @@ export default async function BukuBesarDetailPage({ params }: Props) {
                       <Link href={`/dashboard/keuangan/non-spp/kuitansi/${p.id}`} target="_blank" className="rounded border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50">Cetak</Link>
                     )}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="border-b bg-slate-50 px-5 py-3">
+          <h2 className="font-extrabold text-slate-800">Riwayat Tagihan Awal Migrasi</h2>
+          <p className="text-xs text-slate-500">Tagihan awal bukan pembayaran dan tidak memiliki kuitansi.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Tanggal</th>
+                <th className="px-4 py-3">Jenis</th>
+                <th className="px-4 py-3 text-right">Nominal Tagihan</th>
+                <th className="px-4 py-3">Petugas</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Catatan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.openingBalances.length === 0 ? (
+                <tr><td colSpan={6} className="py-10 text-center text-slate-400">Tidak ada tagihan awal migrasi.</td></tr>
+              ) : data.openingBalances.map((item: any) => (
+                <tr key={item.id} className={item.status === 'VOID' ? 'bg-red-50/40 text-slate-500' : ''}>
+                  <td className="px-4 py-3 text-xs">{item.created_at}</td>
+                  <td className="px-4 py-3 font-bold">{item.jenis_biaya}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">{rp(item.nominal_tagihan)}</td>
+                  <td className="px-4 py-3 text-xs">{item.penerima_nama || 'Sistem'}</td>
+                  <td className="px-4 py-3">{item.status === 'VOID' ? <span className="font-bold text-red-700">VOID</span> : <span className="font-bold text-indigo-700">TAGIHAN AWAL</span>}</td>
+                  <td className="px-4 py-3 text-xs">{item.status === 'VOID' ? item.void_reason : item.catatan || '-'}</td>
                 </tr>
               ))}
             </tbody>

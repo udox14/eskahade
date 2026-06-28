@@ -193,61 +193,63 @@ export default function PenempatanKelasPage() {
       )}
 
       {/* STEP 1: PILIH MARHALAH TUJUAN */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-end gap-4">
-        <div className="w-full md:flex-1">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Marhalah Tujuan</label>
-          <select
-            className="w-full p-3 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-500 font-medium text-sm outline-none"
-            value={selectedMarhalah}
-            onChange={(e) => setSelectedMarhalah(e.target.value)}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row items-end gap-4">
+          <div className="w-full md:flex-1">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Marhalah Tujuan</label>
+            <select
+              className="w-full p-3 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-500 font-medium text-sm outline-none"
+              value={selectedMarhalah}
+              onChange={(e) => setSelectedMarhalah(e.target.value)}
+            >
+              <option value="">-- Pilih Marhalah --</option>
+              {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+            </select>
+          </div>
+          <div className="w-full md:w-auto">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Kelamin</label>
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setSelectedGender('L')}
+                className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'L' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Putra
+              </button>
+              <button
+                onClick={() => setSelectedGender('P')}
+                className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'P' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Putri
+              </button>
+            </div>
+          </div>
+          <div className="w-full md:w-auto">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenjang Sekolah</label>
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setSelectedJenjang('SLTP')}
+                className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTP' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                SLTP
+              </button>
+              <button
+                onClick={() => setSelectedJenjang('SLTA')}
+                className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTA' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                SLTA
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={handleTampilkan}
+            disabled={!selectedMarhalah || loading}
+            className="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
           >
-            <option value="">-- Pilih Marhalah --</option>
-            {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-          </select>
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
+            Tampilkan
+          </button>
         </div>
-        <div className="w-full md:w-auto">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Kelamin</label>
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setSelectedGender('L')}
-              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'L' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Putra
-            </button>
-            <button
-              onClick={() => setSelectedGender('P')}
-              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedGender === 'P' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Putri
-            </button>
-          </div>
-        </div>
-        <div className="w-full md:w-auto">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenjang Sekolah</label>
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setSelectedJenjang('SLTP')}
-              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTP' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              SLTP
-            </button>
-            <button
-              onClick={() => setSelectedJenjang('SLTA')}
-              className={`flex-1 md:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all ${selectedJenjang === 'SLTA' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              SLTA
-            </button>
-          </div>
-          <p className="mt-1 text-[11px] font-medium text-slate-400">SLTP: MTS/MTSN/SMP. SLTA: MAN/SMK/SMA/SADESA.</p>
-        </div>
-        <button
-          onClick={handleTampilkan}
-          disabled={!selectedMarhalah || loading}
-          className="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
-          Tampilkan
-        </button>
+        <p className="text-[11px] font-medium text-slate-400">SLTP: MTS/MTSN/SMP. SLTA: MAN/SMK/SMA/SADESA.</p>
       </div>
 
       {/* PERINGATAN KELAS KOSONG */}

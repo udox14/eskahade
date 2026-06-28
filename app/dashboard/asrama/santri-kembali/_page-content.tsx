@@ -1,20 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CheckCircle2, Clock, Home, Loader2, Lock, LogIn, Search, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Home, Loader2, Lock, LogIn, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getAsramaListSantriKembali,
   getSantriBelumKembali,
   getSantriKembaliSession,
   tandaiSantriKembali,
+  tandaiSantriKembaliBulk,
   type SantriKembaliRow,
   type SessionInfo,
 } from './actions'
 import { formatWibDate, toWibDateInputValue } from '@/lib/date/wib'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
-
-const PAGE_SIZE = 30
 
 function formatDateTime(value: string) {
   return formatWibDate(value)
@@ -31,13 +30,20 @@ export default function SantriKembaliPageContent() {
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<SantriKembaliRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [totalRows, setTotalRows] = useState(0)
   const [overdueTotal, setOverdueTotal] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
   const [selectedRow, setSelectedRow] = useState<SantriKembaliRow | null>(null)
   const [waktuDatang, setWaktuDatang] = useState(toWibDateInputValue())
   const [pending, startTransition] = useTransition()
+
+  // Pagination states
+  const [pageSize, setPageSize] = useState(20)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Selection states
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [waktuDatangBulk, setWaktuDatangBulk] = useState(toWibDateInputValue())
+  const [pendingBulk, startTransitionBulk] = useTransition()
 
   const loadBootstrap = async () => {
     const [info, asramas] = await Promise.all([getSantriKembaliSession(), getAsramaListSantriKembali()])
@@ -51,29 +57,32 @@ export default function SantriKembaliPageContent() {
     loadBootstrap()
   }, [])
 
-  const loadRows = useCallback(async (append = false, offset = 0) => {
-    if (append) setLoadingMore(true)
-    else setLoading(true)
-
+  const loadRows = useCallback(async () => {
+    setLoading(true)
+    const offset = (currentPage - 1) * pageSize
     const data = await getSantriBelumKembali({
       asrama: selectedAsrama,
       search,
-      limit: PAGE_SIZE,
+      limit: pageSize,
       offset,
     })
 
-    setRows(prev => append ? [...prev, ...data.rows] : data.rows)
+    setRows(data.rows)
     setTotalRows(data.total)
     setOverdueTotal(data.overdueTotal)
-    setHasMore(data.hasMore)
     setLoading(false)
-    setLoadingMore(false)
-  }, [search, selectedAsrama])
+  }, [currentPage, pageSize, search, selectedAsrama])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadRows(false)
+    loadRows()
   }, [loadRows])
+
+  // Reset page & selection on filter change
+  useEffect(() => {
+    setCurrentPage(1)
+    setSelectedIds([])
+  }, [search, selectedAsrama, pageSize])
 
   const loadedOverdueCount = useMemo(() => rows.filter(isOverdue).length, [rows])
 
@@ -93,8 +102,38 @@ export default function SantriKembaliPageContent() {
       }
       toast.success(res.message)
       setSelectedRow(null)
-      await loadRows(false)
+      await loadRows()
     })
+  }
+
+  const handleBulkConfirm = () => {
+    if (selectedIds.length === 0) return
+
+    startTransitionBulk(async () => {
+      const res = await tandaiSantriKembaliBulk(selectedIds, waktuDatangBulk)
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      setSelectedIds([])
+      await loadRows()
+    })
+  }
+
+  const pageIds = rows.map(r => r.id)
+  const isAllSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id))
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)))
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])))
+    }
+  }
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   return (
@@ -154,6 +193,14 @@ export default function SantriKembaliPageContent() {
           <table className="w-full text-sm">
             <thead className="bg-white text-slate-500">
               <tr>
+                <th className="px-4 py-3 text-left font-bold w-12">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left font-bold min-w-[240px]">Santri</th>
                 <th className="px-4 py-3 text-left font-bold w-40">Asrama</th>
                 <th className="px-4 py-3 text-left font-bold min-w-[220px]">Izin Pulang</th>
@@ -163,13 +210,22 @@ export default function SantriKembaliPageContent() {
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={6} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={5} className="py-12 text-center text-slate-400">Tidak ada izin pulang yang belum kembali.</td></tr>
+                <tr><td colSpan={6} className="py-12 text-center text-slate-400">Tidak ada izin pulang yang belum kembali.</td></tr>
               ) : rows.map(row => {
                 const late = isOverdue(row)
+                const isSelected = selectedIds.includes(row.id)
                 return (
-                  <tr key={row.id} className="hover:bg-slate-50">
+                  <tr key={row.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/30' : ''}`}>
+                    <td className="px-4 py-3 w-12">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectRow(row.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-start gap-3">
                         <SantriPhotoAvatar
@@ -213,18 +269,53 @@ export default function SantriKembaliPageContent() {
           </table>
         </div>
 
-        {!loading && hasMore ? (
-          <div className="border-t bg-slate-50 px-5 py-4 flex justify-center">
-            <button
-              onClick={() => loadRows(true, rows.length)}
-              disabled={loadingMore}
-              className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+        {/* PAGINATION CONTROLS */}
+        <div className="border-t bg-slate-50 px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase">Tampilkan:</span>
+            <select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setCurrentPage(1)
+              }}
+              className="bg-white border rounded-xl px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-100 cursor-pointer"
             >
-              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Muat Lagi
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={9999}>Semua</option>
+            </select>
+            <span className="text-xs text-slate-500 font-medium">data per halaman</span>
+          </div>
+
+          <div className="text-xs text-slate-500 font-semibold uppercase">
+            Menampilkan {totalRows > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalRows)} dari {totalRows}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+              disabled={currentPage === 1 || loading}
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Sebelumnya
+            </button>
+            <span className="text-xs font-bold text-slate-700 px-1">
+              Halaman {currentPage} dari {Math.max(1, Math.ceil(totalRows / pageSize))}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(p + 1, Math.max(1, Math.ceil(totalRows / pageSize))))}
+              disabled={currentPage >= Math.max(1, Math.ceil(totalRows / pageSize)) || loading}
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              Selanjutnya
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        ) : null}
+        </div>
       </section>
 
       {selectedRow && (
@@ -275,6 +366,49 @@ export default function SantriKembaliPageContent() {
                 Simpan Kedatangan
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING BULK TOOLBAR */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] lg:w-auto lg:min-w-[550px] bg-slate-950 text-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 z-40 animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="bg-emerald-500 w-8 h-8 rounded-full flex items-center justify-center font-black text-slate-950 text-sm">
+              {selectedIds.length}
+            </div>
+            <div>
+              <p className="font-bold text-sm">Santri terpilih</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Konfirmasi kedatangan secara massal.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative w-full md:w-40">
+              <Clock className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="date"
+                value={waktuDatangBulk}
+                onChange={e => setWaktuDatangBulk(e.target.value)}
+                className="w-full bg-slate-850 border border-slate-700 rounded-xl pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            
+            <button
+              onClick={handleBulkConfirm}
+              disabled={pendingBulk}
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 active:scale-95 disabled:opacity-50 text-xs shrink-0 cursor-pointer"
+            >
+              {pendingBulk ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+              Proses ({selectedIds.length})
+            </button>
+            
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-slate-400 hover:text-white font-semibold text-xs px-2 py-2 cursor-pointer"
+            >
+              Batal
+            </button>
           </div>
         </div>
       )}

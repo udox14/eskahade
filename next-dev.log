@@ -3,39 +3,12 @@
 > next dev
 
 ▲ Next.js 16.1.6 (Turbopack)
-- Local:         http://localhost:3000
-- Network:       http://192.168.1.8:3000
+- Local:         http://localhost:3001
+- Network:       http://172.25.45.67:3001
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
 ⎔ Establishing remote connection...
-✓ Ready in 4.2s
-[layout] session null → redirect /login
- GET /dashboard/ehb/cetak 307 in 3.3s (compile: 3.0s, render: 224ms)
-✓ Compiled in 360ms
-✓ Compiled in 601ms
-✓ Compiled in 292ms
-✓ Compiled in 400ms
-✓ Compiled in 1316ms
-✓ Compiled in 429ms
-✓ Compiled in 363ms
-✓ Compiled in 340ms
- HEAD / 200 in 1148ms (compile: 699ms, render: 449ms)
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 2.0s (compile: 1726ms, render: 324ms)
-[layout] session null → redirect /login
- GET /dashboard/asrama/spp 307 in 892ms (compile: 688ms, render: 204ms)
-✓ Compiled in 110ms
-○ Compiling /api/update-db ...
-⎔ Establishing remote connection...
- GET /api/update-db 200 in 17.5s (compile: 4.9s, render: 12.5s)
-✓ Compiled in 1582ms
-✓ Compiled in 208ms
-✓ Compiled in 569ms
-✓ Compiled in 1176ms
-✓ Compiled in 605ms
-✓ Compiled in 1269ms
-✓ Compiled in 262ms
-✓ Compiled in 285ms
+✓ Ready in 4.9s

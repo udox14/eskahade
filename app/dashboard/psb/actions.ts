@@ -34,6 +34,7 @@ type SantriPsbRow = {
   asrama: string | null
   kamar: string | null
   tahun_masuk: number | null
+  tanggal_masuk: string | null
   created_at: string
   kategori_santri: string | null
   kategori_efektif: string
@@ -98,8 +99,10 @@ function deriveFlowStatusFromPayments(params: {
   return params.payments.length > 0 ? 'PAID' : 'PLACED_KAMAR'
 }
 
-function yearFromSantri(row: { tahun_masuk: number | null; created_at: string | null }) {
+function yearFromSantri(row: { tahun_masuk: number | null; tanggal_masuk?: string | null; created_at: string | null }) {
   if (row.tahun_masuk) return Number(row.tahun_masuk)
+  const tanggalMasukYear = Number(String(row.tanggal_masuk ?? '').slice(0, 4))
+  if (Number.isFinite(tanggalMasukYear) && tanggalMasukYear > 0) return tanggalMasukYear
   const parsed = row.created_at ? new Date(row.created_at).getFullYear() : new Date().getFullYear()
   return Number.isFinite(parsed) ? parsed : new Date().getFullYear()
 }
@@ -180,7 +183,7 @@ async function getPsbRows(session: SessionUser | null, filters?: {
   const statusFilter = normalizeStatus(filters?.status)
   const rows = await query<SantriPsbRow>(`
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
-           s.asrama, s.kamar, s.tahun_masuk, s.created_at, s.kategori_santri,
+           s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
            ${kategoriSql} AS kategori_efektif,
            pf.id AS psb_flow_id,
            COALESCE(pf.status, 'VERIFICATION') AS status,
@@ -628,7 +631,7 @@ export async function bayarPsbBatch(input: {
 
   const santri = await queryOne<SantriPsbRow>(`
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
-           s.asrama, s.kamar, s.tahun_masuk, s.created_at, s.kategori_santri,
+           s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
            'BARU' AS kategori_efektif, pf.id AS psb_flow_id, pf.status,
            pf.verification_note, pf.verified_at, pf.placed_asrama_at, pf.placed_kamar_at, pf.paid_at, pf.done_at
     FROM santri s
@@ -767,9 +770,10 @@ export async function batalkanPembayaranPsb(input: { santriId: string; receiptId
     tahun_tagihan: number | null
     nama_lengkap: string
     tahun_masuk: number | null
+    tanggal_masuk: string | null
     created_at: string | null
   }>(`
-    SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.created_at
+    SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.tanggal_masuk, s.created_at
     FROM psb_payment_receipt r
     JOIN santri s ON s.id = r.santri_id
     WHERE r.id = ?

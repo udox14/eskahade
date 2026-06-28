@@ -121,6 +121,7 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
       if (s.nama_tempat_cuci) tempat_mencuci_id = await upsertJasa(s.nama_tempat_cuci, 'Cuci')
       const sekolah = s.kategori_santri === 'SADESA' ? null : s.sekolah
       const kelasSekolah = s.kategori_santri === 'SADESA' ? null : s.kelas_sekolah
+      const tahunMasuk = Number(String(s.tanggal_masuk || '').slice(0, 4)) || tahunMasukDefault
 
       await query(
         `INSERT INTO santri (
@@ -128,16 +129,16 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
           nama_ayah, nama_ibu, alamat,
           gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
           jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
-          status_global, kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
+          tahun_masuk, status_global, kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
           tempat_makan_id, tempat_mencuci_id,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
           s.nama_ayah, s.nama_ibu, s.alamat,
           s.gol_darah, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
           s.jemaah, s.no_wa_ortu, s.tanggal_masuk, s.tanggal_keluar,
-          s.status_global, s.kategori_santri, sekolah, kelasSekolah, s.asrama, s.kamar,
+          tahunMasuk, s.status_global, s.kategori_santri, sekolah, kelasSekolah, s.asrama, s.kamar,
           tempat_makan_id, tempat_mencuci_id,
           now, now
         ]
@@ -223,6 +224,8 @@ export async function tambahSantriSatuSatu(data: {
   const now = new Date().toISOString()
   const tahunMasuk = new Date().getFullYear()
   const kategoriSantri = normalizeKategoriSantriDasar(data.kategori_santri)
+  const tanggalMasuk = rest.tanggal_masuk || `${tahunMasuk}-01-01`
+  const tahunMasukEfektif = Number(String(tanggalMasuk).slice(0, 4)) || tahunMasuk
   const sekolah = kategoriSantri === 'SADESA' ? null : rest.sekolah?.toUpperCase().trim() || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : rest.kelas_sekolah?.trim() || null
 
@@ -238,10 +241,10 @@ export async function tambahSantriSatuSatu(data: {
       nama_ayah, nama_ibu, alamat,
       gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
       jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
-      kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
+      tahun_masuk, kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
       tempat_makan_id, tempat_mencuci_id,
       status_global, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, nis.trim(), nama_lengkap.trim(),
       rest.nik?.trim() || null, rest.jenis_kelamin,
@@ -254,8 +257,9 @@ export async function tambahSantriSatuSatu(data: {
       rest.provinsi?.trim() || null,
       rest.jemaah?.trim() || null,
       rest.no_wa_ortu?.trim() || null,
-      rest.tanggal_masuk || `${tahunMasuk}-01-01`,
+      tanggalMasuk,
       rest.tanggal_keluar || null,
+      tahunMasukEfektif,
       kategoriSantri,
       sekolah,
       kelasSekolah,

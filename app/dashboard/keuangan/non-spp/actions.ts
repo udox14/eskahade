@@ -8,6 +8,8 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 const PATH = '/dashboard/keuangan/non-spp'
 const JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
 const JENIS_ALL = ['BANGUNAN', ...JENIS_TAHUNAN] as const
+const LEGACY_CUTOFF_KEY = 'keuangan_non_spp_cutoff_tanggal'
+const DEFAULT_LEGACY_CUTOFF = '2026-07-01'
 
 type JenisBiaya = typeof JENIS_ALL[number]
 
@@ -24,7 +26,9 @@ type SantriRow = {
   asrama: string | null
   kamar: string | null
   tahun_masuk: number | null
+  tanggal_masuk?: string | null
   created_at: string | null
+  psb_flow_id?: string | null
 }
 
 type PaymentRow = {
@@ -52,6 +56,22 @@ type PaymentRow = {
 
 type TarifMap = Record<JenisBiaya, number>
 
+type OpeningBalanceRow = {
+  id: string
+  santri_id: string
+  tahun_ajaran_id: number
+  jenis_biaya: JenisBiaya
+  nominal_tagihan: number
+  status: string
+  catatan: string | null
+  created_at: string
+  created_by: string | null
+  void_reason: string | null
+  voided_by: string | null
+  voided_at: string | null
+  penerima_nama?: string | null
+}
+
 function toInt(value: unknown) {
   const parsed = Number(value ?? 0)
   return Number.isFinite(parsed) ? parsed : 0
@@ -72,6 +92,86 @@ function activeCondition(alias = 'p') {
 
 function annualTaCondition(alias = 'p') {
   return `((${alias}.tahun_ajaran_id = ?) OR (${alias}.tahun_ajaran_id IS NULL AND ${alias}.tahun_tagihan = ?))`
+}
+
+function normalizeDate(value: string | null | undefined) {
+  const text = String(value ?? '').slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
+}
+
+function effectiveYear(row: Pick<SantriRow, 'tahun_masuk' | 'tanggal_masuk' | 'created_at'>) {
+  if (row.tahun_masuk) return Number(row.tahun_masuk)
+  const tanggalMasukYear = Number(String(row.tanggal_masuk ?? '').slice(0, 4))
+  if (Number.isFinite(tanggalMasukYear) && tanggalMasukYear > 0) return tanggalMasukYear
+  const createdYear = row.created_at ? new Date(row.created_at).getFullYear() : new Date().getFullYear()
+  return Number.isFinite(createdYear) ? createdYear : new Date().getFullYear()
+}
+
+function isLegacySettledSantri(row: SantriRow, cutoffTanggal: string) {
+  const createdDate = normalizeDate(row.created_at)
+  return !!createdDate && createdDate < cutoffTanggal && !row.psb_flow_id
+}
+
+function openingEmpty(): TarifMap {
+  return emptyTarif()
+}
+
+async function ensureLegacySchema() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `)
+  await execute(
+    'INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)',
+    [LEGACY_CUTOFF_KEY, DEFAULT_LEGACY_CUTOFF]
+  )
+  await execute(`
+    CREATE TABLE IF NOT EXISTS keuangan_non_spp_opening_balance (
+      id                TEXT PRIMARY KEY,
+      santri_id         TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
+      tahun_ajaran_id   INTEGER NOT NULL REFERENCES tahun_ajaran(id),
+      jenis_biaya       TEXT NOT NULL,
+      nominal_tagihan   INTEGER NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'AKTIF',
+      catatan           TEXT,
+      created_by        TEXT REFERENCES users(id),
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      void_reason       TEXT,
+      voided_by         TEXT REFERENCES users(id),
+      voided_at         TEXT
+    )
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_non_spp_opening_balance_santri_ta
+      ON keuangan_non_spp_opening_balance(santri_id, tahun_ajaran_id, status)
+  `)
+  await execute(`
+    CREATE INDEX IF NOT EXISTS idx_non_spp_opening_balance_ta_status
+      ON keuangan_non_spp_opening_balance(tahun_ajaran_id, status)
+  `)
+  await execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_non_spp_opening_balance_active
+      ON keuangan_non_spp_opening_balance(santri_id, tahun_ajaran_id, jenis_biaya)
+      WHERE COALESCE(status, 'AKTIF') != 'VOID'
+  `)
+}
+
+async function getLegacyCutoffTanggal() {
+  await ensureLegacySchema()
+  const row = await queryOne<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', [LEGACY_CUTOFF_KEY])
+  return normalizeDate(row?.value) ?? DEFAULT_LEGACY_CUTOFF
+}
+
+function groupOpeningBalances(rows: OpeningBalanceRow[]) {
+  const bySantri = new Map<string, OpeningBalanceRow[]>()
+  rows.forEach((row) => {
+    if (!bySantri.has(row.santri_id)) bySantri.set(row.santri_id, [])
+    bySantri.get(row.santri_id)!.push(row)
+  })
+  return bySantri
 }
 
 export async function getTahunAjaranOptions() {
@@ -200,29 +300,40 @@ async function loadMonitoringRows(filters: {
   kamar: string
   search: string
 }) {
+  const cutoffTanggal = await getLegacyCutoffTanggal()
   let santriSql = `
-    SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at
-    FROM santri
-    WHERE status_global = 'aktif'
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.status_global = 'aktif'
   `
   const santriParams: unknown[] = []
   if (filters.asrama && filters.asrama !== 'SEMUA') {
-    santriSql += ' AND asrama = ?'
+    santriSql += ' AND s.asrama = ?'
     santriParams.push(filters.asrama)
   }
   if (filters.kamar && filters.kamar !== 'SEMUA') {
-    santriSql += ' AND kamar = ?'
+    santriSql += ' AND s.kamar = ?'
     santriParams.push(filters.kamar)
   }
   if (filters.search.trim()) {
-    santriSql += ' AND (nama_lengkap LIKE ? OR nis LIKE ?)'
+    santriSql += ' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)'
     const like = `%${filters.search.trim()}%`
     santriParams.push(like, like)
   }
-  santriSql += ' ORDER BY nama_lengkap'
+  santriSql += ' ORDER BY s.nama_lengkap'
 
   const santri = await query<SantriRow>(santriSql, santriParams)
   const tarifMap = await loadTarifMap(filters.tahunAjaranId)
+  const openingRows = await query<OpeningBalanceRow>(`
+    SELECT ob.*, u.full_name AS penerima_nama
+    FROM keuangan_non_spp_opening_balance ob
+    LEFT JOIN users u ON u.id = ob.created_by
+    WHERE ob.tahun_ajaran_id = ?
+      AND COALESCE(ob.status, 'AKTIF') != 'VOID'
+  `, [filters.tahunAjaranId])
+  const openingBySantri = groupOpeningBalances(openingRows)
 
   let paySql = `
     SELECT p.*
@@ -258,19 +369,29 @@ async function loadMonitoringRows(filters: {
   })
 
   return santri.map((s) => {
-    const tahunMasuk = s.tahun_masuk || (s.created_at ? new Date(s.created_at).getFullYear() : new Date().getFullYear())
+    const tahunMasuk = effectiveYear(s)
+    const legacySettled = isLegacySettledSantri(s, cutoffTanggal)
     const rows = bySantri.get(s.id) ?? []
+    const openingRowsSantri = openingBySantri.get(s.id) ?? []
+    const opening = openingEmpty()
+    openingRowsSantri.forEach((row) => {
+      if (JENIS_ALL.includes(row.jenis_biaya)) opening[row.jenis_biaya] += toInt(row.nominal_tagihan)
+    })
     const tarif = emptyTarif()
-    JENIS_ALL.forEach((jenis) => { tarif[jenis] = tarifMap.get(`${tahunMasuk}-${jenis}`) ?? 0 })
+    JENIS_ALL.forEach((jenis) => {
+      tarif[jenis] = legacySettled ? opening[jenis] : (tarifMap.get(`${tahunMasuk}-${jenis}`) ?? 0)
+    })
 
-    const bangunanPaid = rows
+    const rawBangunanPaid = rows
       .filter((p) => p.jenis_biaya === 'BANGUNAN')
       .reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+    const bangunanPaid = legacySettled && tarif.BANGUNAN <= 0 ? 0 : rawBangunanPaid
     const bangunanSisa = Math.max(0, tarif.BANGUNAN - bangunanPaid)
 
     const tahunan = Object.fromEntries(JENIS_TAHUNAN.map((jenis) => {
       const jenisRows = rows.filter((p) => p.jenis_biaya === jenis)
-      const paid = jenisRows.reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+      const rawPaid = jenisRows.reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+      const paid = legacySettled && tarif[jenis] <= 0 ? 0 : rawPaid
       const sisa = Math.max(0, tarif[jenis] - paid)
       return [jenis, {
         tarif: tarif[jenis],
@@ -287,6 +408,10 @@ async function loadMonitoringRows(filters: {
     return {
       ...s,
       tahun_masuk_fix: tahunMasuk,
+      is_legacy_settled: legacySettled,
+      legacy_cutoff_tanggal: cutoffTanggal,
+      opening_balance: opening,
+      opening_balance_rows: openingRowsSantri,
       tarif,
       bangunan: {
         tarif: tarif.BANGUNAN,
@@ -329,12 +454,32 @@ export async function bayarInlineNonSpp(input: {
   if (!JENIS_ALL.includes(input.jenis)) return { error: 'Jenis biaya tidak valid.' }
   const tahunAjaran = await queryOne<TahunAjaran>('SELECT id, nama, is_active FROM tahun_ajaran WHERE id = ?', [input.tahunAjaranId])
   if (!tahunAjaran) return { error: 'Tahun ajaran tidak ditemukan.' }
-  const santri = await queryOne<SantriRow>('SELECT id, nama_lengkap, nis, tahun_masuk, created_at FROM santri WHERE id = ?', [input.santriId])
+  const cutoffTanggal = await getLegacyCutoffTanggal()
+  const santri = await queryOne<SantriRow>(`
+    SELECT s.id, s.nama_lengkap, s.nis, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ?
+  `, [input.santriId])
   if (!santri) return { error: 'Santri tidak ditemukan.' }
 
-  const tahunMasuk = santri.tahun_masuk || (santri.created_at ? new Date(santri.created_at).getFullYear() : new Date().getFullYear())
+  const tahunMasuk = effectiveYear(santri)
   const tahunTagihan = inferTahunTagihan(tahunAjaran)
-  const tarif = await getTarifNonSpp(tahunAjaran.id, tahunMasuk)
+  const legacySettled = isLegacySettledSantri(santri, cutoffTanggal)
+  const tarif = legacySettled ? openingEmpty() : await getTarifNonSpp(tahunAjaran.id, tahunMasuk)
+  if (legacySettled) {
+    const openingRows = await query<OpeningBalanceRow>(`
+      SELECT *
+      FROM keuangan_non_spp_opening_balance
+      WHERE santri_id = ?
+        AND tahun_ajaran_id = ?
+        AND COALESCE(status, 'AKTIF') != 'VOID'
+    `, [santri.id, tahunAjaran.id])
+    openingRows.forEach((row) => {
+      if (JENIS_ALL.includes(row.jenis_biaya)) tarif[row.jenis_biaya] += toInt(row.nominal_tagihan)
+    })
+  }
   const target = tarif[input.jenis] ?? 0
   if (target <= 0) return { error: `Tarif ${input.jenis} belum diatur untuk angkatan ini.` }
 
@@ -525,9 +670,123 @@ export async function voidPembayaranNonSpp(input: {
   return { success: true, count: rows.length }
 }
 
+export async function simpanOpeningBalanceNonSpp(input: {
+  santriId: string
+  tahunAjaranId: number
+  jenis: JenisBiaya
+  nominal: number
+  catatan?: string
+}): Promise<{ success: true; id: string } | { error: string }> {
+  const session = await getSession()
+  await ensureLegacySchema()
+  if (!JENIS_ALL.includes(input.jenis)) return { error: 'Jenis biaya tidak valid.' }
+  const nominal = Math.max(0, toInt(input.nominal))
+  if (nominal <= 0) return { error: 'Nominal tagihan awal wajib lebih dari 0.' }
+
+  const tahunAjaran = await queryOne<TahunAjaran>('SELECT id, nama, is_active FROM tahun_ajaran WHERE id = ?', [input.tahunAjaranId])
+  if (!tahunAjaran) return { error: 'Tahun ajaran tidak ditemukan.' }
+  const cutoffTanggal = await getLegacyCutoffTanggal()
+  const santri = await queryOne<SantriRow>(`
+    SELECT s.id, s.nama_lengkap, s.nis, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ? AND s.status_global = 'aktif'
+  `, [input.santriId])
+  if (!santri) return { error: 'Santri tidak ditemukan.' }
+  if (!isLegacySettledSantri(santri, cutoffTanggal)) return { error: 'Tagihan awal hanya untuk santri legacy/migrasi.' }
+
+  const existing = await queryOne<{ id: string }>(`
+    SELECT id FROM keuangan_non_spp_opening_balance
+    WHERE santri_id = ? AND tahun_ajaran_id = ? AND jenis_biaya = ? AND COALESCE(status, 'AKTIF') != 'VOID'
+  `, [santri.id, tahunAjaran.id, input.jenis])
+  const catatan = input.catatan?.trim() || `Tagihan awal migrasi ${tahunAjaran.nama}`
+
+  if (existing) {
+    await execute(`
+      UPDATE keuangan_non_spp_opening_balance
+      SET nominal_tagihan = ?, catatan = ?
+      WHERE id = ?
+    `, [nominal, catatan, existing.id])
+    revalidatePath(PATH)
+    revalidatePath(`${PATH}/buku-besar/${santri.id}`)
+    return { success: true, id: existing.id }
+  }
+
+  const id = generateId()
+  await execute(`
+    INSERT INTO keuangan_non_spp_opening_balance
+      (id, santri_id, tahun_ajaran_id, jenis_biaya, nominal_tagihan, status, catatan, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, 'AKTIF', ?, ?, datetime('now'))
+  `, [id, santri.id, tahunAjaran.id, input.jenis, nominal, catatan, session?.id ?? null])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keuangan_non_spp',
+    action: 'opening_balance',
+    fiturHref: PATH,
+    logKind: 'create',
+    entityType: 'keuangan_non_spp_opening_balance',
+    entityId: id,
+    entityLabel: santri.nama_lengkap || santri.nis || santri.id,
+    summary: `Menandai tagihan awal ${input.jenis} untuk ${santri.nama_lengkap || santri.nis || santri.id}`,
+    details: { santri_id: santri.id, tahun_ajaran_id: tahunAjaran.id, jenis_biaya: input.jenis, nominal },
+  })
+
+  revalidatePath(PATH)
+  revalidatePath(`${PATH}/buku-besar/${santri.id}`)
+  return { success: true, id }
+}
+
+export async function voidOpeningBalanceNonSpp(input: {
+  openingBalanceId: string
+  alasan: string
+}): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  await ensureLegacySchema()
+  const alasan = input.alasan.trim()
+  if (alasan.length < 5) return { error: 'Alasan void minimal 5 karakter.' }
+  const row = await queryOne<OpeningBalanceRow>(`
+    SELECT *
+    FROM keuangan_non_spp_opening_balance
+    WHERE id = ? AND COALESCE(status, 'AKTIF') != 'VOID'
+  `, [input.openingBalanceId])
+  if (!row) return { error: 'Tagihan awal aktif tidak ditemukan.' }
+
+  await execute(`
+    UPDATE keuangan_non_spp_opening_balance
+    SET status = 'VOID', void_reason = ?, voided_by = ?, voided_at = ?
+    WHERE id = ?
+  `, [alasan, session?.id ?? null, now(), row.id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keuangan_non_spp',
+    action: 'opening_balance_void',
+    fiturHref: PATH,
+    logKind: 'update',
+    entityType: 'keuangan_non_spp_opening_balance',
+    entityId: row.id,
+    entityLabel: row.jenis_biaya,
+    summary: `Void tagihan awal ${row.jenis_biaya}`,
+    details: { santri_id: row.santri_id, tahun_ajaran_id: row.tahun_ajaran_id, alasan },
+  })
+
+  revalidatePath(PATH)
+  revalidatePath(`${PATH}/buku-besar/${row.santri_id}`)
+  return { success: true }
+}
+
 export async function getBukuBesarSantri(santriId: string, tahunAjaranId?: number) {
   if (!santriId) return null
-  const santri = await queryOne<SantriRow>('SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at FROM santri WHERE id = ?', [santriId])
+  const cutoffTanggal = await getLegacyCutoffTanggal()
+  const santri = await queryOne<SantriRow>(`
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ?
+  `, [santriId])
   if (!santri) return null
 
   const payments = await query<PaymentRow>(`
@@ -540,14 +799,29 @@ export async function getBukuBesarSantri(santriId: string, tahunAjaranId?: numbe
     ORDER BY p.tanggal_bayar DESC, p.id DESC
   `, [santriId])
 
-  const tahunMasuk = santri.tahun_masuk || (santri.created_at ? new Date(santri.created_at).getFullYear() : new Date().getFullYear())
+  const tahunMasuk = effectiveYear(santri)
+  const legacySettled = isLegacySettledSantri(santri, cutoffTanggal)
   const tahunAjaran = tahunAjaranId
     ? await queryOne<TahunAjaran>('SELECT id, nama, is_active FROM tahun_ajaran WHERE id = ?', [tahunAjaranId])
     : await getActiveTahunAjaran()
-  const tarif = tahunAjaran ? await getTarifNonSpp(tahunAjaran.id, tahunMasuk) : emptyTarif()
+  const openingRows = tahunAjaran ? await query<OpeningBalanceRow>(`
+    SELECT ob.*, u.full_name AS penerima_nama
+    FROM keuangan_non_spp_opening_balance ob
+    LEFT JOIN users u ON u.id = ob.created_by
+    WHERE ob.santri_id = ?
+      AND ob.tahun_ajaran_id = ?
+      AND COALESCE(ob.status, 'AKTIF') != 'VOID'
+  `, [santri.id, tahunAjaran.id]) : []
+  const tarif = tahunAjaran && !legacySettled ? await getTarifNonSpp(tahunAjaran.id, tahunMasuk) : emptyTarif()
+  if (legacySettled) {
+    openingRows.forEach((row) => {
+      if (JENIS_ALL.includes(row.jenis_biaya)) tarif[row.jenis_biaya] += toInt(row.nominal_tagihan)
+    })
+  }
   const tahunTagihan = inferTahunTagihan(tahunAjaran)
   const active = payments.filter((p) => (p.status || 'AKTIF') !== 'VOID')
-  const paidBangunan = active.filter((p) => p.jenis_biaya === 'BANGUNAN').reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+  const rawPaidBangunan = active.filter((p) => p.jenis_biaya === 'BANGUNAN').reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+  const paidBangunan = legacySettled && tarif.BANGUNAN <= 0 ? 0 : rawPaidBangunan
   const saldo = {
     BANGUNAN: Math.max(0, tarif.BANGUNAN - paidBangunan),
     KESEHATAN: 0,
@@ -555,25 +829,36 @@ export async function getBukuBesarSantri(santriId: string, tahunAjaranId?: numbe
     EKSKUL: 0,
   }
   JENIS_TAHUNAN.forEach((jenis) => {
-    const paid = active
+    const rawPaid = active
       .filter((p) => p.jenis_biaya === jenis && ((p.tahun_ajaran_id && p.tahun_ajaran_id === tahunAjaran?.id) || (!p.tahun_ajaran_id && p.tahun_tagihan === tahunTagihan)))
       .reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+    const paid = legacySettled && tarif[jenis] <= 0 ? 0 : rawPaid
     saldo[jenis] = Math.max(0, tarif[jenis] - paid)
   })
 
-  return { santri: { ...santri, tahun_masuk_fix: tahunMasuk }, payments, saldo, tarif }
+  return {
+    santri: { ...santri, tahun_masuk_fix: tahunMasuk, is_legacy_settled: legacySettled, legacy_cutoff_tanggal: cutoffTanggal },
+    payments,
+    openingBalances: openingRows,
+    saldo,
+    tarif,
+  }
 }
 
 export async function getBukuBesarDetailNonSpp(santriId: string) {
   if (!santriId) return null
+  const cutoffTanggal = await getLegacyCutoffTanggal()
   const santri = await queryOne<SantriRow>(`
-    SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at
-    FROM santri
-    WHERE id = ?
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ?
   `, [santriId])
   if (!santri) return null
 
-  const tahunMasuk = santri.tahun_masuk || (santri.created_at ? new Date(santri.created_at).getFullYear() : new Date().getFullYear())
+  const tahunMasuk = effectiveYear(santri)
+  const legacySettled = isLegacySettledSantri(santri, cutoffTanggal)
   const tahunAjaranList = await getTahunAjaranOptions()
   const payments = await query<PaymentRow>(`
     SELECT p.*, ta.nama AS tahun_ajaran_nama, u.full_name AS penerima_nama, vu.full_name AS voided_by_name
@@ -586,18 +871,32 @@ export async function getBukuBesarDetailNonSpp(santriId: string) {
   `, [santriId])
 
   const active = payments.filter((p) => (p.status || 'AKTIF') !== 'VOID')
-  const bangunanPaid = active
+  const openingRows = await query<OpeningBalanceRow>(`
+    SELECT ob.*, u.full_name AS penerima_nama
+    FROM keuangan_non_spp_opening_balance ob
+    LEFT JOIN users u ON u.id = ob.created_by
+    WHERE ob.santri_id = ?
+    ORDER BY datetime(ob.created_at) DESC, ob.created_at DESC
+  `, [santriId])
+  const activeOpeningByTa = groupOpeningBalances(openingRows.filter((row) => (row.status || 'AKTIF') !== 'VOID'))
+  const rawBangunanPaid = active
     .filter((p) => p.jenis_biaya === 'BANGUNAN')
     .reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
 
   const yearly = await Promise.all(tahunAjaranList.map(async (ta) => {
-    const tarif = await getTarifNonSpp(ta.id, tahunMasuk)
+    const tarif = legacySettled ? emptyTarif() : await getTarifNonSpp(ta.id, tahunMasuk)
+    if (legacySettled) {
+      const taOpeningRows = (activeOpeningByTa.get(santriId) ?? []).filter((row) => row.tahun_ajaran_id === ta.id)
+      taOpeningRows.forEach((row) => {
+        if (JENIS_ALL.includes(row.jenis_biaya)) tarif[row.jenis_biaya] += toInt(row.nominal_tagihan)
+      })
+    }
     const tahunTagihan = inferTahunTagihan(ta)
     const categories = {
       BANGUNAN: {
         tarif: tarif.BANGUNAN,
-        paid: bangunanPaid,
-        sisa: Math.max(0, tarif.BANGUNAN - bangunanPaid),
+        paid: legacySettled && tarif.BANGUNAN <= 0 ? 0 : rawBangunanPaid,
+        sisa: Math.max(0, tarif.BANGUNAN - (legacySettled && tarif.BANGUNAN <= 0 ? 0 : rawBangunanPaid)),
       },
       KESEHATAN: { tarif: tarif.KESEHATAN, paid: 0, sisa: 0 },
       EHB: { tarif: tarif.EHB, paid: 0, sisa: 0 },
@@ -605,9 +904,10 @@ export async function getBukuBesarDetailNonSpp(santriId: string) {
     }
 
     JENIS_TAHUNAN.forEach((jenis) => {
-      const paid = active
+      const rawPaid = active
         .filter((p) => p.jenis_biaya === jenis && ((p.tahun_ajaran_id && p.tahun_ajaran_id === ta.id) || (!p.tahun_ajaran_id && p.tahun_tagihan === tahunTagihan)))
         .reduce((sum, p) => sum + toInt(p.nominal_bayar), 0)
+      const paid = legacySettled && tarif[jenis] <= 0 ? 0 : rawPaid
       categories[jenis] = {
         tarif: tarif[jenis],
         paid,
@@ -633,19 +933,22 @@ export async function getBukuBesarDetailNonSpp(santriId: string) {
   }))
 
   return {
-    santri: { ...santri, tahun_masuk_fix: tahunMasuk },
+    santri: { ...santri, tahun_masuk_fix: tahunMasuk, is_legacy_settled: legacySettled, legacy_cutoff_tanggal: cutoffTanggal },
     yearly,
     payments,
+    openingBalances: openingRows,
   }
 }
 
 export async function searchSantriNonSpp(keyword: string) {
   const like = `%${keyword.trim()}%`
   return query<SantriRow>(`
-    SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at
-    FROM santri
-    WHERE status_global = 'aktif' AND (nama_lengkap LIKE ? OR nis LIKE ?)
-    ORDER BY nama_lengkap
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+           pf.id AS psb_flow_id
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.status_global = 'aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)
+    ORDER BY s.nama_lengkap
     LIMIT 12
   `, [like, like])
 }
@@ -676,6 +979,8 @@ export async function getLaporanNonSpp(tahunAjaranId: number) {
   })
 
   const rows = await loadMonitoringRows({ tahunAjaranId: tahunAjaran.id, tahunTagihan, asrama: 'SEMUA', kamar: 'SEMUA', search: '' })
+  const legacySettledCount = rows.filter((row: any) => row.is_legacy_settled && row.total_kurang <= 0).length
+  const legacyPiutangCount = rows.filter((row: any) => row.is_legacy_settled && row.total_kurang > 0).length
   const targets = {
     BANGUNAN: { target: 0, terima: 0, kurang: 0 },
     KESEHATAN: { target: 0, terima: 0, kurang: 0 },
@@ -700,7 +1005,17 @@ export async function getLaporanNonSpp(tahunAjaranId: number) {
     })
   })
 
-  return { tahunAjaran, cashFlow, targets, list }
+  return {
+    tahunAjaran,
+    cashFlow,
+    targets,
+    list,
+    legacy: {
+      cutoffTanggal: await getLegacyCutoffTanggal(),
+      settledCount: legacySettledCount,
+      piutangCount: legacyPiutangCount,
+    },
+  }
 }
 
 export async function getNonSppReceipt(paymentId: string) {

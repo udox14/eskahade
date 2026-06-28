@@ -5,6 +5,10 @@ import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import {
+  scoreToKepribadianCode,
+  scoreToKepribadianDescription,
+} from '@/lib/akademik/kepribadian'
 
 export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
@@ -117,7 +121,7 @@ export async function getDaftarCetakRapor(kelasId: string, semester: number) {
   const riwayatIds = listSantri.map((s: any) => s.riwayat_id)
   const nilaiRows = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
     sql: `
-      SELECT riwayat_pendidikan_id, mapel_id, nilai
+      SELECT riwayat_pendidikan_id, mapel_id, COALESCE(nilai, 0) AS nilai
       FROM nilai_akademik
       WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
     `,
@@ -132,9 +136,7 @@ export async function getDaftarCetakRapor(kelasId: string, semester: number) {
   return {
     mapel,
     siswa: listSantri.map((s: any) => {
-      const terisi = mapel.reduce((total, m) => {
-        return total + ((nilaiMap.get(`${s.riwayat_id}:${m.id}`) ?? 0) > 0 ? 1 : 0)
-      }, 0)
+      const terisi = mapel.reduce((total, m) => total + (nilaiMap.has(`${s.riwayat_id}:${m.id}`) ? 1 : 0), 0)
 
       return {
         riwayat_id: s.riwayat_id,
@@ -200,7 +202,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
 
   const nilaiAkademik = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
     sql: `
-      SELECT na.riwayat_pendidikan_id, na.mapel_id, mp.nama AS mapel_nama, na.nilai
+      SELECT na.riwayat_pendidikan_id, na.mapel_id, mp.nama AS mapel_nama, COALESCE(na.nilai, 0) AS nilai
       FROM nilai_akademik na
       JOIN mapel mp ON mp.id = na.mapel_id
       WHERE na.riwayat_pendidikan_id IN (${ph}) AND na.semester = ?
@@ -249,12 +251,17 @@ export async function getDataRapor(kelasId: string, semester: number) {
   }))
 
   const akhlakMap = new Map<string, any>()
+  const predikatAkhlak = (score: unknown) => {
+    const code = scoreToKepribadianCode(score)
+    return `${code} - ${scoreToKepribadianDescription(score)}`
+  }
   nilaiAkhlak.forEach((a: any) => {
     akhlakMap.set(a.riwayat_pendidikan_id, [
-      { label: 'Akhlak/Budi Pekerti', predikat: angkaKePredikat(a.kedisiplinan) },
-      { label: 'Ketekunan Ibadah',    predikat: angkaKePredikat(a.ibadah) },
-      { label: 'Kerapihan',           predikat: angkaKePredikat(a.kesopanan) },
-      { label: 'Kebersihan',          predikat: angkaKePredikat(a.kebersihan) },
+      { label: 'Akhlak/Budi Pekerti', predikat: predikatAkhlak(a.kedisiplinan) },
+      { label: 'Ketekunan Ibadah',    predikat: predikatAkhlak(a.ibadah) },
+      { label: 'Kerapihan',           predikat: predikatAkhlak(a.kesopanan) },
+      { label: 'Kebersihan',          predikat: predikatAkhlak(a.kebersihan) },
+      { label: 'Kemandirian',         predikat: predikatAkhlak(a.kemandirian) },
     ])
   })
 
@@ -265,7 +272,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
   const mapelDiujikan = new Set<string>()
   const namaByMapel = new Map<string, string>()
   nilaiAkademik.forEach((n: any) => {
-    if (Number(n.nilai) > 0) mapelDiujikan.add(String(n.mapel_id))
+    mapelDiujikan.add(String(n.mapel_id))
     if (!namaByMapel.has(String(n.mapel_id))) namaByMapel.set(String(n.mapel_id), n.mapel_nama)
   })
 
@@ -290,10 +297,8 @@ export async function getDataRapor(kelasId: string, semester: number) {
       mapelRataKelas[n.mapel_id] = 0
       mapelCount[n.mapel_id] = 0
     }
-    if (n.nilai > 0) {
-      mapelRataKelas[n.mapel_id] += n.nilai
-      mapelCount[n.mapel_id]++
-    }
+    mapelRataKelas[n.mapel_id] += Number(n.nilai) || 0
+    mapelCount[n.mapel_id]++
   })
   Object.keys(mapelRataKelas).forEach(id => {
     mapelRataKelas[id] = mapelCount[id] > 0
@@ -574,7 +579,7 @@ export async function getLegerRaporData(kelasId: string, semester: number) {
   const riwayatIds = siswaList.map((s: any) => s.riwayat_id)
   const nilaiRows = await queryChunkedByIds(riwayatIds, (ph, ids) => ({
     sql: `
-      SELECT riwayat_pendidikan_id, mapel_id, nilai
+      SELECT riwayat_pendidikan_id, mapel_id, COALESCE(nilai, 0) AS nilai
       FROM nilai_akademik
       WHERE riwayat_pendidikan_id IN (${ph}) AND semester = ?
     `,
@@ -891,12 +896,6 @@ export async function saveKitabPilihan(
   return { success: true }
 }
 
-function angkaKePredikat(angka: number): string {
-  if (angka >= 90) return 'Sangat Baik'
-  if (angka >= 75) return 'Baik'
-  if (angka >= 60) return 'Cukup'
-  return 'Kurang'
-}
 
 export async function getKelasList(tahunAjaranId?: number) {
   let taId = tahunAjaranId

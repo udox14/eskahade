@@ -1,4 +1,4 @@
-(()=>{var a={};a.id=6004,a.ids=[6004],a.modules={261:a=>{"use strict";a.exports=require("next/dist/shared/lib/router/utils/app-paths")},338:(a,b,c)=>{"use strict";c.d(b,{Ag:()=>E,Ex:()=>H,FT:()=>M,I7:()=>O,M9:()=>I,U9:()=>D,c3:()=>P,fT:()=>K,gG:()=>J,hz:()=>G,yz:()=>N});var d=c(49796),e=c(16949),f=c(30236),g=c(1501),h=c(23755),i=c(44075),j=c(74812),k=c(24424);let l="/dashboard/psb",m="/dashboard/psb/monitoring",n=["MTSU","MTSN","MAN","SMK","SMA","SMP","LAINNYA"],o=["AL-FALAH","AS-SALAM","BAHAGIA","ASY-SYIFA 1","ASY-SYIFA 2","ASY-SYIFA 3","ASY-SYIFA 4","AL-BAGHORY"],p=["VERIFICATION","VERIFIED","PLACED_ASRAMA","PLACED_KAMAR","PAID","DONE"],q=["KESEHATAN","EHB","EKSKUL"];function r(a){return(0,h.qc)(a)||(0,h.hf)(a,"sekpen")}function s(a){return(0,h.qc)(a)||(0,h.hf)(a,"sekpen")}function t(a){return(0,h.qc)(a)||(0,h.hf)(a,"pengurus_asrama")}function u(a){return(0,h.qc)(a)||(0,h.hf)(a,"bendahara")}function v(a,b){return p.indexOf(a)>=p.indexOf(b)}function w(a){return p.includes(a)?a:"VERIFICATION"}function x(a){let b=a.bangunanTarget<=0||a.bangunanPaid>=a.bangunanTarget,c=q.every(b=>a.payments.some(c=>c.jenis_biaya===b&&Number(c.tahun_tagihan)===a.tahunTagihan));return b&&c}function y(a){if(a.tahun_masuk)return Number(a.tahun_masuk);let b=a.created_at?new Date(a.created_at).getFullYear():new Date().getFullYear();return Number.isFinite(b)?b:new Date().getFullYear()}async function z(){let a=await (0,i.xA)();await a.batch([a.prepare(`
+(()=>{var a={};a.id=6004,a.ids=[6004],a.modules={261:a=>{"use strict";a.exports=require("next/dist/shared/lib/router/utils/app-paths")},338:(a,b,c)=>{"use strict";c.d(b,{Ag:()=>E,Ex:()=>H,FT:()=>M,I7:()=>O,M9:()=>I,U9:()=>D,c3:()=>P,fT:()=>K,gG:()=>J,hz:()=>G,yz:()=>N});var d=c(49796),e=c(16949),f=c(30236),g=c(1501),h=c(23755),i=c(44075),j=c(74812),k=c(24424);let l="/dashboard/psb",m="/dashboard/psb/monitoring",n=["MTSU","MTSN","MAN","SMK","SMA","SMP","LAINNYA"],o=["AL-FALAH","AS-SALAM","BAHAGIA","ASY-SYIFA 1","ASY-SYIFA 2","ASY-SYIFA 3","ASY-SYIFA 4","AL-BAGHORY"],p=["VERIFICATION","VERIFIED","PLACED_ASRAMA","PLACED_KAMAR","PAID","DONE"],q=["KESEHATAN","EHB","EKSKUL"];function r(a){return(0,h.qc)(a)||(0,h.hf)(a,"sekpen")}function s(a){return(0,h.qc)(a)||(0,h.hf)(a,"sekpen")}function t(a){return(0,h.qc)(a)||(0,h.hf)(a,"pengurus_asrama")}function u(a){return(0,h.qc)(a)||(0,h.hf)(a,"bendahara")}function v(a,b){return p.indexOf(a)>=p.indexOf(b)}function w(a){return p.includes(a)?a:"VERIFICATION"}function x(a){let b=a.bangunanTarget<=0||a.bangunanPaid>=a.bangunanTarget,c=q.every(b=>a.payments.some(c=>c.jenis_biaya===b&&Number(c.tahun_tagihan)===a.tahunTagihan));return b&&c}function y(a){if(a.tahun_masuk)return Number(a.tahun_masuk);let b=Number(String(a.tanggal_masuk??"").slice(0,4));if(Number.isFinite(b)&&b>0)return b;let c=a.created_at?new Date(a.created_at).getFullYear():new Date().getFullYear();return Number.isFinite(c)?c:new Date().getFullYear()}async function z(){let a=await (0,i.xA)();await a.batch([a.prepare(`
       CREATE TABLE IF NOT EXISTS psb_flow (
         id                    TEXT PRIMARY KEY,
         santri_id             TEXT NOT NULL REFERENCES santri(id) ON DELETE CASCADE,
@@ -31,7 +31,7 @@
       )
     `)]),(await (0,i.P)("PRAGMA table_info(pembayaran_tahunan)")).some(a=>"psb_receipt_id"===a.name)||await (0,i.g7)("ALTER TABLE pembayaran_tahunan ADD COLUMN psb_receipt_id TEXT REFERENCES psb_payment_receipt(id)")}async function A(a,b){await z();let c=(0,j.kM)("s"),d=[],e=`s.status_global = 'aktif' AND ((${c}) = 'BARU' OR pf.id IS NOT NULL)`;if((0,h.hf)(a,"pengurus_asrama")&&!(0,h.qc)(a)&&a?.asrama_binaan&&(e+=" AND s.asrama = ?",d.push(a.asrama_binaan)),b?.q?.trim()){e+=" AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)";let a=`%${b.q.trim()}%`;d.push(a,a)}b?.sekolah&&(e+=" AND s.sekolah = ?",d.push(b.sekolah)),b?.asrama&&(e+=" AND s.asrama = ?",d.push(b.asrama));let f=w(b?.status),g=await (0,i.P)(`
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
-           s.asrama, s.kamar, s.tahun_masuk, s.created_at, s.kategori_santri,
+           s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
            ${c} AS kategori_efektif,
            pf.id AS psb_flow_id,
            COALESCE(pf.status, 'VERIFICATION') AS status,
@@ -126,7 +126,7 @@
         updated_at = excluded.updated_at
     `).bind((0,i.$C)(),a,c.id,c.id)]),await (0,f.Mx)({actor:(0,f.CF)(c),module:"psb",action:"update",fiturHref:l,logKind:"update",entityType:"psb_flow",entityId:a,entityLabel:j.nama_lengkap,summary:`Menempatkan ${j.nama_lengkap} ke kamar ${d}`,details:{asrama:j.asrama,kamar:d}}),(0,e.revalidatePath)(l),(0,e.revalidatePath)(m),{success:!0}}async function L(){let a=`PSB/${(0,i.Ec)().replace(/-/g,"")}`,b=await (0,i.Zy)("SELECT COUNT(*) AS total FROM psb_payment_receipt WHERE receipt_no LIKE ?",[`${a}/%`]);return`${a}/${String(Number(b?.total??0)+1).padStart(4,"0")}`}async function M(a){let b=await (0,g.n)(l,"create");if("error"in b)return b;if(!u(b))return{error:"Akses ditolak"};await z();let c=Number(a.tahunTagihan||new Date().getFullYear()),d=a.items.filter(a=>["BANGUNAN","KESEHATAN","EHB","EKSKUL"].includes(a.jenis)).map(a=>({jenis:a.jenis,nominal:Number(a.nominal??0)}));if(!d.length)return{error:"Pilih minimal satu item pembayaran"};let h=await (0,i.Zy)(`
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
-           s.asrama, s.kamar, s.tahun_masuk, s.created_at, s.kategori_santri,
+           s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
            'BARU' AS kategori_efektif, pf.id AS psb_flow_id, pf.status,
            pf.verification_note, pf.verified_at, pf.placed_asrama_at, pf.placed_kamar_at, pf.paid_at, pf.done_at
     FROM santri s
@@ -158,7 +158,7 @@
     SET status = 'DONE', done_by = ?, done_at = datetime('now'), updated_at = datetime('now')
     WHERE santri_id = ?
   `,[b.id,a]),(0,e.revalidatePath)(l),(0,e.revalidatePath)(m),{success:!0}):{error:"Santri belum menyelesaikan pembayaran PSB"}}async function O(a){var b;let c=await (0,g.n)(l,"update");if("error"in c)return c;if(!(0,h.qc)(c)&&!(0,h.hf)(c,"bendahara"))return{error:"Akses ditolak"};await z();let d=await (0,i.Zy)(`
-    SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.created_at
+    SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.tanggal_masuk, s.created_at
     FROM psb_payment_receipt r
     JOIN santri s ON s.id = r.santri_id
     WHERE r.id = ?

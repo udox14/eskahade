@@ -84,7 +84,7 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
   const restrictedAsrama = await getRestrictedAsrama()
   const clauses = ["p.jenis = 'PULANG'", "p.status = 'AKTIF'", "p.tgl_kembali_aktual IS NULL"]
   const bind: unknown[] = []
-  const limit = Math.min(Math.max(params.limit ?? 30, 1), 100)
+  const limit = Math.min(Math.max(params.limit ?? 30, 1), 9999)
   const offset = Math.max(params.offset ?? 0, 0)
 
   const targetAsrama = restrictedAsrama || params.asrama
@@ -205,4 +205,86 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
     return { success: true, telat: true, message: 'Santri ditandai datang terlambat dan masuk verifikasi telat.' }
   }
   return { success: true, telat: false, message: 'Santri sudah ditandai kembali.' }
+}
+
+export async function tandaiSantriKembaliBulk(ids: string[], waktuDatang: string) {
+  const session = await getAllowedSession()
+  if (!session) return { error: 'Akses ditolak' }
+  if (!ids || ids.length === 0) return { error: 'Tidak ada santri yang dipilih.' }
+
+  const restrictedAsrama = await getRestrictedAsrama()
+
+  const actual = parseWibDate(waktuDatang, 'start')
+  if (Number.isNaN(actual.getTime())) return { error: 'Waktu datang tidak valid.' }
+
+  const placeholders = ids.map(() => '?').join(',')
+  const listIzin = await query<{
+    id: string
+    jenis: string
+    status: string
+    tgl_selesai_rencana: string
+    asrama: string | null
+    nama_lengkap: string | null
+  }>(`
+    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, s.asrama, s.nama_lengkap
+    FROM perizinan p
+    JOIN santri s ON s.id = p.santri_id
+    WHERE p.id IN (${placeholders})
+  `, [...ids])
+
+  if (listIzin.length === 0) return { error: 'Data izin tidak ditemukan.' }
+
+  const validIzin = listIzin.filter(izin => {
+    if (izin.jenis !== 'PULANG') return false
+    if (izin.status !== 'AKTIF') return false
+    if (restrictedAsrama && izin.asrama !== restrictedAsrama) return false
+    return true
+  })
+
+  if (validIzin.length === 0) return { error: 'Tidak ada perizinan valid yang dapat diproses.' }
+
+  let countTelat = 0
+
+  for (const izin of validIzin) {
+    const rencana = new Date(izin.tgl_selesai_rencana)
+    const isTelat = actual > rencana
+    const statusFinal = isTelat ? 'AKTIF' : 'KEMBALI'
+    if (isTelat) countTelat++
+
+    await execute(`
+      UPDATE perizinan
+      SET status = ?, tgl_kembali_aktual = ?
+      WHERE id = ?
+    `, [statusFinal, actual.toISOString(), izin.id])
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'asrama_santri_kembali',
+      action: 'update',
+      fiturHref: FEATURE_PATH,
+      logKind: 'update',
+      entityType: 'perizinan',
+      entityId: izin.id,
+      entityLabel: izin.nama_lengkap || izin.id,
+      summary: `Menandai santri kembali ${izin.nama_lengkap || izin.id} (Bulk)`,
+      details: {
+        waktu_datang: actual.toISOString(),
+        status_final: statusFinal,
+        telat: isTelat,
+        bulk: true,
+      },
+    })
+  }
+
+  revalidatePath(FEATURE_PATH)
+  revalidatePath('/dashboard/asrama/absen-malam')
+  revalidatePath('/dashboard/keamanan/perizinan')
+  revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
+
+  let message = `${validIzin.length} santri ditandai kembali.`
+  if (countTelat > 0) {
+    message += ` (${countTelat} santri terlambat dan masuk verifikasi telat)`
+  }
+
+  return { success: true, count: validIzin.length, message }
 }
