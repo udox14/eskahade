@@ -91,7 +91,6 @@ type MonitoringRow = {
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
   orang_bayar: number
-  nominal_bulan_ini: number
   nominal_lebih_awal: number
   orang_lebih_awal: number
 }
@@ -104,6 +103,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
   const isBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
   const bulanSebelumnya = bulan === 1 ? 12 : bulan - 1
   const tahunSebelumnya = bulan === 1 ? tahun - 1 : tahun
+  const settings = await getSppSettings(tahun)
+  const tarif = settings.nominal
 
   const monthStart = `${tahun}-${String(bulan).padStart(2, '0')}-01`
   const nextMo = bulan === 12 ? 1 : bulan + 1
@@ -141,16 +142,6 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         FROM spp_tagihan_ditiadakan
         WHERE tahun = ? AND bulan = ? AND is_active = 1
       ),
-      nominal_bulan_ini AS (
-        SELECT bs.unit_setor, SUM(sl.nominal_bayar) AS nominal_bulan_ini
-        FROM base_santri bs
-        JOIN spp_log sl ON sl.santri_id = bs.id
-        LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
-        WHERE sl.tahun = ? AND sl.bulan = ?
-          AND bs.bebas_spp = 0
-          AND di.santri_id IS NULL
-        GROUP BY bs.unit_setor
-      ),
       lebih_awal_unit AS (
         SELECT bs.unit_setor,
                SUM(sl.nominal_bayar) AS nominal_lebih_awal,
@@ -179,13 +170,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
       COALESCE(tu.jumlah_bayar, 0) AS bayar_tunggakan_lalu,
       COALESCE(tu.orang_bayar, 0) AS orang_bayar,
-      COALESCE(nbi.nominal_bulan_ini, 0) AS nominal_bulan_ini,
       COALESCE(la.nominal_lebih_awal, 0) AS nominal_lebih_awal,
       COALESCE(la.orang_lebih_awal, 0) AS orang_lebih_awal
     FROM base_santri bs
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
-    LEFT JOIN nominal_bulan_ini nbi ON nbi.unit_setor = bs.unit_setor
     LEFT JOIN tunggakan_unit tu ON tu.unit_setor = bs.unit_setor
     LEFT JOIN lebih_awal_unit la ON la.unit_setor = bs.unit_setor
     GROUP BY bs.unit_setor
@@ -194,7 +183,6 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     SADESA_CATEGORY, SADESA_UNIT,
     tahun, bulan,
     tahun, bulan, monthStart, monthEnd,
-    tahun, bulan,
     tahun, bulan,
     tahun, bulan, monthStart, monthEnd,
     SADESA_UNIT,
@@ -268,7 +256,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     const persentase = isBeforeBillingStart || r.wajib_bayar <= 0 ? 0 : Math.round((r.bayar_bulan_ini / r.wajib_bayar) * 100)
     const bayarTunggakan = (isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu) + (historisPaid?.jumlah_bayar ?? 0)
     const orangBayarTunggakan = (isBeforeBillingStart ? 0 : r.orang_bayar) + (historisPaid?.orang_bayar ?? 0)
-    const nominalBulanIni = isBeforeBillingStart ? 0 : r.nominal_bulan_ini
+    const nominalBulanIni = isBeforeBillingStart ? 0 : r.bayar_bulan_ini * tarif
     const nominalTunggakanBerjalan = isBeforeBillingStart ? 0 : (tunggakanPaidMap.get(r.unit_setor) ?? 0)
     const nominalTunggakanHistoris = historisPaid?.total_nominal ?? 0
     const totalNominal = nominalBulanIni + nominalTunggakanBerjalan + nominalTunggakanHistoris + r.nominal_lebih_awal
