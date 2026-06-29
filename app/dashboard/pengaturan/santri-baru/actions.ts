@@ -5,8 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
 import { execute } from '@/lib/db'
+import { getSantriBaruSettings } from '@/lib/santri/kategori-settings'
 import {
-  getSantriBaruSettings,
   normalizeDurasiBulan,
   normalizeMulaiBerlaku,
   SANTRI_BARU_DURASI_KEY,

@@ -6,7 +6,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
 import { isAdmin } from '@/lib/auth/session'
 import { execute, query, queryOne } from '@/lib/db'
-import { getSantriBaruSettings } from '@/lib/santri/kategori'
+import { getSantriBaruSettings } from '@/lib/santri/kategori-settings'
 
 const FEATURE_PATH = '/dashboard/setup-tahun-ajaran'
 const RETURN_TO = '/dashboard/setup-tahun-ajaran'

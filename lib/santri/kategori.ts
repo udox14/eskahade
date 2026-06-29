@@ -4,8 +4,6 @@ export const KATEGORI_SANTRI_EFEKTIF = ['BARU', ...KATEGORI_SANTRI_DASAR] as con
 export type KategoriSantriDasar = (typeof KATEGORI_SANTRI_DASAR)[number]
 export type KategoriSantriEfektif = (typeof KATEGORI_SANTRI_EFEKTIF)[number]
 
-import { execute, queryOne } from '@/lib/db'
-
 export const SANTRI_BARU_MULAI_KEY = 'santri_baru_mulai_berlaku'
 export const SANTRI_BARU_DURASI_KEY = 'santri_baru_durasi_bulan'
 export const DEFAULT_SANTRI_BARU_MULAI = '2026-07-01'
@@ -40,37 +38,6 @@ export function getKategoriSantriEfektifCondition(alias = 's') {
 export type SantriBaruSettings = {
   mulaiBerlaku: string
   durasiBulan: number
-}
-
-export async function ensureSantriBaruSettings() {
-  await execute(`
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT DEFAULT (datetime('now'))
-    )
-  `)
-  await execute(
-    `INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`,
-    [SANTRI_BARU_MULAI_KEY, DEFAULT_SANTRI_BARU_MULAI]
-  )
-  await execute(
-    `INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`,
-    [SANTRI_BARU_DURASI_KEY, String(DEFAULT_SANTRI_BARU_DURASI_BULAN)]
-  )
-}
-
-export async function getSantriBaruSettings(): Promise<SantriBaruSettings> {
-  await ensureSantriBaruSettings()
-  const [mulai, durasi] = await Promise.all([
-    queryOne<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', [SANTRI_BARU_MULAI_KEY]),
-    queryOne<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', [SANTRI_BARU_DURASI_KEY]),
-  ])
-
-  return {
-    mulaiBerlaku: normalizeMulaiBerlaku(mulai?.value),
-    durasiBulan: normalizeDurasiBulan(durasi?.value),
-  }
 }
 
 export function normalizeMulaiBerlaku(value: unknown) {
