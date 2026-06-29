@@ -23,6 +23,8 @@ type AsramaRow = {
   total_nominal: number
   nominal_bulan_ini: number
   nominal_tunggakan_lalu: number
+  nominal_lebih_awal: number
+  orang_lebih_awal: number
   persentase: number
   tanggal_setor: string | null
   nama_penyetor: string | null
@@ -78,6 +80,7 @@ export default function MonitoringPrintControls({
       acc.total_nominal += row.total_nominal
       acc.nominal_bulan_ini += row.nominal_bulan_ini
       acc.nominal_tunggakan_lalu += row.nominal_tunggakan_lalu
+      acc.nominal_lebih_awal += row.nominal_lebih_awal
       if (row.tanggal_setor) acc.tersetor += 1
       return acc
     }, {
@@ -92,6 +95,7 @@ export default function MonitoringPrintControls({
       total_nominal: 0,
       nominal_bulan_ini: 0,
       nominal_tunggakan_lalu: 0,
+      nominal_lebih_awal: 0,
       tersetor: 0,
     })
   }, [printRows])
@@ -180,6 +184,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
     total_nominal: number
     nominal_bulan_ini: number
     nominal_tunggakan_lalu: number
+    nominal_lebih_awal: number
     tersetor: number
   }
   totalPersentase: number
@@ -272,11 +277,12 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
             <col style={{ width: '70px' }} /> {/* Biaya Nominal */}
             <col style={{ width: '22px' }} /> {/* Uang Tercatat Rp */}
             <col style={{ width: '104px' }} /> {/* Uang Tercatat Nominal */}
-            <col style={{ width: '63px' }} /> {/* Rincian Bulan Ini */}
-            <col style={{ width: '63px' }} /> {/* Rincian Tunggakan */}
-            <col style={{ width: '40px' }} /> {/* % */}
-            <col style={{ width: '75px' }} /> {/* Tgl/Jam Stor */}
-            <col style={{ width: '40px' }} /> {/* Rank */}
+            <col style={{ width: '60px' }} /> {/* Rincian Bulan Ini */}
+            <col style={{ width: '60px' }} /> {/* Rincian Tunggakan */}
+            <col style={{ width: '60px' }} /> {/* Rincian Titipan */}
+            <col style={{ width: '35px' }} /> {/* % */}
+            <col style={{ width: '70px' }} /> {/* Tgl/Jam Stor */}
+            <col style={{ width: '35px' }} /> {/* Rank */}
           </colgroup>
           <thead>
             <tr className="main-head">
@@ -292,7 +298,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th rowSpan={2}>Jumlah Bayar</th>
               <th colSpan={2}>Biaya</th>
               <th colSpan={2}>Uang Tercatat</th>
-              <th colSpan={2}>Rincian</th>
+              <th colSpan={3}>Rincian</th>
               <th rowSpan={2}>%</th>
               <th rowSpan={2}>Tgl/Jam Stor</th>
               <th rowSpan={2}>Rank</th>
@@ -304,6 +310,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <th>Nominal</th>
               <th>Bulan Ini</th>
               <th>Tunggakan</th>
+              <th>Titipan</th>
             </tr>
           </thead>
           <tbody>
@@ -327,6 +334,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
                   <td className="money-highlight text-right">{formatNumber(row.total_nominal)}</td>
                   <td className="text-right">{formatNumber(row.nominal_bulan_ini)}</td>
                   <td className="text-right">{formatNumber(row.nominal_tunggakan_lalu)}</td>
+                  <td className="text-right text-emerald-700">{formatNumber(row.nominal_lebih_awal)}</td>
                   <td className="highlight text-center">{row.persentase}</td>
                   <td className="text-center">{safeFormatDateTime(row.tanggal_setor)}</td>
                   <td className="text-center font-bold">{row.rank ?? '-'}</td>
@@ -349,6 +357,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
               <td className="total-amount text-right">{formatNumber(totals.total_nominal)}</td>
               <td className="total-amount text-right">{formatNumber(totals.nominal_bulan_ini)}</td>
               <td className="total-amount text-right">{formatNumber(totals.nominal_tunggakan_lalu)}</td>
+              <td className="total-amount text-right text-emerald-700">{formatNumber(totals.nominal_lebih_awal)}</td>
               <td className="text-center">{totalPersentase}</td>
               <td className="text-center">{totals.tersetor > 0 ? 'Ada' : '-'}</td>
               <td className="text-center">-</td>

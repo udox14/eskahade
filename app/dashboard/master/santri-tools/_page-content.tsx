@@ -76,13 +76,19 @@ export default function SantriToolsPage() {
     setLoadingPreview(true)
     setPreview(null)
     setSelectedIds(new Set())
-    const res = await previewNaikKelas({ asrama: filterAsrama || undefined, sekolah: filterSekolah || undefined, kelasSekolah: filterKelas || undefined })
-    if ('error' in res) { toast.error(res.error as string); setLoadingPreview(false); return }
-    setPreview(res)
-    // Auto-select semua yang bisa naik
-    const autoSelect = new Set(res.filter(s => s.status !== 'tidak_diketahui').map(s => s.id))
-    setSelectedIds(autoSelect)
-    setLoadingPreview(false)
+    try {
+      const res = await previewNaikKelas({ asrama: filterAsrama || undefined, sekolah: filterSekolah || undefined, kelasSekolah: filterKelas || undefined })
+      if ('error' in res) { toast.error(res.error as string); return }
+      setPreview(res)
+      // Auto-select semua yang bisa naik
+      const autoSelect = new Set(res.filter(s => s.status !== 'tidak_diketahui').map(s => s.id))
+      setSelectedIds(autoSelect)
+    } catch (err) {
+      console.error('[santri-tools] handlePreview ERROR:', err)
+      toast.error('Gagal memuat preview naik kelas.')
+    } finally {
+      setLoadingPreview(false)
+    }
   }
 
   const toggleSelect = (id: string) => {
@@ -107,12 +113,18 @@ export default function SantriToolsPage() {
     if (!selectedIds.size) return
     if (!await confirm(`Naikkan kelas sekolah ${selectedIds.size} santri? Tindakan ini tidak bisa dibatalkan secara massal.`)) return
     setEksekusiLoading(true)
-    const res = await eksekusiNaikKelas([...selectedIds])
-    setEksekusiLoading(false)
-    if ('error' in res) { toast.error(res.error as string); return }
-    toast.success(`${(res as any).updated} santri berhasil dinaikkan kelasnya!`)
-    setPreview(null)
-    setSelectedIds(new Set())
+    try {
+      const res = await eksekusiNaikKelas([...selectedIds])
+      if ('error' in res) { toast.error(res.error as string); return }
+      toast.success(`${(res as any).updated} santri berhasil dinaikkan kelasnya!`)
+      setPreview(null)
+      setSelectedIds(new Set())
+    } catch (err) {
+      console.error('[santri-tools] handleEksekusi ERROR:', err)
+      toast.error('Gagal mengeksekusi naik kelas massal.')
+    } finally {
+      setEksekusiLoading(false)
+    }
   }
 
   // Group preview by status

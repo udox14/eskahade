@@ -72,6 +72,12 @@ function parseKelas(raw: string | null): number | null {
   return n >= 1 && n <= 13 ? n : null
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size))
+  return chunks
+}
+
 // ── Preview naik kelas — tidak mengubah data ──────────────────────────────
 export async function previewNaikKelas(filter: {
   asrama?: string
@@ -123,14 +129,18 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
   const access = await assertFeature('/dashboard/master/santri-tools')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
-  if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
+  const cleanIds = Array.from(new Set((santriIds || []).filter(Boolean)))
+  if (!cleanIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   // Ambil data kelas_sekolah santri yang dipilih
-  const ph = santriIds.map(() => '?').join(',')
-  const rows = await query<{ id: string; kelas_sekolah: string }>(
-    `SELECT id, kelas_sekolah FROM santri WHERE id IN (${ph})`,
-    santriIds
-  )
+  const rows: { id: string; kelas_sekolah: string }[] = []
+  for (const chunk of chunkArray(cleanIds, 200)) {
+    const ph = chunk.map(() => '?').join(',')
+    rows.push(...await query<{ id: string; kelas_sekolah: string }>(
+      `SELECT id, kelas_sekolah FROM santri WHERE id IN (${ph})`,
+      chunk
+    ))
+  }
 
   const updates = rows
     .map(s => {
@@ -145,10 +155,27 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
   if (!updates.length) return { error: 'Tidak ada kelas yang bisa dinaikkan.' }
 
   const now = new Date().toISOString()
-  await batch(updates.map(u => ({
-    sql: `UPDATE santri SET kelas_sekolah = ?, updated_at = ? WHERE id = ?`,
-    params: [u.kelas_baru, now, u.id],
-  })))
+  const idsByKelasBaru = new Map<string | null, string[]>()
+  for (const update of updates) {
+    const current = idsByKelasBaru.get(update.kelas_baru) || []
+    current.push(update.id)
+    idsByKelasBaru.set(update.kelas_baru, current)
+  }
+
+  try {
+    for (const [kelasBaru, ids] of idsByKelasBaru.entries()) {
+      for (const chunk of chunkArray(ids, 200)) {
+        const ph = chunk.map(() => '?').join(',')
+        await execute(
+          `UPDATE santri SET kelas_sekolah = ?, updated_at = ? WHERE id IN (${ph})`,
+          [kelasBaru, now, ...chunk]
+        )
+      }
+    }
+  } catch (err: any) {
+    console.error('[santri-tools] eksekusiNaikKelas ERROR:', err?.message)
+    return { error: `Gagal menaikkan kelas massal: ${err?.message ?? 'error tidak diketahui'}` }
+  }
 
   await logActivity({
     actor: actorFromSession(session),

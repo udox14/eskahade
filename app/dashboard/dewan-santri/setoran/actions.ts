@@ -90,7 +90,10 @@ type MonitoringRow = {
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
+  orang_bayar: number
   nominal_bulan_ini: number
+  nominal_lebih_awal: number
+  orang_lebih_awal: number
 }
 
 export async function getMonitoringSetoran(tahun: number, bulan: number) {
@@ -142,13 +145,27 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         SELECT bs.unit_setor, SUM(sl.nominal_bayar) AS nominal_bulan_ini
         FROM base_santri bs
         JOIN spp_log sl ON sl.santri_id = bs.id
+        LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
         WHERE sl.tahun = ? AND sl.bulan = ?
+          AND bs.bebas_spp = 0
+          AND di.santri_id IS NULL
+        GROUP BY bs.unit_setor
+      ),
+      lebih_awal_unit AS (
+        SELECT bs.unit_setor,
+               SUM(sl.nominal_bayar) AS nominal_lebih_awal,
+               COUNT(DISTINCT sl.santri_id) AS orang_lebih_awal
+        FROM base_santri bs
+        JOIN spp_log sl ON sl.santri_id = bs.id
+        WHERE (sl.tahun * 100 + sl.bulan) > (? * 100 + ?)
+          AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
         GROUP BY bs.unit_setor
       ),
       tunggakan_unit AS (
         SELECT bs.unit_setor,
                SUM(bt.jumlah_bayar) AS jumlah_bayar,
-               SUM(bt.total_nominal) AS total_nominal
+               SUM(bt.total_nominal) AS total_nominal,
+               COUNT(DISTINCT bt.santri_id) AS orang_bayar
         FROM base_santri bs
         JOIN bayar_tunggakan bt ON bt.santri_id = bs.id
         GROUP BY bs.unit_setor
@@ -161,12 +178,16 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       COUNT(*) - SUM(bs.bebas_spp) - SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS wajib_bayar,
       SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
       COALESCE(tu.jumlah_bayar, 0) AS bayar_tunggakan_lalu,
-      COALESCE(nbi.nominal_bulan_ini, 0) AS nominal_bulan_ini
+      COALESCE(tu.orang_bayar, 0) AS orang_bayar,
+      COALESCE(nbi.nominal_bulan_ini, 0) AS nominal_bulan_ini,
+      COALESCE(la.nominal_lebih_awal, 0) AS nominal_lebih_awal,
+      COALESCE(la.orang_lebih_awal, 0) AS orang_lebih_awal
     FROM base_santri bs
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
     LEFT JOIN nominal_bulan_ini nbi ON nbi.unit_setor = bs.unit_setor
     LEFT JOIN tunggakan_unit tu ON tu.unit_setor = bs.unit_setor
+    LEFT JOIN lebih_awal_unit la ON la.unit_setor = bs.unit_setor
     GROUP BY bs.unit_setor
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
   `, [
@@ -175,6 +196,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     tahun, bulan, monthStart, monthEnd,
     tahun, bulan,
     tahun, bulan,
+    tahun, bulan, monthStart, monthEnd,
     SADESA_UNIT,
   ])
 
@@ -198,6 +220,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     unit_setor: string
     jumlah_bayar: number
     total_nominal: number
+    orang_bayar: number
   }>(
     `SELECT
         CASE
@@ -205,7 +228,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
           ELSE COALESCE(s.asrama, 'LAINNYA')
         END AS unit_setor,
         COUNT(*) AS jumlah_bayar,
-        COALESCE(SUM(th.nominal_tagihan), 0) AS total_nominal
+        COALESCE(SUM(th.nominal_tagihan), 0) AS total_nominal,
+        COUNT(DISTINCT th.santri_id) AS orang_bayar
      FROM spp_tunggakan_historis th
      JOIN santri s ON s.id = th.santri_id
      WHERE th.status = 'LUNAS'
@@ -243,10 +267,11 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     const penunggak = isBeforeBillingStart ? 0 : Math.max(0, r.wajib_bayar - r.bayar_bulan_ini)
     const persentase = isBeforeBillingStart || r.wajib_bayar <= 0 ? 0 : Math.round((r.bayar_bulan_ini / r.wajib_bayar) * 100)
     const bayarTunggakan = (isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu) + (historisPaid?.jumlah_bayar ?? 0)
+    const orangBayarTunggakan = (isBeforeBillingStart ? 0 : r.orang_bayar) + (historisPaid?.orang_bayar ?? 0)
     const nominalBulanIni = isBeforeBillingStart ? 0 : r.nominal_bulan_ini
     const nominalTunggakanBerjalan = isBeforeBillingStart ? 0 : (tunggakanPaidMap.get(r.unit_setor) ?? 0)
     const nominalTunggakanHistoris = historisPaid?.total_nominal ?? 0
-    const totalNominal = nominalBulanIni + nominalTunggakanBerjalan + nominalTunggakanHistoris
+    const totalNominal = nominalBulanIni + nominalTunggakanBerjalan + nominalTunggakanHistoris + r.nominal_lebih_awal
     return {
       unit_setor: r.unit_setor,
       total_santri: r.total_santri,
@@ -255,10 +280,13 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       wajib_bayar: isBeforeBillingStart ? 0 : r.wajib_bayar,
       bayar_bulan_ini: isBeforeBillingStart ? 0 : r.bayar_bulan_ini,
       bayar_tunggakan_lalu: bayarTunggakan,
+      orang_bayar_tunggakan: orangBayarTunggakan,
       penunggak,
       total_nominal: totalNominal,
       nominal_bulan_ini: nominalBulanIni,
       nominal_tunggakan_lalu: nominalTunggakanBerjalan + nominalTunggakanHistoris,
+      nominal_lebih_awal: r.nominal_lebih_awal,
+      orang_lebih_awal: r.orang_lebih_awal,
       nominal_tunggakan_berjalan: nominalTunggakanBerjalan,
       nominal_tunggakan_historis: nominalTunggakanHistoris,
       persentase,
@@ -1050,4 +1078,75 @@ export async function getRekapAsramaSnapshot(
     return { error: error instanceof Error ? error.message : 'Gagal membuat laporan rekap.' }
   }
 }
+
+export async function getDetailPembayarTunggakan(tahun: number, bulan: number) {
+  const session = await getSession()
+  assertMonitoringAccess(session)
+
+  const monthStart = `${tahun}-${String(bulan).padStart(2, '0')}-01`
+  const nextMo = bulan === 12 ? 1 : bulan + 1
+  const nextYr = bulan === 12 ? tahun + 1 : tahun
+  const monthEnd = `${nextYr}-${String(nextMo).padStart(2, '0')}-01`
+  const currentYm = tahun * 100 + bulan
+
+  const rows = await query<{
+    id: string
+    nama_lengkap: string
+    asrama: string | null
+    tahun: number
+    bulan: number
+  }>(`
+    WITH 
+      tunggakan_berjalan AS (
+        SELECT santri_id, tahun, bulan
+        FROM spp_log
+        WHERE (tahun * 100 + bulan) < ?
+          AND tanggal_bayar >= ? AND tanggal_bayar < ?
+      ),
+      tunggakan_historis AS (
+        SELECT santri_id, tahun, bulan
+        FROM spp_tunggakan_historis
+        WHERE status = 'LUNAS'
+          AND tanggal_lunas >= ? AND tanggal_lunas < ?
+      ),
+      gabungan AS (
+        SELECT santri_id, tahun, bulan FROM tunggakan_berjalan
+        UNION ALL
+        SELECT santri_id, tahun, bulan FROM tunggakan_historis
+      )
+    SELECT
+      s.id,
+      s.nama_lengkap,
+      s.asrama,
+      g.tahun,
+      g.bulan
+    FROM gabungan g
+    JOIN santri s ON s.id = g.santri_id
+    WHERE s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+    ORDER BY s.asrama, s.nama_lengkap, g.tahun, g.bulan
+  `, [currentYm, monthStart, monthEnd, monthStart, monthEnd])
+
+  const grouped = new Map<string, {
+    id: string
+    nama_lengkap: string
+    asrama: string
+    unpaidMonths: { tahun: number; bulan: number }[]
+  }>()
+
+  rows.forEach(r => {
+    if (!grouped.has(r.id)) {
+      grouped.set(r.id, {
+        id: r.id,
+        nama_lengkap: r.nama_lengkap,
+        asrama: r.asrama || 'LAINNYA',
+        unpaidMonths: []
+      })
+    }
+    grouped.get(r.id)!.unpaidMonths.push({ tahun: r.tahun, bulan: r.bulan })
+  })
+
+  return Array.from(grouped.values())
+}
+
 

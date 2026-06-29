@@ -1,16 +1,17 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow, getRekapAsramaSnapshot, type RekapAsramaPayload } from './actions'
-import type { RekapOrientation } from './_rekap-asrama-print'
 import {
   Building2, Users, ShieldCheck, AlertCircle, CheckCircle2,
   CalendarCheck, Banknote, RefreshCw, ChevronLeft,
-  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download, CalendarDays
+  ChevronRight, UserCheck, Eye, X, Check, Search, Save, FileText, Download, CalendarDays, History
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import dynamic from 'next/dynamic'
+
+import { getMonitoringSetoran, getSppSettings, simpanSetoran, getClientRestriction, getSppBillingStart, simpanSppBillingStart, getMonitoringPrintMeta, getDaftarPenunggak, getDaftarBebasSpp, getPenunggakExportData, getSppSetoranWindow, simpanSppSetoranWindow, getRekapAsramaSnapshot, getDetailPembayarTunggakan, type RekapAsramaPayload } from './actions'
+import type { RekapOrientation } from './_rekap-asrama-print'
 
 const BULAN_NAMA = [
   '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -25,12 +26,15 @@ type AsramaRow = {
   wajib_bayar: number
   bayar_bulan_ini: number
   bayar_tunggakan_lalu: number
+  orang_bayar_tunggakan?: number
   penunggak: number
   total_nominal: number
   nominal_bulan_ini: number
   nominal_tunggakan_lalu: number
   nominal_tunggakan_berjalan?: number
   nominal_tunggakan_historis?: number
+  nominal_lebih_awal: number
+  orang_lebih_awal: number
   persentase: number
   tanggal_setor: string | null
   nama_penyetor: string | null
@@ -71,6 +75,12 @@ export default function MonitoringSetoranPage() {
   const [rekapLoading, setRekapLoading] = useState<string | null>(null)
   const [rekapModalUnit, setRekapModalUnit] = useState<string | null>(null)
   const [rekapOrientation, setRekapOrientation] = useState<RekapOrientation>('landscape')
+
+  // PEMBAYAR TUNGGAKAN MODAL STATE
+  const [isTunggakanModalOpen, setIsTunggakanModalOpen] = useState(false)
+  const [detailTunggakanList, setDetailTunggakanList] = useState<any[]>([])
+  const [loadingTunggakanDetail, setLoadingTunggakanDetail] = useState(false)
+  const [cacheTunggakanDetail, setCacheTunggakanDetail] = useState<Record<string, any[]>>({})
 
   // TABS & PENUNGGAK STATE
   const [activeTab, setActiveTab] = useState<'setoran' | 'penunggak' | 'bebas'>('setoran')
@@ -416,8 +426,34 @@ export default function MonitoringSetoranPage() {
       toast.success('Setoran berhasil disimpan')
       setIsEditingForm(false)
       load(true)
+      // Reset detail tunggakan cache as well
+      setCacheTunggakanDetail(prev => {
+        const key = `${tahun}-${bulan}`
+        const copy = { ...prev }
+        delete copy[key]
+        return copy
+      })
     } finally {
       setSavingSetoran(false)
+    }
+  }
+
+  async function handleOpenTunggakanModal() {
+    setIsTunggakanModalOpen(true)
+    const key = `${tahun}-${bulan}`
+    if (cacheTunggakanDetail[key]) {
+      setDetailTunggakanList(cacheTunggakanDetail[key])
+      return
+    }
+    setLoadingTunggakanDetail(true)
+    try {
+      const res = await getDetailPembayarTunggakan(tahun, bulan)
+      setDetailTunggakanList(res)
+      setCacheTunggakanDetail(prev => ({ ...prev, [key]: res }))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gagal memuat detail tunggakan.')
+    } finally {
+      setLoadingTunggakanDetail(false)
     }
   }
 
@@ -476,6 +512,8 @@ export default function MonitoringSetoranPage() {
   const totalNominal   = filteredData.reduce((a, r) => a + r.total_nominal, 0)
   const totalNominalBulanIni = filteredData.reduce((a, r) => a + r.nominal_bulan_ini, 0)
   const totalNominalTunggakan = filteredData.reduce((a, r) => a + r.nominal_tunggakan_lalu, 0)
+  const totalNominalLebihAwal = filteredData.reduce((a, r) => a + r.nominal_lebih_awal, 0)
+  const totalOrangTunggakan = filteredData.reduce((a, r) => a + (r.orang_bayar_tunggakan || 0), 0)
   const pctKeseluruhan = totalWajib > 0 ? Math.round((totalBayar / totalWajib) * 100) : 0
   const selectedBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
   const tahunAjaranDisplay = tahunAjaranNama ?? deriveAcademicYear(tahun, bulan)
@@ -615,16 +653,17 @@ export default function MonitoringSetoranPage() {
 
           {/* ── Ringkasan Total - Sleek Version ── */}
           {!userAsrama && hasLoaded && filteredData.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-6">
               <StatCard title="Total Santri" value={fmt(totalSantri)} icon={Users} />
               <StatCard title="Tidak Ada Tagihan" value={fmt(totalTidakAdaTagihan)} icon={CalendarCheck} color="text-blue-600" />
               <StatCard title="Wajib SPP" value={fmt(totalWajib)} icon={UserCheck} />
               <StatCard title="Telah Lunas" value={fmt(totalBayar)} sub={`${pctKeseluruhan}%`} icon={CheckCircle2} color="text-emerald-600" />
+              <StatCard title="Pembayar Tunggakan" value={fmt(totalOrangTunggakan)} icon={History} color="text-amber-600" onClick={handleOpenTunggakanModal} />
               <StatCard title="Penunggak" value={fmt(totalTunggak)} icon={AlertCircle} color="text-rose-600" />
               <div className="col-span-2 md:col-span-1 border border-indigo-100 bg-indigo-50/50 rounded-xl p-3 flex flex-col justify-center relative overflow-hidden">
                  <div className="text-[10px] font-semibold text-indigo-500 uppercase tracking-widest mb-1">Uang Tercatat</div>
                  <div className="text-xl font-bold text-indigo-900 leading-none">{fmtRp(totalNominal)}</div>
-                 <div className="text-[10px] text-slate-500 mt-1">Bulan ini {fmtRp(totalNominalBulanIni)} + tunggakan {fmtRp(totalNominalTunggakan)}</div>
+                 <div className="text-[10px] text-slate-500 mt-1">Bulan ini {fmtRp(totalNominalBulanIni)} + tunggakan {fmtRp(totalNominalTunggakan)}{totalNominalLebihAwal > 0 && ` + titipan ${fmtRp(totalNominalLebihAwal)}`}</div>
               </div>
             </div>
           )}
@@ -687,6 +726,11 @@ export default function MonitoringSetoranPage() {
                           {!row.belum_ada_tagihan && row.nominal_tunggakan_lalu > 0 && (
                             <p className="text-[10px] font-medium text-slate-500 mt-0.5">
                               {fmtRp(row.nominal_bulan_ini)} bulan ini + {fmtRp(row.nominal_tunggakan_lalu)} tunggakan
+                            </p>
+                          )}
+                          {!row.belum_ada_tagihan && row.nominal_lebih_awal > 0 && (
+                            <p className="text-[10px] font-medium text-emerald-600 mt-0.5">
+                              + {fmtRp(row.nominal_lebih_awal)} ({fmt(row.orang_lebih_awal)} Titipan)
                             </p>
                           )}
                           {row.penunggak > 0 && <p className="text-[10px] font-medium text-rose-500 mt-0.5">-{fmt(row.penunggak)} Orang Nunggak</p>}
@@ -1139,6 +1183,65 @@ export default function MonitoringSetoranPage() {
         </div>
       )}
 
+      {/* ── Modal Pembayar Tunggakan ── */}
+      {isTunggakanModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setIsTunggakanModalOpen(false)}>
+          <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Pembayar Tunggakan</h2>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">Daftar santri yang melunasi tunggakan di bulan {BULAN_NAMA[bulan]} {tahun}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsTunggakanModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 p-2 rounded-full transition-colors border border-slate-200">
+                <X className="w-4 h-4"/>
+              </button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto bg-slate-50/30 flex-1">
+              {loadingTunggakanDetail ? (
+                <div className="py-24 flex flex-col items-center justify-center text-slate-400">
+                  <RefreshCw className="w-8 h-8 animate-spin mb-4 text-amber-500" />
+                  <p className="text-sm font-medium">Memuat data detail pembayar...</p>
+                </div>
+              ) : detailTunggakanList.length === 0 ? (
+                <div className="py-24 text-center text-slate-400">
+                  <p className="text-sm font-medium">Tidak ada data pembayar tunggakan bulan ini.</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="sticky top-0 bg-white border-b border-slate-200 shadow-sm z-10">
+                    <tr>
+                      <th className="py-3 px-5 font-bold text-xs uppercase text-slate-500 tracking-wider">No</th>
+                      <th className="py-3 px-5 font-bold text-xs uppercase text-slate-500 tracking-wider">Nama Santri</th>
+                      <th className="py-3 px-5 font-bold text-xs uppercase text-slate-500 tracking-wider">Asrama</th>
+                      <th className="py-3 px-5 font-bold text-xs uppercase text-slate-500 tracking-wider">Bulan Tunggakan Dilunasi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {detailTunggakanList.map((row, idx) => (
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-5 text-slate-500 text-center w-12">{idx + 1}</td>
+                        <td className="py-3 px-5 font-semibold text-slate-800">{row.nama_lengkap}</td>
+                        <td className="py-3 px-5 text-slate-600">{row.asrama}</td>
+                        <td className="py-3 px-5 text-amber-700 font-medium">{formatUnpaidMonths(row.unpaidMonths)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 shrink-0 text-right">
+              <p className="text-xs font-semibold text-slate-500">Total: {detailTunggakanList.length} Santri</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal Mulai Setor ── */}
       {isSetoranWindowModalOpen && (
         <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
@@ -1275,9 +1378,9 @@ export default function MonitoringSetoranPage() {
   )
 }
 
-function StatCard({title, value, sub, icon: Icon, color}: {title: string, value: string, sub?: string, icon: any, color?: string}) {
+function StatCard({title, value, sub, icon: Icon, color, onClick}: {title: string, value: string, sub?: string, icon: any, color?: string, onClick?: () => void}) {
   return (
-    <div className="border border-slate-200 rounded-xl p-3 flex flex-col justify-center bg-white shadow-sm">
+    <div onClick={onClick} className={`border border-slate-200 rounded-xl p-3 flex flex-col justify-center bg-white shadow-sm transition-colors ${onClick ? 'cursor-pointer hover:border-blue-300 hover:shadow-md hover:bg-blue-50/30' : ''}`}>
       <div className="flex justify-between items-start mb-1">
         <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{title}</div>
         <Icon className={`w-3.5 h-3.5 ${color || 'text-slate-400'}`} />
