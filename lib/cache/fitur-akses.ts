@@ -156,6 +156,12 @@ async function getUserOverrides(userId: string): Promise<OverrideRow[]> {
 // PLUS apply per-user overrides (grant/revoke)
 export async function getFiturForRoles(roles: string[], userId?: string): Promise<FiturAkses[]> {
   const all = await getCachedFiturAkses()
+
+  // Admin & akun demo: lihat SEMUA fitur aktif (akses penuh)
+  if (roles.includes('admin') || roles.includes('demo')) {
+    return all.filter(f => f.is_active)
+  }
+
   const overrides = userId ? await getUserOverrides(userId) : []
 
   const grantedIds = new Set(overrides.filter(o => o.action === 'grant').map(o => o.fitur_id))

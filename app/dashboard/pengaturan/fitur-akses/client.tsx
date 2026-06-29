@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
-import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2, Search, X } from 'lucide-react'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2, Search, X, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
 
@@ -1005,6 +1005,7 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [resetting, setResetting] = useState(false)
   const normalizedSearch = searchQuery.trim().toLowerCase()
   const filteredFiturList = normalizedSearch
     ? fiturList.filter(fitur => {
@@ -1017,6 +1018,21 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  async function handleResetDemo() {
+    if (!confirm('Reset SEMUA data demo (DEMO_DB) dan isi ulang data sampel? Data demo saat ini akan dihapus. Data ASLI tidak terpengaruh.')) return
+    setResetting(true)
+    try {
+      const res = await fetch('/api/demo/reset', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Reset gagal')
+      showToast(`Data demo di-reset (${json.seeded} seed, ${json.syncedUsers} user demo).`, 'success')
+    } catch (e: any) {
+      showToast(e?.message || 'Reset gagal', 'error')
+    } finally {
+      setResetting(false)
+    }
   }
 
   function updateLocal(id: number, updater: (f: FiturItem) => FiturItem) {
@@ -1172,6 +1188,26 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
           Perubahan akses tersimpan langsung ke database dan berlaku dalam <strong>±5 menit</strong> setelah cache diperbarui.
           Role <strong>Admin</strong> tidak bisa dicabut aksesnya dari fitur apapun.
         </span>
+      </div>
+
+      {/* Reset data demo */}
+      <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+        <div className="flex items-start gap-3 text-sm text-amber-800">
+          <RotateCcw className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+          <span>
+            <strong>Akun Demo</strong> — kosongkan data sandbox lalu isi ulang data sampel.
+            Hanya berlaku ke <strong>DEMO_DB</strong>, data asli aman.
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleResetDemo}
+          disabled={resetting}
+          className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RotateCcw className={cn("w-4 h-4", resetting && "animate-spin")} />
+          {resetting ? 'Mereset…' : 'Reset Data Demo'}
+        </button>
       </div>
 
       {showSearch && (

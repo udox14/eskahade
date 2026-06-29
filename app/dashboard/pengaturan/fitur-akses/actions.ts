@@ -8,6 +8,7 @@ import { revalidateTag } from 'next/cache'
 
 const ALL_ROLES = [
   'admin',
+  'demo',
   'keamanan',
   'sekpen',
   'dewan_santri',

@@ -1,5 +1,5 @@
 import { query } from '@/lib/db'
-import { getSession, getEffectiveRoles, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, getEffectiveRoles, isSuperAccess, type SessionUser } from '@/lib/auth/session'
 import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 
 export type CrudAction = 'create' | 'update' | 'delete'
@@ -56,7 +56,7 @@ export async function canCrudForSession(
   action: CrudAction
 ): Promise<boolean> {
   if (!session) return false
-  if (isAdmin(session)) return true
+  if (isSuperAccess(session)) return true
 
   const roles = getEffectiveRoles(session)
   if (roles.length === 0) return false
@@ -97,7 +97,7 @@ export async function getCrudForRoles(
   fiturHref: string,
   roles: string[]
 ): Promise<{ canCreate: boolean; canUpdate: boolean; canDelete: boolean }> {
-  if (roles.includes('admin')) {
+  if (roles.includes('admin') || roles.includes('demo')) {
     return { canCreate: true, canUpdate: true, canDelete: true }
   }
   if (roles.length === 0) {

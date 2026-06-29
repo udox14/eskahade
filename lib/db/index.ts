@@ -1,8 +1,12 @@
 // lib/db/index.ts
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { isDemoRequest } from '@/lib/auth/demo-context'
 
 export async function getDB() {
   const { env } = await getCloudflareContext({ async: true })
+  // Session role 'demo' → arahkan SEMUA query ke DB sandbox (data dummy),
+  // sehingga tidak pernah menyentuh data asli.
+  if (await isDemoRequest()) return env.DEMO_DB
   return env.DB
 }
 

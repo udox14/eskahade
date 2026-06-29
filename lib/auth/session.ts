@@ -221,6 +221,17 @@ export function isAdmin(session: SessionUser | null): boolean {
   return hasRole(session, 'admin')
 }
 
+// Role AKUN DEMO: setara super admin (bypass gate fitur). Data sudah disandbox
+// ke DEMO_DB lewat getDB(), jadi akses penuh ini aman terhadap data asli.
+export function isDemo(session: SessionUser | null): boolean {
+  return hasRole(session, 'demo')
+}
+
+// Akses super: admin asli ATAU akun demo. Dipakai di titik bypass akses fitur.
+export function isSuperAccess(session: SessionUser | null): boolean {
+  return isAdmin(session) || isDemo(session)
+}
+
 export function getEffectiveRoles(session: SessionUser | null): string[] {
   if (!session) return []
   const roles = getRoles(session)

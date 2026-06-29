@@ -214,7 +214,7 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
                 {jenis}
               </label>
             ))}
-            <button onClick={submitBulk} disabled={loading || !selected.size} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">Tandai Terpilih Bayar</button>
+            <button onClick={submitBulk} disabled={loading || !selected.size} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">Tandai Lunas</button>
             {lastBatch && (
               <button onClick={undoBatch} className="flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50">
                 <RotateCcw className="h-4 w-4" /> Void Batch

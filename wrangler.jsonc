@@ -34,6 +34,15 @@
 			"database_name": "eskahade-db",
 			"database_id": "a2010f08-f314-46af-88fd-dbb9b4ef1bb1",
 			"remote": true
+		},
+		{
+			// DB sandbox untuk role AKUN DEMO. Schema sama dgn DB asli (jalankan
+			// semua migrasi yang sama), berisi data dummy. CRUD demo diarahkan ke sini.
+			// TODO: isi database_id setelah `wrangler d1 create eskahade-demo-db`.
+			"binding": "DEMO_DB",
+			"database_name": "eskahade-demo-db",
+			"database_id": "677f05ba-9b52-4534-9542-96cc785f25e4",
+			"remote": true
 		}
 	],
 	"r2_buckets": [

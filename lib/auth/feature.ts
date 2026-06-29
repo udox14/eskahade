@@ -1,4 +1,4 @@
-import { getSession, getEffectiveRoles, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, getEffectiveRoles, isSuperAccess, type SessionUser } from '@/lib/auth/session'
 import { canAccessHref } from '@/lib/cache/fitur-akses'
 import { canCrudForSession, type CrudAction } from '@/lib/auth/crud'
 
@@ -9,7 +9,7 @@ export async function canAccessFeatureForSession(
   href: string
 ): Promise<boolean> {
   if (!session) return false
-  if (isAdmin(session)) return true
+  if (isSuperAccess(session)) return true
 
   const roles = getEffectiveRoles(session)
   if (roles.length === 0) return false

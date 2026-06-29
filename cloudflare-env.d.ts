@@ -55,6 +55,9 @@ interface CloudflareEnv {
   // D1 Database (pengganti Supabase)
   DB: D1Database
 
+  // D1 Database sandbox untuk role AKUN DEMO (data dummy, terpisah dari DB asli)
+  DEMO_DB: D1Database
+
   // R2 Storage (pengganti Supabase Storage)
   R2_BUCKET: R2Bucket
 

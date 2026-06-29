@@ -16,6 +16,7 @@ import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 // UPDATE: Tambahkan Role Bendahara
 const ROLES = [
   { value: 'admin', label: 'Admin' },
+  { value: 'demo', label: 'Akun Demo' }, // sandbox: akses penuh, data dummy
   { value: 'bendahara', label: 'Bendahara Umum' }, // BARU
   { value: 'sekpen', label: 'Sekpen' },
   { value: 'keamanan', label: 'Keamanan' },
@@ -779,6 +780,7 @@ export default function ManajemenUserPage() {
                             return (
                               <span key={r} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 r === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                r === 'demo' ? 'bg-amber-100 text-amber-700' :
                                 r === 'pengurus_asrama' ? 'bg-orange-100 text-orange-700' :
                                 r === 'bendahara' ? 'bg-emerald-100 text-emerald-700' :
                                 r === 'keamanan' ? 'bg-red-100 text-red-700' :

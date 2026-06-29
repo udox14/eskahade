@@ -21,8 +21,8 @@ export async function guardPage(href: string): Promise<SessionUser> {
 
   const roles = getEffectiveRoles(session)
 
-  // Admin selalu boleh akses semua
-  if (roles.includes('admin')) {
+  // Admin (dan akun demo) selalu boleh akses semua
+  if (roles.includes('admin') || roles.includes('demo')) {
     return session
   }
 

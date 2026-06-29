@@ -37,7 +37,9 @@
       "Bash(python -c \"import pdfplumber\")",
       "Bash(python -c \"import fitz\")",
       "Bash(python -c ' *)",
-      "Bash(awk '{print $NF}')"
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs ls -lh)",
+      "Bash(grep -ri \"demo\\\\|test.*user\\\\|sample.*data\" /c/DATA/eskahade --include=\"*.ts\" --include=\"*.sql\" ! -path \"*/node_modules/*\" ! -path \"*/.next/*\")"
     ]
   }
 }
