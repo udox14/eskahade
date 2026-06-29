@@ -304,6 +304,9 @@ export default function SantriToolsPage() {
                             : <Square className="w-4 h-4 text-slate-300 shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-slate-800 truncate">{s.nama_lengkap}</p>
+                            {s.sekolah_baru && s.sekolah_baru !== s.sekolah && (
+                              <p className="text-[10px] font-bold text-blue-600">Sekolah baru: {s.sekolah_baru}</p>
+                            )}
                             <p className="text-[10px] text-slate-400">{s.nis} · {s.asrama} · {s.sekolah || '-'}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 text-sm">

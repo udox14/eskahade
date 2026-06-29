@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 
 let santriToolsSchemaReady: Promise<void> | null = null
 const NAIK_KELAS_CHUNK_SIZE = 50
+const DEFAULT_SLTA_SEKOLAH = 'MAN'
 
 async function ensureSantriToolsSchema() {
   santriToolsSchemaReady ??= (async () => {
@@ -106,6 +107,7 @@ export async function previewNaikKelas(filter: {
     const angka = parseKelas(s.kelas_sekolah)
     const suffix = s.kelas_sekolah.trim().replace(/^\d+/, '') // ambil suffix huruf, misal "A" dari "7A"
     let kelasBaruStr: string | null = null
+    let sekolahBaruStr: string | null = s.sekolah
     let status: 'naik' | 'lulus_sltp' | 'lulus_slta' | 'tidak_diketahui' = 'tidak_diketahui'
 
     if (angka === null) {
@@ -113,6 +115,7 @@ export async function previewNaikKelas(filter: {
     } else if (angka === 9) {
       status = 'lulus_sltp'
       kelasBaruStr = '10' + suffix
+      sekolahBaruStr = DEFAULT_SLTA_SEKOLAH
     } else if (angka === 12) {
       status = 'lulus_slta'
       kelasBaruStr = null // lulus, kelas_sekolah dikosongkan
@@ -121,7 +124,7 @@ export async function previewNaikKelas(filter: {
       kelasBaruStr = String(angka + 1) + suffix
     }
 
-    return { ...s, angka_kelas: angka, kelas_baru: kelasBaruStr, status }
+    return { ...s, angka_kelas: angka, kelas_baru: kelasBaruStr, sekolah_baru: sekolahBaruStr, status }
   })
 }
 
@@ -134,11 +137,11 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
   if (!cleanIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   // Ambil data kelas_sekolah santri yang dipilih
-  const rows: { id: string; kelas_sekolah: string }[] = []
+  const rows: { id: string; sekolah: string | null; kelas_sekolah: string }[] = []
   for (const chunk of chunkArray(cleanIds, NAIK_KELAS_CHUNK_SIZE)) {
     const ph = chunk.map(() => '?').join(',')
-    rows.push(...await query<{ id: string; kelas_sekolah: string }>(
-      `SELECT id, kelas_sekolah FROM santri WHERE id IN (${ph})`,
+    rows.push(...await query<{ id: string; sekolah: string | null; kelas_sekolah: string }>(
+      `SELECT id, sekolah, kelas_sekolah FROM santri WHERE id IN (${ph})`,
       chunk
     ))
   }
@@ -156,6 +159,9 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
   if (!updates.length) return { error: 'Tidak ada kelas yang bisa dinaikkan.' }
 
   const now = new Date().toISOString()
+  const kelas9Ids = rows
+    .filter(row => parseKelas(row.kelas_sekolah) === 9)
+    .map(row => row.id)
   const idsByKelasBaru = new Map<string | null, string[]>()
   for (const update of updates) {
     const current = idsByKelasBaru.get(update.kelas_baru) || []
@@ -173,6 +179,13 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
         )
       }
     }
+    for (const chunk of chunkArray(kelas9Ids, NAIK_KELAS_CHUNK_SIZE)) {
+      const ph = chunk.map(() => '?').join(',')
+      await execute(
+        `UPDATE santri SET sekolah = ?, updated_at = ? WHERE id IN (${ph})`,
+        [DEFAULT_SLTA_SEKOLAH, now, ...chunk]
+      )
+    }
   } catch (err: any) {
     console.error('[santri-tools] eksekusiNaikKelas ERROR:', err?.message)
     return { error: `Gagal menaikkan kelas massal: ${err?.message ?? 'error tidak diketahui'}` }
@@ -188,7 +201,7 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
     entityId: 'naik-kelas',
     entityLabel: 'Naik kelas massal',
     summary: `Menaikkan kelas ${updates.length} santri`,
-    details: { updated: updates.length },
+    details: { updated: updates.length, kelas_9_ke_sekolah: DEFAULT_SLTA_SEKOLAH, kelas_9_count: kelas9Ids.length },
   })
 
   revalidatePath('/dashboard/santri')
