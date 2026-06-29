@@ -7,6 +7,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 let santriToolsSchemaReady: Promise<void> | null = null
+const NAIK_KELAS_CHUNK_SIZE = 50
 
 async function ensureSantriToolsSchema() {
   santriToolsSchemaReady ??= (async () => {
@@ -134,7 +135,7 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
 
   // Ambil data kelas_sekolah santri yang dipilih
   const rows: { id: string; kelas_sekolah: string }[] = []
-  for (const chunk of chunkArray(cleanIds, 200)) {
+  for (const chunk of chunkArray(cleanIds, NAIK_KELAS_CHUNK_SIZE)) {
     const ph = chunk.map(() => '?').join(',')
     rows.push(...await query<{ id: string; kelas_sekolah: string }>(
       `SELECT id, kelas_sekolah FROM santri WHERE id IN (${ph})`,
@@ -164,7 +165,7 @@ export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success:
 
   try {
     for (const [kelasBaru, ids] of idsByKelasBaru.entries()) {
-      for (const chunk of chunkArray(ids, 200)) {
+      for (const chunk of chunkArray(ids, NAIK_KELAS_CHUNK_SIZE)) {
         const ph = chunk.map(() => '?').join(',')
         await execute(
           `UPDATE santri SET kelas_sekolah = ?, updated_at = ? WHERE id IN (${ph})`,
