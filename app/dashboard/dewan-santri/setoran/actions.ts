@@ -147,7 +147,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       ),
       tunggakan_unit AS (
         SELECT bs.unit_setor,
-               COUNT(DISTINCT bt.santri_id) AS jumlah_bayar,
+               SUM(bt.jumlah_bayar) AS jumlah_bayar,
                SUM(bt.total_nominal) AS total_nominal
         FROM base_santri bs
         JOIN bayar_tunggakan bt ON bt.santri_id = bs.id

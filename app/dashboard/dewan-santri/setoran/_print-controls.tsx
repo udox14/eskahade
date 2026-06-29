@@ -205,8 +205,8 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
             .monitoring-print-sheet * { box-sizing: border-box; }
             .monitoring-print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .monitoring-print-sheet th,
-            .monitoring-print-sheet td { border: 1px solid #0f172a; padding: 5px 6px; vertical-align: middle; }
-            .monitoring-print-sheet .currency { width: 30px; text-align: center; }
+            .monitoring-print-sheet td { border: 1px solid #0f172a; padding: 4px 3px; vertical-align: middle; line-height: 1.15; }
+            .monitoring-print-sheet .currency { text-align: center; }
             .monitoring-print-sheet .text-left { text-align: left; }
             .monitoring-print-sheet .text-center { text-align: center; }
             .monitoring-print-sheet .text-right { text-align: right; }
@@ -214,12 +214,12 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
             .monitoring-print-sheet .summary-card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px; background: #f8fafc; }
             .monitoring-print-sheet .summary-card-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
             .monitoring-print-sheet .summary-card-value { margin-top: 4px; font-size: 18px; font-weight: 700; color: #0f172a; }
-            .monitoring-print-sheet .main-head th { background: #e2e8f0; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-            .monitoring-print-sheet .sub-head th { background: #f8fafc; font-size: 9px; font-weight: 700; }
-            .monitoring-print-sheet tbody td { font-size: 10px; }
+            .monitoring-print-sheet .main-head th { background: #e2e8f0; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+            .monitoring-print-sheet .sub-head th { background: #f8fafc; font-size: 8px; font-weight: 700; }
+            .monitoring-print-sheet tbody td { font-size: 9.5px; }
             .monitoring-print-sheet .highlight { background: #fef3c7; font-weight: 700; }
             .monitoring-print-sheet .money-highlight { background: #fff7ed; font-weight: 700; }
-            .monitoring-print-sheet .total-row td { background: #dbeafe; font-weight: 800; }
+            .monitoring-print-sheet .total-row td { background: #dbeafe; font-weight: 700; }
             .monitoring-print-sheet .total-row td.total-amount { background: #fee2e2; }
             .monitoring-print-sheet .footer-note { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; gap: 12px; }
             .monitoring-print-sheet .signature { width: 220px; text-align: center; }
@@ -232,7 +232,7 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
 
       <div className="monitoring-print-sheet">
         <div className="mb-4 text-center">
-          <div className="text-[24px] font-black uppercase tracking-wide">{title}</div>
+          <div className="text-[24px] font-bold uppercase tracking-wide">{title}</div>
           <div className="mt-1 text-[12px] font-bold uppercase tracking-[0.2em] text-slate-600">{subtitle}</div>
           <div className="mt-1 text-[14px] font-bold uppercase">Tahun Ajaran {tahunAjaran}</div>
         </div>
@@ -257,24 +257,45 @@ const MonitoringPrintSheet = React.forwardRef<HTMLDivElement, {
         </div>
 
         <table>
+          <colgroup>
+            <col style={{ width: '35px' }} /> {/* No */}
+            <col style={{ width: mode === 'SADESA' ? '100px' : '140px' }} /> {/* Asrama */}
+            <col style={{ width: '70px' }} /> {/* Jumlah Penduduk */}
+            <col style={{ width: '65px' }} /> {/* Digratiskan */}
+            <col style={{ width: '75px' }} /> {/* Tidak Ada Tagihan */}
+            <col style={{ width: '65px' }} /> {/* Wajib Bayar */}
+            <col style={{ width: '75px' }} /> {/* Jumlah Bayar Bulan Ini */}
+            <col style={{ width: '65px' }} /> {/* Penunggak */}
+            <col style={{ width: '80px' }} /> {/* Bayar Tunggakan */}
+            <col style={{ width: '65px' }} /> {/* Jumlah Bayar */}
+            <col style={{ width: '22px' }} /> {/* Biaya Rp */}
+            <col style={{ width: '70px' }} /> {/* Biaya Nominal */}
+            <col style={{ width: '22px' }} /> {/* Uang Tercatat Rp */}
+            <col style={{ width: '104px' }} /> {/* Uang Tercatat Nominal */}
+            <col style={{ width: '63px' }} /> {/* Rincian Bulan Ini */}
+            <col style={{ width: '63px' }} /> {/* Rincian Tunggakan */}
+            <col style={{ width: '40px' }} /> {/* % */}
+            <col style={{ width: '75px' }} /> {/* Tgl/Jam Stor */}
+            <col style={{ width: '40px' }} /> {/* Rank */}
+          </colgroup>
           <thead>
             <tr className="main-head">
-              <th rowSpan={2} style={{ width: '34px' }}>No</th>
-              <th rowSpan={2} style={{ width: mode === 'SADESA' ? '100px' : '140px' }}>Asrama</th>
-              <th rowSpan={2} style={{ width: '78px' }}>Jumlah Penduduk</th>
-              <th rowSpan={2} style={{ width: '72px' }}>Digratiskan</th>
-              <th rowSpan={2} style={{ width: '82px' }}>Tidak Ada Tagihan</th>
-              <th rowSpan={2} style={{ width: '74px' }}>Wajib Bayar</th>
-              <th rowSpan={2} style={{ width: '82px' }}>Jumlah Bayar Bulan Ini</th>
-              <th rowSpan={2} style={{ width: '72px' }}>Penunggak</th>
-              <th rowSpan={2} style={{ width: '88px' }}>Bayar Tunggakan</th>
-              <th rowSpan={2} style={{ width: '72px' }}>Jumlah Bayar</th>
-              <th colSpan={2} style={{ width: '92px' }}>Biaya</th>
-              <th colSpan={2} style={{ width: '126px' }}>Uang Tercatat</th>
-              <th colSpan={2} style={{ width: '126px' }}>Rincian</th>
-              <th rowSpan={2} style={{ width: '48px' }}>%</th>
-              <th rowSpan={2} style={{ width: '72px' }}>Tgl/Jam Stor</th>
-              <th rowSpan={2} style={{ width: '48px' }}>Rank</th>
+              <th rowSpan={2}>No</th>
+              <th rowSpan={2}>Asrama</th>
+              <th rowSpan={2}>Jumlah Penduduk</th>
+              <th rowSpan={2}>Digratiskan</th>
+              <th rowSpan={2}>Tidak Ada Tagihan</th>
+              <th rowSpan={2}>Wajib Bayar</th>
+              <th rowSpan={2}>Jumlah Bayar Bulan Ini</th>
+              <th rowSpan={2}>Penunggak</th>
+              <th rowSpan={2}>Bayar Tunggakan</th>
+              <th rowSpan={2}>Jumlah Bayar</th>
+              <th colSpan={2}>Biaya</th>
+              <th colSpan={2}>Uang Tercatat</th>
+              <th colSpan={2}>Rincian</th>
+              <th rowSpan={2}>%</th>
+              <th rowSpan={2}>Tgl/Jam Stor</th>
+              <th rowSpan={2}>Rank</th>
             </tr>
             <tr className="sub-head">
               <th className="currency">Rp</th>

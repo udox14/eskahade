@@ -124,24 +124,24 @@ const RekapAsramaSheet = React.forwardRef<HTMLDivElement, { payload: RekapAsrama
             __html: `
               .rekap-asrama-print { width: 100%; color: #000; background: #fff; font-family: "Arial","Helvetica",sans-serif; }
               .rekap-asrama-print * { box-sizing: border-box; }
-              .rekap-asrama-print .doc-title { text-align: center; font-weight: 800; }
+              .rekap-asrama-print .doc-title { text-align: center; font-weight: 700; }
               .rekap-asrama-print .doc-title .t1 { font-size: 13px; text-transform: uppercase; }
               .rekap-asrama-print .doc-title .t2 { font-size: 11px; text-transform: uppercase; margin-top: 1px; }
-              .rekap-asrama-print .asrama-line { font-size: 12px; font-weight: 800; margin: 8px 2px 6px; }
+              .rekap-asrama-print .asrama-line { font-size: 12px; font-weight: 700; margin: 8px 2px 6px; }
               .rekap-asrama-print table { width: 100%; border-collapse: collapse; table-layout: fixed; }
               .rekap-asrama-print th, .rekap-asrama-print td { border: 1px solid #000; padding: 1px 4px; font-size: 10px; line-height: 1.25; vertical-align: middle; }
-              .rekap-asrama-print thead th { font-weight: 800; text-align: center; text-transform: uppercase; background: #fff; }
+              .rekap-asrama-print thead th { font-weight: 700; text-align: center; text-transform: uppercase; background: #fff; }
               .rekap-asrama-print td.c { text-align: center; }
               .rekap-asrama-print td.l { text-align: left; }
               .rekap-asrama-print td.nm { text-align: left; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .rekap-asrama-print td.vert { text-align: center; padding: 2px; }
-              .rekap-asrama-print td.vert span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 800; text-transform: uppercase; white-space: nowrap; letter-spacing: .05em; }
-              .rekap-asrama-print td.midsection { text-align: center; font-weight: 800; text-transform: uppercase; }
-              .rekap-asrama-print td.subh { text-align: center; font-weight: 800; text-transform: uppercase; }
-              .rekap-asrama-print .rincian-stor { text-align: center; font-weight: 800; text-transform: uppercase; font-size: 12px; }
-              .rekap-asrama-print .sum-label { font-weight: 800; text-transform: uppercase; }
+              .rekap-asrama-print td.vert span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 700; text-transform: uppercase; white-space: nowrap; letter-spacing: .05em; }
+              .rekap-asrama-print td.midsection { text-align: center; font-weight: 700; text-transform: uppercase; }
+              .rekap-asrama-print td.subh { text-align: center; font-weight: 700; text-transform: uppercase; }
+              .rekap-asrama-print .rincian-stor { text-align: center; font-weight: 700; text-transform: uppercase; font-size: 12px; }
+              .rekap-asrama-print .sum-label { font-weight: 700; text-transform: uppercase; }
               .rekap-asrama-print .ttd-wrap { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-top: 14px; }
-              .rekap-asrama-print .ttd-wrap .role { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+              .rekap-asrama-print .ttd-wrap .role { font-size: 11px; font-weight: 700; text-transform: uppercase; }
               .rekap-asrama-print .ttd-wrap .gap { height: 64px; }
               .rekap-asrama-print .ttd-wrap .nm { font-size: 11px; }
               .rekap-asrama-print .notes { margin-top: 14px; font-size: 9px; font-style: italic; }
@@ -259,8 +259,8 @@ const RekapAsramaSheet = React.forwardRef<HTMLDivElement, { payload: RekapAsrama
             <tr>
               <td className="sum-label">Jml yg Digratiskan</td>
               <td className="c">{formatNumber(ringkasan.jml_gratis)}</td>
-              <td className="c" style={{ fontWeight: 800 }}>{formatNumber(ringkasan.jml_bayar)} × {formatNumber(ringkasan.tarif)}</td>
-              <td className="c" style={{ fontWeight: 800 }}>= {formatCurrency(ringkasan.total)}</td>
+              <td className="c" style={{ fontWeight: 700 }}>{formatNumber(ringkasan.jml_bayar)} × {formatNumber(ringkasan.tarif)}</td>
+              <td className="c" style={{ fontWeight: 700 }}>= {formatCurrency(ringkasan.total)}</td>
             </tr>
             <tr>
               <td className="sum-label">Jml Penunggak</td>
