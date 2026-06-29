@@ -92,8 +92,11 @@ export default function PenempatanKelasPage() {
   const grouped = useMemo(() => {
     const g: Record<string, KandidatPenempatan[]> = { A: [], B: [], C: [], X: [] }
     kandidat.forEach(k => g[k.grade ?? 'X'].push(k))
-    // Urutkan tiap grade ikut urutan grading (kecil=atas), baru/null jatuh ke bawah alfabet.
+    // Urutkan tiap grade ikut kelas asal (natural sort), lalu urutan grading (kecil=atas), baru/null jatuh ke bawah alfabet.
     Object.values(g).forEach(list => list.sort((a, b) => {
+      const cmpAsal = naturalCompare(a.asal || '', b.asal || '')
+      if (cmpAsal !== 0) return cmpAsal
+      
       const ua = a.urutan ?? Number.MAX_SAFE_INTEGER
       const ub = b.urutan ?? Number.MAX_SAFE_INTEGER
       if (ua !== ub) return ua - ub
