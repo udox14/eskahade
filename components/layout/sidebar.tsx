@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React from 'react'
 import Link from "next/link";
@@ -224,31 +224,31 @@ type ThemeColor = {
 const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
   light: {
     bg: "bg-white",
-    baseText: "text-slate-600",
+    baseText: "text-slate-700",
     borderBase: "border-slate-100",
     logoText: "text-slate-800",
-    toggleBtn: "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 hover:border-slate-300",
+    toggleBtn: "bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-300 shadow-sm",
     glowText: "text-emerald-600",
-    activeText: "text-emerald-700",
-    activeBg: "bg-emerald-50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]",
-    activeBorder: "border-emerald-500",
+    activeText: "text-slate-800",
+    activeBg: "bg-slate-100",
+    activeBorder: "border-slate-300",
     hoverBg: "hover:bg-slate-50",
     hoverText: "group-hover:text-slate-900",
-    mutedText: "text-slate-400",
-    folderActiveBg: "bg-slate-50 border-slate-200",
-    folderOpenBg: "border-slate-200",
-    indicator: "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]",
+    mutedText: "text-slate-500",
+    folderActiveBg: "bg-transparent border-transparent",
+    folderOpenBg: "border-transparent",
+    indicator: "bg-slate-400 shadow-none",
     glowBg: "bg-transparent",
     lineDivider: "before:bg-slate-200",
     footerBg: "bg-white border-slate-100",
     footerGlow: "bg-transparent",
-    themeIcon: "text-slate-400",
+    themeIcon: "text-slate-500",
     themeActiveBorder: "border-slate-400",
-    roleBadge: "bg-slate-100 text-slate-600 border border-slate-200",
+    roleBadge: "bg-slate-100 text-slate-700 border border-slate-200",
     roleLabel: "text-slate-500",
     searchBg: "bg-slate-50",
     searchBorder: "border border-slate-200",
-    searchFocus: "focus:bg-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400",
+    searchFocus: "focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300",
   },
   emerald: {
     bg: "bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950",
@@ -509,7 +509,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
       <button
         onClick={toggleSidebar}
         className={cn(
-          "absolute -right-3 top-16 flex items-center justify-center w-6 h-10 rounded-md border shadow-sm transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:w-7 hover:-right-3.5",
+          "absolute -right-3.5 top-16 flex items-center justify-center w-7 h-7 rounded-full border shadow-md transition-all duration-300 z-50 hidden md:flex opacity-60 hover:opacity-100 hover:scale-110",
           c.toggleBtn
         )}
         title={isCollapsed ? "Perlebar Sidebar" : "Lipat Sidebar"}
@@ -557,7 +557,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
         </div>
       )}
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40 transition-colors pb-10">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors pb-10">
         {groupedMenu.map(({ group, items }) => {
 
           if (group === '_standalone') {
@@ -613,7 +613,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                     ? `${c.folderActiveBg} ${c.activeText} shadow-lg border`
                     : `${c.mutedText} ${c.hoverBg} ${c.hoverText} hover:translate-x-1`,
                   isOpen && !isCollapsed
-                    ? `${c.activeBg} ${c.activeText} border-l-2 ${c.folderOpenBg}`
+                    ? `bg-transparent ${c.activeText} border-l-2 ${c.folderOpenBg}`
                     : "border-l-2 border-transparent"
                 )}
               >

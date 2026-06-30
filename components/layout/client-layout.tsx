@@ -40,7 +40,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 
         className={cn(
-          "no-print hidden md:flex flex-col fixed inset-y-0 z-50 shadow-2xl transition-all duration-300 ease-in-out",
+          "no-print hidden md:flex flex-col fixed inset-y-0 z-50 border-r border-slate-200 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-16" : "w-60"
         )}
       >
