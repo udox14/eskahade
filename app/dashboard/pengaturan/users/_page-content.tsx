@@ -17,6 +17,7 @@ import { rolesCanAccessFeature } from '@/lib/auth/role-access'
 const ROLES = [
   { value: 'admin', label: 'Admin' },
   { value: 'demo', label: 'Akun Demo' }, // sandbox: akses penuh, data dummy
+  { value: 'tester', label: 'Tester' },
   { value: 'bendahara', label: 'Bendahara Umum' }, // BARU
   { value: 'sekpen', label: 'Sekpen' },
   { value: 'keamanan', label: 'Keamanan' },

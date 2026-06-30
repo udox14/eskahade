@@ -66,6 +66,7 @@ function getIcon(name: string): React.ElementType {
 
 const ALL_ROLES = [
   'admin',
+  'tester',
   'keamanan',
   'sekpen',
   'dewan_santri',
@@ -81,6 +82,7 @@ const ALL_ROLES = [
 
 const ROLE_LABEL: Record<string, string> = {
   admin:           'Admin',
+  tester:          'Tester',
   keamanan:        'Keamanan',
   sekpen:          'Sekpen',
   dewan_santri:    'Dewan Santri',
@@ -96,6 +98,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 const ROLE_LABEL_FULL: Record<string, string> = {
   admin:           'Administrator',
+  tester:          'Tester',
   keamanan:        'Keamanan',
   sekpen:          'SEKPEN',
   dewan_santri:    'Dewan Santri',
@@ -111,6 +114,7 @@ const ROLE_LABEL_FULL: Record<string, string> = {
 
 const ROLE_COLOR: Record<string, string> = {
   admin:           'bg-red-100 text-red-700 border-red-200',
+  tester:          'bg-slate-100 text-slate-700 border-slate-200',
   keamanan:        'bg-orange-100 text-orange-700 border-orange-200',
   sekpen:          'bg-blue-100 text-blue-700 border-blue-200',
   dewan_santri:    'bg-purple-100 text-purple-700 border-purple-200',
@@ -126,6 +130,7 @@ const ROLE_COLOR: Record<string, string> = {
 
 const ROLE_BG_SOFT: Record<string, string> = {
   admin:           'bg-red-50 border-red-200',
+  tester:          'bg-slate-50 border-slate-200',
   keamanan:        'bg-orange-50 border-orange-200',
   sekpen:          'bg-blue-50 border-blue-200',
   dewan_santri:    'bg-purple-50 border-purple-200',
@@ -141,6 +146,7 @@ const ROLE_BG_SOFT: Record<string, string> = {
 
 const ROLE_HEADER: Record<string, string> = {
   admin:           'from-red-600 to-red-700',
+  tester:          'from-slate-600 to-slate-700',
   keamanan:        'from-orange-500 to-orange-600',
   sekpen:          'from-blue-600 to-blue-700',
   dewan_santri:    'from-purple-600 to-purple-700',
@@ -483,6 +489,7 @@ function TabCrudMatrix({
 
   function hasCrud(fitur: FiturItem, role: string, action: CrudAction) {
     if (role === 'admin') return true
+    if (role === 'tester') return false
     const row = crudMap.get(`${fitur.href}::${role}`)
     if (!row) return false
     if (action === 'create') return row.can_create
@@ -554,17 +561,19 @@ function TabCrudMatrix({
                   {actionLabels.map(item => {
                     const value = hasCrud(fitur, selectedRole, item.action)
                     const key = `crud-${fitur.href}-${selectedRole}-${item.action}`
-                    const disabled = selectedRole === 'admin' || loadingId === key || pending
+                    const isReadOnlyRole = selectedRole === 'tester'
+                    const disabled = selectedRole === 'admin' || isReadOnlyRole || loadingId === key || pending
                     return (
                       <button
                         key={item.action}
                         onClick={() => onToggleCrud(fitur, selectedRole, item.action, value)}
                         disabled={disabled}
-                        title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : item.title}
+                        title={selectedRole === 'admin' ? 'Admin selalu full CRUD' : isReadOnlyRole ? 'Tester hanya punya akses read-only' : item.title}
                         className={cn(
                           "inline-flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-black transition-all",
                           loadingId === key && "opacity-50 cursor-wait",
                           disabled && selectedRole === 'admin' && "cursor-not-allowed",
+                          disabled && isReadOnlyRole && "cursor-not-allowed",
                           value
                             ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
                             : "bg-slate-50 border-slate-200 text-slate-300 hover:bg-slate-100 hover:text-slate-500"

@@ -293,6 +293,7 @@ const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator',
+  tester: 'Tester',
   keamanan: 'Keamanan',
   sekpen: 'SEKPEN',
   dewan_santri: 'Dewan Santri',

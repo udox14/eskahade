@@ -60,6 +60,7 @@ export async function canCrudForSession(
 
   const roles = getEffectiveRoles(session)
   if (roles.length === 0) return false
+  if (roles.length === 1 && roles[0] === 'tester') return false
 
   const column = actionColumn(action)
   try {
@@ -99,6 +100,9 @@ export async function getCrudForRoles(
 ): Promise<{ canCreate: boolean; canUpdate: boolean; canDelete: boolean }> {
   if (roles.includes('admin') || roles.includes('demo')) {
     return { canCreate: true, canUpdate: true, canDelete: true }
+  }
+  if (roles.length === 1 && roles[0] === 'tester') {
+    return { canCreate: false, canUpdate: false, canDelete: false }
   }
   if (roles.length === 0) {
     return { canCreate: false, canUpdate: false, canDelete: false }

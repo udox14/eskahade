@@ -16,6 +16,7 @@ interface HeaderProps {
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator',
+  tester: 'Tester',
   wali_kelas: 'Wali Kelas',
   pengurus_asrama: 'Pengurus Asrama',
   akademik: 'Akademik',
@@ -27,6 +28,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 const ROLE_COLOR: Record<string, string> = {
   admin: 'text-rose-600',
+  tester: 'text-slate-600',
   wali_kelas: 'text-blue-600',
   pengurus_asrama: 'text-amber-600',
   keamanan: 'text-red-600',

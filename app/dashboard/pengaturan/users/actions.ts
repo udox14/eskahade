@@ -8,6 +8,18 @@ import { revalidatePath } from 'next/cache'
 import { getCachedFiturAkses } from '@/lib/cache/fitur-akses'
 
 const DEFAULT_USER_PASSWORD = 'eskahade2026'
+const VALID_USER_ROLES = [
+  'admin',
+  'demo',
+  'tester',
+  'bendahara',
+  'sekpen',
+  'keamanan',
+  'dewan_santri',
+  'pengurus_asrama',
+  'wali_kelas',
+  'guru',
+]
 
 type UserSourceType = 'guru' | 'sadesa'
 
@@ -84,6 +96,12 @@ function parseRoles(raw: string | null, fallbackRole: string) {
 
 function addRoleUnique(roles: string[], role: string) {
   return roles.includes(role) ? roles : [...roles, role]
+}
+
+function normalizeUserRoles(roles: unknown[]) {
+  return Array.from(new Set(roles
+    .map(role => String(role || '').trim().toLowerCase())
+    .filter(role => VALID_USER_ROLES.includes(role))))
 }
 
 async function ensureUserSourceColumns() {
@@ -175,6 +193,9 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
 
   if (!input.role) {
     return { error: `Role untuk ${sourceProfile.full_name} belum dipilih.` } as const
+  }
+  if (!VALID_USER_ROLES.includes(input.role)) {
+    return { error: `Role untuk ${sourceProfile.full_name} tidak valid.` } as const
   }
 
   if (input.role === 'pengurus_asrama' && !String(input.asrama_binaan || '').trim()) {
@@ -498,18 +519,19 @@ export async function updateUserRoles(
   asrama?: string,
   structuralJabatanInput?: string
 ): Promise<{ success: boolean } | { error: string }> {
-  if (!newRoles || newRoles.length === 0) return { error: 'Minimal satu role harus dipilih.' }
+  const normalizedRoles = normalizeUserRoles(newRoles || [])
+  if (normalizedRoles.length === 0) return { error: 'Minimal satu role valid harus dipilih.' }
   await ensureUserManagementColumns()
 
   const session = await getSession()
   const beforeUser = await getUserById(id)
   if (!beforeUser) return { error: 'User tidak ditemukan.' }
 
-  const primaryRole = newRoles[0]
-  const asramaBinaan = newRoles.includes('pengurus_asrama') ? (asrama || null) : null
-  const needsStructuralJabatan = roleNeedsStructuralJabatan(newRoles)
+  const primaryRole = normalizedRoles[0]
+  const asramaBinaan = normalizedRoles.includes('pengurus_asrama') ? (asrama || null) : null
+  const needsStructuralJabatan = roleNeedsStructuralJabatan(normalizedRoles)
   const structuralJabatan = needsStructuralJabatan ? normalizeStructuralJabatan(structuralJabatanInput) : null
-  const rolesJson = JSON.stringify(newRoles)
+  const rolesJson = JSON.stringify(normalizedRoles)
 
   await execute(
     'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, structural_jabatan = ?, updated_at = ? WHERE id = ?',
@@ -536,7 +558,7 @@ export async function updateUserRoles(
         },
         {
           role: primaryRole,
-          roles: newRoles,
+          roles: normalizedRoles,
           asrama_binaan: asramaBinaan,
           structural_jabatan: structuralJabatan,
         },
@@ -607,6 +629,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   if (!fullName) return { error: 'Nama lengkap wajib diisi.' }
   if (!email) return { error: 'Email login wajib diisi.' }
   if (!role) return { error: 'Role wajib dipilih.' }
+  if (!VALID_USER_ROLES.includes(role)) return { error: 'Role tidak valid.' }
 
   const exist = await queryOne('SELECT id FROM users WHERE email = ?', [email])
   if (exist) return { error: 'Email sudah digunakan.' }
@@ -732,7 +755,9 @@ export async function createUsersBatch(usersData: any[]) {
     try {
       const passwordHash = await hashPassword(String(u.password))
       const now = new Date().toISOString()
-      const userRole = u.role || 'wali_kelas'
+      const userRole = VALID_USER_ROLES.includes(String(u.role || '').trim().toLowerCase())
+        ? String(u.role).trim().toLowerCase()
+        : 'wali_kelas'
       const structuralJabatan = normalizeStructuralJabatan(u.structural_jabatan)
       const rolesJson = JSON.stringify([userRole])
 

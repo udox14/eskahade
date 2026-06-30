@@ -9,6 +9,7 @@ import { revalidateTag } from 'next/cache'
 const ALL_ROLES = [
   'admin',
   'demo',
+  'tester',
   'keamanan',
   'sekpen',
   'dewan_santri',
@@ -189,6 +190,7 @@ export async function toggleCrudPermission(
   const session = await assertAdmin()
   if (!ALL_ROLES.includes(role)) throw new Error('Role tidak valid')
   if (role === 'admin') return { success: false, message: 'Admin selalu full CRUD' }
+  if (role === 'tester') return { success: false, message: 'Tester hanya punya akses read-only' }
   if (!['create', 'update', 'delete'].includes(action)) throw new Error('Aksi tidak valid')
 
   const column =

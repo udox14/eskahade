@@ -91,7 +91,7 @@ async function ensureFiturAksesReady() {
     await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', title = 'Nilai Rapor', icon = 'FileSpreadsheet', is_active = 1, is_bottomnav = 1, bottomnav_urutan = 4, urutan = 1 WHERE href = '/dashboard/akademik/leger'")
     await execute("UPDATE fitur_akses SET is_active = 0, is_bottomnav = 0 WHERE href = '/dashboard/akademik/nilai/input'")
     await execute("UPDATE fitur_akses SET group_name = 'Akademik', title = 'Ranking', urutan = 4 WHERE href = '/dashboard/akademik/ranking'")
-    await execute("UPDATE fitur_akses SET group_name = 'Keuangan Pusat', title = 'Keuangan Non-SPP', icon = 'HandCoins', roles = '[\"admin\",\"bendahara\"]', is_active = 1, urutan = 0 WHERE href = '/dashboard/keuangan/non-spp'")
+    await execute("UPDATE fitur_akses SET group_name = 'Keuangan Pusat', title = 'Keuangan Non-SPP', icon = 'HandCoins', is_active = 1, urutan = 0 WHERE href = '/dashboard/keuangan/non-spp'")
     await execute("UPDATE fitur_akses SET is_active = 0 WHERE href IN ('/dashboard/keuangan/pembayaran', '/dashboard/keuangan/tarif', '/dashboard/keuangan/laporan')")
   } catch {}
 
