@@ -21,7 +21,8 @@ async function assertAsramaAccess(asrama: string, action: 'read' | 'update' | 'd
   if (!targetAsrama) return { error: 'Asrama wajib dipilih' }
   if (isAsramaTanpaKamar(targetAsrama)) return { error: 'Asrama ini tidak memakai fitur kamar' }
 
-  if (!isAdmin(session)) {
+  const canReadAllAsrama = action === 'read' && hasRole(session, 'tester')
+  if (!isAdmin(session) && !canReadAllAsrama) {
     if (!hasRole(session, 'pengurus_asrama')) return { error: 'Unauthorized' }
     if (!session.asrama_binaan) return { error: 'Asrama binaan akun belum diset' }
     if (session.asrama_binaan !== targetAsrama) {

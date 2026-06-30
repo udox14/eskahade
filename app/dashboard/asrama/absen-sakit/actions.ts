@@ -83,7 +83,7 @@ async function getRestrictedAsrama(): Promise<string | null> {
 
 async function requireAllowedSession() {
   const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) {
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'tester'])) {
     return null
   }
   return session
@@ -111,7 +111,7 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
   return {
     role: session.role,
     asrama_binaan: hasRole(session, 'pengurus_asrama') ? session.asrama_binaan ?? null : null,
-    isAdmin: isAdmin(session),
+    isAdmin: isAdmin(session) || hasRole(session, 'tester'),
   }
 }
 

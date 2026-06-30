@@ -106,7 +106,7 @@ export default function PlottingKamarManualClient({
   userRole: string
   asramaBinaan: string | null
 }) {
-  const isAdmin = userRole === 'admin'
+  const isAdminLikeRead = userRole === 'admin' || userRole === 'tester'
   const asramaOptions = asramaBinaan ? [asramaBinaan] : ASRAMA_LIST
   const [asrama, setAsrama] = useState(asramaOptions[0] ?? '')
   const [configs, setConfigs] = useState<KamarConfig[]>([])
@@ -389,7 +389,7 @@ ${printRooms.map(({ cfg, ketua, members }) => {
           className="flex-1"
         />
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin ? (
+          {isAdminLikeRead ? (
             <select
               value={asrama}
               onChange={(event) => setAsrama(event.target.value)}

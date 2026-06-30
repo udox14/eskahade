@@ -38,7 +38,7 @@ export type SantriBelumKembaliResult = {
 
 async function getAllowedSession() {
   const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'dewan_santri'])) {
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'dewan_santri', 'tester'])) {
     return null
   }
   return session
@@ -57,7 +57,7 @@ export async function getSantriKembaliSession(): Promise<SessionInfo | null> {
   return {
     role: session.role,
     asrama_binaan: hasRole(session, 'pengurus_asrama') ? session.asrama_binaan ?? null : null,
-    isAdmin: isAdmin(session),
+    isAdmin: isAdmin(session) || hasRole(session, 'tester'),
   }
 }
 

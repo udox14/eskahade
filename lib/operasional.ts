@@ -351,7 +351,7 @@ export async function getOperasionalScope(sessionArg?: SessionUser | null): Prom
   const units = await getOperasionalUnits()
   const accessibleIds = new Set<string>()
 
-  if (isAdmin(session) || hasRole(session, 'bendahara')) {
+  if (isAdmin(session) || hasRole(session, 'bendahara') || hasRole(session, 'tester')) {
     units.forEach(unit => accessibleIds.add(unit.id))
   } else {
     if (hasRole(session, 'sekpen')) accessibleIds.add('SEKPEN')
@@ -364,7 +364,7 @@ export async function getOperasionalScope(sessionArg?: SessionUser | null): Prom
   const unitOptions = units.filter(unit => accessibleIds.has(unit.id))
   if (unitOptions.length === 0) return null
 
-  const canManageAll = isAdmin(session) || hasRole(session, 'bendahara')
+  const canManageAll = isAdmin(session) || hasRole(session, 'bendahara') || hasRole(session, 'tester')
   return {
     canManageAll,
     lockedUnitId: canManageAll || unitOptions.length !== 1 ? null : unitOptions[0].id,

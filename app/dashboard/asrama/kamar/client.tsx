@@ -259,7 +259,7 @@ export default function KamarClient({
     return () => { cancelled = true }
   }, [selectedAsrama, selectedKamar, setKamarQuery])
 
-  const isAdmin = userRole === 'admin'
+  const isAdminLikeRead = userRole === 'admin' || userRole === 'tester'
 
   const refreshCurrentRoom = useCallback(async () => {
     await load(selectedAsrama)
@@ -725,7 +725,7 @@ export default function KamarClient({
           description="Pantau kamar, lihat penghuni, ubah ketua kamar, dan mutasi santri dalam satu asrama."
           className="flex-1"
         />
-        {isAdmin ? (
+        {isAdminLikeRead ? (
           <select
             value={selectedAsrama}
             onChange={(event) => {

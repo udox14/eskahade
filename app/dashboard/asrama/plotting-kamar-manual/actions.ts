@@ -128,7 +128,8 @@ async function assertAccess(asrama: string, action: 'read' | 'update' | 'delete'
   if (!targetAsrama) return { error: 'Asrama wajib dipilih' }
   if (isAsramaTanpaKamar(targetAsrama)) return { error: 'Asrama ini tidak memakai fitur kamar' }
 
-  if (!isAdmin(access)) {
+  const canReadAllAsrama = action === 'read' && hasRole(access, 'tester')
+  if (!isAdmin(access) && !canReadAllAsrama) {
     if (!hasRole(access, 'pengurus_asrama')) return { error: 'Unauthorized' }
     if (!access.asrama_binaan) return { error: 'Asrama binaan akun belum diset' }
     if (access.asrama_binaan !== targetAsrama) return { error: 'Anda hanya boleh mengelola asrama binaan Anda' }

@@ -11,6 +11,7 @@ const ASRAMA_PUTRI = ['ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4'
 export async function getSessionBerjamaah() {
   const session = await getSession()
   if (!session) return null
+  if (hasRole(session, 'tester')) return { role: 'tester', asrama_binaan: null }
   if (isAdmin(session)) return { role: 'admin', asrama_binaan: null }
   if (hasRole(session, 'pengurus_asrama') && ASRAMA_PUTRI.includes(session.asrama_binaan || '')) {
     return { role: 'pengurus_asrama', asrama_binaan: session.asrama_binaan! }

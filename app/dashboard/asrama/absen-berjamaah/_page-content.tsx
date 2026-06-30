@@ -57,7 +57,7 @@ export default function AbsenBerjamaahPage() {
     getSessionBerjamaah().then(s => {
       setSessionInfo(s)
       if (s?.asrama_binaan) setAsrama(s.asrama_binaan)
-      else if (s?.role === 'admin') setAsrama(ASRAMA_PUTRI[0])
+      else if (s?.role === 'admin' || s?.role === 'tester') setAsrama(ASRAMA_PUTRI[0])
     })
   }, [])
 

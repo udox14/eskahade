@@ -73,8 +73,9 @@ async function getAccess(asrama?: string | null, action: 'read' | 'update' = 're
 
   const session = access as SessionUser
   const requestedAsrama = String(asrama ?? '').trim()
+  const canReadAllAsrama = action === 'read' && hasRole(session, 'tester')
 
-  if (!isAdmin(session)) {
+  if (!isAdmin(session) && !canReadAllAsrama) {
     if (!hasRole(session, 'pengurus_asrama')) return { error: 'Unauthorized' }
     if (!session.asrama_binaan) return { error: 'Asrama binaan akun belum diset' }
     if (requestedAsrama && requestedAsrama !== session.asrama_binaan) {
@@ -86,7 +87,7 @@ async function getAccess(asrama?: string | null, action: 'read' | 'update' = 're
 }
 
 async function getAllowedAsrama(session: SessionUser) {
-  if (!isAdmin(session)) {
+  if (!isAdmin(session) && !hasRole(session, 'tester')) {
     return session.asrama_binaan ? [session.asrama_binaan] : []
   }
 

@@ -129,7 +129,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
   const [loading, setLoading] = useState(true)
   const [pending, startTransition] = useTransition()
 
-  const isAdmin = userRole === 'admin'
+  const isAdminLikeRead = userRole === 'admin' || userRole === 'tester'
 
   const load = useCallback(async (targetAsrama?: string) => {
     setLoading(true)
@@ -214,7 +214,7 @@ export default function PageContent({ userRole, asramaBinaan }: { userRole: stri
           className="flex-1"
         />
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          {isAdmin ? (
+          {isAdminLikeRead ? (
             <select
               value={selectedAsrama}
               onChange={(event) => {

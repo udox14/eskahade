@@ -16,7 +16,7 @@ export type SppScope = {
 
 export function getSppScope(session: SessionUser | null): SppScope | null {
   if (!session) return null
-  if (isAdmin(session)) {
+  if (isAdmin(session) || hasRole(session, 'tester')) {
     return { kind: 'ADMIN', lockedUnit: null, defaultUnit: ASRAMA_LIST[0] }
   }
   if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan) {
