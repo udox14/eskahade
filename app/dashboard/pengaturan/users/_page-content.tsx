@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -72,6 +72,9 @@ export default function ManajemenUserPage() {
   const [candidateSearch, setCandidateSearch] = useState('')
   const [selectedBatchConfigs, setSelectedBatchConfigs] = useState<Record<string, SelectedBatchConfig>>({})
   const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [testerName, setTesterName] = useState('')
+  const [testerEmail, setTesterEmail] = useState('')
+  const [testerPassword, setTesterPassword] = useState(DEFAULT_USER_PASSWORD)
 
   const [isAsramaModalOpen, setIsAsramaModalOpen] = useState(false)
   const [pendingRoleUpdate, setPendingRoleUpdate] = useState<{userId: string, roles: string[]} | null>(null)
@@ -206,6 +209,7 @@ export default function ManajemenUserPage() {
   const selectedBatchCandidates = userCandidates
     .filter(candidate => Boolean(selectedBatchConfigs[`${candidate.source_type}:${candidate.source_ref_id}`]))
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
+  const isTesterManualMode = newRole === 'tester'
 
   const closeAddModal = () => {
     setIsOpenAdd(false)
@@ -213,6 +217,9 @@ export default function ManajemenUserPage() {
     setCandidateSearch('')
     setSelectedBatchConfigs({})
     setNewRole('guru')
+    setTesterName('')
+    setTesterEmail('')
+    setTesterPassword(DEFAULT_USER_PASSWORD)
   }
 
   const toggleCandidateSelection = (candidate: UserCreationCandidate) => {
@@ -383,6 +390,41 @@ export default function ManajemenUserPage() {
   // --- HANDLER CREATE ---
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (isTesterManualMode) {
+      const fullName = testerName.trim()
+      const email = testerEmail.trim().toLowerCase()
+      const password = testerPassword.trim() || DEFAULT_USER_PASSWORD
+
+      if (!fullName || !email) {
+        toast.error('Nama dan email tester wajib diisi')
+        return
+      }
+
+      setIsCreating(true)
+      const toastId = toast.loading('Membuat akun tester...')
+
+      const formData = new FormData()
+      formData.set('full_name', fullName)
+      formData.set('email', email)
+      formData.set('password', password)
+      formData.set('role', 'tester')
+
+      const res = await createUser(formData)
+
+      setIsCreating(false)
+      toast.dismiss(toastId)
+
+      if ('error' in res) {
+        toast.error('Gagal membuat tester', { description: res.error })
+        return
+      }
+
+      toast.success('Akun tester berhasil dibuat', { description: `Password: ${password}` })
+      closeAddModal()
+      loadData()
+      return
+    }
+
     const items = Object.values(selectedBatchConfigs)
     if (items.length === 0) {
       toast.error('Pilih dulu orang yang akan dibuatkan akun')
@@ -945,7 +987,12 @@ export default function ManajemenUserPage() {
                     <select 
                       className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
                       value={newRole}
-                      onChange={(e) => setNewRole(e.target.value)}
+                      onChange={(e) => {
+                        setNewRole(e.target.value)
+                        if (e.target.value === 'tester') {
+                          setSelectedBatchConfigs({})
+                        }
+                      }}
                     >
                       {ROLES.map(r => (
                         <option key={r.value} value={r.value}>{r.label}</option>
@@ -964,7 +1011,11 @@ export default function ManajemenUserPage() {
                       </span>
                     </div>
 
-                    {selectedBatchCandidates.length === 0 ? (
+                    {isTesterManualMode ? (
+                      <div className="px-4 py-10 text-center text-sm text-slate-500 flex-1">
+                        Isi data tester di kolom kanan.
+                      </div>
+                    ) : selectedBatchCandidates.length === 0 ? (
                       <div className="px-4 py-10 text-center text-sm text-slate-500 flex-1">
                         Pilih orang dari kolom kanan dulu.
                       </div>
@@ -1047,111 +1098,153 @@ export default function ManajemenUserPage() {
                 </div>
 
                 <div className="xl:order-2 min-h-0 h-full flex flex-col gap-4 overflow-hidden">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
-                      <select
-                        value={candidateSource}
-                        onChange={(e) => {
-                          setCandidateSource(e.target.value as 'guru' | 'sadesa')
-                          setCandidateSearch('')
-                        }}
-                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
-                      >
-                        <option value="guru">Guru</option>
-                        <option value="sadesa">SADESA</option>
-                      </select>
-                    </div>
+                  {isTesterManualMode ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">Data Akun Tester</p>
+                        <p className="mt-1 text-[11px] text-slate-500">Tester dibuat manual, tanpa harus terhubung ke data Guru atau SADESA.</p>
+                      </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Orang</label>
-                      <input
-                        value={candidateSearch}
-                        onChange={(e) => setCandidateSearch(e.target.value)}
-                        placeholder={candidateSource === 'guru' ? 'Cari nama guru...' : 'Cari santri SADESA...'}
-                        className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-                      />
-                    </div>
-                  </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                        <input
+                          value={testerName}
+                          onChange={(e) => setTesterName(e.target.value)}
+                          placeholder="Nama tester"
+                          className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                      </div>
 
-                  <div className="min-h-0 h-0 flex-1 flex flex-col">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kandidat Akun</label>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSelectAllVisibleCandidates}
-                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
-                        >
-                          Pilih semua hasil
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBatchConfigs({})}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
-                        >
-                          Kosongkan
-                        </button>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Login</label>
+                        <input
+                          type="email"
+                          value={testerEmail}
+                          onChange={(e) => setTesterEmail(e.target.value)}
+                          placeholder="tester@sukahideng.or.id"
+                          className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                        <input
+                          value={testerPassword}
+                          onChange={(e) => setTesterPassword(e.target.value)}
+                          placeholder={DEFAULT_USER_PASSWORD}
+                          className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                        />
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sumber Data</label>
+                          <select
+                            value={candidateSource}
+                            onChange={(e) => {
+                              setCandidateSource(e.target.value as 'guru' | 'sadesa')
+                              setCandidateSearch('')
+                            }}
+                            className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                          >
+                            <option value="guru">Guru</option>
+                            <option value="sadesa">SADESA</option>
+                          </select>
+                        </div>
 
-                    <div className="overflow-y-auto overscroll-contain border border-slate-200 rounded-xl divide-y bg-slate-50 min-h-0 flex-1">
-                      {loadingCandidates ? (
-                        <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Orang</label>
+                          <input
+                            value={candidateSearch}
+                            onChange={(e) => setCandidateSearch(e.target.value)}
+                            placeholder={candidateSource === 'guru' ? 'Cari nama guru...' : 'Cari santri SADESA...'}
+                            className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                          />
                         </div>
-                      ) : filteredCandidates.length === 0 ? (
-                        <div className="px-4 py-8 text-sm text-slate-500 text-center">
-                          Tidak ada data yang cocok.
-                        </div>
-                      ) : (
-                        filteredCandidates.map(candidate => {
-                          const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
-                          const selected = Boolean(selectedBatchConfigs[candidateKey])
-                          return (
+                      </div>
+
+                      <div className="min-h-0 h-0 flex-1 flex flex-col">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kandidat Akun</label>
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-slate-500">{filteredCandidates.filter(c => !c.has_account).length} kandidat tersedia</p>
+                          <div className="flex items-center gap-2">
                             <button
-                              key={candidateKey}
                               type="button"
-                              disabled={candidate.has_account}
-                              onClick={() => toggleCandidateSelection(candidate)}
-                              className={`w-full text-left px-4 py-3 transition-colors ${
-                                candidate.has_account
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                  : selected
-                                    ? 'bg-emerald-50 border-l-4 border-emerald-500'
-                                    : 'hover:bg-white text-slate-700'
-                              }`}
+                              onClick={handleSelectAllVisibleCandidates}
+                              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className={`font-semibold truncate ${selected ? 'text-emerald-800' : ''}`}>{candidate.label}</p>
-                                  <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
-                                  <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
-                                </div>
-                                {candidate.has_account ? (
-                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Sudah ada akun</span>
-                                ) : selected ? (
-                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Terpilih</span>
-                                ) : null}
-                              </div>
+                              Pilih semua hasil
                             </button>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBatchConfigs({})}
+                              className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                            >
+                              Kosongkan
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="overflow-y-auto overscroll-contain border border-slate-200 rounded-xl divide-y bg-slate-50 min-h-0 flex-1">
+                          {loadingCandidates ? (
+                            <div className="px-4 py-8 text-sm text-slate-500 flex items-center justify-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" /> Memuat kandidat akun...
+                            </div>
+                          ) : filteredCandidates.length === 0 ? (
+                            <div className="px-4 py-8 text-sm text-slate-500 text-center">
+                              Tidak ada data yang cocok.
+                            </div>
+                          ) : (
+                            filteredCandidates.map(candidate => {
+                              const candidateKey = `${candidate.source_type}:${candidate.source_ref_id}`
+                              const selected = Boolean(selectedBatchConfigs[candidateKey])
+                              return (
+                                <button
+                                  key={candidateKey}
+                                  type="button"
+                                  disabled={candidate.has_account}
+                                  onClick={() => toggleCandidateSelection(candidate)}
+                                  className={`w-full text-left px-4 py-3 transition-colors ${
+                                    candidate.has_account
+                                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                      : selected
+                                        ? 'bg-emerald-50 border-l-4 border-emerald-500'
+                                        : 'hover:bg-white text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className={`font-semibold truncate ${selected ? 'text-emerald-800' : ''}`}>{candidate.label}</p>
+                                      <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
+                                      <p className="text-[11px] text-slate-400 mt-1">{candidate.meta || (candidate.source_type === 'guru' ? 'Data Guru' : 'Santri SADESA')}</p>
+                                    </div>
+                                    {candidate.has_account ? (
+                                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Sudah ada akun</span>
+                                    ) : selected ? (
+                                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Terpilih</span>
+                                    ) : null}
+                                  </div>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="pt-2 md:pt-4 border-t bg-white">
                 <button 
                   type="submit" 
-                  disabled={isCreating || selectedBatchCandidates.length === 0}
+                  disabled={isCreating || (isTesterManualMode ? !testerName.trim() || !testerEmail.trim() : selectedBatchCandidates.length === 0)}
                   className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow-sm flex justify-center items-center gap-2 disabled:opacity-70"
                 >
                   {isCreating ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                  {isCreating ? "Membuat Akun..." : `Buat ${selectedBatchCandidates.length || ''} Akun Sekarang`}
+                  {isCreating ? "Membuat Akun..." : isTesterManualMode ? 'Buat Akun Tester' : `Buat ${selectedBatchCandidates.length || ''} Akun Sekarang`}
                 </button>
               </div>
             </form>
