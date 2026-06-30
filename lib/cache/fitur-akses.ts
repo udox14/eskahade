@@ -35,6 +35,10 @@ interface FiturAksesRow {
 
 let fiturSchemaReady = false
 
+function isReadOnlyTesterError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Akun tester hanya boleh membaca data.'
+}
+
 async function ensureFiturAksesReady() {
   if (fiturSchemaReady) return
 
@@ -101,7 +105,11 @@ async function ensureFiturAksesReady() {
 // Ambil SEMUA fitur — query langsung ke D1, dengan fallback aman kalau DB error
 export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
   try {
-    await ensureFiturAksesReady()
+    try {
+      await ensureFiturAksesReady()
+    } catch (err) {
+      if (!isReadOnlyTesterError(err)) throw err
+    }
     // Coba query dengan kolom bottomnav dulu (setelah migration 0016)
     // Kalau kolom belum ada, fallback ke query tanpa kolom bottomnav
     let rows: FiturAksesRow[] = []
@@ -162,6 +170,12 @@ export async function getFiturForRoles(roles: string[], userId?: string): Promis
     return all.filter(f => f.is_active)
   }
 
+  // Tester: baca semua fitur aktif. Hak create/update/delete tetap diblokir
+  // oleh CRUD guard dan pagar read-only di lib/db.
+  if (roles.includes('tester')) {
+    return all.filter(f => f.is_active)
+  }
+
   const overrides = userId ? await getUserOverrides(userId) : []
 
   const grantedIds = new Set(overrides.filter(o => o.action === 'grant').map(o => o.fitur_id))
@@ -208,6 +222,8 @@ export async function canAccessHref(href: string, roles: string[], userId?: stri
       return override.action === 'grant' // grant → true, revoke → false
     }
   }
+
+  if (roles.includes('tester')) return true
 
   // Cek role biasa (multi-role) + jabatan struktural
   return rolesCanAccessFeature(fitur.roles, roles)
