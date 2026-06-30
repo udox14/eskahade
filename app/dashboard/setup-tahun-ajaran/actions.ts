@@ -319,15 +319,15 @@ async function runAutoCheck(key: WizardItemKey, tahunAjaran: TahunAjaranRow | nu
   return empty('Belum ada pemeriksaan otomatis.')
 }
 
-async function requireAdmin() {
-  const access = await assertFeature(FEATURE_PATH)
+async function requireAdmin(action: 'read' | 'update' | 'delete' = 'read') {
+  const access = await assertFeature(FEATURE_PATH, action)
   if ('error' in access) return access
   if (!isAdmin(access)) return { error: 'Akses ditolak' }
   return access
 }
 
 export async function getSetupTahunAjaranState(): Promise<SetupWizardState | { error: string }> {
-  const access = await requireAdmin()
+  const access = await requireAdmin('update')
   if ('error' in access) return access
 
   await ensureSetupWizardSchema()
@@ -379,7 +379,7 @@ export async function saveSetupWizardOverride(input: {
   status: SetupWizardOverrideStatus
   note?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const access = await requireAdmin()
+  const access = await requireAdmin('delete')
   if ('error' in access) return access
   await ensureSetupWizardSchema()
 

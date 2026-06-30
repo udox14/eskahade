@@ -47,7 +47,7 @@ export async function getMasterPelanggaran() {
 export async function tambahMasterPelanggaran(data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = await getSession()
   await execute(
@@ -77,7 +77,7 @@ export async function tambahMasterPelanggaran(data: {
 export async function editMasterPelanggaran(id: number, data: {
   kategori: string; nama: string; poin: number; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'update')
   if ('error' in access) return access
   const session = await getSession()
   const beforeMaster = await queryOne<Record<string, unknown>>(
@@ -118,7 +118,7 @@ export async function editMasterPelanggaran(id: number, data: {
 }
 
 export async function hapusMasterPelanggaran(id: number): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'delete')
   if ('error' in access) return access
   const session = await getSession()
   const targetMaster = await queryOne<{
@@ -156,7 +156,7 @@ export async function hapusMasterPelanggaran(id: number): Promise<{ success: boo
 export async function importMasterPelanggaranMassal(
   rows: ImportMasterPelanggaranRow[]
 ): Promise<{ success: boolean; inserted: number; updated: number; skipped: number } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -265,7 +265,7 @@ export async function simpanPelanggaran(data: {
   tanggal: string
   fotoUrl?: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = access
 
@@ -313,7 +313,7 @@ export async function simpanPelanggaran(data: {
 }
 
 export async function hapusPelanggaran(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'delete')
   if ('error' in access) return access
   const session = await getSession()
   const target = await queryOne<{
@@ -546,7 +546,7 @@ export async function simpanSuratPernyataan(
   pelanggaranIds: string[],
   tanggal: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = access
   const id = generateId()
@@ -586,7 +586,7 @@ export async function simpanSuratPerjanjian(
   tanggal: string,
   catatan?: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan')
+  const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = access
   const id = generateId()

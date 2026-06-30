@@ -29,6 +29,12 @@ async function assertBendaharaRead() {
   return access
 }
 
+async function assertBendaharaWrite(action: 'create' | 'update' | 'delete' = 'update') {
+  const access = await assertFeature(OPERASIONAL_BENDAHARA_FEATURE, action)
+  if ('error' in access) throw new Error(access.error)
+  return access
+}
+
 export async function getBendaharaOperasionalPageData(tahun: number, bulan: number, unitId?: string | null) {
   const session = await assertBendaharaRead()
   const scope = await getOperasionalScope(session)
@@ -66,7 +72,7 @@ export async function getBendaharaPrintData(tahun: number, bulan: number, unitId
 }
 
 export async function saveBendaharaAlokasi(payload: SaveOperasionalAlokasiPayload) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('update')
   const result = await saveOperasionalAlokasi(payload)
   if ('success' in result) {
     revalidatePath(MONITORING_PATH)
@@ -76,7 +82,7 @@ export async function saveBendaharaAlokasi(payload: SaveOperasionalAlokasiPayloa
 }
 
 export async function postBendaharaAlokasi(id: string) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('update')
   const result = await postOperasionalAlokasi(id)
   if ('success' in result) {
     revalidatePath(MONITORING_PATH)
@@ -86,7 +92,7 @@ export async function postBendaharaAlokasi(id: string) {
 }
 
 export async function cancelBendaharaAlokasi(id: string) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('update')
   const result = await cancelOperasionalAlokasi(id)
   if ('success' in result) {
     revalidatePath(MONITORING_PATH)
@@ -96,7 +102,7 @@ export async function cancelBendaharaAlokasi(id: string) {
 }
 
 export async function saveBendaharaTransaksi(payload: SaveOperasionalTransaksiPayload) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('update')
   const result = await saveOperasionalTransaksi(payload)
   if ('success' in result) {
     revalidatePath(MONITORING_PATH)
@@ -106,7 +112,7 @@ export async function saveBendaharaTransaksi(payload: SaveOperasionalTransaksiPa
 }
 
 export async function deleteBendaharaTransaksi(id: string) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('delete')
   const result = await deleteOperasionalTransaksi(id)
   if ('success' in result) {
     revalidatePath(MONITORING_PATH)
@@ -116,7 +122,7 @@ export async function deleteBendaharaTransaksi(id: string) {
 }
 
 export async function saveBendaharaPrintPrefs(payload: OperasionalPrintPreference) {
-  await assertBendaharaRead()
+  await assertBendaharaWrite('update')
   const result = await saveOperasionalPrintPreferences(payload)
   revalidatePath(MONITORING_PATH)
   revalidatePath(PRINT_PATH)

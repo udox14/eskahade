@@ -126,11 +126,11 @@ async function ensureKeluarTandaiSchema() {
   `)
 }
 
-async function getAccess(asrama?: string | null) {
+async function getAccess(asrama?: string | null, action: 'read' | 'update' = 'read') {
   await ensureKamarSchema()
   await ensureKepengurusanSchema()
   await ensureKeluarTandaiSchema()
-  const access = await assertFeature(KAMAR_PATH)
+  const access = await assertFeature(KAMAR_PATH, action)
   if ('error' in access) return access
 
   const session = access as SessionUser
@@ -462,7 +462,7 @@ export async function updateKetuaKamarLangsung(params: {
   nomorKamar: string
   santriId: string | null
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama
@@ -554,7 +554,7 @@ export async function mutasiKamarDalamAsrama(params: {
   santriId: string
   kamarTujuan: string
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama
@@ -627,7 +627,7 @@ export async function updateNomorWaOrtuBatchKamar(params: {
   nomorKamar: string
   items: Array<{ santriId: string; noWaOrtu: string }>
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama
@@ -697,7 +697,7 @@ export async function tandaiSantriKeluarDariKamar(params: {
   santriId: string
   catatan?: string
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const session = await getSession()
@@ -780,7 +780,7 @@ export async function batalTandaiSantriKeluarDariKamar(params: {
   asrama: string
   santriId: string
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const santri = await queryOne<{ nama_lengkap: string | null; kamar: string | null }>(

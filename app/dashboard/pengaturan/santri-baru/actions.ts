@@ -25,7 +25,7 @@ export async function simpanPengaturanSantriBaru(input: {
   mulaiBerlaku: string
   durasiBulan: number
 }) {
-  const access = await assertFeature(FEATURE_PATH)
+  const access = await assertFeature(FEATURE_PATH, 'update')
   if ('error' in access) return access
 
   const mulaiBerlaku = normalizeMulaiBerlaku(input.mulaiBerlaku)

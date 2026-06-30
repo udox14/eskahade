@@ -119,9 +119,9 @@ async function ensureSchema() {
   }
 }
 
-async function assertAccess(asrama: string): Promise<AccessOk | { error: string }> {
+async function assertAccess(asrama: string, action: 'read' | 'update' | 'delete' = 'read'): Promise<AccessOk | { error: string }> {
   await ensureSchema()
-  const access = await assertFeature(FEATURE_PATH)
+  const access = await assertFeature(FEATURE_PATH, action)
   if ('error' in access) return access
 
   const targetAsrama = String(asrama ?? '').trim()
@@ -264,7 +264,7 @@ export async function getDataPlottingManual(asrama: string) {
 }
 
 export async function simpanKonfigurasiManual(asrama: string, kamarList: KamarManualInput[]) {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'update')
   if ('error' in access) return access
   const cleaned = cleanKamarList(kamarList)
   if ('error' in cleaned) return cleaned
@@ -301,7 +301,7 @@ export async function simpanKonfigurasiManual(asrama: string, kamarList: KamarMa
 }
 
 export async function buatDraftManual(asrama: string, mode: 'prefill' | 'empty') {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'update')
   if ('error' in access) return access
 
   const [configs, santriList] = await Promise.all([
@@ -347,7 +347,7 @@ export async function buatDraftManual(asrama: string, mode: 'prefill' | 'empty')
 }
 
 export async function tambahSantriKeKamar(asrama: string, nomorKamar: string, santriIds: string[]) {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'update')
   if ('error' in access) return access
   const targetKamar = String(nomorKamar ?? '').trim()
   if (!targetKamar) return { error: 'Kamar wajib dipilih' }
@@ -418,7 +418,7 @@ export async function tambahSantriKeKamar(asrama: string, nomorKamar: string, sa
 }
 
 export async function hapusSantriDariDraft(asrama: string, santriId: string) {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'delete')
   if ('error' in access) return access
   const id = String(santriId ?? '').trim()
   if (!id) return { error: 'Santri wajib dipilih' }
@@ -443,7 +443,7 @@ export async function hapusSantriDariDraft(asrama: string, santriId: string) {
 }
 
 export async function setKetuaKamarManual(asrama: string, nomorKamar: string, santriId: string | null) {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'update')
   if ('error' in access) return access
   const targetKamar = String(nomorKamar ?? '').trim()
   if (!targetKamar) return { error: 'Kamar wajib dipilih' }
@@ -489,7 +489,7 @@ export async function setKetuaKamarManual(asrama: string, nomorKamar: string, sa
 }
 
 export async function terapkanPlottingManual(asrama: string) {
-  const access = await assertAccess(asrama)
+  const access = await assertAccess(asrama, 'update')
   if ('error' in access) return access
   const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 

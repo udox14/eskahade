@@ -66,9 +66,9 @@ async function ensureKepengurusanSchema() {
   `)
 }
 
-async function getAccess(asrama?: string | null) {
+async function getAccess(asrama?: string | null, action: 'read' | 'update' = 'read') {
   await ensureKepengurusanSchema()
-  const access = await assertFeature(KEPENGURUSAN_PATH)
+  const access = await assertFeature(KEPENGURUSAN_PATH, action)
   if ('error' in access) return access
 
   const session = access as SessionUser
@@ -240,7 +240,7 @@ export async function saveKepengurusanAsrama(params: {
   bendahara: PengurusInput[]
   pembinaKamar: PembinaKamarInput[]
 }) {
-  const access = await getAccess(params.asrama)
+  const access = await getAccess(params.asrama, 'update')
   if ('error' in access) return access
 
   const asrama = access.requestedAsrama

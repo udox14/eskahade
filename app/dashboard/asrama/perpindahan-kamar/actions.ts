@@ -12,8 +12,8 @@ const REVALIDATE = '/dashboard/asrama/perpindahan-kamar'
 type KamarInput = { nomor_kamar: string; kuota: number; reserved_baru?: number; blok?: string }
 type AccessOk = { session: { id: string; email: string; full_name: string; role: string; roles: string[]; asrama_binaan: string | null }; asrama: string }
 
-async function assertAsramaAccess(asrama: string): Promise<AccessOk | { error: string }> {
-  const access = await assertFeature('/dashboard/asrama/perpindahan-kamar')
+async function assertAsramaAccess(asrama: string, action: 'read' | 'update' | 'delete' = 'read'): Promise<AccessOk | { error: string }> {
+  const access = await assertFeature('/dashboard/asrama/perpindahan-kamar', action)
   const targetAsrama = asrama?.trim()
 
   if ('error' in access) return access
@@ -119,7 +119,7 @@ async function ensurePerpindahanKamarSchema() {
 
 export async function getDataPerpindahan(asrama: string) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'update')
   if ('error' in access) {
     return { error: access.error, configs: [], drafts: [], ketuaList: [], santriList: [], defaultConfigs: [] }
   }
@@ -179,7 +179,7 @@ export async function simpanKonfigurasiKamar(
   kamarList: KamarInput[]
 ) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'update')
   if ('error' in access) return access
   const cleaned = cleanKamarList(kamarList)
   if ('error' in cleaned) return cleaned
@@ -227,7 +227,7 @@ export async function simpanKonfigurasiKamar(
 
 export async function generateDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'update')
   if ('error' in access) return access
 
   const { configs, santriList } = await getDataPerpindahan(access.asrama)
@@ -376,7 +376,7 @@ export async function generateDraft(asrama: string) {
 
 export async function updateKamarDraft(asrama: string, santriId: string, kamarBaru: string) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'update')
   if ('error' in access) return access
   const targetKamar = String(kamarBaru ?? '').trim()
   if (!targetKamar) return { error: 'Kamar tujuan wajib dipilih' }
@@ -453,7 +453,7 @@ export async function updateKamarDraft(asrama: string, santriId: string, kamarBa
 
 export async function applyDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'update')
   if ('error' in access) return access
 
   const [allDrafts, validDrafts] = await Promise.all([
@@ -520,7 +520,7 @@ export async function applyDraft(asrama: string) {
 
 export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_id: string | null) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'delete')
   if ('error' in access) return access
   const targetKamar = String(nomor_kamar ?? '').trim()
   if (!targetKamar) return { error: 'Nomor kamar wajib diisi' }
@@ -598,7 +598,7 @@ export async function setKetuaKamar(asrama: string, nomor_kamar: string, santri_
 
 export async function resetDraft(asrama: string) {
   await ensurePerpindahanKamarSchema()
-  const access = await assertAsramaAccess(asrama)
+  const access = await assertAsramaAccess(asrama, 'delete')
   if ('error' in access) return access
 
   await execute('DELETE FROM kamar_draft WHERE asrama = ?', [access.asrama])

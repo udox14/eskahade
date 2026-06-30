@@ -25,8 +25,8 @@ async function assertRecipientRead() {
   return access
 }
 
-async function assertRecipientWrite() {
-  const access = await assertFeature(OPERASIONAL_RECIPIENT_FEATURE)
+async function assertRecipientWrite(action: 'create' | 'update' | 'delete' = 'update') {
+  const access = await assertFeature(OPERASIONAL_RECIPIENT_FEATURE, action)
   if ('error' in access) throw new Error(access.error)
   return access
 }
@@ -79,7 +79,7 @@ export async function saveRecipientTransaksi(payload: SaveOperasionalTransaksiPa
 }
 
 export async function deleteRecipientTransaksi(id: string) {
-  await assertRecipientWrite()
+  await assertRecipientWrite('delete')
   const result = await deleteOperasionalTransaksi(id)
   if ('success' in result) {
     revalidatePath(RECIPIENT_PATH)
@@ -89,7 +89,7 @@ export async function deleteRecipientTransaksi(id: string) {
 }
 
 export async function saveRecipientPrintPrefs(payload: OperasionalPrintPreference) {
-  await assertRecipientRead()
+  await assertRecipientWrite('update')
   const result = await saveOperasionalPrintPreferences(payload)
   revalidatePath(RECIPIENT_PATH)
   revalidatePath(PRINT_PATH)

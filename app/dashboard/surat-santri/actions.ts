@@ -55,7 +55,7 @@ export async function simpanSuratPernyataan(
   pelanggaranIds: string[],
   tanggal: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/surat-santri')
+  const access = await assertFeature('/dashboard/surat-santri', 'create')
   if ('error' in access) return access
   const session = access
   if (pelanggaranIds.length === 0) return { error: 'Pilih minimal 1 pelanggaran' }
@@ -76,7 +76,7 @@ export async function simpanSuratPerjanjian(
   tanggal: string,
   catatan?: string
 ): Promise<{ success: boolean; id: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/surat-santri')
+  const access = await assertFeature('/dashboard/surat-santri', 'create')
   if ('error' in access) return access
   const session = access
   const id = generateId()
@@ -206,7 +206,7 @@ export async function hapusSurat(
   suratId: string,
   tipe: 'pernyataan' | 'perjanjian'
 ): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/surat-santri')
+  const access = await assertFeature('/dashboard/surat-santri', 'delete')
   if ('error' in access) return access
   const tabel = tipe === 'pernyataan' ? 'surat_pernyataan' : 'surat_perjanjian'
   await execute(`DELETE FROM ${tabel} WHERE id = ?`, [suratId])

@@ -257,7 +257,7 @@ export async function mutasiSantri(payload: {
   alasan?: string
   overrideKapasitas?: boolean
 }) {
-  const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
+  const access = await assertFeature('/dashboard/asrama/mutasi-asrama', 'update')
   if ('error' in access) return access
   const session = access
 
@@ -339,7 +339,7 @@ export async function mutasiBatch(payload: {
   alasan?: string
   overrideKapasitas?: boolean
 }) {
-  const access = await assertFeature('/dashboard/asrama/mutasi-asrama')
+  const access = await assertFeature('/dashboard/asrama/mutasi-asrama', 'update')
   if ('error' in access) return access
   const session = access
 

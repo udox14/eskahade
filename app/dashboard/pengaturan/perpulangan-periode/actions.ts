@@ -7,8 +7,8 @@ import { revalidatePath } from 'next/cache'
 
 const REVALIDATE = '/dashboard/pengaturan/perpulangan-periode'
 
-async function assertAllowed() {
-  const access = await assertFeature('/dashboard/pengaturan/perpulangan-periode')
+async function assertAllowed(action: 'create' | 'update' | 'delete') {
+  const access = await assertFeature('/dashboard/pengaturan/perpulangan-periode', action)
   if ('error' in access) throw new Error(access.error)
   return access
 }
@@ -31,7 +31,7 @@ export async function tambahPeriode(data: {
   tgl_mulai_datang: string
   tgl_selesai_datang: string
 }): Promise<{ success: boolean } | { error: string }> {
-  const session = await assertAllowed()
+  const session = await assertAllowed('create')
 
   if (!data.nama_periode.trim()) return { error: 'Nama periode wajib diisi.' }
   if (data.tgl_mulai_pulang > data.tgl_selesai_pulang)
@@ -68,7 +68,7 @@ export async function tambahPeriode(data: {
 
 // ─── Aktifkan periode (nonaktifkan semua yang lain dulu) ──────────────────────
 export async function aktifkanPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  const session = await assertAllowed()
+  const session = await assertAllowed('update')
   await execute('UPDATE perpulangan_periode SET is_active = 0', [])
   await execute('UPDATE perpulangan_periode SET is_active = 1 WHERE id = ?', [id])
   const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
@@ -90,7 +90,7 @@ export async function aktifkanPeriode(id: number): Promise<{ success: boolean } 
 
 // ─── Nonaktifkan periode ──────────────────────────────────────────────────────
 export async function nonaktifkanPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  const session = await assertAllowed()
+  const session = await assertAllowed('update')
   await execute('UPDATE perpulangan_periode SET is_active = 0 WHERE id = ?', [id])
   const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
   await logActivity({
@@ -114,7 +114,7 @@ export async function perpanjangTglDatang(
   id: number,
   tglSelesaiBaru: string
 ): Promise<{ success: boolean } | { error: string }> {
-  const session = await assertAllowed()
+  const session = await assertAllowed('update')
 
   const p = await queryOne<{ tgl_selesai_datang: string; tgl_mulai_datang: string }>(
     'SELECT tgl_mulai_datang, tgl_selesai_datang FROM perpulangan_periode WHERE id = ?',
@@ -151,7 +151,7 @@ export async function perpanjangTglDatang(
 
 // ─── Hapus periode (ikut hapus log perpulangan di periode tersebut) ───────────
 export async function hapusPeriode(id: number): Promise<{ success: boolean } | { error: string }> {
-  const session = await assertAllowed()
+  const session = await assertAllowed('delete')
   const periode = await queryOne<{ nama_periode: string | null }>('SELECT nama_periode FROM perpulangan_periode WHERE id = ?', [id])
   if (!periode) return { error: 'Periode tidak ditemukan.' }
 
@@ -173,3 +173,4 @@ export async function hapusPeriode(id: number): Promise<{ success: boolean } | {
   revalidatePath('/dashboard/asrama/perpulangan/monitoring')
   return { success: true }
 }
+

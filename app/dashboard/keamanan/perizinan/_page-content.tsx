@@ -49,9 +49,12 @@ function getDefaultReturnValue(jenis: 'PULANG' | 'KELUAR_KOMPLEK') {
 interface Props {
   userRoles: string[]
   asramaBinaan: string | null
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
 }
 
-export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
+export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate = false, canUpdate = false, canDelete = false }: Props) {
   const confirm = useConfirm()
   const router = useRouter()
 
@@ -576,14 +579,16 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
         </div>
 
         {/* TOMBOL AJUKAN */}
-        <div className="flex justify-end">
-          <button
-            onClick={openTambahModal}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> Ajukan Izin Pulang
-          </button>
-        </div>
+        {canCreate && (
+          <div className="flex justify-end">
+            <button
+              onClick={openTambahModal}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" /> Ajukan Izin Pulang
+            </button>
+          </div>
+        )}
 
         {/* RIWAYAT PENGAJUAN */}
         <div className="space-y-3">
@@ -608,23 +613,27 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                     </div>
                     <div className="flex items-center gap-2">
                       {statusBadge(item.status)}
-                      {item.status === 'PENDING' && (
+                      {item.status === 'PENDING' && (canUpdate || canDelete) && (
                         <div className="flex gap-1">
-                          <button
-                            onClick={() => openEditPengajuan(item)}
-                            title="Edit pengajuan"
-                            className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg border border-slate-100 transition-colors"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleHapusPengajuan(item.id)}
-                            disabled={deletingPengajuanId === item.id}
-                            title="Hapus pengajuan"
-                            className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg border border-slate-100 transition-colors disabled:opacity-50"
-                          >
-                            {deletingPengajuanId === item.id ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                          </button>
+                          {canUpdate && (
+                            <button
+                              onClick={() => openEditPengajuan(item)}
+                              title="Edit pengajuan"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg border border-slate-100 transition-colors"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleHapusPengajuan(item.id)}
+                              disabled={deletingPengajuanId === item.id}
+                              title="Hapus pengajuan"
+                              className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg border border-slate-100 transition-colors disabled:opacity-50"
+                            >
+                              {deletingPengajuanId === item.id ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -739,24 +748,30 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
 
       <div className="flex justify-end">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:p-2 sm:shadow-sm">
-          {isDewanOrAdmin && (
+          {isDewanOrAdmin && (canUpdate || canCreate) && (
             <>
-              <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
-                <Settings className="w-4 h-4" /> Alasan
-              </button>
-              <button onClick={openPengajuanModal} className="relative bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
+              {canUpdate && (
+                <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
+                  <Settings className="w-4 h-4" /> Alasan
+                </button>
+              )}
+              {(canCreate || canUpdate) && (
+                <button onClick={openPengajuanModal} className="relative bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
                 <Clock className="w-4 h-4" /> Pengajuan Asrama
                 {pengajuanCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
                     {pengajuanCount}
                   </span>
                 )}
-              </button>
+                </button>
+              )}
             </>
           )}
-          <button onClick={openTambahModal} className={`${isAsrama ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95`}>
-            <Plus className="w-4 h-4" /> {isAsrama ? 'Ajukan Izin Pulang' : 'Izin Baru'}
-          </button>
+          {canCreate && (
+            <button onClick={openTambahModal} className={`${isAsrama ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95`}>
+              <Plus className="w-4 h-4" /> {isAsrama ? 'Ajukan Izin Pulang' : 'Izin Baru'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -861,7 +876,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                       <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase">Perizinan</th>
                       <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase">Waktu</th>
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase w-32">Status</th>
-                      {!isAsrama && <th className="px-3 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase w-16">Aksi</th>}
+                      {!isAsrama && (canUpdate || canDelete) && <th className="px-3 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase w-16">Aksi</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -907,23 +922,29 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                               item.tgl_kembali_aktual ? (
                                 <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg border border-orange-200 flex items-center justify-center gap-1 shadow-sm"><AlertTriangle className="w-3 h-3"/> Sidang</span>
                               ) : (
-                                <button onClick={() => openReturnModal(item)} className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg text-[11px] font-bold w-full transition-colors shadow-sm">Tandai Tiba</button>
+                                canUpdate ? (
+                                  <button onClick={() => openReturnModal(item)} className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg text-[11px] font-bold w-full transition-colors shadow-sm">Tandai Tiba</button>
+                                ) : (
+                                  <span className="text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg flex items-center justify-center gap-1">Aktif</span>
+                                )
                               )
                             ) : (
                               <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg flex items-center justify-center gap-1"><CheckCircle className="w-3 h-3"/> Selesai {isTelat && '(Telat)'}</span>
                             )}
                           </td>
-                          {!isAsrama && (
+                          {!isAsrama && (canUpdate || canDelete) && (
                             <td className="px-3 py-2">
                               <div className="flex items-center justify-end gap-1.5">
-                                {item.status === 'AKTIF' && !item.tgl_kembali_aktual && (
+                                {canUpdate && item.status === 'AKTIF' && !item.tgl_kembali_aktual && (
                                   <button onClick={() => openEditModal(item)} title="Edit Izin" className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg transition-colors border border-slate-100">
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                 )}
-                                <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} title="Hapus Izin" className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg transition-colors border border-slate-100 disabled:opacity-50">
-                                  {deletingId === item.id ? <Clock className="w-3.5 h-3.5 animate-spin"/> : <Trash2 className="w-3.5 h-3.5" />}
-                                </button>
+                                {canDelete && (
+                                  <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} title="Hapus Izin" className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg transition-colors border border-slate-100 disabled:opacity-50">
+                                    {deletingId === item.id ? <Clock className="w-3.5 h-3.5 animate-spin"/> : <Trash2 className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           )}
@@ -958,14 +979,16 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                             <p className="font-bold text-slate-900 text-sm leading-tight">{item.nama}</p>
                             <p className="text-[10px] text-slate-500 mt-0.5">{item.nis} · {item.asrama}/{item.kamar}</p>
                           </div>
-                          {!isAsrama && (
+                          {!isAsrama && (canUpdate || canDelete) && (
                             <div className="shrink-0 flex gap-1">
-                              {item.status === 'AKTIF' && !item.tgl_kembali_aktual && (
+                              {canUpdate && item.status === 'AKTIF' && !item.tgl_kembali_aktual && (
                                 <button onClick={() => openEditModal(item)} className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded-lg border border-slate-100"><Edit2 className="w-3.5 h-3.5"/></button>
                               )}
-                              <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} className="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-50 rounded-lg border border-slate-100">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete && (
+                                <button onClick={() => handleHapus(item)} disabled={deletingId === item.id} className="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-50 rounded-lg border border-slate-100">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -992,7 +1015,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                             item.tgl_kembali_aktual ? (
                               <span className="w-full text-center py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-xl border border-orange-200 flex items-center justify-center gap-1.5"><AlertTriangle className="w-4 h-4"/> Menunggu Sidang (Telat)</span>
                             ) : (
-                              <button onClick={() => openReturnModal(item)} className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold border border-rose-200 shadow-sm rounded-xl text-xs transition-colors">Tandai Santri Tiba</button>
+                              canUpdate ? (
+                                <button onClick={() => openReturnModal(item)} className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold border border-rose-200 shadow-sm rounded-xl text-xs transition-colors">Tandai Santri Tiba</button>
+                              ) : (
+                                <span className="w-full text-center py-2 text-xs font-bold text-slate-600 bg-slate-50 rounded-xl border border-slate-200 flex justify-center items-center">Izin Aktif</span>
+                              )
                             )
                           ) : (
                             <span className="w-full text-center py-2 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-center items-center gap-1.5"><CheckCircle className="w-4 h-4"/> Izin Selesai {isTelat && '(Terlambat)'}</span>
@@ -1324,24 +1351,30 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan }: Props) {
                         )}
                       </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRejectPengajuan(item.id)}
-                          disabled={processingId === item.id}
-                          className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-xl border border-red-200 text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                        >
-                          <X className="w-4 h-4" /> Tolak
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleApprovePengajuan(item.id)}
-                          disabled={processingId === item.id}
-                          className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-1.5"
-                        >
-                          <CheckCircle className="w-4 h-4" /> ACC / Setujui
-                        </button>
-                      </div>
+                      {(canUpdate || canCreate) && (
+                        <div className="flex gap-2">
+                          {canUpdate && (
+                            <button
+                              type="button"
+                              onClick={() => handleRejectPengajuan(item.id)}
+                              disabled={processingId === item.id}
+                              className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-xl border border-red-200 text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              <X className="w-4 h-4" /> Tolak
+                            </button>
+                          )}
+                          {canCreate && (
+                            <button
+                              type="button"
+                              onClick={() => handleApprovePengajuan(item.id)}
+                              disabled={processingId === item.id}
+                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-1.5"
+                            >
+                              <CheckCircle className="w-4 h-4" /> ACC / Setujui
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

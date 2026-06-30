@@ -130,7 +130,7 @@ export async function previewNaikKelas(filter: {
 
 // ── Eksekusi naik kelas massal ────────────────────────────────────────────
 export async function eksekusiNaikKelas(santriIds: string[]): Promise<{ success: boolean; updated: number } | { error: string }> {
-  const access = await assertFeature('/dashboard/master/santri-tools')
+  const access = await assertFeature('/dashboard/master/santri-tools', 'update')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
   const cleanIds = Array.from(new Set((santriIds || []).filter(Boolean)))
@@ -280,7 +280,7 @@ export async function setBebas(
   bebas: boolean
 ): Promise<{ success: boolean; updated: number } | { error: string }> {
   await ensureSantriToolsSchema()
-  const access = await assertFeature('/dashboard/master/santri-tools')
+  const access = await assertFeature('/dashboard/master/santri-tools', 'update')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
@@ -317,7 +317,7 @@ export async function catatBebasPembayaran(
   keterangan: string
 ): Promise<{ success: boolean } | { error: string }> {
   await ensureSantriToolsSchema()
-  const access = await assertFeature('/dashboard/master/santri-tools')
+  const access = await assertFeature('/dashboard/master/santri-tools', 'create')
   if ('error' in access) return { error: access.error }
   const session = access
 
@@ -363,7 +363,7 @@ export async function hapusBebasPembayaran(
   tahun: number
 ): Promise<{ success: boolean } | { error: string }> {
   await ensureSantriToolsSchema()
-  const access = await assertFeature('/dashboard/master/santri-tools')
+  const access = await assertFeature('/dashboard/master/santri-tools', 'delete')
   if ('error' in access) return { error: access.error }
   const session = await getSession()
   const santri = await queryOne<{ nama_lengkap: string | null }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])

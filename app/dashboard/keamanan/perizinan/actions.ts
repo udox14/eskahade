@@ -116,7 +116,7 @@ export async function getAlasanIzinList() {
 }
 
 export async function simpanAlasanIzinList(items: string[]) {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -320,7 +320,7 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 
 // ─── Update Izin ─────────────────────────────────────────────────────────────
 export async function updateIzin(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
   if ('error' in access) return access
   const session = await getSession()
   const beforeIzin = await queryOne<Record<string, unknown>>(
@@ -369,7 +369,7 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
 
 // ─── Simpan Izin ─────────────────────────────────────────────────────────────
 export async function simpanIzin(formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'create')
   if ('error' in access) return access
   const session = access
 
@@ -417,7 +417,7 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
 }
 
 export async function setSudahDatang(id: string, waktuDatang: string): Promise<{ success: boolean; message: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -510,7 +510,7 @@ export async function cariSantriAsrama(keyword: string, asramaBinaan: string) {
 
 // ─── Ajukan Izin Pulang (oleh pengurus asrama) ────────────────────────────────
 export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'create')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -600,7 +600,7 @@ export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
 
 // ─── Update Pengajuan PENDING milik asrama ────────────────────────────────────
 export async function updatePengajuanAsrama(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
   if ('error' in access) return access
   const session = await getSession()
   if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
@@ -631,7 +631,7 @@ export async function updatePengajuanAsrama(id: string, formData: FormData): Pro
 
 // ─── Hapus Pengajuan PENDING milik asrama ─────────────────────────────────────
 export async function hapusPengajuanAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'delete')
   if ('error' in access) return access
   const session = await getSession()
   if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
@@ -673,7 +673,7 @@ export async function getPengajuanPendingAsrama(): Promise<any[]> {
 
 // ─── Approve Pengajuan Asrama ─────────────────────────────────────────────────
 export async function approveIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'create')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -725,7 +725,7 @@ export async function approveIzinAsrama(id: string): Promise<{ success: boolean 
 
 // ─── Reject Pengajuan Asrama ──────────────────────────────────────────────────
 export async function rejectIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -763,7 +763,7 @@ export async function rejectIzinAsrama(id: string): Promise<{ success: boolean }
 }
 
 export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan')
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'delete')
   if ('error' in access) return access
   const session = await getSession()
   const izin = await queryOne<{
