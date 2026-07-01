@@ -18,6 +18,7 @@ import {
   Printer,
   RefreshCw,
   Search,
+  Undo2,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -28,6 +29,7 @@ import {
   bayarPsbBatch,
   getKamarPsb,
   getPsbDashboard,
+  kembalikanTahapPsb,
   selesaikanPsb,
   tambahSantriDadakan,
   tempatkanAsramaPsb,
@@ -36,7 +38,7 @@ import {
   type PsbStatus,
 } from './actions'
 
-const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PLACED_KAMAR', 'PAID', 'DONE']
+const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PAID', 'PLACED_KAMAR', 'DONE']
 
 const STATUS_LABEL: Record<PsbStatus, string> = {
   VERIFICATION: 'Belum Verifikasi',
@@ -162,10 +164,10 @@ export default function PsbPageContent() {
   const sekretariatRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFICATION'), [rows])
   const placementRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFIED'), [rows])
   const roomRows = useMemo(() => {
-    return rows.filter((row: any) => row.status === 'PLACED_ASRAMA' && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
+    return rows.filter((row: any) => row.status === 'PAID' && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
   }, [activeRoomAsrama, rows])
   const paymentRows = useMemo(() => {
-    return rows.filter((row: any) => statusAtLeast(row.status, 'PLACED_KAMAR'))
+    return rows.filter((row: any) => statusAtLeast(row.status, 'PLACED_ASRAMA'))
   }, [rows])
 
   const sekretariatStats = useMemo(() => {
@@ -259,6 +261,12 @@ export default function PsbPageContent() {
     }
   }
 
+  const handleRevert = async (row: any) => {
+    const ok = window.confirm(`Kembalikan ${row.nama_lengkap} ke tahap sebelumnya?`)
+    if (!ok) return
+    await run(row.id, () => kembalikanTahapPsb(row.id), 'Santri dikembalikan ke tahap sebelumnya')
+  }
+
   const handleCancelPayment = async (row: any) => {
     const latestReceipt = row.pembayaran?.latestReceipt
     if (!latestReceipt?.id) {
@@ -307,20 +315,20 @@ export default function PsbPageContent() {
       count: placementRows.length,
     },
     {
-      key: 'kamar' as const,
-      title: 'Penentuan Kamar',
-      description: 'Kelola kamar santri sesuai asrama binaan.',
-      icon: Bed,
-      can: !!data?.user?.canKamar,
-      count: roomRows.length,
-    },
-    {
       key: 'pembayaran' as const,
       title: 'Pembayaran',
       description: 'Input pembayaran dan cetak kuitansi PSB.',
       icon: Wallet,
       can: !!data?.user?.canBayar,
       count: paymentRows.filter((row: any) => row.status !== 'DONE').length,
+    },
+    {
+      key: 'kamar' as const,
+      title: 'Penentuan Kamar',
+      description: 'Kelola kamar santri yang sudah menyelesaikan pembayaran.',
+      icon: Bed,
+      can: !!data?.user?.canKamar,
+      count: roomRows.length,
     },
   ]
 
@@ -432,6 +440,19 @@ export default function PsbPageContent() {
               setSelectedAsrama={setSelectedAsrama}
               busyId={busyId}
               onPlace={(row: any) => run(row.id, () => tempatkanAsramaPsb(row.id, selectedAsrama[row.id] ?? row.asrama), 'Asrama tersimpan')}
+              onRevert={handleRevert}
+            />
+          ) : null}
+
+          {selectedRole === 'pembayaran' ? (
+            <PembayaranView
+              rows={paymentRows}
+              stats={paymentStats}
+              busyId={busyId}
+              onOpenPayment={setPaymentModalRow}
+              onCancelPayment={handleCancelPayment}
+              onDone={(row: any) => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
+              onRevert={handleRevert}
             />
           ) : null}
 
@@ -451,17 +472,10 @@ export default function PsbPageContent() {
                 const result = await run(row.id, () => tempatkanKamarPsb(row.id, selectedKamar[row.id] ?? row.kamar), 'Kamar tersimpan')
                 if (result && row.asrama) await loadKamar(row.asrama, true)
               }}
-            />
-          ) : null}
-
-          {selectedRole === 'pembayaran' ? (
-            <PembayaranView
-              rows={paymentRows}
-              stats={paymentStats}
-              busyId={busyId}
-              onOpenPayment={setPaymentModalRow}
-              onCancelPayment={handleCancelPayment}
-              onDone={(row: any) => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
+              onRevert={async (row: any) => {
+                await handleRevert(row)
+                if (row.asrama) await loadKamar(row.asrama, true)
+              }}
             />
           ) : null}
         </div>
@@ -553,7 +567,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
   )
 }
 
-function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selectedAsrama, setSelectedAsrama, busyId, onPlace }: any) {
+function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selectedAsrama, setSelectedAsrama, busyId, onPlace, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -606,13 +620,23 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
                     </td>
                     <td className="px-4 py-3">{quota ? <AsramaStatusBadge status={quota.status} over={quota.over} /> : <span className="text-xs text-slate-400">Pilih asrama</span>}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        disabled={!target || busyId === row.id}
-                        onClick={() => onPlace(row)}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                      >
-                        Simpan Asrama
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          disabled={busyId === row.id}
+                          onClick={() => onRevert(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          Kembalikan
+                        </button>
+                        <button
+                          disabled={!target || busyId === row.id}
+                          onClick={() => onPlace(row)}
+                          className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          Simpan Asrama
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -625,7 +649,7 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
   )
 }
 
-function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace }: any) {
+function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -669,7 +693,7 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
       </QuotaAccordion>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah ditempatkan ke asrama aktif yang muncul di tabel ini." />
+        <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah menyelesaikan pembayaran PSB di asrama aktif yang muncul di tabel ini." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
@@ -701,13 +725,23 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
                     </select>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      disabled={!(selectedKamar[row.id] ?? row.kamar) || busyId === row.id}
-                      onClick={() => onPlace(row)}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                    >
-                      Simpan Kamar
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        disabled={busyId === row.id}
+                        onClick={() => onRevert(row)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                        Kembalikan
+                      </button>
+                      <button
+                        disabled={!(selectedKamar[row.id] ?? row.kamar) || busyId === row.id}
+                        onClick={() => onPlace(row)}
+                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                      >
+                        Simpan Kamar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )) : <EmptyRow colSpan={6} text="Tidak ada santri yang menunggu penentuan kamar untuk asrama ini." />}
@@ -805,7 +839,7 @@ function MiniMetric({ label, value, className = 'text-slate-900' }: { label: str
   )
 }
 
-function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, onDone }: any) {
+function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, onDone, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -834,7 +868,7 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
             <tbody className="divide-y divide-slate-100">
               {rows.length ? rows.map((row: any) => {
                 const outstanding = paymentOutstanding(row)
-                const canPay = row.status !== 'DONE' && statusAtLeast(row.status, 'PLACED_KAMAR') && outstanding > 0
+                const canPay = row.status !== 'DONE' && statusAtLeast(row.status, 'PLACED_ASRAMA') && outstanding > 0
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">
                     <SantriCells row={row} />
@@ -862,7 +896,7 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
                             Batalkan
                           </button>
                         ) : null}
-                        {row.status === 'PAID' ? (
+                        {row.status === 'PLACED_KAMAR' ? (
                           <button
                             disabled={busyId === row.id}
                             onClick={() => onDone(row)}
@@ -871,6 +905,14 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
                             Selesai
                           </button>
                         ) : null}
+                        <button
+                          disabled={busyId === row.id}
+                          onClick={() => onRevert(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          Kembalikan
+                        </button>
                       </div>
                     </td>
                   </tr>

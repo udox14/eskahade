@@ -15,7 +15,7 @@ const MONITORING_PATH = '/dashboard/psb/monitoring'
 
 const SEKOLAH_LIST = ['MTSU', 'MTSN', 'MAN', 'SMK', 'SMA', 'SMP', 'LAINNYA'] as const
 const ASRAMA_LIST = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4', 'AL-BAGHORY']
-const STATUS_ORDER = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PLACED_KAMAR', 'PAID', 'DONE'] as const
+const STATUS_ORDER = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PAID', 'PLACED_KAMAR', 'DONE'] as const
 const BIAYA_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
 
 export type PsbStatus = (typeof STATUS_ORDER)[number]
@@ -76,27 +76,10 @@ function normalizeStatus(status: string | null | undefined): PsbStatus {
   return STATUS_ORDER.includes(status as PsbStatus) ? status as PsbStatus : 'VERIFICATION'
 }
 
-function hasCompletedPsbPayment(params: {
-  bangunanTarget: number
-  bangunanPaid: number
-  tahunTagihan: number
-  payments: Array<{ jenis_biaya: string; tahun_tagihan: number | null }>
-}) {
-  const bangunanLunas = params.bangunanTarget <= 0 || params.bangunanPaid >= params.bangunanTarget
-  const tahunanLunas = BIAYA_TAHUNAN.every((jenis) =>
-    params.payments.some((row) => row.jenis_biaya === jenis && Number(row.tahun_tagihan) === params.tahunTagihan)
-  )
-  return bangunanLunas && tahunanLunas
-}
-
 function deriveFlowStatusFromPayments(params: {
-  bangunanTarget: number
-  bangunanPaid: number
-  tahunTagihan: number
   payments: Array<{ jenis_biaya: string; tahun_tagihan: number | null }>
 }): PsbStatus {
-  if (hasCompletedPsbPayment(params)) return 'DONE'
-  return params.payments.length > 0 ? 'PAID' : 'PLACED_KAMAR'
+  return params.payments.length > 0 ? 'PAID' : 'PLACED_ASRAMA'
 }
 
 function yearFromSantri(row: { tahun_masuk: number | null; tanggal_masuk?: string | null; created_at: string | null }) {
@@ -556,7 +539,7 @@ export async function tempatkanKamarPsb(santriId: string, kamar: string) {
   `, [santriId])
   if (!row) return { error: 'Santri tidak ditemukan' }
   if (!row.asrama) return { error: 'Santri belum ditempatkan ke asrama' }
-  if (!statusAtLeast(normalizeStatus(row.status), 'PLACED_ASRAMA')) return { error: 'Santri belum masuk tahap kamar' }
+  if (!statusAtLeast(normalizeStatus(row.status), 'PAID')) return { error: 'Santri belum menyelesaikan pembayaran PSB' }
   if (!isAdmin(access) && hasRole(access, 'pengurus_asrama') && access.asrama_binaan !== row.asrama) {
     return { error: 'Anda hanya boleh mengelola asrama binaan Anda' }
   }
@@ -580,7 +563,7 @@ export async function tempatkanKamarPsb(santriId: string, kamar: string) {
       INSERT INTO psb_flow (id, santri_id, status, placed_kamar_by, placed_kamar_at, created_by, created_at, updated_at)
       VALUES (?, ?, 'PLACED_KAMAR', ?, datetime('now'), ?, datetime('now'), datetime('now'))
       ON CONFLICT(santri_id) DO UPDATE SET
-        status = CASE WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PLACED_KAMAR') THEN 'PLACED_KAMAR' ELSE psb_flow.status END,
+        status = CASE WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PAID','PLACED_KAMAR') THEN 'PLACED_KAMAR' ELSE psb_flow.status END,
         placed_kamar_by = excluded.placed_kamar_by,
         placed_kamar_at = excluded.placed_kamar_at,
         updated_at = excluded.updated_at
@@ -639,7 +622,7 @@ export async function bayarPsbBatch(input: {
     WHERE s.id = ? AND s.status_global = 'aktif'
   `, [input.santriId])
   if (!santri) return { error: 'Santri tidak ditemukan' }
-  if (!statusAtLeast(normalizeStatus(santri.status), 'PLACED_KAMAR')) return { error: 'Santri belum ditempatkan ke kamar' }
+  if (!statusAtLeast(normalizeStatus(santri.status), 'PLACED_ASRAMA')) return { error: 'Santri belum ditempatkan ke asrama' }
 
   const tahunMasuk = yearFromSantri(santri)
   const tarifRows = await query<{ jenis_biaya: string; nominal: number }>(
@@ -676,16 +659,7 @@ export async function bayarPsbBatch(input: {
   const receiptId = generateId()
   const receiptNo = await nextReceiptNo()
   const total = normalized.reduce((sum, item) => sum + item.nominal, 0)
-  const completedPayments = [
-    ...existing.map((row) => ({ jenis_biaya: row.jenis_biaya, tahun_tagihan: row.tahun_tagihan })),
-    ...normalized.map((item) => ({ jenis_biaya: item.jenis, tahun_tagihan: item.tahunTagihan })),
-  ]
-  const statusAfterPayment: PsbStatus = hasCompletedPsbPayment({
-    bangunanTarget: tarif.get('BANGUNAN') ?? 0,
-    bangunanPaid: totalBangunanPaid + normalized.filter((item) => item.jenis === 'BANGUNAN').reduce((sum, item) => sum + item.nominal, 0),
-    tahunTagihan,
-    payments: completedPayments,
-  }) ? 'DONE' : 'PAID'
+  const statusAfterPayment: PsbStatus = 'PAID'
   const db = await getDB()
   await db.batch([
     db.prepare(`
@@ -700,20 +674,14 @@ export async function bayarPsbBatch(input: {
       `).bind(generateId(), input.santriId, item.jenis, item.tahunTagihan, item.nominal, access.id, item.keterangan, receiptId)
     ),
     db.prepare(`
-      INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, done_by, done_at, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, datetime('now'), ?, CASE WHEN ? = 'DONE' THEN datetime('now') ELSE NULL END, ?, datetime('now'), datetime('now'))
+      INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, created_by, created_at, updated_at)
+      VALUES (?, ?, 'PAID', ?, datetime('now'), ?, datetime('now'), datetime('now'))
       ON CONFLICT(santri_id) DO UPDATE SET
-        status = CASE
-          WHEN ? = 'DONE' THEN 'DONE'
-          WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PLACED_KAMAR','PAID') THEN 'PAID'
-          ELSE psb_flow.status
-        END,
+        status = CASE WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PAID') THEN 'PAID' ELSE psb_flow.status END,
         paid_by = excluded.paid_by,
         paid_at = excluded.paid_at,
-        done_by = CASE WHEN ? = 'DONE' THEN excluded.done_by ELSE psb_flow.done_by END,
-        done_at = CASE WHEN ? = 'DONE' THEN excluded.done_at ELSE psb_flow.done_at END,
         updated_at = excluded.updated_at
-    `).bind(generateId(), input.santriId, statusAfterPayment, access.id, access.id, statusAfterPayment, access.id, statusAfterPayment, statusAfterPayment, statusAfterPayment),
+    `).bind(generateId(), input.santriId, access.id, access.id),
   ])
 
   try {
@@ -746,7 +714,7 @@ export async function selesaikanPsb(santriId: string) {
   if ('error' in access) return access
   if (!isAdmin(access) && !hasRole(access, 'bendahara')) return { error: 'Akses ditolak' }
   const flow = await queryOne<{ status: string }>('SELECT status FROM psb_flow WHERE santri_id = ?', [santriId])
-  if (!flow || !statusAtLeast(normalizeStatus(flow.status), 'PAID')) return { error: 'Santri belum menyelesaikan pembayaran PSB' }
+  if (!flow || !statusAtLeast(normalizeStatus(flow.status), 'PLACED_KAMAR')) return { error: 'Santri belum ditempatkan ke kamar' }
   await execute(`
     UPDATE psb_flow
     SET status = 'DONE', done_by = ?, done_at = datetime('now'), updated_at = datetime('now')
@@ -755,6 +723,93 @@ export async function selesaikanPsb(santriId: string) {
   revalidatePath(PSB_PATH)
   revalidatePath(MONITORING_PATH)
   return { success: true }
+}
+
+const STATUS_LABEL_FOR_LOG: Record<PsbStatus, string> = {
+  VERIFICATION: 'Belum Verifikasi',
+  VERIFIED: 'Sudah Verifikasi',
+  PLACED_ASRAMA: 'Sudah Asrama',
+  PAID: 'Sudah Bayar',
+  PLACED_KAMAR: 'Sudah Kamar',
+  DONE: 'Selesai',
+}
+
+export async function kembalikanTahapPsb(santriId: string) {
+  const access = await assertFeature(PSB_PATH, 'update')
+  if ('error' in access) return access
+  await ensureSchema()
+
+  const row = await queryOne<{ status: string | null; nama_lengkap: string; asrama: string | null; kamar: string | null }>(`
+    SELECT pf.status, s.nama_lengkap, s.asrama, s.kamar
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ? AND s.status_global = 'aktif'
+  `, [santriId])
+  if (!row) return { error: 'Santri tidak ditemukan' }
+
+  const current = normalizeStatus(row.status)
+  const idx = STATUS_ORDER.indexOf(current)
+  if (idx <= 0) return { error: 'Santri masih di tahap paling awal' }
+  const prev = STATUS_ORDER[idx - 1]
+
+  const permittedByStage: Partial<Record<PsbStatus, boolean>> = {
+    VERIFIED: canPenempatan(access),
+    PLACED_ASRAMA: canBayar(access),
+    PAID: canBayar(access) || canKamar(access),
+    PLACED_KAMAR: canBayar(access),
+    DONE: canBayar(access),
+  }
+  if (!isAdmin(access) && !permittedByStage[current]) return { error: 'Akses ditolak untuk mengembalikan tahap ini' }
+
+  const db = await getDB()
+  const statements = []
+
+  if (current === 'PLACED_ASRAMA') {
+    statements.push(db.prepare('UPDATE santri SET asrama = NULL, kamar = NULL, updated_at = datetime(\'now\') WHERE id = ?').bind(santriId))
+  }
+  if (current === 'PLACED_KAMAR') {
+    statements.push(db.prepare('UPDATE santri SET kamar = NULL, updated_at = datetime(\'now\') WHERE id = ?').bind(santriId))
+  }
+
+  statements.push(db.prepare(`
+    UPDATE psb_flow
+    SET status = ?,
+        verified_by = CASE WHEN ? = 'VERIFICATION' THEN NULL ELSE verified_by END,
+        verified_at = CASE WHEN ? = 'VERIFICATION' THEN NULL ELSE verified_at END,
+        placed_asrama_by = CASE WHEN ? = 'VERIFIED' THEN NULL ELSE placed_asrama_by END,
+        placed_asrama_at = CASE WHEN ? = 'VERIFIED' THEN NULL ELSE placed_asrama_at END,
+        paid_by = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE paid_by END,
+        paid_at = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE paid_at END,
+        placed_kamar_by = CASE WHEN ? = 'PAID' THEN NULL ELSE placed_kamar_by END,
+        placed_kamar_at = CASE WHEN ? = 'PAID' THEN NULL ELSE placed_kamar_at END,
+        done_by = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE done_by END,
+        done_at = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE done_at END,
+        updated_at = datetime('now')
+    WHERE santri_id = ?
+  `).bind(prev, prev, prev, prev, prev, prev, prev, prev, prev, prev, prev, santriId))
+
+  await db.batch(statements)
+
+  try {
+    await logActivity({
+      actor: actorFromSession(access),
+      module: 'psb',
+      action: 'revert',
+      fiturHref: PSB_PATH,
+      logKind: 'update',
+      entityType: 'psb_flow',
+      entityId: santriId,
+      entityLabel: row.nama_lengkap,
+      summary: `Mengembalikan ${row.nama_lengkap} dari ${STATUS_LABEL_FOR_LOG[current]} ke ${STATUS_LABEL_FOR_LOG[prev]}`,
+      details: { status_sebelumnya: current, status_baru: prev },
+    })
+  } catch (error) {
+    console.error('Failed to write PSB revert activity log', error)
+  }
+
+  revalidatePath(PSB_PATH)
+  revalidatePath(MONITORING_PATH)
+  return { success: true, status: prev }
 }
 
 export async function batalkanPembayaranPsb(input: { santriId: string; receiptId: string }) {
@@ -800,31 +855,22 @@ export async function batalkanPembayaranPsb(input: { santriId: string; receiptId
     'SELECT jenis_biaya, tahun_tagihan, nominal_bayar FROM pembayaran_tahunan WHERE santri_id = ?',
     [input.santriId]
   )
-  const tahunMasuk = yearFromSantri(receipt)
-  const tarifRows = await query<{ jenis_biaya: string; nominal: number }>(
-    'SELECT jenis_biaya, nominal FROM biaya_settings WHERE tahun_angkatan = ?',
-    [tahunMasuk]
-  )
-  const tarif = new Map(tarifRows.map((row) => [row.jenis_biaya, Number(row.nominal ?? 0)]))
   const nextStatus = deriveFlowStatusFromPayments({
-    bangunanTarget: tarif.get('BANGUNAN') ?? 0,
-    bangunanPaid: remainingPayments
-      .filter((row) => row.jenis_biaya === 'BANGUNAN')
-      .reduce((sum, row) => sum + Number(row.nominal_bayar ?? 0), 0),
-    tahunTagihan: Number(receipt.tahun_tagihan ?? new Date().getFullYear()),
     payments: remainingPayments.map((row) => ({ jenis_biaya: row.jenis_biaya, tahun_tagihan: row.tahun_tagihan })),
   })
 
   await execute(`
     UPDATE psb_flow
     SET status = ?,
-        paid_by = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE paid_by END,
-        paid_at = CASE WHEN ? = 'PLACED_KAMAR' THEN NULL ELSE paid_at END,
+        paid_by = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE paid_by END,
+        paid_at = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE paid_at END,
+        placed_kamar_by = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE placed_kamar_by END,
+        placed_kamar_at = CASE WHEN ? = 'PLACED_ASRAMA' THEN NULL ELSE placed_kamar_at END,
         done_by = CASE WHEN ? = 'DONE' THEN done_by ELSE NULL END,
         done_at = CASE WHEN ? = 'DONE' THEN done_at ELSE NULL END,
         updated_at = datetime('now')
     WHERE santri_id = ?
-  `, [nextStatus, nextStatus, nextStatus, nextStatus, nextStatus, input.santriId])
+  `, [nextStatus, nextStatus, nextStatus, nextStatus, nextStatus, nextStatus, nextStatus, input.santriId])
 
   try {
     await logActivity({
