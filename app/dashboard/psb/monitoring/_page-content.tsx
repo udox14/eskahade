@@ -17,14 +17,14 @@ const STATUS_LABEL: Record<PsbStatus, string> = {
   DONE: 'Selesai',
 }
 
-const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PLACED_KAMAR', 'PAID', 'DONE']
+const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PAID', 'PLACED_KAMAR', 'DONE']
 const STATUS_COLOR: Record<PsbStatus, string> = {
   VERIFICATION: 'bg-slate-100 text-slate-600',
-  VERIFIED: 'bg-emerald-50 text-emerald-700',
-  PLACED_ASRAMA: 'bg-emerald-100 text-emerald-800',
-  PLACED_KAMAR: 'bg-green-100 text-green-800',
-  PAID: 'bg-green-200 text-green-900',
-  DONE: 'bg-green-700 text-white',
+  VERIFIED: 'bg-blue-50 text-blue-700',
+  PLACED_ASRAMA: 'bg-cyan-50 text-cyan-700',
+  PLACED_KAMAR: 'bg-amber-50 text-amber-700',
+  PAID: 'bg-emerald-50 text-emerald-700',
+  DONE: 'bg-emerald-700 text-white',
 }
 const TIMELINE_GRADIENT = ['bg-emerald-100', 'bg-emerald-200', 'bg-green-300', 'bg-green-500', 'bg-green-600', 'bg-green-800']
 
@@ -170,8 +170,8 @@ export default function PsbMonitoringContent() {
                           <span>Verif</span>
                           <span>OK</span>
                           <span>Asrama</span>
-                          <span>Kamar</span>
                           <span>Bayar</span>
+                          <span>Kamar</span>
                           <span>Selesai</span>
                         </div>
                       </td>

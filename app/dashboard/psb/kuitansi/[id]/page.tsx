@@ -29,9 +29,9 @@ export default async function PsbReceiptPage({ params }: Props) {
       <style>{`
         .receipt-page {
           min-height: 100vh;
-          background: #f5f5f5;
+          background: #fff;
           padding: 14px 0;
-          color: #111;
+          color: #000;
           font-family: "Times New Roman", Times, serif;
         }
         .print-actions {
@@ -42,12 +42,12 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .print-actions span {
           display: inline-block;
-          border: 1px solid #bbb;
+          border: 1px solid #000;
           border-radius: 4px;
-          background: white;
+          background: #fff;
           padding: 5px 9px;
           font-size: 11px;
-          color: #444;
+          color: #000;
         }
         .receipt-copy {
           position: relative;
@@ -101,7 +101,7 @@ export default async function PsbReceiptPage({ params }: Props) {
         .header-rule {
           height: 0;
           margin: 1mm 0 1.5mm;
-          border-top: 2px solid #111;
+          border-top: 2px solid #000;
         }
         .intro-grid {
           display: grid;
@@ -129,17 +129,17 @@ export default async function PsbReceiptPage({ params }: Props) {
         .info-row span,
         .info-row b {
           font-weight: 400;
-          color: #555;
+          color: #000;
         }
         .info-row strong {
           font-style: normal;
           font-weight: 700;
-          color: #111;
+          color: #000;
           text-transform: uppercase;
         }
         .info-row em {
           font-style: normal;
-          color: #111;
+          color: #000;
         }
         .payment-title {
           text-align: center;
@@ -154,7 +154,7 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .payment-title p {
           margin: 3px 0 0;
-          color: #777;
+          color: #000;
           font-size: 7px;
         }
         .terbilang {
@@ -162,14 +162,14 @@ export default async function PsbReceiptPage({ params }: Props) {
           align-items: center;
           gap: 5px;
           min-height: 4.8mm;
-          border: 1px solid #9a9a9a;
+          border: 1px solid #000;
           padding: 1px 5px;
           box-sizing: border-box;
           font-size: 7.8px;
-          color: #555;
+          color: #000;
         }
         .terbilang strong {
-          color: #111;
+          color: #000;
           font-size: 7.8px;
           font-style: italic;
           font-weight: 700;
@@ -183,10 +183,10 @@ export default async function PsbReceiptPage({ params }: Props) {
           font-size: 7.8px;
         }
         .main-table th {
-          background: #111;
+          background: #000;
           color: #fff;
           padding: 1.5px 4px;
-          border-right: 1px solid #555;
+          border-right: 1px solid #fff;
           text-align: left;
           font-weight: 700;
         }
@@ -195,12 +195,12 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .main-table td {
           padding: 1.5px 4px;
-          border-bottom: 1px solid #ddd;
+          border-bottom: 1px dashed #000;
         }
         .main-table tfoot td {
-          border-top: 2px solid #111;
-          border-bottom: 0;
-          background: #f1f1f1;
+          border-top: 2px solid #000;
+          border-bottom: 2px solid #000;
+          background: transparent;
           font-weight: 700;
           text-align: center;
         }
@@ -218,29 +218,29 @@ export default async function PsbReceiptPage({ params }: Props) {
           margin: 2mm 0 .8mm;
           font-size: 7.2px;
           font-style: italic;
-          color: #666;
+          color: #000;
         }
         .arrears-table {
           font-size: 7.2px;
-          color: #111;
+          color: #000;
         }
         .arrears-table th {
           padding: 1.4px 4px;
-          border: 1px solid #ddd;
-          background: #f3f3f3;
+          border: 1px solid #000;
+          background: transparent;
           text-align: left;
           font-weight: 700;
         }
         .arrears-table td {
           padding: 1.4px 4px;
-          border: 1px solid #eee;
+          border: 1px solid #000;
         }
         .total-arrears td {
-          background: #fff1f1;
+          background: transparent;
           font-weight: 700;
         }
         .due-zero {
-          color: #c00;
+          color: #000;
         }
         .summary-block {
           display: grid;
@@ -279,7 +279,7 @@ export default async function PsbReceiptPage({ params }: Props) {
           line-height: 1.25;
         }
         .signature-line {
-          border-top: 1px solid #111;
+          border-top: 1px dashed #000;
           height: 0;
           margin: 0 auto 1mm;
         }
@@ -299,10 +299,10 @@ export default async function PsbReceiptPage({ params }: Props) {
           display: grid;
           grid-template-columns: 1fr 1.4fr 1fr;
           gap: 4mm;
-          border-top: 1px solid #ddd;
+          border-top: 1px dashed #000;
           padding-top: .7mm;
           font-size: 6.4px;
-          color: #999;
+          color: #000;
         }
         .receipt-footer span:nth-child(2) {
           text-align: center;
@@ -316,15 +316,16 @@ export default async function PsbReceiptPage({ params }: Props) {
           bottom: 40mm;
           z-index: 0;
           transform: rotate(-13deg);
-          border: 3px double rgba(10, 120, 56, .16);
+          border: 3px double #000;
           border-radius: 7px;
           padding: 4px 16px;
-          color: rgba(10, 120, 56, .14);
+          color: #000;
           font-family: Arial, sans-serif;
           font-size: 28px;
           font-weight: 700;
           letter-spacing: .10em;
           pointer-events: none;
+          opacity: 0.15;
         }
         @page {
           size: 24cm 14cm;
@@ -347,7 +348,7 @@ export default async function PsbReceiptPage({ params }: Props) {
           .receipt-copy {
             margin: 0;
           }
-          }
+        }
       `}</style>
     </main>
   )
