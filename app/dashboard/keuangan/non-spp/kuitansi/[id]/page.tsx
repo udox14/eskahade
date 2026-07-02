@@ -131,17 +131,10 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
         </tfoot>
       </table>
 
-      <p className="arrears-caption">Catatan - sisa tagihan yang belum terbayar:</p>
       <table className="arrears-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th className="amount-col">Sisa (Rp)</th>
-          </tr>
-        </thead>
         <tbody>
           <tr className="total-arrears">
-            <td>Total Sisa Tagihan Non-SPP</td>
+            <td>Sisa Tagihan</td>
             <td className="amount-col due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tbody>
@@ -554,12 +547,14 @@ export default async function NonSppReceiptPage({ params }: Props) {
             background: #fff !important;
             padding: 0 !important;
             min-height: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
           }
           .print-actions {
             display: none !important;
           }
           .receipt-copy {
-            margin: 0 !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
           }
         }

@@ -358,12 +358,14 @@ export default async function PsbReceiptPage({ params }: Props) {
             background: #fff !important;
             padding: 0 !important;
             min-height: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
           }
           .print-actions {
             display: none !important;
           }
           .receipt-copy {
-            margin: 0 !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
           }
         }

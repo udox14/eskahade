@@ -128,17 +128,10 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         </tfoot>
       </table>
 
-      <p className="arrears-caption">Catatan - sisa tagihan yang belum terbayar:</p>
       <table className="arrears-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th className="amount-col">Sisa (Rp)</th>
-          </tr>
-        </thead>
         <tbody>
           <tr className="total-arrears">
-            <td>Total Sisa Tagihan PSB</td>
+            <td>Sisa Tagihan</td>
             <td className="amount-col due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tbody>
@@ -485,7 +478,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         }
         @media print {
           .receipt-copy {
-            margin: 0;
+            margin: 0 auto !important;
           }
         }
       `}</style>
