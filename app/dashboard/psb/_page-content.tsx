@@ -29,6 +29,7 @@ import {
   FileCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { printIframe } from '@/lib/utils'
 
 import {
   bayarPsbBatch,
@@ -44,6 +45,8 @@ import {
   verifikasiSantriPsb,
   type PsbStatus,
 } from './actions'
+
+import { PsbReceiptCopy } from './psb-receipt-copy'
 
 const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PAID', 'PLACED_KAMAR', 'DONE']
 
@@ -266,7 +269,7 @@ export default function PsbPageContent() {
     })
     const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items }), 'Pembayaran PSB tersimpan')
     if (result?.receiptId) {
-      window.open(`/dashboard/psb/kuitansi/${result.receiptId}`, '_blank', 'noopener,noreferrer')
+      printIframe(`/dashboard/psb/kuitansi/${result.receiptId}`)
       setPaymentItems(prev => ({ ...prev, [row.id]: {} }))
       setBangunanNominal(prev => ({ ...prev, [row.id]: '' }))
       setPaymentModalRow(null)
@@ -1261,6 +1264,19 @@ function PaymentOption({ title, subtitle, checked, disabled, onChange }: any) {
 }
 
 function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
+  const mockReceipt = {
+    total,
+    nama_lengkap: row.nama_lengkap,
+    nis: row.nis,
+    sekolah: row.sekolah,
+    asrama: row.asrama,
+    kamar: row.kamar,
+    tahun_tagihan: tahunTagihan,
+    receipt_no: 'Nomor otomatis',
+    created_at: new Date().toISOString(),
+    penerima_nama: 'Bendahara',
+  }
+
   return (
     <div className="bg-slate-100 p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -1268,92 +1284,13 @@ function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
           <p className="text-xs font-bold uppercase text-slate-500">Live Preview</p>
           <h3 className="text-sm font-bold text-slate-900">Kuitansi PSB</h3>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">A4 - 2 Salinan</span>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">Kertas NCR</span>
       </div>
 
-      <div className="space-y-3">
-        {[1, 2].map(copy => (
-          <div key={copy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-sm">
-            <div className="border-b-[3px] border-slate-900 pb-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-900">Kuitansi Pembayaran</p>
-                  <p className="mt-0.5 text-sm font-black text-slate-900">Pondok Pesantren Sukahideng</p>
-                  <p className="text-[9px] text-slate-500">Desa Sukarapih Kec. Sukarame Kabupaten Tasikmalaya Jawa Barat 46461</p>
-                </div>
-                <span className="rounded-full border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                  {copy === 1 ? 'Lembar Pembayar' : 'Arsip Pondok'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-[1.1fr_auto_0.9fr] gap-3">
-              <div className="space-y-1 text-[11px]">
-                <PreviewInfo label="Nama Santri" value={row.nama_lengkap} />
-                <PreviewInfo label="NIS" value={row.nis || '-'} />
-                <PreviewInfo label="Kelas" value={row.sekolah || '-'} />
-                <PreviewInfo label="Asrama" value={`${row.asrama || '-'} / ${row.kamar || '-'}`} />
-              </div>
-
-              <div className="pt-1 text-center">
-                <p className="text-sm font-black tracking-[0.2em] text-slate-900">BUKTI PEMBAYARAN</p>
-                <p className="mt-1 text-[9px] text-slate-500">Pembayaran PSB - Tahun Tagihan {tahunTagihan}</p>
-              </div>
-
-              <div className="space-y-1 text-[11px]">
-                <PreviewInfo label="No. Bukti" value="Nomor otomatis" />
-                <PreviewInfo label="Tanggal" value="Tanggal transaksi" />
-                <PreviewInfo label="Metode" value="Tunai" />
-                <PreviewInfo label="Petugas" value="Bendahara" />
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-[11px]">
-              <span className="text-slate-500">Terbilang:</span>
-              <span className="font-semibold italic text-slate-900">{total ? `${rupiah(total)} dibayarkan` : 'Belum ada item dipilih'}</span>
-            </div>
-
-            <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-900 text-left text-[10px] uppercase text-white">
-                  <tr>
-                    <th className="px-2 py-1.5">Uraian Pembayaran</th>
-                    <th className="px-2 py-1.5 text-right">Nominal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length ? items.map((item: any) => (
-                    <tr key={`${item.label}-${item.tahun}`} className="border-t border-slate-100">
-                      <td className="px-2 py-1.5 font-medium">{item.label}</td>
-                      <td className="px-2 py-1.5 text-right">{rupiah(item.nominal)}</td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-5 text-center text-slate-400">Centang item pembayaran untuk melihat preview.</td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-black">
-                  <tr>
-                    <td className="px-2 py-1.5">TOTAL PEMBAYARAN INI</td>
-                    <td className="px-2 py-1.5 text-right">{rupiah(total)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-8 px-4 text-center text-[10px] text-slate-500">
-              <div>
-                <p>Penyetor / Santri</p>
-                <p className="mt-6 font-bold text-slate-700">( {row.nama_lengkap || '________________'} )</p>
-              </div>
-              <div>
-                <p>Tasikmalaya, Tanggal transaksi<br />Bendahara</p>
-                <p className="mt-6 font-bold text-slate-700">( Bendahara )</p>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
+        <div className="origin-top-left" style={{ transform: 'scale(0.55)', width: '181.8%' }}>
+          <PsbReceiptCopy receipt={mockReceipt} items={items} printedAt={new Date().toISOString()} />
+        </div>
       </div>
     </div>
   )

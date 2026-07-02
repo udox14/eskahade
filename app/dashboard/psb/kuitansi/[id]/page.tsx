@@ -25,7 +25,7 @@ export default async function PsbReceiptPage({ params }: Props) {
         <span>Gunakan Ctrl+P untuk mencetak</span>
       </div>
       <PsbReceiptCopy receipt={receipt} items={items} printedAt={printedAt} sisa={sisa} />
-      <script dangerouslySetInnerHTML={{ __html: 'window.print();' }} />
+      <script dangerouslySetInnerHTML={{ __html: 'window.addEventListener("load", function() { setTimeout(window.print, 100); });' }} />
       <style>{`
         .receipt-page {
           min-height: 100vh;
