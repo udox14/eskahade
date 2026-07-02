@@ -292,7 +292,11 @@ export default function PsbPageContent() {
   }
 
   const handleCicilSemua = async (row: any) => {
-    await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items: [] }), 'Pembayaran dicicil')
+    await run(
+      row.id,
+      () => bypassPsbPayment({ santriId: row.id, alasan: 'Dicicil - lanjut tanpa pelunasan' }),
+      'Santri lanjut ke tahap kamar (dicicil)'
+    )
     setPaymentModalRow(null)
   }
 
@@ -935,7 +939,11 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
             <tbody className="divide-y divide-slate-100">
               {rows.length ? rows.map((row: any) => {
                 const outstanding = paymentOutstanding(row)
-                const canPay = row.status !== 'DONE' && statusAtLeast(row.status, 'PLACED_ASRAMA') && outstanding > 0
+                // Buka modal kalau masih ada tagihan, ATAU santri belum lolos tahap bayar
+                // (mis. gratis/tanpa tarif) supaya tombol GRATISKAN tetap bisa diakses.
+                const canPay = row.status !== 'DONE'
+                  && statusAtLeast(row.status, 'PLACED_ASRAMA')
+                  && (outstanding > 0 || !statusAtLeast(row.status, 'PAID'))
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">
                     <SantriCells row={row} />
