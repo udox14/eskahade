@@ -64,12 +64,12 @@ export default async function PsbReceiptPage({ params }: Props) {
           align-items: center;
           justify-content: center;
           gap: 7px;
-          height: 14mm;
+          height: 11.5mm;
           text-align: left;
         }
         .receipt-header img {
-          width: 13mm;
-          height: 13mm;
+          width: 11mm;
+          height: 11mm;
           object-fit: contain;
         }
         .school-heading {
@@ -105,8 +105,8 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .intro-grid {
           display: grid;
-          grid-template-columns: 42% 1fr 32%;
-          column-gap: 7px;
+          grid-template-columns: 1fr 62mm;
+          column-gap: 10mm;
           align-items: start;
           margin-bottom: .8mm;
         }
@@ -214,6 +214,12 @@ export default async function PsbReceiptPage({ params }: Props) {
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
+        .main-table td.amount-col,
+        .arrears-table td.amount-col {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
+        }
         .arrears-caption {
           margin: .8mm 0 .4mm;
           font-size: 10.2px;
@@ -244,7 +250,7 @@ export default async function PsbReceiptPage({ params }: Props) {
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 44mm;
+          grid-template-columns: 1fr 58mm;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -253,42 +259,49 @@ export default async function PsbReceiptPage({ params }: Props) {
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 18mm;
+          width: 24mm;
         }
         .summary-block table td:nth-child(2) {
           width: 3mm;
           text-align: center;
         }
         .summary-block table td:nth-child(3) {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
           font-family: "Courier New", monospace;
           font-weight: 700;
-          text-align: right;
+          white-space: nowrap;
         }
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14mm;
-          margin-top: .3mm;
-          padding: 0 12mm;
+          margin-top: 2mm;
+          padding: 0 14mm;
           text-align: center;
           font-size: 11px;
         }
-        .signature-box p {
-          height: 4.5mm;
+        .signature-box .sig-place {
           margin: 0;
           line-height: 1.25;
         }
+        .signature-box .sig-role {
+          margin: 0 0 13mm;
+          line-height: 1.25;
+        }
         .signature-line {
-          width: 32mm;
+          width: 40mm;
           border-top: 1px solid #000;
           height: 0;
-          margin: 0 auto 1mm;
+          margin: 0 auto;
         }
         .signature-box strong {
           display: block;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          margin-top: 1.2mm;
           font-size: 10.5px;
           font-weight: 700;
         }

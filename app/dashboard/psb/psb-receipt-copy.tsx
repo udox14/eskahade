@@ -89,13 +89,8 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           <InfoRow label="Asrama" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
         </div>
 
-        <div className="payment-title">
-          <h3>BUKTI PEMBAYARAN</h3>
-          <p>Pembayaran PSB - Tahun Tagihan {receipt.tahun_tagihan || '-'}</p>
-        </div>
-
         <div className="receipt-info">
-          <InfoRow label="No. Bukti" value={receipt.receipt_no} strong />
+          <InfoRow label="No. Kuitansi" value={receipt.receipt_no} strong />
           <InfoRow label="Tanggal" value={formatLongDate(receipt.created_at)} />
           <InfoRow label="Metode" value="Tunai" />
           <InfoRow label="Petugas" value={officerName} />
@@ -120,14 +115,14 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
             <tr key={`${item.jenis_biaya}-${index}`}>
               <td className="no-col">{index + 1}</td>
               <td>{paymentLabel(item.jenis_biaya)}</td>
-              <td className="amount-col">{rupiah(item.nominal_bayar)}</td>
+              <td className="amount-col"><span className="rp">Rp</span><span>{Number(item.nominal_bayar || 0).toLocaleString('id-ID')}</span></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr>
             <td colSpan={2}>TOTAL PEMBAYARAN INI</td>
-            <td className="amount-col">{rupiah(total)}</td>
+            <td className="amount-col"><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tfoot>
       </table>
@@ -141,13 +136,9 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>PSB</td>
-            <td className="amount-col due-zero">{rupiah(sisa)}</td>
-          </tr>
           <tr className="total-arrears">
-            <td>Total Sisa Tunggakan</td>
-            <td className="amount-col due-zero">{rupiah(sisa)}</td>
+            <td>Total Sisa Tagihan PSB</td>
+            <td className="amount-col due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tbody>
       </table>
@@ -159,17 +150,17 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
             <tr>
               <td>JUMLAH</td>
               <td>:</td>
-              <td>{rupiah(total)}</td>
+              <td><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
             </tr>
             <tr>
               <td>PEMBAYARAN</td>
               <td>:</td>
-              <td>{rupiah(total)}</td>
+              <td><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
             </tr>
             <tr>
               <td>KEMBALI</td>
               <td>:</td>
-              <td>Rp 0</td>
+              <td><span className="rp">Rp</span><span>0</span></td>
             </tr>
           </tbody>
         </table>
@@ -177,12 +168,14 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
 
       <section className="signature-section">
         <div className="signature-box">
-          <p>Penyetor / Santri</p>
+          <p className="sig-place">&nbsp;</p>
+          <p className="sig-role">Penyetor / Santri</p>
           <div className="signature-line" />
           <strong>( {payerName} )</strong>
         </div>
         <div className="signature-box">
-          <p>Tasikmalaya, {formatLongDate(receipt.created_at)}<br />Bendahara</p>
+          <p className="sig-place">Tasikmalaya, {formatLongDate(receipt.created_at)}</p>
+          <p className="sig-role">Bendahara PSB</p>
           <div className="signature-line" />
           <strong>( {officerName} )</strong>
         </div>
@@ -212,12 +205,12 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           align-items: center;
           justify-content: center;
           gap: 7px;
-          height: 14mm;
+          height: 11.5mm;
           text-align: left;
         }
         .receipt-header img {
-          width: 13mm;
-          height: 13mm;
+          width: 11mm;
+          height: 11mm;
           object-fit: contain;
         }
         .school-heading {
@@ -253,8 +246,8 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         }
         .intro-grid {
           display: grid;
-          grid-template-columns: 42% 1fr 32%;
-          column-gap: 7px;
+          grid-template-columns: 1fr 62mm;
+          column-gap: 10mm;
           align-items: start;
           margin-bottom: .8mm;
         }
@@ -291,17 +284,17 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         }
         .payment-title {
           text-align: center;
-          padding-top: 0;
+          margin: .4mm 0 1.6mm;
         }
         .payment-title h3 {
           margin: 0;
           font-size: 14px;
           font-weight: 700;
           letter-spacing: .08em;
-          line-height: 1;
+          line-height: 1.1;
         }
         .payment-title p {
-          margin: 3px 0 0;
+          margin: 1px 0 0;
           color: #777;
           font-size: 10px;
         }
@@ -362,6 +355,12 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
+        .main-table td.amount-col,
+        .arrears-table td.amount-col {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
+        }
         .arrears-caption {
           margin: .8mm 0 .4mm;
           font-size: 10.2px;
@@ -392,7 +391,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 44mm;
+          grid-template-columns: 1fr 58mm;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -401,42 +400,49 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 18mm;
+          width: 24mm;
         }
         .summary-block table td:nth-child(2) {
           width: 3mm;
           text-align: center;
         }
         .summary-block table td:nth-child(3) {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
           font-family: "Courier New", monospace;
           font-weight: 700;
-          text-align: right;
+          white-space: nowrap;
         }
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14mm;
-          margin-top: .3mm;
-          padding: 0 12mm;
+          margin-top: 2mm;
+          padding: 0 14mm;
           text-align: center;
           font-size: 11px;
         }
-        .signature-box p {
-          height: 4.5mm;
+        .signature-box .sig-place {
           margin: 0;
           line-height: 1.25;
         }
+        .signature-box .sig-role {
+          margin: 0 0 13mm;
+          line-height: 1.25;
+        }
         .signature-line {
-          width: 32mm;
+          width: 40mm;
           border-top: 1px solid #111;
           height: 0;
-          margin: 0 auto 1mm;
+          margin: 0 auto;
         }
         .signature-box strong {
           display: block;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          margin-top: 1.2mm;
           font-size: 10.5px;
           font-weight: 700;
         }

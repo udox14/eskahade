@@ -93,11 +93,6 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
           <InfoRow label="Asrama / Kamar" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
         </div>
 
-        <div className="payment-title">
-          <h3>BUKTI PEMBAYARAN</h3>
-          <p>Non-SPP - {receipt.tahun_ajaran_nama || `Tahun Tagihan ${receipt.tahun_tagihan || '-'}`}</p>
-        </div>
-
         <div className="receipt-info">
           <InfoRow label="Nomor Kuitansi" value={receiptNumber(receipt)} strong />
           <InfoRow label="Tanggal Dibayar" value={formatLongDate(receipt.tanggal_bayar)} />
@@ -124,14 +119,14 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
             <tr key={`${item.jenis_biaya}-${index}`}>
               <td className="no-col">{index + 1}</td>
               <td>{paymentLabel(item.jenis_biaya)}</td>
-              <td className="amount-col">{rupiah(item.nominal_bayar)}</td>
+              <td className="amount-col"><span className="rp">Rp</span><span>{Number(item.nominal_bayar || 0).toLocaleString('id-ID')}</span></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr>
             <td colSpan={2}>TOTAL PEMBAYARAN INI</td>
-            <td className="amount-col">{rupiah(total)}</td>
+            <td className="amount-col"><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tfoot>
       </table>
@@ -145,13 +140,9 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Non-SPP</td>
-            <td className="amount-col due-zero">{rupiah(sisa)}</td>
-          </tr>
           <tr className="total-arrears">
-            <td>Total Sisa Tunggakan</td>
-            <td className="amount-col due-zero">{rupiah(sisa)}</td>
+            <td>Total Sisa Tagihan Non-SPP</td>
+            <td className="amount-col due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tbody>
       </table>
@@ -163,17 +154,17 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
             <tr>
               <td>JUMLAH</td>
               <td>:</td>
-              <td>{rupiah(total)}</td>
+              <td><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
             </tr>
             <tr>
               <td>PEMBAYARAN</td>
               <td>:</td>
-              <td>{rupiah(total)}</td>
+              <td><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
             </tr>
             <tr>
               <td>KEMBALI</td>
               <td>:</td>
-              <td>Rp 0</td>
+              <td><span className="rp">Rp</span><span>0</span></td>
             </tr>
           </tbody>
         </table>
@@ -181,12 +172,14 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
 
       <section className="signature-section">
         <div className="signature-box">
-          <p>Penyetor / Santri</p>
+          <p className="sig-place">&nbsp;</p>
+          <p className="sig-role">Penyetor / Santri</p>
           <div className="signature-line" />
           <strong>( {payerName} )</strong>
         </div>
         <div className="signature-box">
-          <p>Tasikmalaya, {formatLongDate(receipt.tanggal_bayar)}<br />Bendahara</p>
+          <p className="sig-place">Tasikmalaya, {formatLongDate(receipt.tanggal_bayar)}</p>
+          <p className="sig-role">Bendahara</p>
           <div className="signature-line" />
           <strong>( {officerName} )</strong>
         </div>
@@ -268,12 +261,12 @@ export default async function NonSppReceiptPage({ params }: Props) {
           align-items: center;
           justify-content: center;
           gap: 7px;
-          height: 14mm;
+          height: 11.5mm;
           text-align: left;
         }
         .receipt-header img {
-          width: 13mm;
-          height: 13mm;
+          width: 11mm;
+          height: 11mm;
           object-fit: contain;
         }
         .school-heading {
@@ -309,8 +302,8 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .intro-grid {
           display: grid;
-          grid-template-columns: 42% 1fr 32%;
-          column-gap: 7px;
+          grid-template-columns: 1fr 62mm;
+          column-gap: 10mm;
           align-items: start;
           margin-bottom: .8mm;
         }
@@ -418,6 +411,12 @@ export default async function NonSppReceiptPage({ params }: Props) {
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
+        .main-table td.amount-col,
+        .arrears-table td.amount-col {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
+        }
         .arrears-caption {
           margin: .8mm 0 .4mm;
           font-size: 10.2px;
@@ -448,7 +447,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 44mm;
+          grid-template-columns: 1fr 58mm;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -457,42 +456,49 @@ export default async function NonSppReceiptPage({ params }: Props) {
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 18mm;
+          width: 24mm;
         }
         .summary-block table td:nth-child(2) {
           width: 3mm;
           text-align: center;
         }
         .summary-block table td:nth-child(3) {
+          display: flex;
+          justify-content: space-between;
+          gap: 6px;
           font-family: "Courier New", monospace;
           font-weight: 700;
-          text-align: right;
+          white-space: nowrap;
         }
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14mm;
-          margin-top: .3mm;
-          padding: 0 12mm;
+          margin-top: 2mm;
+          padding: 0 14mm;
           text-align: center;
           font-size: 11px;
         }
-        .signature-box p {
-          height: 4.5mm;
+        .signature-box .sig-place {
           margin: 0;
           line-height: 1.25;
         }
+        .signature-box .sig-role {
+          margin: 0 0 13mm;
+          line-height: 1.25;
+        }
         .signature-line {
-          width: 32mm;
+          width: 40mm;
           border-top: 1px solid #111;
           height: 0;
-          margin: 0 auto 1mm;
+          margin: 0 auto;
         }
         .signature-box strong {
           display: block;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          margin-top: 1.2mm;
           font-size: 10.5px;
           font-weight: 700;
         }
