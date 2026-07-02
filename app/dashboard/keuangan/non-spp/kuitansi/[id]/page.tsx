@@ -483,6 +483,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           line-height: 1.25;
         }
         .signature-line {
+          width: 32mm;
           border-top: 1px solid #111;
           height: 0;
           margin: 0 auto 1mm;

@@ -279,7 +279,8 @@ export default async function PsbReceiptPage({ params }: Props) {
           line-height: 1.25;
         }
         .signature-line {
-          border-top: 1px dashed #000;
+          width: 32mm;
+          border-top: 1px solid #000;
           height: 0;
           margin: 0 auto 1mm;
         }
