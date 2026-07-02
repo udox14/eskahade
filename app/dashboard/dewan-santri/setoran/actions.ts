@@ -135,12 +135,18 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         FROM spp_log
         WHERE (tahun * 100 + bulan) < (? * 100 + ?)
           AND tanggal_bayar >= ? AND tanggal_bayar < ?
+          AND psb_receipt_id IS NULL
         GROUP BY santri_id
       ),
       ditiadakan_ini AS (
         SELECT DISTINCT santri_id
         FROM spp_tagihan_ditiadakan
         WHERE tahun = ? AND bulan = ? AND is_active = 1
+        UNION
+        -- SPP Juli via PSB: netral (uang ke Bendahara Pusat, bukan setoran asrama)
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ? AND psb_receipt_id IS NOT NULL
       ),
       lebih_awal_unit AS (
         SELECT bs.unit_setor,
@@ -150,6 +156,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         JOIN spp_log sl ON sl.santri_id = bs.id
         WHERE (sl.tahun * 100 + sl.bulan) > (? * 100 + ?)
           AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+          AND sl.psb_receipt_id IS NULL
         GROUP BY bs.unit_setor
       ),
       tunggakan_unit AS (
@@ -183,6 +190,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     SADESA_CATEGORY, SADESA_UNIT,
     tahun, bulan,
     tahun, bulan, monthStart, monthEnd,
+    tahun, bulan,
     tahun, bulan,
     tahun, bulan, monthStart, monthEnd,
     SADESA_UNIT,
@@ -242,6 +250,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
      JOIN santri s ON s.id = sl.santri_id
      WHERE (sl.tahun * 100 + sl.bulan) < (? * 100 + ?)
        AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+       AND sl.psb_receipt_id IS NULL
        AND s.status_global = 'aktif'
        ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
      GROUP BY unit_setor`,
@@ -840,7 +849,19 @@ async function buildRekapAsramaPayload(
     ...ditiadakanRows.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Ditiadakan' })),
   ].sort((a, b) => a.nama.localeCompare(b.nama))
   const jmlGratis = digratiskan.length
-  const jmlWajibBayar = Math.max(0, jumlahPenduduk - jmlGratis)
+
+  // SPP Juli via PSB: netral untuk asrama (uang ke Bendahara Pusat). Santri ini
+  // tidak dihitung sebagai wajib bayar / pembayar unit di rekap setoran asrama.
+  const psbPaidRows = await query<{ santri_id: string }>(
+    `SELECT DISTINCT sl.santri_id
+     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
+     WHERE s.asrama = ? AND s.status_global = 'aktif'
+       AND COALESCE(s.kategori_santri, '') <> ?
+       AND sl.tahun = ? AND sl.bulan = ? AND sl.psb_receipt_id IS NOT NULL`,
+    [unitSetor, SADESA_CATEGORY, tahun, bulan]
+  )
+  const psbPaidCount = new Set(psbPaidRows.map(r => r.santri_id)).size
+  const jmlWajibBayar = Math.max(0, jumlahPenduduk - jmlGratis - psbPaidCount)
 
   // --- Pembayaran, waive, historis (scope asrama) untuk hitung penunggak ---
   const payments = await query<{ santri_id: string; tahun: number; bulan: number }>(
@@ -1090,6 +1111,7 @@ export async function getDetailPembayarTunggakan(tahun: number, bulan: number) {
         FROM spp_log
         WHERE (tahun * 100 + bulan) < ?
           AND tanggal_bayar >= ? AND tanggal_bayar < ?
+          AND psb_receipt_id IS NULL
       ),
       tunggakan_historis AS (
         SELECT santri_id, tahun, bulan

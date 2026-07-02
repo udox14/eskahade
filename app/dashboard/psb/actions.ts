@@ -823,6 +823,7 @@ export async function bayarPsbBatch(input: {
     if (wantSppJuli) {
       revalidatePath('/dashboard/asrama/spp')
       revalidatePath('/dashboard/dewan-santri/setoran')
+      revalidatePath('/dashboard/keuangan/laporan')
     }
   } catch (error) {
     console.error('Failed to revalidate PSB pages after payment', error)
@@ -1078,6 +1079,7 @@ export async function voidPsbReceipt(input: { receiptId: string; santriId: strin
     revalidatePath(MONITORING_PATH)
     revalidatePath('/dashboard/asrama/spp')
     revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/keuangan/laporan')
   } catch (error) {
     console.error('Failed to revalidate PSB pages after cancellation', error)
   }

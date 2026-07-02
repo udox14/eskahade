@@ -19,12 +19,43 @@ export async function getLaporanKeuangan(tahun: number) {
     ORDER BY pt.tanggal_bayar DESC
   `, [startDate, endDate])
 
-  const cashFlow = { BANGUNAN: 0, KESEHATAN: 0, EHB: 0, EKSKUL: 0, TOTAL: 0 }
+  // SPP Juli yang dibayar via flow PSB tercatat di spp_log (bertag psb_receipt_id).
+  // Uangnya milik Bendahara Pusat — dimunculkan di sini, TIDAK di setoran asrama.
+  const sppJuliPsb = await query<any>(`
+    SELECT sl.id, sl.nominal_bayar, sl.tanggal_bayar, sl.keterangan,
+           s.nama_lengkap, s.nis, s.asrama,
+           u.full_name AS penerima_nama
+    FROM spp_log sl
+    JOIN santri s ON s.id = sl.santri_id
+    LEFT JOIN users u ON u.id = sl.penerima_id
+    WHERE sl.psb_receipt_id IS NOT NULL
+      AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar <= ?
+    ORDER BY sl.tanggal_bayar DESC
+  `, [startDate, endDate])
+
+  const cashFlow = { BANGUNAN: 0, KESEHATAN: 0, EHB: 0, EKSKUL: 0, SPP_JULI: 0, TOTAL: 0 }
   listTransaksi.forEach((item: any) => {
     const jenis = item.jenis_biaya as keyof typeof cashFlow
     if (cashFlow[jenis] !== undefined) cashFlow[jenis] += item.nominal_bayar
     cashFlow.TOTAL += item.nominal_bayar
   })
+  sppJuliPsb.forEach((item: any) => {
+    cashFlow.SPP_JULI += item.nominal_bayar
+    cashFlow.TOTAL += item.nominal_bayar
+    listTransaksi.push({
+      id: item.id,
+      jenis_biaya: 'SPP_JULI',
+      nominal_bayar: item.nominal_bayar,
+      tahun_tagihan: null,
+      tanggal_bayar: item.tanggal_bayar,
+      keterangan: item.keterangan,
+      nama_lengkap: item.nama_lengkap,
+      nis: item.nis,
+      asrama: item.asrama,
+      penerima_nama: item.penerima_nama,
+    })
+  })
+  listTransaksi.sort((a: any, b: any) => String(b.tanggal_bayar).localeCompare(String(a.tanggal_bayar)))
 
   // 2. Target & kekurangan
   const santriList = await query<any>(

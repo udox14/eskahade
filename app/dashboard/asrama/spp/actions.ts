@@ -210,16 +210,24 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
         SELECT DISTINCT santri_id
         FROM spp_log
         WHERE tahun = ? AND bulan = ?
+          AND psb_receipt_id IS NULL
       ),
       ditiadakan_ini AS (
         SELECT DISTINCT santri_id
         FROM spp_tagihan_ditiadakan
         WHERE tahun = ? AND bulan = ? AND is_active = 1
+        UNION
+        -- SPP Juli via PSB: netral untuk asrama (uang ke Bendahara Pusat),
+        -- diperlakukan seperti tidak ada tagihan di sisi asrama.
+        SELECT DISTINCT santri_id
+        FROM spp_log
+        WHERE tahun = ? AND bulan = ? AND psb_receipt_id IS NOT NULL
       ),
       uang_masuk_bulan_ini AS (
         SELECT sl.santri_id, sl.nominal_bayar, sl.bulan, sl.tahun
         FROM spp_log sl
         WHERE sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+          AND sl.psb_receipt_id IS NULL
       ),
       uang_historis_masuk_bulan_ini AS (
         SELECT th.santri_id, th.nominal_tagihan
@@ -242,8 +250,8 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN uang_masuk_bulan_ini um ON um.santri_id = bs.id
     LEFT JOIN uang_historis_masuk_bulan_ini uh ON uh.santri_id = bs.id
-  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
-                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
+  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
+                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
 
   let totalSantri = 0
   let bebasSppCount = 0
@@ -1058,14 +1066,18 @@ export async function batalkanPembayaranSPP(logId: string): Promise<{ success: b
     nominal_bayar: number
     nama_lengkap: string | null
     nis: string | null
+    psb_receipt_id: string | null
   }>(
-    `SELECT sl.id, sl.santri_id, sl.bulan, sl.tahun, sl.nominal_bayar, s.nama_lengkap, s.nis
+    `SELECT sl.id, sl.santri_id, sl.bulan, sl.tahun, sl.nominal_bayar, s.nama_lengkap, s.nis, sl.psb_receipt_id
      FROM spp_log sl
      LEFT JOIN santri s ON s.id = sl.santri_id
      WHERE sl.id = ?`,
     [logId]
   )
   if (!current) return { error: 'Data pembayaran tidak ditemukan.' }
+  if (current.psb_receipt_id) {
+    return { error: 'SPP Juli ini dibayar via PSB. Batalkan lewat void kuitansi PSB, bukan dari sini.' }
+  }
 
   try {
     const session = await getSession()

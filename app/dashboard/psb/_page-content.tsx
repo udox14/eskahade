@@ -396,7 +396,7 @@ export default function PsbPageContent() {
 
   if (loading && !data) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white py-24 text-center text-slate-400 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white py-24 text-center text-slate-400 shadow-sm">
         <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-blue-500" />
         Memuat flow PSB...
       </div>
@@ -404,7 +404,7 @@ export default function PsbPageContent() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 max-w-7xl mx-auto pb-24">
       {!selectedRole ? (
         <div className="grid gap-4 lg:grid-cols-4">
           {roles.map((role) => {
@@ -415,19 +415,19 @@ export default function PsbPageContent() {
                 type="button"
                 disabled={!role.can}
                 onClick={() => setSelectedRole(role.key)}
-                className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
+                className="group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <span className="rounded-2xl bg-slate-900 p-3 text-white">
-                    <Icon className="h-5 w-5" />
+                  <span className="rounded-xl bg-slate-900 p-2.5 text-white">
+                    <Icon className="h-4 w-4" />
                   </span>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-extrabold text-blue-700">
                     {role.count} antrean
                   </span>
                 </div>
-                <h2 className="mt-4 text-lg font-black text-slate-900">{role.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{role.description}</p>
-                <p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-400">
+                <h2 className="mt-4 text-base font-extrabold text-slate-900">{role.title}</h2>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{role.description}</p>
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                   {role.can ? 'Masuk halaman kerja' : 'Tidak ada akses akun'}
                 </p>
               </button>
@@ -435,8 +435,8 @@ export default function PsbPageContent() {
           })}
         </div>
       ) : (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-3">
                 <button
@@ -448,7 +448,7 @@ export default function PsbPageContent() {
                   <ArrowLeft className="h-4 w-4" />
                 </button>
                 <div>
-                  <h2 className="font-black text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
+                  <h2 className="font-extrabold text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
                   <p className="text-xs text-slate-500">
                     Data refresh otomatis setiap 5 detik. {refreshing ? 'Sedang sinkron...' : 'Siap dipakai.'}
                   </p>
@@ -602,7 +602,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
           </button>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Antrean Verifikasi" description="Santri yang sudah diverifikasi akan langsung masuk ke halaman penempatan asrama." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
@@ -664,7 +664,7 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
         </div>
       </QuotaAccordion>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Home className="h-4 w-4" />} title="Antrean Penempatan Asrama" description="Data verifikasi sekretariat tampil di sini otomatis tanpa refresh browser." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
@@ -729,10 +729,10 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
 function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert }: any) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Asrama yang dikelola</p>
-          <h3 className="text-lg font-black text-slate-900">{activeAsrama || user?.asrama_binaan || '-'}</h3>
+          <h3 className="text-lg font-extrabold text-slate-900">{activeAsrama || user?.asrama_binaan || '-'}</h3>
           <p className="text-sm text-slate-500">Pengurus asrama hanya melihat santri dan kamar dari asrama binaannya.</p>
         </div>
         {!user?.asrama_binaan ? (
@@ -769,7 +769,7 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
         )}
       </QuotaAccordion>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah menyelesaikan pembayaran PSB di asrama aktif yang muncul di tabel ini." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
@@ -842,16 +842,16 @@ function QuotaAccordion({
   children: React.ReactNode
 }) {
   return (
-    <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <details className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
         <div className="flex min-w-0 items-center gap-3">
           <span className="rounded-xl bg-slate-100 p-2 text-slate-700">{icon}</span>
           <div className="min-w-0">
-            <h3 className="font-black text-slate-900">{title}</h3>
+            <h3 className="font-extrabold text-slate-900">{title}</h3>
             <p className="truncate text-xs text-slate-500">{description}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-slate-500 group-open:bg-blue-50 group-open:text-blue-700">
+        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 group-open:bg-blue-50 group-open:text-blue-700">
           <span className="group-open:hidden">Buka</span>
           <span className="hidden group-open:inline">Tutup</span>
         </span>
@@ -869,7 +869,7 @@ function AsramaQuotaCard({ item }: { item: any }) {
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-slate-900">{item.asrama}</p>
+          <p className="truncate text-sm font-extrabold text-slate-900">{item.asrama}</p>
           <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Santri baru</p>
         </div>
         <AsramaStatusBadge status={item.status} over={item.over} />
@@ -893,7 +893,7 @@ function KamarQuotaCard({ room }: { room: any }) {
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-black text-slate-900">Kamar {room.nomor_kamar}</p>
+          <p className="text-sm font-extrabold text-slate-900">Kamar {room.nomor_kamar}</p>
           <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{room.blok ? `Blok ${room.blok}` : 'Tanpa blok'}</p>
         </div>
         <KamarStatusBadge terisi={terisi} kuota={kuota} />
@@ -910,7 +910,7 @@ function KamarQuotaCard({ room }: { room: any }) {
 function MiniMetric({ label, value, className = 'text-slate-900' }: { label: string; value: number; className?: string }) {
   return (
     <div className="rounded-lg bg-slate-50 px-2 py-1.5">
-      <p className={`text-sm font-black ${className}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
+      <p className={`text-sm font-extrabold ${className}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
     </div>
   )
@@ -925,7 +925,7 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
         <MoneyCard label="Belum Masuk" value={stats.unpaid} tone="rose" />
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Wallet className="h-4 w-4" />} title="Antrean Pembayaran" description="Status verifikasi, asrama, dan kamar ditampilkan sebagai tabel agar bendahara bisa cek cepat." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-left text-sm">
@@ -1043,12 +1043,9 @@ function KamarStatusBadge({ terisi, kuota }: { terisi: number; kuota: number }) 
 
 function TableTitle({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="flex items-start gap-3 p-4">
-      <span className="rounded-xl bg-slate-100 p-2 text-slate-700">{icon}</span>
-      <div>
-        <h3 className="font-black text-slate-900">{title}</h3>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
-      </div>
+    <div className="border-b bg-slate-50 px-5 py-3">
+      <h3 className="font-extrabold text-slate-700">{title}</h3>
+      <p className="text-xs text-slate-500">{description}</p>
     </div>
   )
 }
@@ -1063,9 +1060,9 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
   }[tone]
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className={`text-3xl font-black ${color}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
+      <p className={`text-lg font-extrabold ${color}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
     </div>
   )
 }
@@ -1078,9 +1075,9 @@ function MoneyCard({ label, value, tone }: { label: string; value: number; tone:
   }[tone]
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className={`text-2xl font-black ${color}`}>{rupiah(value)}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
+      <p className={`text-lg font-extrabold ${color}`}>{rupiah(value)}</p>
     </div>
   )
 }
@@ -1097,19 +1094,21 @@ function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button type="button" aria-label="Tutup modal" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
-      <form onSubmit={onSubmit} className="relative z-10 w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <form onSubmit={onSubmit} className="relative z-10 w-full rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:max-w-md sm:rounded-xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
           <div>
-            <div className="mb-2 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <UserPlus className="h-4 w-4 text-blue-600" />
-              <h2 className="text-base font-bold text-slate-900">Santri Dadakan</h2>
+              <h2 className="text-sm font-bold text-slate-800">Santri Dadakan</h2>
             </div>
-            <p className="text-xs leading-5 text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
+            <p className="text-[11px] mt-1 leading-relaxed text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
+          <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-lg">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 p-5">
           <label className="block">
             <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Nama Lengkap</span>
             <input
@@ -1164,16 +1163,18 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button type="button" aria-label="Tutup modal pembayaran" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
           <div>
             <div className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-emerald-700" />
-              <h2 className="text-lg font-bold text-slate-900">Pembayaran PSB</h2>
+              <Wallet className="h-4 w-4 text-emerald-700" />
+              <h2 className="text-base font-bold text-slate-800">Pembayaran PSB</h2>
             </div>
-            <p className="mt-1 text-sm text-slate-500">{row.nama_lengkap} - {row.nis}</p>
+            <p className="mt-1 text-xs text-slate-500">{row.nama_lengkap} - {row.nis}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50">Tutup</button>
+          <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-lg">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[420px_1fr]">
@@ -1385,17 +1386,17 @@ function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
     <>
       <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl sm:max-w-lg animate-in slide-in-from-right duration-300">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Verifikasi Berkas</h2>
-            <p className="text-sm text-slate-500">{row.nama_lengkap}</p>
+            <h2 className="text-base font-bold text-slate-800">Verifikasi Berkas</h2>
+            <p className="text-xs text-slate-500">{row.nama_lengkap}</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-5">
           <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50 p-4">
             <div className="flex items-center gap-3 text-blue-700">
               <FileCheck className="h-5 w-5" />
