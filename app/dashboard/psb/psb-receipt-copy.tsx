@@ -128,17 +128,16 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         </tfoot>
       </table>
 
-      <table className="arrears-table">
-        <tbody>
-          <tr className="total-arrears">
-            <td>Sisa Tagihan</td>
-            <td className="amount-col due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
-          </tr>
-        </tbody>
-      </table>
-
       <div className="summary-block">
-        <div />
+        <table>
+          <tbody>
+            <tr>
+              <td>SISA TAGIHAN</td>
+              <td>:</td>
+              <td className="due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
+            </tr>
+          </tbody>
+        </table>
         <table>
           <tbody>
             <tr>
@@ -350,43 +349,17 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
-        .main-table td.amount-col,
-        .arrears-table td.amount-col {
+        .main-table td.amount-col {
           display: flex;
           justify-content: space-between;
           gap: 6px;
-        }
-        .arrears-caption {
-          margin: .8mm 0 .4mm;
-          font-size: 10.2px;
-          font-style: italic;
-          color: #666;
-        }
-        .arrears-table {
-          font-size: 10.2px;
-          color: #111;
-        }
-        .arrears-table th {
-          padding: 1px 4px;
-          border: 1px solid #ddd;
-          background: #f3f3f3;
-          text-align: left;
-          font-weight: 700;
-        }
-        .arrears-table td {
-          padding: 1px 4px;
-          border: 1px solid #eee;
-        }
-        .total-arrears td {
-          background: #fff1f1;
-          font-weight: 700;
         }
         .due-zero {
           color: #c00;
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 58mm;
+          grid-template-columns: 1fr 66mm;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -395,7 +368,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 24mm;
+          width: 32mm;
         }
         .summary-block table td:nth-child(2) {
           width: 3mm;
@@ -423,7 +396,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           line-height: 1.25;
         }
         .signature-box .sig-role {
-          margin: 0 0 13mm;
+          margin: 0 0 10mm;
           line-height: 1.25;
         }
         .signature-line {

@@ -215,43 +215,17 @@ export default async function PsbReceiptPage({ params }: Props) {
           font-family: "Courier New", monospace;
           font-weight: 700;
         }
-        .main-table td.amount-col,
-        .arrears-table td.amount-col {
+        .main-table td.amount-col {
           display: flex;
           justify-content: space-between;
           gap: 6px;
-        }
-        .arrears-caption {
-          margin: .8mm 0 .4mm;
-          font-size: 10.2px;
-          font-style: italic;
-          color: #000;
-        }
-        .arrears-table {
-          font-size: 10.2px;
-          color: #000;
-        }
-        .arrears-table th {
-          padding: 1px 4px;
-          border: 1px solid #000;
-          background: transparent;
-          text-align: left;
-          font-weight: 700;
-        }
-        .arrears-table td {
-          padding: 1px 4px;
-          border: 1px solid #000;
-        }
-        .total-arrears td {
-          background: transparent;
-          font-weight: 700;
         }
         .due-zero {
           color: #000;
         }
         .summary-block {
           display: grid;
-          grid-template-columns: 1fr 58mm;
+          grid-template-columns: 1fr 66mm;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -260,7 +234,7 @@ export default async function PsbReceiptPage({ params }: Props) {
           border: 0;
         }
         .summary-block table td:nth-child(1) {
-          width: 24mm;
+          width: 32mm;
         }
         .summary-block table td:nth-child(2) {
           width: 3mm;
@@ -288,7 +262,7 @@ export default async function PsbReceiptPage({ params }: Props) {
           line-height: 1.25;
         }
         .signature-box .sig-role {
-          margin: 0 0 13mm;
+          margin: 0 0 10mm;
           line-height: 1.25;
         }
         .signature-line {
