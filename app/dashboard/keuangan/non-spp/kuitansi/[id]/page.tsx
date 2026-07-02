@@ -539,6 +539,8 @@ export default async function NonSppReceiptPage({ params }: Props) {
             margin: 0 !important;
             padding: 0 !important;
             background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .receipt-page {
             background: #fff !important;

@@ -33,6 +33,12 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
   const returnTo = searchParams.get('returnTo');
   const showSetupReturn = returnTo === '/dashboard/setup-tahun-ajaran' && pathname !== '/dashboard/setup-tahun-ajaran';
 
+  // Halaman kuitansi dirender tanpa chrome (sidebar/header/padding) agar hasil
+  // cetak & tampilan hanya berisi dokumen kuitansi, konsisten di semua device.
+  if (pathname?.includes('/kuitansi/')) {
+    return <IconContext.Provider value={{ weight: "duotone" }}>{children}</IconContext.Provider>;
+  }
+
   return (
     <IconContext.Provider value={{ weight: "duotone" }}>
       <div className="relative flex h-[100dvh] w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
