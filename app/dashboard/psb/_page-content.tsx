@@ -83,6 +83,7 @@ function paymentLabel(value: string) {
     KESEHATAN: 'Biaya Kesehatan',
     EHB: 'Biaya EHB',
     EKSKUL: 'Biaya Ekstrakurikuler',
+    SPP_JULI: 'SPP Bulan Juli',
   }
   return labels[value] ?? value
 }
@@ -267,6 +268,7 @@ export default function PsbPageContent() {
     PAYMENT_TYPES.forEach((jenis) => {
       if (picks[jenis]) items.push({ jenis })
     })
+    if (picks.SPP_JULI) items.push({ jenis: 'SPP_JULI' })
     const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items }), 'Pembayaran PSB tersimpan')
     if (result?.receiptId) {
       printIframe(`/dashboard/psb/kuitansi/${result.receiptId}`)
@@ -279,7 +281,8 @@ export default function PsbPageContent() {
   const handleLunasSemua = (row: any) => {
     const picks: Record<string, boolean> = { BANGUNAN: true }
     PAYMENT_TYPES.forEach(jenis => picks[jenis] = true)
-    
+    if (!row.pembayaran?.sppJuli?.lunas) picks.SPP_JULI = true
+
     setPaymentItems(prev => ({
       ...prev,
       [row.id]: picks
@@ -350,6 +353,9 @@ export default function PsbPageContent() {
         items.push({ label: paymentLabel(jenis), tahun: String(tahunTagihan), nominal: Number(payment?.tahunan?.[jenis]?.nominal ?? 0) })
       }
     })
+    if (picks.SPP_JULI) {
+      items.push({ label: paymentLabel('SPP_JULI'), tahun: String(tahunTagihan), nominal: Number(payment?.sppJuli?.nominal ?? 0) })
+    }
     return items
   }
 
@@ -1229,6 +1235,14 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
                   onChange={(checked: boolean) => togglePayment(row.id, jenis, checked)}
                 />
               ))}
+
+              <PaymentOption
+                title={paymentLabel('SPP_JULI')}
+                subtitle={row.pembayaran?.sppJuli?.lunas ? 'Sudah lunas' : `${rupiah(row.pembayaran?.sppJuli?.nominal ?? 0)} — dicatat ke Pembayaran SPP asrama`}
+                checked={!!paymentItems[row.id]?.SPP_JULI}
+                disabled={!!row.pembayaran?.sppJuli?.lunas || Number(row.pembayaran?.sppJuli?.nominal ?? 0) <= 0}
+                onChange={(checked: boolean) => togglePayment(row.id, 'SPP_JULI', checked)}
+              />
             </div>
 
             {items.length > 0 ? (

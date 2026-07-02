@@ -8,7 +8,15 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { execute, generateId, getDB, query, queryOne, today } from '@/lib/db'
-import { getKategoriSantriEfektifSql, normalizeKategoriSantriDasar } from '@/lib/santri/kategori'
+import {
+  DEFAULT_SANTRI_BARU_DURASI_BULAN,
+  DEFAULT_SANTRI_BARU_MULAI,
+  getKategoriSantriEfektifSql,
+  normalizeKategoriSantriDasar,
+  SANTRI_BARU_DURASI_KEY,
+  SANTRI_BARU_MULAI_KEY,
+} from '@/lib/santri/kategori'
+import { getNominalSppForYear } from '@/lib/spp/tunggakan'
 
 const PSB_PATH = '/dashboard/psb'
 const MONITORING_PATH = '/dashboard/psb/monitoring'
@@ -20,9 +28,13 @@ const BIAYA_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
 
 export type PsbStatus = (typeof STATUS_ORDER)[number]
 export type PsbPaymentInput = {
-  jenis: 'BANGUNAN' | 'KESEHATAN' | 'EHB' | 'EKSKUL'
+  jenis: 'BANGUNAN' | 'KESEHATAN' | 'EHB' | 'EKSKUL' | 'SPP_JULI'
   nominal?: number
 }
+
+// SPP yang ikut ditagih di flow PSB: bulan Juli. Uangnya dicatat ke modul
+// Pembayaran SPP asrama (spp_log), bukan ke pembayaran_tahunan.
+const SPP_JULI_BULAN = 7
 
 type SantriPsbRow = {
   id: string
@@ -134,6 +146,13 @@ async function ensureSchema() {
     await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN psb_receipt_id TEXT REFERENCES psb_payment_receipt(id)')
   }
 
+  // SPP Juli yang dibayar lewat PSB tercatat di spp_log, tapi ditautkan ke
+  // kuitansi PSB agar bisa tampil di kuitansi & ikut dibatalkan saat void.
+  const sppLogColumns = await query<{ name: string }>('PRAGMA table_info(spp_log)')
+  if (!sppLogColumns.some((col) => col.name === 'psb_receipt_id')) {
+    await execute('ALTER TABLE spp_log ADD COLUMN psb_receipt_id TEXT REFERENCES psb_payment_receipt(id)')
+  }
+
   const flowColumns = await query<{ name: string }>('PRAGMA table_info(psb_flow)')
   if (!flowColumns.some((col) => col.name === 'payment_note')) {
     await execute('ALTER TABLE psb_flow ADD COLUMN payment_note TEXT')
@@ -224,6 +243,13 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
      ORDER BY datetime(created_at) DESC, created_at DESC`,
     ids
   )
+  const sppJuliNominal = await getNominalSppForYear(tahunTagihan)
+  const sppJuliPaid = await query<{ santri_id: string }>(
+    `SELECT DISTINCT santri_id FROM spp_log
+     WHERE santri_id IN (${placeholders}) AND tahun = ? AND bulan = ?`,
+    [...ids, tahunTagihan, SPP_JULI_BULAN]
+  )
+  const sppJuliPaidSet = new Set(sppJuliPaid.map((row) => row.santri_id))
   const tarifMap = new Map<string, number>()
   tarif.forEach((row) => tarifMap.set(`${row.tahun_angkatan}:${row.jenis_biaya}`, Number(row.nominal ?? 0)))
 
@@ -250,6 +276,10 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
         sisa: Math.max(0, bangunanTarget - bangunanPaid),
       },
       tahunan,
+      sppJuli: {
+        nominal: sppJuliNominal,
+        lunas: sppJuliPaidSet.has(row.id),
+      },
       latestReceipt,
     })
   })
@@ -257,7 +287,6 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
 }
 
 async function getAsramaPsbStats() {
-  const kategoriSql = getKategoriSantriEfektifSql('s')
   const placeholders = ASRAMA_LIST.map(() => '?').join(',')
   const [quotaRows, placedRows] = await Promise.all([
     query<{ asrama: string; total_kuota: number; kuota_baru: number }>(
@@ -270,14 +299,41 @@ async function getAsramaPsbStats() {
       ASRAMA_LIST
     ),
     query<{ asrama: string; terisi_baru: number }>(
-      `SELECT s.asrama, COUNT(*) AS terisi_baru
+      `WITH santri_baru_settings AS (
+         SELECT
+           COALESCE(MAX(CASE WHEN key = ? THEN value END), ?) AS mulai_berlaku,
+           MIN(24, MAX(1, CAST(COALESCE(MAX(CASE WHEN key = ? THEN value END), ?) AS INTEGER))) AS durasi_bulan
+         FROM app_settings
+         WHERE key IN (?, ?)
+       )
+       SELECT s.asrama, COUNT(*) AS terisi_baru
        FROM santri s
-       LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+       CROSS JOIN santri_baru_settings settings
        WHERE s.status_global = 'aktif'
          AND s.asrama IS NOT NULL
          AND TRIM(s.asrama) <> ''
-         AND ((${kategoriSql}) = 'BARU' OR pf.id IS NOT NULL)
-       GROUP BY s.asrama`
+         AND (
+           (
+             s.created_at IS NOT NULL
+             AND date(s.created_at) >= date(settings.mulai_berlaku)
+             AND datetime(s.created_at) >= datetime('now', '-' || settings.durasi_bulan || ' months')
+           )
+           OR COALESCE(NULLIF(s.kategori_santri, ''), 'REGULER') = 'BARU'
+           OR EXISTS (
+             SELECT 1
+             FROM psb_flow pf
+             WHERE pf.santri_id = s.id
+           )
+         )
+       GROUP BY s.asrama`,
+      [
+        SANTRI_BARU_MULAI_KEY,
+        DEFAULT_SANTRI_BARU_MULAI,
+        SANTRI_BARU_DURASI_KEY,
+        String(DEFAULT_SANTRI_BARU_DURASI_BULAN),
+        SANTRI_BARU_MULAI_KEY,
+        SANTRI_BARU_DURASI_KEY,
+      ]
     ),
   ])
 
@@ -631,7 +687,8 @@ export async function bayarPsbBatch(input: {
   const selected = input.items
     .filter((item) => ['BANGUNAN', 'KESEHATAN', 'EHB', 'EKSKUL'].includes(item.jenis))
     .map((item) => ({ jenis: item.jenis, nominal: Number(item.nominal ?? 0) }))
-  if (!selected.length) return { error: 'Pilih minimal satu item pembayaran' }
+  const wantSppJuli = input.items.some((item) => item.jenis === 'SPP_JULI')
+  if (!selected.length && !wantSppJuli) return { error: 'Pilih minimal satu item pembayaran' }
 
   const santri = await queryOne<SantriPsbRow>(`
     SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
@@ -677,9 +734,35 @@ export async function bayarPsbBatch(input: {
     normalized.push({ jenis: item.jenis, nominal, tahunTagihan, keterangan: `Pembayaran PSB - ${item.jenis} ${tahunTagihan}` })
   }
 
+  // SPP Juli: uangnya dicatat ke modul Pembayaran SPP asrama (spp_log bulan 7),
+  // tapi ikut ditampilkan di kuitansi PSB & masuk total kuitansi.
+  let sppJuliNominal = 0
+  if (wantSppJuli) {
+    const sppSantri = await queryOne<{ bebas_spp: number | null }>(
+      'SELECT COALESCE(bebas_spp, 0) AS bebas_spp FROM santri WHERE id = ?',
+      [input.santriId]
+    )
+    if ((sppSantri?.bebas_spp ?? 0) === 1) return { error: 'Santri ini berstatus bebas SPP permanen.' }
+
+    const sppExist = await queryOne<{ id: string }>(
+      'SELECT id FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan = ?',
+      [input.santriId, tahunTagihan, SPP_JULI_BULAN]
+    )
+    if (sppExist) return { error: `SPP bulan Juli ${tahunTagihan} sudah dibayar` }
+
+    const sppWaived = await queryOne<{ bulan: number }>(
+      'SELECT bulan FROM spp_tagihan_ditiadakan WHERE santri_id = ? AND tahun = ? AND bulan = ? AND is_active = 1',
+      [input.santriId, tahunTagihan, SPP_JULI_BULAN]
+    )
+    if (sppWaived) return { error: 'SPP bulan Juli berstatus TIDAK ADA TAGIHAN.' }
+
+    sppJuliNominal = await getNominalSppForYear(tahunTagihan)
+    if (sppJuliNominal <= 0) return { error: `Tarif SPP tahun ${tahunTagihan} belum diatur` }
+  }
+
   const receiptId = generateId()
   const receiptNo = await nextReceiptNo()
-  const total = normalized.reduce((sum, item) => sum + item.nominal, 0)
+  const total = normalized.reduce((sum, item) => sum + item.nominal, 0) + sppJuliNominal
   const statusAfterPayment: PsbStatus = 'PAID'
   const db = await getDB()
   await db.batch([
@@ -694,6 +777,12 @@ export async function bayarPsbBatch(input: {
         ) VALUES (?, ?, ?, ?, ?, date('now'), ?, ?, ?)
       `).bind(generateId(), input.santriId, item.jenis, item.tahunTagihan, item.nominal, access.id, item.keterangan, receiptId)
     ),
+    ...(wantSppJuli ? [
+      db.prepare(`
+        INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, psb_receipt_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?)
+      `).bind(generateId(), input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId),
+    ] : []),
     db.prepare(`
       INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, created_by, created_at, updated_at)
       VALUES (?, ?, 'PAID', ?, datetime('now'), ?, datetime('now'), datetime('now'))
@@ -716,7 +805,14 @@ export async function bayarPsbBatch(input: {
       entityId: receiptId,
       entityLabel: receiptNo,
       summary: `Pembayaran PSB ${santri.nama_lengkap}: ${receiptNo}`,
-      details: { santri_id: input.santriId, receipt_no: receiptNo, total, items: normalized, status_after_payment: statusAfterPayment },
+      details: {
+        santri_id: input.santriId,
+        receipt_no: receiptNo,
+        total,
+        items: normalized,
+        spp_juli: wantSppJuli ? { tahun: tahunTagihan, bulan: SPP_JULI_BULAN, nominal: sppJuliNominal } : null,
+        status_after_payment: statusAfterPayment,
+      },
     })
   } catch (error) {
     console.error('Failed to write PSB payment activity log', error)
@@ -724,6 +820,10 @@ export async function bayarPsbBatch(input: {
   try {
     revalidatePath(PSB_PATH)
     revalidatePath(MONITORING_PATH)
+    if (wantSppJuli) {
+      revalidatePath('/dashboard/asrama/spp')
+      revalidatePath('/dashboard/dewan-santri/setoran')
+    }
   } catch (error) {
     console.error('Failed to revalidate PSB pages after payment', error)
   }
@@ -930,6 +1030,9 @@ export async function voidPsbReceipt(input: { receiptId: string; santriId: strin
 
   const stamp = new Date().toISOString()
   await execute('UPDATE pembayaran_tahunan SET status = ?, void_reason = ?, voided_by = ?, voided_at = ? WHERE psb_receipt_id = ?', ['VOID', input.alasan, access.id, stamp, input.receiptId])
+  // spp_log tidak punya status VOID: pembayaran SPP Juli-nya dihapus, sama
+  // seperti batalkan pembayaran di modul Pembayaran SPP.
+  await execute('DELETE FROM spp_log WHERE psb_receipt_id = ?', [input.receiptId])
   await execute('UPDATE psb_payment_receipt SET is_void = 1, void_reason = ?, voided_by = ?, voided_at = ? WHERE id = ?', [input.alasan, access.id, stamp, input.receiptId])
 
   const remainingPayments = await query<{ jenis_biaya: string; tahun_tagihan: number | null; nominal_bayar: number }>(
@@ -973,6 +1076,8 @@ export async function voidPsbReceipt(input: { receiptId: string; santriId: strin
   try {
     revalidatePath(PSB_PATH)
     revalidatePath(MONITORING_PATH)
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
   } catch (error) {
     console.error('Failed to revalidate PSB pages after cancellation', error)
   }
@@ -999,6 +1104,22 @@ export async function getPsbReceipt(receiptId: string) {
     WHERE psb_receipt_id = ?
     ORDER BY jenis_biaya
   `, [receiptId])
+
+  // SPP Juli dicatat di spp_log, tapi tetap tampil sebagai baris kuitansi.
+  const sppItems = await query<any>(`
+    SELECT tahun, bulan, nominal_bayar, keterangan, tanggal_bayar
+    FROM spp_log
+    WHERE psb_receipt_id = ?
+  `, [receiptId])
+  sppItems.forEach((row) => {
+    items.push({
+      jenis_biaya: 'SPP_JULI',
+      tahun_tagihan: row.tahun,
+      nominal_bayar: row.nominal_bayar,
+      keterangan: row.keterangan,
+      tanggal_bayar: row.tanggal_bayar,
+    })
+  })
 
   const tahunMasuk = receipt.tahun_masuk || receipt.tahun_tagihan
   const tarif = await query<any>('SELECT jenis_biaya, nominal FROM biaya_settings WHERE tahun_angkatan = ?', [tahunMasuk])

@@ -46,6 +46,7 @@ function paymentLabel(value: string) {
     KESEHATAN: 'Biaya Kesehatan',
     EHB: 'Biaya EHB',
     EKSKUL: 'Biaya Ekstrakurikuler',
+    SPP_JULI: 'SPP Bulan Juli',
   }
   return labels[value] ?? value
 }
