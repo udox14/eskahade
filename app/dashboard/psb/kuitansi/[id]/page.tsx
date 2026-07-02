@@ -331,9 +331,15 @@ export default async function PsbReceiptPage({ params }: Props) {
           margin: 1.5cm;
         }
         @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
           .receipt-page {
             background: #fff;
             padding: 0;
+            min-height: auto;
           }
           .print-actions {
             display: none;

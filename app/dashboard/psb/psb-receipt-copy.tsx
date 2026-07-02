@@ -62,7 +62,7 @@ function InfoRow({ label, value, strong = false }: { label?: string; value: stri
 
 export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; items: any[]; printedAt: string; sisa?: number }) {
   const total = Number(receipt.total || 0)
-  const isLunas = total > 0
+  const isLunas = sisa <= 0
   const payerName = receipt.nama_lengkap || '________________'
   const officerName = receipt.penerima_nama || 'Bendahara'
 
