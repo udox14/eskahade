@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -1277,6 +1277,27 @@ function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
     penerima_nama: 'Bendahara',
   }
 
+  const frameRef = useRef<HTMLDivElement>(null)
+  const scalerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const frame = frameRef.current
+    const scaler = scalerRef.current
+    if (!frame || !scaler) return
+    const fit = () => {
+      const naturalW = scaler.offsetWidth
+      const naturalH = scaler.offsetHeight
+      if (!naturalW || !naturalH) return
+      const scale = frame.clientWidth / naturalW
+      scaler.style.transform = `scale(${scale})`
+      frame.style.height = `${naturalH * scale}px`
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(frame)
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <div className="bg-slate-100 p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -1287,8 +1308,8 @@ function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">Kertas NCR</span>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
-        <div className="origin-top-left" style={{ transform: 'scale(0.55)', width: '181.8%' }}>
+      <div ref={frameRef} className="relative w-full overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
+        <div ref={scalerRef} className="origin-top-left" style={{ width: '21cm' }}>
           <PsbReceiptCopy receipt={mockReceipt} items={items} printedAt={new Date().toISOString()} />
         </div>
       </div>

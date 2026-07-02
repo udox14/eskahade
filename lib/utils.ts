@@ -18,7 +18,7 @@ export function capitalizeEachWord(str: string): string {
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-}
+}
 /**
  * Mencetak URL dalam iframe tersembunyi tanpa membuka tab baru.
  */
@@ -31,5 +31,8 @@ export function printIframe(url: string) {
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
   }
-  iframe.src = url;
+  // Cache-buster agar klik ulang pada kuitansi yang sama tetap memuat ulang
+  // dan menjalankan skrip auto-print di halaman kuitansi.
+  const separator = url.includes('?') ? '&' : '?';
+  iframe.src = `${url}${separator}print=${Date.now()}`;
 }

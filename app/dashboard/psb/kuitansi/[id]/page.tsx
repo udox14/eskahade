@@ -25,7 +25,7 @@ export default async function PsbReceiptPage({ params }: Props) {
         <span>Gunakan Ctrl+P untuk mencetak</span>
       </div>
       <PsbReceiptCopy receipt={receipt} items={items} printedAt={printedAt} sisa={sisa} />
-      <script dangerouslySetInnerHTML={{ __html: 'window.addEventListener("load", function() { setTimeout(window.print, 100); });' }} />
+      <script dangerouslySetInnerHTML={{ __html: 'window.addEventListener("load",function(){Promise.all(Array.prototype.map.call(document.images,function(i){return i.complete?0:new Promise(function(r){i.onload=i.onerror=r})})).then(function(){setTimeout(function(){window.focus();window.print();},150);});});' }} />
       <style>{`
         .receipt-page {
           min-height: 100vh;
@@ -328,25 +328,26 @@ export default async function PsbReceiptPage({ params }: Props) {
           opacity: 0.15;
         }
         @page {
-          size: 24cm 14cm;
-          margin: 1.5cm;
+          size: 21cm 11cm;
+          margin: 0;
         }
         @media print {
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
+            background: #fff !important;
           }
           .receipt-page {
-            background: #fff;
-            padding: 0;
-            min-height: auto;
+            background: #fff !important;
+            padding: 0 !important;
+            min-height: 0 !important;
           }
           .print-actions {
-            display: none;
+            display: none !important;
           }
           .receipt-copy {
-            margin: 0;
+            margin: 0 !important;
+            box-shadow: none !important;
           }
         }
       `}</style>
