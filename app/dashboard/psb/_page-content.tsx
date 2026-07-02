@@ -180,10 +180,15 @@ export default function PsbPageContent() {
     setVerificationRow(null)
   }
   const roomRows = useMemo(() => {
-    return rows.filter((row: any) => row.status === 'PAID' && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
+    return rows.filter((row: any) => (row.status === 'PAID' || row.status === 'PLACED_KAMAR') && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
   }, [activeRoomAsrama, rows])
   const paymentRows = useMemo(() => {
-    return rows.filter((row: any) => statusAtLeast(row.status, 'PLACED_ASRAMA'))
+    return rows.filter((row: any) => row.status === 'PLACED_ASRAMA')
+  }, [rows])
+  // Santri yang punya kuitansi aktif — muncul di seksi "Sudah Bayar" agar
+  // bendahara tetap bisa void tanpa perlu revert tahap lebih dulu.
+  const paidRows = useMemo(() => {
+    return rows.filter((row: any) => row.pembayaran?.latestReceipt?.id)
   }, [rows])
 
   const sekretariatStats = useMemo(() => {
@@ -382,7 +387,7 @@ export default function PsbPageContent() {
       description: 'Input pembayaran dan cetak kuitansi PSB.',
       icon: Wallet,
       can: !!data?.user?.canBayar,
-      count: paymentRows.filter((row: any) => row.status !== 'DONE').length,
+      count: paymentRows.length,
     },
     {
       key: 'kamar' as const,
@@ -421,11 +426,11 @@ export default function PsbPageContent() {
                   <span className="rounded-xl bg-slate-900 p-2.5 text-white">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-extrabold text-blue-700">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
                     {role.count} antrean
                   </span>
                 </div>
-                <h2 className="mt-4 text-base font-extrabold text-slate-900">{role.title}</h2>
+                <h2 className="mt-4 text-base font-bold text-slate-900">{role.title}</h2>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{role.description}</p>
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                   {role.can ? 'Masuk halaman kerja' : 'Tidak ada akses akun'}
@@ -448,7 +453,7 @@ export default function PsbPageContent() {
                   <ArrowLeft className="h-4 w-4" />
                 </button>
                 <div>
-                  <h2 className="font-extrabold text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
+                  <h2 className="font-bold text-slate-900">{roles.find(role => role.key === selectedRole)?.title}</h2>
                   <p className="text-xs text-slate-500">
                     Data refresh otomatis setiap 5 detik. {refreshing ? 'Sedang sinkron...' : 'Siap dipakai.'}
                   </p>
@@ -509,11 +514,11 @@ export default function PsbPageContent() {
           {selectedRole === 'pembayaran' ? (
             <PembayaranView
               rows={paymentRows}
+              paidRows={paidRows}
               stats={paymentStats}
               busyId={busyId}
               onOpenPayment={setPaymentModalRow}
               onCancelPayment={handleCancelPayment}
-              onDone={(row: any) => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
               onRevert={handleRevert}
             />
           ) : null}
@@ -530,6 +535,7 @@ export default function PsbPageContent() {
               selectedKamar={selectedKamar}
               setSelectedKamar={setSelectedKamar}
               busyId={busyId}
+              onDone={(row: any) => run(row.id, () => selesaikanPsb(row.id), 'PSB santri selesai')}
               onPlace={async (row: any) => {
                 const result = await run(row.id, () => tempatkanKamarPsb(row.id, selectedKamar[row.id] ?? row.kamar), 'Kamar tersimpan')
                 if (result && row.asrama) await loadKamar(row.asrama, true)
@@ -605,14 +611,13 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Antrean Verifikasi" description="Santri yang sudah diverifikasi akan langsung masuk ke halaman penempatan asrama." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
+          <table className="w-full whitespace-nowrap min-w-[980px] text-left text-sm">
             <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Santri</th>
                 <th className="px-4 py-3">Sekolah</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Asrama</th>
-                <th className="px-4 py-3">Kamar</th>
                 <th className="px-4 py-3">Pembayaran</th>
                 <th className="px-4 py-3 text-right">Aksi</th>
               </tr>
@@ -621,8 +626,9 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
               {rows.length ? rows.map((row: any) => (
                 <tr key={row.id} className="hover:bg-slate-50">
                   <SantriCells row={row} />
-                  <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.kamar || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {row.asrama ? `${row.asrama} / ${row.kamar || '-'}` : '-'}
+                  </td>
                   <td className="px-4 py-3 font-semibold text-slate-700">{rupiah(paymentPaid(row))}</td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -667,7 +673,7 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Home className="h-4 w-4" />} title="Antrean Penempatan Asrama" description="Data verifikasi sekretariat tampil di sini otomatis tanpa refresh browser." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
+          <table className="w-full whitespace-nowrap min-w-[960px] text-left text-sm">
             <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Santri</th>
@@ -701,10 +707,11 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
                         <button
                           disabled={busyId === row.id}
                           onClick={() => onRevert(row)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                          title="Kembalikan ke tahap sebelumnya"
+                          aria-label="Kembalikan ke tahap sebelumnya"
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
                         >
                           <Undo2 className="h-3.5 w-3.5" />
-                          Kembalikan
                         </button>
                         <button
                           disabled={!target || busyId === row.id}
@@ -726,13 +733,13 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
   )
 }
 
-function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert }: any) {
+function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert, onDone }: any) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Asrama yang dikelola</p>
-          <h3 className="text-lg font-extrabold text-slate-900">{activeAsrama || user?.asrama_binaan || '-'}</h3>
+          <h3 className="text-lg font-bold text-slate-900">{activeAsrama || user?.asrama_binaan || '-'}</h3>
           <p className="text-sm text-slate-500">Pengurus asrama hanya melihat santri dan kamar dari asrama binaannya.</p>
         </div>
         {!user?.asrama_binaan ? (
@@ -770,9 +777,9 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
       </QuotaAccordion>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Hanya santri yang sudah menyelesaikan pembayaran PSB di asrama aktif yang muncul di tabel ini." />
+        <TableTitle icon={<Bed className="h-4 w-4" />} title="Antrean Penentuan Kamar" description="Santri yang sudah membayar tampil di sini. Simpan kamar lalu klik Selesai untuk menuntaskan PSB (step terakhir)." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
+          <table className="w-full whitespace-nowrap min-w-[960px] text-left text-sm">
             <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Santri</th>
@@ -818,6 +825,16 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
                       >
                         Simpan Kamar
                       </button>
+                      {row.status === 'PLACED_KAMAR' ? (
+                        <button
+                          disabled={busyId === row.id}
+                          onClick={() => onDone(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          <FileCheck className="h-3.5 w-3.5" />
+                          Selesai
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -847,11 +864,11 @@ function QuotaAccordion({
         <div className="flex min-w-0 items-center gap-3">
           <span className="rounded-xl bg-slate-100 p-2 text-slate-700">{icon}</span>
           <div className="min-w-0">
-            <h3 className="font-extrabold text-slate-900">{title}</h3>
+            <h3 className="font-bold text-slate-900">{title}</h3>
             <p className="truncate text-xs text-slate-500">{description}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 group-open:bg-blue-50 group-open:text-blue-700">
+        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 group-open:bg-blue-50 group-open:text-blue-700">
           <span className="group-open:hidden">Buka</span>
           <span className="hidden group-open:inline">Tutup</span>
         </span>
@@ -869,7 +886,7 @@ function AsramaQuotaCard({ item }: { item: any }) {
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-extrabold text-slate-900">{item.asrama}</p>
+          <p className="truncate text-sm font-bold text-slate-900">{item.asrama}</p>
           <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Santri baru</p>
         </div>
         <AsramaStatusBadge status={item.status} over={item.over} />
@@ -893,7 +910,7 @@ function KamarQuotaCard({ room }: { room: any }) {
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-extrabold text-slate-900">Kamar {room.nomor_kamar}</p>
+          <p className="text-sm font-bold text-slate-900">Kamar {room.nomor_kamar}</p>
           <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{room.blok ? `Blok ${room.blok}` : 'Tanpa blok'}</p>
         </div>
         <KamarStatusBadge terisi={terisi} kuota={kuota} />
@@ -910,13 +927,13 @@ function KamarQuotaCard({ room }: { room: any }) {
 function MiniMetric({ label, value, className = 'text-slate-900' }: { label: string; value: number; className?: string }) {
   return (
     <div className="rounded-lg bg-slate-50 px-2 py-1.5">
-      <p className={`text-sm font-extrabold ${className}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
+      <p className={`text-sm font-bold ${className}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
     </div>
   )
 }
 
-function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, onDone, onRevert }: any) {
+function PembayaranView({ rows, paidRows, stats, busyId, onOpenPayment, onCancelPayment, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -928,14 +945,13 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <TableTitle icon={<Wallet className="h-4 w-4" />} title="Antrean Pembayaran" description="Status verifikasi, asrama, dan kamar ditampilkan sebagai tabel agar bendahara bisa cek cepat." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-left text-sm">
+          <table className="w-full whitespace-nowrap min-w-[1180px] text-left text-sm">
             <thead className="border-y bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Santri</th>
                 <th className="px-4 py-3">Sekolah</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Asrama</th>
-                <th className="px-4 py-3">Kamar</th>
                 <th className="px-4 py-3 text-right">Tagihan</th>
                 <th className="px-4 py-3 text-right">Masuk</th>
                 <th className="px-4 py-3 text-right">Sisa</th>
@@ -953,8 +969,9 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">
                     <SantriCells row={row} />
-                    <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.kamar || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {row.asrama ? `${row.asrama} / ${row.kamar || '-'}` : '-'}
+                    </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-700">{rupiah(paymentTarget(row))}</td>
                     <td className="px-4 py-3 text-right font-semibold text-emerald-700">{rupiah(paymentPaid(row))}</td>
                     <td className="px-4 py-3 text-right font-semibold text-rose-700">{rupiah(outstanding)}</td>
@@ -977,22 +994,14 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
                             Batalkan
                           </button>
                         ) : null}
-                        {row.status === 'PLACED_KAMAR' ? (
-                          <button
-                            disabled={busyId === row.id}
-                            onClick={() => onDone(row)}
-                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:bg-slate-200 disabled:text-slate-500"
-                          >
-                            Selesai
-                          </button>
-                        ) : null}
                         <button
                           disabled={busyId === row.id}
                           onClick={() => onRevert(row)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                          title="Kembalikan ke tahap sebelumnya"
+                          aria-label="Kembalikan ke tahap sebelumnya"
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
                         >
                           <Undo2 className="h-3.5 w-3.5" />
-                          Kembalikan
                         </button>
                       </div>
                     </td>
@@ -1003,6 +1012,56 @@ function PembayaranView({ rows, stats, busyId, onOpenPayment, onCancelPayment, o
           </table>
         </div>
       </div>
+
+      <QuotaAccordion
+        icon={<Undo2 className="h-4 w-4" />}
+        title={`Sudah Bayar (${paidRows?.length ?? 0})`}
+        description="Santri yang punya kuitansi aktif. Buka kalau bendahara perlu membatalkan (void) pembayaran."
+      >
+        {paidRows?.length ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full whitespace-nowrap min-w-[820px] text-left text-sm">
+                <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Santri</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Kuitansi</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paidRows.map((row: any) => (
+                    <tr key={row.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-900">{row.nama_lengkap}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{row.asrama ? `${row.asrama} / ${row.kamar || '-'}` : '-'}</p>
+                      </td>
+                      <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{row.pembayaran?.latestReceipt?.receipt_no || '-'}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-700">{rupiah(row.pembayaran?.latestReceipt?.total ?? 0)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          disabled={busyId === row.id}
+                          onClick={() => onCancelPayment(row)}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          Batalkan
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+            Belum ada pembayaran yang bisa dibatalkan.
+          </div>
+        )}
+      </QuotaAccordion>
     </div>
   )
 }
@@ -1044,7 +1103,7 @@ function KamarStatusBadge({ terisi, kuota }: { terisi: number; kuota: number }) 
 function TableTitle({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div className="border-b bg-slate-50 px-5 py-3">
-      <h3 className="font-extrabold text-slate-700">{title}</h3>
+      <h3 className="font-bold text-slate-700">{title}</h3>
       <p className="text-xs text-slate-500">{description}</p>
     </div>
   )
@@ -1062,7 +1121,7 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
-      <p className={`text-lg font-extrabold ${color}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
+      <p className={`text-lg font-bold ${color}`}>{Number(value || 0).toLocaleString('id-ID')}</p>
     </div>
   )
 }
@@ -1077,7 +1136,7 @@ function MoneyCard({ label, value, tone }: { label: string; value: number; tone:
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
-      <p className={`text-lg font-extrabold ${color}`}>{rupiah(value)}</p>
+      <p className={`text-lg font-bold ${color}`}>{rupiah(value)}</p>
     </div>
   )
 }

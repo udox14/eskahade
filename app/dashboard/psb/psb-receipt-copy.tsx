@@ -122,7 +122,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={2}>TOTAL PEMBAYARAN INI</td>
+            <td colSpan={2}>TOTAL PEMBAYARAN</td>
             <td className="amount-col"><span className="rp">Rp</span><span>{Number(total || 0).toLocaleString('id-ID')}</span></td>
           </tr>
         </tfoot>
@@ -191,12 +191,12 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
       <style>{`
         .receipt-copy {
           position: relative;
-          width: 24cm;
+          width: 19cm;
           height: 13.7cm;
           margin: 0 auto;
           box-sizing: border-box;
           background: #fff;
-          padding: 3mm 10mm 4mm;
+          padding: 10mm 10mm 4mm;
           overflow: hidden;
           font-family: "Times New Roman", Times, serif;
           color: #111;
@@ -248,7 +248,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         .intro-grid {
           display: grid;
           grid-template-columns: 1fr 62mm;
-          column-gap: 10mm;
+          column-gap: 5mm;
           align-items: start;
           margin-bottom: .8mm;
         }
@@ -325,10 +325,11 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-size: 11px;
         }
         .main-table th {
-          background: #111;
-          color: #fff;
-          padding: 1px 4px;
-          border-right: 1px solid #555;
+          background: transparent;
+          color: #111;
+          padding: 2px 4px;
+          border-top: 2px solid #111;
+          border-bottom: 2px solid #111;
           text-align: left;
           font-weight: 700;
         }

@@ -16,7 +16,7 @@ import {
   SANTRI_BARU_DURASI_KEY,
   SANTRI_BARU_MULAI_KEY,
 } from '@/lib/santri/kategori'
-import { getNominalSppForYear } from '@/lib/spp/tunggakan'
+import { getNominalSppForYear, getSppBillingStartSetting } from '@/lib/spp/tunggakan'
 
 const PSB_PATH = '/dashboard/psb'
 const MONITORING_PATH = '/dashboard/psb/monitoring'
@@ -760,6 +760,21 @@ export async function bayarPsbBatch(input: {
     if (sppJuliNominal <= 0) return { error: `Tarif SPP tahun ${tahunTagihan} belum diatur` }
   }
 
+  // Santri PSB baru masuk Juli: bulan-bulan billable sebelum Juli otomatis
+  // ditandai TIDAK ADA TAGIHAN (mustahil nunggak, belum jadi santri).
+  const preJulyWaiveMonths: Array<{ tahun: number; bulan: number }> = []
+  if (wantSppJuli) {
+    const billingStart = await getSppBillingStartSetting()
+    const endKey = tahunTagihan * 100 + (SPP_JULI_BULAN - 1) // sampai Juni tahun tagihan
+    let y = billingStart.tahun
+    let m = billingStart.bulan
+    while (y * 100 + m <= endKey) {
+      preJulyWaiveMonths.push({ tahun: y, bulan: m })
+      m += 1
+      if (m > 12) { m = 1; y += 1 }
+    }
+  }
+
   const receiptId = generateId()
   const receiptNo = await nextReceiptNo()
   const total = normalized.reduce((sum, item) => sum + item.nominal, 0) + sppJuliNominal
@@ -783,6 +798,18 @@ export async function bayarPsbBatch(input: {
         VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?)
       `).bind(generateId(), input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId),
     ] : []),
+    ...preJulyWaiveMonths.map((mo) =>
+      db.prepare(`
+        INSERT INTO spp_tagihan_ditiadakan (id, santri_id, tahun, bulan, alasan, is_active, created_by, created_at, updated_by, updated_at)
+        SELECT ?, ?, ?, ?, 'Santri baru masuk Juli (PSB)', 1, ?, datetime('now'), ?, datetime('now')
+        WHERE NOT EXISTS (SELECT 1 FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan = ?)
+        ON CONFLICT(santri_id, tahun, bulan) DO UPDATE SET
+          is_active = 1,
+          alasan = excluded.alasan,
+          updated_by = excluded.updated_by,
+          updated_at = excluded.updated_at
+      `).bind(generateId(), input.santriId, mo.tahun, mo.bulan, access.id, access.id, input.santriId, mo.tahun, mo.bulan)
+    ),
     db.prepare(`
       INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, created_by, created_at, updated_at)
       VALUES (?, ?, 'PAID', ?, datetime('now'), ?, datetime('now'), datetime('now'))
@@ -811,6 +838,7 @@ export async function bayarPsbBatch(input: {
         total,
         items: normalized,
         spp_juli: wantSppJuli ? { tahun: tahunTagihan, bulan: SPP_JULI_BULAN, nominal: sppJuliNominal } : null,
+        spp_pre_juli_ditiadakan: wantSppJuli ? preJulyWaiveMonths : [],
         status_after_payment: statusAfterPayment,
       },
     })
@@ -891,9 +919,19 @@ export async function bypassPsbPayment(input: {
 export async function selesaikanPsb(santriId: string) {
   const access = await assertFeature(PSB_PATH, 'update')
   if ('error' in access) return access
-  if (!isAdmin(access) && !hasRole(access, 'bendahara')) return { error: 'Akses ditolak' }
-  const flow = await queryOne<{ status: string }>('SELECT status FROM psb_flow WHERE santri_id = ?', [santriId])
+  // Kamar kini step terakhir sebelum DONE, jadi finalisasi boleh oleh pengurus
+  // asrama (yang input kamar) selain bendahara/admin.
+  if (!canKamar(access) && !canBayar(access)) return { error: 'Akses ditolak' }
+  const flow = await queryOne<{ status: string; asrama: string | null }>(`
+    SELECT pf.status, s.asrama
+    FROM psb_flow pf
+    JOIN santri s ON s.id = pf.santri_id
+    WHERE pf.santri_id = ?
+  `, [santriId])
   if (!flow || !statusAtLeast(normalizeStatus(flow.status), 'PLACED_KAMAR')) return { error: 'Santri belum ditempatkan ke kamar' }
+  if (!isAdmin(access) && hasRole(access, 'pengurus_asrama') && !hasRole(access, 'bendahara') && access.asrama_binaan !== flow.asrama) {
+    return { error: 'Anda hanya boleh menyelesaikan santri asrama binaan Anda' }
+  }
   await execute(`
     UPDATE psb_flow
     SET status = 'DONE', done_by = ?, done_at = datetime('now'), updated_at = datetime('now')
@@ -935,8 +973,8 @@ export async function kembalikanTahapPsb(santriId: string) {
     VERIFIED: canPenempatan(access),
     PLACED_ASRAMA: canBayar(access),
     PAID: canBayar(access) || canKamar(access),
-    PLACED_KAMAR: canBayar(access),
-    DONE: canBayar(access),
+    PLACED_KAMAR: canBayar(access) || canKamar(access),
+    DONE: canBayar(access) || canKamar(access),
   }
   if (!isAdmin(access) && !permittedByStage[current]) return { error: 'Akses ditolak untuk mengembalikan tahap ini' }
 
