@@ -43,6 +43,7 @@ type SantriPsbRow = {
   jenis_kelamin: string
   sekolah: string | null
   kelas_sekolah: string | null
+  kab_kota: string | null
   asrama: string | null
   kamar: string | null
   tahun_masuk: number | null
@@ -201,7 +202,7 @@ async function getPsbRows(session: SessionUser | null, filters?: {
 
   const statusFilter = normalizeStatus(filters?.status)
   const rows = await query<SantriPsbRow>(`
-    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
+    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah, s.kab_kota,
            s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
            ${kategoriSql} AS kategori_efektif,
            pf.id AS psb_flow_id,

@@ -617,8 +617,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
                 <th className="px-4 py-3">Santri</th>
                 <th className="px-4 py-3">Sekolah</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Asrama</th>
-                <th className="px-4 py-3">Pembayaran</th>
+                <th className="px-4 py-3">Alamat</th>
                 <th className="px-4 py-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -626,10 +625,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
               {rows.length ? rows.map((row: any) => (
                 <tr key={row.id} className="hover:bg-slate-50">
                   <SantriCells row={row} />
-                  <td className="px-4 py-3 text-slate-600">
-                    {row.asrama ? `${row.asrama} / ${row.kamar || '-'}` : '-'}
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-slate-700">{rupiah(paymentPaid(row))}</td>
+                  <td className="px-4 py-3 text-slate-600">{row.kab_kota || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       disabled={busyId === row.id}
@@ -641,7 +637,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
                     </button>
                   </td>
                 </tr>
-              )) : <EmptyRow colSpan={7} text="Tidak ada santri yang menunggu verifikasi." />}
+              )) : <EmptyRow colSpan={5} text="Tidak ada santri yang menunggu verifikasi." />}
             </tbody>
           </table>
         </div>
@@ -1413,12 +1409,10 @@ const VERIFICATION_DOCS = [
   { id: 'formulir', label: 'Formulir Pendaftaran' },
   { id: 'sp_ortu', label: 'Surat Pernyataan Orang Tua' },
   { id: 'sp_santri', label: 'Surat Pernyataan Santri' },
-  { id: 'kartu_tes', label: 'Kartu Tes Klasifikasi' },
   { id: 'kk', label: 'Kartu Keluarga (2 lembar)' },
   { id: 'akta', label: 'Akta Kelahiran (2 lembar)' },
   { id: 'ktp', label: 'KTP Kedua Orang Tua (2 lembar)' },
   { id: 'foto', label: 'Foto 3 x 4 calon santri berlatar biru (3 lembar)' },
-  { id: 'ijazah', label: 'Ijazah SD/MI atau SMP/MTs (jika sudah ada)' },
 ]
 
 function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
@@ -1442,10 +1436,10 @@ function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
   const isAllComplete = VERIFICATION_DOCS.every(doc => items[doc.id] === 'LENGKAP')
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl sm:max-w-lg animate-in slide-in-from-right duration-300">
-        <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-3">
           <div>
             <h2 className="text-base font-bold text-slate-800">Verifikasi Berkas</h2>
             <p className="text-xs text-slate-500">{row.nama_lengkap}</p>
@@ -1455,48 +1449,48 @@ function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
-          <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50 p-4">
-            <div className="flex items-center gap-3 text-blue-700">
-              <FileCheck className="h-5 w-5" />
-              <span className="text-sm font-semibold">Tandai semua berkas lengkap?</span>
+        <div className="space-y-3 overflow-y-auto p-4">
+          <div className="flex items-center justify-between rounded-xl bg-blue-50 px-3 py-2">
+            <div className="flex items-center gap-2 text-blue-700">
+              <FileCheck className="h-4 w-4" />
+              <span className="text-xs font-semibold">Tandai semua berkas lengkap?</span>
             </div>
             <button
               onClick={markAllComplete}
               disabled={isAllComplete}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
             >
               LENGKAP SEMUA
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {VERIFICATION_DOCS.map(doc => {
               const status = items[doc.id]
               return (
-                <div key={doc.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-sm font-medium text-slate-700">{doc.label}</span>
-                  <div className="flex shrink-0 gap-2">
+                <div key={doc.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="text-xs font-medium text-slate-700">{doc.label}</span>
+                  <div className="flex shrink-0 gap-1.5">
                     <button
                       onClick={() => setItems(prev => ({ ...prev, [doc.id]: 'LENGKAP' }))}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                         status === 'LENGKAP'
                           ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
                           : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      {status === 'LENGKAP' ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                      {status === 'LENGKAP' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                       Lengkap
                     </button>
                     <button
                       onClick={() => setItems(prev => ({ ...prev, [doc.id]: 'MENYUSUL' }))}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                         status === 'MENYUSUL'
                           ? 'border-amber-600 bg-amber-50 text-amber-700'
                           : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      {status === 'MENYUSUL' ? <Clock className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                      {status === 'MENYUSUL' ? <Clock className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                       Menyusul
                     </button>
                   </div>
@@ -1505,23 +1499,23 @@ function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
             })}
           </div>
 
-          <div className="mt-6 space-y-2">
-            <label className="text-sm font-semibold text-slate-700">Catatan Tambahan (Opsional)</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700">Catatan Tambahan (Opsional)</label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Catatan verifikasi..."
-              className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              rows={3}
+              className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              rows={2}
             />
           </div>
         </div>
 
-        <div className="border-t p-6">
+        <div className="border-t p-4">
           <button
             disabled={busy || Object.keys(items).length < VERIFICATION_DOCS.length}
             onClick={() => onSubmit(items, note)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
             Simpan Verifikasi
@@ -1533,6 +1527,6 @@ function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }
