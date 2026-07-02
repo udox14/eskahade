@@ -19,3 +19,17 @@ export function capitalizeEachWord(str: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
+/**
+ * Mencetak URL dalam iframe tersembunyi tanpa membuka tab baru.
+ */
+export function printIframe(url: string) {
+  if (typeof window === 'undefined') return;
+  let iframe = document.getElementById('hidden-print-iframe') as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'hidden-print-iframe';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+  iframe.src = url;
+}

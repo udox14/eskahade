@@ -1,54 +1,200 @@
 import Image from 'next/image'
-import { notFound } from 'next/navigation'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+function rupiah(value: number) {
+  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+}
 
-import { getPsbReceipt } from '../../actions'
+function terbilangRupiah(value: number): string {
+  const angka = Math.floor(Math.abs(Number(value || 0)))
+  const satuan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas']
+  const baca = (n: number): string => {
+    if (n < 12) return satuan[n]
+    if (n < 20) return `${baca(n - 10)} Belas`
+    if (n < 100) return `${baca(Math.floor(n / 10))} Puluh ${baca(n % 10)}`.trim()
+    if (n < 200) return `Seratus ${baca(n - 100)}`.trim()
+    if (n < 1000) return `${baca(Math.floor(n / 100))} Ratus ${baca(n % 100)}`.trim()
+    if (n < 2000) return `Seribu ${baca(n - 1000)}`.trim()
+    if (n < 1000000) return `${baca(Math.floor(n / 1000))} Ribu ${baca(n % 1000)}`.trim()
+    if (n < 1000000000) return `${baca(Math.floor(n / 1000000))} Juta ${baca(n % 1000000)}`.trim()
+    return `${baca(Math.floor(n / 1000000000))} Miliar ${baca(n % 1000000000)}`.trim()
+  }
+  return `${baca(angka).replace(/\s+/g, ' ')} Rupiah`
+}
 
-export const dynamic = 'force-dynamic'
+function formatLongDate(value: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(value))
+}
 
-type Props = { params: Promise<{ id: string }> }
+function formatPrintedAt(value: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(value))
+}
 
-import { PsbReceiptCopy } from '../../psb-receipt-copy'
+function paymentLabel(value: string) {
+  const labels: Record<string, string> = {
+    BANGUNAN: 'USPP',
+    KESEHATAN: 'Biaya Kesehatan',
+    EHB: 'Biaya EHB',
+    EKSKUL: 'Biaya Ekstrakurikuler',
+  }
+  return labels[value] ?? value
+}
 
-export default async function PsbReceiptPage({ params }: Props) {
-  const { id } = await params
-  const data = await getPsbReceipt(id)
-  if ('error' in data) return notFound()
+function InfoRow({ label, value, strong = false }: { label?: string; value: string; strong?: boolean }) {
+  return (
+    <div className="info-row">
+      {label && <span>{label}</span>}
+      {label && <b>:</b>}
+      {strong ? <strong>{value}</strong> : <em>{value}</em>}
+    </div>
+  )
+}
 
-  const { receipt, items, sisa } = data
-  const printedAt = new Date().toISOString()
+export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; items: any[]; printedAt: string; sisa?: number }) {
+  const total = Number(receipt.total || 0)
+  const isLunas = total > 0
+  const payerName = receipt.nama_lengkap || '________________'
+  const officerName = receipt.penerima_nama || 'Bendahara'
 
   return (
-    <main className="receipt-page">
-      <div className="print-actions">
-        <span>Gunakan Ctrl+P untuk mencetak</span>
+    <section className="receipt-copy">
+      {isLunas ? <div className="paid-stamp">LUNAS</div> : null}
+
+      <header className="receipt-header">
+        <Image src="/logohitam.png" width={78} height={78} alt="Logo Pesantren Sukahideng" priority />
+        <div className="school-heading">
+          <h1>KUITANSI PEMBAYARAN</h1>
+          <h2>PONDOK PESANTREN SUKAHIDENG</h2>
+          <p>Desa Sukarapih Kec. Sukarame Kabupaten Tasikmalaya Jawa Barat 46461</p>
+        </div>
+      </header>
+
+      <div className="header-rule" />
+
+      <section className="intro-grid">
+        <div className="student-info">
+          <InfoRow label="Nama Santri" value={payerName} strong />
+          <InfoRow label="NIS" value={receipt.nis || '-'} />
+          <InfoRow label="Kelas" value={receipt.sekolah || '-'} />
+          <InfoRow label="Asrama" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
+        </div>
+
+        <div className="payment-title">
+          <h3>BUKTI PEMBAYARAN</h3>
+          <p>Pembayaran PSB - Tahun Tagihan {receipt.tahun_tagihan || '-'}</p>
+        </div>
+
+        <div className="receipt-info">
+          <InfoRow label="No. Bukti" value={receipt.receipt_no} strong />
+          <InfoRow label="Tanggal" value={formatLongDate(receipt.created_at)} />
+          <InfoRow label="Metode" value="Tunai" />
+          <InfoRow label="Petugas" value={officerName} />
+        </div>
+      </section>
+
+      <div className="terbilang">
+        <span>Terbilang:</span>
+        <strong>{terbilangRupiah(total)}</strong>
       </div>
-      <PsbReceiptCopy receipt={receipt} items={items} printedAt={printedAt} sisa={sisa} />
-      <script dangerouslySetInnerHTML={{ __html: 'window.print();' }} />
+
+      <table className="main-table">
+        <thead>
+          <tr>
+            <th className="no-col">No.</th>
+            <th>Uraian Pembayaran</th>
+            <th className="amount-col">Jumlah (Rp)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={`${item.jenis_biaya}-${index}`}>
+              <td className="no-col">{index + 1}</td>
+              <td>{paymentLabel(item.jenis_biaya)}</td>
+              <td className="amount-col">{rupiah(item.nominal_bayar)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={2}>TOTAL PEMBAYARAN INI</td>
+            <td className="amount-col">{rupiah(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <p className="arrears-caption">Catatan - sisa tagihan yang belum terbayar:</p>
+      <table className="arrears-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th className="amount-col">Sisa (Rp)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PSB</td>
+            <td className="amount-col due-zero">{rupiah(sisa)}</td>
+          </tr>
+          <tr className="total-arrears">
+            <td>Total Sisa Tunggakan</td>
+            <td className="amount-col due-zero">{rupiah(sisa)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="summary-block">
+        <div />
+        <table>
+          <tbody>
+            <tr>
+              <td>JUMLAH</td>
+              <td>:</td>
+              <td>{rupiah(total)}</td>
+            </tr>
+            <tr>
+              <td>PEMBAYARAN</td>
+              <td>:</td>
+              <td>{rupiah(total)}</td>
+            </tr>
+            <tr>
+              <td>KEMBALI</td>
+              <td>:</td>
+              <td>Rp 0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section className="signature-section">
+        <div className="signature-box">
+          <p>Penyetor / Santri</p>
+          <div className="signature-line" />
+          <strong>( {payerName} )</strong>
+        </div>
+        <div className="signature-box">
+          <p>Tasikmalaya, {formatLongDate(receipt.created_at)}<br />Bendahara</p>
+          <div className="signature-line" />
+          <strong>( {officerName} )</strong>
+        </div>
+      </section>
+
+      <footer className="receipt-footer">
+        <span>Dicetak: {formatPrintedAt(printedAt)}</span>
+        <span>Dokumen ini sah tanpa tanda tangan basah jika dicetak dari sistem</span>
+        <span>PSB</span>
+      </footer>
+
       <style>{`
-        .receipt-page {
-          min-height: 100vh;
-          background: #f5f5f5;
-          padding: 14px 0;
-          color: #111;
-          font-family: "Times New Roman", Times, serif;
-        }
-        .print-actions {
-          width: 210mm;
-          margin: 0 auto 8px;
-          text-align: right;
-          font-family: Arial, sans-serif;
-        }
-        .print-actions span {
-          display: inline-block;
-          border: 1px solid #bbb;
-          border-radius: 4px;
-          background: white;
-          padding: 5px 9px;
-          font-size: 11px;
-          color: #444;
-        }
         .receipt-copy {
           position: relative;
           width: 21cm;
@@ -58,6 +204,8 @@ export default async function PsbReceiptPage({ params }: Props) {
           background: #fff;
           padding: 3mm 10mm 5.5mm;
           overflow: hidden;
+          font-family: "Times New Roman", Times, serif;
+          color: #111;
         }
         .receipt-header {
           display: flex;
@@ -326,23 +474,12 @@ export default async function PsbReceiptPage({ params }: Props) {
           letter-spacing: .10em;
           pointer-events: none;
         }
-        @page {
-          size: 24cm 14cm;
-          margin: 1.5cm;
-        }
         @media print {
-          .receipt-page {
-            background: #fff;
-            padding: 0;
-          }
-          .print-actions {
-            display: none;
-          }
           .receipt-copy {
             margin: 0;
           }
-          }
+        }
       `}</style>
-    </main>
+    </section>
   )
 }

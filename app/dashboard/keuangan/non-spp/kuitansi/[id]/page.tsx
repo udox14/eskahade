@@ -52,7 +52,7 @@ function formatPrintedAt(value: string) {
 
 function paymentLabel(value: string) {
   const labels: Record<string, string> = {
-    BANGUNAN: 'Dana Bangunan',
+    BANGUNAN: 'USPP',
     KESEHATAN: 'Biaya Kesehatan',
     EHB: 'Biaya EHB',
     EKSKUL: 'Biaya Ekstrakurikuler',
@@ -64,7 +64,7 @@ function receiptNumber(receipt: any) {
   return receipt.receipt_no || `NSP-${String(receipt.id || '').slice(0, 8).toUpperCase()}`
 }
 
-function ReceiptCopy({ receipt, items, label, printedAt }: { receipt: any; items: any[]; label: string; printedAt: string }) {
+function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; items: any[]; printedAt: string; sisa?: number }) {
   const total = Number(receipt.nominal_bayar || 0)
   const isLunas = total > 0
   const payerName = receipt.nama_lengkap || '________________'
@@ -75,7 +75,7 @@ function ReceiptCopy({ receipt, items, label, printedAt }: { receipt: any; items
       {isLunas ? <div className="paid-stamp">LUNAS</div> : null}
 
       <header className="receipt-header">
-        <Image src="/logo.png" width={78} height={78} alt="Logo Pesantren Sukahideng" priority />
+        <Image src="/logohitam.png" width={78} height={78} alt="Logo Pesantren Sukahideng" priority />
         <div className="school-heading">
           <h1>KUITANSI PEMBAYARAN</h1>
           <h2>PONDOK PESANTREN SUKAHIDENG</h2>
@@ -85,14 +85,12 @@ function ReceiptCopy({ receipt, items, label, printedAt }: { receipt: any; items
 
       <div className="header-rule" />
 
-      <div className="copy-label">{label}</div>
-
       <section className="intro-grid">
         <div className="student-info">
           <InfoRow label="Nama Santri" value={payerName} strong />
-          <InfoRow label="NIS" value={receipt.nis || '-'} />
-          <InfoRow label="Kelas" value={receipt.sekolah || '-'} />
-          <InfoRow label="Asrama" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
+          <InfoRow label="N I S" value={receipt.nis || '-'} />
+          <InfoRow label="Madrasah" value={receipt.sekolah || '-'} />
+          <InfoRow label="Asrama / Kamar" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
         </div>
 
         <div className="payment-title">
@@ -101,9 +99,9 @@ function ReceiptCopy({ receipt, items, label, printedAt }: { receipt: any; items
         </div>
 
         <div className="receipt-info">
-          <InfoRow label="No. Bukti" value={receiptNumber(receipt)} strong />
-          <InfoRow label="Tanggal" value={formatLongDate(receipt.tanggal_bayar)} />
-          <InfoRow label="Metode" value="Tunai" />
+          <InfoRow label="Nomor Kuitansi" value={receiptNumber(receipt)} strong />
+          <InfoRow label="Tanggal Dibayar" value={formatLongDate(receipt.tanggal_bayar)} />
+          <InfoRow label="Cara Pembayaran" value="Tunai" />
           <InfoRow label="Petugas" value={officerName} />
         </div>
       </section>
@@ -149,11 +147,11 @@ function ReceiptCopy({ receipt, items, label, printedAt }: { receipt: any; items
         <tbody>
           <tr>
             <td>Non-SPP</td>
-            <td className="amount-col due-zero">Rp 0</td>
+            <td className="amount-col due-zero">{rupiah(sisa)}</td>
           </tr>
           <tr className="total-arrears">
             <td>Total Sisa Tunggakan</td>
-            <td className="amount-col due-zero">Rp 0</td>
+            <td className="amount-col due-zero">{rupiah(sisa)}</td>
           </tr>
         </tbody>
       </table>
@@ -223,16 +221,15 @@ export default async function NonSppReceiptPage({ params }: Props) {
   const receipt = data.receipt
   const items = [{ jenis_biaya: receipt.jenis_biaya, nominal_bayar: receipt.nominal_bayar }]
   const printedAt = new Date().toISOString()
+  const sisa = data.sisa ?? 0
 
   return (
     <main className="receipt-page">
       <div className="print-actions">
         <span>Gunakan Ctrl+P untuk mencetak</span>
       </div>
-      <ReceiptCopy receipt={receipt} items={items} label="Lembar Pembayar" printedAt={printedAt} />
-      <div className="copy-divider" />
-      <ReceiptCopy receipt={receipt} items={items} label="Arsip Pondok" printedAt={printedAt} />
-
+      <ReceiptCopy receipt={receipt} items={items} printedAt={printedAt} sisa={sisa} />
+      <script dangerouslySetInnerHTML={{ __html: 'window.print();' }} />
       <style>{`
         .receipt-page {
           min-height: 100vh;
@@ -258,8 +255,8 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .receipt-copy {
           position: relative;
-          width: 210mm;
-          height: 147.5mm;
+          width: 21cm;
+          height: 11cm;
           margin: 0 auto;
           box-sizing: border-box;
           background: #fff;
@@ -290,13 +287,13 @@ export default async function NonSppReceiptPage({ params }: Props) {
         .school-heading h1 {
           font-family: Arial, sans-serif;
           font-size: 12px;
-          font-weight: 900;
+          font-weight: 700;
           line-height: 1.05;
         }
         .school-heading h2 {
           font-family: Arial, sans-serif;
           font-size: 13px;
-          font-weight: 900;
+          font-weight: 700;
           line-height: 1.1;
         }
         .school-heading p {
@@ -309,17 +306,6 @@ export default async function NonSppReceiptPage({ params }: Props) {
           height: 0;
           margin: 1mm 0 1.5mm;
           border-top: 2px solid #111;
-        }
-        .copy-label {
-          display: inline-block;
-          margin-left: 0;
-          margin-bottom: 2mm;
-          border: 1px solid #b7b7b7;
-          border-radius: 999px;
-          padding: 1px 8px;
-          font-size: 7px;
-          color: #777;
-          background: #fff;
         }
         .intro-grid {
           display: grid;
@@ -351,7 +337,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .info-row strong {
           font-style: normal;
-          font-weight: 800;
+          font-weight: 700;
           color: #111;
           text-transform: uppercase;
         }
@@ -366,7 +352,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         .payment-title h3 {
           margin: 0;
           font-size: 12px;
-          font-weight: 900;
+          font-weight: 700;
           letter-spacing: .08em;
           line-height: 1;
         }
@@ -390,7 +376,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           color: #111;
           font-size: 7.8px;
           font-style: italic;
-          font-weight: 800;
+          font-weight: 700;
         }
         table {
           width: 100%;
@@ -406,7 +392,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           padding: 1.5px 4px;
           border-right: 1px solid #555;
           text-align: left;
-          font-weight: 800;
+          font-weight: 700;
         }
         .main-table th:last-child {
           border-right: 0;
@@ -419,7 +405,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           border-top: 2px solid #111;
           border-bottom: 0;
           background: #f1f1f1;
-          font-weight: 900;
+          font-weight: 700;
           text-align: center;
         }
         .no-col {
@@ -447,7 +433,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           border: 1px solid #ddd;
           background: #f3f3f3;
           text-align: left;
-          font-weight: 800;
+          font-weight: 700;
         }
         .arrears-table td {
           padding: 1.4px 4px;
@@ -455,7 +441,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .total-arrears td {
           background: #fff1f1;
-          font-weight: 800;
+          font-weight: 700;
         }
         .due-zero {
           color: #c00;
@@ -479,7 +465,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .summary-block table td:nth-child(3) {
           font-family: "Courier New", monospace;
-          font-weight: 800;
+          font-weight: 700;
           text-align: right;
         }
         .signature-section {
@@ -507,7 +493,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           text-overflow: ellipsis;
           white-space: nowrap;
           font-size: 7.4px;
-          font-weight: 800;
+          font-weight: 700;
         }
         .receipt-footer {
           position: absolute;
@@ -528,12 +514,6 @@ export default async function NonSppReceiptPage({ params }: Props) {
         .receipt-footer span:nth-child(3) {
           text-align: right;
         }
-        .copy-divider {
-          width: 210mm;
-          height: 0;
-          margin: 0 auto;
-          border-top: .5px dashed #9b9b9b;
-        }
         .paid-stamp {
           position: absolute;
           right: 34mm;
@@ -546,13 +526,13 @@ export default async function NonSppReceiptPage({ params }: Props) {
           color: rgba(10, 120, 56, .14);
           font-family: Arial, sans-serif;
           font-size: 28px;
-          font-weight: 900;
+          font-weight: 700;
           letter-spacing: .10em;
           pointer-events: none;
         }
         @page {
-          size: A4 portrait;
-          margin: 0;
+          size: 24cm 14cm;
+          margin: 1.5cm;
         }
         @media print {
           .receipt-page {
@@ -565,10 +545,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           .receipt-copy {
             margin: 0;
           }
-          .copy-divider {
-            margin: 0;
           }
-        }
       `}</style>
     </main>
   )

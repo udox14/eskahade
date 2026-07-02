@@ -21,12 +21,19 @@ import {
   Undo2,
   UserPlus,
   Wallet,
+  Eye,
+  X,
+  Clock,
+  CheckCircle2,
+  Circle,
+  FileCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
-  batalkanPembayaranPsb,
   bayarPsbBatch,
+  voidPsbReceipt,
+  bypassPsbPayment,
   getKamarPsb,
   getPsbDashboard,
   kembalikanTahapPsb,
@@ -118,6 +125,8 @@ export default function PsbPageContent() {
   const [selectedKamar, setSelectedKamar] = useState<Record<string, string>>({})
   const [bangunanNominal, setBangunanNominal] = useState<Record<string, string>>({})
   const [paymentItems, setPaymentItems] = useState<Record<string, Record<string, boolean>>>({})
+  const [showPreview, setShowPreview] = useState<Record<string, boolean>>({})
+  const [verificationRow, setVerificationRow] = useState<any>(null)
 
   const load = async (silent = false) => {
     if (silent) setRefreshing(true)
@@ -163,6 +172,9 @@ export default function PsbPageContent() {
   const rows = useMemo(() => data?.rows ?? [], [data])
   const sekretariatRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFICATION'), [rows])
   const placementRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFIED'), [rows])
+  const goBack = () => {
+    setVerificationRow(null)
+  }
   const roomRows = useMemo(() => {
     return rows.filter((row: any) => row.status === 'PAID' && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
   }, [activeRoomAsrama, rows])
@@ -261,6 +273,39 @@ export default function PsbPageContent() {
     }
   }
 
+  const handleLunasSemua = (row: any) => {
+    const picks: Record<string, boolean> = { BANGUNAN: true }
+    PAYMENT_TYPES.forEach(jenis => picks[jenis] = true)
+    
+    setPaymentItems(prev => ({
+      ...prev,
+      [row.id]: picks
+    }))
+    
+    setBangunanNominal(prev => ({
+      ...prev,
+      [row.id]: String(row.pembayaran?.bangunan?.sisa ?? 0)
+    }))
+  }
+
+  const handleCicilSemua = async (row: any) => {
+    await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items: [] }), 'Pembayaran dicicil')
+    setPaymentModalRow(null)
+  }
+
+  const handleBypass = async (row: any) => {
+    const reason = window.prompt(`Alasan menggratiskan santri ${row.nama_lengkap}? (Wajib diisi)`)
+    if (!reason?.trim()) {
+      if (reason !== null) toast.error('Alasan wajib diisi')
+      return
+    }
+    
+    await run(
+      row.id,
+      () => bypassPsbPayment({ santriId: row.id, alasan: reason.trim() }), 'Pembayaran berhasil digratiskan/di-bypass')
+    setPaymentModalRow(null)
+  }
+
   const handleRevert = async (row: any) => {
     const ok = window.confirm(`Kembalikan ${row.nama_lengkap} ke tahap sebelumnya?`)
     if (!ok) return
@@ -273,12 +318,16 @@ export default function PsbPageContent() {
       toast.error('Belum ada pembayaran yang bisa dibatalkan.')
       return
     }
-    const ok = window.confirm(`Batalkan pembayaran terakhir ${latestReceipt.receipt_no} untuk ${row.nama_lengkap}?`)
-    if (!ok) return
+    const reason = window.prompt(`Alasan membatalkan pembayaran ${latestReceipt.receipt_no} untuk ${row.nama_lengkap}? (Wajib diisi)`)
+    if (!reason?.trim()) {
+      if (reason !== null) toast.error('Alasan pembatalan wajib diisi')
+      return
+    }
+    
     await run(
       row.id,
-      () => batalkanPembayaranPsb({ santriId: row.id, receiptId: latestReceipt.id }),
-      'Pembayaran terakhir berhasil dibatalkan'
+      () => voidPsbReceipt({ receiptId: latestReceipt.id, santriId: row.id, alasan: reason.trim() }),
+      'Pembayaran terakhir berhasil dibatalkan (VOID)'
     )
   }
 
@@ -426,7 +475,7 @@ export default function PsbPageContent() {
               canCreate={!!data?.user?.canSekretariat}
               busyId={busyId}
               onDadakan={() => setShowDadakanModal(true)}
-              onVerify={(row: any) => run(row.id, () => verifikasiSantriPsb(row.id), 'Santri terverifikasi')}
+              onVerify={(row: any) => setVerificationRow(row)}
             />
           ) : null}
 
@@ -486,8 +535,20 @@ export default function PsbPageContent() {
           dadakan={dadakan}
           busy={busyId === 'dadakan'}
           setDadakan={setDadakan}
-          onClose={() => setShowDadakanModal(false)}
+          onClose={goBack}
           onSubmit={handleDadakan}
+        />
+      ) : null}
+
+      {verificationRow ? (
+        <VerificationPanel
+          row={verificationRow}
+          busy={busyId === verificationRow.id}
+          onClose={() => setVerificationRow(null)}
+          onSubmit={async (items: any, note: string) => {
+            const result = await run(verificationRow.id, () => verifikasiSantriPsb(verificationRow.id, items, note), 'Santri terverifikasi')
+            if (result) setVerificationRow(null)
+          }}
         />
       ) : null}
 
@@ -501,6 +562,9 @@ export default function PsbPageContent() {
           setBangunanNominal={setBangunanNominal}
           togglePayment={togglePayment}
           getPreviewItems={getPreviewItems}
+          onBypass={() => handleBypass(paymentModalRow)}
+          onCicilSemua={() => handleCicilSemua(paymentModalRow)}
+          onLunasSemua={() => handleLunasSemua(paymentModalRow)}
           onClose={() => setPaymentModalRow(null)}
           onSubmit={() => handlePayment(paymentModalRow)}
         />
@@ -553,7 +617,7 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
                       onClick={() => onVerify(row)}
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
                     >
-                      {busyId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      {busyId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
                       Verifikasi
                     </button>
                   </td>
@@ -1076,7 +1140,7 @@ function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
   )
 }
 
-function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onClose, onSubmit }: any) {
+function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onBypass, onCicilSemua, onLunasSemua, onClose, onSubmit }: any) {
   const items = getPreviewItems(row)
   const total = items.reduce((sum: number, item: any) => sum + item.nominal, 0)
 
@@ -1100,6 +1164,25 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Asrama / Kamar</p>
               <p className="mt-1 font-bold text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onBypass}
+                disabled={busy}
+                className="flex flex-1 items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-200"
+              >
+                GRATISKAN
+              </button>
+              <button
+                type="button"
+                onClick={onLunasSemua}
+                disabled={busy}
+                className="flex flex-1 items-center justify-center rounded-xl bg-blue-100 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-200"
+              >
+                BAYAR SEMUA
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -1137,14 +1220,25 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
               ))}
             </div>
 
-            <button
-              disabled={busy || items.length === 0}
-              onClick={onSubmit}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              Simpan & Cetak Kuitansi
-            </button>
+            {items.length > 0 ? (
+              <button
+                disabled={busy}
+                onClick={onSubmit}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                Simpan & Cetak Kuitansi
+              </button>
+            ) : (
+              <button
+                disabled={busy}
+                onClick={onCicilSemua}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Lewati (Cicil)
+              </button>
+            )}
           </div>
 
           <ReceiptPreview row={row} items={items} total={total} tahunTagihan={tahunTagihan} />
@@ -1272,5 +1366,133 @@ function PreviewInfo({ label, value }: { label: string; value: string }) {
       <span className="text-slate-400">:</span>
       <span className="font-medium text-slate-900">{value}</span>
     </div>
+  )
+}
+
+const VERIFICATION_DOCS = [
+  { id: 'formulir', label: 'Formulir Pendaftaran' },
+  { id: 'sp_ortu', label: 'Surat Pernyataan Orang Tua' },
+  { id: 'sp_santri', label: 'Surat Pernyataan Santri' },
+  { id: 'kartu_tes', label: 'Kartu Tes Klasifikasi' },
+  { id: 'kk', label: 'Kartu Keluarga (2 lembar)' },
+  { id: 'akta', label: 'Akta Kelahiran (2 lembar)' },
+  { id: 'ktp', label: 'KTP Kedua Orang Tua (2 lembar)' },
+  { id: 'foto', label: 'Foto 3 x 4 calon santri berlatar biru (3 lembar)' },
+  { id: 'ijazah', label: 'Ijazah SD/MI atau SMP/MTs (jika sudah ada)' },
+]
+
+function VerificationPanel({ row, busy, onClose, onSubmit }: any) {
+  const initialItems = useMemo(() => {
+    try {
+      return row.verification_items ? JSON.parse(row.verification_items) : {}
+    } catch {
+      return {}
+    }
+  }, [row.verification_items])
+
+  const [items, setItems] = useState<Record<string, 'LENGKAP' | 'MENYUSUL'>>(initialItems)
+  const [note, setNote] = useState(row.verification_note || '')
+
+  const markAllComplete = () => {
+    const all: Record<string, 'LENGKAP'> = {}
+    VERIFICATION_DOCS.forEach(doc => all[doc.id] = 'LENGKAP')
+    setItems(all)
+  }
+
+  const isAllComplete = VERIFICATION_DOCS.every(doc => items[doc.id] === 'LENGKAP')
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl sm:max-w-lg animate-in slide-in-from-right duration-300">
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Verifikasi Berkas</h2>
+            <p className="text-sm text-slate-500">{row.nama_lengkap}</p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50 p-4">
+            <div className="flex items-center gap-3 text-blue-700">
+              <FileCheck className="h-5 w-5" />
+              <span className="text-sm font-semibold">Tandai semua berkas lengkap?</span>
+            </div>
+            <button
+              onClick={markAllComplete}
+              disabled={isAllComplete}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              LENGKAP SEMUA
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {VERIFICATION_DOCS.map(doc => {
+              const status = items[doc.id]
+              return (
+                <div key={doc.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-sm font-medium text-slate-700">{doc.label}</span>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={() => setItems(prev => ({ ...prev, [doc.id]: 'LENGKAP' }))}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                        status === 'LENGKAP'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {status === 'LENGKAP' ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                      Lengkap
+                    </button>
+                    <button
+                      onClick={() => setItems(prev => ({ ...prev, [doc.id]: 'MENYUSUL' }))}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                        status === 'MENYUSUL'
+                          ? 'border-amber-600 bg-amber-50 text-amber-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {status === 'MENYUSUL' ? <Clock className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                      Menyusul
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-6 space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Catatan Tambahan (Opsional)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Catatan verifikasi..."
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="border-t p-6">
+          <button
+            disabled={busy || Object.keys(items).length < VERIFICATION_DOCS.length}
+            onClick={() => onSubmit(items, note)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+            Simpan Verifikasi
+          </button>
+          {Object.keys(items).length < VERIFICATION_DOCS.length && (
+            <p className="mt-2 text-center text-xs text-slate-500">
+              Pilih kelengkapan untuk semua dokumen terlebih dahulu.
+            </p>
+          )}
+        </div>
+      </div>
+    </>
   )
 }

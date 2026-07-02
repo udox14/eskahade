@@ -41,6 +41,7 @@ type SantriPsbRow = {
   psb_flow_id: string | null
   status: PsbStatus | null
   verification_note: string | null
+  verification_items: string | null
   verified_at: string | null
   placed_asrama_at: string | null
   placed_kamar_at: string | null
@@ -132,6 +133,22 @@ async function ensureSchema() {
   if (!paymentColumns.some((col) => col.name === 'psb_receipt_id')) {
     await execute('ALTER TABLE pembayaran_tahunan ADD COLUMN psb_receipt_id TEXT REFERENCES psb_payment_receipt(id)')
   }
+
+  const flowColumns = await query<{ name: string }>('PRAGMA table_info(psb_flow)')
+  if (!flowColumns.some((col) => col.name === 'payment_note')) {
+    await execute('ALTER TABLE psb_flow ADD COLUMN payment_note TEXT')
+  }
+  if (!flowColumns.some((col) => col.name === 'verification_items')) {
+    await execute('ALTER TABLE psb_flow ADD COLUMN verification_items TEXT')
+  }
+
+  const receiptColumns = await query<{ name: string }>('PRAGMA table_info(psb_payment_receipt)')
+  if (!receiptColumns.some((col) => col.name === 'is_void')) {
+    await execute('ALTER TABLE psb_payment_receipt ADD COLUMN is_void INTEGER NOT NULL DEFAULT 0')
+    await execute('ALTER TABLE psb_payment_receipt ADD COLUMN void_reason TEXT')
+    await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_by TEXT')
+    await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_at TEXT')
+  }
 }
 
 async function getPsbRows(session: SessionUser | null, filters?: {
@@ -171,6 +188,7 @@ async function getPsbRows(session: SessionUser | null, filters?: {
            pf.id AS psb_flow_id,
            COALESCE(pf.status, 'VERIFICATION') AS status,
            pf.verification_note,
+           pf.verification_items,
            pf.verified_at,
            pf.placed_asrama_at,
            pf.placed_kamar_at,
@@ -195,14 +213,14 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
   const pembayaran = await query<any>(
     `SELECT santri_id, jenis_biaya, nominal_bayar, tahun_tagihan
      FROM pembayaran_tahunan
-     WHERE santri_id IN (${placeholders})`,
+     WHERE santri_id IN (${placeholders}) AND COALESCE(status, 'AKTIF') != 'VOID'`,
     ids
   )
   const tarif = await query<any>('SELECT tahun_angkatan, jenis_biaya, nominal FROM biaya_settings')
   const receipts = await query<any>(
     `SELECT id, santri_id, receipt_no, total, created_at
      FROM psb_payment_receipt
-     WHERE santri_id IN (${placeholders})
+     WHERE santri_id IN (${placeholders}) AND COALESCE(is_void, 0) = 0
      ORDER BY datetime(created_at) DESC, created_at DESC`,
     ids
   )
@@ -415,7 +433,7 @@ export async function tambahSantriDadakan(input: {
   return { success: true, santriId, nis }
 }
 
-export async function verifikasiSantriPsb(santriId: string, note?: string) {
+export async function verifikasiSantriPsb(santriId: string, itemsObj?: Record<string, string>, note?: string) {
   const access = await assertFeature(PSB_PATH, 'update')
   if ('error' in access) return access
   if (!canSekretariat(access)) return { error: 'Akses ditolak' }
@@ -424,16 +442,19 @@ export async function verifikasiSantriPsb(santriId: string, note?: string) {
   const santri = await queryOne<{ nama_lengkap: string }>('SELECT nama_lengkap FROM santri WHERE id = ? AND status_global = ?', [santriId, 'aktif'])
   if (!santri) return { error: 'Santri tidak ditemukan' }
 
+  const itemsJson = itemsObj ? JSON.stringify(itemsObj) : null
+
   await execute(`
-    INSERT INTO psb_flow (id, santri_id, status, verification_note, verified_by, verified_at, created_by, created_at, updated_at)
-    VALUES (?, ?, 'VERIFIED', ?, ?, datetime('now'), ?, datetime('now'), datetime('now'))
+    INSERT INTO psb_flow (id, santri_id, status, verification_items, verification_note, verified_by, verified_at, created_by, created_at, updated_at)
+    VALUES (?, ?, 'VERIFIED', ?, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'))
     ON CONFLICT(santri_id) DO UPDATE SET
       status = CASE WHEN psb_flow.status = 'VERIFICATION' THEN 'VERIFIED' ELSE psb_flow.status END,
+      verification_items = excluded.verification_items,
       verification_note = excluded.verification_note,
       verified_by = excluded.verified_by,
       verified_at = excluded.verified_at,
       updated_at = excluded.updated_at
-  `, [generateId(), santriId, note?.trim() || null, access.id, access.id])
+  `, [generateId(), santriId, itemsJson, note?.trim() || null, access.id, access.id])
 
   await logActivity({
     actor: actorFromSession(access),
@@ -631,7 +652,7 @@ export async function bayarPsbBatch(input: {
   )
   const tarif = new Map(tarifRows.map((row) => [row.jenis_biaya, Number(row.nominal ?? 0)]))
   const existing = await query<{ jenis_biaya: string; nominal_bayar: number; tahun_tagihan: number | null }>(
-    'SELECT jenis_biaya, nominal_bayar, tahun_tagihan FROM pembayaran_tahunan WHERE santri_id = ?',
+    "SELECT jenis_biaya, nominal_bayar, tahun_tagihan FROM pembayaran_tahunan WHERE santri_id = ? AND COALESCE(status, 'AKTIF') != 'VOID'",
     [input.santriId]
   )
   const totalBangunanPaid = existing
@@ -707,6 +728,63 @@ export async function bayarPsbBatch(input: {
     console.error('Failed to revalidate PSB pages after payment', error)
   }
   return { success: true, receiptId, receiptNo, total, status: statusAfterPayment }
+}
+
+export async function bypassPsbPayment(input: {
+  santriId: string
+  alasan: string
+}) {
+  const access = await assertFeature(PSB_PATH, 'create')
+  if ('error' in access) return access
+  if (!canBayar(access)) return { error: 'Akses ditolak' }
+  await ensureSchema()
+
+  const santri = await queryOne<SantriPsbRow>(`
+    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.kelas_sekolah,
+           s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at, s.kategori_santri,
+           'BARU' AS kategori_efektif, pf.id AS psb_flow_id, pf.status,
+           pf.verification_note, pf.verified_at, pf.placed_asrama_at, pf.placed_kamar_at, pf.paid_at, pf.done_at
+    FROM santri s
+    LEFT JOIN psb_flow pf ON pf.santri_id = s.id
+    WHERE s.id = ? AND s.status_global = 'aktif'
+  `, [input.santriId])
+  if (!santri) return { error: 'Santri tidak ditemukan' }
+  if (!statusAtLeast(normalizeStatus(santri.status), 'PLACED_ASRAMA')) return { error: 'Santri belum ditempatkan ke asrama' }
+
+  if (!input.alasan || input.alasan.trim().length < 3) return { error: 'Alasan lewati pembayaran wajib diisi dengan jelas' }
+
+  const db = await getDB()
+  await db.batch([
+    db.prepare(`
+      INSERT INTO psb_flow (id, santri_id, status, paid_by, paid_at, payment_note, created_by, created_at, updated_at)
+      VALUES (?, ?, 'PAID', ?, datetime('now'), ?, ?, datetime('now'), datetime('now'))
+      ON CONFLICT(santri_id) DO UPDATE SET
+        status = CASE WHEN psb_flow.status IN ('VERIFICATION','VERIFIED','PLACED_ASRAMA','PAID') THEN 'PAID' ELSE psb_flow.status END,
+        paid_by = excluded.paid_by,
+        paid_at = excluded.paid_at,
+        payment_note = excluded.payment_note,
+        updated_at = excluded.updated_at
+    `).bind(generateId(), input.santriId, access.id, input.alasan.trim(), access.id)
+  ])
+
+  try {
+    await logActivity({
+      actor: actorFromSession(access),
+      module: 'psb',
+      action: 'payment',
+      fiturHref: PSB_PATH,
+      logKind: 'update',
+      entityType: 'psb_flow',
+      entityId: santri.psb_flow_id || santri.id,
+      entityLabel: santri.nama_lengkap,
+      summary: `Membypass pembayaran PSB untuk ${santri.nama_lengkap} (${input.alasan})`,
+      details: { santri_id: input.santriId, note: input.alasan },
+    })
+  } catch (error) {}
+
+  revalidatePath(PSB_PATH)
+  revalidatePath(MONITORING_PATH)
+  return { success: true }
 }
 
 export async function selesaikanPsb(santriId: string) {
@@ -812,11 +890,13 @@ export async function kembalikanTahapPsb(santriId: string) {
   return { success: true, status: prev }
 }
 
-export async function batalkanPembayaranPsb(input: { santriId: string; receiptId: string }) {
-  const access = await assertFeature(PSB_PATH, 'update')
+export async function voidPsbReceipt(input: { receiptId: string; santriId: string; alasan: string }) {
+  const access = await assertFeature(PSB_PATH, 'delete')
   if ('error' in access) return access
-  if (!isAdmin(access) && !hasRole(access, 'bendahara')) return { error: 'Akses ditolak' }
+  if (!canBayar(access)) return { error: 'Akses ditolak' }
   await ensureSchema()
+
+  if (!input.alasan || input.alasan.trim().length < 5) return { error: 'Alasan pembatalan minimal 5 karakter' }
 
   const receipt = await queryOne<{
     id: string
@@ -831,15 +911,15 @@ export async function batalkanPembayaranPsb(input: { santriId: string; receiptId
     SELECT r.id, r.santri_id, r.receipt_no, r.tahun_tagihan, s.nama_lengkap, s.tahun_masuk, s.tanggal_masuk, s.created_at
     FROM psb_payment_receipt r
     JOIN santri s ON s.id = r.santri_id
-    WHERE r.id = ?
+    WHERE r.id = ? AND COALESCE(r.is_void, 0) = 0
   `, [input.receiptId])
-  if (!receipt) return { error: 'Kuitansi pembayaran tidak ditemukan' }
+  if (!receipt) return { error: 'Kuitansi pembayaran tidak ditemukan atau sudah dibatalkan' }
   if (receipt.santri_id !== input.santriId) return { error: 'Kuitansi tidak cocok dengan santri' }
 
   const latestReceipt = await queryOne<{ id: string }>(
     `SELECT id
      FROM psb_payment_receipt
-     WHERE santri_id = ?
+     WHERE santri_id = ? AND COALESCE(is_void, 0) = 0
      ORDER BY datetime(created_at) DESC, created_at DESC
      LIMIT 1`,
     [input.santriId]
@@ -848,11 +928,12 @@ export async function batalkanPembayaranPsb(input: { santriId: string; receiptId
     return { error: 'Hanya pembayaran terakhir yang bisa dibatalkan' }
   }
 
-  await execute('DELETE FROM pembayaran_tahunan WHERE psb_receipt_id = ?', [input.receiptId])
-  await execute('DELETE FROM psb_payment_receipt WHERE id = ?', [input.receiptId])
+  const stamp = new Date().toISOString()
+  await execute('UPDATE pembayaran_tahunan SET status = ?, void_reason = ?, voided_by = ?, voided_at = ? WHERE psb_receipt_id = ?', ['VOID', input.alasan, access.id, stamp, input.receiptId])
+  await execute('UPDATE psb_payment_receipt SET is_void = 1, void_reason = ?, voided_by = ?, voided_at = ? WHERE id = ?', [input.alasan, access.id, stamp, input.receiptId])
 
   const remainingPayments = await query<{ jenis_biaya: string; tahun_tagihan: number | null; nominal_bayar: number }>(
-    'SELECT jenis_biaya, tahun_tagihan, nominal_bayar FROM pembayaran_tahunan WHERE santri_id = ?',
+    "SELECT jenis_biaya, tahun_tagihan, nominal_bayar FROM pembayaran_tahunan WHERE santri_id = ? AND COALESCE(status, 'AKTIF') != 'VOID'",
     [input.santriId]
   )
   const nextStatus = deriveFlowStatusFromPayments({
@@ -918,5 +999,25 @@ export async function getPsbReceipt(receiptId: string) {
     WHERE psb_receipt_id = ?
     ORDER BY jenis_biaya
   `, [receiptId])
-  return { receipt, items }
+
+  const tahunMasuk = receipt.tahun_masuk || receipt.tahun_tagihan
+  const tarif = await query<any>('SELECT jenis_biaya, nominal FROM biaya_settings WHERE tahun_angkatan = ?', [tahunMasuk])
+  const paidRows = await query<any>(`
+    SELECT jenis_biaya, nominal_bayar
+    FROM pembayaran_tahunan
+    WHERE santri_id = ? AND (tahun_tagihan = ? OR jenis_biaya = 'BANGUNAN') AND COALESCE(status, 'AKTIF') != 'VOID'
+  `, [receipt.santri_id, receipt.tahun_tagihan])
+
+  let totalTagihan = 0
+  let totalDibayar = 0
+  tarif.forEach((t) => {
+    totalTagihan += Number(t.nominal || 0)
+  })
+  paidRows.forEach((p) => {
+    totalDibayar += Number(p.nominal_bayar || 0)
+  })
+
+  const sisa = Math.max(0, totalTagihan - totalDibayar)
+
+  return { receipt, items, sisa }
 }

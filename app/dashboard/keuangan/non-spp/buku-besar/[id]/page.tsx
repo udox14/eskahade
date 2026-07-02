@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { guardPage } from '@/lib/auth/guard'
 import { getBukuBesarDetailNonSpp } from '../../actions'
+import { PrintReceiptButton } from './print-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,7 +112,7 @@ export default async function BukuBesarDetailPage({ params }: Props) {
                     ) : p.psb_receipt_id ? (
                       <Link href={`/dashboard/psb/kuitansi/${p.psb_receipt_id}`} target="_blank" className="rounded border border-blue-200 px-3 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">Kuitansi PSB</Link>
                     ) : (
-                      <Link href={`/dashboard/keuangan/non-spp/kuitansi/${p.id}`} target="_blank" className="rounded border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50">Cetak</Link>
+                      <PrintReceiptButton receiptId={p.id} />
                     )}
                   </td>
                 </tr>

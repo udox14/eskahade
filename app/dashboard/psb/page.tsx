@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+
 import { guardPage } from '@/lib/auth/guard'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import PsbPageContent from './_page-content'
@@ -13,7 +15,9 @@ export default async function PsbPage() {
         title="Flow PSB"
         description="Alur terpadu daftar ulang santri baru dari sekretariat sampai pembayaran."
       />
-      <PsbPageContent />
+      <Suspense fallback={null}>
+        <PsbPageContent />
+      </Suspense>
     </div>
   )
 }

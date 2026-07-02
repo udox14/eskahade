@@ -1023,9 +1023,10 @@ export async function getNonSppReceipt(paymentId: string) {
     sekolah: string | null
     kamar: string | null
     created_at: string | null
+    tahun_masuk: number | null
     penerima_nama: string | null
   }>(`
-    SELECT p.*, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.created_at,
+    SELECT p.*, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.created_at, s.tahun_masuk,
            ta.nama AS tahun_ajaran_nama, u.full_name AS penerima_nama
     FROM pembayaran_tahunan p
     JOIN santri s ON s.id = p.santri_id
@@ -1034,5 +1035,22 @@ export async function getNonSppReceipt(paymentId: string) {
     WHERE p.id = ?
   `, [paymentId])
   if (!receipt) return { error: 'Transaksi tidak ditemukan.' }
-  return { receipt }
+
+  const tahunMasuk = receipt.tahun_masuk || new Date(receipt.created_at || new Date()).getFullYear()
+  const tarif = await queryOne<any>('SELECT nominal FROM biaya_settings WHERE jenis_biaya = ? AND tahun_angkatan = ?', [receipt.jenis_biaya, tahunMasuk])
+  
+  const paidRows = await query<any>(`
+    SELECT nominal_bayar
+    FROM pembayaran_tahunan
+    WHERE santri_id = ? AND jenis_biaya = ? AND (tahun_tagihan = ? OR jenis_biaya = 'BANGUNAN') AND COALESCE(status, 'AKTIF') != 'VOID'
+  `, [receipt.santri_id, receipt.jenis_biaya, receipt.tahun_tagihan])
+
+  let totalDibayar = 0
+  paidRows.forEach((p) => {
+    totalDibayar += Number(p.nominal_bayar || 0)
+  })
+
+  const sisa = Math.max(0, Number(tarif?.nominal || 0) - totalDibayar)
+
+  return { receipt, sisa }
 }
