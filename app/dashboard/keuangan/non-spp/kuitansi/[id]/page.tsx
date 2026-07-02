@@ -255,12 +255,12 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .receipt-copy {
           position: relative;
-          width: 21cm;
-          height: 11cm;
+          width: 24cm;
+          height: 13.7cm;
           margin: 0 auto;
           box-sizing: border-box;
           background: #fff;
-          padding: 3mm 10mm 5.5mm;
+          padding: 3mm 10mm 4mm;
           overflow: hidden;
         }
         .receipt-header {
@@ -286,25 +286,25 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .school-heading h1 {
           font-family: Arial, sans-serif;
-          font-size: 12px;
+          font-size: 14px;
           font-weight: 700;
           line-height: 1.05;
         }
         .school-heading h2 {
           font-family: Arial, sans-serif;
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 700;
           line-height: 1.1;
         }
         .school-heading p {
           margin-top: 1px;
           font-family: Arial, sans-serif;
-          font-size: 7.8px;
+          font-size: 11px;
           line-height: 1.15;
         }
         .header-rule {
           height: 0;
-          margin: 1mm 0 1.5mm;
+          margin: .6mm 0 1mm;
           border-top: 2px solid #111;
         }
         .intro-grid {
@@ -312,7 +312,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           grid-template-columns: 42% 1fr 32%;
           column-gap: 7px;
           align-items: start;
-          margin-bottom: 2mm;
+          margin-bottom: .8mm;
         }
         .student-info,
         .receipt-info {
@@ -324,7 +324,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           column-gap: 2px;
           min-height: 3.2mm;
           align-items: baseline;
-          font-size: 8px;
+          font-size: 11.5px;
           line-height: 1.12;
         }
         .receipt-info .info-row {
@@ -351,7 +351,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
         }
         .payment-title h3 {
           margin: 0;
-          font-size: 12px;
+          font-size: 14px;
           font-weight: 700;
           letter-spacing: .08em;
           line-height: 1;
@@ -359,22 +359,22 @@ export default async function NonSppReceiptPage({ params }: Props) {
         .payment-title p {
           margin: 3px 0 0;
           color: #777;
-          font-size: 7px;
+          font-size: 10px;
         }
         .terbilang {
           display: flex;
           align-items: center;
           gap: 5px;
-          min-height: 4.8mm;
+          min-height: 3.2mm;
           border: 1px solid #9a9a9a;
           padding: 1px 5px;
           box-sizing: border-box;
-          font-size: 7.8px;
+          font-size: 11px;
           color: #555;
         }
         .terbilang strong {
           color: #111;
-          font-size: 7.8px;
+          font-size: 11px;
           font-style: italic;
           font-weight: 700;
         }
@@ -383,13 +383,13 @@ export default async function NonSppReceiptPage({ params }: Props) {
           border-collapse: collapse;
         }
         .main-table {
-          margin-top: 1.6mm;
-          font-size: 7.8px;
+          margin-top: .6mm;
+          font-size: 11px;
         }
         .main-table th {
           background: #111;
           color: #fff;
-          padding: 1.5px 4px;
+          padding: 1px 4px;
           border-right: 1px solid #555;
           text-align: left;
           font-weight: 700;
@@ -398,7 +398,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           border-right: 0;
         }
         .main-table td {
-          padding: 1.5px 4px;
+          padding: 1px 4px;
           border-bottom: 1px solid #ddd;
         }
         .main-table tfoot td {
@@ -419,24 +419,24 @@ export default async function NonSppReceiptPage({ params }: Props) {
           font-weight: 700;
         }
         .arrears-caption {
-          margin: 2mm 0 .8mm;
-          font-size: 7.2px;
+          margin: .8mm 0 .4mm;
+          font-size: 10.2px;
           font-style: italic;
           color: #666;
         }
         .arrears-table {
-          font-size: 7.2px;
+          font-size: 10.2px;
           color: #111;
         }
         .arrears-table th {
-          padding: 1.4px 4px;
+          padding: 1px 4px;
           border: 1px solid #ddd;
           background: #f3f3f3;
           text-align: left;
           font-weight: 700;
         }
         .arrears-table td {
-          padding: 1.4px 4px;
+          padding: 1px 4px;
           border: 1px solid #eee;
         }
         .total-arrears td {
@@ -449,8 +449,8 @@ export default async function NonSppReceiptPage({ params }: Props) {
         .summary-block {
           display: grid;
           grid-template-columns: 1fr 44mm;
-          margin-top: 1.7mm;
-          font-size: 7.8px;
+          margin-top: .5mm;
+          font-size: 11px;
         }
         .summary-block table td {
           padding: .5px 0;
@@ -472,13 +472,13 @@ export default async function NonSppReceiptPage({ params }: Props) {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14mm;
-          margin-top: 2mm;
+          margin-top: .3mm;
           padding: 0 12mm;
           text-align: center;
-          font-size: 7.7px;
+          font-size: 11px;
         }
         .signature-box p {
-          height: 8.5mm;
+          height: 4.5mm;
           margin: 0;
           line-height: 1.25;
         }
@@ -492,7 +492,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 7.4px;
+          font-size: 10.5px;
           font-weight: 700;
         }
         .receipt-footer {
@@ -505,7 +505,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           gap: 4mm;
           border-top: 1px solid #ddd;
           padding-top: .7mm;
-          font-size: 6.4px;
+          font-size: 8px;
           color: #999;
         }
         .receipt-footer span:nth-child(2) {
@@ -531,7 +531,7 @@ export default async function NonSppReceiptPage({ params }: Props) {
           pointer-events: none;
         }
         @page {
-          size: 21cm 11cm;
+          size: 24cm 13.7cm landscape;
           margin: 0;
         }
         @media print {
