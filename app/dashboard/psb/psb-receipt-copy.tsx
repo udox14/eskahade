@@ -1,7 +1,21 @@
 import Image from 'next/image'
 
-function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+type PsbReceipt = {
+  total?: number | string | null
+  nama_lengkap?: string | null
+  penerima_nama?: string | null
+  nis?: string | null
+  sekolah?: string | null
+  asrama?: string | null
+  kamar?: string | null
+  receipt_no: string
+  created_at: string
+  metode?: string | null
+}
+
+type PsbReceiptItem = {
+  jenis_biaya: string
+  nominal_bayar?: number | string | null
 }
 
 function terbilangRupiah(value: number): string {
@@ -61,7 +75,7 @@ function InfoRow({ label, value, strong = false }: { label?: string; value: stri
   )
 }
 
-export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; items: any[]; printedAt: string; sisa?: number }) {
+export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: PsbReceipt; items: PsbReceiptItem[]; printedAt: string; sisa?: number }) {
   const total = Number(receipt.total || 0)
   const isLunas = sisa <= 0
   const payerName = receipt.nama_lengkap || '________________'
@@ -129,14 +143,17 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
       </table>
 
       <div className="summary-block">
-        <div />
-        <table>
+        <table className="due-table">
           <tbody>
             <tr>
               <td>SISA TAGIHAN</td>
               <td>:</td>
               <td className="due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
             </tr>
+          </tbody>
+        </table>
+        <table className="payment-summary-table">
+          <tbody>
             <tr>
               <td>JUMLAH</td>
               <td>:</td>
@@ -357,6 +374,8 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         .summary-block {
           display: grid;
           grid-template-columns: 1fr 66mm;
+          column-gap: 6mm;
+          align-items: start;
           margin-top: .5mm;
           font-size: 11px;
         }
@@ -364,14 +383,36 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           padding: .5px 0;
           border: 0;
         }
-        .summary-block table td:nth-child(1) {
+        .due-table {
+          width: auto;
+          justify-self: start;
+        }
+        .due-table td:nth-child(1) {
           width: 32mm;
         }
-        .summary-block table td:nth-child(2) {
+        .due-table td:nth-child(2) {
           width: 3mm;
           text-align: center;
         }
-        .summary-block table td:nth-child(3) {
+        .due-table td:nth-child(3) {
+          display: flex;
+          justify-content: flex-start;
+          gap: 4px;
+          font-family: "Courier New", monospace;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+        .payment-summary-table {
+          width: 66mm;
+        }
+        .payment-summary-table td:nth-child(1) {
+          width: 32mm;
+        }
+        .payment-summary-table td:nth-child(2) {
+          width: 3mm;
+          text-align: center;
+        }
+        .payment-summary-table td:nth-child(3) {
           display: flex;
           justify-content: space-between;
           gap: 6px;
@@ -379,9 +420,6 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-weight: 700;
           white-space: nowrap;
         }
-        /* SISA TAGIHAN sekarang berada di stack kanan bersama JUMLAH/PEMBAYARAN/
-           KEMBALI: nominalnya rata kanan (space-between) agar sejajar dengan
-           TOTAL PEMBAYARAN di atasnya. */
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
