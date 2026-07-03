@@ -50,6 +50,7 @@ type SantriPlotRow = {
   sekolah: string | null
   asrama: string | null
   kamar: string | null
+  kategori_santri: string | null
   level: LevelSekolah | 'LAINNYA'
   asrama_rank: number
 }
@@ -74,7 +75,7 @@ function normalizeLevels(value: unknown): LevelSekolah[] {
 
 function getLevelSekolah(sekolah: string | null | undefined): SantriPlotRow['level'] {
   const value = String(sekolah || '').toUpperCase().replace(/\./g, '').trim()
-  if (['MAN', 'MA', 'MAS', 'SMK', 'SMA', 'SLTA', 'ALIYAH', 'MADRASAH ALIYAH'].includes(value)) return 'SLTA'
+  if (['MAN', 'MA', 'MAS', 'SMK', 'SMA', 'SLTA', 'ALIYAH', 'MADRASAH ALIYAH', 'SADESA'].includes(value)) return 'SLTA'
   if (['MTSU', 'MTSN', 'MTS', 'MTSS', 'SMP', 'SLTP', 'TSANAWIYAH', 'MADRASAH TSANAWIYAH'].includes(value)) return 'SLTP'
   return 'LAINNYA'
 }
@@ -190,7 +191,7 @@ async function ensureSchema() {
 async function getSantriBaruRows(eventId: number, includePlotted = false) {
   const plottedClause = includePlotted ? '' : 'AND p.id IS NULL'
   const rows = await query<Omit<SantriPlotRow, 'level' | 'asrama_rank'>>(`
-    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.asrama, s.kamar
+    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.asrama, s.kamar, s.kategori_santri
     FROM santri s
     LEFT JOIN tes_klasifikasi_plotting p ON p.santri_id = s.id AND p.event_id = ?
     WHERE s.status_global = 'aktif'
@@ -204,7 +205,7 @@ async function getSantriBaruRows(eventId: number, includePlotted = false) {
   return rows.map(row => ({
     ...row,
     jenis_kelamin: normalizeJk(row.jenis_kelamin),
-    level: getLevelSekolah(row.sekolah),
+    level: row.kategori_santri === 'SADESA' ? 'SLTA' : getLevelSekolah(row.sekolah),
     asrama_rank: getAsramaRank(row.asrama),
   })).sort(compareSantri)
 }
@@ -613,7 +614,7 @@ export async function getPlottingRows(eventId: number) {
   return query<any>(`
     SELECT p.*, s.tanggal, s.nomor_sesi, s.label AS sesi_label, s.waktu_mulai, s.waktu_selesai,
            r.nomor_ruangan, r.nama_ruangan, r.tempat, r.kapasitas,
-           san.nis, san.nama_lengkap, san.jenis_kelamin, san.sekolah, san.asrama, san.kamar, san.alamat,
+           san.nis, san.nama_lengkap, san.jenis_kelamin, san.sekolah, san.asrama, san.kamar, san.alamat, san.kategori_santri,
            pengetes.nama_lengkap AS pengetes_nama,
            pendamping.nama_lengkap AS pendamping_nama
     FROM tes_klasifikasi_plotting p

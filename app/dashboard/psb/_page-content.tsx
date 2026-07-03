@@ -643,7 +643,7 @@ export default function PsbPageContent() {
           dadakan={dadakan}
           busy={busyId === 'dadakan'}
           setDadakan={setDadakan}
-          onClose={goBack}
+          onClose={() => setShowDadakanModal(false)}
           onSubmit={handleDadakan}
         />
       ) : null}

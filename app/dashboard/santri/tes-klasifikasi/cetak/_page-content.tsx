@@ -32,11 +32,16 @@ function formatSekolah(sekolah: string | null | undefined) {
     MTSU: 'MTs',
     MTSN: 'MTsN',
     SMP: 'SMP',
-    MAN: 'MA',
+    MAN: 'MAN',
     SMA: 'SMA',
     SMK: 'SMK',
   }
   return map[value] || value || '-'
+}
+
+function formatNama(nama: string | null | undefined) {
+  if (!nama) return ''
+  return String(nama).replace(/\b(muhammad|muhamad|mohammad|mohamad|muchammad|muchamad|mohammed|mochammad|mochamad)\b/ig, 'M.')
 }
 
 function formatHariTanggal(date: string | null | undefined) {
@@ -70,11 +75,12 @@ function getAsramaOptions(rows: any[]) {
     .sort((a, b) => a.localeCompare(b, 'id-ID', { sensitivity: 'base', numeric: true }))
 }
 
-function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { event: any; rows: any[]; mode: PrintMode; selectedSesi: string; selectedRuangan: string }) {
+function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan, selectedAsrama, preview }: { event: any; rows: any[]; mode: PrintMode; selectedSesi: string; selectedRuangan: string; selectedAsrama: string; preview?: boolean }) {
   if (!event) return null
   const filtered = rows.filter(row => {
     if (mode === 'sesi' && selectedSesi) return String(row.sesi_id) === selectedSesi
     if (mode === 'ruangan' && selectedRuangan) return String(row.ruangan_id) === selectedRuangan
+    if (mode === 'asrama' && selectedAsrama) return String(row.asrama || '') === selectedAsrama
     return true
   })
   const groupsMap = new Map<string, any[]>()
@@ -83,14 +89,17 @@ function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { even
     groupsMap.set(key, [...(groupsMap.get(key) || []), row])
   })
   const groups = Array.from(groupsMap.values())
+  const allPages = groups.flatMap(items => chunkRows(items, 45).map((chunk, chunkIndex) => ({ chunk, chunkIndex })))
+  const totalPages = allPages.length
+  const displayPages = preview ? allPages.slice(0, 2) : allPages
 
   return (
-    <div>
-      {groups.map((items, groupIndex) => {
-        const first = items[0]
+    <div className={preview ? "flex flex-col items-center gap-6" : ""}>
+      {displayPages.map(({ chunk, chunkIndex }, pageIndex) => {
+        const first = chunk[0]
         return (
           <div
-            key={`${first.sesi_id}-${first.ruangan_id}-${groupIndex}`}
+            key={`${first.sesi_id}-${first.ruangan_id}-${pageIndex}`}
             style={{
               width: '210mm',
               minHeight: '330mm',
@@ -101,44 +110,41 @@ function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { even
               color: '#000',
               background: '#fff',
               breakAfter: 'page',
+              boxShadow: preview ? '0 10px 15px -3px rgb(0 0 0 / 0.1)' : 'none',
             }}
           >
             <h1 style={{ textAlign: 'center', fontWeight: 700, fontSize: '13pt', margin: '0 0 4mm', lineHeight: 1.2 }}>
               JADWAL PESERTA TES KLASIFIKASI TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}
             </h1>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1mm 8mm', marginBottom: '4mm', fontSize: '11pt' }}>
-              <div><b>Tanggal:</b> {formatDate(first.tanggal)}</div>
-              <div><b>Waktu:</b> {formatTime(first)}</div>
-              <div><b>Ruangan:</b> {first.nama_ruangan}</div>
-              <div><b>Tempat:</b> {first.tempat || '-'}</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4mm', fontSize: '11pt' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm', width: 'fit-content' }}>
+                <div><b>Tanggal</b></div><div>:</div><div>{formatDate(first.tanggal)}</div>
+                <div><b>Waktu</b></div><div>:</div><div>{formatTime(first)}</div>
+                <div><b>Ruangan</b></div><div>:</div><div>{first.nama_ruangan}</div>
+                <div><b>Tempat</b></div><div>:</div><div>{first.tempat || '-'}</div>
+              </div>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '10.5pt' }}>
               <colgroup>
-                <col style={{ width: '10mm' }} />
+                <col style={{ width: '12mm' }} />
                 <col />
-                <col style={{ width: '29mm' }} />
-                <col style={{ width: '31mm' }} />
+                <col style={{ width: '40mm' }} />
                 <col style={{ width: '25mm' }} />
-                <col style={{ width: '24mm' }} />
-                <col style={{ width: '27mm' }} />
               </colgroup>
               <thead>
                 <tr>
-                  {['NO', 'Nama Lengkap', 'Asrama/Kamar', 'Tanggal tes', 'Waktu', 'Ruangan', 'Tempat'].map(label => (
+                  {['NO', 'NAMA LENGKAP', 'ASRAMA/KAMAR', 'SEKOLAH'].map(label => (
                     <th key={label} style={printTh}>{label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {items.map((row, index) => (
+                {chunk.map((row, index) => (
                   <tr key={row.id}>
-                    <td style={{ ...printTd, textAlign: 'center' }}>{index + 1}</td>
-                    <td style={printTd}>{row.nama_lengkap}</td>
-                    <td style={printTd}>{row.asrama || '-'}/{row.kamar || '-'}</td>
-                    <td style={printTd}>{formatDate(row.tanggal)}</td>
-                    <td style={printTd}>{formatTime(row)}</td>
-                    <td style={printTd}>{row.nama_ruangan}</td>
-                    <td style={printTd}>{row.tempat || '-'}</td>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{chunkIndex * 45 + index + 1}</td>
+                    <td style={{ ...printTd, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatNama(row.nama_lengkap)}</td>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{row.asrama || '-'}/{row.kamar || '-'}</td>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{formatSekolah(row.sekolah)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -146,11 +152,16 @@ function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { even
           </div>
         )
       })}
+      {preview && totalPages > 2 && (
+        <div className="py-4 text-center text-sm font-bold text-slate-500">
+          Menampilkan 2 dari {totalPages} halaman. Silakan cetak untuk melihat seluruh data.
+        </div>
+      )}
     </div>
   )
 }
 
-function AbsensiSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { event: any; rows: any[]; mode: PrintMode; selectedSesi: string; selectedRuangan: string }) {
+function AbsensiSheet({ event, rows, mode, selectedSesi, selectedRuangan, preview }: { event: any; rows: any[]; mode: PrintMode; selectedSesi: string; selectedRuangan: string; preview?: boolean }) {
   if (!event) return null
   const filtered = rows.filter(row => {
     if (mode === 'sesi' && selectedSesi) return String(row.sesi_id) === selectedSesi
@@ -163,68 +174,79 @@ function AbsensiSheet({ event, rows, mode, selectedSesi, selectedRuangan }: { ev
     groupsMap.set(key, [...(groupsMap.get(key) || []), row])
   })
 
+  const allPages = Array.from(groupsMap.values()).flatMap(items => {
+    const first = items[0]
+    return chunkRows(items, 45).map((chunk, chunkIndex) => {
+      const padded = [...chunk]
+      while (padded.length < 45) padded.push(null)
+      return { first, chunkIndex, padded }
+    })
+  })
+
+  const totalPages = allPages.length
+  const displayPages = preview ? allPages.slice(0, 2) : allPages
+
   return (
-    <div>
-      {Array.from(groupsMap.values()).flatMap(items => {
-        const first = items[0]
-        return chunkRows(items, 30).map((chunk, chunkIndex) => {
-          const padded = [...chunk]
-          while (padded.length < 30) padded.push(null)
-
-          return (
-            <div key={`${first.sesi_id}-${first.ruangan_id}-${chunkIndex}`} style={absensiPageStyle}>
-              <div style={absensiTitleStyle}>DAFTAR HADIR PESERTA TES KLASIFIKASI</div>
-              <div style={absensiSubtitleStyle}>TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}</div>
-              <div style={absensiMetaStyle}>
-                <div>Tanggal</div><div>: {formatDate(first.tanggal)}</div>
-                <div>Sesi/Waktu</div><div>: {first.sesi_label || `Sesi ${first.nomor_sesi}`} ({formatTime(first)})</div>
-                <div>Ruangan</div><div>: {first.nama_ruangan}</div>
-                <div>Tempat</div><div>: {first.tempat || '-'}</div>
-              </div>
-
-              <table style={absensiTableStyle}>
-                <colgroup>
-                  <col style={{ width: '11mm' }} />
-                  <col />
-                  <col style={{ width: '31mm' }} />
-                  <col style={{ width: '20mm' }} />
-                  <col style={{ width: '32mm' }} />
-                  <col style={{ width: '32mm' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th style={absensiThStyle}>NO</th>
-                    <th style={absensiThStyle}>NAMA LENGKAP</th>
-                    <th style={absensiThStyle}>ASRAMA/KAMAR</th>
-                    <th style={absensiThStyle}>SEKOLAH</th>
-                    <th style={absensiThStyle} colSpan={2}>TANDA TANGAN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {padded.map((row, index) => (
-                    <tr key={row?.id || `blank-${index}`}>
-                      <td style={{ ...absensiTdStyle, textAlign: 'center' }}>{chunkIndex * 30 + index + 1}</td>
-                      <td style={{ ...absensiTdStyle, textTransform: 'uppercase' }}>{row?.nama_lengkap || ''}</td>
-                      <td style={absensiTdStyle}>{row ? `${row.asrama || '-'}/${row.kamar || '-'}` : ''}</td>
-                      <td style={{ ...absensiTdStyle, textAlign: 'center' }}>{row ? formatSekolah(row.sekolah) : ''}</td>
-                      {index % 2 === 0 ? (
-                        <>
-                          <td rowSpan={2} style={signatureTdStyle}>
-                            <span style={signatureNumberStyle}>{chunkIndex * 30 + index + 1}</span>
-                          </td>
-                          <td rowSpan={2} style={signatureTdStyle}>
-                            {index < 29 && <span style={signatureNumberStyle}>{chunkIndex * 30 + index + 2}</span>}
-                          </td>
-                        </>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <div className={preview ? "flex flex-col items-center gap-6" : ""}>
+      {displayPages.map(({ first, chunkIndex, padded }) => (
+        <div key={`${first.sesi_id}-${first.ruangan_id}-${chunkIndex}`} style={{ ...absensiPageStyle, boxShadow: preview ? '0 10px 15px -3px rgb(0 0 0 / 0.1)' : 'none' }}>
+          <div style={absensiTitleStyle}>DAFTAR HADIR PESERTA TES KLASIFIKASI</div>
+          <div style={absensiSubtitleStyle}>TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}</div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4mm', fontSize: '11pt' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm', width: 'fit-content' }}>
+              <div><b>Tanggal</b></div><div>:</div><div>{formatDate(first.tanggal)}</div>
+              <div><b>Sesi/Waktu</b></div><div>:</div><div>{first.sesi_label || `Sesi ${first.nomor_sesi}`} ({formatTime(first)})</div>
+              <div><b>Ruangan</b></div><div>:</div><div>{first.nama_ruangan}</div>
+              <div><b>Tempat</b></div><div>:</div><div>{first.tempat || '-'}</div>
             </div>
-          )
-        })
-      })}
+          </div>
+
+          <table style={absensiTableStyle}>
+            <colgroup>
+              <col style={{ width: '11mm' }} />
+              <col />
+              <col style={{ width: '31mm' }} />
+              <col style={{ width: '20mm' }} />
+              <col style={{ width: '32mm' }} />
+              <col style={{ width: '32mm' }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={absensiThStyle}>NO</th>
+                <th style={absensiThStyle}>NAMA LENGKAP</th>
+                <th style={absensiThStyle}>ASRAMA</th>
+                <th style={absensiThStyle}>SEKOLAH</th>
+                <th style={absensiThStyle} colSpan={2}>TANDA TANGAN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {padded.map((row, index) => (
+                <tr key={row?.id || `blank-${index}`}>
+                  <td style={{ ...absensiTdStyle, textAlign: 'center' }}>{chunkIndex * 45 + index + 1}</td>
+                  <td style={{ ...absensiTdStyle, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatNama(row?.nama_lengkap)}</td>
+                  <td style={absensiTdStyle}>{row ? `${row.asrama || '-'}/${row.kamar || '-'}` : ''}</td>
+                  <td style={{ ...absensiTdStyle, textAlign: 'center' }}>{row ? formatSekolah(row.sekolah) : ''}</td>
+                  {index % 2 === 0 ? (
+                    <>
+                      <td rowSpan={2} style={signatureTdStyle}>
+                        <span style={signatureNumberStyle}>{chunkIndex * 45 + index + 1}</span>
+                      </td>
+                      <td rowSpan={2} style={signatureTdStyle}>
+                        {index < 44 && <span style={signatureNumberStyle}>{chunkIndex * 45 + index + 2}</span>}
+                      </td>
+                    </>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      {preview && totalPages > 2 && (
+        <div className="py-4 text-center text-sm font-bold text-slate-500">
+          Menampilkan 2 dari {totalPages} halaman. Silakan cetak untuk melihat seluruh data.
+        </div>
+      )}
     </div>
   )
 }
@@ -238,6 +260,7 @@ function PenilaianSheet({
   selectedAsrama,
   blankOnly,
   blankCount,
+  preview,
 }: {
   event: any
   rows: any[]
@@ -247,6 +270,7 @@ function PenilaianSheet({
   selectedAsrama: string
   blankOnly: boolean
   blankCount: number
+  preview?: boolean
 }) {
   if (!event && !blankOnly) return null
   const filtered = blankOnly
@@ -257,17 +281,24 @@ function PenilaianSheet({
         return true
       })
   const pages = chunkRows(filtered, 2)
+  const totalPages = pages.length
+  const displayPages = preview ? pages.slice(0, 2) : pages
 
   return (
-    <div>
-      {pages.map((items, pageIndex) => (
-        <div key={`penilaian-page-${pageIndex}`} style={penilaianPageStyle}>
+    <div className={preview ? "flex flex-col items-center gap-6" : ""}>
+      {displayPages.map((items, pageIndex) => (
+        <div key={`penilaian-page-${pageIndex}`} style={{ ...penilaianPageStyle, boxShadow: preview ? '0 10px 15px -3px rgb(0 0 0 / 0.1)' : 'none' }}>
           {[0, 1].map(slot => {
             const row = items[slot] || { id: `empty-${pageIndex}-${slot}`, __blank: true }
             return <PenilaianBlanko key={`${row.id}-${slot}`} event={event} row={row} blank={blankOnly || row.__blank} />
           })}
         </div>
       ))}
+      {preview && totalPages > 2 && (
+        <div className="py-4 text-center text-sm font-bold text-slate-500">
+          Menampilkan 2 dari {totalPages} halaman. Silakan cetak untuk melihat seluruh data.
+        </div>
+      )}
     </div>
   )
 }
@@ -308,7 +339,7 @@ function PenilaianBlanko({ event, row, blank }: { event: any; row: any; blank: b
         <table style={penilaianTableStyle}>
           <tbody>
             {[
-              ['NAMA', upperOrBlank(row.nama_lengkap, blank)],
+              ['NAMA', upperOrBlank(formatNama(row.nama_lengkap), blank)],
               ['NO INDUK', blank ? '' : row.nis || ''],
               ['ASRAMA / KMR', upperOrBlank(asramaKamar, blank)],
               ['SEKOLAH', upperOrBlank(sekolah, blank)],
@@ -399,7 +430,7 @@ function CheckLabel({ label }: { label: string }) {
 
 const printTh: React.CSSProperties = {
   border: '1pt solid #000',
-  padding: '1.2mm',
+  padding: '1mm',
   textAlign: 'center',
   fontWeight: 700,
   lineHeight: 1.1,
@@ -407,9 +438,9 @@ const printTh: React.CSSProperties = {
 
 const printTd: React.CSSProperties = {
   border: '1pt solid #000',
-  padding: '1.1mm',
+  padding: '0.8mm 1mm',
   verticalAlign: 'middle',
-  lineHeight: 1.12,
+  lineHeight: 1.1,
 }
 
 const absensiPageStyle: React.CSSProperties = {
@@ -460,21 +491,21 @@ const absensiTableStyle: React.CSSProperties = {
 const absensiThStyle: React.CSSProperties = {
   border: '1pt solid #000',
   backgroundColor: '#e5e7eb',
-  height: '9mm',
+  height: '7.5mm',
   padding: '1mm',
   textAlign: 'center',
   verticalAlign: 'middle',
-  fontSize: '10pt',
+  fontSize: '9.5pt',
   fontWeight: 700,
   lineHeight: 1,
 }
 
 const absensiTdStyle: React.CSSProperties = {
   border: '1pt solid #000',
-  height: '7.6mm',
-  padding: '0.7mm 1.2mm',
+  height: '5.8mm',
+  padding: '0.5mm 1.2mm',
   verticalAlign: 'middle',
-  fontSize: '10pt',
+  fontSize: '9.5pt',
   lineHeight: 1,
 }
 
@@ -870,11 +901,9 @@ export default function CetakTesKlasifikasiPage() {
               </button>
             </div>
 
-            <div className="rounded-xl border bg-slate-100 p-4">
-              <div className="max-h-[760px] overflow-auto">
-                <div style={{ zoom: 0.35 }} className="origin-top-left bg-white shadow">
-                  <AbsensiSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} />
-                </div>
+            <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
+              <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
+                <AbsensiSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} preview />
               </div>
             </div>
             <div className="hidden">
@@ -971,20 +1000,19 @@ export default function CetakTesKlasifikasiPage() {
               </button>
             </div>
 
-            <div className="rounded-xl border bg-slate-100 p-4">
-              <div className="max-h-[760px] overflow-auto">
-                <div style={{ zoom: 0.38 }} className="origin-top-left bg-white shadow">
-                  <PenilaianSheet
-                    event={printData?.event || activeEvent}
-                    rows={rows}
-                    mode={printMode}
-                    selectedSesi={selectedSesi}
-                    selectedRuangan={selectedRuangan}
-                    selectedAsrama={selectedAsrama}
-                    blankOnly={penilaianBlankOnly}
-                    blankCount={penilaianBlankCount}
-                  />
-                </div>
+            <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
+              <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
+                <PenilaianSheet
+                  event={printData?.event || activeEvent}
+                  rows={rows}
+                  mode={printMode}
+                  selectedSesi={selectedSesi}
+                  selectedRuangan={selectedRuangan}
+                  selectedAsrama={selectedAsrama}
+                  blankOnly={penilaianBlankOnly}
+                  blankCount={penilaianBlankCount}
+                  preview
+                />
               </div>
             </div>
             <div className="hidden">
@@ -1030,6 +1058,7 @@ export default function CetakTesKlasifikasiPage() {
                   <option value="all">Semua</option>
                   <option value="sesi">Per Sesi</option>
                   <option value="ruangan">Per Ruangan</option>
+                  <option value="asrama">Per Asrama</option>
                 </select>
               </div>
               {printMode === 'sesi' && (
@@ -1050,28 +1079,35 @@ export default function CetakTesKlasifikasiPage() {
                   </select>
                 </div>
               )}
+              {printMode === 'asrama' && (
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
+                  <select value={selectedAsrama} onChange={e => setSelectedAsrama(e.target.value)} className="rounded-lg border px-3 py-2 text-sm">
+                    <option value="">Pilih asrama</option>
+                    {asramaOptions.map(asrama => <option key={asrama} value={asrama}>{asrama}</option>)}
+                  </select>
+                </div>
+              )}
               <button
                 onClick={async () => {
                   setPrintData(await getCetakJadwalData(activeEvent.id))
                   window.setTimeout(() => handlePrint(), 100)
                 }}
-                disabled={rows.length === 0 || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan)}
+                disabled={rows.length === 0 || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan) || (printMode === 'asrama' && !selectedAsrama)}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300"
               >
                 <Printer className="h-4 w-4" /> Cetak / PDF
               </button>
             </div>
 
-            <div className="rounded-xl border bg-slate-100 p-4">
-              <div className="max-h-[640px] overflow-auto">
-                <div style={{ zoom: 0.36 }} className="origin-top-left bg-white shadow">
-                  <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} />
-                </div>
+            <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
+              <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
+                <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} preview />
               </div>
             </div>
             <div className="hidden">
               <div ref={printRef}>
-                <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} />
+                <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} />
               </div>
             </div>
           </section>
