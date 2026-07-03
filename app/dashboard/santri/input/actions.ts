@@ -11,7 +11,7 @@ type SantriImportData = {
   nis: string | number
   nama_lengkap: string
   nik?: string | number
-  jenis_kelamin: 'L' | 'P'
+  jenis_kelamin?: string | number
   tempat_lahir?: string
   tanggal_lahir?: string
   nama_ayah?: string
@@ -34,6 +34,17 @@ type SantriImportData = {
   kelas_pesantren?: string
   nama_tempat_makan?: string   // nama penyedia jasa makan (auto-create di master_jasa)
   nama_tempat_cuci?: string    // nama penyedia jasa cuci (auto-create di master_jasa)
+}
+
+function normalizeJenisKelamin(value: unknown): 'L' | 'P' | null {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s._-]+/g, '')
+
+  if (['l', 'lk', 'laki', 'lakilaki', 'male', 'm'].includes(normalized)) return 'L'
+  if (['p', 'pr', 'perempuan', 'wanita', 'female', 'f'].includes(normalized)) return 'P'
+  return null
 }
 
 /**
@@ -63,7 +74,7 @@ export async function getKelasList() {
   return data.sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
-export async function importSantriMassal(dataSantri: SantriImportData[]): Promise<{ success: boolean; count: number } | { error: string }> {
+export async function importSantriMassal(dataSantri: SantriImportData[]): Promise<{ success: boolean; count: number; updated: number; skipped: number } | { error: string }> {
   const access = await assertCrud('/dashboard/santri', 'create')
   if ('error' in access) return access
   const session = await getSession()
@@ -78,12 +89,26 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
 
   const tahunMasukDefault = new Date().getFullYear()
 
+  const invalidJenisKelamin = dataSantri
+    .map((s, index) => ({ row: index + 2, nis: s.nis, nama: s.nama_lengkap, value: s.jenis_kelamin }))
+    .filter(s => !normalizeJenisKelamin(s.value))
+
+  if (invalidJenisKelamin.length > 0) {
+    const preview = invalidJenisKelamin
+      .slice(0, 5)
+      .map(s => `baris ${s.row} (${s.nis || s.nama || '-'}): "${s.value ?? ''}"`)
+      .join(', ')
+    return {
+      error: `Jenis kelamin tidak valid. Gunakan L/P atau Laki-laki/Perempuan. Cek ${preview}${invalidJenisKelamin.length > 5 ? ', ...' : ''}.`,
+    }
+  }
+
   const cleanData = dataSantri.map(s => ({
     id: crypto.randomUUID(),
     nis: String(s.nis).trim(),
     nama_lengkap: String(s.nama_lengkap).trim(),
     nik: s.nik ? String(s.nik).trim() : null,
-    jenis_kelamin: String(s.jenis_kelamin).toUpperCase() === 'P' ? 'P' : 'L',
+    jenis_kelamin: normalizeJenisKelamin(s.jenis_kelamin)!,
     tempat_lahir: s.tempat_lahir || null,
     tanggal_lahir: s.tanggal_lahir || null,
     nama_ayah: s.nama_ayah || null,
@@ -111,6 +136,17 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
 
   const now = new Date().toISOString()
   let inserted = 0
+  let updated = 0
+  let skipped = 0
+
+  // Kolom-kolom yang akan di-compare & update (tanpa id, nis, created_at)
+  const UPDATABLE_FIELDS = [
+    'nama_lengkap', 'nik', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir',
+    'nama_ayah', 'nama_ibu', 'alamat', 'gol_darah', 'alamat_lengkap',
+    'kecamatan', 'kab_kota', 'provinsi', 'jemaah', 'no_wa_ortu',
+    'tanggal_masuk', 'tanggal_keluar', 'kategori_santri', 'sekolah', 'kelas_sekolah',
+    'asrama', 'kamar', 'tempat_makan_id', 'tempat_mencuci_id',
+  ] as const
 
   for (const s of cleanData) {
     try {
@@ -123,63 +159,153 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
       const kelasSekolah = s.kategori_santri === 'SADESA' ? null : s.kelas_sekolah
       const tahunMasuk = Number(String(s.tanggal_masuk || '').slice(0, 4)) || tahunMasukDefault
 
-      await query(
-        `INSERT INTO santri (
-          id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
-          nama_ayah, nama_ibu, alamat,
-          gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
-          jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
-          tahun_masuk, status_global, kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
-          tempat_makan_id, tempat_mencuci_id,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
-          s.nama_ayah, s.nama_ibu, s.alamat,
-          s.gol_darah, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
-          s.jemaah, s.no_wa_ortu, s.tanggal_masuk, s.tanggal_keluar,
-          tahunMasuk, s.status_global, s.kategori_santri, sekolah, kelasSekolah, s.asrama, s.kamar,
-          tempat_makan_id, tempat_mencuci_id,
-          now, now
-        ]
+      // Cek apakah NIS sudah ada di database
+      const existing = await queryOne<Record<string, any>>(
+        `SELECT id, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
+          nama_ayah, nama_ibu, alamat, gol_darah, alamat_lengkap,
+          kecamatan, kab_kota, provinsi, jemaah, no_wa_ortu,
+          tanggal_masuk, tanggal_keluar, kategori_santri, sekolah, kelas_sekolah,
+          asrama, kamar, tempat_makan_id, tempat_mencuci_id
+        FROM santri WHERE nis = ?`,
+        [s.nis]
       )
 
-      if (s.kelas_pesantren) {
-        const kelasId = mapKelas.get(s.kelas_pesantren.toLowerCase())
-        if (kelasId) {
-          await query(
-            'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
-            [crypto.randomUUID(), s.id, kelasId, 'aktif', now]
-          )
+      if (existing) {
+        // ── NIS sudah ada → bandingkan & update hanya field yang berbeda ──
+        const newValues: Record<string, any> = {
+          nama_lengkap: s.nama_lengkap, nik: s.nik, jenis_kelamin: s.jenis_kelamin,
+          tempat_lahir: s.tempat_lahir, tanggal_lahir: s.tanggal_lahir,
+          nama_ayah: s.nama_ayah, nama_ibu: s.nama_ibu, alamat: s.alamat,
+          gol_darah: s.gol_darah, alamat_lengkap: s.alamat_lengkap,
+          kecamatan: s.kecamatan, kab_kota: s.kab_kota, provinsi: s.provinsi,
+          jemaah: s.jemaah, no_wa_ortu: s.no_wa_ortu,
+          tanggal_masuk: s.tanggal_masuk, tanggal_keluar: s.tanggal_keluar,
+          kategori_santri: s.kategori_santri, sekolah, kelas_sekolah: kelasSekolah,
+          asrama: s.asrama, kamar: s.kamar,
+          tempat_makan_id, tempat_mencuci_id,
         }
+
+        // Cari field-field yang berubah
+        const changedFields: string[] = []
+        const changedValues: any[] = []
+        const changedDetails: Record<string, { from: any; to: any }> = {}
+
+        for (const field of UPDATABLE_FIELDS) {
+          const oldVal = existing[field] ?? null
+          const newVal = newValues[field] ?? null
+          // Normalisasi keduanya ke string untuk perbandingan yang adil
+          const oldStr = oldVal === null ? null : String(oldVal).trim()
+          const newStr = newVal === null ? null : String(newVal).trim()
+          if (oldStr !== newStr) {
+            changedFields.push(field)
+            changedValues.push(newVal)
+            changedDetails[field] = { from: oldVal, to: newVal }
+          }
+        }
+
+        if (changedFields.length === 0) {
+          // Data 100% sama, tidak ada yang perlu diupdate
+          skipped++
+          continue
+        }
+
+        // Bangun query UPDATE dinamis hanya untuk kolom yang berubah
+        const setClauses = changedFields.map(f => `${f} = ?`).join(', ')
+        await execute(
+          `UPDATE santri SET ${setClauses}, updated_at = ? WHERE id = ?`,
+          [...changedValues, now, existing.id]
+        )
+
+        // Update kelas pesantren jika berubah
+        if (s.kelas_pesantren) {
+          const kelasId = mapKelas.get(s.kelas_pesantren.toLowerCase())
+          if (kelasId) {
+            // Cek apakah sudah ada riwayat pendidikan aktif di kelas ini
+            const existingRiwayat = await queryOne<{ id: string }>(
+              'SELECT id FROM riwayat_pendidikan WHERE santri_id = ? AND kelas_id = ? AND status_riwayat = ?',
+              [existing.id, kelasId, 'aktif']
+            )
+            if (!existingRiwayat) {
+              // Nonaktifkan riwayat lama, buat baru
+              await execute(
+                'UPDATE riwayat_pendidikan SET status_riwayat = ? WHERE santri_id = ? AND status_riwayat = ?',
+                ['nonaktif', existing.id, 'aktif']
+              )
+              await execute(
+                'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+                [crypto.randomUUID(), existing.id, kelasId, 'aktif', now]
+              )
+            }
+          }
+        }
+
+        updated++
+      } else {
+        // ── NIS belum ada → INSERT baru ──
+        await execute(
+          `INSERT INTO santri (
+            id, nis, nama_lengkap, nik, jenis_kelamin, tempat_lahir, tanggal_lahir,
+            nama_ayah, nama_ibu, alamat,
+            gol_darah, alamat_lengkap, kecamatan, kab_kota, provinsi,
+            jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar,
+            tahun_masuk, status_global, kategori_santri, sekolah, kelas_sekolah, asrama, kamar,
+            tempat_makan_id, tempat_mencuci_id,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            s.id, s.nis, s.nama_lengkap, s.nik, s.jenis_kelamin, s.tempat_lahir, s.tanggal_lahir,
+            s.nama_ayah, s.nama_ibu, s.alamat,
+            s.gol_darah, s.alamat_lengkap, s.kecamatan, s.kab_kota, s.provinsi,
+            s.jemaah, s.no_wa_ortu, s.tanggal_masuk, s.tanggal_keluar,
+            tahunMasuk, s.status_global, s.kategori_santri, sekolah, kelasSekolah, s.asrama, s.kamar,
+            tempat_makan_id, tempat_mencuci_id,
+            now, now
+          ]
+        )
+
+        if (s.kelas_pesantren) {
+          const kelasId = mapKelas.get(s.kelas_pesantren.toLowerCase())
+          if (kelasId) {
+            await execute(
+              'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+              [crypto.randomUUID(), s.id, kelasId, 'aktif', now]
+            )
+          }
+        }
+        inserted++
       }
-      inserted++
     } catch (err: any) {
-      if (err.message?.includes('UNIQUE')) continue // NIS sudah ada, skip saja
-      return { error: `Gagal menyimpan NIS ${s.nis}: ${err.message}` }
+      return { error: `Gagal memproses NIS ${s.nis}: ${err.message}` }
     }
   }
 
   revalidatePath('/dashboard/santri')
-  if (inserted > 0) {
+  const totalAffected = inserted + updated
+  if (totalAffected > 0) {
+    const summaryParts: string[] = []
+    if (inserted > 0) summaryParts.push(`${inserted} data baru ditambahkan`)
+    if (updated > 0) summaryParts.push(`${updated} data diperbarui`)
+    if (skipped > 0) summaryParts.push(`${skipped} data tidak berubah`)
+
     await logActivity({
       actor: actorFromSession(session),
       module: 'santri',
-      action: 'create',
+      action: updated > 0 ? 'update' : 'create',
       fiturHref: '/dashboard/santri',
-      logKind: 'create',
+      logKind: updated > 0 ? 'update' : 'create',
       entityType: 'santri_batch',
       entityId: 'import',
       entityLabel: 'Import santri massal',
-      summary: `Import santri massal: ${inserted} data ditambahkan`,
+      summary: `Import santri massal: ${summaryParts.join(', ')}`,
       details: {
         inserted,
+        updated,
+        skipped,
         attempted: cleanData.length,
-        skipped: cleanData.length - inserted,
       },
     })
   }
-  return { success: true, count: inserted }
+  return { success: true, count: inserted, updated, skipped }
 }
 
 export async function tambahSantriSatuSatu(data: {

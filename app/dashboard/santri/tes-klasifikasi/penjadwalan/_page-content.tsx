@@ -197,9 +197,10 @@ export default function PenjadwalanTesKlasifikasiPage() {
   const guruList = data?.guruList || []
   const plotting = data?.plotting || []
   const unplotted = data?.unplotted || []
+  const unplottedCount = data?.unplottedCount ?? unplotted.length
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     try {
       const loaded = await getPenjadwalanData()
       setData(loaded)
@@ -210,14 +211,11 @@ export default function PenjadwalanTesKlasifikasiPage() {
         pengetes_guru_id: row.pengetes_guru_id ? String(row.pengetes_guru_id) : '',
         pendamping_guru_id: row.pendamping_guru_id ? String(row.pendamping_guru_id) : '',
       }])))
-      if (loaded.activeEvent) {
-        const cetak = await getCetakJadwalData(loaded.activeEvent.id)
-        setPrintData(cetak)
-      }
+      setPrintData(null)
     } catch (error: any) {
       toast.error('Gagal memuat data penjadwalan', { description: error?.message })
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -271,8 +269,8 @@ export default function PenjadwalanTesKlasifikasiPage() {
     sesi: data?.sesiList?.length || 0,
     ruangan: data?.ruanganList?.length || 0,
     plotting: plotting.length,
-    unplotted: unplotted.length,
-  }), [data, plotting.length, unplotted.length])
+    unplotted: unplottedCount,
+  }), [data, plotting.length, unplottedCount])
 
   const saveEvent = async () => {
     setSaving(true)
@@ -281,7 +279,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     if ('error' in res) return toast.error(res.error)
     toast.success('Event dibuat dan diaktifkan')
     setNewEvent({ tahun_ajaran_id: 0, nama: '' })
-    loadData()
+    loadData(false)
   }
 
   const saveStruktur = async () => {
@@ -296,7 +294,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     setSaving(false)
     if ('error' in ruangRes) return toast.error(ruangRes.error)
     toast.success('Sesi dan ruangan tersimpan')
-    loadData()
+    loadData(false)
   }
 
   const saveMatrix = async () => {
@@ -319,7 +317,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success('Rule dan petugas tersimpan')
-    loadData()
+    loadData(false)
   }
 
   const runAutoPlot = async () => {
@@ -330,7 +328,8 @@ export default function PenjadwalanTesKlasifikasiPage() {
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success(`Auto plotting selesai: ${res.count} peserta terplot`)
-    loadData()
+    await loadData(false)
+    await refreshUnplotted()
   }
 
   const runResetPlotting = async () => {
@@ -341,7 +340,8 @@ export default function PenjadwalanTesKlasifikasiPage() {
     setSaving(false)
     if ('error' in res) return toast.error(res.error)
     toast.success('Plotting dikosongkan')
-    loadData()
+    await loadData(false)
+    await refreshUnplotted()
   }
 
   const addManual = async () => {
@@ -352,7 +352,8 @@ export default function PenjadwalanTesKlasifikasiPage() {
     if ('error' in res) return toast.error(res.error)
     toast.success('Santri ditambahkan ke ruangan')
     setManualTarget(prev => ({ ...prev, santri_id: '' }))
-    loadData()
+    await loadData(false)
+    await refreshUnplotted()
   }
 
   const removePlotting = async (id: number) => {
@@ -360,14 +361,22 @@ export default function PenjadwalanTesKlasifikasiPage() {
     const res = await hapusPlotting(id)
     if ('error' in res) return toast.error(res.error)
     toast.success('Peserta dikeluarkan dari plotting')
-    loadData()
+    await loadData(false)
+    await refreshUnplotted()
   }
 
   const refreshUnplotted = async () => {
     if (!activeEvent) return
     const rows = await getUnplottedSantri(activeEvent.id, filters)
-    setData((prev: any) => ({ ...prev, unplotted: rows }))
+    const hasFilter = Boolean(filters.search || filters.jenis_kelamin || filters.level || filters.asrama)
+    setData((prev: any) => ({ ...prev, unplotted: rows, unplottedCount: hasFilter ? prev?.unplottedCount : rows.length }))
   }
+
+  useEffect(() => {
+    if (tab === 'plotting' && activeEvent && unplotted.length === 0 && unplottedCount > 0) {
+      refreshUnplotted()
+    }
+  }, [tab, activeEvent?.id])
 
   const updateRule = (sesiId: number, ruanganId: number, patch: Partial<{ jenis_kelamin: 'L' | 'P'; levels: LevelSekolah[] }>) => {
     const key = keyOf(sesiId, ruanganId)
@@ -446,7 +455,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
                     <p className="text-xs text-slate-500">{event.tahun_ajaran_nama || '-'}</p>
                   </div>
                   <button
-                    onClick={async () => { await setActiveEvent(event.id); toast.success('Event aktif diubah'); loadData() }}
+                    onClick={async () => { await setActiveEvent(event.id); toast.success('Event aktif diubah'); loadData(false) }}
                     disabled={event.is_active === 1}
                     className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:bg-emerald-50 disabled:text-emerald-700"
                   >

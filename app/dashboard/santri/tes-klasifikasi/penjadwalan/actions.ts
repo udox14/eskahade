@@ -231,10 +231,10 @@ export async function getPenjadwalanData() {
   ])
 
   if (!activeEvent) {
-    return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList: [], ruanganList: [], rules: [], petugas: [], plotting: [], unplotted: [] }
+    return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList: [], ruanganList: [], rules: [], petugas: [], plotting: [], unplotted: [], unplottedCount: 0 }
   }
 
-  const [sesiList, ruanganList, rulesRaw, petugas, plotting, unplotted] = await Promise.all([
+  const [sesiList, ruanganList, rulesRaw, petugas, plotting, unplottedCount] = await Promise.all([
     query<any>('SELECT * FROM tes_klasifikasi_sesi WHERE event_id = ? ORDER BY tanggal, nomor_sesi', [activeEvent.id]),
     query<any>(`
       SELECT r.*,
@@ -246,11 +246,11 @@ export async function getPenjadwalanData() {
     query<any>('SELECT * FROM tes_klasifikasi_plotting_rule WHERE event_id = ?', [activeEvent.id]),
     query<any>('SELECT * FROM tes_klasifikasi_ruangan_petugas WHERE event_id = ?', [activeEvent.id]),
     getPlottingRows(activeEvent.id),
-    getUnplottedSantri(activeEvent.id, {}),
+    getUnplottedCount(activeEvent.id),
   ])
 
   const rules = rulesRaw.map(rule => ({ ...rule, levels: parseLevelsJson(rule.levels_json) }))
-  return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList, ruanganList, rules, petugas, plotting, unplotted }
+  return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList, ruanganList, rules, petugas, plotting, unplotted: [], unplottedCount }
 }
 
 export async function createEvent(input: { tahun_ajaran_id: number; nama: string }) {
@@ -526,6 +526,21 @@ export async function getUnplottedSantri(eventId: number, filters: { search?: st
   if (level) rows = rows.filter(row => row.level === level)
   if (asrama) rows = rows.filter(row => String(row.asrama || '').toUpperCase() === asrama)
   return rows
+}
+
+async function getUnplottedCount(eventId: number) {
+  const row = await queryOne<{ total: number }>(`
+    SELECT COUNT(*) AS total
+    FROM santri s
+    LEFT JOIN tes_klasifikasi_plotting p ON p.santri_id = s.id AND p.event_id = ?
+    WHERE s.status_global = 'aktif'
+      AND p.id IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM riwayat_pendidikan rp
+        WHERE rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      )
+  `, [eventId])
+  return Number(row?.total || 0)
 }
 
 export async function tambahPesertaManual(eventId: number, sesiId: number, ruanganId: number, santriId: string) {

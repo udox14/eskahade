@@ -16,6 +16,24 @@ const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIF
 const KATEGORI_SANTRI_LIST = KATEGORI_SANTRI_DASAR
 const SEKOLAH_LIST = ["MTSU", "MTSN", "MAN", "SMK", "SMA", "SMP", "LAINNYA"]
 
+const getExcelCell = (row: Record<string, any>, keys: string[]) => {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return row[key]
+  }
+  return ''
+}
+
+const normalizeJenisKelaminExcel = (value: unknown): 'L' | 'P' | '' => {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s._-]+/g, '')
+
+  if (['l', 'lk', 'laki', 'lakilaki', 'male', 'm'].includes(normalized)) return 'L'
+  if (['p', 'pr', 'perempuan', 'wanita', 'female', 'f'].includes(normalized)) return 'P'
+  return ''
+}
+
 const FORM_INIT = {
   nis: '', nama_lengkap: '', nik: '',
   jenis_kelamin: 'L' as 'L' | 'P',
@@ -118,9 +136,12 @@ export default function InputSantriPage() {
       const raw = XLSX.utils.sheet_to_json(ws)
       const clean = JSON.parse(JSON.stringify(raw)).map((row: any) => ({
         ...row,
-        kategori_santri: row.kategori_santri || row['KATEGORI SANTRI'] || row['kategori santri'] || '',
-        kelas_pesantren: row.kelas_pesantren || row['KELAS PESANTREN'] || row['kelas pesantren'],
-        no_wa_ortu: row.no_wa_ortu ? String(row.no_wa_ortu) : (row['no_wa_ortu'] || ''),
+        nis: getExcelCell(row, ['nis', 'NIS']),
+        nama_lengkap: getExcelCell(row, ['nama_lengkap', 'Nama Lengkap', 'NAMA LENGKAP', 'nama lengkap', 'Nama']),
+        jenis_kelamin: getExcelCell(row, ['jenis_kelamin', 'Jenis Kelamin', 'JENIS KELAMIN', 'jenis kelamin']),
+        kategori_santri: getExcelCell(row, ['kategori_santri', 'Kategori Santri', 'KATEGORI SANTRI', 'kategori santri']),
+        kelas_pesantren: getExcelCell(row, ['kelas_pesantren', 'Kelas Pesantren', 'KELAS PESANTREN', 'kelas pesantren']),
+        no_wa_ortu: String(getExcelCell(row, ['no_wa_ortu', 'No WA Ortu', 'NO WA ORTU', 'No. WA Ortu', 'no wa ortu'])),
       }))
       setExcelData(clean)
       toast.dismiss(id)
@@ -130,12 +151,29 @@ export default function InputSantriPage() {
 
   const handleSaveExcel = async () => {
     if (excelData.length === 0) return toast.warning("Data kosong")
-    if (!await confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nData yang NIS-nya sudah ada akan dilewati otomatis.`)) return
+    const invalidGender = excelData
+      .map((row, index) => ({ row: index + 2, nis: row.nis, nama: row.nama_lengkap, value: row.jenis_kelamin }))
+      .filter(row => !normalizeJenisKelaminExcel(row.value))
+
+    if (invalidGender.length > 0) {
+      const preview = invalidGender
+        .slice(0, 5)
+        .map(row => `baris ${row.row} (${row.nis || row.nama || '-'}): "${row.value ?? ''}"`)
+        .join(', ')
+      toast.error("Jenis kelamin belum valid", {
+        description: `Gunakan L/P atau Laki-laki/Perempuan. Cek ${preview}${invalidGender.length > 5 ? ', ...' : ''}.`,
+      })
+      return
+    }
+
+    if (!await confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nJika NIS sudah ada, data yang berubah akan otomatis diperbarui.`)) return
 
     setIsSavingExcel(true)
     const BATCH_SIZE = 50
     const total = excelData.length
     let inserted = 0
+    let updated = 0
+    let skipped = 0
 
     const toastId = toast.loading(`Memproses 0 / ${total} santri...`)
 
@@ -151,15 +189,18 @@ export default function InputSantriPage() {
       }
 
       inserted += result.count ?? 0
+      updated += result.updated ?? 0
+      skipped += result.skipped ?? 0
       toast.loading(`Memproses ${Math.min(i + BATCH_SIZE, total)} / ${total} santri...`, { id: toastId })
     }
 
     setIsSavingExcel(false)
     toast.dismiss(toastId)
-    const skipped = total - inserted
-    const desc = skipped > 0
-      ? `${inserted} santri ditambahkan, ${skipped} dilewati (NIS sudah ada).`
-      : `${inserted} santri berhasil diimport.`
+    const parts: string[] = []
+    if (inserted > 0) parts.push(`${inserted} santri baru ditambahkan`)
+    if (updated > 0) parts.push(`${updated} santri diperbarui`)
+    if (skipped > 0) parts.push(`${skipped} santri tidak berubah`)
+    const desc = parts.join(', ') + '.'
     toast.success("Import selesai!", { description: desc })
     router.push('/dashboard/santri')
   }
@@ -410,6 +451,7 @@ export default function InputSantriPage() {
                     <tr>
                       <th className="p-3 border-b">NIS</th>
                       <th className="p-3 border-b">Nama</th>
+                      <th className="p-3 border-b">JK</th>
                       <th className="p-3 border-b bg-green-50 text-green-800">Kelas Pesantren</th>
                       <th className="p-3 border-b">Asrama</th>
                       <th className="p-3 border-b">Sekolah</th>
@@ -424,6 +466,7 @@ export default function InputSantriPage() {
                       <tr key={i} className="hover:bg-slate-50">
                         <td className="p-3 font-mono text-xs">{r.nis}</td>
                         <td className="p-3 font-medium">{r.nama_lengkap}</td>
+                        <td className="p-3 text-slate-500">{normalizeJenisKelaminExcel(r.jenis_kelamin) || <span className="text-red-500 font-semibold">Invalid</span>}</td>
                         <td className="p-3 font-bold text-green-700 bg-green-50/30">{r.kelas_pesantren || <span className="text-slate-400 font-normal italic">Kosong</span>}</td>
                         <td className="p-3 text-slate-500">{r.asrama}</td>
                         <td className="p-3 text-blue-600">{r.sekolah}</td>
