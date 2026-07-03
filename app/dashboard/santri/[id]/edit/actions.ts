@@ -90,6 +90,8 @@ export async function updateSantri(id: string, formData: FormData) {
 
   if (kelasPesantrenId && !afterKelas) return { error: 'Kelas pesantren tidak ditemukan.' }
 
+  const beforeKelasId = beforeKelas?.kelas_id ?? ''
+
   try {
     await query(
       `UPDATE santri SET
@@ -120,7 +122,6 @@ export async function updateSantri(id: string, formData: FormData) {
       ]
     )
 
-    const beforeKelasId = beforeKelas?.kelas_id ?? ''
     if (kelasPesantrenId !== beforeKelasId) {
       await query(
         "UPDATE riwayat_pendidikan SET status_riwayat = 'pindah' WHERE santri_id = ? AND status_riwayat = 'aktif'",
