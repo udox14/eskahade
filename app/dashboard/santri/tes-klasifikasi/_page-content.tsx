@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { TesKlasifikasiTabs } from './_tabs'
 
 type FilterStatus = 'SEMUA' | 'SUDAH' | 'BELUM'
 
@@ -109,6 +110,7 @@ export default function TesKlasifikasiPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-16 space-y-5">
+      <TesKlasifikasiTabs />
 
       {/* ── Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
