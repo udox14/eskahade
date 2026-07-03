@@ -136,8 +136,7 @@ function statusAtLeast(status: PsbStatus, minimum: PsbStatus) {
 function paymentTarget(row: any) {
   const payment = row.pembayaran
   if (!payment) return 0
-  const sppJuli = Number(payment.sppJuli?.nominal ?? 0)
-  return Number(payment.bangunan?.target ?? 0) + sppJuli + PAYMENT_TYPES.reduce((sum, jenis) => {
+  return Number(payment.bangunan?.target ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
     return sum + Number(payment.tahunan?.[jenis]?.nominal ?? 0)
   }, 0)
 }
@@ -145,8 +144,7 @@ function paymentTarget(row: any) {
 function paymentPaid(row: any) {
   const payment = row.pembayaran
   if (!payment) return 0
-  const sppJuliPaid = payment.sppJuli?.lunas ? Number(payment.sppJuli?.nominal ?? 0) : 0
-  return Number(payment.bangunan?.paid ?? 0) + sppJuliPaid + PAYMENT_TYPES.reduce((sum, jenis) => {
+  return Number(payment.bangunan?.paid ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
     return sum + (payment.tahunan?.[jenis]?.lunas ? Number(payment.tahunan?.[jenis]?.nominal ?? 0) : 0)
   }, 0)
 }
