@@ -110,8 +110,6 @@ export default function TesKlasifikasiPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-16 space-y-5">
-      <TesKlasifikasiTabs />
-
       {/* ── Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <DashboardPageHeader
@@ -130,6 +128,8 @@ export default function TesKlasifikasiPage() {
           </div>
         )}
       </div>
+
+      <TesKlasifikasiTabs />
 
       {/* ── Filter bar ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">

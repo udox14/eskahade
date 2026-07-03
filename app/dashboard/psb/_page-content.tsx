@@ -50,6 +50,8 @@ import { PsbReceiptCopy } from './psb-receipt-copy'
 
 const STATUS_LIST: PsbStatus[] = ['VERIFICATION', 'VERIFIED', 'PLACED_ASRAMA', 'PAID', 'PLACED_KAMAR', 'DONE']
 
+const PAGE_SIZE = 25
+
 const STATUS_LABEL: Record<PsbStatus, string> = {
   VERIFICATION: 'Belum Verifikasi',
   VERIFIED: 'Sudah Verifikasi',
@@ -75,6 +77,44 @@ type RoleKey = 'sekretariat' | 'asrama' | 'kamar' | 'pembayaran'
 
 function rupiah(value: number) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+}
+
+function paginate<T>(rows: T[], page: number): T[] {
+  const start = (page - 1) * PAGE_SIZE
+  return rows.slice(start, start + PAGE_SIZE)
+}
+
+function Pagination({ total, page, setPage }: { total: number; page: number; setPage: (updater: (p: number) => number) => void }) {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  if (total <= PAGE_SIZE) return null
+  const from = (page - 1) * PAGE_SIZE + 1
+  const to = Math.min(total, page * PAGE_SIZE)
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+      <span className="text-xs text-slate-500">
+        Menampilkan <span className="font-bold text-slate-700">{from}-{to}</span> dari <span className="font-bold text-slate-700">{total}</span>
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+        >
+          Sebelumnya
+        </button>
+        <span className="font-mono text-xs font-bold text-slate-700">{page} / {totalPages}</span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+        >
+          Berikutnya
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function paymentLabel(value: string) {
@@ -131,19 +171,31 @@ export default function PsbPageContent() {
   const [paymentItems, setPaymentItems] = useState<Record<string, Record<string, boolean>>>({})
   const [showPreview, setShowPreview] = useState<Record<string, boolean>>({})
   const [verificationRow, setVerificationRow] = useState<any>(null)
+  const [page, setPage] = useState(1)
+
+  // Reset ke halaman 1 tiap ganti tugas/pencarian agar lazy-load konsisten.
+  useEffect(() => {
+    setPage(1)
+  }, [selectedRole, q, tahunTagihan])
 
   const load = async (silent = false) => {
     if (silent) setRefreshing(true)
     else setLoading(true)
 
-    const result = await getPsbDashboard({ q, tahunTagihan })
-    setLoading(false)
-    setRefreshing(false)
-    if ('error' in result) {
-      toast.error(result.error)
-      return
+    try {
+      const result = await getPsbDashboard({ q, tahunTagihan })
+      if (result && 'error' in result) {
+        toast.error(result.error)
+        return
+      }
+      setData(result)
+    } catch (error: any) {
+      // Jangan biarkan spinner muter selamanya kalau query gagal.
+      toast.error(error?.message || 'Gagal memuat data PSB.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    setData(result)
   }
 
   useEffect(() => {
@@ -156,11 +208,14 @@ export default function PsbPageContent() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      // Skip polling kalau tab tidak aktif atau ada modal terbuka — hemat query
+      // berat pada dataset besar.
+      if (document.hidden || showDadakanModal || paymentModalRow || verificationRow) return
       void load(true)
-    }, 5000)
+    }, 10000)
     return () => window.clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, tahunTagihan])
+  }, [q, tahunTagihan, showDadakanModal, paymentModalRow, verificationRow])
 
   useEffect(() => {
     if (!data || activeRoomAsrama) return
@@ -488,7 +543,8 @@ export default function PsbPageContent() {
 
           {selectedRole === 'sekretariat' ? (
             <SekretariatView
-              rows={sekretariatRows}
+              rows={paginate(sekretariatRows, page)}
+              footer={<Pagination total={sekretariatRows.length} page={page} setPage={setPage} />}
               stats={sekretariatStats}
               canCreate={!!data?.user?.canSekretariat}
               busyId={busyId}
@@ -499,7 +555,8 @@ export default function PsbPageContent() {
 
           {selectedRole === 'asrama' ? (
             <AsramaPlacementView
-              rows={placementRows}
+              rows={paginate(placementRows, page)}
+              footer={<Pagination total={placementRows.length} page={page} setPage={setPage} />}
               stats={asramaStats}
               totalKuotaBaru={totalKuotaBaru}
               totalTerisi={totalTerisiAsrama}
@@ -513,7 +570,8 @@ export default function PsbPageContent() {
 
           {selectedRole === 'pembayaran' ? (
             <PembayaranView
-              rows={paymentRows}
+              rows={paginate(paymentRows, page)}
+              footer={<Pagination total={paymentRows.length} page={page} setPage={setPage} />}
               paidRows={paidRows}
               stats={paymentStats}
               busyId={busyId}
@@ -525,7 +583,8 @@ export default function PsbPageContent() {
 
           {selectedRole === 'kamar' ? (
             <KamarPlacementView
-              rows={roomRows}
+              rows={paginate(roomRows, page)}
+              footer={<Pagination total={roomRows.length} page={page} setPage={setPage} />}
               user={data?.user}
               asramaList={data?.asramaList ?? []}
               activeAsrama={activeRoomAsrama}
@@ -592,7 +651,7 @@ export default function PsbPageContent() {
   )
 }
 
-function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }: any) {
+function SekretariatView({ rows, footer, stats, canCreate, busyId, onDadakan, onVerify }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -642,11 +701,12 @@ function SekretariatView({ rows, stats, canCreate, busyId, onDadakan, onVerify }
           </table>
         </div>
       </div>
+      {footer}
     </div>
   )
 }
 
-function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selectedAsrama, setSelectedAsrama, busyId, onPlace, onRevert }: any) {
+function AsramaPlacementView({ rows, footer, stats, totalKuotaBaru, totalTerisi, selectedAsrama, setSelectedAsrama, busyId, onPlace, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -725,11 +785,12 @@ function AsramaPlacementView({ rows, stats, totalKuotaBaru, totalTerisi, selecte
           </table>
         </div>
       </div>
+      {footer}
     </div>
   )
 }
 
-function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert, onDone }: any) {
+function KamarPlacementView({ rows, footer, user, asramaList, activeAsrama, setActiveAsrama, roomOptions, roomStats, selectedKamar, setSelectedKamar, busyId, onPlace, onRevert, onDone }: any) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -839,6 +900,7 @@ function KamarPlacementView({ rows, user, asramaList, activeAsrama, setActiveAsr
           </table>
         </div>
       </div>
+      {footer}
     </div>
   )
 }
@@ -929,7 +991,7 @@ function MiniMetric({ label, value, className = 'text-slate-900' }: { label: str
   )
 }
 
-function PembayaranView({ rows, paidRows, stats, busyId, onOpenPayment, onCancelPayment, onRevert }: any) {
+function PembayaranView({ rows, footer, paidRows, stats, busyId, onOpenPayment, onCancelPayment, onRevert }: any) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -1008,6 +1070,7 @@ function PembayaranView({ rows, paidRows, stats, busyId, onOpenPayment, onCancel
           </table>
         </div>
       </div>
+      {footer}
 
       <QuotaAccordion
         icon={<Undo2 className="h-4 w-4" />}

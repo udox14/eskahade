@@ -357,11 +357,11 @@ export default function PenjadwalanTesKlasifikasiPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-20">
-      <TesKlasifikasiTabs />
       <DashboardPageHeader
         title="Penjadwalan Tes Klasifikasi"
         description="Atur sesi, ruangan, petugas, plotting peserta, dan cetak jadwal."
       />
+      <TesKlasifikasiTabs />
 
       <div className="flex flex-wrap gap-2">
         <TabButton active={tab === 'event'} onClick={() => setTab('event')}>1. Event</TabButton>

@@ -302,8 +302,8 @@ const signatureNumberStyle: React.CSSProperties = {
 function PlaceholderView({ label, onBack }: { label: string; onBack: () => void }) {
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-20">
-      <TesKlasifikasiTabs />
       <DashboardPageHeader title={label} description="Format cetak ini akan dilanjutkan setelah format jadwal." />
+      <TesKlasifikasiTabs />
       <button onClick={onBack} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600">Kembali</button>
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-semibold text-slate-500">
         Placeholder fitur cetak berikutnya.
@@ -371,8 +371,8 @@ export default function CetakTesKlasifikasiPage() {
   if (view === 'blanko-absensi') {
     return (
       <div className="mx-auto max-w-7xl space-y-5 pb-20">
-        <TesKlasifikasiTabs />
         <DashboardPageHeader title="Blanko Absensi Tes Klasifikasi" description="Cetak daftar hadir peserta per sesi dan ruangan." />
+        <TesKlasifikasiTabs />
         <button onClick={() => setView('menu')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600">Kembali</button>
 
         {loading ? (
@@ -445,8 +445,8 @@ export default function CetakTesKlasifikasiPage() {
   if (view === 'jadwal') {
     return (
       <div className="mx-auto max-w-7xl space-y-5 pb-20">
-        <TesKlasifikasiTabs />
         <DashboardPageHeader title="Jadwal Peserta Tes Klasifikasi" description="Cetak jadwal peserta semua, per sesi, atau per ruangan." />
+        <TesKlasifikasiTabs />
         <button onClick={() => setView('menu')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600">Kembali</button>
 
         {loading ? (
@@ -517,11 +517,11 @@ export default function CetakTesKlasifikasiPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-20">
-      <TesKlasifikasiTabs />
       <DashboardPageHeader
         title="Cetak Tes Klasifikasi"
         description="Pilih dokumen administrasi tes klasifikasi yang akan dicetak."
       />
+      <TesKlasifikasiTabs />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MENU_ITEMS.map(item => {
           const Icon = item.icon

@@ -104,7 +104,29 @@ function yearFromSantri(row: { tahun_masuk: number | null; tanggal_masuk?: strin
   return Number.isFinite(parsed) ? parsed : new Date().getFullYear()
 }
 
+// D1 membatasi jumlah bound-parameter per query (~100). IN (591 placeholders)
+// bikin query gagal → dashboard hang. Pecah id jadi chunk aman.
+const D1_PARAM_CHUNK = 80
+
+function chunk<T>(arr: T[], size = D1_PARAM_CHUNK): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+// Schema + index cukup dijamin sekali per proses; jangan PRAGMA tiap request.
+let schemaReady: Promise<void> | null = null
 async function ensureSchema() {
+  if (!schemaReady) {
+    schemaReady = ensureSchemaOnce().catch((error) => {
+      schemaReady = null
+      throw error
+    })
+  }
+  return schemaReady
+}
+
+async function ensureSchemaOnce() {
   const db = await getDB()
   await db.batch([
     db.prepare(`
@@ -169,6 +191,16 @@ async function ensureSchema() {
     await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_by TEXT')
     await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_at TEXT')
   }
+
+  // Index untuk mempercepat scan flow PSB pada dataset besar (591+ santri).
+  await db.batch([
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_santri_status_created ON santri(status_global, created_at)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_santri_asrama ON santri(asrama)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_psb_flow_santri ON psb_flow(santri_id)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pembayaran_tahunan_santri ON pembayaran_tahunan(santri_id)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_psb_receipt_santri ON psb_payment_receipt(santri_id)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_spp_log_santri_tahun_bulan ON spp_log(santri_id, tahun, bulan)'),
+  ])
 }
 
 async function getPsbRows(session: SessionUser | null, filters?: {
@@ -229,27 +261,40 @@ async function getPsbRows(session: SessionUser | null, filters?: {
 async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number) {
   if (!rows.length) return new Map<string, any>()
   const ids = rows.map((row) => row.id)
-  const placeholders = ids.map(() => '?').join(',')
-  const pembayaran = await query<any>(
-    `SELECT santri_id, jenis_biaya, nominal_bayar, tahun_tagihan
-     FROM pembayaran_tahunan
-     WHERE santri_id IN (${placeholders}) AND COALESCE(status, 'AKTIF') != 'VOID'`,
-    ids
-  )
+  const idChunks = chunk(ids)
+
+  const pembayaran: any[] = []
+  const receipts: any[] = []
+  const sppJuliPaid: { santri_id: string }[] = []
+  for (const slice of idChunks) {
+    const placeholders = slice.map(() => '?').join(',')
+    const [payChunk, receiptChunk, sppChunk] = await Promise.all([
+      query<any>(
+        `SELECT santri_id, jenis_biaya, nominal_bayar, tahun_tagihan
+         FROM pembayaran_tahunan
+         WHERE santri_id IN (${placeholders}) AND COALESCE(status, 'AKTIF') != 'VOID'`,
+        slice
+      ),
+      query<any>(
+        `SELECT id, santri_id, receipt_no, total, created_at
+         FROM psb_payment_receipt
+         WHERE santri_id IN (${placeholders}) AND COALESCE(is_void, 0) = 0
+         ORDER BY datetime(created_at) DESC, created_at DESC`,
+        slice
+      ),
+      query<{ santri_id: string }>(
+        `SELECT DISTINCT santri_id FROM spp_log
+         WHERE santri_id IN (${placeholders}) AND tahun = ? AND bulan = ?`,
+        [...slice, tahunTagihan, SPP_JULI_BULAN]
+      ),
+    ])
+    pembayaran.push(...payChunk)
+    receipts.push(...receiptChunk)
+    sppJuliPaid.push(...sppChunk)
+  }
+
   const tarif = await query<any>('SELECT tahun_angkatan, jenis_biaya, nominal FROM biaya_settings')
-  const receipts = await query<any>(
-    `SELECT id, santri_id, receipt_no, total, created_at
-     FROM psb_payment_receipt
-     WHERE santri_id IN (${placeholders}) AND COALESCE(is_void, 0) = 0
-     ORDER BY datetime(created_at) DESC, created_at DESC`,
-    ids
-  )
   const sppJuliNominal = await getNominalSppForYear(tahunTagihan)
-  const sppJuliPaid = await query<{ santri_id: string }>(
-    `SELECT DISTINCT santri_id FROM spp_log
-     WHERE santri_id IN (${placeholders}) AND tahun = ? AND bulan = ?`,
-    [...ids, tahunTagihan, SPP_JULI_BULAN]
-  )
   const sppJuliPaidSet = new Set(sppJuliPaid.map((row) => row.santri_id))
   const tarifMap = new Map<string, number>()
   tarif.forEach((row) => tarifMap.set(`${row.tahun_angkatan}:${row.jenis_biaya}`, Number(row.nominal ?? 0)))
