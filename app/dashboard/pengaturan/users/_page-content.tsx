@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts, setUserPsbBayarAkses } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts, setUserPsbAkses } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -37,6 +37,20 @@ const STRUCTURAL_JABATAN = [
   { value: 'bendahara', label: 'Bendahara' },
 ]
 const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
+
+// Grant petugas PSB per-user (verifikasi / penempatan asrama / pembayaran).
+// User yang diberi akses bertindak penuh seperti admin pada step tsb.
+type PsbAksesField = 'psb_verifikasi_akses' | 'psb_asrama_akses' | 'psb_bayar_akses'
+const PSB_AKSES_LABEL: Record<PsbAksesField, string> = {
+  psb_verifikasi_akses: 'verifikasi',
+  psb_asrama_akses: 'penempatan asrama',
+  psb_bayar_akses: 'pembayaran',
+}
+const PSB_AKSES_TOGGLES: { field: PsbAksesField; on: string; off: string; tip: string }[] = [
+  { field: 'psb_verifikasi_akses', on: 'Verifikasi ✓', off: 'Verifikasi', tip: 'Berikan akses verifikasi/kesekretariatan PSB' },
+  { field: 'psb_asrama_akses', on: 'Penempatan Asrama ✓', off: 'Penempatan Asrama', tip: 'Berikan akses penempatan asrama PSB' },
+  { field: 'psb_bayar_akses', on: 'Pembayaran ✓', off: 'Pembayaran', tip: 'Berikan akses pembayaran PSB' },
+]
 
 type SelectedBatchConfig = {
   source_type: 'guru' | 'sadesa'
@@ -318,18 +332,18 @@ export default function ManajemenUserPage() {
     }
   }
 
-  const handleTogglePsbBayarAkses = async (user: any) => {
-    const granted = !user.psb_bayar_akses
+  const handleTogglePsbAkses = async (user: any, field: 'psb_verifikasi_akses' | 'psb_asrama_akses' | 'psb_bayar_akses', label: string) => {
+    const granted = !user[field]
     setProcessingId(user.id)
-    const toastId = toast.loading(granted ? 'Memberikan akses bayar PSB...' : 'Mencabut akses bayar PSB...')
-    const res = await setUserPsbBayarAkses(user.id, granted)
+    const toastId = toast.loading(granted ? `Memberikan akses ${label}...` : `Mencabut akses ${label}...`)
+    const res = await setUserPsbAkses(user.id, field, granted)
     toast.dismiss(toastId)
     setProcessingId(null)
     if ('error' in res) {
       toast.error('Gagal update', { description: (res as any).error })
     } else {
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, psb_bayar_akses: granted ? 1 : 0 } : u))
-      toast.success(granted ? 'Akses bayar PSB diberikan' : 'Akses bayar PSB dicabut')
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, [field]: granted ? 1 : 0 } : u))
+      toast.success(granted ? `Akses ${label} diberikan` : `Akses ${label} dicabut`)
     }
   }
 
@@ -869,18 +883,24 @@ export default function ManajemenUserPage() {
                         </div>
                       )}
                       {parseRoles(u).includes('pengurus_asrama') && (
-                        <button
-                          onClick={() => handleTogglePsbBayarAkses(u)}
-                          disabled={processingId === u.id}
-                          title={u.psb_bayar_akses ? 'Cabut akses bayar PSB' : 'Berikan akses bayar PSB (khusus ditunjuk bendahara)'}
-                          className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
-                            u.psb_bayar_akses
-                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          <Coins className="w-3 h-3" /> {u.psb_bayar_akses ? 'Akses Bayar PSB' : 'Tanpa Akses Bayar PSB'}
-                        </button>
+                        <div className="mt-2 flex flex-col items-start gap-1">
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Petugas PSB</span>
+                          {PSB_AKSES_TOGGLES.map(({ field, on, off, tip }) => (
+                            <button
+                              key={field}
+                              onClick={() => handleTogglePsbAkses(u, field, PSB_AKSES_LABEL[field])}
+                              disabled={processingId === u.id}
+                              title={u[field] ? `Cabut akses ${PSB_AKSES_LABEL[field]}` : tip}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                                u[field]
+                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                              }`}
+                            >
+                              <Coins className="w-3 h-3" /> {u[field] ? on : off}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4">

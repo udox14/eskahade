@@ -129,6 +129,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
       </table>
 
       <div className="summary-block">
+        <div />
         <table>
           <tbody>
             <tr>
@@ -136,10 +137,6 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
               <td>:</td>
               <td className="due-zero"><span className="rp">Rp</span><span>{Number(sisa || 0).toLocaleString('id-ID')}</span></td>
             </tr>
-          </tbody>
-        </table>
-        <table>
-          <tbody>
             <tr>
               <td>JUMLAH</td>
               <td>:</td>
@@ -168,7 +165,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         </div>
         <div className="signature-box">
           <p className="sig-place">Tasikmalaya, {formatLongDate(receipt.created_at)}</p>
-          <p className="sig-role">Bendahara PSB</p>
+          <p className="sig-role">Petugas</p>
           <div className="signature-line" />
           <strong>( {officerName} )</strong>
         </div>
@@ -382,12 +379,9 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-weight: 700;
           white-space: nowrap;
         }
-        /* SISA TAGIHAN: Rp + nominal nempel tepat setelah titik dua, bukan
-           direntang ke ujung kolom. */
-        .summary-block table td.due-zero {
-          justify-content: flex-start;
-          gap: 4px;
-        }
+        /* SISA TAGIHAN sekarang berada di stack kanan bersama JUMLAH/PEMBAYARAN/
+           KEMBALI: nominalnya rata kanan (space-between) agar sejajar dengan
+           TOTAL PEMBAYARAN di atasnya. */
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;

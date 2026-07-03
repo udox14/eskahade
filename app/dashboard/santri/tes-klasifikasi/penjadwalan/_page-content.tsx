@@ -173,6 +173,8 @@ export default function PenjadwalanTesKlasifikasiPage() {
   const [petugas, setPetugas] = useState<Record<string, { pengetes_guru_id: string; pendamping_guru_id: string }>>({})
   const [filters, setFilters] = useState({ search: '', jenis_kelamin: '', level: '', asrama: '' })
   const [manualTarget, setManualTarget] = useState({ santri_id: '', sesi_id: '', ruangan_id: '' })
+  const [unplottedPage, setUnplottedPage] = useState(1)
+  const [unplottedPageSize, setUnplottedPageSize] = useState<'10' | '25' | '50' | '100' | 'all'>('25')
   const [printMode, setPrintMode] = useState<PrintMode>('all')
   const [selectedSesi, setSelectedSesi] = useState('')
   const [selectedRuangan, setSelectedRuangan] = useState('')
@@ -240,6 +242,30 @@ export default function PenjadwalanTesKlasifikasiPage() {
       return true
     })
   }, [filters, unplotted])
+
+  const unplottedPagination = useMemo(() => {
+    const pageSize = unplottedPageSize === 'all' ? filteredUnplotted.length || 1 : Number(unplottedPageSize)
+    const pageCount = Math.max(1, Math.ceil(filteredUnplotted.length / pageSize))
+    const currentPage = Math.min(unplottedPage, pageCount)
+    const start = (currentPage - 1) * pageSize
+    const end = Math.min(start + pageSize, filteredUnplotted.length)
+    return {
+      currentPage,
+      pageCount,
+      start,
+      end,
+      rows: filteredUnplotted.slice(start, end),
+    }
+  }, [filteredUnplotted, unplottedPage, unplottedPageSize])
+
+  useEffect(() => {
+    setUnplottedPage(1)
+    setManualTarget(prev => ({ ...prev, santri_id: '' }))
+  }, [filters, unplottedPageSize])
+
+  useEffect(() => {
+    if (unplottedPage > unplottedPagination.pageCount) setUnplottedPage(unplottedPagination.pageCount)
+  }, [unplottedPage, unplottedPagination.pageCount])
 
   const stats = useMemo(() => ({
     sesi: data?.sesiList?.length || 0,
@@ -589,7 +615,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
                 <div className="mt-3 grid gap-2 md:grid-cols-[1.3fr_1fr_1fr_auto]">
                   <select value={manualTarget.santri_id} onChange={e => setManualTarget(prev => ({ ...prev, santri_id: e.target.value }))} className="rounded-lg border px-3 py-2 text-sm">
                     <option value="">Pilih santri ({filteredUnplotted.length})</option>
-                    {filteredUnplotted.map((row: any) => <option key={row.id} value={row.id}>{row.nama_lengkap} · {row.jenis_kelamin} · {row.level} · {row.asrama || '-'}/{row.kamar || '-'}</option>)}
+                    {unplottedPagination.rows.map((row: any) => <option key={row.id} value={row.id}>{row.nama_lengkap} · {row.jenis_kelamin} · {row.level} · {row.asrama || '-'}/{row.kamar || '-'}</option>)}
                   </select>
                   <select value={manualTarget.sesi_id} onChange={e => setManualTarget(prev => ({ ...prev, sesi_id: e.target.value }))} className="rounded-lg border px-3 py-2 text-sm">
                     <option value="">Pilih sesi</option>
@@ -600,6 +626,40 @@ export default function PenjadwalanTesKlasifikasiPage() {
                     {data.ruanganList.map((room: any) => <option key={room.id} value={room.id}>{room.nama_ruangan} · {room.tempat || '-'}</option>)}
                   </select>
                   <button onClick={addManual} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><UserPlus className="h-4 w-4" /> Tambah</button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                  <div>
+                    Menampilkan {filteredUnplotted.length === 0 ? 0 : unplottedPagination.start + 1}-{unplottedPagination.end} dari {filteredUnplotted.length} santri belum terplot
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Per halaman</span>
+                    <select
+                      value={unplottedPageSize}
+                      onChange={e => setUnplottedPageSize(e.target.value as '10' | '25' | '50' | '100' | 'all')}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold"
+                    >
+                      <option value="10">10</option>
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="all">Semua</option>
+                    </select>
+                    <button
+                      onClick={() => setUnplottedPage(page => Math.max(1, page - 1))}
+                      disabled={unplottedPagination.currentPage <= 1 || unplottedPageSize === 'all'}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 font-bold disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    <span>Hal {unplottedPagination.currentPage}/{unplottedPagination.pageCount}</span>
+                    <button
+                      onClick={() => setUnplottedPage(page => Math.min(unplottedPagination.pageCount, page + 1))}
+                      disabled={unplottedPagination.currentPage >= unplottedPagination.pageCount || unplottedPageSize === 'all'}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 font-bold disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
 

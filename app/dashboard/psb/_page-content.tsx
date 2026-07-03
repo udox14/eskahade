@@ -136,7 +136,8 @@ function statusAtLeast(status: PsbStatus, minimum: PsbStatus) {
 function paymentTarget(row: any) {
   const payment = row.pembayaran
   if (!payment) return 0
-  return Number(payment.bangunan?.target ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
+  const sppJuli = Number(payment.sppJuli?.nominal ?? 0)
+  return Number(payment.bangunan?.target ?? 0) + sppJuli + PAYMENT_TYPES.reduce((sum, jenis) => {
     return sum + Number(payment.tahunan?.[jenis]?.nominal ?? 0)
   }, 0)
 }
@@ -144,7 +145,8 @@ function paymentTarget(row: any) {
 function paymentPaid(row: any) {
   const payment = row.pembayaran
   if (!payment) return 0
-  return Number(payment.bangunan?.paid ?? 0) + PAYMENT_TYPES.reduce((sum, jenis) => {
+  const sppJuliPaid = payment.sppJuli?.lunas ? Number(payment.sppJuli?.nominal ?? 0) : 0
+  return Number(payment.bangunan?.paid ?? 0) + sppJuliPaid + PAYMENT_TYPES.reduce((sum, jenis) => {
     return sum + (payment.tahunan?.[jenis]?.lunas ? Number(payment.tahunan?.[jenis]?.nominal ?? 0) : 0)
   }, 0)
 }
@@ -1133,13 +1135,22 @@ function PembayaranView({ rows, footer, paidRows, stats, busyId, onOpenPayment, 
                       <td className="px-4 py-3 font-mono text-xs text-slate-600">{row.pembayaran?.latestReceipt?.receipt_no || '-'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-emerald-700">{rupiah(row.pembayaran?.latestReceipt?.total ?? 0)}</td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          disabled={busyId === row.id}
-                          onClick={() => onCancelPayment(row)}
-                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
-                        >
-                          Batalkan
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            disabled={!row.pembayaran?.latestReceipt?.id}
+                            onClick={() => printIframe(`/dashboard/psb/kuitansi/${row.pembayaran.latestReceipt.id}`)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            <Printer className="h-3.5 w-3.5" /> Cetak Ulang
+                          </button>
+                          <button
+                            disabled={busyId === row.id}
+                            onClick={() => onCancelPayment(row)}
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:bg-slate-200 disabled:text-slate-500"
+                          >
+                            Batalkan
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

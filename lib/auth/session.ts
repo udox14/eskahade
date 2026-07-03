@@ -22,6 +22,8 @@ export type SessionUser = {
   roles: string[]
   asrama_binaan: string | null
   structural_jabatan?: string | null
+  psb_verifikasi_akses?: boolean
+  psb_asrama_akses?: boolean
   psb_bayar_akses?: boolean
 }
 
@@ -32,6 +34,8 @@ type SessionUserRow = {
   roles: string | null
   asrama_binaan: string | null
   structural_jabatan: string | null
+  psb_verifikasi_akses: number | null
+  psb_asrama_akses: number | null
   psb_bayar_akses: number | null
 }
 
@@ -44,11 +48,13 @@ export async function ensureUserStructuralJabatanColumn() {
       throw error
     }
   }
-  try {
-    await execute('ALTER TABLE users ADD COLUMN psb_bayar_akses INTEGER NOT NULL DEFAULT 0')
-  } catch (error: any) {
-    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
-      throw error
+  for (const col of ['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses']) {
+    try {
+      await execute(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
+    } catch (error: any) {
+      if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+        throw error
+      }
     }
   }
   structuralJabatanColumnReady = true
@@ -189,7 +195,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
   try {
     await ensureUserStructuralJabatanColumn()
     const user = await queryOne<SessionUserRow>(
-      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_bayar_akses FROM users WHERE id = ?',
+      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_verifikasi_akses, psb_asrama_akses, psb_bayar_akses FROM users WHERE id = ?',
       [session.id]
     )
 
@@ -204,6 +210,8 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       roles,
       asrama_binaan: user.asrama_binaan ?? null,
       structural_jabatan: user.structural_jabatan ?? null,
+      psb_verifikasi_akses: Number(user.psb_verifikasi_akses ?? 0) === 1,
+      psb_asrama_akses: Number(user.psb_asrama_akses ?? 0) === 1,
       psb_bayar_akses: Number(user.psb_bayar_akses ?? 0) === 1,
     }
   } catch (err: any) {
@@ -231,10 +239,25 @@ export function isAdmin(session: SessionUser | null): boolean {
   return hasRole(session, 'admin')
 }
 
-// Grant khusus per-user (bukan berbasis role) untuk akses bayar PSB, biasanya
-// diberikan ke pengurus_asrama yang ditunjuk menjabat bendahara.
+// Grant khusus per-user (bukan berbasis role) untuk step-step PSB, diberikan ke
+// petugas tertentu (mis. pengurus_asrama yang ditunjuk). User bertindak penuh
+// seperti admin pada step tsb & melihat seluruh santri PSB (tak di-scope asrama).
+export function hasPsbVerifikasiAkses(session: SessionUser | null): boolean {
+  return Boolean(session?.psb_verifikasi_akses)
+}
+
+export function hasPsbAsramaAkses(session: SessionUser | null): boolean {
+  return Boolean(session?.psb_asrama_akses)
+}
+
 export function hasPsbBayarAkses(session: SessionUser | null): boolean {
   return Boolean(session?.psb_bayar_akses)
+}
+
+// True jika user punya salah satu grant petugas PSB. Dipakai untuk membuka
+// visibilitas seluruh santri (bypass scoping asrama binaan pengurus_asrama).
+export function hasAnyPsbAkses(session: SessionUser | null): boolean {
+  return hasPsbVerifikasiAkses(session) || hasPsbAsramaAkses(session) || hasPsbBayarAkses(session)
 }
 
 // Role AKUN DEMO: setara super admin (bypass gate fitur). Data sudah disandbox

@@ -523,7 +523,7 @@ export async function getUnplottedSantri(eventId: number, filters: { search?: st
   if (jk === 'L' || jk === 'P') rows = rows.filter(row => row.jenis_kelamin === jk)
   if (level) rows = rows.filter(row => row.level === level)
   if (asrama) rows = rows.filter(row => String(row.asrama || '').toUpperCase() === asrama)
-  return rows.slice(0, 100)
+  return rows
 }
 
 export async function tambahPesertaManual(eventId: number, sesiId: number, ruanganId: number, santriId: string) {

@@ -493,12 +493,12 @@ const signatureNumberStyle: React.CSSProperties = {
 }
 
 const penilaianPageStyle: React.CSSProperties = {
-  width: '210mm',
-  height: '330mm',
+  width: '330mm',
+  height: '210mm',
   padding: '4mm',
   boxSizing: 'border-box',
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'row',
   gap: '2mm',
   fontFamily: '"Arial Narrow", Arial, sans-serif',
   color: '#000',
@@ -508,12 +508,12 @@ const penilaianPageStyle: React.CSSProperties = {
 }
 
 const penilaianBlankoStyle: React.CSSProperties = {
-  height: '160mm',
-  width: '100%',
+  height: '202mm',
+  width: '160mm',
   border: '1pt solid #000',
   boxSizing: 'border-box',
   fontFamily: '"Arial Narrow", Arial, sans-serif',
-  fontSize: '9pt',
+  fontSize: '10pt',
   lineHeight: 1,
   display: 'flex',
   flexDirection: 'column',
@@ -529,14 +529,14 @@ const penilaianTopBoxStyle: React.CSSProperties = {
 const penilaianHeaderTitleStyle: React.CSSProperties = {
   textAlign: 'center',
   fontWeight: 700,
-  fontSize: '10.5pt',
+  fontSize: '11pt',
   lineHeight: 1.05,
 }
 
 const penilaianSectionTitleStyle: React.CSSProperties = {
   textAlign: 'center',
   fontWeight: 700,
-  fontSize: '10.5pt',
+  fontSize: '11pt',
   lineHeight: 1.1,
   padding: '1mm 0',
 }
@@ -553,8 +553,8 @@ const penilaianInfoThStyle: React.CSSProperties = {
   textAlign: 'center',
   verticalAlign: 'middle',
   fontWeight: 700,
-  fontSize: '9.5pt',
-  height: '7mm',
+  fontSize: '10pt',
+  height: '8.5mm',
   padding: '0.6mm',
 }
 
@@ -563,8 +563,8 @@ const penilaianInfoTdStyle: React.CSSProperties = {
   textAlign: 'center',
   verticalAlign: 'middle',
   fontWeight: 700,
-  fontSize: '9.3pt',
-  height: '6.8mm',
+  fontSize: '9.8pt',
+  height: '8mm',
   padding: '0.7mm',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
@@ -573,7 +573,7 @@ const penilaianInfoTdStyle: React.CSSProperties = {
 
 const penilaianInfoTdCenterStyle: React.CSSProperties = {
   ...penilaianInfoTdStyle,
-  fontSize: '9.5pt',
+  fontSize: '10pt',
 }
 
 const penilaianIdentityBoxStyle: React.CSSProperties = {
@@ -584,18 +584,18 @@ const penilaianIdentityBoxStyle: React.CSSProperties = {
 const penilaianIdentityLabelStyle: React.CSSProperties = {
   border: '1pt solid #000',
   width: '64mm',
-  height: '4.2mm',
+  height: '5.5mm',
   padding: '0.5mm 2mm',
   verticalAlign: 'middle',
-  fontSize: '9.2pt',
+  fontSize: '10pt',
 }
 
 const penilaianIdentityValueStyle: React.CSSProperties = {
   border: '1pt solid #000',
-  height: '4.2mm',
+  height: '5.5mm',
   padding: '0.5mm 2mm',
   verticalAlign: 'middle',
-  fontSize: '9.2pt',
+  fontSize: '10pt',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -604,13 +604,13 @@ const penilaianIdentityValueStyle: React.CSSProperties = {
 const penilaianAssessmentBoxStyle: React.CSSProperties = {
   borderBottom: '1pt solid #000',
   padding: '0 2mm',
-  height: '67mm',
+  height: '95mm',
   boxSizing: 'border-box',
 }
 
 const penilaianBoldLineStyle: React.CSSProperties = {
   fontWeight: 700,
-  fontSize: '9.5pt',
+  fontSize: '10pt',
   lineHeight: 1.05,
   paddingTop: '1mm',
 }
@@ -622,7 +622,7 @@ const penilaianColonStyle: React.CSSProperties = {
 
 const penilaianWriteLinesStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateRows: 'repeat(4, 6.6mm)',
+  gridTemplateRows: 'repeat(4, 9mm)',
   margin: '0 7mm 0 0',
 }
 
@@ -634,8 +634,8 @@ const penilaianCheckRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '22mm',
-  minHeight: '5.8mm',
-  fontSize: '9pt',
+  minHeight: '7mm',
+  fontSize: '10pt',
 }
 
 const penilaianCheckLabelStyle: React.CSSProperties = {
@@ -643,14 +643,14 @@ const penilaianCheckLabelStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: '2.5mm',
   whiteSpace: 'nowrap',
-  fontSize: '9pt',
+  fontSize: '10pt',
   fontWeight: 400,
 }
 
 const penilaianCheckBoxStyle: React.CSSProperties = {
   display: 'inline-block',
-  width: '5mm',
-  height: '5mm',
+  width: '5.5mm',
+  height: '5.5mm',
   border: '1pt solid #000',
   boxSizing: 'border-box',
 }
@@ -659,8 +659,8 @@ const penilaianChoiceLineStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '28mm 4mm 37mm 47mm 1fr',
   alignItems: 'center',
-  minHeight: '6mm',
-  fontSize: '9pt',
+  minHeight: '7mm',
+  fontSize: '10pt',
 }
 
 const penilaianChoiceTitleStyle: React.CSSProperties = {
@@ -671,8 +671,8 @@ const penilaianHafalanLineStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '28mm 4mm 1fr',
   alignItems: 'end',
-  minHeight: '9mm',
-  fontSize: '9pt',
+  minHeight: '12mm',
+  fontSize: '10pt',
 }
 
 const penilaianLongLineStyle: React.CSSProperties = {
@@ -683,14 +683,14 @@ const penilaianLongLineStyle: React.CSSProperties = {
 const penilaianNahwuBoxStyle: React.CSSProperties = {
   borderBottom: '1pt solid #000',
   padding: '1mm 2mm',
-  minHeight: '11mm',
+  minHeight: '15mm',
   boxSizing: 'border-box',
 }
 
 const penilaianFooterStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 60mm',
-  minHeight: '21mm',
+  minHeight: '28mm',
   flex: 1,
 }
 
@@ -698,34 +698,34 @@ const penilaianMarhalahStyle: React.CSSProperties = {
   borderRight: '1pt solid #000',
   padding: '1.2mm 2mm',
   boxSizing: 'border-box',
-  fontSize: '9pt',
+  fontSize: '10pt',
 }
 
 const penilaianFooterOptionsStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '5mm',
-  minHeight: '6.2mm',
+  minHeight: '8mm',
 }
 
 const penilaianVerticalRuleStyle: React.CSSProperties = {
   display: 'inline-block',
   width: '1pt',
-  height: '11mm',
+  height: '13mm',
   background: '#000',
 }
 
 const penilaianGradeBoxStyle: React.CSSProperties = {
   display: 'inline-block',
   width: '27mm',
-  height: '11mm',
+  height: '13mm',
   border: '1pt solid #000',
 }
 
 const penilaianSignatureBoxStyle: React.CSSProperties = {
   textAlign: 'center',
   paddingTop: '3mm',
-  fontSize: '9pt',
+  fontSize: '10pt',
   lineHeight: 1.05,
 }
 
@@ -786,7 +786,7 @@ export default function CetakTesKlasifikasiPage() {
     documentTitle: 'Blanko Penilaian Tes Klasifikasi',
     filename: 'blanko-penilaian-tes-klasifikasi.pdf',
     pageStyle: `
-      @page { size: 210mm 330mm; margin: 0; }
+      @page { size: 330mm 210mm; margin: 0; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }

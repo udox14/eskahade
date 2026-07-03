@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
-import { getSession, hasAnyRole, hasPsbBayarAkses, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasAnyPsbAkses, hasAnyRole, hasPsbAsramaAkses, hasPsbBayarAkses, hasPsbVerifikasiAkses, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { execute, generateId, getDB, query, queryOne, today } from '@/lib/db'
 import {
   DEFAULT_SANTRI_BARU_DURASI_BULAN,
@@ -63,15 +63,15 @@ type SantriPsbRow = {
 }
 
 function hasProcessAccess(session: SessionUser | null) {
-  return isAdmin(session) || hasAnyRole(session, ['sekpen', 'pengurus_asrama', 'bendahara'])
+  return isAdmin(session) || hasAnyRole(session, ['sekpen', 'pengurus_asrama', 'bendahara']) || hasAnyPsbAkses(session)
 }
 
 function canSekretariat(session: SessionUser | null) {
-  return isAdmin(session) || hasRole(session, 'sekpen')
+  return isAdmin(session) || hasRole(session, 'sekpen') || hasPsbVerifikasiAkses(session)
 }
 
 function canPenempatan(session: SessionUser | null) {
-  return isAdmin(session) || hasRole(session, 'sekpen')
+  return isAdmin(session) || hasRole(session, 'sekpen') || hasPsbAsramaAkses(session)
 }
 
 function canKamar(session: SessionUser | null) {
@@ -217,7 +217,10 @@ async function getPsbRows(session: SessionUser | null, filters?: {
   const params: unknown[] = []
   let where = `s.status_global = 'aktif' AND ((${kategoriSql}) = 'BARU' OR pf.id IS NOT NULL)`
 
-  if (hasRole(session, 'pengurus_asrama') && !isAdmin(session) && session?.asrama_binaan) {
+  // Pengurus_asrama biasa hanya melihat santri asrama binaannya (untuk step
+  // kamar). Tapi jika diberi grant petugas PSB (verifikasi/asrama/bayar), ia
+  // bertindak sebagai petugas pusat → lihat seluruh santri, tanpa scoping.
+  if (hasRole(session, 'pengurus_asrama') && !isAdmin(session) && session?.asrama_binaan && !hasAnyPsbAkses(session)) {
     where += ` AND s.asrama = ?`
     params.push(session.asrama_binaan)
   }

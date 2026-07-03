@@ -84,6 +84,18 @@ async function getUserById(id: string) {
   )
 }
 
+// Grant petugas PSB per-user + label untuk log aktivitas. Whitelist nama kolom
+// karena diinterpolasi langsung ke SQL.
+const PSB_AKSES_LABEL: Record<string, string> = {
+  psb_verifikasi_akses: 'verifikasi (kesekretariatan)',
+  psb_asrama_akses: 'penempatan asrama',
+  psb_bayar_akses: 'pembayaran',
+}
+
+function isPsbAksesField(field: string): field is keyof typeof PSB_AKSES_LABEL {
+  return field === 'psb_verifikasi_akses' || field === 'psb_asrama_akses' || field === 'psb_bayar_akses'
+}
+
 function parseRoles(raw: string | null, fallbackRole: string) {
   try {
     if (raw) {
@@ -143,11 +155,13 @@ async function ensureUserManagementColumns() {
     // Abaikan jika engine belum mendukung partial index.
   }
 
-  try {
-    await execute('ALTER TABLE users ADD COLUMN psb_bayar_akses INTEGER NOT NULL DEFAULT 0')
-  } catch (error: any) {
-    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
-      throw error
+  for (const col of ['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses']) {
+    try {
+      await execute(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
+    } catch (error: any) {
+      if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+        throw error
+      }
     }
   }
 }
@@ -437,6 +451,8 @@ export async function getUsersList() {
       u.roles,
       u.asrama_binaan,
       u.structural_jabatan,
+      u.psb_verifikasi_akses,
+      u.psb_asrama_akses,
       u.psb_bayar_akses,
       u.source_type,
       u.source_ref_id,
@@ -446,20 +462,23 @@ export async function getUsersList() {
     LEFT JOIN kelas k ON k.wali_kelas_id = u.id
     GROUP BY
       u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
-      u.structural_jabatan, u.psb_bayar_akses, u.source_type, u.source_ref_id, u.created_at
+      u.structural_jabatan, u.psb_verifikasi_akses, u.psb_asrama_akses,
+      u.psb_bayar_akses, u.source_type, u.source_ref_id, u.created_at
     ORDER BY u.created_at DESC`
   )
 }
 
-export async function setUserPsbBayarAkses(id: string, granted: boolean): Promise<{ success: boolean } | { error: string }> {
+// Set salah satu grant petugas PSB (verifikasi / asrama / bayar) untuk 1 user.
+export async function setUserPsbAkses(id: string, field: string, granted: boolean): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   if (!isAdmin(session)) return { error: 'Akses ditolak' }
+  if (!isPsbAksesField(field)) return { error: 'Jenis akses PSB tidak valid.' }
   await ensureUserManagementColumns()
 
   const user = await getUserById(id)
   if (!user) return { error: 'User tidak ditemukan.' }
 
-  await execute('UPDATE users SET psb_bayar_akses = ?, updated_at = ? WHERE id = ?', [granted ? 1 : 0, new Date().toISOString(), id])
+  await execute(`UPDATE users SET ${field} = ?, updated_at = ? WHERE id = ?`, [granted ? 1 : 0, new Date().toISOString(), id])
 
   await logActivity({
     actor: actorFromSession(session),
@@ -470,8 +489,8 @@ export async function setUserPsbBayarAkses(id: string, granted: boolean): Promis
     entityType: 'user',
     entityId: id,
     entityLabel: user.full_name || user.email,
-    summary: `${granted ? 'Memberikan' : 'Mencabut'} akses bayar PSB untuk ${user.full_name || user.email}`,
-    details: { psb_bayar_akses: granted },
+    summary: `${granted ? 'Memberikan' : 'Mencabut'} akses ${PSB_AKSES_LABEL[field]} PSB untuk ${user.full_name || user.email}`,
+    details: { field, granted },
   })
 
   revalidatePath('/dashboard/pengaturan/users')
