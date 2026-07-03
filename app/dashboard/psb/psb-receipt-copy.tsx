@@ -93,7 +93,7 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
         <div className="receipt-info">
           <InfoRow label="No. Kuitansi" value={receipt.receipt_no} strong />
           <InfoRow label="Tanggal" value={formatLongDate(receipt.created_at)} />
-          <InfoRow label="Metode" value="Tunai" />
+          <InfoRow label="Metode" value={receipt.metode === 'TRANSFER' ? 'Transfer' : 'Tunai'} />
           <InfoRow label="Petugas" value={officerName} />
         </div>
       </section>
@@ -381,6 +381,12 @@ export function PsbReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receip
           font-family: "Courier New", monospace;
           font-weight: 700;
           white-space: nowrap;
+        }
+        /* SISA TAGIHAN: Rp + nominal nempel tepat setelah titik dua, bukan
+           direntang ke ujung kolom. */
+        .summary-block table td.due-zero {
+          justify-content: flex-start;
+          gap: 4px;
         }
         .signature-section {
           display: grid;

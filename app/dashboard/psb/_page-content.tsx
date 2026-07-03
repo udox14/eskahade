@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -153,13 +154,22 @@ function paymentOutstanding(row: any) {
 }
 
 export default function PsbPageContent() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [selectedRole, setSelectedRole] = useState<RoleKey | null>(null)
-  const [q, setQ] = useState('')
-  const [tahunTagihan, setTahunTagihan] = useState(new Date().getFullYear())
+  // State awal dibaca dari URL agar tombol kembali (browser/HP/tombol halaman)
+  // mengembalikan user ke tugas & halaman PSB yang sama, bukan landing.
+  const [selectedRole, setSelectedRole] = useState<RoleKey | null>(() => {
+    const role = searchParams.get('role')
+    return (['sekretariat', 'asrama', 'kamar', 'pembayaran'] as const).includes(role as RoleKey) ? (role as RoleKey) : null
+  })
+  const [q, setQ] = useState(() => searchParams.get('q') ?? '')
+  const [tahunTagihan, setTahunTagihan] = useState(() => Number(searchParams.get('tahun')) || new Date().getFullYear())
   const [showDadakanModal, setShowDadakanModal] = useState(false)
   const [paymentModalRow, setPaymentModalRow] = useState<any | null>(null)
   const [dadakan, setDadakan] = useState({ nama_lengkap: '', jenis_kelamin: 'L' as 'L' | 'P', sekolah: '' })
@@ -171,12 +181,32 @@ export default function PsbPageContent() {
   const [paymentItems, setPaymentItems] = useState<Record<string, Record<string, boolean>>>({})
   const [showPreview, setShowPreview] = useState<Record<string, boolean>>({})
   const [verificationRow, setVerificationRow] = useState<any>(null)
-  const [page, setPage] = useState(1)
+  const [metode, setMetode] = useState<'TUNAI' | 'TRANSFER'>('TUNAI')
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
 
-  // Reset ke halaman 1 tiap ganti tugas/pencarian agar lazy-load konsisten.
+  // Reset ke halaman 1 tiap ganti tugas/pencarian — tapi jangan saat mount awal,
+  // supaya halaman yang dipulihkan dari URL tidak ketimpa.
+  const didMountRef = useRef(false)
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
     setPage(1)
   }, [selectedRole, q, tahunTagihan])
+
+  // Simpan state tugas/pencarian/halaman ke URL (replace, tanpa nambah history)
+  // agar bisa dipulihkan saat kembali dari halaman Edit santri.
+  useEffect(() => {
+    const sp = new URLSearchParams()
+    if (selectedRole) sp.set('role', selectedRole)
+    if (q.trim()) sp.set('q', q.trim())
+    sp.set('tahun', String(tahunTagihan))
+    if (page > 1) sp.set('page', String(page))
+    const qs = sp.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole, q, tahunTagihan, page])
 
   const load = async (silent = false) => {
     if (silent) setRefreshing(true)
@@ -329,7 +359,7 @@ export default function PsbPageContent() {
       if (picks[jenis]) items.push({ jenis })
     })
     if (picks.SPP_JULI) items.push({ jenis: 'SPP_JULI' })
-    const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items }), 'Pembayaran PSB tersimpan')
+    const result = await run(row.id, () => bayarPsbBatch({ santriId: row.id, tahunTagihan, items, metode }), 'Pembayaran PSB tersimpan')
     if (result?.receiptId) {
       printIframe(`/dashboard/psb/kuitansi/${result.receiptId}`)
       setPaymentItems(prev => ({ ...prev, [row.id]: {} }))
@@ -575,7 +605,7 @@ export default function PsbPageContent() {
               paidRows={paidRows}
               stats={paymentStats}
               busyId={busyId}
-              onOpenPayment={setPaymentModalRow}
+              onOpenPayment={(row: any) => { setMetode('TUNAI'); setPaymentModalRow(row) }}
               onCancelPayment={handleCancelPayment}
               onRevert={handleRevert}
             />
@@ -640,6 +670,8 @@ export default function PsbPageContent() {
           setBangunanNominal={setBangunanNominal}
           togglePayment={togglePayment}
           getPreviewItems={getPreviewItems}
+          metode={metode}
+          setMetode={setMetode}
           onBypass={() => handleBypass(paymentModalRow)}
           onCicilSemua={() => handleCicilSemua(paymentModalRow)}
           onLunasSemua={() => handleLunasSemua(paymentModalRow)}
@@ -1126,13 +1158,18 @@ function PembayaranView({ rows, footer, paidRows, stats, busyId, onOpenPayment, 
 }
 
 function SantriCells({ row }: { row: any }) {
+  // Bawa URL PSB saat ini (role/pencarian/halaman) sebagai `return` agar tombol
+  // kembali di halaman Edit balik ke state yang sama.
+  const searchParams = useSearchParams()
+  const returnUrl = `/dashboard/psb${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+  const editHref = `/dashboard/santri/${row.id}/edit?from=psb&return=${encodeURIComponent(returnUrl)}`
   return (
     <>
       <td className="px-4 py-3">
         <p className="font-bold text-slate-900">{row.nama_lengkap}</p>
         <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
           <span>{row.nis || '-'}</span>
-          <Link href={`/dashboard/santri/${row.id}/edit?from=psb`} className="font-bold text-blue-700 hover:underline">Edit</Link>
+          <Link href={editHref} className="font-bold text-blue-700 hover:underline">Edit</Link>
         </div>
       </td>
       <td className="px-4 py-3 text-slate-600">{row.sekolah || '-'}</td>
@@ -1274,7 +1311,7 @@ function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
   )
 }
 
-function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, onBypass, onCicilSemua, onLunasSemua, onClose, onSubmit }: any) {
+function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, setBangunanNominal, togglePayment, getPreviewItems, metode, setMetode, onBypass, onCicilSemua, onLunasSemua, onClose, onSubmit }: any) {
   const items = getPreviewItems(row)
   const total = items.reduce((sum: number, item: any) => sum + item.nominal, 0)
 
@@ -1301,7 +1338,23 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
               <p className="text-xs font-bold uppercase text-slate-500">Asrama / Kamar</p>
               <p className="mt-1 font-bold text-slate-900">{row.asrama || '-'} / {row.kamar || '-'}</p>
             </div>
-            
+
+            <div>
+              <p className="mb-1.5 text-[11px] font-bold uppercase text-slate-500">Metode Pembayaran</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['TUNAI', 'TRANSFER'] as const).map(m => (
+                  <button
+                    type="button"
+                    key={m}
+                    onClick={() => setMetode(m)}
+                    className={`rounded-xl border px-3 py-2 text-sm font-bold transition-colors ${metode === m ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    {m === 'TUNAI' ? 'Tunai' : 'Transfer'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1385,7 +1438,7 @@ function PaymentModal({ row, tahunTagihan, busy, paymentItems, bangunanNominal, 
             )}
           </div>
 
-          <ReceiptPreview row={row} items={items} total={total} tahunTagihan={tahunTagihan} />
+          <ReceiptPreview row={row} items={items} total={total} tahunTagihan={tahunTagihan} metode={metode} />
         </div>
       </div>
     </div>
@@ -1404,7 +1457,7 @@ function PaymentOption({ title, subtitle, checked, disabled, onChange }: any) {
   )
 }
 
-function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
+function ReceiptPreview({ row, items, total, tahunTagihan, metode }: any) {
   const mockReceipt = {
     total,
     nama_lengkap: row.nama_lengkap,
@@ -1416,6 +1469,7 @@ function ReceiptPreview({ row, items, total, tahunTagihan }: any) {
     receipt_no: 'Nomor otomatis',
     created_at: new Date().toISOString(),
     penerima_nama: 'Bendahara',
+    metode,
   }
 
   const frameRef = useRef<HTMLDivElement>(null)

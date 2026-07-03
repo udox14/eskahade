@@ -27,7 +27,11 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
   if (!(await canCrud('/dashboard/santri', 'update'))) redirect('/dashboard/santri')
   const { id } = await params
   const query = await searchParams
-  const backHref = query.from === 'psb' ? '/dashboard/psb' : `/dashboard/santri/${id}`
+  // Kembali ke state Flow PSB persis sebelum klik Edit (role/pencarian/halaman),
+  // bukan ke landing PSB. `return` dibawa dari link PSB, divalidasi agar aman.
+  const rawReturn = typeof query.return === 'string' ? query.return : ''
+  const psbReturn = rawReturn.startsWith('/dashboard/psb') ? rawReturn : '/dashboard/psb'
+  const backHref = query.from === 'psb' ? psbReturn : `/dashboard/santri/${id}`
   const [{ data: santri, error }, kelasList, kelasAktif] = await Promise.all([
     getSantriById(id),
     getKelasPesantrenList(),
@@ -61,7 +65,7 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
       </div>
 
       <form action={handleUpdate} className="space-y-6">
-        {query.from === 'psb' ? <input type="hidden" name="redirect_to" value="/dashboard/psb" /> : null}
+        {query.from === 'psb' ? <input type="hidden" name="redirect_to" value={psbReturn} /> : null}
 
         {/* ── IDENTITAS ── */}
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">

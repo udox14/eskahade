@@ -182,7 +182,9 @@ export async function updateSantri(id: string, formData: FormData) {
   })
 
   const redirectTo = String(formData.get('redirect_to') || '')
-  const target = redirectTo === '/dashboard/psb' ? redirectTo : '/dashboard/santri'
+  // Terima path Flow PSB beserta query (role/pencarian/halaman) supaya balik ke
+  // state semula. Batasi ke prefix PSB agar tidak jadi open-redirect.
+  const target = redirectTo.startsWith('/dashboard/psb') ? redirectTo : '/dashboard/santri'
 
   revalidatePath('/dashboard/santri')
   revalidatePath('/dashboard/santri/atur-kelas')

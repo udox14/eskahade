@@ -248,6 +248,11 @@ export default async function PsbReceiptPage({ params }: Props) {
           font-weight: 700;
           white-space: nowrap;
         }
+        /* SISA TAGIHAN: Rp + nominal nempel tepat setelah titik dua. */
+        .summary-block table td.due-zero {
+          justify-content: flex-start;
+          gap: 4px;
+        }
         .signature-section {
           display: grid;
           grid-template-columns: 1fr 1fr;

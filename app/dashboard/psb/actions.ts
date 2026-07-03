@@ -191,6 +191,9 @@ async function ensureSchemaOnce() {
     await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_by TEXT')
     await execute('ALTER TABLE psb_payment_receipt ADD COLUMN voided_at TEXT')
   }
+  if (!receiptColumns.some((col) => col.name === 'metode')) {
+    await execute("ALTER TABLE psb_payment_receipt ADD COLUMN metode TEXT NOT NULL DEFAULT 'TUNAI'")
+  }
 
   // Index untuk mempercepat scan flow PSB pada dataset besar (591+ santri).
   await db.batch([
@@ -719,10 +722,13 @@ async function nextReceiptNo() {
   return `${prefix}/${String(Number(row?.total ?? 0) + 1).padStart(4, '0')}`
 }
 
+export type PsbMetode = 'TUNAI' | 'TRANSFER'
+
 export async function bayarPsbBatch(input: {
   santriId: string
   tahunTagihan: number
   items: PsbPaymentInput[]
+  metode?: PsbMetode
 }) {
   const access = await assertFeature(PSB_PATH, 'create')
   if ('error' in access) return access
@@ -821,6 +827,7 @@ export async function bayarPsbBatch(input: {
     }
   }
 
+  const metode: PsbMetode = input.metode === 'TRANSFER' ? 'TRANSFER' : 'TUNAI'
   const receiptId = generateId()
   const receiptNo = await nextReceiptNo()
   const total = normalized.reduce((sum, item) => sum + item.nominal, 0) + sppJuliNominal
@@ -828,9 +835,9 @@ export async function bayarPsbBatch(input: {
   const db = await getDB()
   await db.batch([
     db.prepare(`
-      INSERT INTO psb_payment_receipt (id, receipt_no, santri_id, tahun_tagihan, total, created_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `).bind(receiptId, receiptNo, input.santriId, tahunTagihan, total, access.id),
+      INSERT INTO psb_payment_receipt (id, receipt_no, santri_id, tahun_tagihan, total, metode, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(receiptId, receiptNo, input.santriId, tahunTagihan, total, metode, access.id),
     ...normalized.map((item) =>
       db.prepare(`
         INSERT INTO pembayaran_tahunan (
@@ -882,6 +889,7 @@ export async function bayarPsbBatch(input: {
         santri_id: input.santriId,
         receipt_no: receiptNo,
         total,
+        metode,
         items: normalized,
         spp_juli: wantSppJuli ? { tahun: tahunTagihan, bulan: SPP_JULI_BULAN, nominal: sppJuliNominal } : null,
         spp_pre_juli_ditiadakan: wantSppJuli ? preJulyWaiveMonths : [],

@@ -88,15 +88,15 @@ function ReceiptCopy({ receipt, items, printedAt, sisa = 0 }: { receipt: any; it
       <section className="intro-grid">
         <div className="student-info">
           <InfoRow label="Nama Santri" value={payerName} strong />
-          <InfoRow label="N I S" value={receipt.nis || '-'} />
-          <InfoRow label="Madrasah" value={receipt.sekolah || '-'} />
-          <InfoRow label="Asrama / Kamar" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
+          <InfoRow label="NIS" value={receipt.nis || '-'} />
+          <InfoRow label="Kelas" value={receipt.sekolah || '-'} />
+          <InfoRow label="Asrama" value={`${receipt.asrama || '-'} / ${receipt.kamar || '-'}`} />
         </div>
 
         <div className="receipt-info">
-          <InfoRow label="Nomor Kuitansi" value={receiptNumber(receipt)} strong />
-          <InfoRow label="Tanggal Dibayar" value={formatLongDate(receipt.tanggal_bayar)} />
-          <InfoRow label="Cara Pembayaran" value="Tunai" />
+          <InfoRow label="No. Kuitansi" value={receiptNumber(receipt)} strong />
+          <InfoRow label="Tanggal" value={formatLongDate(receipt.tanggal_bayar)} />
+          <InfoRow label="Metode" value="Tunai" />
           <InfoRow label="Petugas" value={officerName} />
         </div>
       </section>
