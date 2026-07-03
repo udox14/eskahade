@@ -90,48 +90,52 @@ export async function updateSantri(id: string, formData: FormData) {
 
   if (kelasPesantrenId && !afterKelas) return { error: 'Kelas pesantren tidak ditemukan.' }
 
-  await query(
-    `UPDATE santri SET
-      nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
-      jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?,
-      gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
-      jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
-      kategori_santri = ?, sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
-    WHERE id = ?`,
-    [
-      formData.get('nis'), formData.get('nama_lengkap'), formData.get('nik') || null,
-      formData.get('tempat_lahir') || null, formData.get('tanggal_lahir') || null,
-      formData.get('jenis_kelamin'),
-      formData.get('nama_ayah') || null, formData.get('nama_ibu') || null,
-      formData.get('alamat') || null,
-      formData.get('gol_darah') || null,
-      formData.get('alamat_lengkap') || null,
-      formData.get('kecamatan') || null,
-      formData.get('kab_kota') || null,
-      formData.get('provinsi') || null,
-      formData.get('jemaah') || null,
-      formData.get('no_wa_ortu') || null,
-      formData.get('tanggal_masuk') || null,
-      formData.get('tanggal_keluar') || null,
-      kategoriSantri, sekolah, kelasSekolah,
-      formData.get('asrama') || null, formData.get('kamar') || null,
-      now, id
-    ]
-  )
-
-  const beforeKelasId = beforeKelas?.kelas_id ?? ''
-  if (kelasPesantrenId !== beforeKelasId) {
+  try {
     await query(
-      "UPDATE riwayat_pendidikan SET status_riwayat = 'pindah' WHERE santri_id = ? AND status_riwayat = 'aktif'",
-      [id]
+      `UPDATE santri SET
+        nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
+        jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?,
+        gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
+        jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
+        kategori_santri = ?, sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
+      WHERE id = ?`,
+      [
+        formData.get('nis'), formData.get('nama_lengkap'), formData.get('nik') || null,
+        formData.get('tempat_lahir') || null, formData.get('tanggal_lahir') || null,
+        formData.get('jenis_kelamin'),
+        formData.get('nama_ayah') || null, formData.get('nama_ibu') || null,
+        formData.get('alamat') || null,
+        formData.get('gol_darah') || null,
+        formData.get('alamat_lengkap') || null,
+        formData.get('kecamatan') || null,
+        formData.get('kab_kota') || null,
+        formData.get('provinsi') || null,
+        formData.get('jemaah') || null,
+        formData.get('no_wa_ortu') || null,
+        formData.get('tanggal_masuk') || null,
+        formData.get('tanggal_keluar') || null,
+        kategoriSantri, sekolah, kelasSekolah,
+        formData.get('asrama') || null, formData.get('kamar') || null,
+        now, id
+      ]
     )
 
-    if (kelasPesantrenId) {
+    const beforeKelasId = beforeKelas?.kelas_id ?? ''
+    if (kelasPesantrenId !== beforeKelasId) {
       await query(
-        'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
-        [crypto.randomUUID(), id, kelasPesantrenId, 'aktif', now]
+        "UPDATE riwayat_pendidikan SET status_riwayat = 'pindah' WHERE santri_id = ? AND status_riwayat = 'aktif'",
+        [id]
       )
+
+      if (kelasPesantrenId) {
+        await query(
+          'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
+          [crypto.randomUUID(), id, kelasPesantrenId, 'aktif', now]
+        )
+      }
     }
+  } catch (err: any) {
+    return { error: `Gagal menyimpan: ${err.message}` }
   }
 
   const changedFields = diffWhitelistedFields(beforeSantri, afterSantri, [

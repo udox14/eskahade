@@ -166,10 +166,10 @@ export default function InputSantriPage() {
       return
     }
 
-    if (!await confirm(`Import ${excelData.length} santri? Proses akan berjalan per 50 data.\nJika NIS sudah ada, data yang berubah akan otomatis diperbarui.`)) return
+    if (!await confirm(`Import ${excelData.length} santri?\nJika NIS sudah ada, data yang berubah akan otomatis diperbarui.`)) return
 
     setIsSavingExcel(true)
-    const BATCH_SIZE = 50
+    const BATCH_SIZE = 500
     const total = excelData.length
     let inserted = 0
     let updated = 0

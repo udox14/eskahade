@@ -104,6 +104,11 @@ const STATIC_EDGES: ForeignKeyEdge[] = [
   { childTable: 'nilai_harian_detail',    childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
   { childTable: 'hafalan_progress',       childColumn: 'riwayat_pendidikan_id', parentTable: 'riwayat_pendidikan', parentColumn: 'id' },
   { childTable: 'upk_item',               childColumn: 'transaksi_id',  parentTable: 'upk_transaksi',             parentColumn: 'id' },
+  { childTable: 'perizinan_pengajuan',    childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'pendaftar',              childColumn: 'santri_id',      parentTable: 'santri',                  parentColumn: 'id' },
+  { childTable: 'pendaftar_berkas',       childColumn: 'pendaftar_id',   parentTable: 'pendaftar',               parentColumn: 'id' },
+  { childTable: 'keuangan_non_spp_opening_balance', childColumn: 'santri_id', parentTable: 'santri', parentColumn: 'id' },
+  { childTable: 'tes_klasifikasi_plotting', childColumn: 'santri_id',    parentTable: 'santri',                  parentColumn: 'id' },
 ]
 
 const STATIC_PK: Map<string, string | null> = new Map([
@@ -151,6 +156,11 @@ const STATIC_PK: Map<string, string | null> = new Map([
   ['nilai_akhlak',             'id'],
   ['ranking',                  'id'],
   ['nilai_harian_detail',      'id'],
+  ['perizinan_pengajuan',      'id'],
+  ['pendaftar',                'id'],
+  ['pendaftar_berkas',         'id'],
+  ['keuangan_non_spp_opening_balance', 'id'],
+  ['tes_klasifikasi_plotting', 'id'],
 ])
 
 async function buildRelatedDeleteStatements(rootSantriId: string) {
