@@ -5,7 +5,7 @@ import { hashPassword } from '@/lib/auth/password'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { getCachedDataGuru, getCachedMarhalahList } from '@/lib/cache/master'
+import { getCachedDataGuru, getCachedMarhalahList, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 import {
   buildWeeklyGuruRuleMap,
   ensureGuruJadwalSchema,
@@ -260,6 +260,120 @@ async function validateWeeklyGuruConflicts(payload: SimpanJadwalPayload[]) {
   }
 
   return null
+}
+
+export async function getTahunAjaranList() {
+  return getCachedTahunAjaranList()
+}
+
+export async function copyGuruJadwalFromTahunAjaran(sourceTahunAjaranId: number): Promise<
+  { success: boolean; kelasUpdated: number; jadwalCopied: number; skipped: number; unmatched: number } | { error: string }
+> {
+  await ensureKelasCetakColumns()
+  const session = await getSession()
+  const aktif = await getCachedTahunAjaranAktif()
+  if (!aktif) return { error: 'Tidak ada tahun ajaran aktif.' }
+  if (Number(sourceTahunAjaranId) === Number(aktif.id)) return { error: 'Tidak bisa copy dari tahun ajaran yang sama.' }
+
+  const sourceKelas = await query<{
+    id: string; nama_kelas: string; marhalah_id: string | null
+    wali_kelas_id: string | null; guru_shubuh_id: number | null; guru_ashar_id: number | null; guru_maghrib_id: number | null
+  }>(
+    `SELECT id, nama_kelas, marhalah_id, wali_kelas_id, guru_shubuh_id, guru_ashar_id, guru_maghrib_id
+     FROM kelas WHERE tahun_ajaran_id = ?`,
+    [sourceTahunAjaranId]
+  )
+  if (sourceKelas.length === 0) return { error: 'Tidak ada data kelas di tahun ajaran sumber.' }
+
+  const targetKelas = await query<{
+    id: string; nama_kelas: string; marhalah_id: string | null
+    wali_kelas_id: string | null; guru_shubuh_id: number | null; guru_ashar_id: number | null; guru_maghrib_id: number | null
+  }>(
+    `SELECT id, nama_kelas, marhalah_id, wali_kelas_id, guru_shubuh_id, guru_ashar_id, guru_maghrib_id
+     FROM kelas WHERE tahun_ajaran_id = ?`,
+    [aktif.id]
+  )
+  const targetMap = new Map(targetKelas.map(k => [`${k.nama_kelas.toLowerCase().trim()}-${k.marhalah_id}`, k]))
+
+  const kelasUpdateStmts: { sql: string; params: any[] }[] = []
+  const kelasIdsToCopyJadwal: { sourceId: string; targetId: string }[] = []
+  let unmatched = 0
+  let skipped = 0
+
+  for (const src of sourceKelas) {
+    const key = `${src.nama_kelas.toLowerCase().trim()}-${src.marhalah_id}`
+    const target = targetMap.get(key)
+    if (!target) { unmatched++; continue }
+
+    const targetHasGuru = target.wali_kelas_id || target.guru_shubuh_id || target.guru_ashar_id || target.guru_maghrib_id
+    if (!targetHasGuru) {
+      kelasUpdateStmts.push({
+        sql: 'UPDATE kelas SET wali_kelas_id = ?, guru_shubuh_id = ?, guru_ashar_id = ?, guru_maghrib_id = ? WHERE id = ?',
+        params: [src.wali_kelas_id, src.guru_shubuh_id, src.guru_ashar_id, src.guru_maghrib_id, target.id],
+      })
+    } else {
+      skipped++
+    }
+
+    kelasIdsToCopyJadwal.push({ sourceId: src.id, targetId: target.id })
+  }
+
+  if (kelasUpdateStmts.length > 0) await batch(kelasUpdateStmts)
+
+  let jadwalCopied = 0
+  if (kelasIdsToCopyJadwal.length > 0) {
+    const targetIdsWithRules = new Set(
+      (await query<{ kelas_id: string }>(
+        `SELECT DISTINCT kelas_id FROM kelas_jadwal_guru_mingguan WHERE kelas_id IN (${kelasIdsToCopyJadwal.map(() => '?').join(',')})`,
+        kelasIdsToCopyJadwal.map(x => x.targetId)
+      )).map(r => r.kelas_id)
+    )
+
+    const sourceIds = kelasIdsToCopyJadwal.map(x => x.sourceId)
+    const sourceRules = await query<{ kelas_id: string; sesi: string; hari_index: number; guru_id: number }>(
+      `SELECT kelas_id, sesi, hari_index, guru_id FROM kelas_jadwal_guru_mingguan WHERE kelas_id IN (${sourceIds.map(() => '?').join(',')})`,
+      sourceIds
+    )
+
+    const insertStmts: { sql: string; params: any[] }[] = []
+    for (const pair of kelasIdsToCopyJadwal) {
+      if (targetIdsWithRules.has(pair.targetId)) continue
+      const rulesForKelas = sourceRules.filter(r => r.kelas_id === pair.sourceId)
+      for (const rule of rulesForKelas) {
+        insertStmts.push({
+          sql: `INSERT INTO kelas_jadwal_guru_mingguan (kelas_id, sesi, hari_index, guru_id, updated_at) VALUES (?, ?, ?, ?, datetime('now'))`,
+          params: [pair.targetId, rule.sesi, rule.hari_index, rule.guru_id],
+        })
+      }
+    }
+    if (insertStmts.length > 0) {
+      await batch(insertStmts)
+      jadwalCopied = insertStmts.length
+    }
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_wali_kelas',
+    action: 'update',
+    fiturHref: '/dashboard/master/wali-kelas',
+    logKind: 'update',
+    entityType: 'kelas_guru_jadwal_batch',
+    entityId: 'copy-tahun-ajaran',
+    entityLabel: 'Copy guru & jadwal dari tahun ajaran lalu',
+    summary: `Copy guru & jadwal dari tahun ajaran lalu: ${kelasUpdateStmts.length} kelas, ${jadwalCopied} baris jadwal`,
+    details: {
+      kelas_updated: kelasUpdateStmts.length,
+      jadwal_copied: jadwalCopied,
+      skipped,
+      unmatched,
+      source_tahun_ajaran_id: sourceTahunAjaranId,
+      target_tahun_ajaran_id: aktif.id,
+    },
+  })
+
+  revalidatePath('/dashboard/master/wali-kelas')
+  return { success: true, kelasUpdated: kelasUpdateStmts.length, jadwalCopied, skipped, unmatched }
 }
 
 export async function getDataMaster() {

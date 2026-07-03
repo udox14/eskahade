@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif } from './actions'
-import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle } from 'lucide-react'
+import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif, getTahunAjaranList, copyKitabFromTahunAjaran } from './actions'
+import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
@@ -31,19 +31,38 @@ export default function MasterKitabPage() {
   const [excelData, setExcelData] = useState<any[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // State Copy
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState<number | ''>('')
+  const [isCopying, setIsCopying] = useState(false)
+
   useEffect(() => {
     initData()
   }, [])
 
   useEffect(() => {
     loadKitab()
-  }, [filterMarhalah]) 
+  }, [filterMarhalah])
 
   const initData = async () => {
-    const [m, mp, ta] = await Promise.all([getMarhalahList(), getMapelList(), getTahunAjaranAktif()])
+    const [m, mp, ta, tal] = await Promise.all([getMarhalahList(), getMapelList(), getTahunAjaranAktif(), getTahunAjaranList()])
     setMarhalahList(m)
     setMapelList(mp)
     setTahunAktif(ta)
+    setTahunAjaranList(tal)
+  }
+
+  const handleCopyKitab = async () => {
+    if (copySourceId === '') return toast.error('Pilih tahun ajaran sumber terlebih dahulu')
+    setIsCopying(true)
+    const res = await copyKitabFromTahunAjaran(copySourceId as number)
+    setIsCopying(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${res.count} kitab disalin${res.skipped > 0 ? `, ${res.skipped} dilewati (sudah ada)` : ''}`)
+    setCopyModalOpen(false)
+    setCopySourceId('')
+    loadKitab()
   }
 
   const loadKitab = async () => {
@@ -141,13 +160,22 @@ export default function MasterKitabPage() {
           className="flex-1"
         />
         
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-           <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-             <List className="w-4 h-4"/> Daftar Kitab
-           </button>
-           <button onClick={() => setTab('IMPORT')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'IMPORT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-             <FileSpreadsheet className="w-4 h-4"/> Import Excel
-           </button>
+        <div className="flex flex-wrap gap-2 items-start">
+          <button
+            onClick={() => setCopyModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            <Copy className="h-4 w-4" />
+            Copy dari Tahun Lalu
+          </button>
+          <div className="flex bg-slate-100 p-1 rounded-lg">
+             <button onClick={() => setTab('LIST')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'LIST' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+               <List className="w-4 h-4"/> Daftar Kitab
+             </button>
+             <button onClick={() => setTab('IMPORT')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${tab === 'IMPORT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+               <FileSpreadsheet className="w-4 h-4"/> Import Excel
+             </button>
+          </div>
         </div>
       </div>
 
@@ -312,6 +340,41 @@ export default function MasterKitabPage() {
                 </div>
              )}
          </div>
+      )}
+
+      {copyModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">Copy Kitab dari Tahun Lalu</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Kitab yang namanya sudah ada di tahun ini akan dilewati.</p>
+              </div>
+              <button onClick={() => setCopyModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Pilih Tahun Ajaran Sumber</label>
+                <select
+                  value={copySourceId}
+                  onChange={e => setCopySourceId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-emerald-500"
+                >
+                  <option value="">-- Pilih Tahun Ajaran --</option>
+                  {tahunAjaranList.filter((t: any) => t.id !== tahunAktif?.id).map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.nama}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="p-5 border-t flex justify-end gap-2">
+              <button onClick={() => setCopyModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+              <button onClick={handleCopyKitab} disabled={isCopying} className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
+                {isCopying ? <Loader2 className="w-4 h-4 animate-spin"/> : <Copy className="w-4 h-4"/>} Copy Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

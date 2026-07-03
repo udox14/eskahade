@@ -596,11 +596,19 @@ export async function getPlottingRows(eventId: number) {
   return query<any>(`
     SELECT p.*, s.tanggal, s.nomor_sesi, s.label AS sesi_label, s.waktu_mulai, s.waktu_selesai,
            r.nomor_ruangan, r.nama_ruangan, r.tempat, r.kapasitas,
-           san.nis, san.nama_lengkap, san.jenis_kelamin, san.sekolah, san.asrama, san.kamar
+           san.nis, san.nama_lengkap, san.jenis_kelamin, san.sekolah, san.asrama, san.kamar, san.alamat,
+           pengetes.nama_lengkap AS pengetes_nama,
+           pendamping.nama_lengkap AS pendamping_nama
     FROM tes_klasifikasi_plotting p
     JOIN tes_klasifikasi_sesi s ON s.id = p.sesi_id
     JOIN tes_klasifikasi_ruangan r ON r.id = p.ruangan_id
     JOIN santri san ON san.id = p.santri_id
+    LEFT JOIN tes_klasifikasi_ruangan_petugas petugas
+      ON petugas.event_id = p.event_id
+      AND petugas.sesi_id = p.sesi_id
+      AND petugas.ruangan_id = p.ruangan_id
+    LEFT JOIN data_guru pengetes ON pengetes.id = petugas.pengetes_guru_id
+    LEFT JOIN data_guru pendamping ON pendamping.id = petugas.pendamping_guru_id
     WHERE p.event_id = ?
     ORDER BY s.tanggal, s.nomor_sesi, r.nomor_ruangan, p.nomor_urut
   `, [eventId])

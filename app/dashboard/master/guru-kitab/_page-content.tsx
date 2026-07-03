@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, CalendarDays, Filter, Loader2, Plus, Save, Search, Settings2, Sparkles, Trash2, UsersRound, X } from 'lucide-react'
+import { BookOpen, CalendarDays, Copy, Filter, Loader2, Plus, Save, Search, Settings2, Sparkles, Trash2, UsersRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { generateGuruKitabDefaults, getGuruKitabSetup, saveGuruKitabAssignments, type GuruKitabSaveRow } from './actions'
+import { copyGuruKitabFromTahunAjaran, generateGuruKitabDefaults, getGuruKitabSetup, saveGuruKitabAssignments, type GuruKitabSaveRow } from './actions'
 
 type SessionKey = 'shubuh' | 'ashar' | 'maghrib'
 type DraftAssignment = {
@@ -82,6 +82,9 @@ export default function GuruKitabPageContent() {
   const [guruFilter, setGuruFilter] = useState('')
   const [overrideModal, setOverrideModal] = useState<{ kelasId: string; sesi: SessionKey } | null>(null)
   const [overrideHariIndex, setOverrideHariIndex] = useState(1)
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState('')
+  const [isCopying, setIsCopying] = useState(false)
 
   const loadData = async (tahunId?: string, mrhId?: string) => {
     setLoading(true)
@@ -257,6 +260,22 @@ export default function GuruKitabPageContent() {
     })
   }
 
+  const handleCopyGuruKitab = async () => {
+    if (!tahunAjaranId) return toast.warning('Pilih tahun ajaran target dulu.')
+    if (!copySourceId) return toast.error('Pilih tahun ajaran sumber terlebih dahulu')
+    setIsCopying(true)
+    const res = await copyGuruKitabFromTahunAjaran(Number(tahunAjaranId), Number(copySourceId))
+    setIsCopying(false)
+    if ('error' in res) return toast.error(res.error)
+    const parts = [`${res.count} baris disalin`]
+    if (res.skipped > 0) parts.push(`${res.skipped} dilewati (sudah ada)`)
+    if (res.unmatched > 0) parts.push(`${res.unmatched} tidak ketemu padanan kelas/kitab`)
+    toast.success(parts.join(', '))
+    setCopyModalOpen(false)
+    setCopySourceId('')
+    await loadData(tahunAjaranId, marhalahId)
+  }
+
   const activeOverrideClass = overrideModal ? kelasList.find(kelas => kelas.id === overrideModal.kelasId) : null
 
   return (
@@ -268,6 +287,10 @@ export default function GuruKitabPageContent() {
           className="flex-1"
         />
         <div className="flex flex-wrap gap-2">
+          <button onClick={() => setCopyModalOpen(true)} disabled={loading || !tahunAjaranId} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+            <Copy className="h-4 w-4" />
+            Copy dari Tahun Lalu
+          </button>
           <button onClick={handleGenerate} disabled={generating || loading || !tahunAjaranId} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-amber-600 disabled:opacity-50">
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Generate Default
@@ -444,6 +467,43 @@ export default function GuruKitabPageContent() {
           </div>
         </div>
       ) : null}
+
+      {copyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Copy Pembagian Kitab dari Tahun Lalu</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Kelas & kitab dicocokkan berdasarkan nama. Yang sudah ada dilewati.</p>
+              </div>
+              <button onClick={() => setCopyModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Pilih Tahun Ajaran Sumber</label>
+                <select
+                  value={copySourceId}
+                  onChange={e => setCopySourceId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Pilih Tahun Ajaran --</option>
+                  {tahunAjaranList.filter((t: any) => String(t.id) !== String(tahunAjaranId)).map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.nama}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
+              <button onClick={() => setCopyModalOpen(false)} className="rounded-xl border bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Batal</button>
+              <button onClick={handleCopyGuruKitab} disabled={isCopying} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                {isCopying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />} Copy Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

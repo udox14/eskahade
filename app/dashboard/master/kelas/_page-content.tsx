@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif } from './actions'
-import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer } from 'lucide-react'
+import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif, getTahunAjaranList, copyKelasFromTahunAjaran } from './actions'
+import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -17,6 +17,10 @@ export default function MasterKelasPage() {
   const [loading, setLoading] = useState(true)
   const [excelData, setExcelData] = useState<any[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState<number | ''>('')
+  const [isCopying, setIsCopying] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -24,11 +28,24 @@ export default function MasterKelasPage() {
 
   const loadData = async () => {
     setLoading(true)
-    const [m, k, ta] = await Promise.all([getMarhalahList(), getKelasList(), getTahunAjaranAktif()])
+    const [m, k, ta, tal] = await Promise.all([getMarhalahList(), getKelasList(), getTahunAjaranAktif(), getTahunAjaranList()])
     setMarhalahList(m)
     setKelasList(k)
     setTahunAktif(ta)
+    setTahunAjaranList(tal)
     setLoading(false)
+  }
+
+  const handleCopyKelas = async () => {
+    if (copySourceId === '') return toast.error('Pilih tahun ajaran sumber terlebih dahulu')
+    setIsCopying(true)
+    const res = await copyKelasFromTahunAjaran(copySourceId as number)
+    setIsCopying(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success(`${res.count} kelas disalin${res.skipped > 0 ? `, ${res.skipped} dilewati (sudah ada)` : ''}`)
+    setCopyModalOpen(false)
+    setCopySourceId('')
+    loadData()
   }
 
   const handleTambahManual = async (formData: FormData) => {
@@ -109,13 +126,22 @@ export default function MasterKelasPage() {
           title="Manajemen Kelas & Ruangan"
           description="Atur struktur kelas per tahun ajaran."
           action={(
-            <Link
-              href="/dashboard/master/kelas/tempelan"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" />
-              Cetak Tempelan
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setCopyModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Copy className="h-4 w-4" />
+                Copy dari Tahun Lalu
+              </button>
+              <Link
+                href="/dashboard/master/kelas/tempelan"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Printer className="h-4 w-4" />
+                Cetak Tempelan
+              </Link>
+            </div>
           )}
           className="flex-1"
         />
@@ -253,6 +279,41 @@ export default function MasterKelasPage() {
                 </div>
             )}
          </div>
+      )}
+
+      {copyModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">Copy Kelas dari Tahun Lalu</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Kelas yang namanya sudah ada di tahun ini akan dilewati.</p>
+              </div>
+              <button onClick={() => setCopyModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Pilih Tahun Ajaran Sumber</label>
+                <select
+                  value={copySourceId}
+                  onChange={e => setCopySourceId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-blue-500"
+                >
+                  <option value="">-- Pilih Tahun Ajaran --</option>
+                  {tahunAjaranList.filter((t: any) => t.id !== tahunAktif?.id).map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.nama}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="p-5 border-t flex justify-end gap-2">
+              <button onClick={() => setCopyModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+              <button onClick={handleCopyKelas} disabled={isCopying} className="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                {isCopying ? <Loader2 className="w-4 h-4 animate-spin"/> : <Copy className="w-4 h-4"/>} Copy Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

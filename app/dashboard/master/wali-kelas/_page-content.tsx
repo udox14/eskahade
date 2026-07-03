@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch } from './actions'
-import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X } from 'lucide-react'
+import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran } from './actions'
+import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -102,16 +102,37 @@ export default function ManajemenGuruPage() {
   const [newGuru, setNewGuru] = useState({ nama: '', gelar: '', kode: '' })
   const [search, setSearch] = useState('')
 
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState<number | ''>('')
+  const [isCopying, setIsCopying] = useState(false)
+
   useEffect(() => { loadInitialData() }, [])
 
   const loadInitialData = async () => {
     setLoading(true)
-    const res = await getJadwalFilterOptions()
+    const [res, tal] = await Promise.all([getJadwalFilterOptions(), getTahunAjaranList()])
     setGuruList(res.guruList)
     setMarhalahList(res.marhalahList)
     setWaliUserList(res.waliUserList || [])
     setSelectedGuruIds([])
+    setTahunAjaranList(tal)
     setLoading(false)
+  }
+
+  const handleCopyGuruJadwal = async () => {
+    if (copySourceId === '') return toast.error('Pilih tahun ajaran sumber terlebih dahulu')
+    setIsCopying(true)
+    const res = await copyGuruJadwalFromTahunAjaran(copySourceId as number)
+    setIsCopying(false)
+    if ('error' in res) return toast.error(res.error)
+    const parts = [`${res.kelasUpdated} kelas diisi guru`, `${res.jadwalCopied} baris jadwal disalin`]
+    if (res.skipped > 0) parts.push(`${res.skipped} kelas dilewati (sudah diisi)`)
+    if (res.unmatched > 0) parts.push(`${res.unmatched} kelas tidak ketemu padanan nama`)
+    toast.success(parts.join(', '))
+    setCopyModalOpen(false)
+    setCopySourceId('')
+    if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
   }
 
   const loadKelasByFilter = async (marhalahId: string) => {
@@ -389,13 +410,22 @@ export default function ManajemenGuruPage() {
           title="Manajemen Guru & Jadwal"
           description="Atur guru default, pembagian harian mingguan, dan wali kelas manual."
           action={(
-            <Link
-              href="/dashboard/master/wali-kelas/cetak"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" />
-              Cetak Tugas Mengajar
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setCopyModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Copy className="h-4 w-4" />
+                Copy dari Tahun Lalu
+              </button>
+              <Link
+                href="/dashboard/master/wali-kelas/cetak"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Printer className="h-4 w-4" />
+                Cetak Tugas Mengajar
+              </Link>
+            </div>
           )}
           className="flex-1"
         />
@@ -809,6 +839,41 @@ export default function ManajemenGuruPage() {
               onPageChange={setPage}
               onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
             />
+          </div>
+        </div>
+      )}
+
+      {copyModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">Copy Guru & Jadwal dari Tahun Lalu</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Hanya mengisi kelas yang belum ada guru/jadwal-nya. Kelas dicocokkan berdasarkan nama.</p>
+              </div>
+              <button onClick={() => setCopyModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Pilih Tahun Ajaran Sumber</label>
+                <select
+                  value={copySourceId}
+                  onChange={e => setCopySourceId(e.target.value ? parseInt(e.target.value) : '')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Pilih Tahun Ajaran --</option>
+                  {tahunAjaranList.filter((t: any) => !t.is_active).map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.nama}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="p-5 border-t flex justify-end gap-2">
+              <button onClick={() => setCopyModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+              <button onClick={handleCopyGuruJadwal} disabled={isCopying} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
+                {isCopying ? <Loader2 className="w-4 h-4 animate-spin"/> : <Copy className="w-4 h-4"/>} Copy Sekarang
+              </button>
+            </div>
           </div>
         </div>
       )}

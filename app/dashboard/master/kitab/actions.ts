@@ -200,3 +200,52 @@ export async function importKitabMassal(dataExcel: any[]): Promise<{ success: bo
   revalidatePath('/dashboard/master/kitab')
   return { success: true, inserted: toInsert.length, updated: toUpdate.length, failed: failCount }
 }
+
+export async function copyKitabFromTahunAjaran(sourceTahunAjaranId: number): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+  const session = await getSession()
+  const aktif = await getCachedTahunAjaranAktif()
+  if (!aktif) return { error: 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.' }
+  if (Number(sourceTahunAjaranId) === Number(aktif.id)) return { error: 'Tidak bisa copy dari tahun ajaran yang sama.' }
+
+  const sourceKitab = await query<any>(
+    'SELECT nama_kitab, marhalah_id, mapel_id, harga FROM kitab WHERE tahun_ajaran_id = ?',
+    [sourceTahunAjaranId]
+  )
+  if (sourceKitab.length === 0) return { error: 'Tidak ada data kitab di tahun ajaran sumber.' }
+
+  const existing = await query<any>('SELECT nama_kitab, marhalah_id FROM kitab WHERE tahun_ajaran_id = ?', [aktif.id])
+  const existingSet = new Set(existing.map((e: any) => `${String(e.nama_kitab).toLowerCase().trim()}|||${e.marhalah_id}`))
+
+  const toInsert: { sql: string; params: any[] }[] = []
+  let skipped = 0
+
+  for (const k of sourceKitab) {
+    const key = `${String(k.nama_kitab).toLowerCase().trim()}|||${k.marhalah_id}`
+    if (existingSet.has(key)) { skipped++; continue }
+    toInsert.push({
+      sql: 'INSERT INTO kitab (nama_kitab, marhalah_id, mapel_id, tahun_ajaran_id, harga) VALUES (?, ?, ?, ?, ?)',
+      params: [k.nama_kitab, k.marhalah_id, k.mapel_id, aktif.id, k.harga ?? 0],
+    })
+    existingSet.add(key)
+  }
+
+  if (toInsert.length === 0) return { success: true, count: 0, skipped }
+
+  await batch(toInsert)
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kitab',
+    action: 'create',
+    fiturHref: '/dashboard/master/kitab',
+    logKind: 'create',
+    entityType: 'kitab_batch',
+    entityId: 'copy-tahun-ajaran',
+    entityLabel: 'Copy kitab dari tahun ajaran lalu',
+    summary: `Copy kitab dari tahun ajaran lalu: ${toInsert.length} kitab disalin`,
+    details: { inserted: toInsert.length, skipped, source_tahun_ajaran_id: sourceTahunAjaranId, tahun_ajaran: aktif.nama },
+  })
+
+  revalidatePath('/dashboard/master/kitab')
+  return { success: true, count: toInsert.length, skipped }
+}

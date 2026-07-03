@@ -4,12 +4,13 @@ import { query, queryOne, batch, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
-import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
+import { getCachedMarhalahList, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 import { isKomposisiKelas } from '@/lib/akademik/grade'
 
 // Pakai cache untuk data yang jarang berubah
 export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
 export { getCachedMarhalahList as getMarhalahList }
+export { getCachedTahunAjaranList as getTahunAjaranList }
 
 async function ensureKelasExtraColumns() {
   try {
@@ -281,4 +282,65 @@ export async function importKelasMassal(dataExcel: any[]) {
 
   revalidatePath('/dashboard/master/kelas')
   return { success: true, count: inserts.length, skipped: duplicates }
+}
+
+export async function copyKelasFromTahunAjaran(sourceTahunAjaranId: number): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+  const session = await getSession()
+  await ensureKelasExtraColumns()
+
+  const tahunAktif = await queryOne<{ id: number; nama: string }>(
+    'SELECT id, nama FROM tahun_ajaran WHERE is_active = 1 LIMIT 1'
+  )
+  if (!tahunAktif) return { error: 'Tidak ada tahun ajaran aktif.' }
+  if (Number(sourceTahunAjaranId) === Number(tahunAktif.id)) return { error: 'Tidak bisa copy dari tahun ajaran yang sama.' }
+
+  const sourceKelas = await query<any>(
+    `SELECT nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, baru_lama, wali_kelas_id, guru_shubuh_id, guru_ashar_id, guru_maghrib_id
+     FROM kelas WHERE tahun_ajaran_id = ?`,
+    [sourceTahunAjaranId]
+  )
+  if (sourceKelas.length === 0) return { error: 'Tidak ada data kelas di tahun ajaran sumber.' }
+
+  const existingClasses = await query<{ nama_kelas: string; marhalah_id: string }>(
+    'SELECT nama_kelas, marhalah_id FROM kelas WHERE tahun_ajaran_id = ?',
+    [tahunAktif.id]
+  )
+  const existingSet = new Set(existingClasses.map(c => `${c.nama_kelas.toLowerCase().trim()}-${c.marhalah_id}`))
+
+  const inserts: any[] = []
+  let skipped = 0
+
+  for (const k of sourceKelas) {
+    const keyCheck = `${String(k.nama_kelas).toLowerCase().trim()}-${k.marhalah_id}`
+    if (existingSet.has(keyCheck)) { skipped++; continue }
+    inserts.push([
+      crypto.randomUUID(), k.nama_kelas, k.marhalah_id, k.jenis_kelamin, k.tempat, k.grade, k.baru_lama,
+      k.wali_kelas_id, k.guru_shubuh_id, k.guru_ashar_id, k.guru_maghrib_id, tahunAktif.id,
+    ])
+    existingSet.add(keyCheck)
+  }
+
+  if (inserts.length === 0) return { success: true, count: 0, skipped }
+
+  await batch(inserts.map(row => ({
+    sql: `INSERT INTO kelas (id, nama_kelas, marhalah_id, jenis_kelamin, tempat, grade, baru_lama, wali_kelas_id, guru_shubuh_id, guru_ashar_id, guru_maghrib_id, tahun_ajaran_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    params: row,
+  })))
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kelas',
+    action: 'create',
+    fiturHref: '/dashboard/master/kelas',
+    logKind: 'create',
+    entityType: 'kelas_batch',
+    entityId: 'copy-tahun-ajaran',
+    entityLabel: 'Copy kelas dari tahun ajaran lalu',
+    summary: `Copy kelas dari tahun ajaran lalu: ${inserts.length} kelas disalin`,
+    details: { inserted: inserts.length, skipped, source_tahun_ajaran_id: sourceTahunAjaranId, target_tahun_ajaran_id: tahunAktif.id },
+  })
+
+  revalidatePath('/dashboard/master/kelas')
+  return { success: true, count: inserts.length, skipped }
 }

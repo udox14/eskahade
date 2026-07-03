@@ -228,3 +228,81 @@ export async function getGuruKitabResolvedForEhb(eventId: number) {
 export async function getTahunAjaranName(tahunAjaranId: number) {
   return queryOne<{ nama: string }>('SELECT nama FROM tahun_ajaran WHERE id = ?', [tahunAjaranId])
 }
+
+export async function copyGuruKitabFromTahunAjaran(targetTahunAjaranId: number, sourceTahunAjaranId: number): Promise<
+  { success: boolean; count: number; skipped: number; unmatched: number } | { error: string }
+> {
+  const session = await getSession()
+  await ensureGuruKitabSchema()
+  const targetId = Number(targetTahunAjaranId || 0)
+  const sourceId = Number(sourceTahunAjaranId || 0)
+  if (!targetId) return { error: 'Pilih tahun ajaran target dulu.' }
+  if (!sourceId) return { error: 'Pilih tahun ajaran sumber dulu.' }
+  if (targetId === sourceId) return { error: 'Tidak bisa copy dari tahun ajaran yang sama.' }
+
+  const sourceRows = await query<{
+    sesi: GuruKitabSession; hari_index: number | null; guru_id: number; is_active: number
+    nama_kelas: string; kelas_marhalah_id: string; nama_kitab: string; kitab_marhalah_id: string
+  }>(
+    `SELECT gka.sesi, gka.hari_index, gka.guru_id, gka.is_active,
+            k.nama_kelas, k.marhalah_id AS kelas_marhalah_id,
+            kt.nama_kitab, kt.marhalah_id AS kitab_marhalah_id
+     FROM guru_kitab_assignment gka
+     JOIN kelas k ON k.id = gka.kelas_id
+     JOIN kitab kt ON kt.id = gka.kitab_id
+     WHERE gka.tahun_ajaran_id = ?`,
+    [sourceId]
+  )
+  if (sourceRows.length === 0) return { error: 'Tidak ada data pembagian kitab guru di tahun ajaran sumber.' }
+
+  const [targetKelas, targetKitab] = await Promise.all([
+    query<{ id: string; nama_kelas: string; marhalah_id: string }>(
+      'SELECT id, nama_kelas, marhalah_id FROM kelas WHERE tahun_ajaran_id = ?', [targetId]
+    ),
+    query<{ id: number; nama_kitab: string; marhalah_id: string }>(
+      'SELECT id, nama_kitab, marhalah_id FROM kitab WHERE tahun_ajaran_id = ?', [targetId]
+    ),
+  ])
+  const kelasMap = new Map(targetKelas.map(k => [`${k.nama_kelas.toLowerCase().trim()}|||${k.marhalah_id}`, k.id]))
+  const kitabMap = new Map(targetKitab.map(k => [`${k.nama_kitab.toLowerCase().trim()}|||${k.marhalah_id}`, k.id]))
+
+  const insertStmts: { sql: string; params: any[] }[] = []
+  let unmatched = 0
+
+  for (const row of sourceRows) {
+    const kelasId = kelasMap.get(`${row.nama_kelas.toLowerCase().trim()}|||${row.kelas_marhalah_id}`)
+    const kitabId = kitabMap.get(`${row.nama_kitab.toLowerCase().trim()}|||${row.kitab_marhalah_id}`)
+    if (!kelasId || !kitabId) { unmatched++; continue }
+    insertStmts.push({
+      sql: `INSERT OR IGNORE INTO guru_kitab_assignment
+              (tahun_ajaran_id, kelas_id, sesi, hari_index, guru_id, kitab_id, source, is_active, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, datetime('now'))`,
+      params: [targetId, kelasId, row.sesi, row.hari_index, row.guru_id, kitabId, row.is_active],
+    })
+  }
+
+  if (insertStmts.length === 0) return { success: true, count: 0, skipped: 0, unmatched }
+
+  const before = await queryOne<{ c: number }>('SELECT COUNT(*) as c FROM guru_kitab_assignment WHERE tahun_ajaran_id = ?', [targetId])
+  await batch(insertStmts)
+  const after = await queryOne<{ c: number }>('SELECT COUNT(*) as c FROM guru_kitab_assignment WHERE tahun_ajaran_id = ?', [targetId])
+  const count = (after?.c ?? 0) - (before?.c ?? 0)
+  const skipped = insertStmts.length - count
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_guru_kitab',
+    action: 'create',
+    fiturHref: '/dashboard/master/guru-kitab',
+    logKind: 'create',
+    entityType: 'guru_kitab_assignment_batch',
+    entityId: 'copy-tahun-ajaran',
+    entityLabel: 'Copy pembagian kitab guru dari tahun ajaran lalu',
+    summary: `Copy pembagian kitab guru dari tahun ajaran lalu: ${count} baris disalin`,
+    details: { inserted: count, skipped, unmatched, source_tahun_ajaran_id: sourceId, target_tahun_ajaran_id: targetId },
+  })
+
+  revalidatePath('/dashboard/master/guru-kitab')
+  revalidatePath('/dashboard/ehb/keuangan')
+  return { success: true, count, skipped, unmatched }
+}
