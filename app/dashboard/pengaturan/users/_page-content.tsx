@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts, setUserPsbBayarAkses } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -315,6 +315,21 @@ export default function ManajemenUserPage() {
       setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson, structural_jabatan: needsStructuralJabatan(roleEditSelected) ? roleEditJabatan : null } : u))
       toast.success('Role diperbarui', { description: roleEditSelected.map(r => ROLES.find(x=>x.value===r)?.label||r).join(', ') })
       setIsRoleModalOpen(false)
+    }
+  }
+
+  const handleTogglePsbBayarAkses = async (user: any) => {
+    const granted = !user.psb_bayar_akses
+    setProcessingId(user.id)
+    const toastId = toast.loading(granted ? 'Memberikan akses bayar PSB...' : 'Mencabut akses bayar PSB...')
+    const res = await setUserPsbBayarAkses(user.id, granted)
+    toast.dismiss(toastId)
+    setProcessingId(null)
+    if ('error' in res) {
+      toast.error('Gagal update', { description: (res as any).error })
+    } else {
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, psb_bayar_akses: granted ? 1 : 0 } : u))
+      toast.success(granted ? 'Akses bayar PSB diberikan' : 'Akses bayar PSB dicabut')
     }
   }
 
@@ -852,6 +867,20 @@ export default function ManajemenUserPage() {
                             {getJabatanLabel(getStructuralJabatan(u)) || 'Anggota'}
                           </span>
                         </div>
+                      )}
+                      {parseRoles(u).includes('pengurus_asrama') && (
+                        <button
+                          onClick={() => handleTogglePsbBayarAkses(u)}
+                          disabled={processingId === u.id}
+                          title={u.psb_bayar_akses ? 'Cabut akses bayar PSB' : 'Berikan akses bayar PSB (khusus ditunjuk bendahara)'}
+                          className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                            u.psb_bayar_akses
+                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Coins className="w-3 h-3" /> {u.psb_bayar_akses ? 'Akses Bayar PSB' : 'Tanpa Akses Bayar PSB'}
+                        </button>
                       )}
                     </td>
                     <td className="px-6 py-4">

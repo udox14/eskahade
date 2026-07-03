@@ -22,6 +22,7 @@ export type SessionUser = {
   roles: string[]
   asrama_binaan: string | null
   structural_jabatan?: string | null
+  psb_bayar_akses?: boolean
 }
 
 type SessionUserRow = {
@@ -31,12 +32,20 @@ type SessionUserRow = {
   roles: string | null
   asrama_binaan: string | null
   structural_jabatan: string | null
+  psb_bayar_akses: number | null
 }
 
 export async function ensureUserStructuralJabatanColumn() {
   if (structuralJabatanColumnReady) return
   try {
     await execute('ALTER TABLE users ADD COLUMN structural_jabatan TEXT')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
+  }
+  try {
+    await execute('ALTER TABLE users ADD COLUMN psb_bayar_akses INTEGER NOT NULL DEFAULT 0')
   } catch (error: any) {
     if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
       throw error
@@ -180,7 +189,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
   try {
     await ensureUserStructuralJabatanColumn()
     const user = await queryOne<SessionUserRow>(
-      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE id = ?',
+      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_bayar_akses FROM users WHERE id = ?',
       [session.id]
     )
 
@@ -195,6 +204,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       roles,
       asrama_binaan: user.asrama_binaan ?? null,
       structural_jabatan: user.structural_jabatan ?? null,
+      psb_bayar_akses: Number(user.psb_bayar_akses ?? 0) === 1,
     }
   } catch (err: any) {
     console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
@@ -219,6 +229,12 @@ export function hasAnyRole(session: SessionUser | null, roles: string[]): boolea
 
 export function isAdmin(session: SessionUser | null): boolean {
   return hasRole(session, 'admin')
+}
+
+// Grant khusus per-user (bukan berbasis role) untuk akses bayar PSB, biasanya
+// diberikan ke pengurus_asrama yang ditunjuk menjabat bendahara.
+export function hasPsbBayarAkses(session: SessionUser | null): boolean {
+  return Boolean(session?.psb_bayar_akses)
 }
 
 // Role AKUN DEMO: setara super admin (bypass gate fitur). Data sudah disandbox

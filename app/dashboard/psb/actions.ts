@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
-import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasAnyRole, hasPsbBayarAkses, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { execute, generateId, getDB, query, queryOne, today } from '@/lib/db'
 import {
   DEFAULT_SANTRI_BARU_DURASI_BULAN,
@@ -79,7 +79,7 @@ function canKamar(session: SessionUser | null) {
 }
 
 function canBayar(session: SessionUser | null) {
-  return isAdmin(session) || hasRole(session, 'bendahara')
+  return isAdmin(session) || hasRole(session, 'bendahara') || hasPsbBayarAkses(session)
 }
 
 function statusAtLeast(status: PsbStatus, minimum: PsbStatus) {

@@ -2,7 +2,7 @@
 
 import { batch, query, queryOne, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
-import { getSession } from '@/lib/auth/session'
+import { getSession, isAdmin } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedFiturAkses } from '@/lib/cache/fitur-akses'
@@ -141,6 +141,14 @@ async function ensureUserManagementColumns() {
     `)
   } catch {
     // Abaikan jika engine belum mendukung partial index.
+  }
+
+  try {
+    await execute('ALTER TABLE users ADD COLUMN psb_bayar_akses INTEGER NOT NULL DEFAULT 0')
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+      throw error
+    }
   }
 }
 
@@ -429,6 +437,7 @@ export async function getUsersList() {
       u.roles,
       u.asrama_binaan,
       u.structural_jabatan,
+      u.psb_bayar_akses,
       u.source_type,
       u.source_ref_id,
       u.created_at,
@@ -437,9 +446,36 @@ export async function getUsersList() {
     LEFT JOIN kelas k ON k.wali_kelas_id = u.id
     GROUP BY
       u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
-      u.structural_jabatan, u.source_type, u.source_ref_id, u.created_at
+      u.structural_jabatan, u.psb_bayar_akses, u.source_type, u.source_ref_id, u.created_at
     ORDER BY u.created_at DESC`
   )
+}
+
+export async function setUserPsbBayarAkses(id: string, granted: boolean): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (!isAdmin(session)) return { error: 'Akses ditolak' }
+  await ensureUserManagementColumns()
+
+  const user = await getUserById(id)
+  if (!user) return { error: 'User tidak ditemukan.' }
+
+  await execute('UPDATE users SET psb_bayar_akses = ?, updated_at = ? WHERE id = ?', [granted ? 1 : 0, new Date().toISOString(), id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'access_change',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user',
+    entityId: id,
+    entityLabel: user.full_name || user.email,
+    summary: `${granted ? 'Memberikan' : 'Mencabut'} akses bayar PSB untuk ${user.full_name || user.email}`,
+    details: { psb_bayar_akses: granted },
+  })
+
+  revalidatePath('/dashboard/pengaturan/users')
+  return { success: true }
 }
 
 export async function getUserCreationCandidates(): Promise<UserCreationCandidate[]> {
