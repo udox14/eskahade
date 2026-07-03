@@ -518,9 +518,9 @@ export async function tambahSantriDadakan(input: {
     `).bind(santriId, nis, nama, jenisKelamin, sekolah, tanggalMasuk, tahunMasuk, normalizeKategoriSantriDasar('REGULER')),
     db.prepare(`
       INSERT INTO psb_flow (
-        id, santri_id, status, verified_by, verified_at, created_by, created_at, updated_at
-      ) VALUES (?, ?, 'VERIFIED', ?, datetime('now'), ?, datetime('now'), datetime('now'))
-    `).bind(flowId, santriId, access.id, access.id),
+        id, santri_id, status, created_by, created_at, updated_at
+      ) VALUES (?, ?, 'VERIFICATION', ?, datetime('now'), datetime('now'))
+    `).bind(flowId, santriId, access.id),
   ])
 
   await logActivity({
@@ -1188,7 +1188,9 @@ export async function getPsbReceipt(receiptId: string) {
   if (!hasAnyRole(session, ['admin', 'bendahara', 'sekpen'])) return { error: 'Akses ditolak' }
   await ensureSchema()
   const receipt = await queryOne<any>(`
-    SELECT r.*, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, u.full_name AS penerima_nama
+    SELECT r.*, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah,
+           COALESCE(s.bebas_spp, 0) AS bebas_spp,
+           u.full_name AS penerima_nama
     FROM psb_payment_receipt r
     JOIN santri s ON s.id = r.santri_id
     LEFT JOIN users u ON u.id = r.created_by
@@ -1225,6 +1227,15 @@ export async function getPsbReceipt(receiptId: string) {
     FROM pembayaran_tahunan
     WHERE santri_id = ? AND (tahun_tagihan = ? OR jenis_biaya = 'BANGUNAN') AND COALESCE(status, 'AKTIF') != 'VOID'
   `, [receipt.santri_id, receipt.tahun_tagihan])
+  const sppJuliPaidRows = await query<any>(`
+    SELECT nominal_bayar
+    FROM spp_log
+    WHERE santri_id = ? AND tahun = ? AND bulan = ?
+  `, [receipt.santri_id, receipt.tahun_tagihan, SPP_JULI_BULAN])
+  const sppJuliWaived = await queryOne<{ bulan: number }>(
+    'SELECT bulan FROM spp_tagihan_ditiadakan WHERE santri_id = ? AND tahun = ? AND bulan = ? AND is_active = 1',
+    [receipt.santri_id, receipt.tahun_tagihan, SPP_JULI_BULAN]
+  )
 
   let totalTagihan = 0
   let totalDibayar = 0
@@ -1233,6 +1244,12 @@ export async function getPsbReceipt(receiptId: string) {
   })
   paidRows.forEach((p) => {
     totalDibayar += Number(p.nominal_bayar || 0)
+  })
+  if (Number(receipt.bebas_spp ?? 0) !== 1 && !sppJuliWaived) {
+    totalTagihan += await getNominalSppForYear(Number(receipt.tahun_tagihan))
+  }
+  sppJuliPaidRows.forEach((row) => {
+    totalDibayar += Number(row.nominal_bayar || 0)
   })
 
   const sisa = Math.max(0, totalTagihan - totalDibayar)

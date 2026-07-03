@@ -115,9 +115,18 @@ export async function SantriTable({
                   size="md"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{santri.nama_lengkap}</p>
+                    {santri.kategori_efektif === 'BARU' && (
+                      <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black text-indigo-700">
+                        BARU
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 mt-0.5">{santri.kelas_pesantren || '-'}</p>
-                  <p className="text-[11px] text-indigo-600 mt-1 font-semibold">{santri.kategori_efektif || santri.kategori_santri || 'REGULER'}</p>
+                  {santri.kategori_santri === 'SADESA' && (
+                    <p className="text-[11px] text-indigo-600 mt-1 font-semibold">SADESA</p>
+                  )}
                 </div>
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -184,7 +193,19 @@ export async function SantriTable({
                         name={santri.nama_lengkap}
                         size="sm"
                       />
-                      <span className="font-medium text-gray-900">{santri.nama_lengkap}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-gray-900 truncate">{santri.nama_lengkap}</span>
+                          {santri.kategori_efektif === 'BARU' && (
+                            <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black text-indigo-700">
+                              BARU
+                            </span>
+                          )}
+                        </div>
+                        {santri.kategori_santri === 'SADESA' && (
+                          <p className="mt-0.5 text-[10px] font-bold text-indigo-600">SADESA</p>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-gray-500 font-mono text-xs">{santri.nis}</td>
@@ -193,7 +214,7 @@ export async function SantriTable({
                     <p className="text-gray-400 text-xs">Kamar {santri.kamar || '-'}</p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="text-blue-700 font-medium text-xs">{santri.kategori_efektif === 'BARU' ? 'BARU' : santri.kategori_santri === 'SADESA' ? 'SADESA' : (santri.sekolah || '-')}</p>
+                    <p className="text-blue-700 font-medium text-xs">{santri.kategori_santri === 'SADESA' ? 'SADESA' : (santri.sekolah || '-')}</p>
                     <p className="text-gray-400 text-xs">{santri.kategori_santri === 'SADESA' ? 'Tanpa sekolah formal' : (santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-')}</p>
                   </td>
                   <td className="px-5 py-3.5">

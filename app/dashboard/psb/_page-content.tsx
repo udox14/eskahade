@@ -327,7 +327,7 @@ export default function PsbPageContent() {
 
   const handleDadakan = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = await run('dadakan', () => tambahSantriDadakan(dadakan), 'Santri dadakan masuk flow PSB')
+    const result = await run('dadakan', () => tambahSantriDadakan(dadakan), 'Santri dadakan masuk antrean kesekretariatan')
     if (result) {
       setDadakan({ nama_lengkap: '', jenis_kelamin: 'L', sekolah: '' })
       setShowDadakanModal(false)
@@ -1267,7 +1267,7 @@ function DadakanModal({ dadakan, busy, setDadakan, onClose, onSubmit }: any) {
               <UserPlus className="h-4 w-4 text-blue-600" />
               <h2 className="text-sm font-bold text-slate-800">Santri Dadakan</h2>
             </div>
-            <p className="text-[11px] mt-1 leading-relaxed text-slate-500">Isi data dasar agar santri langsung masuk tahap penempatan PSB.</p>
+            <p className="text-[11px] mt-1 leading-relaxed text-slate-500">Isi data dasar agar santri masuk antrean kesekretariatan PSB.</p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-lg">
             <X className="h-5 w-5" />
