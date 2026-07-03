@@ -57,7 +57,9 @@ type SantriPlotRow = {
 const ASRAMA_ORDER = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4']
 
 function normalizeJk(value: unknown): JenisKelamin {
-  return String(value).toUpperCase() === 'P' ? 'P' : 'L'
+  const raw = String(value || '').toUpperCase().trim()
+  if (['P', 'PI', 'PR', 'PUTRI', 'PEREMPUAN', 'WANITA', 'F', 'FEMALE'].includes(raw)) return 'P'
+  return 'L'
 }
 
 function normalizeLevels(value: unknown): LevelSekolah[] {
@@ -71,9 +73,9 @@ function normalizeLevels(value: unknown): LevelSekolah[] {
 }
 
 function getLevelSekolah(sekolah: string | null | undefined): SantriPlotRow['level'] {
-  const value = String(sekolah || '').toUpperCase().trim()
-  if (['MAN', 'SMK', 'SMA'].includes(value)) return 'SLTA'
-  if (['MTSU', 'MTSN', 'SMP'].includes(value)) return 'SLTP'
+  const value = String(sekolah || '').toUpperCase().replace(/\./g, '').trim()
+  if (['MAN', 'MA', 'MAS', 'SMK', 'SMA', 'SLTA', 'ALIYAH', 'MADRASAH ALIYAH'].includes(value)) return 'SLTA'
+  if (['MTSU', 'MTSN', 'MTS', 'MTSS', 'SMP', 'SLTP', 'TSANAWIYAH', 'MADRASAH TSANAWIYAH'].includes(value)) return 'SLTP'
   return 'LAINNYA'
 }
 
