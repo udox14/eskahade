@@ -70,10 +70,7 @@ function chunkRows<T>(rows: T[], size: number) {
   return chunks.length ? chunks : [[]]
 }
 
-function getAsramaOptions(rows: any[]) {
-  return Array.from(new Set(rows.map(row => String(row.asrama || '').trim()).filter(Boolean)))
-    .sort((a, b) => a.localeCompare(b, 'id-ID', { sensitivity: 'base', numeric: true }))
-}
+
 
 function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan, selectedAsrama, preview }: { event: any; rows: any[]; mode: PrintMode; selectedSesi: string; selectedRuangan: string; selectedAsrama: string; preview?: boolean }) {
   if (!event) return null
@@ -116,11 +113,13 @@ function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan, selected
             <h1 style={{ textAlign: 'center', fontWeight: 700, fontSize: '13pt', margin: '0 0 4mm', lineHeight: 1.2 }}>
               JADWAL PESERTA TES KLASIFIKASI TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}
             </h1>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4mm', fontSize: '11pt' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm', width: 'fit-content' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4mm', fontSize: '11pt' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm' }}>
                 <div><b>Tanggal</b></div><div>:</div><div>{formatDate(first.tanggal)}</div>
-                <div><b>Waktu</b></div><div>:</div><div>{formatTime(first)}</div>
                 <div><b>Ruangan</b></div><div>:</div><div>{first.nama_ruangan}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm' }}>
+                <div><b>Waktu</b></div><div>:</div><div>{formatTime(first)}</div>
                 <div><b>Tempat</b></div><div>:</div><div>{first.tempat || '-'}</div>
               </div>
             </div>
@@ -192,11 +191,13 @@ function AbsensiSheet({ event, rows, mode, selectedSesi, selectedRuangan, previe
         <div key={`${first.sesi_id}-${first.ruangan_id}-${chunkIndex}`} style={{ ...absensiPageStyle, boxShadow: preview ? '0 10px 15px -3px rgb(0 0 0 / 0.1)' : 'none' }}>
           <div style={absensiTitleStyle}>DAFTAR HADIR PESERTA TES KLASIFIKASI</div>
           <div style={absensiSubtitleStyle}>TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}</div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4mm', fontSize: '11pt' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm', width: 'fit-content' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4mm', fontSize: '11pt' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm' }}>
               <div><b>Tanggal</b></div><div>:</div><div>{formatDate(first.tanggal)}</div>
-              <div><b>Sesi/Waktu</b></div><div>:</div><div>{first.sesi_label || `Sesi ${first.nomor_sesi}`} ({formatTime(first)})</div>
               <div><b>Ruangan</b></div><div>:</div><div>{first.nama_ruangan}</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '1mm 2mm' }}>
+              <div><b>Sesi/Waktu</b></div><div>:</div><div>{first.sesi_label || `Sesi ${first.nomor_sesi}`} ({formatTime(first)})</div>
               <div><b>Tempat</b></div><div>:</div><div>{first.tempat || '-'}</div>
             </div>
           </div>
@@ -526,11 +527,11 @@ const signatureNumberStyle: React.CSSProperties = {
 const penilaianPageStyle: React.CSSProperties = {
   width: '330mm',
   height: '210mm',
-  padding: '4mm',
+  padding: '4mm 6mm',
   boxSizing: 'border-box',
   display: 'flex',
   flexDirection: 'row',
-  gap: '2mm',
+  justifyContent: 'space-between',
   fontFamily: '"Arial Narrow", Arial, sans-serif',
   color: '#000',
   background: '#fff',
@@ -540,7 +541,7 @@ const penilaianPageStyle: React.CSSProperties = {
 
 const penilaianBlankoStyle: React.CSSProperties = {
   height: '202mm',
-  width: '160mm',
+  width: '155mm',
   border: '1pt solid #000',
   boxSizing: 'border-box',
   fontFamily: '"Arial Narrow", Arial, sans-serif',
@@ -825,8 +826,26 @@ export default function CetakTesKlasifikasiPage() {
   })
 
   const activeEvent = data?.activeEvent
-  const rows = printData?.rows || []
-  const asramaOptions = getAsramaOptions(rows)
+  const asramaOptions = data?.asramaList || []
+  const [loadingPrintData, setLoadingPrintData] = useState(false)
+
+  const refreshPrintData = async () => {
+    if (!activeEvent) return
+    setLoadingPrintData(true)
+    try {
+      const filters: any = {}
+      if (printMode === 'sesi' && selectedSesi) filters.sesi_id = selectedSesi
+      if (printMode === 'ruangan' && selectedRuangan) filters.ruangan_id = selectedRuangan
+      if (printMode === 'asrama' && selectedAsrama) filters.asrama = selectedAsrama
+      
+      const loaded = await getCetakJadwalData(activeEvent.id, filters)
+      setPrintData(loaded)
+    } catch (e: any) {
+      toast.error('Gagal memuat data cetak', { description: e?.message })
+    } finally {
+      setLoadingPrintData(false)
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -834,9 +853,6 @@ export default function CetakTesKlasifikasiPage() {
       try {
         const loaded = await getPenjadwalanData()
         setData(loaded)
-        if (loaded.activeEvent) {
-          setPrintData(await getCetakJadwalData(loaded.activeEvent.id))
-        }
       } catch (error: any) {
         toast.error('Gagal memuat data cetak', { description: error?.message })
       } finally {
@@ -890,12 +906,16 @@ export default function CetakTesKlasifikasiPage() {
                 </div>
               )}
               <button
-                onClick={async () => {
-                  setPrintData(await getCetakJadwalData(activeEvent.id))
-                  window.setTimeout(() => handlePrintAbsensi(), 100)
-                }}
-                disabled={rows.length === 0 || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan)}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300"
+                onClick={refreshPrintData}
+                disabled={loadingPrintData || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+              >
+                {loadingPrintData ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Tampilkan'}
+              </button>
+              <button
+                onClick={handlePrintAbsensi}
+                disabled={!printData?.rows?.length}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:bg-slate-300"
               >
                 <Printer className="h-4 w-4" /> Cetak / PDF
               </button>
@@ -903,12 +923,12 @@ export default function CetakTesKlasifikasiPage() {
 
             <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
               <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
-                <AbsensiSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} preview />
+                <AbsensiSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} preview />
               </div>
             </div>
             <div className="hidden">
               <div ref={absensiPrintRef}>
-                <AbsensiSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} />
+                <AbsensiSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} />
               </div>
             </div>
           </section>
@@ -919,7 +939,7 @@ export default function CetakTesKlasifikasiPage() {
   if (view === 'blanko-penilaian') {
     const disablePenilaianPrint = penilaianBlankOnly
       ? penilaianBlankCount < 1
-      : !activeEvent || rows.length === 0 || (printMode === 'sesi' && !selectedSesi) || (printMode === 'asrama' && !selectedAsrama)
+      : !activeEvent || !printData?.rows?.length
 
     return (
       <div className="mx-auto max-w-7xl space-y-5 pb-20">
@@ -988,13 +1008,19 @@ export default function CetakTesKlasifikasiPage() {
                 </>
               )}
 
+              {!penilaianBlankOnly && (
+                <button
+                  onClick={refreshPrintData}
+                  disabled={loadingPrintData || (printMode === 'sesi' && !selectedSesi) || (printMode === 'asrama' && !selectedAsrama)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+                >
+                  {loadingPrintData ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Tampilkan'}
+                </button>
+              )}
               <button
-                onClick={async () => {
-                  if (activeEvent) setPrintData(await getCetakJadwalData(activeEvent.id))
-                  window.setTimeout(() => handlePrintPenilaian(), 100)
-                }}
+                onClick={handlePrintPenilaian}
                 disabled={disablePenilaianPrint}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:bg-slate-300"
               >
                 <Printer className="h-4 w-4" /> Cetak / PDF
               </button>
@@ -1004,7 +1030,7 @@ export default function CetakTesKlasifikasiPage() {
               <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
                 <PenilaianSheet
                   event={printData?.event || activeEvent}
-                  rows={rows}
+                  rows={printData?.rows || []}
                   mode={printMode}
                   selectedSesi={selectedSesi}
                   selectedRuangan={selectedRuangan}
@@ -1019,7 +1045,7 @@ export default function CetakTesKlasifikasiPage() {
               <div ref={penilaianPrintRef}>
                 <PenilaianSheet
                   event={printData?.event || activeEvent}
-                  rows={rows}
+                  rows={printData?.rows || []}
                   mode={printMode}
                   selectedSesi={selectedSesi}
                   selectedRuangan={selectedRuangan}
@@ -1089,12 +1115,16 @@ export default function CetakTesKlasifikasiPage() {
                 </div>
               )}
               <button
-                onClick={async () => {
-                  setPrintData(await getCetakJadwalData(activeEvent.id))
-                  window.setTimeout(() => handlePrint(), 100)
-                }}
-                disabled={rows.length === 0 || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan) || (printMode === 'asrama' && !selectedAsrama)}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300"
+                onClick={refreshPrintData}
+                disabled={loadingPrintData || (printMode === 'sesi' && !selectedSesi) || (printMode === 'ruangan' && !selectedRuangan) || (printMode === 'asrama' && !selectedAsrama)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+              >
+                {loadingPrintData ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Tampilkan'}
+              </button>
+              <button
+                onClick={handlePrint}
+                disabled={!printData?.rows?.length}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:bg-slate-300"
               >
                 <Printer className="h-4 w-4" /> Cetak / PDF
               </button>
@@ -1102,12 +1132,12 @@ export default function CetakTesKlasifikasiPage() {
 
             <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
               <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
-                <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} preview />
+                <PrintSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} preview />
               </div>
             </div>
             <div className="hidden">
               <div ref={printRef}>
-                <PrintSheet event={printData?.event} rows={rows} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} />
+                <PrintSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} />
               </div>
             </div>
           </section>

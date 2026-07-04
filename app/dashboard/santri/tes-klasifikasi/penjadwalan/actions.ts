@@ -232,10 +232,10 @@ export async function getPenjadwalanData() {
   ])
 
   if (!activeEvent) {
-    return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList: [], ruanganList: [], rules: [], petugas: [], plotting: [], unplotted: [], unplottedCount: 0 }
+    return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList: [], ruanganList: [], rules: [], petugas: [], plotting: [], unplotted: [], unplottedCount: 0, asramaList: [] }
   }
 
-  const [sesiList, ruanganList, rulesRaw, petugas, plotting, unplottedCount] = await Promise.all([
+  const [sesiList, ruanganList, rulesRaw, petugas, unplottedCount, asramaListRaw] = await Promise.all([
     query<any>('SELECT * FROM tes_klasifikasi_sesi WHERE event_id = ? ORDER BY tanggal, nomor_sesi', [activeEvent.id]),
     query<any>(`
       SELECT r.*,
@@ -246,12 +246,13 @@ export async function getPenjadwalanData() {
     `, [activeEvent.id]),
     query<any>('SELECT * FROM tes_klasifikasi_plotting_rule WHERE event_id = ?', [activeEvent.id]),
     query<any>('SELECT * FROM tes_klasifikasi_ruangan_petugas WHERE event_id = ?', [activeEvent.id]),
-    getPlottingRows(activeEvent.id),
     getUnplottedCount(activeEvent.id),
+    query<{asrama: string}>('SELECT DISTINCT asrama FROM santri WHERE asrama IS NOT NULL AND TRIM(asrama) != ""'),
   ])
 
+  const asramaList = asramaListRaw.map(r => r.asrama.trim()).sort((a, b) => a.localeCompare(b, 'id-ID', { numeric: true }))
   const rules = rulesRaw.map(rule => ({ ...rule, levels: parseLevelsJson(rule.levels_json) }))
-  return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList, ruanganList, rules, petugas, plotting, unplotted: [], unplottedCount }
+  return { activeEvent, allEvents, tahunAjaranList, guruList, sesiList, ruanganList, rules, petugas, plotting: [], unplotted: [], unplottedCount, asramaList }
 }
 
 export async function createEvent(input: { tahun_ajaran_id: number; nama: string }) {
@@ -609,8 +610,25 @@ export async function hapusPlotting(plottingId: number) {
   return { success: true }
 }
 
-export async function getPlottingRows(eventId: number) {
+export async function getPlottingRows(eventId: number, filters?: { sesi_id?: string, ruangan_id?: string, asrama?: string }) {
   await ensureSchema()
+  
+  let filterClause = ''
+  const params: any[] = [eventId]
+
+  if (filters?.sesi_id) {
+    filterClause += ' AND p.sesi_id = ?'
+    params.push(Number(filters.sesi_id))
+  }
+  if (filters?.ruangan_id) {
+    filterClause += ' AND p.ruangan_id = ?'
+    params.push(Number(filters.ruangan_id))
+  }
+  if (filters?.asrama) {
+    filterClause += ' AND san.asrama = ?'
+    params.push(filters.asrama)
+  }
+
   return query<any>(`
     SELECT p.*, s.tanggal, s.nomor_sesi, s.label AS sesi_label, s.waktu_mulai, s.waktu_selesai,
            r.nomor_ruangan, r.nama_ruangan, r.tempat, r.kapasitas,
@@ -627,12 +645,12 @@ export async function getPlottingRows(eventId: number) {
       AND petugas.ruangan_id = p.ruangan_id
     LEFT JOIN data_guru pengetes ON pengetes.id = petugas.pengetes_guru_id
     LEFT JOIN data_guru pendamping ON pendamping.id = petugas.pendamping_guru_id
-    WHERE p.event_id = ?
+    WHERE p.event_id = ? ${filterClause}
     ORDER BY s.tanggal, s.nomor_sesi, r.nomor_ruangan, p.nomor_urut
-  `, [eventId])
+  `, params)
 }
 
-export async function getCetakJadwalData(eventId: number) {
+export async function getCetakJadwalData(eventId: number, filters?: { sesi_id?: string, ruangan_id?: string, asrama?: string }) {
   await ensureSchema()
   const event = await queryOne<any>(`
     SELECT e.*, ta.nama AS tahun_ajaran_nama
@@ -640,6 +658,6 @@ export async function getCetakJadwalData(eventId: number) {
     LEFT JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
     WHERE e.id = ?
   `, [eventId])
-  const rows = await getPlottingRows(eventId)
+  const rows = await getPlottingRows(eventId, filters)
   return { event, rows }
 }

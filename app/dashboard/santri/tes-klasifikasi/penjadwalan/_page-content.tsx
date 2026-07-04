@@ -11,6 +11,7 @@ import {
   createEvent,
   getCetakJadwalData,
   getPenjadwalanData,
+  getPlottingRows,
   getUnplottedSantri,
   hapusPlotting,
   resetPlotting,
@@ -173,6 +174,9 @@ export default function PenjadwalanTesKlasifikasiPage() {
   const [petugas, setPetugas] = useState<Record<string, { pengetes_guru_id: string; pendamping_guru_id: string }>>({})
   const [filters, setFilters] = useState({ search: '', jenis_kelamin: '', level: '', asrama: '' })
   const [manualTarget, setManualTarget] = useState({ santri_id: '', sesi_id: '', ruangan_id: '' })
+  const [plottingRows, setPlottingRows] = useState<any[]>([])
+  const [plottingFilters, setPlottingFilters] = useState({ sesi_id: '', ruangan_id: '', asrama: '' })
+  const [loadingPlotting, setLoadingPlotting] = useState(false)
   const [unplottedPage, setUnplottedPage] = useState(1)
   const [unplottedPageSize, setUnplottedPageSize] = useState<'10' | '25' | '50' | '100' | 'all'>('25')
   const [printMode, setPrintMode] = useState<PrintMode>('all')
@@ -195,7 +199,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
 
   const activeEvent = data?.activeEvent
   const guruList = data?.guruList || []
-  const plotting = data?.plotting || []
+  const plotting = plottingRows
   const unplotted = data?.unplotted || []
   const unplottedCount = data?.unplottedCount ?? unplotted.length
 
@@ -330,6 +334,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     toast.success(`Auto plotting selesai: ${res.count} peserta terplot`)
     await loadData(false)
     await refreshUnplotted()
+    await refreshPlotting()
   }
 
   const runResetPlotting = async () => {
@@ -342,6 +347,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     toast.success('Plotting dikosongkan')
     await loadData(false)
     await refreshUnplotted()
+    await refreshPlotting()
   }
 
   const addManual = async () => {
@@ -354,6 +360,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     setManualTarget(prev => ({ ...prev, santri_id: '' }))
     await loadData(false)
     await refreshUnplotted()
+    await refreshPlotting()
   }
 
   const removePlotting = async (id: number) => {
@@ -363,6 +370,7 @@ export default function PenjadwalanTesKlasifikasiPage() {
     toast.success('Peserta dikeluarkan dari plotting')
     await loadData(false)
     await refreshUnplotted()
+    await refreshPlotting()
   }
 
   const refreshUnplotted = async () => {
@@ -370,6 +378,17 @@ export default function PenjadwalanTesKlasifikasiPage() {
     const rows = await getUnplottedSantri(activeEvent.id, filters)
     const hasFilter = Boolean(filters.search || filters.jenis_kelamin || filters.level || filters.asrama)
     setData((prev: any) => ({ ...prev, unplotted: rows, unplottedCount: hasFilter ? prev?.unplottedCount : rows.length }))
+  }
+
+  const refreshPlotting = async () => {
+    if (!activeEvent) return
+    setLoadingPlotting(true)
+    try {
+      const rows = await getPlottingRows(activeEvent.id, plottingFilters)
+      setPlottingRows(rows)
+    } finally {
+      setLoadingPlotting(false)
+    }
   }
 
   useEffect(() => {
@@ -673,7 +692,26 @@ export default function PenjadwalanTesKlasifikasiPage() {
               </div>
 
               <div className="rounded-xl border bg-white p-5">
-                <h3 className="mb-3 font-bold text-slate-800">Hasil Plotting</h3>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800">Hasil Plotting</h3>
+                </div>
+                <div className="mb-4 grid gap-2 md:grid-cols-4">
+                  <select value={plottingFilters.sesi_id} onChange={e => setPlottingFilters(prev => ({ ...prev, sesi_id: e.target.value }))} className="rounded-lg border px-3 py-2 text-sm">
+                    <option value="">Semua Sesi</option>
+                    {data.sesiList.map((sesi: any) => <option key={sesi.id} value={sesi.id}>{formatDate(sesi.tanggal)} · {sesi.label}</option>)}
+                  </select>
+                  <select value={plottingFilters.ruangan_id} onChange={e => setPlottingFilters(prev => ({ ...prev, ruangan_id: e.target.value }))} className="rounded-lg border px-3 py-2 text-sm">
+                    <option value="">Semua Ruangan</option>
+                    {data.ruanganList.map((room: any) => <option key={room.id} value={room.id}>{room.nama_ruangan}</option>)}
+                  </select>
+                  <select value={plottingFilters.asrama} onChange={e => setPlottingFilters(prev => ({ ...prev, asrama: e.target.value }))} className="rounded-lg border px-3 py-2 text-sm">
+                    <option value="">Semua Asrama</option>
+                    {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  <button onClick={refreshPlotting} disabled={loadingPlotting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                    {loadingPlotting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Tampilkan'}
+                  </button>
+                </div>
                 <div className="max-h-[520px] overflow-auto rounded-xl border">
                   <table className="w-full min-w-[900px] text-sm">
                     <thead className="sticky top-0 bg-slate-50 text-left text-xs font-bold uppercase text-slate-500">
