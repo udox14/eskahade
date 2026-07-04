@@ -14,8 +14,8 @@ type SantriPhotoAvatarProps = {
 }
 
 const sizeClassMap = {
-  sm: 'w-10 h-[3.35rem]',
-  md: 'w-12 h-16',
+  sm: 'w-10 min-w-[2.5rem] max-w-[2.5rem] aspect-[3/4] shrink-0',
+  md: 'w-12 min-w-[3rem] max-w-[3rem] aspect-[3/4] shrink-0',
 } as const
 
 function getInitials(name: string) {
@@ -112,7 +112,7 @@ export function SantriPhotoAvatar({
           event.stopPropagation()
           setOpen(true)
         }}
-        className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        className="block shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         aria-label={`Lihat foto ${name}`}
       >
         {frame}
