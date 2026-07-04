@@ -453,10 +453,7 @@ export default function KamarClient({
                   <p className="text-xs font-medium text-slate-400">Centang langsung dari tabel anggota.</p>
                 </div>
               </div>
-                  <p className="text-lg font-black text-slate-800">{selectedRoom.ketua?.nama_lengkap || 'Belum ditentukan'}</p>
-                  <p className="text-xs font-medium text-slate-400">Centang langsung dari tabel anggota.</p>
-                </div>
-              </div>
+
               <div className="rounded-2xl border bg-white p-4 shadow-sm">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pembina Kamar</p>
                 <p className="mt-2 text-lg font-black text-slate-800">{selectedRoom.pembina_nama || 'Belum diatur'}</p>
