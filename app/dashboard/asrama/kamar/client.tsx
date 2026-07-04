@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Crown, LogOut, MapPin, MessageCircle, Phone, Save, School, Users, X } from 'lucide-react'
+import { ArrowLeft, Crown, LogOut, MapPin, MessageCircle, Phone, Save, School, Settings, Users, X } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import {
@@ -13,6 +13,7 @@ import {
   getKamarOverview,
   tandaiSantriKeluarDariKamar,
   updateKetuaKamarLangsung,
+  updateKamarConfig,
   updateNomorWaOrtuBatchKamar,
 } from './actions'
 
@@ -157,6 +158,9 @@ export default function KamarClient({
   const [keluarModalMember, setKeluarModalMember] = useState<RoomMember | null>(null)
   const [waModalOpen, setWaModalOpen] = useState(false)
   const [waDraftById, setWaDraftById] = useState<Record<string, string>>({})
+  const [kuotaModalOpen, setKuotaModalOpen] = useState(false)
+  const [kuotaInput, setKuotaInput] = useState(10)
+  const [reserveInput, setReserveInput] = useState(0)
   const [pending, startTransition] = useTransition()
   const selectedKamar = searchParams.get('kamar')
 
@@ -379,6 +383,37 @@ export default function KamarClient({
     })
   }
 
+  const openKuotaModal = () => {
+    if (!selectedRoom) return
+    setKuotaInput(selectedRoom.kuota || 10)
+    setReserveInput(selectedRoom.reserved_baru || 0)
+    setKuotaModalOpen(true)
+  }
+
+  const handleSaveKuota = () => {
+    if (!selectedRoom) return
+    if (kuotaInput < selectedRoom.total_anggota) {
+      toast.error('Kuota tidak boleh kurang dari jumlah penghuni saat ini')
+      return
+    }
+    startTransition(async () => {
+      const result = await updateKamarConfig({
+        asrama: selectedAsrama,
+        nomor_kamar: selectedRoom.nomor_kamar,
+        kuota: kuotaInput,
+        reserved_baru: reserveInput,
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success('Kuota kamar berhasil diperbarui')
+      setKuotaModalOpen(false)
+      await load() // refresh overview and detail
+    })
+  }
+
   if (selectedKamar) {
     return (
       <div className="mx-auto max-w-7xl space-y-5 pb-20">
@@ -418,26 +453,41 @@ export default function KamarClient({
                   <p className="text-xs font-medium text-slate-400">Centang langsung dari tabel anggota.</p>
                 </div>
               </div>
+                  <p className="text-lg font-black text-slate-800">{selectedRoom.ketua?.nama_lengkap || 'Belum ditentukan'}</p>
+                  <p className="text-xs font-medium text-slate-400">Centang langsung dari tabel anggota.</p>
+                </div>
+              </div>
               <div className="rounded-2xl border bg-white p-4 shadow-sm">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pembina Kamar</p>
                 <p className="mt-2 text-lg font-black text-slate-800">{selectedRoom.pembina_nama || 'Belum diatur'}</p>
               </div>
-              <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <KamarStatusBadge
-                    isi={selectedRoom.total_anggota}
-                    kuota={selectedRoom.kuota}
-                  />
-                  <span className="text-sm font-semibold text-slate-600">
-                    {selectedRoom.total_anggota}/{selectedRoom.kuota} kuota fisik
-                  </span>
+              <div className="rounded-2xl border bg-white p-4 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</p>
+                    <button
+                      type="button"
+                      onClick={openKuotaModal}
+                      className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <Settings className="h-3 w-3" /> Edit
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <KamarStatusBadge
+                      isi={selectedRoom.total_anggota}
+                      kuota={selectedRoom.kuota}
+                    />
+                    <span className="text-sm font-semibold text-slate-600">
+                      {selectedRoom.total_anggota}/{selectedRoom.kuota} kuota fisik
+                    </span>
+                  </div>
+                  {selectedRoom.reserved_baru ? (
+                    <p className="mt-1 text-xs text-slate-400">
+                      Reserve santri baru: {selectedRoom.reserved_baru} slot
+                    </p>
+                  ) : null}
                 </div>
-                {selectedRoom.reserved_baru ? (
-                  <p className="mt-1 text-xs text-slate-400">
-                    Reserve santri baru: {selectedRoom.reserved_baru} slot
-                  </p>
-                ) : null}
               </div>
             </div>
 
@@ -706,6 +756,71 @@ export default function KamarClient({
                     >
                       <Save className="h-4 w-4" />
                       Simpan Batch
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {kuotaModalOpen ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+                <div className="flex w-full max-w-sm flex-col rounded-2xl bg-white shadow-2xl">
+                  <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">Edit Kuota Kamar</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">Kamar {selectedRoom.nomor_kamar}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKuotaModalOpen(false)}
+                      className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Tutup modal edit kuota"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="px-5 py-4 space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Kuota Fisik (Total Kapasitas)</label>
+                      <input
+                        type="number"
+                        min={selectedRoom.total_anggota}
+                        value={kuotaInput}
+                        onChange={(e) => setKuotaInput(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="text-[10px] text-slate-500">Kamar ini sedang dihuni {selectedRoom.total_anggota} santri.</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Reserve Santri Baru</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={kuotaInput - selectedRoom.total_anggota}
+                        value={reserveInput}
+                        onChange={(e) => setReserveInput(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="text-[10px] text-slate-500">Plotting slot kosong untuk santri baru.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setKuotaModalOpen(false)}
+                      disabled={pending}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:bg-slate-100"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveKuota}
+                      disabled={pending}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:bg-indigo-300"
+                    >
+                      <Save className="h-4 w-4" />
+                      Simpan Kuota
                     </button>
                   </div>
                 </div>

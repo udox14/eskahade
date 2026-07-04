@@ -226,12 +226,12 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
 
 export function hasRole(session: SessionUser | null, role: string): boolean {
   if (!session) return false
-  return getRoles(session).includes(role)
+  return getEffectiveRoles(session).includes(role)
 }
 
 export function hasAnyRole(session: SessionUser | null, roles: string[]): boolean {
   if (!session) return false
-  const userRoles = getRoles(session)
+  const userRoles = getEffectiveRoles(session)
   return roles.some(r => userRoles.includes(r))
 }
 
@@ -273,14 +273,31 @@ export function isSuperAccess(session: SessionUser | null): boolean {
 
 export function getEffectiveRoles(session: SessionUser | null): string[] {
   if (!session) return []
-  const roles = getRoles(session)
-  const needsStructuralJabatan = roles.some(role => STRUCTURAL_ROLE_VALUES.includes(role))
-  const structuralJabatan = needsStructuralJabatan ? (session.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : session.structural_jabatan
-  if (!structuralJabatan) return roles
+  const baseRoles = getRoles(session)
+  const expandedRoles = new Set<string>()
 
-  return Array.from(new Set([
-    ...roles,
-    `jabatan:${structuralJabatan}`,
-    ...roles.map(role => `${role}:${structuralJabatan}`),
-  ]))
+  // Ekspansi role lama yang menggunakan format "baseRole:jabatan" 
+  // agar baseRole tetap dikenali oleh hasRole()
+  for (const role of baseRoles) {
+    expandedRoles.add(role)
+    const parts = role.split(':')
+    if (parts.length === 2 && STRUCTURAL_ROLE_VALUES.includes(parts[0]) && parts[1] !== '') {
+      expandedRoles.add(parts[0])
+      expandedRoles.add(`jabatan:${parts[1]}`)
+    }
+  }
+
+  const needsStructuralJabatan = Array.from(expandedRoles).some(role => STRUCTURAL_ROLE_VALUES.includes(role))
+  const structuralJabatan = needsStructuralJabatan ? (session.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : session.structural_jabatan
+
+  if (structuralJabatan) {
+    expandedRoles.add(`jabatan:${structuralJabatan}`)
+    for (const role of Array.from(expandedRoles)) {
+      if (STRUCTURAL_ROLE_VALUES.includes(role)) {
+        expandedRoles.add(`${role}:${structuralJabatan}`)
+      }
+    }
+  }
+
+  return Array.from(expandedRoles)
 }

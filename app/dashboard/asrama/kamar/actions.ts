@@ -818,3 +818,48 @@ export async function batalTandaiSantriKeluarDariKamar(params: {
   revalidatePath('/dashboard/santri/keluar')
   return { success: true }
 }
+
+export async function updateKamarConfig(params: {
+  asrama: string
+  nomor_kamar: string
+  kuota: number
+  reserved_baru: number
+}) {
+  const access = await getAccess(params.asrama, 'update')
+  if ('error' in access) return access
+
+  const db = await getDB()
+  
+  const existing = await queryOne<{ id: string }>(
+    'SELECT id FROM kamar_config WHERE asrama = ? AND nomor_kamar = ?',
+    [params.asrama, params.nomor_kamar]
+  )
+
+  if (existing) {
+    await execute(
+      'UPDATE kamar_config SET kuota = ?, reserved_baru = ? WHERE asrama = ? AND nomor_kamar = ?',
+      [params.kuota, params.reserved_baru, params.asrama, params.nomor_kamar]
+    )
+  } else {
+    await execute(
+      'INSERT INTO kamar_config (asrama, nomor_kamar, kuota, reserved_baru) VALUES (?, ?, ?, ?)',
+      [params.asrama, params.nomor_kamar, params.kuota, params.reserved_baru]
+    )
+  }
+
+  await logActivity({
+    actor: actorFromSession(access.session),
+    module: 'asrama_kamar',
+    action: 'update',
+    fiturHref: KAMAR_PATH,
+    logKind: 'update',
+    entityType: 'kamar_config',
+    entityId: `${params.asrama}-${params.nomor_kamar}`,
+    entityLabel: `Kamar ${params.nomor_kamar}`,
+    summary: `Memperbarui kuota kamar ${params.nomor_kamar} di asrama ${params.asrama} (Kuota: ${params.kuota}, Reserve: ${params.reserved_baru})`,
+    details: params,
+  })
+
+  revalidatePath(KAMAR_PATH)
+  return { success: true }
+}
