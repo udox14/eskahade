@@ -383,6 +383,13 @@ export default function ExportSantriPage() {
           </div>
 
           <div className="col-span-2 sm:col-span-1">
+            <MultiChip label="Kategori Santri"
+              selected={filter.kategori_santri ?? []}
+              onChange={setArr('kategori_santri')}
+              options={['BARU', 'REGULER', 'SADESA']} />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kata dalam Alamat</label>
             <input type="text" placeholder="Cth: Tasikmalaya"
               value={filter.alamat_kata ?? ''}

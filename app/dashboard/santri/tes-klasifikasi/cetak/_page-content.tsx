@@ -1110,7 +1110,7 @@ export default function CetakTesKlasifikasiPage() {
                   <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
                   <select value={selectedAsrama} onChange={e => setSelectedAsrama(e.target.value)} className="rounded-lg border px-3 py-2 text-sm">
                     <option value="">Pilih asrama</option>
-                    {asramaOptions.map(asrama => <option key={asrama} value={asrama}>{asrama}</option>)}
+                    {asramaOptions.map((asrama: string) => <option key={asrama} value={asrama}>{asrama}</option>)}
                   </select>
                 </div>
               )}

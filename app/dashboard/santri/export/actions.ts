@@ -164,6 +164,11 @@ export async function getDataExport(
   addInClause('s.sekolah', filter.sekolah)
   addInClause('s.kelas_sekolah', filter.kelas_sekolah)
   addInClause('s.tahun_masuk', filter.tahun_masuk)
+  if (filter.kategori_santri && filter.kategori_santri.length > 0) {
+    const inList = filter.kategori_santri.map(() => '?').join(', ')
+    clauses.push(`(${kategoriEfektifSql}) IN (${inList})`)
+    params.push(...filter.kategori_santri)
+  }
   if (filter.alamat_kata) {
     clauses.push('(s.alamat LIKE ? OR s.alamat_lengkap LIKE ? OR s.kecamatan LIKE ? OR s.kab_kota LIKE ? OR s.provinsi LIKE ?)')
     params.push(

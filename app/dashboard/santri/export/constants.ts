@@ -11,6 +11,7 @@ export type ExportFilter = {
   nama_kelas?:    string[]
   marhalah?:      string[]
   tahun_masuk?:   number[]
+  kategori_santri?: string[]
   alamat_kata?:   string     // tetap single (LIKE search)
 }
 
