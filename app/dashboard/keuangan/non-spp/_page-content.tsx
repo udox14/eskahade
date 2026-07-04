@@ -390,7 +390,7 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
                     {item.lunas ? item.paymentIds[0] ? (
                       <button onClick={() => voidPayment(item.paymentIds[0])} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-50">Void</button>
                     ) : (
-                      <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{item.hasPsbPayment ? 'Flow PSB' : 'Lunas'}</span>
+                      <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{item.hasPsbPayment ? 'Daftar Ulang PSB' : 'Lunas'}</span>
                     ) : item.sisa > 0 ? (
                       <button onClick={() => bayar(jenis)} disabled={saving === jenis || item.sisa <= 0} className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Bayar</button>
                     ) : row.is_legacy_settled ? (
@@ -453,7 +453,7 @@ function MiniLedger({ santriId, tahunAjaranId, onVoid }: { santriId: string; tah
               <div>
                 <p className="font-extrabold">{p.jenis_biaya} {p.tahun_tagihan || ''} - {rp(p.nominal_bayar)}</p>
                 <p>{p.tanggal_bayar} - {p.penerima_nama || 'Sistem'}</p>
-                {p.psb_receipt_id && <p className="font-bold text-blue-700">Flow PSB</p>}
+                {p.psb_receipt_id && <p className="font-bold text-blue-700">Daftar Ulang PSB</p>}
                 {p.batch_id && <p>Batch: {p.batch_id.slice(0, 8)}</p>}
                 {p.status === 'VOID' && <p className="font-bold">VOID: {p.void_reason}</p>}
               </div>
@@ -685,7 +685,7 @@ function LaporanTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: number;
                   <td className="px-4 py-3"><p className="font-bold">{item.nama_lengkap}</p><p className="text-xs text-slate-400">{item.nis || '-'} - {item.asrama || '-'}</p></td>
                   <td className="px-4 py-3">{item.jenis_biaya} {item.tahun_tagihan || ''}</td>
                   <td className="px-4 py-3 text-right font-mono font-bold">{rp(item.nominal_bayar)}</td>
-                  <td className="px-4 py-3 text-xs font-bold">{item.psb_receipt_id ? 'Flow PSB' : 'Non-SPP'}</td>
+                  <td className="px-4 py-3 text-xs font-bold">{item.psb_receipt_id ? 'Daftar Ulang PSB' : 'Non-SPP'}</td>
                   <td className="px-4 py-3">{item.status === 'VOID' ? <span className="font-bold text-red-700">VOID</span> : <span className="font-bold text-green-700">AKTIF</span>}</td>
                 </tr>
               ))}

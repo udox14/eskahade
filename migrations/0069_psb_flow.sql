@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_pembayaran_tahunan_psb_receipt
 
 INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
 VALUES
-  ('PSB', 'Flow PSB', '/dashboard/psb', 'ClipboardList', '["admin","sekpen","pengurus_asrama","bendahara"]', 1, 0),
+  ('PSB', 'Daftar Ulang PSB', '/dashboard/psb', 'ClipboardList', '["admin","sekpen","pengurus_asrama","bendahara"]', 1, 0),
   ('PSB', 'Monitoring PSB', '/dashboard/psb/monitoring', 'BarChart3', '["admin","dewan_santri"]', 1, 1);
 
 INSERT OR IGNORE INTO role_fitur_crud_permission

@@ -63,7 +63,7 @@ const WIZARD_ITEMS = [
   },
   {
     key: 'flow_psb',
-    title: 'Flow PSB',
+    title: 'Daftar Ulang PSB',
     description: 'Pastikan santri baru tahun berjalan tidak tertahan di alur PSB.',
     href: '/dashboard/psb',
     group: 'PSB',
@@ -300,7 +300,7 @@ async function checkPsb(tahunAwal: number | null): Promise<AutoCheck> {
     if (selesai === total) return done(total, `${total} santri PSB tahun ${tahunAwal} sudah DONE.`)
     return review(total, selesai, `${total - selesai} santri PSB tahun ${tahunAwal} belum DONE.`)
   } catch {
-    return done(1, `Belum ada flow PSB terbaca untuk tahun ${tahunAwal}.`)
+    return done(1, `Belum ada daftar ulang PSB terbaca untuk tahun ${tahunAwal}.`)
   }
 }
 

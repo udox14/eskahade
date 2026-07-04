@@ -12,7 +12,7 @@ export default async function PsbPage() {
   return (
     <div className="space-y-5 pb-10">
       <DashboardPageHeader
-        title="Flow PSB"
+        title="Daftar Ulang PSB"
         description="Alur terpadu daftar ulang santri baru dari sekretariat sampai pembayaran."
       />
       <Suspense fallback={null}>

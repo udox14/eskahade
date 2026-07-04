@@ -103,7 +103,7 @@ export default async function BukuBesarDetailPage({ params }: Props) {
                   <td className="px-4 py-3">{p.tahun_ajaran_nama || p.tahun_tagihan || 'Legacy'}</td>
                   <td className="px-4 py-3 font-bold">{p.jenis_biaya}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">{rp(p.nominal_bayar)}</td>
-                  <td className="px-4 py-3 text-xs font-bold">{p.psb_receipt_id ? 'Flow PSB' : 'Non-SPP'}</td>
+                  <td className="px-4 py-3 text-xs font-bold">{p.psb_receipt_id ? 'Daftar Ulang PSB' : 'Non-SPP'}</td>
                   <td className="px-4 py-3 text-xs">{p.penerima_nama || 'Sistem'}</td>
                   <td className="px-4 py-3">{p.status === 'VOID' ? <span className="font-bold text-red-700">VOID</span> : <span className="font-bold text-green-700">AKTIF</span>}</td>
                   <td className="px-4 py-3 text-right">

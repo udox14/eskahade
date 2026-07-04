@@ -259,21 +259,42 @@ export default function PsbPageContent() {
   }, [activeRoomAsrama, selectedRole])
 
   const rows = useMemo(() => data?.rows ?? [], [data])
-  const sekretariatRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFICATION'), [rows])
-  const placementRows = useMemo(() => rows.filter((row: any) => row.status === 'VERIFIED'), [rows])
+  const sekretariatRows = useMemo(() => {
+    return rows
+      .filter((row: any) => row.status === 'VERIFICATION')
+      .sort((a: any, b: any) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''))
+  }, [rows])
+  const placementRows = useMemo(() => {
+    return rows
+      .filter((row: any) => row.status === 'VERIFIED')
+      .sort((a: any, b: any) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''))
+  }, [rows])
   const goBack = () => {
     setVerificationRow(null)
   }
   const roomRows = useMemo(() => {
-    return rows.filter((row: any) => (row.status === 'PAID' || row.status === 'PLACED_KAMAR') && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
+    return rows
+      .filter((row: any) => (row.status === 'PAID' || row.status === 'PLACED_KAMAR') && (!activeRoomAsrama || row.asrama === activeRoomAsrama))
+      .sort((a: any, b: any) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''))
   }, [activeRoomAsrama, rows])
   const paymentRows = useMemo(() => {
-    return rows.filter((row: any) => row.status === 'PLACED_ASRAMA')
+    return rows
+      .filter((row: any) => row.status === 'PLACED_ASRAMA')
+      .sort((a: any, b: any) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''))
   }, [rows])
   // Santri yang punya kuitansi aktif — muncul di seksi "Sudah Bayar" agar
   // bendahara tetap bisa void tanpa perlu revert tahap lebih dulu.
   const paidRows = useMemo(() => {
-    return rows.filter((row: any) => row.pembayaran?.latestReceipt?.id)
+    return rows
+      .filter((row: any) => row.pembayaran?.latestReceipt?.id)
+      .sort((a: any, b: any) => {
+        const aDate = a.pembayaran.latestReceipt.created_at
+        const bDate = b.pembayaran.latestReceipt.created_at
+        if (aDate && bDate) {
+          return new Date(bDate).getTime() - new Date(aDate).getTime()
+        }
+        return String(b.pembayaran.latestReceipt.id || '').localeCompare(String(a.pembayaran.latestReceipt.id || ''))
+      })
   }, [rows])
 
   const sekretariatStats = useMemo(() => {
@@ -488,7 +509,7 @@ export default function PsbPageContent() {
     return (
       <div className="rounded-xl border border-slate-200 bg-white py-24 text-center text-slate-400 shadow-sm">
         <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-blue-500" />
-        Memuat flow PSB...
+        Memuat daftar ulang PSB...
       </div>
     )
   }
