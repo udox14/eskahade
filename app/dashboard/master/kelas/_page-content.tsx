@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif, getTahunAjaranList, copyKelasFromTahunAjaran } from './actions'
-import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer, Copy, X } from 'lucide-react'
+import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif, getTahunAjaranList, copyKelasFromTahunAjaran, updateKelasRuanganFields } from './actions'
+import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer, Copy, X, Pencil, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -21,6 +21,10 @@ export default function MasterKelasPage() {
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState<number | ''>('')
   const [isCopying, setIsCopying] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editData, setEditData] = useState<Record<string, { tempat: string; grade: string; baru_lama: string; jenis_kelamin: string }>>({})
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -34,6 +38,47 @@ export default function MasterKelasPage() {
     setTahunAktif(ta)
     setTahunAjaranList(tal)
     setLoading(false)
+  }
+
+  const enterEditMode = () => {
+    const init: Record<string, { tempat: string; grade: string; baru_lama: string; jenis_kelamin: string }> = {}
+    kelasList.forEach((k: any) => {
+      init[k.id] = { tempat: k.tempat || '', grade: k.grade || '', baru_lama: k.baru_lama || '', jenis_kelamin: k.jenis_kelamin || 'L' }
+    })
+    setEditData(init)
+    setDirtyIds(new Set())
+    setEditMode(true)
+  }
+
+  const cancelEditMode = () => {
+    setEditMode(false)
+    setEditData({})
+    setDirtyIds(new Set())
+  }
+
+  const handleFieldChange = (kelasId: string, field: string, value: string) => {
+    setEditData(prev => ({ ...prev, [kelasId]: { ...prev[kelasId], [field]: value } }))
+    setDirtyIds(prev => new Set(prev).add(kelasId))
+  }
+
+  const handleSaveChanges = async () => {
+    if (dirtyIds.size === 0) { setEditMode(false); return }
+    setIsSaving(true)
+    const toastId = toast.loading(`Menyimpan ${dirtyIds.size} perubahan...`)
+    const results = await Promise.all(
+      Array.from(dirtyIds).map(id => updateKelasRuanganFields(id, editData[id]))
+    )
+    toast.dismiss(toastId)
+    const errors = results.filter((r: any) => 'error' in r)
+    if (errors.length > 0) {
+      toast.error(`${errors.length} data gagal disimpan`)
+    } else {
+      toast.success(`${dirtyIds.size} kelas berhasil diperbarui`)
+    }
+    setIsSaving(false)
+    setEditMode(false)
+    setDirtyIds(new Set())
+    loadData()
   }
 
   const handleCopyKelas = async () => {
@@ -225,25 +270,131 @@ export default function MasterKelasPage() {
           </div>
           <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
             <div className="bg-slate-50 px-6 py-3 border-b text-xs font-bold text-slate-500 uppercase flex justify-between items-center">
-               <span>Daftar Kelas Tersedia</span><span className="bg-white border px-2 py-0.5 rounded text-slate-600">{kelasList.length} Rombel</span>
+              <div className="flex items-center gap-3">
+                <span>Daftar Kelas Tersedia</span>
+                <span className="bg-white border px-2 py-0.5 rounded text-slate-600">{kelasList.length} Rombel</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {editMode ? (
+                  <>
+                    {dirtyIds.size > 0 && (
+                      <span className="text-amber-600 normal-case font-medium">{dirtyIds.size} perubahan</span>
+                    )}
+                    <button
+                      onClick={handleSaveChanges}
+                      disabled={isSaving}
+                      className="inline-flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 disabled:opacity-50 normal-case"
+                    >
+                      {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      Simpan
+                    </button>
+                    <button
+                      onClick={cancelEditMode}
+                      disabled={isSaving}
+                      className="inline-flex items-center gap-1.5 border border-slate-300 bg-white text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 normal-case"
+                    >
+                      <X className="w-3.5 h-3.5" /> Batal
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={enterEditMode}
+                    className="inline-flex items-center gap-1.5 border border-slate-300 bg-white text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 normal-case"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit Ruangan
+                  </button>
+                )}
+              </div>
             </div>
+            {editMode && (
+              <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-700 flex items-center gap-2">
+                <Pencil className="w-3.5 h-3.5 flex-shrink-0" />
+                Mode edit aktif — Tempat, Grade, B/L, dan L/P bisa diedit langsung di tabel.
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="min-w-[760px] w-full text-sm text-left">
                 <thead className="bg-white text-slate-600 font-bold border-b">
                   <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">B/L</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {kelasList?.map((k) => (
-                    <tr key={k.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
-                      <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
-                      <td className="px-6 py-3 text-slate-500">{k.tempat || '-'}</td>
-                      <td className="px-6 py-3 text-slate-500 font-semibold">{k.grade || '-'}</td>
-                      <td className="px-6 py-3 text-slate-500 font-semibold">{k.baru_lama || '-'}</td>
-                      <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span></td>
-                      <td className="px-6 py-3 text-right"><button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
-                    </tr>
-                  ))}
+                  {kelasList?.map((k) => {
+                    const row = editData[k.id]
+                    const isDirty = dirtyIds.has(k.id)
+                    return (
+                      <tr key={k.id} className={`transition-colors ${isDirty ? 'bg-amber-50' : 'hover:bg-slate-50'}`}>
+                        <td className="px-6 py-3 font-medium text-slate-800">{k.nama_kelas}</td>
+                        <td className="px-6 py-3 text-slate-500">{k.marhalah_nama || '-'}</td>
+                        <td className="px-4 py-2">
+                          {editMode && row ? (
+                            <input
+                              type="text"
+                              value={row.tempat}
+                              onChange={e => handleFieldChange(k.id, 'tempat', e.target.value)}
+                              placeholder="Tempat..."
+                              className="w-full min-w-[120px] px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
+                            />
+                          ) : (
+                            <span className="text-slate-500">{k.tempat || '-'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {editMode && row ? (
+                            <select
+                              value={row.grade}
+                              onChange={e => handleFieldChange(k.id, 'grade', e.target.value)}
+                              className="px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                            >
+                              <option value="">-</option>
+                              <option value="A">A</option>
+                              <option value="B">B</option>
+                              <option value="C">C</option>
+                              <option value="AB">AB</option>
+                              <option value="BC">BC</option>
+                              <option value="ABC">ABC</option>
+                            </select>
+                          ) : (
+                            <span className="text-slate-500 font-semibold">{k.grade || '-'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {editMode && row ? (
+                            <select
+                              value={row.baru_lama}
+                              onChange={e => handleFieldChange(k.id, 'baru_lama', e.target.value)}
+                              className="px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                            >
+                              <option value="">-</option>
+                              <option value="B">B (Baru)</option>
+                              <option value="L">L (Lama)</option>
+                            </select>
+                          ) : (
+                            <span className="text-slate-500 font-semibold">{k.baru_lama || '-'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {editMode && row ? (
+                            <select
+                              value={row.jenis_kelamin}
+                              onChange={e => handleFieldChange(k.id, 'jenis_kelamin', e.target.value)}
+                              className="px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                            >
+                              <option value="L">L (Putra)</option>
+                              <option value="P">P (Putri)</option>
+                              <option value="C">C (Campur)</option>
+                            </select>
+                          ) : (
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          {!editMode && (
+                            <button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

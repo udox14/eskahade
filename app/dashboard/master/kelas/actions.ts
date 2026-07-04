@@ -284,6 +284,47 @@ export async function importKelasMassal(dataExcel: any[]) {
   return { success: true, count: inserts.length, skipped: duplicates }
 }
 
+export async function updateKelasRuanganFields(
+  kelasId: string,
+  fields: { tempat?: string; grade?: string; baru_lama?: string; jenis_kelamin?: string }
+) {
+  const session = await getSession()
+  await ensureKelasExtraColumns()
+
+  const existing = await queryOne<{ id: string; nama_kelas: string }>(
+    'SELECT id, nama_kelas FROM kelas WHERE id = ?',
+    [kelasId]
+  )
+  if (!existing) return { error: 'Kelas tidak ditemukan.' }
+
+  const tempat = (fields.tempat ?? '').trim()
+  const gradeRaw = (fields.grade ?? '').trim().toUpperCase()
+  const grade = isKomposisiKelas(gradeRaw) ? gradeRaw : ''
+  const baruLama = (fields.baru_lama ?? '').trim().toUpperCase()
+  const jenisKelamin = fields.jenis_kelamin ?? 'L'
+
+  await execute(
+    'UPDATE kelas SET tempat = ?, grade = ?, baru_lama = ?, jenis_kelamin = ? WHERE id = ?',
+    [tempat || null, grade || null, baruLama || null, jenisKelamin, kelasId]
+  )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kelas',
+    action: 'update',
+    fiturHref: '/dashboard/master/kelas',
+    logKind: 'update',
+    entityType: 'kelas',
+    entityId: kelasId,
+    entityLabel: existing.nama_kelas,
+    summary: `Update data ruangan kelas ${existing.nama_kelas}`,
+    details: { tempat: tempat || null, grade: grade || null, baru_lama: baruLama || null, jenis_kelamin: jenisKelamin },
+  })
+
+  revalidatePath('/dashboard/master/kelas')
+  return { success: true }
+}
+
 export async function copyKelasFromTahunAjaran(sourceTahunAjaranId: number): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
   const session = await getSession()
   await ensureKelasExtraColumns()
