@@ -2,6 +2,7 @@
 
 import { query, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
@@ -64,6 +65,7 @@ export async function updatePassword(data: { current: string; new: string; confi
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
 
+  if (!data.current) return { error: 'Password saat ini wajib diisi' }
   if (data.new.length < 6) return { error: 'Password baru minimal 6 karakter' }
   if (data.new !== data.confirm) return { error: 'Konfirmasi password tidak cocok' }
 
@@ -71,19 +73,10 @@ export async function updatePassword(data: { current: string; new: string; confi
   const user = await query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?', [session.id])
   if (!user[0]) return { error: 'User tidak ditemukan' }
 
-  const encoder = new TextEncoder()
-  const data2 = encoder.encode(data.current)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data2)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const currentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  const validCurrentPassword = await verifyPassword(data.current, user[0].password_hash)
+  if (!validCurrentPassword) return { error: 'Password saat ini salah' }
 
-  if (currentHash !== user[0].password_hash) return { error: 'Password saat ini salah' }
-
-  // Hash new password
-  const newData = encoder.encode(data.new)
-  const newHashBuffer = await crypto.subtle.digest('SHA-256', newData)
-  const newHashArray = Array.from(new Uint8Array(newHashBuffer))
-  const newHash = newHashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  const newHash = await hashPassword(data.new)
 
   await execute(
     'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
@@ -102,6 +95,7 @@ export async function updatePassword(data: { current: string; new: string; confi
     summary: 'Mengubah password sendiri',
   })
 
+  revalidatePath('/dashboard/profil')
   return { success: true }
 }
 

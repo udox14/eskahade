@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { getPsbMonitoring, type PsbStatus } from '../actions'
@@ -27,6 +27,35 @@ const STATUS_COLOR: Record<PsbStatus, string> = {
   DONE: 'bg-emerald-700 text-white',
 }
 const TIMELINE_GRADIENT = ['bg-emerald-100', 'bg-emerald-200', 'bg-green-300', 'bg-green-500', 'bg-green-600', 'bg-green-800']
+const SEKOLAH_GROUPS = {
+  SLTP: ['MTSN', 'MTSU', 'SMP'],
+  SLTA: ['MAN', 'SMK', 'SMA', 'LAINNYA'],
+} as const
+
+type MonitoringRow = {
+  id: string
+  nama_lengkap: string
+  nis: string
+  jenis_kelamin: string | null
+  sekolah: string | null
+  asrama: string | null
+  kamar: string | null
+  status: PsbStatus
+}
+
+function normalizeSekolah(sekolah: string | null | undefined) {
+  const value = String(sekolah ?? '').trim().toUpperCase()
+  if (SEKOLAH_GROUPS.SLTP.includes(value as any)) return value
+  if (SEKOLAH_GROUPS.SLTA.includes(value as any)) return value
+  return 'LAINNYA'
+}
+
+function sortCountEntries<T extends string>(entries: [T, number][]) {
+  return entries.sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1]
+    return a[0].localeCompare(b[0], 'id-ID')
+  })
+}
 
 export default function PsbMonitoringContent() {
   const [data, setData] = useState<any>(null)
@@ -34,6 +63,7 @@ export default function PsbMonitoringContent() {
   const [filters, setFilters] = useState({ q: '', sekolah: '', asrama: '', status: '' })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  const [activeStat, setActiveStat] = useState<PsbStatus | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -51,10 +81,48 @@ export default function PsbMonitoringContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const rows = useMemo(() => data?.rows ?? [], [data])
+  const rows = useMemo<MonitoringRow[]>(() => data?.rows ?? [], [data])
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const pagedRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const activeStatRows = useMemo(
+    () => activeStat ? rows.filter((row) => row.status === activeStat) : [],
+    [activeStat, rows],
+  )
+  const activeStatBreakdown = useMemo(() => {
+    if (!activeStat) return null
+
+    const sekolahCounts = new Map<string, number>()
+    const asramaCounts = new Map<string, number>()
+    const genderCounts = new Map<string, number>([['Laki-laki', 0], ['Perempuan', 0], ['Belum diisi', 0]])
+
+    activeStatRows.forEach((row) => {
+      const sekolah = normalizeSekolah(row.sekolah)
+      sekolahCounts.set(sekolah, (sekolahCounts.get(sekolah) ?? 0) + 1)
+
+      const asrama = String(row.asrama ?? '').trim() || 'Belum ditempatkan'
+      asramaCounts.set(asrama, (asramaCounts.get(asrama) ?? 0) + 1)
+
+      const jk = String(row.jenis_kelamin ?? '').trim().toUpperCase()
+      if (jk === 'L') genderCounts.set('Laki-laki', (genderCounts.get('Laki-laki') ?? 0) + 1)
+      else if (jk === 'P') genderCounts.set('Perempuan', (genderCounts.get('Perempuan') ?? 0) + 1)
+      else genderCounts.set('Belum diisi', (genderCounts.get('Belum diisi') ?? 0) + 1)
+    })
+
+    const sekolahGroupTotals = {
+      SLTP: SEKOLAH_GROUPS.SLTP.reduce((sum, key) => sum + (sekolahCounts.get(key) ?? 0), 0),
+      SLTA: SEKOLAH_GROUPS.SLTA.reduce((sum, key) => sum + (sekolahCounts.get(key) ?? 0), 0),
+    }
+
+    return {
+      total: activeStatRows.length,
+      sekolahGroupTotals,
+      sekolahSltp: SEKOLAH_GROUPS.SLTP.map((key) => [key, sekolahCounts.get(key) ?? 0] as const),
+      sekolahSlta: SEKOLAH_GROUPS.SLTA.map((key) => [key, sekolahCounts.get(key) ?? 0] as const),
+      asrama: sortCountEntries(Array.from(asramaCounts.entries())),
+      gender: Array.from(genderCounts.entries()),
+    }
+  }, [activeStat, activeStatRows])
 
   useEffect(() => {
     setPage(1)
@@ -64,10 +132,16 @@ export default function PsbMonitoringContent() {
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-6">
         {STATUS_LIST.map(status => (
-          <div key={status} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <button
+            key={status}
+            type="button"
+            onClick={() => setActiveStat(status)}
+            className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+          >
             <p className="text-[11px] font-bold uppercase text-slate-500">{STATUS_LABEL[status]}</p>
             <p className="mt-1 text-2xl font-black text-slate-900">{data?.summary?.[status] ?? 0}</p>
-          </div>
+            <p className="mt-2 text-[11px] font-medium text-blue-600">Klik untuk lihat statistik</p>
+          </button>
         ))}
       </div>
 
@@ -223,6 +297,100 @@ export default function PsbMonitoringContent() {
         <BarChart3 className="h-4 w-4" />
         Monitoring ini hanya baca data, tidak mengubah progress santri.
       </div>
+
+      {activeStat && activeStatBreakdown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Tutup detail statistik"
+            className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+            onClick={() => setActiveStat(null)}
+          />
+          <div className="relative z-10 max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Detail Statistik</p>
+                <h2 className="text-lg font-black text-slate-900">{STATUS_LABEL[activeStat]}</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {activeStatBreakdown.total} santri pada status ini sesuai filter yang sedang aktif.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStat(null)}
+                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(85vh-88px)] overflow-y-auto p-5">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase text-slate-500">Sekolah</p>
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-extrabold text-slate-900">Grup SLTP</p>
+                        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">{activeStatBreakdown.sekolahGroupTotals.SLTP}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {activeStatBreakdown.sekolahSltp.map(([label, total]) => (
+                          <div key={label} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                            <span className="font-medium text-slate-600">{label}</span>
+                            <span className="font-extrabold text-slate-900">{total}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-extrabold text-slate-900">Grup SLTA</p>
+                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">{activeStatBreakdown.sekolahGroupTotals.SLTA}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {activeStatBreakdown.sekolahSlta.map(([label, total]) => (
+                          <div key={label} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                            <span className="font-medium text-slate-600">{label}</span>
+                            <span className="font-extrabold text-slate-900">{total}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase text-slate-500">Asrama</p>
+                  <div className="mt-3 space-y-2">
+                    {activeStatBreakdown.asrama.length === 0 ? (
+                      <div className="rounded-lg bg-white px-3 py-2 text-sm text-slate-500">Belum ada data asrama.</div>
+                    ) : activeStatBreakdown.asrama.map(([label, total]) => (
+                      <div key={label} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                        <span className="font-medium text-slate-600">{label}</span>
+                        <span className="font-extrabold text-slate-900">{total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase text-slate-500">Jenis Kelamin</p>
+                  <div className="mt-3 space-y-2">
+                    {activeStatBreakdown.gender.map(([label, total]) => (
+                      <div key={label} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                        <span className="font-medium text-slate-600">{label}</span>
+                        <span className="font-extrabold text-slate-900">{total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
