@@ -39,7 +39,9 @@
       "Bash(python -c ' *)",
       "Bash(awk '{print $NF}')",
       "Bash(xargs ls -lh)",
-      "Bash(grep -ri \"demo\\\\|test.*user\\\\|sample.*data\" /c/DATA/eskahade --include=\"*.ts\" --include=\"*.sql\" ! -path \"*/node_modules/*\" ! -path \"*/.next/*\")"
+      "Bash(grep -ri \"demo\\\\|test.*user\\\\|sample.*data\" /c/DATA/eskahade --include=\"*.ts\" --include=\"*.sql\" ! -path \"*/node_modules/*\" ! -path \"*/.next/*\")",
+      "Bash(grep -E \"\\\\.\\(mjs|ts\\)$\")",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|sql\\)$\")"
     ]
   }
 }
