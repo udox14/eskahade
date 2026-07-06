@@ -27,6 +27,7 @@ type KatalogRow = {
   toko_nama: string | null
   master_nama_kitab: string | null
   is_consignment: number
+  prioritas_stok?: string | null
 }
 
 type KatalogMarhalahRow = {
@@ -101,11 +102,13 @@ function toNullableInt(value: FormDataEntryValue | null) {
 
 export async function getKatalogUPK(search = '', filterMarhalah = '', filterStatus = 'SEMUA') {
   const hasConsignment = await hasColumn('upk_katalog', 'is_consignment')
+  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
   let sql = `
     SELECT uk.id, uk.kitab_id, uk.nama_kitab, uk.toko_id,
            uk.stok_lama, uk.stok_baru, uk.harga_beli, uk.harga_jual,
            uk.is_active, uk.catatan, uk.stok_updated_at, uk.updated_at, uk.created_at,
            ${hasConsignment ? 'uk.is_consignment' : '0 AS is_consignment'},
+           ${hasPrioritasStok ? 'uk.prioritas_stok' : "'LAMA' AS prioritas_stok"},
            t.nama AS toko_nama,
            k.nama_kitab AS master_nama_kitab
     FROM upk_katalog uk
@@ -157,6 +160,7 @@ export async function getKatalogUPK(search = '', filterMarhalah = '', filterStat
       ...row,
       is_active: !!row.is_active,
       is_consignment: !!row.is_consignment,
+      prioritas_stok: (row.prioritas_stok === 'BARU' ? 'BARU' : 'LAMA') as 'LAMA' | 'BARU',
       marhalah: marhalahByKatalog.get(row.id) ?? [],
       jumlah_stok: jumlahStok,
       modal,
@@ -208,6 +212,7 @@ export async function simpanKatalog(payload: {
   catatan: string
   marhalah: { marhalah_id: number; is_default: boolean }[]
   is_consignment?: boolean
+  prioritas_stok?: 'LAMA' | 'BARU'
 }): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const id = payload.id && payload.id > 0 ? payload.id : null
@@ -219,8 +224,10 @@ export async function simpanKatalog(payload: {
   const hargaJual = Number(payload.harga_jual) || 0
   const isActive = payload.is_active ? 1 : 0
   const isConsignment = payload.is_consignment ? 1 : 0
+  const prioritasStok = payload.prioritas_stok === 'BARU' ? 'BARU' : 'LAMA'
   const catatan = payload.catatan.trim()
   const hasConsignment = await hasColumn('upk_katalog', 'is_consignment')
+  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
 
   // dedupe marhalah, max 1 default per item tetap diizinkan banyak default
   const marhalahMap = new Map<number, boolean>()
@@ -246,35 +253,40 @@ export async function simpanKatalog(payload: {
     const stockUpdatedAt = stockChanged ? timestamp : currentStock.stok_updated_at
 
     const consignmentSet = hasConsignment ? ', is_consignment = ?' : ''
+    const prioritasStokSet = hasPrioritasStok ? ', prioritas_stok = ?' : ''
     const params = [
       kitabId, namaKitab, tokoId, stokLama, hargaBeli, hargaJual,
       isActive, catatan || null,
     ]
     if (hasConsignment) params.push(isConsignment)
+    if (hasPrioritasStok) params.push(prioritasStok)
     params.push(stockUpdatedAt, timestamp, id)
 
     await execute(`
       UPDATE upk_katalog
       SET kitab_id = ?, nama_kitab = ?, toko_id = ?,
           stok_lama = ?, harga_beli = ?, harga_jual = ?,
-          is_active = ?, catatan = ?${consignmentSet}, stok_updated_at = ?, updated_at = ?
+          is_active = ?, catatan = ?${consignmentSet}${prioritasStokSet}, stok_updated_at = ?, updated_at = ?
       WHERE id = ?
     `, params)
   } else {
     const consignmentColumn = hasConsignment ? ', is_consignment' : ''
     const consignmentPlaceholder = hasConsignment ? ', ?' : ''
+    const prioritasStokColumn = hasPrioritasStok ? ', prioritas_stok' : ''
+    const prioritasStokPlaceholder = hasPrioritasStok ? ', ?' : ''
     const params = [
       kitabId, namaKitab, tokoId, stokLama, 0, hargaBeli, hargaJual,
       isActive, catatan || null,
     ]
     if (hasConsignment) params.push(isConsignment)
+    if (hasPrioritasStok) params.push(prioritasStok)
     params.push(timestamp, timestamp, timestamp)
 
     await execute(`
       INSERT INTO upk_katalog
         (kitab_id, nama_kitab, toko_id, stok_lama, stok_baru,
-         harga_beli, harga_jual, is_active, catatan${consignmentColumn}, stok_updated_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${consignmentPlaceholder}, ?, ?, ?)
+         harga_beli, harga_jual, is_active, catatan${consignmentColumn}${prioritasStokColumn}, stok_updated_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${consignmentPlaceholder}${prioritasStokPlaceholder}, ?, ?, ?)
     `, params)
     const created = await queryOne<{ id: number }>('SELECT id FROM upk_katalog ORDER BY id DESC LIMIT 1')
     katalogId = created?.id ?? null
@@ -307,6 +319,7 @@ export async function simpanKatalog(payload: {
       harga_beli: hargaBeli,
       harga_jual: hargaJual,
       is_active: isActive === 1,
+      prioritas_stok: prioritasStok,
     },
   })
 

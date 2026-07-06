@@ -472,24 +472,15 @@ export async function returBelanjaItem(belanjaItemId: string, qtyToReturn: numbe
   if (bi.katalog_id && !katalog) return { error: 'Katalog item tidak ditemukan.' }
 
   if (katalog) {
-    const totalStok = (katalog.stok_lama || 0) + (katalog.stok_baru || 0)
-    if (qty > totalStok) return { error: `Stok saat ini (${totalStok}) tidak mencukupi untuk diretur sebanyak ${qty}.` }
-
-    let remainingToReduce = qty
-    let newStokBaru = katalog.stok_baru
-    let newStokLama = katalog.stok_lama
-
-    if (newStokBaru >= remainingToReduce) {
-      newStokBaru -= remainingToReduce
-      remainingToReduce = 0
-    } else {
-      remainingToReduce -= newStokBaru
-      newStokBaru = 0
+    if (!katalog.is_consignment) {
+      return { error: 'Kitab ini bukan barang konsinyasi.' }
+    }
+    if (qty > katalog.stok_baru) {
+      return { error: `Stok baru saat ini (${katalog.stok_baru}) tidak mencukupi untuk diretur sebanyak ${qty}. (Stok lama tidak termasuk konsinyasi)` }
     }
 
-    if (remainingToReduce > 0) {
-      newStokLama = Math.max(0, newStokLama - remainingToReduce)
-    }
+    const newStokBaru = katalog.stok_baru - qty
+    const newStokLama = katalog.stok_lama
 
     await execute(`
       UPDATE upk_katalog

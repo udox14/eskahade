@@ -50,6 +50,7 @@ type KatalogForm = {
   catatan: string
   marhalah: MarhalahSel[]
   is_consignment: boolean
+  prioritas_stok: 'LAMA' | 'BARU'
 }
 
 type TokoForm = {
@@ -95,6 +96,7 @@ type KatalogItem = {
   laba_kotor: number
   laba_bersih: number
   is_consignment: boolean
+  prioritas_stok?: 'LAMA' | 'BARU'
 }
 
 type ImportPreviewRow = {
@@ -114,6 +116,7 @@ const emptyKatalogForm: KatalogForm = {
   catatan: '',
   marhalah: [],
   is_consignment: false,
+  prioritas_stok: 'LAMA',
 }
 
 const emptyTokoForm: TokoForm = { id: '', nama: '', is_active: true }
@@ -359,6 +362,7 @@ export default function KatalogUPKPage() {
       harga_jual: String(item.harga_jual ?? 0),
       is_active: !!item.is_active,
       is_consignment: !!item.is_consignment,
+      prioritas_stok: item.prioritas_stok ?? 'LAMA',
       catatan: item.catatan ?? '',
       marhalah: item.marhalah.map(m => ({ marhalah_id: m.marhalah_id, is_default: m.is_default })),
     })
@@ -384,6 +388,7 @@ export default function KatalogUPKPage() {
       catatan: form.catatan,
       marhalah: form.marhalah,
       is_consignment: form.is_consignment,
+      prioritas_stok: form.prioritas_stok,
     })
     setSaving(false)
 
@@ -618,6 +623,11 @@ export default function KatalogUPKPage() {
                                 Konsinyasi
                               </span>
                             )}
+                            {item.prioritas_stok === 'BARU' && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                                Stok Baru Dahulu
+                              </span>
+                            )}
                           </div>
                           {item.catatan && <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.catatan}</p>}
                         </td>
@@ -783,6 +793,20 @@ export default function KatalogUPKPage() {
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Catatan</label>
                 <textarea name="catatan" value={form.catatan} onChange={e => setField('catatan', e.target.value)} className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm min-h-20" placeholder="Edisi, kualitas cetak, info toko, atau catatan harga" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Prioritas Pengurangan Stok</label>
+                <select
+                  name="prioritas_stok"
+                  value={form.prioritas_stok}
+                  onChange={e => setField('prioritas_stok', e.target.value)}
+                  className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="LAMA">Habiskan Stok Lama Dulu (Default)</option>
+                  <option value="BARU">Habiskan Stok Baru Dulu</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1 font-semibold">Menentukan stok mana yang akan dipotong terlebih dahulu saat penjualan di kasir.</p>
               </div>
 
               <div className="space-y-2">

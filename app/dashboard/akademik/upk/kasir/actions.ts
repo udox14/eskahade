@@ -28,6 +28,7 @@ type FinalItemPayload = {
 type StockRow = {
   stok_lama: number
   stok_baru: number
+  prioritas_stok?: string | null
 }
 
 type SantriKasirRow = {
@@ -121,14 +122,32 @@ function toInt(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+async function hasColumn(table: string, column: string) {
+  const columns = await query<{ name: string }>(`PRAGMA table_info(${table})`)
+  return columns.some((row) => row.name === column)
+}
+
 async function kurangiStok(katalogId: number, qty: number, meta: { antrianId: string; itemId: string; unit: UnitUPK; catatan: string }) {
   if (qty <= 0) return
-  const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [katalogId])
+  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
+  const stok = await queryOne<StockRow>(
+    `SELECT stok_lama, stok_baru${hasPrioritasStok ? ', prioritas_stok' : ''} FROM upk_katalog WHERE id = ?`,
+    [katalogId]
+  )
   if (!stok) return
 
-  const dariLama = Math.min(stok.stok_lama || 0, qty)
-  const sisa = qty - dariLama
-  const dariBaru = Math.min(stok.stok_baru || 0, sisa)
+  let dariLama = 0
+  let dariBaru = 0
+
+  if (hasPrioritasStok && stok.prioritas_stok === 'BARU') {
+    dariBaru = Math.min(stok.stok_baru || 0, qty)
+    const sisa = qty - dariBaru
+    dariLama = Math.min(stok.stok_lama || 0, sisa)
+  } else {
+    dariLama = Math.min(stok.stok_lama || 0, qty)
+    const sisa = qty - dariLama
+    dariBaru = Math.min(stok.stok_baru || 0, sisa)
+  }
 
   await execute(
     'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
@@ -148,12 +167,25 @@ async function kurangiStokDenganTipe(
   meta: { antrianId: string; itemId: string; unit: UnitUPK; tipe: string; catatan: string }
 ) {
   if (qty <= 0) return
-  const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [katalogId])
+  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
+  const stok = await queryOne<StockRow>(
+    `SELECT stok_lama, stok_baru${hasPrioritasStok ? ', prioritas_stok' : ''} FROM upk_katalog WHERE id = ?`,
+    [katalogId]
+  )
   if (!stok) return
 
-  const dariLama = Math.min(stok.stok_lama || 0, qty)
-  const sisa = qty - dariLama
-  const dariBaru = Math.min(stok.stok_baru || 0, sisa)
+  let dariLama = 0
+  let dariBaru = 0
+
+  if (hasPrioritasStok && stok.prioritas_stok === 'BARU') {
+    dariBaru = Math.min(stok.stok_baru || 0, qty)
+    const sisa = qty - dariBaru
+    dariLama = Math.min(stok.stok_lama || 0, sisa)
+  } else {
+    dariLama = Math.min(stok.stok_lama || 0, qty)
+    const sisa = qty - dariLama
+    dariBaru = Math.min(stok.stok_baru || 0, sisa)
+  }
 
   await execute(
     'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
