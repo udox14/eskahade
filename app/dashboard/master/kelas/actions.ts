@@ -6,6 +6,25 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 import { isKomposisiKelas } from '@/lib/akademik/grade'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+
+// Komposisi baru/lama AKTUAL kelas, dihitung dari data riil hasil Penempatan Kelas
+// (riwayat_pendidikan + kategori efektif santri), bukan dari input manual `baru_lama`.
+// Field manual tetap dipakai sebagai rencana/target komposisi (non-restriktif).
+function baruLamaAktualSql(kelasAlias = 'k') {
+  const kategoriSql = getKategoriSantriEfektifSql('s2')
+  return `(
+    SELECT CASE
+      WHEN COUNT(*) = 0 THEN NULL
+      WHEN SUM(CASE WHEN ${kategoriSql} = 'BARU' THEN 1 ELSE 0 END) = COUNT(*) THEN 'BARU'
+      WHEN SUM(CASE WHEN ${kategoriSql} = 'BARU' THEN 1 ELSE 0 END) = 0 THEN 'LAMA'
+      ELSE 'BARU DAN LAMA (CAMPURAN)'
+    END
+    FROM riwayat_pendidikan rp2
+    JOIN santri s2 ON s2.id = rp2.santri_id AND s2.status_global = 'aktif'
+    WHERE rp2.kelas_id = ${kelasAlias}.id AND rp2.status_riwayat = 'aktif'
+  ) AS baru_lama_aktual`
+}
 
 // Pakai cache untuk data yang jarang berubah
 export { getCachedTahunAjaranAktif as getTahunAjaranAktif }
@@ -41,7 +60,7 @@ async function ensureKelasExtraColumns() {
 export async function getKelasList() {
   await ensureKelasExtraColumns()
   const data = await query<any>(`
-    SELECT k.*, m.nama as marhalah_nama, ta.nama as tahun_ajaran_nama
+    SELECT k.*, m.nama as marhalah_nama, ta.nama as tahun_ajaran_nama, ${baruLamaAktualSql('k')}
     FROM kelas k
     LEFT JOIN marhalah m ON k.marhalah_id = m.id
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1

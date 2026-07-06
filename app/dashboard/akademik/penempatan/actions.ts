@@ -5,6 +5,7 @@ import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/ma
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { normalizeGrade } from '@/lib/akademik/grade'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { revalidatePath } from 'next/cache'
 
 const FITUR_HREF = '/dashboard/akademik/penempatan'
@@ -38,6 +39,7 @@ export type KelasTujuan = {
   jenis_kelamin: string
   jumlah: number // santri aktif yang sudah ada di kelas ini
   draft: number // santri yang sudah masuk draft (belum final) ke kelas ini
+  baru_lama: string | null // rencana komposisi (manual, dari Master Kelas) — sekadar hint, bukan restriksi
 }
 
 // Kolom grade_urutan (urutan manual hasil grading) dipakai juga untuk mengurutkan
@@ -64,7 +66,7 @@ export async function getKelasUntukMarhalah(marhalahId: string, jenisKelamin?: s
     params.push(jenisKelamin)
   }
   const data = await query<KelasTujuan>(`
-    SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin,
+    SELECT k.id, k.nama_kelas, k.grade, k.jenis_kelamin, k.baru_lama,
            (SELECT COUNT(*) FROM riwayat_pendidikan rp
             JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
             WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif') AS jumlah,
@@ -89,6 +91,7 @@ export type KandidatPenempatan = {
   jenjang: JenjangPenempatan | null
   urutan: number | null // urutan manual hasil grading (lama); null untuk baru
   riwayat_lama_id: string | null
+  kategori_efektif: string // 'BARU' | 'REGULER' | 'SADESA' — tag santri baru (sama dengan fitur Data Santri)
 }
 
 // Gabungan kandidat untuk marhalah tujuan terpilih:
@@ -114,9 +117,10 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
   const baruParams: any[] = []
   let baruGender = ''
   if (gender) { baruGender = ' AND s.jenis_kelamin = ?'; baruParams.push(gender) }
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
   const santriBaru = await query<any>(`
     SELECT s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
-           s.sekolah, s.kategori_santri,
+           s.sekolah, s.kategori_santri, ${kategoriEfektifSql} AS kategori_efektif,
            htk.rekomendasi_marhalah, htk.catatan_grade
     FROM santri s
     JOIN hasil_tes_klasifikasi htk ON htk.santri_id = s.id
@@ -151,6 +155,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
         jenjang: jenjangSantri,
         urutan: null,
         riwayat_lama_id: null,
+        kategori_efektif: s.kategori_efektif,
       }
     })
 
@@ -166,7 +171,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
     const santriLama = await query<any>(`
       SELECT rp.id AS riwayat_lama_id, rp.grade_lanjutan, rp.grade_urutan,
              s.id AS santri_id, s.nis, s.nama_lengkap, s.jenis_kelamin,
-             s.sekolah, s.kategori_santri,
+             s.sekolah, s.kategori_santri, ${kategoriEfektifSql} AS kategori_efektif,
              k.nama_kelas
       FROM riwayat_pendidikan rp
       JOIN santri s ON s.id = rp.santri_id
@@ -196,6 +201,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
           jenjang: jenjangSantri,
           urutan: s.grade_urutan ?? null,
           riwayat_lama_id: s.riwayat_lama_id,
+          kategori_efektif: s.kategori_efektif,
         }
       })
   }
@@ -267,6 +273,8 @@ export type DraftPenempatan = {
   marhalah_target_id: string
   riwayat_lama_id: string | null
   created_at: string
+  grade: 'A' | 'B' | 'C' | null
+  kategori_efektif: string
 }
 
 // Daftar seluruh draft yang belum difinalisasi, untuk tab Review Draft.
@@ -274,16 +282,23 @@ export async function getDraftPenempatan(marhalahTargetId?: string): Promise<Dra
   const params: any[] = []
   let filter = ''
   if (marhalahTargetId) { filter = ' WHERE pd.marhalah_target_id = ?'; params.push(marhalahTargetId) }
-  const data = await query<DraftPenempatan>(`
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
+  const data = await query<any>(`
     SELECT pd.id, pd.santri_id, s.nama_lengkap AS nama, s.nis, pd.sumber,
-           pd.kelas_id, k.nama_kelas, pd.marhalah_target_id, pd.riwayat_lama_id, pd.created_at
+           pd.kelas_id, k.nama_kelas, pd.marhalah_target_id, pd.riwayat_lama_id, pd.created_at,
+           htk.catatan_grade, rl.grade_lanjutan, ${kategoriEfektifSql} AS kategori_efektif
     FROM penempatan_draft pd
     JOIN santri s ON s.id = pd.santri_id
     JOIN kelas k ON k.id = pd.kelas_id
+    LEFT JOIN hasil_tes_klasifikasi htk ON htk.santri_id = pd.santri_id AND pd.sumber = 'baru'
+    LEFT JOIN riwayat_pendidikan rl ON rl.id = pd.riwayat_lama_id
     ${filter}
     ORDER BY k.nama_kelas, s.nama_lengkap
   `, params)
-  return data
+  return data.map((d: any) => ({
+    ...d,
+    grade: normalizeGrade(d.sumber === 'baru' ? d.catatan_grade : d.grade_lanjutan),
+  }))
 }
 
 // Batalkan satu item draft (kembali jadi kandidat di tab Penempatan).

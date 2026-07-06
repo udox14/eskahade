@@ -375,7 +375,14 @@ export default function MasterKelasPage() {
                               <option value="BARU DAN LAMA (CAMPURAN)">BARU DAN LAMA (CAMPURAN)</option>
                             </select>
                           ) : (
-                            <span className="text-slate-500 font-semibold">{k.baru_lama || '-'}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-500 font-semibold">{k.baru_lama || '-'}</span>
+                              {k.baru_lama_aktual && (
+                                <span className="text-[10px] font-bold text-indigo-500" title="Komposisi aktual berdasarkan data Penempatan Kelas">
+                                  Aktual: {k.baru_lama_aktual}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-2">

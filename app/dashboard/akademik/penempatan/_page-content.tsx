@@ -38,6 +38,26 @@ function labelSekolah(santri: KandidatPenempatan) {
   return santri.sekolah || '-'
 }
 
+function BadgeSantriBaru() {
+  return (
+    <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-100 text-indigo-700 ml-1.5 align-middle">
+      Santri Baru
+    </span>
+  )
+}
+
+// Kelompokkan list (yang sudah terurut per `asal`) jadi grup beruntun berdasar asal,
+// supaya bisa dipilih sekaligus per kelas asal yang sama.
+function groupConsecutiveByAsal<T extends { asal: string; santri_id: string }>(list: T[]) {
+  const groups: { asal: string; items: T[] }[] = []
+  for (const item of list) {
+    const last = groups[groups.length - 1]
+    if (last && last.asal === item.asal) last.items.push(item)
+    else groups.push({ asal: item.asal, items: [item] })
+  }
+  return groups
+}
+
 export default function PenempatanKelasPage() {
   const [tab, setTab] = useState<'penempatan' | 'review'>('penempatan')
   const [draftCount, setDraftCount] = useState(0)
@@ -464,47 +484,69 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {list.map(s => {
-                        const isSel = selected.includes(s.santri_id)
-                        const placedId = placements[s.santri_id] || ''
+                      {groupConsecutiveByAsal(list).map(asalGroup => {
+                        const asalIds = asalGroup.items.map(s => s.santri_id)
+                        const asalAllSelected = asalIds.every(id => selected.includes(id))
                         return (
-                          <tr key={s.santri_id} className={`hover:bg-slate-50 ${isSel ? 'bg-indigo-50/40' : ''}`}>
-                            <td className="p-3 text-center cursor-pointer" onClick={() => toggleSelect(s.santri_id)}>
-                              {isSel ? <CheckSquare className="w-5 h-5 text-indigo-600 mx-auto" /> : <Square className="w-5 h-5 text-slate-300 mx-auto" />}
-                            </td>
-                            <td className="p-3 cursor-pointer" onClick={() => toggleSelect(s.santri_id)}>
-                              <p className="font-bold text-slate-800">{s.nama}</p>
-                              <p className="text-slate-500 font-mono text-xs">{s.nis}</p>
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.sumber === 'baru' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}`}>
-                                {s.sumber === 'baru' ? 'Baru' : 'Naik'}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center text-slate-500 text-xs">
-                              <span className="inline-flex max-w-36 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-bold uppercase">
-                                {labelSekolah(s)}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center text-slate-500 text-xs">{s.asal}</td>
-                            <td className="p-3">
-                              <select
-                                className={`w-full p-2 border rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 ${placedId ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'border-slate-300 bg-white text-slate-700'}`}
-                                value={placedId}
-                                onChange={(e) => setOne(s.santri_id, e.target.value)}
-                              >
-                                <option value="">- Belum Ditentukan -</option>
-                                {kelasOptionsFor(grade).map(k => {
-                                  const cocok = gradeCocokKelas(grade, k.grade)
-                                  return (
-                                    <option key={k.id} value={k.id}>
-                                      {k.nama_kelas}{k.grade ? ` [${k.grade}]` : ''}{cocok ? ' • disarankan' : ''}
-                                    </option>
-                                  )
-                                })}
-                              </select>
-                            </td>
-                          </tr>
+                          <React.Fragment key={`${section.key}-${asalGroup.asal}`}>
+                            <tr className="bg-slate-50/80">
+                              <td colSpan={6} className="px-3 py-1.5">
+                                <button
+                                  onClick={() => toggleSelectGroup(asalIds)}
+                                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-indigo-600"
+                                >
+                                  {asalAllSelected ? <CheckSquare className="w-3.5 h-3.5 text-indigo-600" /> : <Square className="w-3.5 h-3.5" />}
+                                  Pilih semua dari {asalGroup.asal} ({asalGroup.items.length})
+                                </button>
+                              </td>
+                            </tr>
+                            {asalGroup.items.map(s => {
+                              const isSel = selected.includes(s.santri_id)
+                              const placedId = placements[s.santri_id] || ''
+                              return (
+                                <tr key={s.santri_id} className={`hover:bg-slate-50 ${isSel ? 'bg-indigo-50/40' : ''}`}>
+                                  <td className="p-3 text-center cursor-pointer" onClick={() => toggleSelect(s.santri_id)}>
+                                    {isSel ? <CheckSquare className="w-5 h-5 text-indigo-600 mx-auto" /> : <Square className="w-5 h-5 text-slate-300 mx-auto" />}
+                                  </td>
+                                  <td className="p-3 cursor-pointer" onClick={() => toggleSelect(s.santri_id)}>
+                                    <p className="font-bold text-slate-800">
+                                      {s.nama}
+                                      {s.kategori_efektif === 'BARU' && <BadgeSantriBaru />}
+                                    </p>
+                                    <p className="text-slate-500 font-mono text-xs">{s.nis}</p>
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.sumber === 'baru' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}`}>
+                                      {s.sumber === 'baru' ? 'Baru' : 'Naik'}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-center text-slate-500 text-xs">
+                                    <span className="inline-flex max-w-36 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-bold uppercase">
+                                      {labelSekolah(s)}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-center text-slate-500 text-xs">{s.asal}</td>
+                                  <td className="p-3">
+                                    <select
+                                      className={`w-full p-2 border rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 ${placedId ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'border-slate-300 bg-white text-slate-700'}`}
+                                      value={placedId}
+                                      onChange={(e) => setOne(s.santri_id, e.target.value)}
+                                    >
+                                      <option value="">- Belum Ditentukan -</option>
+                                      {kelasOptionsFor(grade).map(k => {
+                                        const cocok = gradeCocokKelas(grade, k.grade)
+                                        return (
+                                          <option key={k.id} value={k.id}>
+                                            {k.nama_kelas}{k.grade ? ` [${k.grade}]` : ''}{cocok ? ' • disarankan' : ''}{k.baru_lama ? ` • untuk: ${k.baru_lama}` : ''}
+                                          </option>
+                                        )
+                                      })}
+                                    </select>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </React.Fragment>
                         )
                       })}
                     </tbody>
@@ -543,6 +585,7 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
+  const [statOpen, setStatOpen] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -565,6 +608,18 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
     drafts.forEach(d => { (g[d.nama_kelas] ||= []).push(d) })
     return Object.entries(g).sort((a, b) => naturalCompare(a[0], b[0]))
   }, [drafts])
+
+  // Statistik per kelas tujuan: total + breakdown grade A/B/C + jumlah santri baru.
+  const statsPerKelas = useMemo(() => {
+    return grouped.map(([namaKelas, list]) => {
+      const gradeA = list.filter(d => d.grade === 'A').length
+      const gradeB = list.filter(d => d.grade === 'B').length
+      const gradeC = list.filter(d => d.grade === 'C').length
+      const gradeX = list.length - gradeA - gradeB - gradeC
+      const santriBaru = list.filter(d => d.kategori_efektif === 'BARU').length
+      return { namaKelas, total: list.length, gradeA, gradeB, gradeC, gradeX, santriBaru }
+    })
+  }, [grouped])
 
   const toggleSelect = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -625,6 +680,48 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
 
   return (
     <div className="space-y-5">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => setStatOpen(o => !o)}
+          className="w-full flex items-center gap-2 px-5 py-3 text-left hover:bg-slate-50"
+        >
+          <BarChart3 className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span className="text-sm font-bold text-slate-700">Statistik Draft</span>
+          <span className="text-xs text-slate-400 hidden sm:inline">— per kelas tujuan, breakdown grade A/B/C</span>
+          <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${statOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {statOpen && (
+          <div className="px-5 pb-5 border-t border-slate-100 pt-4 overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-slate-500 font-bold uppercase text-[11px] border-b border-slate-100">
+                <tr>
+                  <th className="py-2 pr-3">Kelas Tujuan</th>
+                  <th className="py-2 px-3 text-center">Grade A</th>
+                  <th className="py-2 px-3 text-center">Grade B</th>
+                  <th className="py-2 px-3 text-center">Grade C</th>
+                  <th className="py-2 px-3 text-center">Belum Ada Grade</th>
+                  <th className="py-2 px-3 text-center">Santri Baru</th>
+                  <th className="py-2 pl-3 text-center">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {statsPerKelas.map(s => (
+                  <tr key={s.namaKelas}>
+                    <td className="py-2 pr-3 font-bold text-slate-800">{s.namaKelas}</td>
+                    <td className="py-2 px-3 text-center font-semibold text-green-700">{s.gradeA || '-'}</td>
+                    <td className="py-2 px-3 text-center font-semibold text-blue-700">{s.gradeB || '-'}</td>
+                    <td className="py-2 px-3 text-center font-semibold text-orange-700">{s.gradeC || '-'}</td>
+                    <td className="py-2 px-3 text-center font-semibold text-slate-400">{s.gradeX || '-'}</td>
+                    <td className="py-2 px-3 text-center font-semibold text-indigo-600">{s.santriBaru || '-'}</td>
+                    <td className="py-2 pl-3 text-center font-black text-slate-800">{s.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-indigo-50/60 p-4 border border-indigo-100 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sticky top-2 z-20 backdrop-blur">
         <div>
           <h3 className="font-bold text-indigo-900">{drafts.length} santri dalam draft, {selected.length} dipilih</h3>
@@ -670,7 +767,10 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
                         {isSel ? <CheckSquare className="w-5 h-5 text-indigo-600 mx-auto" /> : <Square className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
                       <td className="p-3 cursor-pointer" onClick={() => toggleSelect(d.id)}>
-                        <p className="font-bold text-slate-800">{d.nama}</p>
+                        <p className="font-bold text-slate-800">
+                          {d.nama}
+                          {d.kategori_efektif === 'BARU' && <BadgeSantriBaru />}
+                        </p>
                         <p className="text-slate-500 font-mono text-xs">{d.nis}</p>
                       </td>
                       <td className="p-3 text-center">
