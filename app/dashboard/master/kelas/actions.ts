@@ -230,7 +230,11 @@ export async function importKelasMassal(dataExcel: any[]) {
     const tempat = String(row['TEMPAT'] || row['tempat'] || '').trim()
     const gradeRaw = String(row['GRADE'] || row['grade'] || '').trim().toUpperCase()
     const grade = isKomposisiKelas(gradeRaw) ? gradeRaw : ''
-    const baruLama = String(row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '').trim().toUpperCase()
+    const baruLamaRaw = String(row['B/L'] || row['BARU/LAMA'] || row['baru/lama'] || row['baru_lama'] || '').trim().toUpperCase()
+    let baruLama = baruLamaRaw
+    if (baruLamaRaw === 'B') baruLama = 'BARU'
+    else if (baruLamaRaw === 'L') baruLama = 'LAMA'
+    else if (baruLamaRaw === 'C' || baruLamaRaw === 'CAMPURAN' || baruLamaRaw === 'CAMPUR') baruLama = 'BARU DAN LAMA (CAMPURAN)'
 
     if (!namaKelas || !namaMarhalah) continue
 

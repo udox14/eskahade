@@ -121,9 +121,9 @@ export default function MasterKelasPage() {
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows = [
-      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Barat", "GRADE": "A", "B/L": "B", "JENIS KELAMIN": "L" },
-      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Timur", "GRADE": "B", "B/L": "L", "JENIS KELAMIN": "P" },
-      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "TEMPAT": "Aula Lama", "GRADE": "AB", "B/L": "B", "JENIS KELAMIN": "C" },
+      { "NAMA KELAS": "1-A", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Barat", "GRADE": "A", "B/L": "BARU", "JENIS KELAMIN": "L" },
+      { "NAMA KELAS": "1-B", "MARHALAH": "Ibtidaiyyah 1", "TEMPAT": "Gedung Timur", "GRADE": "B", "B/L": "LAMA", "JENIS KELAMIN": "P" },
+      { "NAMA KELAS": "2-A", "MARHALAH": "Ibtidaiyyah 2", "TEMPAT": "Aula Lama", "GRADE": "AB", "B/L": "BARU DAN LAMA (CAMPURAN)", "JENIS KELAMIN": "C" },
     ]
     const worksheet = XLSX.utils.json_to_sheet(rows)
     worksheet['!cols'] = [{wch:15}, {wch:20}, {wch:20}, {wch:10}, {wch:10}, {wch:10}]
@@ -255,7 +255,12 @@ export default function MasterKelasPage() {
               </div>
               <div className="w-full md:w-1/4">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">B/L (Baru/Lama)</label>
-                <input type="text" name="baru_lama" placeholder="Contoh: B / L" className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm uppercase" />
+                <select name="baru_lama" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                  <option value="">- Pilih -</option>
+                  <option value="BARU">BARU</option>
+                  <option value="LAMA">LAMA</option>
+                  <option value="BARU DAN LAMA (CAMPURAN)">BARU DAN LAMA (CAMPURAN)</option>
+                </select>
               </div>
               <div className="w-full md:w-1/4">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Jenis Kelamin</label>
@@ -365,8 +370,9 @@ export default function MasterKelasPage() {
                               className="px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white"
                             >
                               <option value="">-</option>
-                              <option value="B">B (Baru)</option>
-                              <option value="L">L (Lama)</option>
+                              <option value="BARU">BARU</option>
+                              <option value="LAMA">LAMA</option>
+                              <option value="BARU DAN LAMA (CAMPURAN)">BARU DAN LAMA (CAMPURAN)</option>
                             </select>
                           ) : (
                             <span className="text-slate-500 font-semibold">{k.baru_lama || '-'}</span>
