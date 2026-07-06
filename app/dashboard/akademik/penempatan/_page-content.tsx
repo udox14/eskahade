@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  getMarhalahList, getTahunAjaranAktif, getKelasUntukMarhalah, getPenempatanData, simpanPenempatan,
-  type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan,
+  getMarhalahList, getTahunAjaranAktif, getKelasUntukMarhalah, getPenempatanData, simpanDraftPenempatan,
+  getDraftPenempatan, hapusDraftItem, finalisasiDraft,
+  type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan, type DraftPenempatan,
 } from './actions'
 import { gradeCocokKelas, type Grade } from '@/lib/akademik/grade'
 import {
-  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3,
+  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3, ClipboardList, X,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -38,6 +39,49 @@ function labelSekolah(santri: KandidatPenempatan) {
 }
 
 export default function PenempatanKelasPage() {
+  const [tab, setTab] = useState<'penempatan' | 'review'>('penempatan')
+  const [draftCount, setDraftCount] = useState(0)
+
+  useEffect(() => {
+    getDraftPenempatan().then(data => setDraftCount(data.length)).catch(() => {})
+  }, [])
+
+  return (
+    <div className="space-y-6 w-full pb-24">
+      <DashboardPageHeader
+        title="Penempatan Kelas"
+        description="Lanjutan tes klasifikasi & grading. Kelompokkan santri per grade, masukkan ke draft, lalu review sebelum difinalisasi permanen."
+        className="border-b pb-4"
+      />
+
+      <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
+        <button
+          onClick={() => setTab('penempatan')}
+          className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'penempatan' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Penempatan
+        </button>
+        <button
+          onClick={() => setTab('review')}
+          className={`px-5 py-2 rounded-lg text-sm font-bold transition-all inline-flex items-center gap-2 ${tab === 'review' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Review Draft
+          {draftCount > 0 && (
+            <span className="bg-amber-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center">{draftCount}</span>
+          )}
+        </button>
+      </div>
+
+      {tab === 'penempatan' ? (
+        <TabPenempatan onDraftSaved={() => setTab('review')} />
+      ) : (
+        <TabReviewDraft onDraftCountChange={setDraftCount} />
+      )}
+    </div>
+  )
+}
+
+function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
   const confirm = useConfirm()
   const [tahunAktif, setTahunAktif] = useState<any>(null)
   const [marhalahList, setMarhalahList] = useState<any[]>([])
@@ -144,20 +188,22 @@ export default function PenempatanKelasPage() {
         santri_id: k.santri_id,
         kelas_id: placements[k.santri_id],
         riwayat_lama_id: k.riwayat_lama_id,
+        sumber: k.sumber,
       }))
     if (payload.length === 0) return toast.error('Belum ada santri yang ditentukan kelasnya.')
-    if (!await confirm(`Simpan penempatan untuk ${payload.length} santri ke kelas tujuan?`)) return
+    if (!await confirm(`Masukkan ${payload.length} santri ke draft penempatan? Belum permanen — bisa direview/dibatalkan di tab Review Draft.`)) return
 
     setSaving(true)
-    const t = toast.loading('Menyimpan penempatan...')
+    const t = toast.loading('Menyimpan draft...')
     try {
-      const res = await simpanPenempatan(payload)
+      const res = await simpanDraftPenempatan(selectedMarhalah, payload)
       toast.dismiss(t)
       if (res?.error) {
         toast.error('Gagal', { description: res.error, duration: 8000 })
       } else {
-        toast.success('Penempatan berhasil!', { description: `${res.count} santri ditempatkan.` })
-        await handleTampilkan() // refresh: santri yang sudah ditempatkan hilang dari daftar
+        toast.success('Masuk draft!', { description: `${res.count} santri masuk draft. Review di tab Review Draft.` })
+        await handleTampilkan() // refresh: santri yang sudah masuk draft hilang dari daftar kandidat
+        onDraftSaved()
       }
     } catch {
       toast.dismiss(t)
@@ -168,13 +214,7 @@ export default function PenempatanKelasPage() {
   }
 
   return (
-    <div className="space-y-6 w-full pb-24">
-      <DashboardPageHeader
-        title="Penempatan Kelas"
-        description="Lanjutan tes klasifikasi & grading. Kelompokkan santri per grade, lalu masukkan ke kelas sesuai komposisinya."
-        className="border-b pb-4"
-      />
-
+    <div className="space-y-6">
       {/* BANNER TAHUN AJARAN */}
       {tahunAktif ? (
         <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
@@ -312,6 +352,7 @@ export default function PenempatanKelasPage() {
                           <th className="py-2 pr-3">Kelas</th>
                           <th className="py-2 px-3 text-center">Komposisi</th>
                           <th className="py-2 px-3 text-center">Terisi</th>
+                          <th className="py-2 px-3 text-center">Draft</th>
                           <th className="py-2 px-3 text-center">+ Baru (sesi ini)</th>
                           <th className="py-2 pl-3 text-center">Total</th>
                         </tr>
@@ -327,8 +368,9 @@ export default function PenempatanKelasPage() {
                               </td>
                               <td className="py-2 px-3 text-center text-slate-500 font-semibold">{k.grade || '-'}</td>
                               <td className="py-2 px-3 text-center text-slate-600">{k.jumlah}</td>
+                              <td className="py-2 px-3 text-center font-bold text-amber-600">{k.draft > 0 ? `+${k.draft}` : '-'}</td>
                               <td className="py-2 px-3 text-center font-bold text-indigo-600">{tambah > 0 ? `+${tambah}` : '-'}</td>
-                              <td className="py-2 pl-3 text-center font-black text-slate-800">{k.jumlah + tambah}</td>
+                              <td className="py-2 pl-3 text-center font-black text-slate-800">{k.jumlah + k.draft + tambah}</td>
                             </tr>
                           )
                         })}
@@ -479,18 +521,179 @@ export default function PenempatanKelasPage() {
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] md:w-auto md:min-w-[420px] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between z-40 animate-in slide-in-from-bottom-5">
           <div className="flex items-center gap-3">
             <div className="bg-indigo-500 w-8 h-8 rounded-full flex items-center justify-center font-black text-white text-sm">{totalReady}</div>
-            <span className="font-semibold text-sm">Santri siap ditempatkan</span>
+            <span className="font-semibold text-sm">Santri siap masuk draft</span>
           </div>
           <button
             onClick={handleSimpan}
             disabled={saving}
-            className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-5 py-2.5 rounded-xl font-black flex items-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+            className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-5 py-2.5 rounded-xl font-black flex items-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
           >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />}
-            Simpan Penempatan
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ClipboardList className="w-5 h-5" />}
+            Simpan ke Draft
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number) => void }) {
+  const confirm = useConfirm()
+  const [drafts, setDrafts] = useState<DraftPenempatan[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const data = await getDraftPenempatan()
+      setDrafts(data)
+      onDraftCountChange(data.length)
+      setSelected(prev => prev.filter(id => data.some(d => d.id === id)))
+    } catch {
+      toast.error('Gagal memuat draft penempatan.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const grouped = useMemo(() => {
+    const g: Record<string, DraftPenempatan[]> = {}
+    drafts.forEach(d => { (g[d.nama_kelas] ||= []).push(d) })
+    return Object.entries(g).sort((a, b) => naturalCompare(a[0], b[0]))
+  }, [drafts])
+
+  const toggleSelect = (id: string) =>
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const selectAll = () => setSelected(drafts.map(d => d.id))
+  const clearSelection = () => setSelected([])
+
+  const handleBatalkanSatu = async (d: DraftPenempatan) => {
+    if (!await confirm(`Batalkan draft penempatan ${d.nama} ke ${d.nama_kelas}?`)) return
+    const res = await hapusDraftItem(d.id)
+    if (res?.error) return toast.error('Gagal', { description: res.error })
+    toast.success('Draft dibatalkan.')
+    await load()
+  }
+
+  const handleFinalisasi = async () => {
+    if (selected.length === 0) return toast.warning('Pilih minimal satu draft untuk difinalisasi.')
+    if (!await confirm(`Finalisasi ${selected.length} santri ke kelas tujuan? Setelah ini penempatan PERMANEN dan tidak bisa dibatalkan dari sini.`)) return
+
+    setBusy(true)
+    const t = toast.loading('Memfinalisasi penempatan...')
+    try {
+      const res = await finalisasiDraft(selected)
+      toast.dismiss(t)
+      if (res?.error) {
+        toast.error('Gagal', { description: res.error, duration: 8000 })
+      } else {
+        toast.success('Penempatan permanen!', { description: `${res.count} santri berhasil ditempatkan.` })
+        setSelected([])
+        await load()
+      }
+    } catch {
+      toast.dismiss(t)
+      toast.error('Terjadi kesalahan saat finalisasi.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm">
+        <Loader2 className="w-8 h-8 animate-spin mb-3 text-indigo-600" />
+        <p className="font-medium">Memuat draft penempatan...</p>
+      </div>
+    )
+  }
+
+  if (drafts.length === 0) {
+    return (
+      <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+        <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-500">Belum ada draft penempatan</h3>
+        <p className="text-sm text-slate-400 mt-1">Tempatkan santri di tab Penempatan — hasilnya akan muncul di sini untuk direview.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-indigo-50/60 p-4 border border-indigo-100 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sticky top-2 z-20 backdrop-blur">
+        <div>
+          <h3 className="font-bold text-indigo-900">{drafts.length} santri dalam draft, {selected.length} dipilih</h3>
+          <p className="text-xs text-indigo-700/70 font-medium mt-0.5">Review dulu sebelum finalisasi — draft belum mengubah kelas santri.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={selectAll} className="text-xs font-bold text-indigo-700 hover:underline px-2">Pilih Semua</button>
+          <button onClick={clearSelection} className="text-xs font-bold text-slate-500 hover:underline px-2">Kosongkan</button>
+          <button
+            onClick={handleFinalisasi}
+            disabled={busy || selected.length === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black flex items-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+          >
+            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />}
+            Finalisasi Terpilih
+          </button>
+        </div>
+      </div>
+
+      {grouped.map(([namaKelas, list]) => (
+        <div key={namaKelas} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+            <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span className="font-bold text-slate-700">{namaKelas}</span>
+            <span className="text-xs font-bold text-slate-400">{list.length} santri (draft)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-white border-b border-slate-100 text-slate-500 font-bold uppercase text-[11px]">
+                <tr>
+                  <th className="p-3 w-10"></th>
+                  <th className="p-3">Nama & NIS</th>
+                  <th className="p-3 text-center">Sumber</th>
+                  <th className="p-3 w-24"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {list.map(d => {
+                  const isSel = selected.includes(d.id)
+                  return (
+                    <tr key={d.id} className={`hover:bg-slate-50 ${isSel ? 'bg-indigo-50/40' : ''}`}>
+                      <td className="p-3 text-center cursor-pointer" onClick={() => toggleSelect(d.id)}>
+                        {isSel ? <CheckSquare className="w-5 h-5 text-indigo-600 mx-auto" /> : <Square className="w-5 h-5 text-slate-300 mx-auto" />}
+                      </td>
+                      <td className="p-3 cursor-pointer" onClick={() => toggleSelect(d.id)}>
+                        <p className="font-bold text-slate-800">{d.nama}</p>
+                        <p className="text-slate-500 font-mono text-xs">{d.nis}</p>
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${d.sumber === 'baru' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}`}>
+                          {d.sumber === 'baru' ? 'Baru' : 'Naik'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleBatalkanSatu(d)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 hover:underline"
+                        >
+                          <X className="w-3.5 h-3.5" /> Batalkan
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
