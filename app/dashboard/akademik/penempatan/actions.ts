@@ -123,9 +123,12 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
   if (!target) return []
 
   const targetNama = String(target.nama).trim().toLowerCase()
-  const sourceMarhalah = opts?.sourceMarhalahId
+  let sourceMarhalah = opts?.sourceMarhalahId
     ? marhalahList.find((m: any) => String(m.id) === String(opts.sourceMarhalahId))
     : marhalahList.find((m: any) => Number(m.urutan) === Number(target.urutan) - 1)
+  // Asal tidak boleh dari marhalah yang levelnya lebih tinggi dari tujuan (gak masuk akal
+  // santri "turun" marhalah). Sama level (tinggal kelas) atau lebih rendah (loncat) tetap boleh.
+  if (sourceMarhalah && Number(sourceMarhalah.urutan) > Number(target.urutan)) sourceMarhalah = undefined
 
   // ── Santri BARU (hasil tes klasifikasi, belum punya kelas) ──
   const baruParams: any[] = []

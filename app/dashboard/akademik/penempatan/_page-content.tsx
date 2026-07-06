@@ -145,6 +145,14 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
     [marhalahList, selectedMarhalah]
   )
 
+  // Asal kandidat lama tidak boleh dari marhalah yang levelnya LEBIH TINGGI dari tujuan
+  // (gak masuk akal santri "turun" dari marhalah atas ke marhalah bawah). Sama level
+  // (tinggal kelas) atau lebih rendah (loncat maju) tetap boleh.
+  const sourceMarhalahOptions = useMemo(() => {
+    if (!targetMarhalah) return marhalahList
+    return marhalahList.filter((m: any) => Number(m.urutan) <= Number(targetMarhalah.urutan))
+  }, [marhalahList, targetMarhalah])
+
   const labelSourceMarhalah = (m: any) => {
     if (!targetMarhalah) return m.nama
     const diff = Number(m.urutan) - Number(targetMarhalah.urutan)
@@ -352,7 +360,7 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
                 value={selectedSourceMarhalah}
                 onChange={(e) => setSelectedSourceMarhalah(e.target.value)}
               >
-                {marhalahList.map(m => <option key={m.id} value={m.id}>{labelSourceMarhalah(m)}</option>)}
+                {sourceMarhalahOptions.map(m => <option key={m.id} value={m.id}>{labelSourceMarhalah(m)}</option>)}
               </select>
               <p className="text-[10px] font-medium text-slate-400 mt-1">Sama dengan tujuan = tinggal kelas. Marhalah lain = loncat kelas.</p>
             </div>
