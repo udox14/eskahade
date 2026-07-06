@@ -116,6 +116,11 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
   const [selectedJenjang, setSelectedJenjang] = useState<JenjangPenempatan>('SLTP')
   const [statOpen, setStatOpen] = useState(false)
 
+  // Asal kandidat "lama": default marhalah sebelumnya (kenaikan normal). Bisa diubah
+  // jadi sama dengan tujuan (tinggal kelas) atau marhalah lain (loncat kelas).
+  const [selectedSourceMarhalah, setSelectedSourceMarhalah] = useState('')
+  const [semuaRekomendasiBaru, setSemuaRekomendasiBaru] = useState(false)
+
   // santri_id -> kelas_id tujuan
   const [placements, setPlacements] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<string[]>([])
@@ -126,6 +131,28 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
     getMarhalahList().then(setMarhalahList)
   }, [])
 
+  // Set ulang default asal (marhalah sebelumnya) tiap kali marhalah tujuan berganti.
+  useEffect(() => {
+    if (!selectedMarhalah || marhalahList.length === 0) return
+    const target = marhalahList.find((m: any) => String(m.id) === String(selectedMarhalah))
+    if (!target) return
+    const prev = marhalahList.find((m: any) => Number(m.urutan) === Number(target.urutan) - 1)
+    setSelectedSourceMarhalah(prev ? String(prev.id) : String(target.id))
+  }, [selectedMarhalah, marhalahList])
+
+  const targetMarhalah = useMemo(
+    () => marhalahList.find((m: any) => String(m.id) === String(selectedMarhalah)) || null,
+    [marhalahList, selectedMarhalah]
+  )
+
+  const labelSourceMarhalah = (m: any) => {
+    if (!targetMarhalah) return m.nama
+    const diff = Number(m.urutan) - Number(targetMarhalah.urutan)
+    if (diff === -1) return `${m.nama} (sebelumnya)`
+    if (diff === 0) return `${m.nama} (tinggal kelas)`
+    return `${m.nama} (loncat)`
+  }
+
   const handleTampilkan = async () => {
     if (!selectedMarhalah) return toast.warning('Pilih marhalah tujuan terlebih dahulu.')
     setLoading(true)
@@ -134,7 +161,10 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
     setBulkKelas('')
     try {
       const [data, kelas] = await Promise.all([
-        getPenempatanData(selectedMarhalah, selectedGender, selectedJenjang),
+        getPenempatanData(selectedMarhalah, selectedGender, selectedJenjang, {
+          sourceMarhalahId: selectedSourceMarhalah || undefined,
+          semuaRekomendasiBaru,
+        }),
         getKelasUntukMarhalah(selectedMarhalah, selectedGender),
       ])
       setKandidat(data)
@@ -312,6 +342,32 @@ function TabPenempatan({ onDraftSaved }: { onDraftSaved: () => void }) {
             Tampilkan
           </button>
         </div>
+
+        {selectedMarhalah && (
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 pt-1 border-t border-slate-100 mt-1">
+            <div className="w-full md:w-72">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Asal Kandidat Lama</label>
+              <select
+                className="w-full p-2.5 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-500 font-medium text-sm outline-none"
+                value={selectedSourceMarhalah}
+                onChange={(e) => setSelectedSourceMarhalah(e.target.value)}
+              >
+                {marhalahList.map(m => <option key={m.id} value={m.id}>{labelSourceMarhalah(m)}</option>)}
+              </select>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">Sama dengan tujuan = tinggal kelas. Marhalah lain = loncat kelas.</p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer pb-1">
+              <input
+                type="checkbox"
+                checked={semuaRekomendasiBaru}
+                onChange={(e) => setSemuaRekomendasiBaru(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Tampilkan santri baru dari rekomendasi marhalah lain juga
+            </label>
+          </div>
+        )}
+
         <p className="text-[11px] font-medium text-slate-400">SLTP: MTS/MTSN/SMP. SLTA: MAN/SMK/SMA/SADESA.</p>
       </div>
 

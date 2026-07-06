@@ -94,12 +94,24 @@ export type KandidatPenempatan = {
   kategori_efektif: string // 'BARU' | 'REGULER' | 'SADESA' — tag santri baru (sama dengan fitur Data Santri)
 }
 
+export type SumberOptionsPenempatan = {
+  // Marhalah asal untuk kandidat "lama". Default (undefined): marhalah urutan-1 (kenaikan normal).
+  // Sama dengan marhalahTargetId = "Tinggal Kelas" (tetap di marhalah yang sama, ganti kelas).
+  // Marhalah lain = "Loncat Kelas".
+  sourceMarhalahId?: string
+  // true: tampilkan semua santri baru walau rekomendasi tes klasifikasinya bukan marhalah ini
+  // (santri baru boleh ditempatkan ke marhalah manapun, rekomendasi hanya saran, bukan restriksi).
+  semuaRekomendasiBaru?: boolean
+}
+
 // Gabungan kandidat untuk marhalah tujuan terpilih:
-//  - "baru": santri aktif tanpa riwayat aktif, grade dari tes klasifikasi,
-//            target marhalah = rekomendasi_marhalah (match nama).
-//  - "lama": santri di kelas marhalah sebelumnya (urutan - 1), grade dari grade_lanjutan.
+//  - "baru": santri aktif tanpa riwayat aktif, grade dari tes klasifikasi.
+//            Default hanya yang rekomendasinya cocok; bisa ditampilkan semua (opts.semuaRekomendasiBaru)
+//            karena santri baru boleh ditempatkan ke marhalah manapun.
+//  - "lama": santri di kelas marhalah asal (default: urutan - 1 = kenaikan normal; bisa sama
+//            dengan target = tinggal kelas, atau marhalah lain = loncat kelas), grade dari grade_lanjutan.
 // jenisKelamin (L/P) opsional untuk memfilter santri per gender.
-export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?: string, jenjangPenempatan?: JenjangPenempatan): Promise<KandidatPenempatan[]> {
+export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?: string, jenjangPenempatan?: JenjangPenempatan, opts?: SumberOptionsPenempatan): Promise<KandidatPenempatan[]> {
   if (!marhalahTargetId) return []
   await ensureGradeUrutanColumn()
 
@@ -111,7 +123,9 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
   if (!target) return []
 
   const targetNama = String(target.nama).trim().toLowerCase()
-  const sourceMarhalah = marhalahList.find((m: any) => Number(m.urutan) === Number(target.urutan) - 1)
+  const sourceMarhalah = opts?.sourceMarhalahId
+    ? marhalahList.find((m: any) => String(m.id) === String(opts.sourceMarhalahId))
+    : marhalahList.find((m: any) => Number(m.urutan) === Number(target.urutan) - 1)
 
   // ── Santri BARU (hasil tes klasifikasi, belum punya kelas) ──
   const baruParams: any[] = []
@@ -137,7 +151,7 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
 
   const kandidatBaru: KandidatPenempatan[] = santriBaru
     .filter((s: any) =>
-      String(s.rekomendasi_marhalah || '').trim().toLowerCase() === targetNama &&
+      (opts?.semuaRekomendasiBaru || String(s.rekomendasi_marhalah || '').trim().toLowerCase() === targetNama) &&
       getJenjangPenempatan(s.kategori_santri, s.sekolah) === jenjang
     )
     .map((s: any) => {
