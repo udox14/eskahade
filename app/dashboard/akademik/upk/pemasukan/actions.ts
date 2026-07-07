@@ -3,6 +3,7 @@
 import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { toInt } from '@/lib/upk-utils'
 import { revalidatePath } from 'next/cache'
 
 const PEMASUKAN_PATH = '/dashboard/akademik/upk/pemasukan'
@@ -41,11 +42,6 @@ type PemasukanRow = {
   created_at: string
   updated_at: string | null
   user_name: string | null
-}
-
-function toInt(value: unknown) {
-  const parsed = parseInt(String(value ?? '0'), 10)
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function normalizeKategori(value: unknown): KategoriPemasukan {

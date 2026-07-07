@@ -661,3 +661,37 @@ export async function getCetakJadwalData(eventId: number, filters?: { sesi_id?: 
   const rows = await getPlottingRows(eventId, filters)
   return { event, rows }
 }
+
+export async function getCetakBelumDitesData(eventId: number, filters?: { asrama?: string }) {
+  await ensureSchema()
+  const event = await queryOne<any>(`
+    SELECT e.*, ta.nama AS tahun_ajaran_nama
+    FROM tes_klasifikasi_event e
+    LEFT JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE e.id = ?
+  `, [eventId])
+
+  let filterClause = ''
+  const params: any[] = []
+
+  if (filters?.asrama) {
+    filterClause += ' AND s.asrama = ?'
+    params.push(filters.asrama)
+  }
+
+  const rows = await query<any>(`
+    SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.sekolah, s.asrama, s.kamar, s.alamat, s.kategori_santri
+    FROM santri s
+    LEFT JOIN hasil_tes_klasifikasi h ON h.santri_id = s.id
+    WHERE s.status_global = 'aktif'
+      AND NOT EXISTS (
+        SELECT 1 FROM riwayat_pendidikan rp
+        WHERE rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      )
+      AND h.id IS NULL
+      ${filterClause}
+    ORDER BY s.asrama, s.nama_lengkap
+  `, params)
+
+  return { event, rows }
+}

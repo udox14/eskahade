@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { rupiah, tanggalWaktu } from '@/lib/upk-utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   getDetailTransaksiUPK,
@@ -66,23 +67,8 @@ type DetailTransaksi = RiwayatItem & {
   }>
 }
 
-function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
-}
-
 function nomorAntrian(value: number) {
   return String(value || 0).padStart(3, '0')
-}
-
-function tanggalWaktu(value: string | null) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function tanggalPendek(value: string | null) {

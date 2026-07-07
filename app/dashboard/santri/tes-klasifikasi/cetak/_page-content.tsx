@@ -1,20 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ClipboardList, FileText, LayoutList, Loader2, Printer } from 'lucide-react'
+import { AlertTriangle, ClipboardList, FileText, LayoutList, Loader2, Printer, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { TesKlasifikasiTabs } from '../_tabs'
-import { getPenjadwalanData, getCetakJadwalData } from '../penjadwalan/actions'
+import { getPenjadwalanData, getCetakJadwalData, getCetakBelumDitesData } from '../penjadwalan/actions'
 
-type View = 'menu' | 'jadwal' | 'blanko-absensi' | 'blanko-penilaian'
+type View = 'menu' | 'jadwal' | 'blanko-absensi' | 'blanko-penilaian' | 'belum-dites'
 type PrintMode = 'all' | 'sesi' | 'ruangan' | 'asrama'
 
 const MENU_ITEMS: { view: View; label: string; desc: string; icon: React.ElementType; ready: boolean }[] = [
   { view: 'jadwal', label: 'Jadwal Peserta', desc: 'Cetak jadwal tes klasifikasi semua peserta, per sesi, atau per ruangan.', icon: LayoutList, ready: true },
   { view: 'blanko-absensi', label: 'Blanko Absensi', desc: 'Lembar daftar hadir peserta tes klasifikasi per sesi dan ruangan.', icon: ClipboardList, ready: true },
   { view: 'blanko-penilaian', label: 'Blanko Penilaian', desc: 'Lembar penilaian tes klasifikasi per peserta.', icon: FileText, ready: true },
+  { view: 'belum-dites', label: 'Belum Dites', desc: 'Cetak daftar santri yang belum dites klasifikasi.', icon: Users, ready: true },
 ]
 
 function formatDate(date: string) {
@@ -151,6 +152,73 @@ function PrintSheet({ event, rows, mode, selectedSesi, selectedRuangan, selected
           </div>
         )
       })}
+      {preview && totalPages > 2 && (
+        <div className="py-4 text-center text-sm font-bold text-slate-500">
+          Menampilkan 2 dari {totalPages} halaman. Silakan cetak untuk melihat seluruh data.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BelumDitesSheet({ event, rows, mode, selectedAsrama, preview }: { event: any; rows: any[]; mode: PrintMode; selectedAsrama: string; preview?: boolean }) {
+  if (!event) return null
+  const filtered = rows.filter(row => {
+    if (mode === 'asrama' && selectedAsrama) return String(row.asrama || '') === selectedAsrama
+    return true
+  })
+  const allPages = chunkRows(filtered, 45).map((chunk, chunkIndex) => ({ chunk, chunkIndex }))
+  const totalPages = allPages.length
+  const displayPages = preview ? allPages.slice(0, 2) : allPages
+
+  return (
+    <div className={preview ? "flex flex-col items-center gap-6" : ""}>
+      {displayPages.map(({ chunk, chunkIndex }, pageIndex) => (
+          <div
+            key={`belum-dites-${pageIndex}`}
+            style={{
+              width: '210mm',
+              minHeight: '330mm',
+              padding: '8mm',
+              boxSizing: 'border-box',
+              fontFamily: '"Arial Narrow", Arial, sans-serif',
+              fontSize: '11pt',
+              color: '#000',
+              background: '#fff',
+              breakAfter: 'page',
+              boxShadow: preview ? '0 10px 15px -3px rgb(0 0 0 / 0.1)' : 'none',
+            }}
+          >
+            <h1 style={{ textAlign: 'center', fontWeight: 700, fontSize: '13pt', margin: '0 0 4mm', lineHeight: 1.2 }}>
+              DAFTAR SANTRI BELUM DITES KLASIFIKASI TAHUN AJARAN {event.tahun_ajaran_nama || '____/____'}
+            </h1>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '10.5pt' }}>
+              <colgroup>
+                <col style={{ width: '12mm' }} />
+                <col />
+                <col style={{ width: '40mm' }} />
+                <col style={{ width: '25mm' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  {['NO', 'NAMA LENGKAP', 'ASRAMA/KAMAR', 'SEKOLAH'].map(label => (
+                    <th key={label} style={printTh}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {chunk.map((row, index) => (
+                  <tr key={row.id}>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{chunkIndex * 45 + index + 1}</td>
+                    <td style={{ ...printTd, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatNama(row.nama_lengkap)}</td>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{row.asrama || '-'}/{row.kamar || '-'}</td>
+                    <td style={{ ...printTd, textAlign: 'center' }}>{formatSekolah(row.sekolah)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      ))}
       {preview && totalPages > 2 && (
         <div className="py-4 text-center text-sm font-bold text-slate-500">
           Menampilkan 2 dari {totalPages} halaman. Silakan cetak untuk melihat seluruh data.
@@ -788,6 +856,7 @@ export default function CetakTesKlasifikasiPage() {
   const printRef = useRef<HTMLDivElement>(null)
   const absensiPrintRef = useRef<HTMLDivElement>(null)
   const penilaianPrintRef = useRef<HTMLDivElement>(null)
+  const belumDitesPrintRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -825,6 +894,18 @@ export default function CetakTesKlasifikasiPage() {
     `,
   })
 
+  const handlePrintBelumDites = useReactToPrint({
+    contentRef: belumDitesPrintRef,
+    documentTitle: 'Santri Belum Dites',
+    filename: 'santri-belum-dites.pdf',
+    pageStyle: `
+      @page { size: 210mm 330mm; margin: 0; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  })
+
   const activeEvent = data?.activeEvent
   const asramaOptions = data?.asramaList || []
   const [loadingPrintData, setLoadingPrintData] = useState(false)
@@ -838,7 +919,12 @@ export default function CetakTesKlasifikasiPage() {
       if (printMode === 'ruangan' && selectedRuangan) filters.ruangan_id = selectedRuangan
       if (printMode === 'asrama' && selectedAsrama) filters.asrama = selectedAsrama
       
-      const loaded = await getCetakJadwalData(activeEvent.id, filters)
+      let loaded: any
+      if (view === 'belum-dites') {
+        loaded = await getCetakBelumDitesData(activeEvent.id, filters)
+      } else {
+        loaded = await getCetakJadwalData(activeEvent.id, filters)
+      }
       setPrintData(loaded)
     } catch (e: any) {
       toast.error('Gagal memuat data cetak', { description: e?.message })
@@ -1138,6 +1224,72 @@ export default function CetakTesKlasifikasiPage() {
             <div className="hidden">
               <div ref={printRef}>
                 <PrintSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedSesi={selectedSesi} selectedRuangan={selectedRuangan} selectedAsrama={selectedAsrama} />
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    )
+  }
+
+  if (view === 'belum-dites') {
+    return (
+      <div className="mx-auto max-w-7xl space-y-5 pb-20">
+        <DashboardPageHeader title="Santri Belum Dites" description="Cetak daftar santri yang belum dites klasifikasi." />
+        <TesKlasifikasiTabs />
+        <button onClick={() => setView('menu')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600">Kembali</button>
+
+        {loading ? (
+          <div className="flex justify-center p-20"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+        ) : !activeEvent ? (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            Buat atau aktifkan event penjadwalan terlebih dahulu.
+          </div>
+        ) : (
+          <section className="space-y-5 rounded-xl border bg-white p-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Mode Cetak</label>
+                <select value={printMode} onChange={e => setPrintMode(e.target.value as PrintMode)} className="rounded-lg border px-3 py-2 text-sm">
+                  <option value="all">Semua</option>
+                  <option value="asrama">Per Asrama</option>
+                </select>
+              </div>
+              
+              {printMode === 'asrama' && (
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
+                  <select value={selectedAsrama} onChange={e => setSelectedAsrama(e.target.value)} className="rounded-lg border px-3 py-2 text-sm">
+                    <option value="">Pilih asrama</option>
+                    {asramaOptions.map((asrama: string) => <option key={asrama} value={asrama}>{asrama}</option>)}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={refreshPrintData}
+                disabled={loadingPrintData || (printMode === 'asrama' && !selectedAsrama)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
+              >
+                {loadingPrintData ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Tampilkan'}
+              </button>
+              <button
+                onClick={handlePrintBelumDites}
+                disabled={!printData?.rows?.length}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 disabled:bg-slate-300"
+              >
+                <Printer className="h-4 w-4" /> Cetak / PDF
+              </button>
+            </div>
+
+            <div className="rounded-xl border bg-slate-200/60 p-4 lg:p-8">
+              <div className="max-h-[75vh] w-full overflow-auto rounded-xl">
+                <BelumDitesSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedAsrama={selectedAsrama} preview />
+              </div>
+            </div>
+            <div className="hidden">
+              <div ref={belumDitesPrintRef}>
+                <BelumDitesSheet event={printData?.event} rows={printData?.rows || []} mode={printMode} selectedAsrama={selectedAsrama} />
               </div>
             </div>
           </section>

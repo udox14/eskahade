@@ -1,8 +1,9 @@
 'use server'
 
-import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
+import { execute, generateId, getDB, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { toInt } from '@/lib/upk-utils'
 import { revalidatePath } from 'next/cache'
 
 const KASIR_PATH = '/dashboard/akademik/upk/kasir'
@@ -117,48 +118,9 @@ function genderFromUnit(unit: UnitUPK) {
   return unit === 'PUTRA' ? 'L' : 'P'
 }
 
-function toInt(value: unknown) {
-  const parsed = parseInt(String(value ?? '0'), 10)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
 async function hasColumn(table: string, column: string) {
   const columns = await query<{ name: string }>(`PRAGMA table_info(${table})`)
   return columns.some((row) => row.name === column)
-}
-
-async function kurangiStok(katalogId: number, qty: number, meta: { antrianId: string; itemId: string; unit: UnitUPK; catatan: string }) {
-  if (qty <= 0) return
-  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
-  const stok = await queryOne<StockRow>(
-    `SELECT stok_lama, stok_baru${hasPrioritasStok ? ', prioritas_stok' : ''} FROM upk_katalog WHERE id = ?`,
-    [katalogId]
-  )
-  if (!stok) return
-
-  let dariLama = 0
-  let dariBaru = 0
-
-  if (hasPrioritasStok && stok.prioritas_stok === 'BARU') {
-    dariBaru = Math.min(stok.stok_baru || 0, qty)
-    const sisa = qty - dariBaru
-    dariLama = Math.min(stok.stok_lama || 0, sisa)
-  } else {
-    dariLama = Math.min(stok.stok_lama || 0, qty)
-    const sisa = qty - dariLama
-    dariBaru = Math.min(stok.stok_baru || 0, sisa)
-  }
-
-  await execute(
-    'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
-    [dariLama, dariBaru, now(), now(), katalogId]
-  )
-
-  await execute(`
-    INSERT INTO upk_stok_mutasi
-      (id, katalog_id, antrian_id, antrian_item_id, tanggal, unit, tipe, qty_lama, qty_baru, total_qty, catatan, created_by, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'PENJUALAN', ?, ?, ?, ?, ?, ?)
-  `, [generateId(), katalogId, meta.antrianId, meta.itemId, today(), meta.unit, dariLama, dariBaru, dariLama + dariBaru, meta.catatan, (await getSession())?.id ?? null, now()])
 }
 
 async function kurangiStokDenganTipe(
@@ -168,29 +130,43 @@ async function kurangiStokDenganTipe(
 ) {
   if (qty <= 0) return
   const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
-  const stok = await queryOne<StockRow>(
-    `SELECT stok_lama, stok_baru${hasPrioritasStok ? ', prioritas_stok' : ''} FROM upk_katalog WHERE id = ?`,
-    [katalogId]
-  )
-  if (!stok) return
+  const db = await getDB()
 
   let dariLama = 0
   let dariBaru = 0
+  const MAX_ATTEMPTS = 3
 
-  if (hasPrioritasStok && stok.prioritas_stok === 'BARU') {
-    dariBaru = Math.min(stok.stok_baru || 0, qty)
-    const sisa = qty - dariBaru
-    dariLama = Math.min(stok.stok_lama || 0, sisa)
-  } else {
-    dariLama = Math.min(stok.stok_lama || 0, qty)
-    const sisa = qty - dariLama
-    dariBaru = Math.min(stok.stok_baru || 0, sisa)
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const stok = await queryOne<StockRow>(
+      `SELECT stok_lama, stok_baru${hasPrioritasStok ? ', prioritas_stok' : ''} FROM upk_katalog WHERE id = ?`,
+      [katalogId]
+    )
+    if (!stok) return
+
+    if (hasPrioritasStok && stok.prioritas_stok === 'BARU') {
+      dariBaru = Math.min(stok.stok_baru || 0, qty)
+      const sisa = qty - dariBaru
+      dariLama = Math.min(stok.stok_lama || 0, sisa)
+    } else {
+      dariLama = Math.min(stok.stok_lama || 0, qty)
+      const sisa = qty - dariLama
+      dariBaru = Math.min(stok.stok_baru || 0, sisa)
+    }
+
+    // Optimistic lock: hanya commit kalau stok belum berubah sejak dibaca (cegah lost update saat 2 transaksi bersamaan)
+    const result = await db.prepare(
+      'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ? AND stok_lama = ? AND stok_baru = ?'
+    ).bind(dariLama, dariBaru, now(), now(), katalogId, stok.stok_lama || 0, stok.stok_baru || 0).run()
+
+    if (result.meta?.changes) break
+    if (attempt === MAX_ATTEMPTS - 1) {
+      // fallback: tetap kurangi stok walau lock gagal terus, lebih baik dari diam-diam tidak mengurangi sama sekali
+      await execute(
+        'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
+        [dariLama, dariBaru, now(), now(), katalogId]
+      )
+    }
   }
-
-  await execute(
-    'UPDATE upk_katalog SET stok_lama = stok_lama - ?, stok_baru = stok_baru - ?, stok_updated_at = ?, updated_at = ? WHERE id = ?',
-    [dariLama, dariBaru, now(), now(), katalogId]
-  )
 
   await execute(`
     INSERT INTO upk_stok_mutasi
@@ -288,7 +264,8 @@ export async function buatTransaksiGratisUPK(payload: {
   const session = await getSession()
   if (payload.jenis === 'GRATIS_SANTRI' && !payload.santri?.id) return { error: 'Pilih santri dulu.' }
   if (payload.jenis === 'GRATIS_GURU' && !payload.guru?.id) return { error: 'Pilih guru dulu.' }
-  if (!payload.items.length) return { error: 'Pilih minimal satu kitab.' }
+  const items = payload.items.filter(item => toInt(item.qty) > 0)
+  if (!items.length) return { error: 'Pilih minimal satu kitab.' }
 
   const tanggal = today()
   const maxRow = await queryOne<{ nomor: number }>(
@@ -300,8 +277,8 @@ export async function buatTransaksiGratisUPK(payload: {
   const penerimaNama = payload.jenis === 'GRATIS_GURU'
     ? payload.guru?.nama_lengkap || 'Guru'
     : payload.santri?.nama_lengkap || 'Santri'
-  const modalTotal = payload.items.reduce((sum, item) => {
-    const qty = Math.max(1, toInt(item.qty))
+  const modalTotal = items.reduce((sum, item) => {
+    const qty = toInt(item.qty)
     const modal = Math.max(0, toInt(item.hargaBeli))
     return sum + qty * modal
   }, 0)
@@ -346,8 +323,8 @@ export async function buatTransaksiGratisUPK(payload: {
     now(),
   ])
 
-  for (const item of payload.items) {
-    const qty = Math.max(1, toInt(item.qty))
+  for (const item of items) {
+    const qty = toInt(item.qty)
     const hargaModal = Math.max(0, toInt(item.hargaBeli))
     const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [item.katalogId])
     const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
@@ -391,7 +368,7 @@ export async function buatTransaksiGratisUPK(payload: {
       nomor,
       unit: payload.unit,
       jenis: payload.jenis,
-      total_item: payload.items.length,
+      total_item: items.length,
       harga_modal_total: modalTotal,
       pengeluaran_id: pengeluaranId,
     },
@@ -419,7 +396,8 @@ export async function buatAntrianUPK(payload: {
 }): Promise<{ success: true; id: string; nomor: number } | { error: string }> {
   const session = await getSession()
   if (!payload.santri?.id) return { error: 'Pilih santri dulu.' }
-  if (!payload.items.length) return { error: 'Pilih minimal satu kitab.' }
+  const items = payload.items.filter(item => toInt(item.qty) > 0)
+  if (!items.length) return { error: 'Pilih minimal satu kitab.' }
 
   const tanggal = today()
   const maxRow = await queryOne<{ nomor: number }>(
@@ -428,7 +406,7 @@ export async function buatAntrianUPK(payload: {
   )
   const nomor = (maxRow?.nomor || 0) + 1
   const antrianId = generateId()
-  const totalTagihan = payload.items.reduce((sum, item) => sum + (Math.max(1, toInt(item.qty)) * Math.max(0, toInt(item.hargaJual))), 0)
+  const totalTagihan = items.reduce((sum, item) => sum + (toInt(item.qty) * Math.max(0, toInt(item.hargaJual))), 0)
 
   await execute(`
     INSERT INTO upk_antrian
@@ -442,8 +420,8 @@ export async function buatAntrianUPK(payload: {
     payload.catatan?.trim() || null, session?.id ?? null, now(), now(),
   ])
 
-  for (const item of payload.items) {
-    const qty = Math.max(1, toInt(item.qty))
+  for (const item of items) {
+    const qty = toInt(item.qty)
     const harga = Math.max(0, toInt(item.hargaJual))
     const stok = await queryOne<StockRow>('SELECT stok_lama, stok_baru FROM upk_katalog WHERE id = ?', [item.katalogId])
     const tersedia = (stok?.stok_lama || 0) + (stok?.stok_baru || 0)
@@ -472,7 +450,7 @@ export async function buatAntrianUPK(payload: {
     details: {
       nomor,
       unit: payload.unit,
-      total_item: payload.items.length,
+      total_item: items.length,
       total_tagihan: totalTagihan,
     },
   })
@@ -568,10 +546,11 @@ export async function selesaikanAntrianUPK(payload: {
     `, [qty, subtotal, diserahkan ? 'SUDAH' : 'BELUM', diserahkan ? 0 : 1, now(), row.id])
 
     if (diserahkan && row.katalog_id) {
-      await kurangiStok(row.katalog_id, qty, {
+      await kurangiStokDenganTipe(row.katalog_id, qty, {
         antrianId: payload.antrianId,
         itemId: row.id,
         unit: payload.unit,
+        tipe: 'PENJUALAN',
         catatan: `Penjualan antrian ${String(antrian.nomor).padStart(3, '0')}`,
       })
     }

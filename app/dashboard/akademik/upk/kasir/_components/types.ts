@@ -1,3 +1,5 @@
+export { rupiah } from '@/lib/upk-utils'
+
 export type UnitUPK = 'PUTRA' | 'PUTRI'
 
 export type SantriOption = {
@@ -65,10 +67,6 @@ export type FinalItem = {
   itemId: string
   qty: number
   diserahkan: boolean
-}
-
-export function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 }
 
 export function nomorAntrian(value: number) {

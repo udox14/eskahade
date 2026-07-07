@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { rupiah, toInt, tanggalWaktu } from '@/lib/upk-utils'
 import {
   getHutangTokoOptions,
   getKatalogRoyaltiOptions,
@@ -113,26 +114,6 @@ const emptyForm: FormState = {
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
-}
-
-function toInt(value: string) {
-  const parsed = parseInt(value || '0', 10)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function tanggalWaktu(value: string) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function kategoriLabel(kategori: KategoriPengeluaran) {

@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { rupiah } from '@/lib/upk-utils'
 import {
   getKatalogUPK,
   getMarhalahList,
@@ -137,10 +138,6 @@ const emptyBatchRow: BatchRow = {
   harga_beli: '',
   harga_jual: '',
   catatan: '',
-}
-
-function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 }
 
 function numberValue(value: string) {
@@ -314,6 +311,9 @@ export default function KatalogUPKPage() {
     const parts = [`${result.inserted} ditambahkan`]
     if (result.skipped) parts.push(`${result.skipped} dilewati`)
     toast.success(`Batch selesai: ${parts.join(', ')}`)
+    if (result.skippedReasons.length) {
+      toast.warning(`Dilewati: ${result.skippedReasons.join('; ')}`)
+    }
     setIsBatchModalOpen(false)
     setBatchRows({})
     loadKatalog()

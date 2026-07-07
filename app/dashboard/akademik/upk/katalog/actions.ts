@@ -340,7 +340,7 @@ type BatchKatalogItem = {
 
 export async function simpanKatalogBatchUPK(
   items: BatchKatalogItem[]
-): Promise<{ success: boolean; inserted: number; skipped: number } | { error: string }> {
+): Promise<{ success: boolean; inserted: number; skipped: number; skippedReasons: string[] } | { error: string }> {
   const session = await getSession()
   if (!items.length) return { error: 'Belum ada kitab yang dipilih.' }
 
@@ -356,18 +356,23 @@ export async function simpanKatalogBatchUPK(
   const timestamp = now()
   let inserted = 0
   let skipped = 0
+  const skippedReasons: string[] = []
 
   for (const item of items) {
+    const label = item.nama_kitab.trim() || `Kitab ID ${item.kitab_id}`
     if (!item.kitab_id || !item.nama_kitab.trim() || !item.marhalah_id) {
       skipped++
+      skippedReasons.push(`${label}: data tidak lengkap (kitab/marhalah)`)
       continue
     }
     if (existingSet.has(item.kitab_id)) {
       skipped++
+      skippedReasons.push(`${label}: sudah ada di katalog`)
       continue
     }
     if (item.stok_lama < 0 || item.harga_beli < 0 || item.harga_jual < 0) {
       skipped++
+      skippedReasons.push(`${label}: stok/harga tidak boleh minus`)
       continue
     }
 
@@ -406,7 +411,7 @@ export async function simpanKatalogBatchUPK(
   })
 
   revalidatePath(KATALOG_PATH)
-  return { success: true, inserted, skipped }
+  return { success: true, inserted, skipped, skippedReasons }
 }
 
 export async function hapusKatalogUPK(id: number): Promise<{ success: boolean } | { error: string }> {

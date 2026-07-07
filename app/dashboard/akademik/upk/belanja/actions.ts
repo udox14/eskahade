@@ -1,8 +1,9 @@
 'use server'
 
-import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
+import { execute, generateId, getDB, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { toInt, statusPembayaran } from '@/lib/upk-utils'
 import { revalidatePath } from 'next/cache'
 
 const BELANJA_PATH = '/dashboard/akademik/upk/belanja'
@@ -36,7 +37,7 @@ type RencanaPayloadItem = {
 }
 
 type BelanjaPayloadItem = {
-  katalogId: number
+  katalogId: number | null
   namaKitab: string
   marhalahId: number | null
   marhalahNama: string | null
@@ -86,17 +87,6 @@ type HutangBelanjaRow = {
   total: number
   dibayar: number
   sisa_hutang: number
-}
-
-function toInt(value: unknown) {
-  const parsed = parseInt(String(value ?? '0'), 10)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function statusPembayaran(total: number, dibayar: number) {
-  if (dibayar <= 0) return 'HUTANG'
-  if (dibayar >= total) return 'LUNAS'
-  return 'SEBAGIAN'
 }
 
 export async function getKatalogBelanja() {
@@ -434,6 +424,161 @@ export async function getBelanjaItems(belanjaId: string) {
   `, [belanjaId])
 }
 
+export async function getBelanjaDetail(id: string) {
+  const header = await queryOne<{
+    id: string
+    tanggal: string
+    jenis: string
+    toko_id: number | null
+    toko_nama: string | null
+    catatan: string | null
+    dibayar: number
+    total: number
+    sisa_hutang: number
+  }>('SELECT * FROM upk_belanja WHERE id = ?', [id])
+  if (!header) return null
+
+  const items = await query<{
+    id: string
+    katalog_id: number | null
+    nama_kitab: string
+    marhalah_id: number | null
+    marhalah_nama: string | null
+    qty: number
+    qty_retur: number
+    harga_beli: number
+    subtotal: number
+  }>(`
+    SELECT id, katalog_id, nama_kitab, marhalah_id, marhalah_nama, qty, qty_retur, harga_beli, subtotal
+    FROM upk_belanja_item
+    WHERE belanja_id = ?
+    ORDER BY nama_kitab
+  `, [id])
+
+  return { header, items }
+}
+
+export async function updateBelanja(payload: {
+  id: string
+  tanggal: string
+  jenis: 'AWAL' | 'TAMBAHAN'
+  tokoId: number | null
+  tokoNama?: string | null
+  catatan?: string
+  items: (BelanjaPayloadItem & { itemId?: string; qtyRetur?: number })[]
+}): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  const belanjaRow = await queryOne<{ id: string; dibayar: number }>('SELECT * FROM upk_belanja WHERE id = ?', [payload.id])
+  if (!belanjaRow) return { error: 'Data belanja tidak ditemukan.' }
+
+  const items = payload.items.filter(item => toInt(item.qty) > 0)
+  if (!items.length) return { error: 'Pilih minimal satu kitab yang dibeli.' }
+
+  const oldItems = await query<{ id: string; katalog_id: number | null; qty: number; qty_retur: number }>(
+    'SELECT id, katalog_id, qty, qty_retur FROM upk_belanja_item WHERE belanja_id = ?', [payload.id]
+  )
+  const oldById = new Map(oldItems.map(row => [row.id, row]))
+  const keptIds = new Set(items.filter(item => item.itemId).map(item => item.itemId as string))
+
+  for (const oldItem of oldItems) {
+    if (keptIds.has(oldItem.id)) continue
+    if (oldItem.qty_retur > 0) {
+      return { error: `Item dengan retur ${oldItem.qty_retur} tidak bisa dihapus dari belanja.` }
+    }
+  }
+
+  for (const item of items) {
+    if (!item.itemId) continue
+    const old = oldById.get(item.itemId)
+    if (old && toInt(item.qty) < old.qty_retur) {
+      return { error: `${item.namaKitab}: qty tidak boleh kurang dari retur yang sudah dilakukan (${old.qty_retur}).` }
+    }
+  }
+
+  const toko = payload.tokoId
+    ? await queryOne<{ id: number; nama: string }>('SELECT id, nama FROM upk_toko WHERE id = ?', [payload.tokoId])
+    : null
+  const tanggal = payload.tanggal || today()
+
+  // Hapus item lama yang tidak ada lagi di payload (sudah divalidasi qty_retur = 0)
+  for (const oldItem of oldItems) {
+    if (keptIds.has(oldItem.id)) continue
+    if (oldItem.katalog_id) {
+      await execute(`
+        UPDATE upk_katalog
+        SET stok_baru = MAX(0, stok_baru - ?), stok_updated_at = ?, updated_at = ?
+        WHERE id = ?
+      `, [oldItem.qty, now(), now(), oldItem.katalog_id])
+    }
+    await execute('DELETE FROM upk_belanja_item WHERE id = ?', [oldItem.id])
+  }
+
+  let total = 0
+  for (const item of items) {
+    const qty = Math.max(0, toInt(item.qty))
+    const harga = Math.max(0, toInt(item.hargaBeli))
+    const qtyRetur = item.itemId ? (oldById.get(item.itemId)?.qty_retur ?? 0) : 0
+    total += (qty - qtyRetur) * harga
+
+    if (item.itemId && oldById.has(item.itemId)) {
+      const old = oldById.get(item.itemId)!
+      const delta = qty - old.qty
+      await execute(
+        'UPDATE upk_belanja_item SET qty = ?, harga_beli = ?, subtotal = ?, updated_at = ? WHERE id = ?',
+        [qty, harga, qty * harga, now(), item.itemId]
+      )
+      if (old.katalog_id && delta !== 0) {
+        await execute(`
+          UPDATE upk_katalog
+          SET stok_baru = MAX(0, stok_baru + ?), stok_updated_at = ?, updated_at = ?
+          WHERE id = ?
+        `, [delta, now(), now(), old.katalog_id])
+      }
+    } else {
+      await execute(`
+        INSERT INTO upk_belanja_item
+          (id, belanja_id, katalog_id, nama_kitab, marhalah_id, marhalah_nama, qty, harga_beli, subtotal, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [generateId(), payload.id, item.katalogId, item.namaKitab, item.marhalahId, item.marhalahNama, qty, harga, qty * harga, now(), now()])
+
+      if (item.katalogId) {
+        await execute(`
+          UPDATE upk_katalog
+          SET stok_baru = stok_baru + ?, harga_beli = ?, toko_id = COALESCE(?, toko_id),
+              stok_updated_at = ?, updated_at = ?
+          WHERE id = ?
+        `, [qty, harga, toko?.id ?? null, now(), now(), item.katalogId])
+      }
+    }
+  }
+
+  const sisaHutang = Math.max(0, total - belanjaRow.dibayar)
+  const status = statusPembayaran(total, belanjaRow.dibayar)
+
+  await execute(`
+    UPDATE upk_belanja
+    SET tanggal = ?, jenis = ?, toko_id = ?, toko_nama = ?, total = ?, sisa_hutang = ?, status_pembayaran = ?, catatan = ?, updated_at = ?
+    WHERE id = ?
+  `, [tanggal, payload.jenis, toko?.id ?? null, toko?.nama ?? payload.tokoNama ?? null, total, sisaHutang, status, payload.catatan?.trim() || null, now(), payload.id])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_belanja',
+    action: 'update',
+    fiturHref: BELANJA_PATH,
+    logKind: 'update',
+    entityType: 'upk_belanja',
+    entityId: payload.id,
+    entityLabel: toko?.nama ?? payload.tokoNama ?? `Belanja ${tanggal}`,
+    summary: `Mengubah belanja UPK ${items.length} item`,
+    details: { tanggal, jenis: payload.jenis, toko: toko?.nama ?? payload.tokoNama ?? null, total, sisa_hutang: sisaHutang },
+  })
+
+  revalidatePath(BELANJA_PATH)
+  revalidatePath('/dashboard/akademik/upk/katalog')
+  return { success: true }
+}
+
 export async function returBelanjaItem(belanjaItemId: string, qtyToReturn: number): Promise<{ success: true } | { error: string }> {
   const session = await getSession()
   const bi = await queryOne<{
@@ -482,15 +627,27 @@ export async function returBelanjaItem(belanjaItemId: string, qtyToReturn: numbe
     const newStokBaru = katalog.stok_baru - qty
     const newStokLama = katalog.stok_lama
 
-    await execute(`
+    const db = await getDB()
+    const stokResult = await db.prepare(`
       UPDATE upk_katalog
       SET stok_baru = ?, stok_lama = ?, stok_updated_at = ?, updated_at = ?
-      WHERE id = ?
-    `, [newStokBaru, newStokLama, now(), now(), bi.katalog_id])
+      WHERE id = ? AND stok_baru = ?
+    `).bind(newStokBaru, newStokLama, now(), now(), bi.katalog_id, katalog.stok_baru).run()
+
+    if (!stokResult.meta?.changes) {
+      return { error: 'Stok katalog baru saja berubah, silakan coba lagi.' }
+    }
   }
 
   const newQtyRetur = (bi.qty_retur || 0) + qty
-  await execute('UPDATE upk_belanja_item SET qty_retur = ?, updated_at = ? WHERE id = ?', [newQtyRetur, now(), belanjaItemId])
+  const db = await getDB()
+  const itemResult = await db.prepare(
+    'UPDATE upk_belanja_item SET qty_retur = ?, updated_at = ? WHERE id = ? AND qty_retur = ?'
+  ).bind(newQtyRetur, now(), belanjaItemId, bi.qty_retur || 0).run()
+
+  if (!itemResult.meta?.changes) {
+    return { error: 'Data item belanja baru saja berubah, silakan coba lagi.' }
+  }
 
   const returnedValue = qty * bi.harga_beli
   const newTotal = Math.max(0, parent.total - returnedValue)

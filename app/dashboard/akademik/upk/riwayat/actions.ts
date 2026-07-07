@@ -3,6 +3,7 @@
 import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { toInt } from '@/lib/upk-utils'
 import { revalidatePath } from 'next/cache'
 
 const RIWAYAT_PATH = '/dashboard/akademik/upk/riwayat'
@@ -60,11 +61,6 @@ type MutasiPenjualanRow = {
   qty_lama: number
   qty_baru: number
   total_qty: number
-}
-
-function toInt(value: unknown) {
-  const parsed = parseInt(String(value ?? '0'), 10)
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function likeParam(value: string) {

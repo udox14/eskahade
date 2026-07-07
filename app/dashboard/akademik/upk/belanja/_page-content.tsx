@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
+import { rupiah } from '@/lib/upk-utils'
 import {
   bayarHutangBelanja,
+  getBelanjaDetail,
   getBelanjaList,
   getHutangBelanja,
   getKatalogBelanja,
@@ -12,12 +14,13 @@ import {
   hitungRencanaBelanja,
   simpanBelanja,
   simpanRencanaBelanja,
+  updateBelanja,
   hapusBelanja,
   getMarhalahBelanja,
   getBelanjaItems,
   returBelanjaItem,
 } from './actions'
-import { CheckCircle, ChevronRight, ClipboardList, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
+import { CheckCircle, ChevronRight, ClipboardList, Edit, Loader2, Plus, Printer, RefreshCw, Save, ShoppingBag, Store, Trash, Wallet, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -53,6 +56,9 @@ type RencanaItem = {
 type BelanjaCartItem = KatalogItem & {
   qty: number
   harga_beli_input: number
+  belanjaItemId?: string
+  qtyRetur?: number
+  katalogIdReal: number | null
 }
 
 type Toko = { id: number; nama: string }
@@ -85,10 +91,6 @@ type HutangListItem = {
   sisa_hutang: number
 }
 
-function rupiah(value: number) {
-  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`
-}
-
 function todayInput() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -109,6 +111,7 @@ export default function BelanjaUPKPage() {
   const [groupRencanaByToko, setGroupRencanaByToko] = useState(true)
   const [namaRencana, setNamaRencana] = useState(`Rencana Belanja ${todayInput()}`)
   const [isBelanjaModalOpen, setIsBelanjaModalOpen] = useState(false)
+  const [editingBelanjaId, setEditingBelanjaId] = useState<string | null>(null)
   const [belanjaCart, setBelanjaCart] = useState<BelanjaCartItem[]>([])
   const [belanjaSearch, setBelanjaSearch] = useState('')
   const [jenisBelanja, setJenisBelanja] = useState<'AWAL' | 'TAMBAHAN'>('AWAL')
@@ -125,10 +128,50 @@ export default function BelanjaUPKPage() {
   const belanjaPrintRef = useRef<HTMLDivElement>(null)
 
   const totalRencana = rencanaHitung.reduce((sum, item) => sum + item.qty_rencana * item.harga_beli, 0)
-  const totalBelanja = belanjaCart.reduce((sum, item) => sum + item.qty * item.harga_beli_input, 0)
+  const totalBelanja = belanjaCart.reduce((sum, item) => sum + (item.qty - (item.qtyRetur || 0)) * item.harga_beli_input, 0)
   const totalHutang = hutangList.reduce((sum, item) => sum + (item.sisa_hutang || 0), 0)
 
   const openBelanjaModal = () => {
+    setEditingBelanjaId(null)
+    setBelanjaCart([])
+    setTanggalBelanja(todayInput())
+    setJenisBelanja('AWAL')
+    setTokoId('')
+    setDibayar('')
+    setCatatanBelanja('')
+    setBelanjaSearch('')
+    setSelectedMarhalahId('')
+    setIsBelanjaModalOpen(true)
+  }
+
+  const openEditBelanja = async (id: string) => {
+    const detail = await getBelanjaDetail(id)
+    if (!detail) {
+      toast.error('Data belanja tidak ditemukan.')
+      return
+    }
+    setEditingBelanjaId(id)
+    setTanggalBelanja(detail.header.tanggal)
+    setJenisBelanja(detail.header.jenis as 'AWAL' | 'TAMBAHAN')
+    setTokoId(detail.header.toko_id ? String(detail.header.toko_id) : '')
+    setCatatanBelanja(detail.header.catatan || '')
+    setDibayar('')
+    setBelanjaCart(detail.items.map((item, index) => ({
+      id: item.katalog_id ?? -(index + 1),
+      nama_kitab: item.nama_kitab,
+      marhalah_id: item.marhalah_id,
+      marhalah_nama: item.marhalah_nama,
+      harga_beli: item.harga_beli,
+      stok_lama: 0,
+      stok_baru: 0,
+      jumlah_stok: 0,
+      marhalah_ids: '',
+      qty: item.qty,
+      harga_beli_input: item.harga_beli,
+      belanjaItemId: item.id,
+      qtyRetur: item.qty_retur,
+      katalogIdReal: item.katalog_id,
+    })))
     setBelanjaSearch('')
     setSelectedMarhalahId('')
     setIsBelanjaModalOpen(true)
@@ -136,6 +179,7 @@ export default function BelanjaUPKPage() {
 
   const closeBelanjaModal = () => {
     setIsBelanjaModalOpen(false)
+    setEditingBelanjaId(null)
   }
 
   const toggleExpand = async (id: string) => {
@@ -264,33 +308,60 @@ export default function BelanjaUPKPage() {
 
   const toggleBelanjaItem = (item: KatalogItem) => {
     setBelanjaCart(prev => {
-      if (prev.some(row => row.id === item.id)) return prev.filter(row => row.id !== item.id)
-      return [...prev, { ...item, qty: 1, harga_beli_input: item.harga_beli || 0 }]
+      const existing = prev.find(row => row.id === item.id)
+      if (existing) {
+        if ((existing.qtyRetur || 0) > 0) {
+          toast.error('Item ini sudah diretur sebagian, tidak bisa dihapus dari belanja.')
+          return prev
+        }
+        return prev.filter(row => row.id !== item.id)
+      }
+      return [...prev, { ...item, qty: 1, harga_beli_input: item.harga_beli || 0, katalogIdReal: item.id }]
     })
   }
 
   const updateCart = (id: number, patch: Partial<BelanjaCartItem>) => {
-    setBelanjaCart(prev => prev.map(item => item.id === id ? { ...item, ...patch, qty: Math.max(0, patch.qty ?? item.qty), harga_beli_input: Math.max(0, patch.harga_beli_input ?? item.harga_beli_input) } : item))
+    setBelanjaCart(prev => prev.map(item => item.id === id
+      ? { ...item, ...patch, qty: Math.max(item.qtyRetur || 0, patch.qty ?? item.qty), harga_beli_input: Math.max(0, patch.harga_beli_input ?? item.harga_beli_input) }
+      : item))
   }
 
   const saveBelanja = async () => {
-    const result = await simpanBelanja({
-      tanggal: tanggalBelanja,
-      jenis: jenisBelanja,
-      tokoId: tokoId ? parseInt(tokoId, 10) : null,
-      dibayar: parseInt(dibayar || '0', 10) || 0,
-      catatan: catatanBelanja,
-      items: belanjaCart.map(item => ({
-        katalogId: item.id,
-        namaKitab: item.nama_kitab,
-        marhalahId: item.marhalah_id,
-        marhalahNama: item.marhalah_nama,
-        qty: item.qty,
-        hargaBeli: item.harga_beli_input,
-      })),
-    })
+    const result = editingBelanjaId
+      ? await updateBelanja({
+        id: editingBelanjaId,
+        tanggal: tanggalBelanja,
+        jenis: jenisBelanja,
+        tokoId: tokoId ? parseInt(tokoId, 10) : null,
+        catatan: catatanBelanja,
+        items: belanjaCart.map(item => ({
+          katalogId: item.katalogIdReal,
+          namaKitab: item.nama_kitab,
+          marhalahId: item.marhalah_id,
+          marhalahNama: item.marhalah_nama,
+          qty: item.qty,
+          hargaBeli: item.harga_beli_input,
+          itemId: item.belanjaItemId,
+          qtyRetur: item.qtyRetur,
+        })),
+      })
+      : await simpanBelanja({
+        tanggal: tanggalBelanja,
+        jenis: jenisBelanja,
+        tokoId: tokoId ? parseInt(tokoId, 10) : null,
+        dibayar: parseInt(dibayar || '0', 10) || 0,
+        catatan: catatanBelanja,
+        items: belanjaCart.map(item => ({
+          katalogId: item.katalogIdReal,
+          namaKitab: item.nama_kitab,
+          marhalahId: item.marhalah_id,
+          marhalahNama: item.marhalah_nama,
+          qty: item.qty,
+          hargaBeli: item.harga_beli_input,
+        })),
+      })
     if ('error' in result) return toast.error(result.error)
-    toast.success('Belanja disimpan dan stok baru bertambah')
+    toast.success(editingBelanjaId ? 'Belanja berhasil diperbarui' : 'Belanja disimpan dan stok baru bertambah')
     closeBelanjaModal()
     setBelanjaCart([])
     setDibayar('')
@@ -508,13 +579,22 @@ export default function BelanjaUPKPage() {
                       <td className="px-4 py-3 text-right font-mono text-emerald-700">{rupiah(row.dibayar)}</td>
                       <td className="px-4 py-3 text-right font-mono text-red-700">{rupiah(row.sisa_hutang)}</td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleDeleteBelanja(row.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Hapus Belanja"
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openEditBelanja(row.id)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit Belanja"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBelanja(row.id)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Hapus Belanja"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>,
                     ...(expandedId === row.id ? [(
@@ -628,7 +708,7 @@ export default function BelanjaUPKPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
           <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-xl shadow-xl flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Store className="w-4 h-4 text-blue-600" /> Tambah Belanja</h2>
+              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Store className="w-4 h-4 text-blue-600" /> {editingBelanjaId ? 'Edit Belanja' : 'Tambah Belanja'}</h2>
               <button onClick={closeBelanjaModal} className="p-2 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
@@ -681,9 +761,12 @@ export default function BelanjaUPKPage() {
                 <div className="border rounded-lg divide-y max-h-72 overflow-y-auto">
                   {belanjaCart.map(item => (
                     <div key={item.id} className="p-3 space-y-2">
-                      <p className="font-bold text-sm text-slate-800">{item.nama_kitab}</p>
+                      <p className="font-bold text-sm text-slate-800">
+                        {item.nama_kitab}
+                        {(item.qtyRetur || 0) > 0 && <span className="ml-2 text-[10px] font-normal text-amber-700">(retur: {item.qtyRetur})</span>}
+                      </p>
                       <div className="grid grid-cols-2 gap-2">
-                        <input type="number" min="0" value={item.qty} onChange={e => updateCart(item.id, { qty: parseInt(e.target.value || '0', 10) })} className="px-2 py-2 border rounded-lg text-sm" placeholder="Qty" />
+                        <input type="number" min={item.qtyRetur || 0} value={item.qty} onChange={e => updateCart(item.id, { qty: parseInt(e.target.value || '0', 10) })} className="px-2 py-2 border rounded-lg text-sm" placeholder="Qty" />
                         <input type="number" min="0" value={item.harga_beli_input} onChange={e => updateCart(item.id, { harga_beli_input: parseInt(e.target.value || '0', 10) })} className="px-2 py-2 border rounded-lg text-sm" placeholder="Harga beli" />
                       </div>
                     </div>
@@ -691,12 +774,16 @@ export default function BelanjaUPKPage() {
                   {!belanjaCart.length && <div className="p-6 text-center text-slate-400 text-sm">Pilih kitab di kiri.</div>}
                 </div>
                 <div className="flex justify-between font-bold"><span>Total</span><span>{rupiah(totalBelanja)}</span></div>
-                <input type="number" value={dibayar} onChange={e => setDibayar(e.target.value)} className="w-full px-3 py-3 border rounded-lg font-bold font-mono" placeholder="Dibayar sekarang (0 jika hutang)" />
+                {editingBelanjaId ? (
+                  <p className="text-xs text-slate-500 bg-slate-50 border rounded-lg px-3 py-2">Pembayaran dikelola di tab Hutang, tidak diubah lewat form ini.</p>
+                ) : (
+                  <input type="number" value={dibayar} onChange={e => setDibayar(e.target.value)} className="w-full px-3 py-3 border rounded-lg font-bold font-mono" placeholder="Dibayar sekarang (0 jika hutang)" />
+                )}
                 <textarea value={catatanBelanja} onChange={e => setCatatanBelanja(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm min-h-20" placeholder="Catatan" />
                 <button onClick={printBelanja} disabled={!belanjaCart.length} className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold disabled:opacity-50 flex items-center justify-center gap-2">
                   <Printer className="w-4 h-4" /> Cetak Daftar
                 </button>
-                <button onClick={saveBelanja} disabled={!belanjaCart.length} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">Simpan Belanja</button>
+                <button onClick={saveBelanja} disabled={!belanjaCart.length} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">{editingBelanjaId ? 'Simpan Perubahan' : 'Simpan Belanja'}</button>
               </aside>
             </div>
           </div>

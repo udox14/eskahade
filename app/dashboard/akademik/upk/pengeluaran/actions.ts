@@ -1,8 +1,9 @@
 'use server'
 
-import { execute, generateId, now, query, queryOne, today } from '@/lib/db'
+import { execute, generateId, getDB, now, query, queryOne, today } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { toInt, statusPembayaran } from '@/lib/upk-utils'
 import { revalidatePath } from 'next/cache'
 
 const PENGELUARAN_PATH = '/dashboard/akademik/upk/pengeluaran'
@@ -64,11 +65,6 @@ type BelanjaHutangRow = {
   sisa_hutang: number
 }
 
-function toInt(value: unknown) {
-  const parsed = parseInt(String(value ?? '0'), 10)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
 function normalizeKategori(value: unknown): KategoriPengeluaran {
   if (
     value === 'KONSUMSI' ||
@@ -82,12 +78,6 @@ function normalizeKategori(value: unknown): KategoriPengeluaran {
   return 'LAINNYA'
 }
 
-function statusPembayaran(total: number, dibayar: number) {
-  if (dibayar <= 0) return 'HUTANG'
-  if (dibayar >= total) return 'LUNAS'
-  return 'SEBAGIAN'
-}
-
 async function ubahPembayaranHutangBelanja(belanjaId: string, delta: number): Promise<{ success: true } | { error: string }> {
   const row = await queryOne<BelanjaHutangRow>('SELECT * FROM upk_belanja WHERE id = ?', [belanjaId])
   if (!row) return { error: 'Data hutang toko tidak ditemukan.' }
@@ -97,10 +87,14 @@ async function ubahPembayaranHutangBelanja(belanjaId: string, delta: number): Pr
   if (dibayarBaru > toInt(row.total)) return { error: 'Nominal melebihi sisa hutang toko.' }
 
   const sisaBaru = Math.max(0, toInt(row.total) - dibayarBaru)
-  await execute(
-    'UPDATE upk_belanja SET dibayar = ?, sisa_hutang = ?, status_pembayaran = ?, updated_at = ? WHERE id = ?',
-    [dibayarBaru, sisaBaru, statusPembayaran(toInt(row.total), dibayarBaru), now(), belanjaId]
-  )
+  const db = await getDB()
+  const result = await db.prepare(
+    'UPDATE upk_belanja SET dibayar = ?, sisa_hutang = ?, status_pembayaran = ?, updated_at = ? WHERE id = ? AND dibayar = ?'
+  ).bind(dibayarBaru, sisaBaru, statusPembayaran(toInt(row.total), dibayarBaru), now(), belanjaId, row.dibayar).run()
+
+  if (!result.meta?.changes) {
+    return { error: 'Data hutang toko baru saja berubah, silakan coba lagi.' }
+  }
 
   return { success: true }
 }
