@@ -113,7 +113,7 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
   const nahwu       = formData.get('nahwu_pengalaman') === 'on'
 
   // Algoritma penentuan marhalah:
-  // prioritas utama adalah kemampuan membaca, lalu tajwid, lalu menulis.
+  // prioritas utama adalah kemampuan membaca dan tajwid.
   let rekomendasi = 'Ibtidaiyyah 1'
   let grade = 'Grade C'
 
@@ -123,13 +123,13 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
   } else if (kelancaran === 'TIDAK_LANCAR') {
     if (tajwid === 'BURUK') {
       rekomendasi = 'Tamhidiyyah 2'
-      grade = 'Grade B'
+      grade = 'Grade C'
     } else if (tajwid === 'KURANG') {
       rekomendasi = 'Tamhidiyyah 2'
-      grade = 'Grade A'
+      grade = 'Grade B'
     } else if (tajwid === 'BAIK') {
-      rekomendasi = 'Ibtidaiyyah 1'
-      grade = tulis === 'BAIK' ? 'Grade B' : 'Grade C'
+      rekomendasi = 'Tamhidiyyah 2'
+      grade = 'Grade A'
     }
   } else if (kelancaran === 'LANCAR') {
     rekomendasi = 'Ibtidaiyyah 1'
@@ -137,9 +137,9 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
     if (tajwid === 'BURUK') {
       grade = 'Grade C'
     } else if (tajwid === 'KURANG') {
-      grade = tulis === 'BAIK' ? 'Grade B' : 'Grade C'
+      grade = 'Grade B'
     } else if (tajwid === 'BAIK') {
-      grade = tulis === 'BAIK' ? 'Grade A' : 'Grade B'
+      grade = 'Grade A'
     }
   }
 
