@@ -3,14 +3,15 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   getMarhalahList, getTahunAjaranAktif, getKelasUntukMarhalah, getPenempatanData, simpanDraftPenempatan,
-  getDraftPenempatan, hapusDraftItem, finalisasiDraft,
+  getDraftPenempatan, hapusDraftItem, finalisasiDraft, hapusDraftBatch,
   type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan, type DraftPenempatan,
 } from './actions'
 import { gradeCocokKelas, type Grade } from '@/lib/akademik/grade'
 import {
-  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3, ClipboardList, X,
+  Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3, ClipboardList, X, FileSpreadsheet
 } from 'lucide-react'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -699,6 +700,45 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
     await load()
   }
 
+  const handleBatalkanBatch = async () => {
+    if (selected.length === 0) return toast.warning('Pilih minimal satu draft untuk dibatalkan.')
+    if (!await confirm(`Kembalikan ${selected.length} santri terpilih ke daftar penempatan?`)) return
+
+    setBusy(true)
+    const t = toast.loading('Membatalkan draft...')
+    try {
+      const res = await hapusDraftBatch(selected)
+      toast.dismiss(t)
+      if (res?.error) {
+        toast.error('Gagal', { description: res.error })
+      } else {
+        toast.success('Draft dibatalkan!', { description: `${res.count} santri dikembalikan ke daftar penempatan.` })
+        setSelected([])
+        await load()
+      }
+    } catch {
+      toast.dismiss(t)
+      toast.error('Terjadi kesalahan saat membatalkan.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleExportExcel = () => {
+    if (drafts.length === 0) return toast.warning('Tidak ada draft untuk diexport.')
+    const data = drafts.map((d, index) => ({
+      'No': index + 1,
+      'Nama Santri': d.nama,
+      'NIS': d.nis,
+      'Kelas Asal': d.asal,
+      'Kelas Tujuan': d.nama_kelas,
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Draft Penempatan')
+    XLSX.writeFile(wb, 'draft_penempatan.xlsx')
+  }
+
   const handleFinalisasi = async () => {
     if (selected.length === 0) return toast.warning('Pilih minimal satu draft untuk difinalisasi.')
     if (!await confirm(`Finalisasi ${selected.length} santri ke kelas tujuan? Setelah ini penempatan PERMANEN dan tidak bisa dibatalkan dari sini.`)) return
@@ -744,6 +784,15 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end mb-1">
+        <button
+          onClick={handleExportExcel}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 transition-all active:scale-95"
+        >
+          <FileSpreadsheet className="w-4 h-4" /> Export Excel
+        </button>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <button
           onClick={() => setStatOpen(o => !o)}
@@ -791,13 +840,23 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
           <h3 className="font-bold text-indigo-900">{drafts.length} santri dalam draft, {selected.length} dipilih</h3>
           <p className="text-xs text-indigo-700/70 font-medium mt-0.5">Review dulu sebelum finalisasi — draft belum mengubah kelas santri.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={selectAll} className="text-xs font-bold text-indigo-700 hover:underline px-2">Pilih Semua</button>
-          <button onClick={clearSelection} className="text-xs font-bold text-slate-500 hover:underline px-2">Kosongkan</button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-3 lg:mt-0">
+          <div className="flex items-center gap-2 justify-center sm:justify-start">
+            <button onClick={selectAll} className="text-xs font-bold text-indigo-700 hover:underline px-2">Pilih Semua</button>
+            <button onClick={clearSelection} className="text-xs font-bold text-slate-500 hover:underline px-2">Kosongkan</button>
+          </div>
+          <button
+            onClick={handleBatalkanBatch}
+            disabled={busy || selected.length === 0}
+            className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm transition-colors"
+          >
+            <X className="w-4 h-4" />
+            Batalkan Terpilih
+          </button>
           <button
             onClick={handleFinalisasi}
             disabled={busy || selected.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black flex items-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
           >
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />}
             Finalisasi Terpilih
@@ -807,10 +866,24 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
 
       {grouped.map(([namaKelas, list]) => (
         <div key={namaKelas} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
-            <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="font-bold text-slate-700">{namaKelas}</span>
-            <span className="text-xs font-bold text-slate-400">{list.length} santri (draft)</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+            <div className="flex items-center gap-3">
+              <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="font-bold text-slate-700">{namaKelas}</span>
+              <span className="text-xs font-bold text-slate-400">{list.length} santri (draft)</span>
+            </div>
+            
+            <button
+              onClick={() => {
+                const ids = list.map(d => d.id)
+                const allSelected = ids.every(id => selected.includes(id))
+                setSelected(prev => allSelected ? prev.filter(id => !ids.includes(id)) : Array.from(new Set([...prev, ...ids])))
+              }}
+              className="sm:ml-auto text-xs font-bold text-indigo-600 hover:underline inline-flex items-center gap-1.5"
+            >
+              {list.every(d => selected.includes(d.id)) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              Pilih Semua Kelas Ini
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">

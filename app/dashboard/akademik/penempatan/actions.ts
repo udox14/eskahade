@@ -292,6 +292,7 @@ export type DraftPenempatan = {
   created_at: string
   grade: 'A' | 'B' | 'C' | null
   kategori_efektif: string
+  asal: string
 }
 
 // Daftar seluruh draft yang belum difinalisasi, untuk tab Review Draft.
@@ -303,18 +304,21 @@ export async function getDraftPenempatan(marhalahTargetId?: string): Promise<Dra
   const data = await query<any>(`
     SELECT pd.id, pd.santri_id, s.nama_lengkap AS nama, s.nis, pd.sumber,
            pd.kelas_id, k.nama_kelas, pd.marhalah_target_id, pd.riwayat_lama_id, pd.created_at,
-           htk.catatan_grade, rl.grade_lanjutan, ${kategoriEfektifSql} AS kategori_efektif
+           htk.catatan_grade, rl.grade_lanjutan, ${kategoriEfektifSql} AS kategori_efektif,
+           kl.nama_kelas AS asal_kelas_lama, htk.rekomendasi_marhalah AS asal_marhalah_baru
     FROM penempatan_draft pd
     JOIN santri s ON s.id = pd.santri_id
     JOIN kelas k ON k.id = pd.kelas_id
     LEFT JOIN hasil_tes_klasifikasi htk ON htk.santri_id = pd.santri_id AND pd.sumber = 'baru'
     LEFT JOIN riwayat_pendidikan rl ON rl.id = pd.riwayat_lama_id
+    LEFT JOIN kelas kl ON kl.id = rl.kelas_id
     ${filter}
     ORDER BY k.nama_kelas, s.nama_lengkap
   `, params)
   return data.map((d: any) => ({
     ...d,
     grade: normalizeGrade(d.sumber === 'baru' ? d.catatan_grade : d.grade_lanjutan),
+    asal: d.sumber === 'baru' ? (d.asal_marhalah_baru || '-') : (d.asal_kelas_lama || '-'),
   }))
 }
 
@@ -325,6 +329,18 @@ export async function hapusDraftItem(id: string) {
   await execute('DELETE FROM penempatan_draft WHERE id = ?', [id])
   revalidatePath(FITUR_HREF)
   return { success: true }
+}
+
+// Batalkan banyak draft sekaligus
+export async function hapusDraftBatch(ids: string[]) {
+  const session = await assertCrud(FITUR_HREF, 'delete')
+  if ('error' in session) return { error: session.error }
+  if (!ids || ids.length === 0) return { error: 'Tidak ada draft yang dipilih.' }
+
+  const ph = ids.map(() => '?').join(',')
+  await execute(`DELETE FROM penempatan_draft WHERE id IN (${ph})`, ids)
+  revalidatePath(FITUR_HREF)
+  return { success: true, count: ids.length }
 }
 
 // Batalkan seluruh draft untuk marhalah tujuan tertentu.
