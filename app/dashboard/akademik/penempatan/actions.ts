@@ -293,6 +293,7 @@ export type DraftPenempatan = {
   grade: 'A' | 'B' | 'C' | null
   kategori_efektif: string
   asal: string
+  jenjang: JenjangPenempatan | null
 }
 
 // Daftar seluruh draft yang belum difinalisasi, untuk tab Review Draft.
@@ -305,7 +306,8 @@ export async function getDraftPenempatan(marhalahTargetId?: string): Promise<Dra
     SELECT pd.id, pd.santri_id, s.nama_lengkap AS nama, s.nis, pd.sumber,
            pd.kelas_id, k.nama_kelas, pd.marhalah_target_id, pd.riwayat_lama_id, pd.created_at,
            htk.catatan_grade, rl.grade_lanjutan, ${kategoriEfektifSql} AS kategori_efektif,
-           kl.nama_kelas AS asal_kelas_lama, htk.rekomendasi_marhalah AS asal_marhalah_baru
+           kl.nama_kelas AS asal_kelas_lama, htk.rekomendasi_marhalah AS asal_marhalah_baru,
+           s.sekolah, s.kategori_santri
     FROM penempatan_draft pd
     JOIN santri s ON s.id = pd.santri_id
     JOIN kelas k ON k.id = pd.kelas_id
@@ -319,6 +321,7 @@ export async function getDraftPenempatan(marhalahTargetId?: string): Promise<Dra
     ...d,
     grade: normalizeGrade(d.sumber === 'baru' ? d.catatan_grade : d.grade_lanjutan),
     asal: d.sumber === 'baru' ? (d.asal_marhalah_baru || '-') : (d.asal_kelas_lama || '-'),
+    jenjang: getJenjangPenempatan(d.kategori_santri, d.sekolah),
   }))
 }
 

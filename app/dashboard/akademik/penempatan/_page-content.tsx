@@ -730,6 +730,9 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
       'No': index + 1,
       'Nama Santri': d.nama,
       'NIS': d.nis,
+      'Status': d.sumber === 'baru' ? 'Baru' : 'Lama',
+      'Jenjang': d.jenjang || '-',
+      'Grade': d.grade || '-',
       'Kelas Asal': d.asal,
       'Kelas Tujuan': d.nama_kelas,
     }))
