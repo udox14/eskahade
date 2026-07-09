@@ -86,6 +86,7 @@ import {
   MinusCircle,
   Bookmark,
   Books,
+  CalendarDots,
   MagnifyingGlass
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -112,7 +113,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
   PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
   Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
-  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books
+  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books, CalendarDots
 };
 
 function getIcon(name: string): React.ElementType {
