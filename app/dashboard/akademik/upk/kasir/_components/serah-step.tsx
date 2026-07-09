@@ -13,6 +13,7 @@ export function SerahStep({
   total,
   onPay,
   showPayButton,
+  onCancel,
 }: {
   detail: AntrianDetail | null
   finalItems: FinalItem[]
