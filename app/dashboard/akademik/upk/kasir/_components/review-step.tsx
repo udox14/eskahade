@@ -50,14 +50,14 @@ export function ReviewStep({
       <div className="flex-1 space-y-2 overflow-y-auto">
         {items.length === 0 && <div className="py-10 text-center text-sm text-slate-400">Belum ada kitab dipilih.</div>}
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-slate-800">{item.nama_kitab}</p>
+          <div key={item.id} className="flex flex-col gap-2 rounded-lg border p-3">
+            <p className="text-sm font-bold text-slate-800 leading-snug">{item.nama_kitab}</p>
+            <div className="flex items-center justify-between">
               <p className="text-xs text-slate-500">
                 {item.qty} × {rupiah(item.harga_jual)}
               </p>
+              <p className="font-mono text-sm font-bold text-slate-800">{rupiah(item.qty * item.harga_jual)}</p>
             </div>
-            <p className="flex-shrink-0 font-mono text-sm font-bold text-slate-800">{rupiah(item.qty * item.harga_jual)}</p>
           </div>
         ))}
 

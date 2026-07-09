@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ArrowUpDown,
   Banknote,
   Building2,
   Calendar,
@@ -24,6 +25,16 @@ import { getPsbFinancialReport, type PsbFinancialFilters } from './actions'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 const JENIS_LIST = ['BANGUNAN', 'KESEHATAN', 'EHB', 'EKSKUL', 'SPP_JULI'] as const
+type JenisKey = (typeof JENIS_LIST)[number]
+type SortDirection = 'asc' | 'desc'
+type SortKey =
+  | 'santri'
+  | 'asrama'
+  | 'status'
+  | 'total_terbayar'
+  | 'total_sisa'
+  | 'kuitansi'
+  | `biaya:${JenisKey}`
 
 const JENIS_LABEL: Record<string, string> = {
   BANGUNAN: 'Bangunan',
@@ -92,6 +103,30 @@ function initialFilters(): PsbFinancialFilters {
   }
 }
 
+function compareValues(a: unknown, b: unknown, direction: SortDirection) {
+  const modifier = direction === 'asc' ? 1 : -1
+  const aNumber = typeof a === 'number' ? a : Number.NaN
+  const bNumber = typeof b === 'number' ? b : Number.NaN
+  if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+    return (aNumber - bNumber) * modifier
+  }
+  return String(a ?? '').localeCompare(String(b ?? ''), 'id-ID', { numeric: true, sensitivity: 'base' }) * modifier
+}
+
+function sortValue(row: any, key: SortKey) {
+  if (key.startsWith('biaya:')) {
+    const jenis = key.split(':')[1] as JenisKey
+    return Number(row.biaya?.[jenis]?.terbayar ?? 0)
+  }
+  if (key === 'santri') return `${row.nama_lengkap ?? ''} ${row.nis ?? ''}`
+  if (key === 'asrama') return `${row.asrama ?? ''} ${row.kamar ?? ''}`
+  if (key === 'status') return `${STATUS_BAYAR_LABEL[row.status_pembayaran] ?? row.status_pembayaran ?? ''} ${STATUS_PSB_LABEL[row.status_psb] ?? row.status_psb ?? ''}`
+  if (key === 'total_terbayar') return Number(row.total_terbayar ?? 0)
+  if (key === 'total_sisa') return Number(row.total_sisa ?? 0)
+  if (key === 'kuitansi') return row.tanggal_bayar_terakhir || row.receipt_no_terakhir || ''
+  return ''
+}
+
 export default function PsbLaporanKeuanganContent() {
   const [filters, setFilters] = useState<PsbFinancialFilters>(() => initialFilters())
   const [appliedFilters, setAppliedFilters] = useState<PsbFinancialFilters>(() => initialFilters())
@@ -99,6 +134,10 @@ export default function PsbLaporanKeuanganContent() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
+    key: 'santri',
+    direction: 'asc',
+  })
 
   const load = async (nextFilters = appliedFilters) => {
     setLoading(true)
@@ -124,9 +163,24 @@ export default function PsbLaporanKeuanganContent() {
   }, [])
 
   const rows = useMemo(() => data?.rows ?? [], [data])
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const primary = compareValues(sortValue(a, sortConfig.key), sortValue(b, sortConfig.key), sortConfig.direction)
+      if (primary !== 0) return primary
+      return compareValues(a.nama_lengkap, b.nama_lengkap, 'asc')
+    })
+  }, [rows, sortConfig])
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize))
   const safePage = Math.min(page, totalPages)
-  const pagedRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const pagedRows = sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  const setSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }))
+    setPage(1)
+  }
 
   const setFilter = (key: keyof PsbFinancialFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }))
@@ -144,12 +198,12 @@ export default function PsbLaporanKeuanganContent() {
   }
 
   const exportExcel = async () => {
-    if (!rows.length) {
+    if (!sortedRows.length) {
       toast.warning('Data kosong.')
       return
     }
     const XLSX = await import('xlsx')
-    const exportRows = rows.map((row: any, index: number) => ({
+    const exportRows = sortedRows.map((row: any, index: number) => ({
       No: index + 1,
       Nama: row.nama_lengkap,
       NIS: row.nis || '',
@@ -328,7 +382,7 @@ export default function PsbLaporanKeuanganContent() {
             <div className="flex flex-col gap-3 border-b bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">Rincian Per Santri</h2>
-                <p className="mt-0.5 text-xs text-slate-500">{rows.length.toLocaleString('id-ID')} santri sesuai filter aktif</p>
+                <p className="mt-0.5 text-xs text-slate-500">{sortedRows.length.toLocaleString('id-ID')} santri sesuai filter aktif</p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <select
@@ -341,7 +395,7 @@ export default function PsbLaporanKeuanganContent() {
                 <button
                   type="button"
                   onClick={exportExcel}
-                  disabled={!rows.length}
+                  disabled={!sortedRows.length}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
@@ -354,13 +408,15 @@ export default function PsbLaporanKeuanganContent() {
               <table className="w-full min-w-[1260px] text-left text-sm">
                 <thead className="border-b bg-white text-[11px] uppercase text-slate-500">
                   <tr>
-                    <th className="px-4 py-3">Santri</th>
-                    <th className="px-4 py-3">Asrama</th>
-                    <th className="px-4 py-3">Status</th>
-                    {JENIS_LIST.map(jenis => <th key={jenis} className="px-4 py-3 text-right">{JENIS_LABEL[jenis]}</th>)}
-                    <th className="px-4 py-3 text-right">Total Bayar</th>
-                    <th className="px-4 py-3 text-right">Sisa</th>
-                    <th className="px-4 py-3">Kuitansi</th>
+                    <SortableTh label="Santri" sortKey="santri" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} />
+                    <SortableTh label="Asrama" sortKey="asrama" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} />
+                    <SortableTh label="Status" sortKey="status" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} />
+                    {JENIS_LIST.map(jenis => (
+                      <SortableTh key={jenis} label={JENIS_LABEL[jenis]} sortKey={`biaya:${jenis}`} active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} align="right" />
+                    ))}
+                    <SortableTh label="Total Bayar" sortKey="total_terbayar" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} align="right" />
+                    <SortableTh label="Sisa" sortKey="total_sisa" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} align="right" />
+                    <SortableTh label="Kuitansi" sortKey="kuitansi" active={sortConfig.key} direction={sortConfig.direction} onSort={setSort} />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -405,7 +461,7 @@ export default function PsbLaporanKeuanganContent() {
 
             <div className="flex flex-col gap-3 border-t bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">
-                Menampilkan <b>{rows.length ? (safePage - 1) * pageSize + 1 : 0}</b>-<b>{Math.min(safePage * pageSize, rows.length)}</b> dari <b>{rows.length}</b>
+                Menampilkan <b>{sortedRows.length ? (safePage - 1) * pageSize + 1 : 0}</b>-<b>{Math.min(safePage * pageSize, sortedRows.length)}</b> dari <b>{sortedRows.length}</b>
               </p>
               <div className="flex items-center gap-2">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 disabled:opacity-40">
@@ -430,6 +486,39 @@ function Select({ value, onChange, placeholder, options }: { value: string; onCh
       <option value="">{placeholder}</option>
       {options.map(option => <option key={option} value={option}>{option}</option>)}
     </select>
+  )
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  active,
+  direction,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  sortKey: SortKey
+  active: SortKey
+  direction: SortDirection
+  onSort: (key: SortKey) => void
+  align?: 'left' | 'right'
+}) {
+  const isActive = active === sortKey
+  return (
+    <th className={`px-4 py-3 ${align === 'right' ? 'text-right' : ''}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex w-full items-center gap-1.5 rounded-md py-1 text-[11px] font-bold uppercase transition-colors hover:text-slate-900 ${
+          align === 'right' ? 'justify-end' : 'justify-start'
+        } ${isActive ? 'text-slate-900' : 'text-slate-500'}`}
+      >
+        <span>{label}</span>
+        <ArrowUpDown className={`h-3.5 w-3.5 ${isActive ? 'text-emerald-700' : 'text-slate-300'}`} />
+        {isActive ? <span className="font-mono text-[10px] text-emerald-700">{direction === 'asc' ? 'ASC' : 'DESC'}</span> : null}
+      </button>
+    </th>
   )
 }
 

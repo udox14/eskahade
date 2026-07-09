@@ -61,44 +61,48 @@ export function KitabStep({
           items.map((item) => {
             const displayPrice = priceMode === 'modal' ? item.harga_beli : item.harga_jual
             return (
-            <div key={item.id} className={cn('flex items-center gap-3 p-3', item.selected ? 'bg-blue-50/40' : 'bg-white')}>
+            <div key={item.id} className={cn('flex items-start gap-3 p-3', item.selected ? 'bg-blue-50/40' : 'bg-white')}>
               <button
                 onClick={() => onToggle(item.id)}
                 className={cn(
-                  'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border transition',
+                  'mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border transition',
                   item.selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-transparent'
                 )}
               >
                 <Check className="h-4 w-4" />
               </button>
 
-              <div className="min-w-0 flex-1" role="button" onClick={() => onToggle(item.id)}>
-                <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm font-bold text-slate-800">{item.nama_kitab}</p>
-                  {item.is_default && (
-                    <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                      Default
-                    </span>
-                  )}
+              <div className="min-w-0 flex-1">
+                <div role="button" onClick={() => onToggle(item.id)}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-slate-800 leading-snug">{item.nama_kitab}</p>
+                    {item.is_default && (
+                      <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {item.marhalah_nama || '-'} - stok {item.jumlah_stok}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {item.marhalah_nama || '-'} - stok {item.jumlah_stok}
-                </p>
-              </div>
 
-              <div className="flex-shrink-0 text-right">
-                <p className="font-mono text-sm font-bold text-emerald-700">{rupiah(displayPrice)}</p>
-                {priceMode === 'modal' && <p className="text-[10px] font-bold uppercase text-slate-400">Modal</p>}
-              </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-mono text-sm font-bold text-emerald-700">{rupiah(displayPrice)}</p>
+                    {priceMode === 'modal' && <p className="text-[10px] font-bold uppercase text-slate-400">Modal</p>}
+                  </div>
 
-              <div className="flex flex-shrink-0 items-center overflow-hidden rounded-lg border">
-                <button onClick={() => onQty(item.id, -1)} className="p-2 hover:bg-slate-50">
-                  <Minus className="h-3 w-3" />
-                </button>
-                <span className="w-8 text-center text-sm font-bold">{item.qty}</span>
-                <button onClick={() => onQty(item.id, 1)} className="p-2 hover:bg-slate-50">
-                  <Plus className="h-3 w-3" />
-                </button>
+                  <div className="flex flex-shrink-0 items-center overflow-hidden rounded-lg border">
+                    <button onClick={() => onQty(item.id, -1)} className="p-2 hover:bg-slate-50">
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="w-8 text-center text-sm font-bold">{item.qty}</span>
+                    <button onClick={() => onQty(item.id, 1)} className="p-2 hover:bg-slate-50">
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )})}

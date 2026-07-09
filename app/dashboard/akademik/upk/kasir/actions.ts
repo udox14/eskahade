@@ -594,3 +594,41 @@ export async function selesaikanAntrianUPK(payload: {
   revalidatePath('/dashboard/akademik/upk/pesanan')
   return { success: true }
 }
+
+export async function batalkanAntrianUPK(antrianId: string): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  const antrian = await queryOne<AntrianRow>('SELECT * FROM upk_antrian WHERE id = ?', [antrianId])
+  if (!antrian) return { error: 'Antrian tidak ditemukan.' }
+  if (antrian.status !== 'ANTRIAN') return { error: 'Hanya antrian yang belum diproses yang bisa dibatalkan.' }
+
+  await execute(`
+    UPDATE upk_antrian_item
+    SET qty = 0, subtotal = 0, status_serah = 'BATAL', masuk_pesanan = 0, updated_at = ?
+    WHERE antrian_id = ?
+  `, [now(), antrianId])
+
+  await execute(`
+    UPDATE upk_antrian
+    SET status = 'BATAL', updated_at = ?
+    WHERE id = ?
+  `, [now(), antrianId])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_kasir',
+    action: 'cancel',
+    fiturHref: '/dashboard/akademik/upk/kasir',
+    logKind: 'update',
+    entityType: 'upk_antrian',
+    entityId: antrianId,
+    entityLabel: antrian.nama_santri,
+    summary: `Membatalkan antrian UPK ${String(antrian.nomor).padStart(3, '0')}`,
+    details: {
+      unit: antrian.unit,
+    },
+  })
+
+  revalidatePath(KASIR_PATH)
+  revalidatePath('/dashboard/akademik/upk/pesanan')
+  return { success: true }
+}

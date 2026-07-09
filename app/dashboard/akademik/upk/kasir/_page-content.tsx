@@ -10,6 +10,7 @@ import {
   getAntrianDetail,
   getKatalogKasir,
   selesaikanAntrianUPK,
+  batalkanAntrianUPK,
 } from './actions'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -264,6 +265,29 @@ export default function KasirUPKPage() {
     setLoading(false)
     if ('error' in result) return toast.error(result.error)
     toast.success('Transaksi selesai')
+    setSelectedAntrian(null)
+    setFinalItems([])
+    setUangBayar('')
+    setKembalianDitahan(false)
+    setBayarOpen(false)
+    setKasirStep('list')
+    loadAntrian()
+  }
+
+  const handleBatalAntrian = async () => {
+    if (!selectedAntrian) return
+    if (!window.confirm('Yakin ingin membatalkan antrian ini?')) return
+
+    setLoading(true)
+    const res = await batalkanAntrianUPK(selectedAntrian.id)
+    setLoading(false)
+
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+
+    toast.success('Antrian dibatalkan')
     setSelectedAntrian(null)
     setFinalItems([])
     setUangBayar('')
@@ -575,6 +599,7 @@ export default function KasirUPKPage() {
                   total={totalKasir}
                   onPay={() => setBayarOpen(true)}
                   showPayButton
+                  onCancel={handleBatalAntrian}
                 />
               )}
             </div>
@@ -603,6 +628,7 @@ export default function KasirUPKPage() {
                 total={totalKasir}
                 onPay={() => {}}
                 showPayButton={false}
+                onCancel={handleBatalAntrian}
               />
             </div>
             <BayarPanel

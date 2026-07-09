@@ -22,6 +22,7 @@ export function SerahStep({
   total: number
   onPay: () => void
   showPayButton: boolean
+  onCancel?: () => void
 }) {
   if (!detail) {
     return (
@@ -33,11 +34,21 @@ export function SerahStep({
 
   return (
     <section className="flex h-full flex-col">
-      <div className="mb-3">
-        <h2 className="text-sm font-bold text-slate-800">Serah Barang</h2>
-        <p className="text-xs text-slate-500">
-          {nomorAntrian(detail.nomor)} - {detail.nama_santri}
-        </p>
+      <div className="mb-3 flex items-start justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-slate-800">Serah Barang</h2>
+          <p className="text-xs text-slate-500">
+            {nomorAntrian(detail.nomor)} - {detail.nama_santri}
+          </p>
+        </div>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100"
+          >
+            Batal
+          </button>
+        )}
       </div>
 
       <div className="flex-1 divide-y overflow-y-auto">
@@ -48,12 +59,12 @@ export function SerahStep({
           const batal = qty === 0
           const stokKosong = row.jumlah_stok <= 0
           return (
-            <div key={row.id} className={cn('flex items-center gap-3 p-3', batal && 'bg-red-50/40')}>
+            <div key={row.id} className={cn('flex items-start gap-3 p-3', batal && 'bg-red-50/40')}>
               <button
                 onClick={() => onToggle(row.id)}
                 disabled={batal || stokKosong}
                 className={cn(
-                  'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border',
+                  'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border',
                   batal
                     ? 'border-slate-200 bg-slate-100 text-slate-300'
                     : diserahkan
@@ -65,36 +76,38 @@ export function SerahStep({
               </button>
 
               <div className="min-w-0 flex-1">
-                <p className={cn('truncate text-sm font-bold', batal ? 'text-slate-400 line-through' : 'text-slate-800')}>
+                <p className={cn('text-sm font-bold leading-snug', batal ? 'text-slate-400 line-through' : 'text-slate-800')}>
                   {row.nama_kitab}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-slate-500">
                   stok {row.jumlah_stok} - {batal ? 'dibatalkan' : stokKosong ? 'otomatis masuk pesanan' : diserahkan ? 'diserahkan' : 'masuk pesanan'}
                 </p>
-              </div>
 
-              <p className={cn('flex-shrink-0 font-mono text-sm font-bold', batal ? 'text-slate-400' : 'text-emerald-700')}>
-                {rupiah(row.harga_jual)}
-              </p>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className={cn('font-mono text-sm font-bold', batal ? 'text-slate-400' : 'text-emerald-700')}>
+                    {rupiah(row.harga_jual)}
+                  </p>
 
-              {batal ? (
-                <button
-                  onClick={() => onSetQty(row.id, 1)}
-                  className="flex-shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                >
-                  Pulihkan
-                </button>
-              ) : (
-                <div className="flex flex-shrink-0 items-center overflow-hidden rounded-lg border">
-                  <button onClick={() => onQty(row.id, -1)} className="p-2 hover:bg-slate-50">
-                    <Minus className="h-3 w-3" />
-                  </button>
-                  <span className="w-8 text-center text-sm font-bold">{qty}</span>
-                  <button onClick={() => onQty(row.id, 1)} className="p-2 hover:bg-slate-50">
-                    <Plus className="h-3 w-3" />
-                  </button>
+                  {batal ? (
+                    <button
+                      onClick={() => onSetQty(row.id, 1)}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                    >
+                      Pulihkan
+                    </button>
+                  ) : (
+                    <div className="flex flex-shrink-0 items-center overflow-hidden rounded-lg border">
+                      <button onClick={() => onQty(row.id, -1)} className="p-2 hover:bg-slate-50">
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="w-8 text-center text-sm font-bold">{qty}</span>
+                      <button onClick={() => onQty(row.id, 1)} className="p-2 hover:bg-slate-50">
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
