@@ -71,18 +71,36 @@ export async function getKalenderBulan(tahun: number, bulan: number): Promise<Ka
   )
 }
 
-export async function simpanTanggal(input: {
-  tanggal: string
+function enumerateDates(start: string, end: string): string[] {
+  const out: string[] = []
+  const cur = new Date(`${start}T00:00:00`)
+  const last = new Date(`${end}T00:00:00`)
+  while (cur <= last) {
+    out.push(
+      `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+    )
+    cur.setDate(cur.getDate() + 1)
+  }
+  return out
+}
+
+// Set libur/lainnya (atau efektif jika sesiList kosong) untuk rentang tanggal [mulai..selesai].
+export async function simpanRentang(input: {
+  tanggalMulai: string
+  tanggalSelesai?: string
   sesiList: string[]
   jenis: string
   keterangan: string
-}): Promise<{ success: true } | { error: string }> {
+}): Promise<{ success: true; jumlahTanggal: number } | { error: string }> {
   const guard = await assertFeature(FITUR_HREF, 'update')
   if ('error' in guard) return { error: guard.error }
   await ensureKalenderSchema()
 
-  const tanggal = String(input.tanggal || '').trim()
-  if (!isValidDate(tanggal)) return { error: 'Tanggal tidak valid.' }
+  let mulai = String(input.tanggalMulai || '').trim()
+  let selesai = String(input.tanggalSelesai || '').trim() || mulai
+  if (!isValidDate(mulai)) return { error: 'Tanggal mulai tidak valid.' }
+  if (!isValidDate(selesai)) return { error: 'Tanggal selesai tidak valid.' }
+  if (mulai > selesai) [mulai, selesai] = [selesai, mulai]
 
   const jenis = (input.jenis || 'libur') as JenisType
   if (!VALID_JENIS.includes(jenis)) return { error: 'Jenis tidak valid.' }
@@ -93,28 +111,37 @@ export async function simpanTanggal(input: {
   const keterangan = String(input.keterangan || '').trim() || null
   const actor = guard.id
 
-  const statements = VALID_SESI.map((sesi) => {
-    if (sesiList.includes(sesi)) {
-      return {
-        sql: `
-          INSERT INTO pengajian_libur_sesi (tanggal, sesi, jenis, keterangan, created_by, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-          ON CONFLICT(tanggal, sesi) DO UPDATE SET
-            jenis = excluded.jenis,
-            keterangan = excluded.keterangan,
-            updated_at = datetime('now')
-        `,
-        params: [tanggal, sesi, jenis, keterangan, actor],
-      }
-    }
-    // Sesi tak dipilih → jadikan efektif (hapus baris jika ada).
-    return {
-      sql: `DELETE FROM pengajian_libur_sesi WHERE tanggal = ? AND sesi = ?`,
-      params: [tanggal, sesi],
-    }
-  })
+  const dates = enumerateDates(mulai, selesai)
+  if (dates.length === 0) return { error: 'Rentang tanggal kosong.' }
+  if (dates.length > 400) return { error: 'Rentang terlalu panjang (maksimal 400 hari).' }
 
-  await batch(statements)
+  const statements = dates.flatMap((tanggal) =>
+    VALID_SESI.map((sesi) => {
+      if (sesiList.includes(sesi)) {
+        return {
+          sql: `
+            INSERT INTO pengajian_libur_sesi (tanggal, sesi, jenis, keterangan, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(tanggal, sesi) DO UPDATE SET
+              jenis = excluded.jenis,
+              keterangan = excluded.keterangan,
+              updated_at = datetime('now')
+          `,
+          params: [tanggal, sesi, jenis, keterangan, actor],
+        }
+      }
+      return {
+        sql: `DELETE FROM pengajian_libur_sesi WHERE tanggal = ? AND sesi = ?`,
+        params: [tanggal, sesi],
+      }
+    })
+  )
+
+  // Chunk agar tidak melebihi batas batch D1.
+  const CHUNK = 90
+  for (let i = 0; i < statements.length; i += CHUNK) {
+    await batch(statements.slice(i, i + CHUNK))
+  }
 
   const jenisLabel = jenis === 'libur' ? 'Libur' : 'Lainnya'
   const cakupan = sesiList.length === 0
@@ -122,6 +149,7 @@ export async function simpanTanggal(input: {
     : sesiList.length === VALID_SESI.length
       ? 'Full hari'
       : sesiList.join(', ')
+  const rangeLabel = mulai === selesai ? mulai : `${mulai} s/d ${selesai}`
   await logActivity({
     actor: actorFromSession(guard),
     module: 'akademik_kalender_pendidikan',
@@ -129,13 +157,13 @@ export async function simpanTanggal(input: {
     fiturHref: FITUR_HREF,
     logKind: 'update',
     entityType: 'kalender_pendidikan',
-    entityId: tanggal,
-    entityLabel: tanggal,
-    summary: `Kalender pendidikan ${tanggal}: ${jenisLabel} — ${cakupan}${keterangan ? ` (${keterangan})` : ''}`,
+    entityId: mulai,
+    entityLabel: rangeLabel,
+    summary: `Kalender pendidikan ${rangeLabel}: ${sesiList.length === 0 ? 'Efektif' : jenisLabel} — ${cakupan}${keterangan ? ` (${keterangan})` : ''}`,
   })
 
   revalidatePath(FITUR_HREF)
-  return { success: true }
+  return { success: true, jumlahTanggal: dates.length }
 }
 
 export async function hapusTanggal(tanggalInput: string): Promise<{ success: true } | { error: string }> {

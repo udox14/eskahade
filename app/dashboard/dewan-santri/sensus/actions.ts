@@ -12,6 +12,7 @@ type SensusStats = {
   jenjang: Record<JenjangKey, number> & { detail: Record<string, number> }
   kelas_sekolah: Record<string, number>
   marhalah: Record<string, number>
+  marhalah_gender: Record<string, { L: number; P: number }>
   distribusi_kamar: Record<string, Record<string, number>>
   santri_kamar: Record<string, Record<string, SantriKamarRow[]>>
 }
@@ -48,6 +49,7 @@ const emptyStats = (): SensusStats => ({
   jenjang: { SLTP: 0, SLTA: 0, KULIAH: 0, SADESA: 0, TIDAK_SEKOLAH: 0, LAINNYA: 0, detail: {} },
   kelas_sekolah: {},
   marhalah: {},
+  marhalah_gender: {},
   distribusi_kamar: {},
   santri_kamar: {},
 })
@@ -116,6 +118,10 @@ export async function getSensusData(asramaFilter: string) {
 
     const mNama = s.marhalah_nama || 'BELUM MASUK KELAS'
     stats.marhalah[mNama] = (stats.marhalah[mNama] || 0) + 1
+
+    if (!stats.marhalah_gender[mNama]) stats.marhalah_gender[mNama] = { L: 0, P: 0 }
+    if (s.jenis_kelamin === 'L') stats.marhalah_gender[mNama].L++
+    if (s.jenis_kelamin === 'P') stats.marhalah_gender[mNama].P++
 
     const namaAsrama = s.asrama || 'LAINNYA'
     const namaKamar = s.kamar || '?'

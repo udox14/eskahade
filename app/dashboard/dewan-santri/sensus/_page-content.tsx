@@ -57,13 +57,18 @@ function HBarRow({ label, value, max, color }: { label: string; value: number; m
   )
 }
 
-function LegendRow({ color, label, value, total }: { color: string; label: string; value: number; total: number }) {
+function LegendRow({ color, label, value, total, L, P }: { color: string; label: string; value: number; total: number; L?: number; P?: number }) {
   const pct = total > 0 ? Math.round(value / total * 100) : 0
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
       <span className="flex-1 text-slate-600 truncate">{label}</span>
-      <span className="font-bold text-slate-800 tabular-nums">{value}</span>
+      {L !== undefined && P !== undefined && (
+        <span className="text-slate-400 text-[10px] tabular-nums whitespace-nowrap">
+          <span className="text-blue-500 font-medium">{L}L</span> / <span className="text-pink-500 font-medium">{P}P</span>
+        </span>
+      )}
+      <span className="font-bold text-slate-800 tabular-nums text-right w-10">{value}</span>
       <span className="text-slate-400 w-9 text-right tabular-nums">{pct}%</span>
     </div>
   )
@@ -105,7 +110,13 @@ export default function SensusPage() {
   const marhalahSlices = data ? Object.entries(data.marhalah as Record<string,number>)
     .filter(([k]) => k !== 'BELUM MASUK KELAS')
     .sort(([,a],[,b]) => (b as number) - (a as number))
-    .map(([label, value], i) => ({ label, value: value as number, color: MARHALAH_COLORS[i % MARHALAH_COLORS.length] })) : []
+    .map(([label, value], i) => ({
+      label,
+      value: value as number,
+      color: MARHALAH_COLORS[i % MARHALAH_COLORS.length],
+      L: data.marhalah_gender?.[label]?.L || 0,
+      P: data.marhalah_gender?.[label]?.P || 0
+    })) : []
   const marhalahTotal = marhalahSlices.reduce((s, d) => s + d.value, 0)
   const laki = data?.jenis_kelamin?.L || 0
   const perempuan = data?.jenis_kelamin?.P || 0
@@ -271,7 +282,7 @@ export default function SensusPage() {
               <PieChart slices={marhalahSlices} size={180} donut={false}/>
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 w-full">
                 {marhalahSlices.map(d => (
-                  <LegendRow key={d.label} color={d.color} label={d.label} value={d.value} total={marhalahTotal}/>
+                  <LegendRow key={d.label} color={d.color} label={d.label} value={d.value} total={marhalahTotal} L={d.L} P={d.P}/>
                 ))}
               </div>
             </div>
