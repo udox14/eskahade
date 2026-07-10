@@ -47,7 +47,8 @@ import {
   Calendar,
   ArrowsLeftRight as ArrowLeftRight,
   Flame,
-  Clipboard as ClipboardList
+  Clipboard as ClipboardList,
+  CalendarDots
 } from "@phosphor-icons/react";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -57,7 +58,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Palette, Archive, Utensils, CalendarDays: Calendar, ArrowLeftRight,
-  Flame, ClipboardList,
+  Flame, ClipboardList, CalendarDots
 }
 
 function getIcon(name: string): React.ElementType {

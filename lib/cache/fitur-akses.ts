@@ -83,7 +83,8 @@ async function ensureFiturAksesReady() {
       ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
       ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8),
-      ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11)
+      ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11),
+      ('Akademik', 'Kalender Pendidikan', '/dashboard/akademik/kalender-pendidikan', 'CalendarDots', '["admin"]', 1, 10)
   `)
 
   // Catatan: Seed awal diisi lewat migrasi database. Programmatic UPDATE dihapus agar kustomisasi admin tidak tertimpa saat startup.

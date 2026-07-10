@@ -1067,8 +1067,9 @@ export async function batalkanPembayaranSPP(logId: string): Promise<{ success: b
     nama_lengkap: string | null
     nis: string | null
     psb_receipt_id: string | null
+    portal_submission_id: string | null
   }>(
-    `SELECT sl.id, sl.santri_id, sl.bulan, sl.tahun, sl.nominal_bayar, s.nama_lengkap, s.nis, sl.psb_receipt_id
+    `SELECT sl.id, sl.santri_id, sl.bulan, sl.tahun, sl.nominal_bayar, s.nama_lengkap, s.nis, sl.psb_receipt_id, sl.portal_submission_id
      FROM spp_log sl
      LEFT JOIN santri s ON s.id = sl.santri_id
      WHERE sl.id = ?`,
@@ -1077,6 +1078,9 @@ export async function batalkanPembayaranSPP(logId: string): Promise<{ success: b
   if (!current) return { error: 'Data pembayaran tidak ditemukan.' }
   if (current.psb_receipt_id) {
     return { error: 'SPP Juli ini dibayar via PSB. Batalkan lewat void kuitansi PSB, bukan dari sini.' }
+  }
+  if (current.portal_submission_id) {
+    return { error: 'Pembayaran ini dikonfirmasi via Portal Ortu. Batalkan lewat halaman Konfirmasi SPP Portal.' }
   }
 
   try {

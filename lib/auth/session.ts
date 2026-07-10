@@ -96,6 +96,12 @@ async function createJWT(payload: object): Promise<string> {
   return `${header}.${body}.${sigB64}`
 }
 
+// Verify generik (dipakai juga oleh session portal ortu di lib/portal/session.ts).
+// Payload dikembalikan apa adanya — caller yang memvalidasi bentuknya.
+export async function verifyJWTToken<T = Record<string, unknown>>(token: string): Promise<T | null> {
+  return (await verifyJWT(token)) as T | null
+}
+
 async function verifyJWT(token: string): Promise<SessionUser | null> {
   try {
     const secret = getJWTSecret()
