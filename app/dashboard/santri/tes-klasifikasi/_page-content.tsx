@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { getSantriBaru, simpanTes, getAsramaList } from './actions'
+import { getSantriBaru, simpanTes, getAsramaList, recomputeSemuaTesKlasifikasi } from './actions'
 import {
   Search, Save, CheckCircle, Clock, GraduationCap,
   RefreshCw, X, FileText, BookOpen, Hash, User,
@@ -40,6 +40,7 @@ export default function TesKlasifikasiPage() {
 
   const [selectedSantri, setSelectedSantri] = useState<Santri | null>(null)
   const [saving, setSaving] = useState(false)
+  const [recomputing, setRecomputing] = useState(false)
 
   function fmtNum(n: number) { return new Intl.NumberFormat('id-ID').format(n) }
 
@@ -105,6 +106,22 @@ export default function TesKlasifikasiPage() {
     }
   }
 
+  const handleRecompute = async () => {
+    if (!confirm('Hitung ulang rekomendasi & grade SEMUA santri yang sudah dites, pakai algoritma yang berlaku sekarang?\n\nJawaban tes asli tidak berubah, hanya hasil rekomendasi/grade-nya. Perubahan tercatat di log aktivitas.')) return
+    setRecomputing(true)
+    try {
+      const res = await recomputeSemuaTesKlasifikasi()
+      if ('error' in res) {
+        toast.error('Gagal menghitung ulang', { description: res.error })
+      } else {
+        toast.success(`Selesai: ${res.totalDiubah} dari ${res.totalDiperiksa} santri diperbarui`)
+        loadData(page)
+      }
+    } finally {
+      setRecomputing(false)
+    }
+  }
+
   const sudah  = rows.filter(r => r.status_tes === 'SUDAH').length
   const belum  = rows.filter(r => r.status_tes === 'BELUM').length
 
@@ -117,16 +134,28 @@ export default function TesKlasifikasiPage() {
           description="Penentuan marhalah awal santri baru."
           className="flex-1"
         />
-        {hasLoaded && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl font-semibold">
-              ✓ {fmtNum(sudah)} sudah dites
-            </span>
-            <span className="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl font-semibold">
-              {fmtNum(total)} total
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 text-sm">
+          {hasLoaded && (
+            <>
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl font-semibold">
+                ✓ {fmtNum(sudah)} sudah dites
+              </span>
+              <span className="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl font-semibold">
+                {fmtNum(total)} total
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={handleRecompute}
+            disabled={recomputing}
+            title="Hitung ulang rekomendasi & grade semua santri pakai algoritma terbaru (untuk data lama)"
+            className="flex items-center gap-1.5 bg-white text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-60 transition-colors"
+          >
+            {recomputing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Hitung Ulang Semua
+          </button>
+        </div>
       </div>
 
       <TesKlasifikasiTabs />

@@ -3,7 +3,11 @@
 import { query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
+import { assertCrud } from '@/lib/auth/crud'
+import { hitungRekomendasiTesKlasifikasi } from '@/lib/akademik/tes-klasifikasi'
 import { revalidatePath } from 'next/cache'
+
+const FITUR_HREF = '/dashboard/santri/tes-klasifikasi'
 
 const PAGE_SIZE = 30
 
@@ -112,38 +116,11 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
   const hafalan     = Number(formData.get('hafalan_juz') || 0)
   const nahwu       = formData.get('nahwu_pengalaman') === 'on'
 
-  // Algoritma penentuan marhalah:
-  // prioritas utama adalah kemampuan membaca dan tajwid.
-  let rekomendasi = 'Ibtidaiyyah 1'
-  let grade = 'Grade C'
-
-  if (kelancaran === 'TIDAK_BISA') {
-    rekomendasi = 'Tamhidiyyah 1'
-    grade = '-'
-  } else if (kelancaran === 'TIDAK_LANCAR') {
-    if (tajwid === 'BURUK') {
-      rekomendasi = 'Tamhidiyyah 2'
-      grade = 'Grade C'
-    } else if (tajwid === 'KURANG') {
-      rekomendasi = 'Tamhidiyyah 2'
-      grade = 'Grade B'
-    } else if (tajwid === 'BAIK') {
-      rekomendasi = 'Tamhidiyyah 2'
-      grade = 'Grade A'
-    }
-  } else if (kelancaran === 'LANCAR') {
-    rekomendasi = 'Ibtidaiyyah 1'
-
-    if (tajwid === 'BURUK') {
-      grade = 'Grade C'
-    } else if (tajwid === 'KURANG') {
-      grade = 'Grade B'
-    } else if (tajwid === 'BAIK') {
-      grade = 'Grade A'
-    }
-  }
-
-  if (nahwu) grade += ' (REKOMENDASI TES NAHWU LANJUTAN)'
+  const { rekomendasi_marhalah: rekomendasi, catatan_grade: grade } = hitungRekomendasiTesKlasifikasi({
+    baca_kelancaran: kelancaran,
+    baca_tajwid: tajwid,
+    nahwu_pengalaman: nahwu,
+  })
 
   const user = await getSession()
   const testerId = user?.id || null
@@ -195,4 +172,73 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
 
   revalidatePath('/dashboard/santri/tes-klasifikasi')
   return { success: true }
+}
+
+// ─── Hitung ulang semua hasil tes ─────────────────────────────────────────
+// Untuk data lama yang rekomendasi/grade-nya tersimpan pakai versi algoritma
+// sebelum diubah. Jawaban mentah (baca_kelancaran, baca_tajwid, nahwu_pengalaman)
+// tetap tersimpan, jadi tinggal dihitung ulang pakai algoritma sekarang —
+// tidak perlu input ulang. Sebelum-sesudah tiap perubahan dicatat di activity
+// log biar bisa diaudit/rollback manual kalau perlu.
+export async function recomputeSemuaTesKlasifikasi(): Promise<
+  { success: true; totalDiperiksa: number; totalDiubah: number } | { error: string }
+> {
+  const session = await assertCrud(FITUR_HREF, 'update')
+  if ('error' in session) return { error: session.error }
+
+  const rows = await query<{
+    id: string
+    santri_id: string
+    baca_kelancaran: string | null
+    baca_tajwid: string | null
+    nahwu_pengalaman: number
+    rekomendasi_marhalah: string | null
+    catatan_grade: string | null
+  }>(
+    `SELECT id, santri_id, baca_kelancaran, baca_tajwid, nahwu_pengalaman,
+            rekomendasi_marhalah, catatan_grade
+     FROM hasil_tes_klasifikasi`
+  )
+
+  const waktu = new Date().toISOString()
+  const changes: Array<{ santri_id: string; before: { rekomendasi: string | null; grade: string | null }; after: { rekomendasi: string; grade: string } }> = []
+
+  for (const r of rows) {
+    const { rekomendasi_marhalah: rekomendasi, catatan_grade: grade } = hitungRekomendasiTesKlasifikasi({
+      baca_kelancaran: r.baca_kelancaran,
+      baca_tajwid: r.baca_tajwid,
+      nahwu_pengalaman: !!r.nahwu_pengalaman,
+    })
+
+    if (rekomendasi === r.rekomendasi_marhalah && grade === r.catatan_grade) continue
+
+    await query(
+      `UPDATE hasil_tes_klasifikasi SET rekomendasi_marhalah = ?, catatan_grade = ?, updated_at = ? WHERE id = ?`,
+      [rekomendasi, grade, waktu, r.id]
+    )
+    changes.push({
+      santri_id: r.santri_id,
+      before: { rekomendasi: r.rekomendasi_marhalah, grade: r.catatan_grade },
+      after: { rekomendasi, grade },
+    })
+  }
+
+  if (changes.length > 0) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'santri_tes_klasifikasi',
+      action: 'update',
+      fiturHref: FITUR_HREF,
+      logKind: 'update',
+      entityType: 'hasil_tes_klasifikasi_batch',
+      entityId: 'recompute',
+      entityLabel: 'Hitung ulang hasil tes klasifikasi',
+      summary: `Menghitung ulang rekomendasi ${changes.length} dari ${rows.length} santri (algoritma diperbarui)`,
+      details: { total_diperiksa: rows.length, total_diubah: changes.length, perubahan: changes.slice(0, 200) },
+    })
+  }
+
+  revalidatePath('/dashboard/santri/tes-klasifikasi')
+  revalidatePath('/dashboard/akademik/penempatan')
+  return { success: true, totalDiperiksa: rows.length, totalDiubah: changes.length }
 }
