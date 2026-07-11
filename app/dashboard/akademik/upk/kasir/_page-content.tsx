@@ -299,17 +299,31 @@ export default function KasirUPKPage() {
 
   const switchMode = (next: 'CATAT' | 'KASIR') => {
     setMode(next)
-    if (next === 'KASIR') loadAntrian()
+    setBayarOpen(false)
+    if (next === 'KASIR') {
+      setCatatStep('form')
+      loadAntrian()
+    } else {
+      setKasirStep('list')
+      setSelectedAntrian(null)
+    }
   }
 
   // ── Sinkron tombol back HP / gesture dengan view internal ──
-  // depth: 0 = pilih unit, 1 = utama, 2 = review/serah, 3 = sheet bayar
+  // KASIR selalu dicapai dgn switch dari CATAT, jadi 1 langkah lebih dalam.
+  // depth: 0 = pilih unit
+  //   CATAT: form=1, review=2
+  //   KASIR: list=2, serah=3, bayar=4
   let depth = 0
   if (unit) {
     depth = 1
-    if (mode === 'CATAT' && catatStep === 'review') depth = 2
-    if (mode === 'KASIR' && kasirStep === 'serah') depth = 2
-    if (mode === 'KASIR' && bayarOpen) depth = 3
+    if (mode === 'CATAT') {
+      if (catatStep === 'review') depth = 2
+    } else {
+      depth = 2
+      if (kasirStep === 'serah') depth = 3
+      if (bayarOpen) depth = 4
+    }
   }
 
   const stateRef = useRef({ unit, mode, catatStep, kasirStep, bayarOpen })
@@ -322,6 +336,13 @@ export default function KasirUPKPage() {
       return
     }
     if (s.mode === 'KASIR' && s.kasirStep === 'serah') {
+      setKasirStep('list')
+      setSelectedAntrian(null)
+      return
+    }
+    if (s.mode === 'KASIR') {
+      // dari KASIR list → balik ke Pencatat (bukan keluar unit)
+      setMode('CATAT')
       setKasirStep('list')
       setSelectedAntrian(null)
       return

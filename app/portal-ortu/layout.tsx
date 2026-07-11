@@ -11,10 +11,6 @@ export const metadata: Metadata = {
 export default function PortalOrtuLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
       <style>{`
         .portal-root {
           --p-cream: #faf6ee;
@@ -43,7 +39,7 @@ export default function PortalOrtuLayout({ children }: { children: React.ReactNo
         .portal-rise-3 { animation-delay: .19s } .portal-rise-4 { animation-delay: .26s }
       `}</style>
       <div className="portal-root min-h-dvh bg-[var(--p-cream)]">
-        <div className="mx-auto w-full max-w-md min-h-dvh relative">
+        <div className="w-full min-h-dvh relative">
           {children}
         </div>
       </div>

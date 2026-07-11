@@ -8,7 +8,7 @@ export default async function PortalAppLayout({ children }: { children: React.Re
   await requirePortalSession()
 
   return (
-    <div className="min-h-dvh pb-28">
+    <div className="mx-auto min-h-dvh w-full max-w-md pb-28">
       {children}
       <BottomNav />
     </div>
