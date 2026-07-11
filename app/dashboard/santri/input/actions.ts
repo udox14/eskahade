@@ -134,6 +134,34 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
     nama_tempat_cuci: s.nama_tempat_cuci ? String(s.nama_tempat_cuci).trim() : null,
   }))
 
+  // ── Guard: cegah upsert-by-NIS yang destruktif ──────────────────────────
+  // NIS adalah satu-satunya kunci pencocokan. NIS kosong/garbage bisa "cocok"
+  // dengan santri lain yang NIS-nya juga kosong → row-nya ketimpa (nama, dst
+  // hilang). NIS duplikat di dalam file juga bisa menimpa satu sama lain.
+  // Tolak dua kondisi itu sebelum menyentuh DB.
+  const invalidNis = cleanData
+    .map((s, i) => ({ row: i + 2, nama: s.nama_lengkap, nis: s.nis }))
+    .filter(s => !s.nis || s.nis === 'null' || s.nis === 'undefined')
+  if (invalidNis.length > 0) {
+    const preview = invalidNis.slice(0, 5).map(s => `baris ${s.row} (${s.nama || '-'})`).join(', ')
+    return {
+      error: `NIS wajib diisi — import dibatalkan agar data lain tidak tertimpa. ${invalidNis.length} baris tanpa NIS: ${preview}${invalidNis.length > 5 ? ', ...' : ''}.`,
+    }
+  }
+  const nisSeen = new Map<string, number>()
+  const dupNis: { row: number; nis: string }[] = []
+  cleanData.forEach((s, i) => {
+    const prev = nisSeen.get(s.nis)
+    if (prev !== undefined) dupNis.push({ row: i + 2, nis: s.nis })
+    else nisSeen.set(s.nis, i + 2)
+  })
+  if (dupNis.length > 0) {
+    const preview = dupNis.slice(0, 5).map(s => `NIS ${s.nis} (baris ${s.row})`).join(', ')
+    return {
+      error: `NIS duplikat di dalam file — import dibatalkan agar data tidak saling menimpa. ${preview}${dupNis.length > 5 ? ', ...' : ''}.`,
+    }
+  }
+
   const now = new Date().toISOString()
 
   // ── OPTIMASI: Fetch semua santri yg NIS-nya ada di batch ini dalam 1 query ──
@@ -189,6 +217,14 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
 
   // ── Kumpulkan semua statements untuk di-batch ──
   const statements: { sql: string; params?: unknown[] }[] = []
+  // Audit nilai-sebelum tiap UPDATE, biar overwrite bisa di-rollback manual
+  // dari activity log (bukan cuma angka agregat).
+  const auditUpdates: Array<{
+    id: string
+    nis: string
+    nama_lama: string | null
+    perubahan: Record<string, { dari: any; ke: any }>
+  }> = []
   let inserted = 0
   let updated = 0
   let skipped = 0
@@ -240,6 +276,15 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
       statements.push({
         sql: `UPDATE santri SET ${setClauses}, updated_at = ? WHERE id = ?`,
         params: [...changedValues, now, existing.id],
+      })
+
+      const perubahan: Record<string, { dari: any; ke: any }> = {}
+      for (const f of changedFields) perubahan[f] = { dari: existing[f] ?? null, ke: newValues[f] ?? null }
+      auditUpdates.push({
+        id: existing.id,
+        nis: s.nis,
+        nama_lama: existing.nama_lengkap ?? null,
+        perubahan,
       })
 
       // Update kelas pesantren jika berubah
@@ -329,6 +374,8 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
         updated,
         skipped,
         attempted: cleanData.length,
+        // Nilai-sebelum tiap update (dibatasi 200 baris) untuk audit/rollback
+        updates: auditUpdates.slice(0, 200),
       },
     })
   }
