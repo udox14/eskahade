@@ -1,0 +1,182 @@
+[
+  {
+    "id": "a632e0c2-bd3d-4ce4-8b62-3a85e73d97ff",
+    "santri_id": "06510834-d6d5-4999-8348-3e08c4f4bdb7",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "5444020f-1b95-4790-b293-f3ab040bb45d",
+    "santri_id": "0f923872-5371-4f2c-8ae3-123e610e0d67",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "38e9b90b-b911-447c-96ad-421287d04009",
+    "santri_id": "33ee97f4-b67e-4768-9c31-164415ec2f34",
+    "kelas_id": "7ad16786-651a-40df-9b9c-17476100771f",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:16:37.422Z"
+  },
+  {
+    "id": "5f22fede-ef18-4ac0-9fae-b13b3022f09c",
+    "santri_id": "38d9bb8e-5327-46cd-84fb-489fda5810a9",
+    "kelas_id": "abbbf69e-981c-4614-b63d-f173b8e437b4",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:25:04.288Z"
+  },
+  {
+    "id": "5b190f0e-fb73-4fd4-8e3a-22599b23b1ea",
+    "santri_id": "49a43485-905e-4a2f-865c-c015634be828",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "11041c27-955d-4f18-aab0-badaf6917c40",
+    "santri_id": "587b222d-9e13-42a2-8266-843eb0218426",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "33034cff-31d2-4b3f-8745-ea580a4de3b3",
+    "santri_id": "6114bf1f-22b5-4e05-9f04-ec92fb50889d",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:30:15.118Z"
+  },
+  {
+    "id": "4422d8d2-ff0d-484b-b222-87d27f33e482",
+    "santri_id": "707344ec-a31a-43de-8b42-dc42d191a11b",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "fe948ea6-9e75-4728-9ba9-d5cc153dc025",
+    "santri_id": "8d0224f3-1144-44cd-8e65-81706268393d",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:30:15.118Z"
+  },
+  {
+    "id": "9f96a3bb-ce07-449a-8d9c-a89da130e626",
+    "santri_id": "8d20aa55-6b6e-4083-837b-fa457fa2cc16",
+    "kelas_id": "7ad16786-651a-40df-9b9c-17476100771f",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:16:37.422Z"
+  },
+  {
+    "id": "9da3fff8-c02f-4217-a328-49e7b3e8ae6c",
+    "santri_id": "92f3acba-1131-42be-bcc1-f35db60d92df",
+    "kelas_id": "ded1397d-7c8d-423b-9322-c989230fe162",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:32:56.388Z"
+  },
+  {
+    "id": "0f003b86-5659-43a3-98fc-de891341d07f",
+    "santri_id": "9da5c90a-a448-4ea9-a70e-16ba906a9bd4",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "e99eeb5e-4c35-4d4d-9fae-62b611b0935b",
+    "santri_id": "9ffb1063-749e-430c-bdd9-f63f04e51b88",
+    "kelas_id": "7ad16786-651a-40df-9b9c-17476100771f",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:16:37.422Z"
+  },
+  {
+    "id": "9b72946d-fd7b-45ac-8cff-f0473a41cbb0",
+    "santri_id": "bef6b26a-c5df-4570-95b7-82992f02686e",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "48237eed-ec61-470a-b71c-fde836e58c70",
+    "santri_id": "dbacb815-c86e-4fad-bf2d-c2fb00d9ea24",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "d2438d09-9f3a-4903-ba7c-979d413b5b31",
+    "santri_id": "e37417c7-3996-4301-9ca8-4c9cfb0d822d",
+    "kelas_id": "7ad16786-651a-40df-9b9c-17476100771f",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:16:37.422Z"
+  },
+  {
+    "id": "a623d62e-319a-4485-a523-cec7ca473668",
+    "santri_id": "ebf1c1a3-9529-4280-9815-1cf9ba6dcd14",
+    "kelas_id": "21274672-0320-4371-821d-c03e5e01e141",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "2",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T03:27:58.463Z"
+  },
+  {
+    "id": "bfa7cd07-771a-49ee-99ae-c3173bb6d9c8",
+    "santri_id": "f8571f23-4e54-4b8b-a809-6fc080d459a3",
+    "kelas_id": "7ad16786-651a-40df-9b9c-17476100771f",
+    "riwayat_lama_id": null,
+    "marhalah_target_id": "3",
+    "sumber": "baru",
+    "created_by": "2b4d47cd-8782-4468-98e8-adb08b5b185d",
+    "created_at": "2026-07-08T04:16:37.422Z"
+  }
+]

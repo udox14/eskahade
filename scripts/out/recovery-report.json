@@ -1,0 +1,182 @@
+[
+  {
+    "uuid": "06510834-d6d5-4999-8348-3e08c4f4bdb7",
+    "korban": "ZANI SYAHID ALWI",
+    "korban_nis_asli": "2627621",
+    "penimpa": "AKMANI HAZIQ HILMI",
+    "penimpa_uuid_baru": "33e9df78-4351-49c8-bbdb-98834e4aeff4",
+    "penimpa_nis_temp": "TMP-33e9df78",
+    "tes_korban": "Tamhidiyyah 2/Grade A",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "0f923872-5371-4f2c-8ae3-123e610e0d67",
+    "korban": "ZAKY RIYADUL FUAD",
+    "korban_nis_asli": "2627618",
+    "penimpa": "YUDA SETIAWAN",
+    "penimpa_uuid_baru": "5fc4d2e3-9675-4b86-8cb9-d2f290a2e8f3",
+    "penimpa_nis_temp": "TMP-5fc4d2e3",
+    "tes_korban": "Ibtidaiyyah 1/Grade C",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "33ee97f4-b67e-4768-9c31-164415ec2f34",
+    "korban": "YUSRAN AZKA PUTRA",
+    "korban_nis_asli": "2627606",
+    "penimpa": "SYAKIRA FITRIANI AGUSTIN",
+    "penimpa_uuid_baru": "78b99e51-6c01-4cce-b7f0-5fbaa945f3fa",
+    "penimpa_nis_temp": "TMP-78b99e51",
+    "tes_korban": "Tamhidiyyah 1/-",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  },
+  {
+    "uuid": "38d9bb8e-5327-46cd-84fb-489fda5810a9",
+    "korban": "YUSRA ZAKIRAH ASKANAH",
+    "korban_nis_asli": "2627605",
+    "penimpa": "NAZWA FALHA RIFDA",
+    "penimpa_uuid_baru": "350e24a2-73f1-4e79-8278-fa5b86872d0b",
+    "penimpa_nis_temp": "TMP-350e24a2",
+    "tes_korban": "Ibtidaiyyah 1/Grade B",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  },
+  {
+    "uuid": "49a43485-905e-4a2f-865c-c015634be828",
+    "korban": "ZALFA DINAR NURALISHA",
+    "korban_nis_asli": "2627619",
+    "penimpa": "KAMIL SYAKIR MUHARAM",
+    "penimpa_uuid_baru": "d55cd619-7858-4bce-9680-17667a104ff4",
+    "penimpa_nis_temp": "TMP-d55cd619",
+    "tes_korban": "Tamhidiyyah 2/Grade A",
+    "tes_penimpa": "Tamhidiyyah 2/Grade B"
+  },
+  {
+    "uuid": "587b222d-9e13-42a2-8266-843eb0218426",
+    "korban": "ZAHRA RHOUDOTUL JANNAH",
+    "korban_nis_asli": "2627611",
+    "penimpa": "MUHAMAD AZFA SYA'BANI",
+    "penimpa_uuid_baru": "5c4e3cb7-5e1e-42e0-9e20-c11b9044c808",
+    "penimpa_nis_temp": "TMP-5c4e3cb7",
+    "tes_korban": "Ibtidaiyyah 1/Grade B",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "6114bf1f-22b5-4e05-9f04-ec92fb50889d",
+    "korban": "ZAHRAN AKHLI KHAERULLAH",
+    "korban_nis_asli": "2627614",
+    "penimpa": "M. HAMZAH PUTRA PURNAMA",
+    "penimpa_uuid_baru": "8378faf1-f238-43fc-aa8c-6d9c6290f481",
+    "penimpa_nis_temp": "TMP-8378faf1",
+    "tes_korban": "Ibtidaiyyah 1/Grade C",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "707344ec-a31a-43de-8b42-dc42d191a11b",
+    "korban": "ZAMZAM NUR PADILAH",
+    "korban_nis_asli": "2627620",
+    "penimpa": "SIDKI JUNDI HAROKI",
+    "penimpa_uuid_baru": "d73c568c-5ba3-45e6-8cbe-958b53232bbb",
+    "penimpa_nis_temp": "TMP-d73c568c",
+    "tes_korban": "Tamhidiyyah 2/Grade A",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "8d0224f3-1144-44cd-8e65-81706268393d",
+    "korban": "ZAKIA RAHMA NISA",
+    "korban_nis_asli": "2627616",
+    "penimpa": "M. RIFALDI",
+    "penimpa_uuid_baru": "b175cc78-807f-4bb3-9202-57949a2b6e66",
+    "penimpa_nis_temp": "TMP-b175cc78",
+    "tes_korban": "Ibtidaiyyah 1/Grade B",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "8d20aa55-6b6e-4083-837b-fa457fa2cc16",
+    "korban": "ZAHARUDDIN MUSTHAFA AZ-ZUHAILIY",
+    "korban_nis_asli": "2627608",
+    "penimpa": "AFIKA AGHISTNI NUR AURALIF",
+    "penimpa_uuid_baru": "fbe37ea1-6a0e-42d3-b5d6-4e0209166b4c",
+    "penimpa_nis_temp": "TMP-fbe37ea1",
+    "tes_korban": "Ibtidaiyyah 1/Grade C",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  },
+  {
+    "uuid": "92f3acba-1131-42be-bcc1-f35db60d92df",
+    "korban": "ZAKI PUTRA NUGRAHA",
+    "korban_nis_asli": "2627615",
+    "penimpa": "ALIF FIRMANSYAH AUFA",
+    "penimpa_uuid_baru": "afa7f3ac-2bb1-4723-83f2-d24b5b6c3fe7",
+    "penimpa_nis_temp": "TMP-afa7f3ac",
+    "tes_korban": "Ibtidaiyyah 1/Grade C",
+    "tes_penimpa": "Tamhidiyyah 2/Grade B"
+  },
+  {
+    "uuid": "9da5c90a-a448-4ea9-a70e-16ba906a9bd4",
+    "korban": "ZAHRA SYIFA RUMANAH",
+    "korban_nis_asli": "2627613",
+    "penimpa": "DIMAS ANGGA SAPUTRA",
+    "penimpa_uuid_baru": "da6d446d-6f33-449d-ada1-e71dc36d7130",
+    "penimpa_nis_temp": "TMP-da6d446d",
+    "tes_korban": "Ibtidaiyyah 1/Grade A (REKOMENDASI TES NAHWU LANJUTAN)",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "9ffb1063-749e-430c-bdd9-f63f04e51b88",
+    "korban": "YUMNA GHAITSA LUBNA",
+    "korban_nis_asli": "2627604",
+    "penimpa": "AZKIYA NUR MAULIDAH",
+    "penimpa_uuid_baru": "07b9fa3c-41cf-4b25-ba3a-3f36177141a2",
+    "penimpa_nis_temp": "TMP-07b9fa3c",
+    "tes_korban": "Ibtidaiyyah 1/Grade A",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  },
+  {
+    "uuid": "bef6b26a-c5df-4570-95b7-82992f02686e",
+    "korban": "ZAKY ABDUL KOHAR",
+    "korban_nis_asli": "2627617",
+    "penimpa": "FAJAR SIDIQ",
+    "penimpa_uuid_baru": "9a0d3843-23ad-440f-a183-45236e7f502c",
+    "penimpa_nis_temp": "TMP-9a0d3843",
+    "tes_korban": "Ibtidaiyyah 1/Grade C",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "dbacb815-c86e-4fad-bf2d-c2fb00d9ea24",
+    "korban": "ZAHRA SHAKILA HANIFA",
+    "korban_nis_asli": "2627612",
+    "penimpa": "NAZMI MUHAMMAD FATHAN",
+    "penimpa_uuid_baru": "f002944b-c8de-449b-b11d-fb38c0d37bc2",
+    "penimpa_nis_temp": "TMP-f002944b",
+    "tes_korban": "Ibtidaiyyah 1/Grade A",
+    "tes_penimpa": "Tamhidiyyah 2/Grade C"
+  },
+  {
+    "uuid": "e37417c7-3996-4301-9ca8-4c9cfb0d822d",
+    "korban": "ZABRINA NURNAJMIA KAMILAH",
+    "korban_nis_asli": "2627607",
+    "penimpa": "NAYA AZKIYA KARMILA",
+    "penimpa_uuid_baru": "14e33331-6efb-4f41-8c44-0d6bf3e82d20",
+    "penimpa_nis_temp": "TMP-14e33331",
+    "tes_korban": "Tamhidiyyah 2/Grade A",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  },
+  {
+    "uuid": "ebf1c1a3-9529-4280-9815-1cf9ba6dcd14",
+    "korban": "ZAHRA NAYLA",
+    "korban_nis_asli": "2627610",
+    "penimpa": "FATTAN FATURRAHMAN",
+    "penimpa_uuid_baru": "ebb5a452-850a-4b56-8411-3ddf953c934c",
+    "penimpa_nis_temp": "TMP-ebb5a452",
+    "tes_korban": "Ibtidaiyyah 1/Grade B",
+    "tes_penimpa": "Tamhidiyyah 2/Grade B"
+  },
+  {
+    "uuid": "f8571f23-4e54-4b8b-a809-6fc080d459a3",
+    "korban": "YAYU MADAYANI LATIPAH",
+    "korban_nis_asli": "2627603",
+    "penimpa": "MEYLA PUTRI KHOERUNNISA",
+    "penimpa_uuid_baru": "ba7177a5-43e4-4565-8c3d-671c9d759813",
+    "penimpa_nis_temp": "TMP-ba7177a5",
+    "tes_korban": "Tamhidiyyah 2/Grade A",
+    "tes_penimpa": "Ibtidaiyyah 1/Grade B"
+  }
+]
