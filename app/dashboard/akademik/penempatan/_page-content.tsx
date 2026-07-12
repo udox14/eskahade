@@ -42,6 +42,13 @@ function singkatKelasLama(nama: string | null) {
     .replace(/\bMutawassithah\b/gi, 'MTW')
 }
 
+function singkatNamaMuhammad(nama: string) {
+  return nama.trim().replace(
+    /^(?:Muhamm?ad|Mohamm?ad|Mochamm?ad|Muhammed|Mohammed|Muhamed|Mohamed)\b[.\s]*/i,
+    'M. '
+  ).trim()
+}
+
 function safeSheetName(name: string, used: Set<string>) {
   const base = (name.replace(/[\\/?*\[\]:]/g, ' ').trim() || 'Marhalah').slice(0, 31)
   let candidate = base
@@ -749,7 +756,7 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
     if (drafts.length === 0) return toast.warning('Tidak ada draft untuk diekspor.')
     const data = drafts.map((d, index) => ({
       'No': index + 1,
-      'Nama Santri': d.nama,
+      'Nama Santri': singkatNamaMuhammad(d.nama),
       'NIS': d.nis,
       'Status': d.sumber === 'baru' ? 'Baru' : 'Lama',
       'Jenjang': d.jenjang || '-',
@@ -758,6 +765,15 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
       'Kelas Tujuan': d.nama_kelas,
     }))
     const worksheet = XLSX.utils.json_to_sheet(data)
+    if (worksheet['!ref']) {
+      const range = XLSX.utils.decode_range(worksheet['!ref'])
+      for (let row = range.s.r; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: col })]
+          if (cell) cell.s = { font: { name: 'Arial Narrow', sz: 13 } }
+        }
+      }
+    }
     worksheet['!cols'] = [
       { wch: 7 }, { wch: 35 }, { wch: 16 }, { wch: 12 },
       { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 22 },
@@ -794,20 +810,20 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
         right: { style: 'thin', color: { rgb: '808080' } },
       }
       const headerStyle: XLSX.CellStyle = {
-        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        font: { name: 'Arial Narrow', sz: 13, bold: true, color: { rgb: 'FFFFFF' } },
         fill: { patternType: 'solid', fgColor: { rgb: '000000' } },
         alignment: { horizontal: 'center', vertical: 'center' },
         border: thinBorder,
       }
       const contentStyle: XLSX.CellStyle = {
-        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: '000000' } },
+        font: { name: 'Arial Narrow', sz: 13, bold: true, color: { rgb: '000000' } },
         fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
         alignment: { vertical: 'center' },
         border: thinBorder,
       }
       const oldClassStyle = (isBaru: boolean): XLSX.CellStyle => ({
         ...contentStyle,
-        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        font: { name: 'Arial Narrow', sz: 13, bold: true, color: { rgb: 'FFFFFF' } },
         fill: { patternType: 'solid', fgColor: { rgb: isBaru ? 'C00000' : '1F4E78' } },
         alignment: { horizontal: 'center', vertical: 'center' },
       })
@@ -834,7 +850,7 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
           rows.push(['No', 'Nama', 'Kelas Lama', 'Kelas Baru'])
           kelasRows.forEach((row, index) => {
             const kelasLama = singkatKelasLama(row.kelas_lama)
-            rows.push([index + 1, row.nama, kelasLama, row.kelas_baru])
+            rows.push([index + 1, singkatNamaMuhammad(row.nama), kelasLama, row.kelas_baru])
             oldClassCells.set(rows.length - 1, kelasLama === 'BARU')
           })
         }
@@ -859,7 +875,7 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
           }
         }
         worksheet['!cols'] = [{ wch: 7 }, { wch: 38 }, { wch: 20 }, { wch: 20 }]
-        worksheet['!rows'] = rows.map((_, index) => ({ hpt: headerIndexes.has(index) ? 24 : 21 }))
+        worksheet['!rows'] = rows.map((_, index) => ({ hpt: headerIndexes.has(index) ? 27 : 24 }))
         const sheetName = safeSheetName(marhalahRows[0].marhalah_nama, usedSheetNames)
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
       }
