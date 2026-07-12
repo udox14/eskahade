@@ -745,6 +745,28 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
     }
   }
 
+  const handleExportDraft = () => {
+    if (drafts.length === 0) return toast.warning('Tidak ada draft untuk diekspor.')
+    const data = drafts.map((d, index) => ({
+      'No': index + 1,
+      'Nama Santri': d.nama,
+      'NIS': d.nis,
+      'Status': d.sumber === 'baru' ? 'Baru' : 'Lama',
+      'Jenjang': d.jenjang || '-',
+      'Grade': d.grade || '-',
+      'Kelas Asal': d.asal,
+      'Kelas Tujuan': d.nama_kelas,
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(data)
+    worksheet['!cols'] = [
+      { wch: 7 }, { wch: 35 }, { wch: 16 }, { wch: 12 },
+      { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 22 },
+    ]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Draft Penempatan')
+    XLSX.writeFile(workbook, 'draft_penempatan.xlsx')
+  }
+
   const handleExportExcel = async () => {
     setExporting(true)
     const loadingToast = toast.loading('Menyiapkan hasil final penempatan...')
@@ -912,7 +934,15 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end mb-1">
+      <div className="flex flex-wrap justify-end gap-2 mb-1">
+        <button
+          onClick={handleExportDraft}
+          disabled={exporting}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Export Draft
+        </button>
         <button
           onClick={handleExportExcel}
           disabled={exporting}
