@@ -23,6 +23,7 @@ export async function getStatusSetoranSaya(tahun: number) {
     FROM spp_setoran ss
     LEFT JOIN users u ON u.id = ss.penerima_id
     WHERE COALESCE(NULLIF(TRIM(ss.unit_setor), ''), ss.asrama) = ? AND ss.tahun = ?
+      AND ss.tujuan_setoran = 'DEWAN_SANTRI'
     ORDER BY ss.bulan
   `, [unitSetor, tahun])
 

@@ -85,12 +85,17 @@ export default function SPPPage() {
     bulan: number
     tanggalMulai: string | null
     setoran: any | null
+    setoranPusat: any | null
+    targetPusat: number
   } | null>(null)
   const [setoranInfoLoading, setSetoranInfoLoading] = useState(false)
   const [setoranNama, setSetoranNama] = useState('')
   const [setoranBulanIni, setSetoranBulanIni] = useState('')
   const [setoranTunggakan, setSetoranTunggakan] = useState('')
   const [submittingSetoran, setSubmittingSetoran] = useState(false)
+  const [setoranPusatNama, setSetoranPusatNama] = useState('')
+  const [setoranPusatNominal, setSetoranPusatNominal] = useState('')
+  const [submittingSetoranPusat, setSubmittingSetoranPusat] = useState(false)
 
   const currentMonthIdx = new Date().getMonth() + 1
   const isCurrentYear = new Date().getFullYear() === tahun
@@ -485,6 +490,18 @@ export default function SPPPage() {
     refreshSetoranInfo()
   }
 
+  const handleSubmitSetoranPusat = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const nominal = Number(setoranPusatNominal.replace(/\D/g, '') || '0')
+    if (nominal <= 0) return toast.error('Nominal setoran Bendahara Pesantren wajib diisi.')
+    setSubmittingSetoranPusat(true)
+    const res = await submitSetoranAsrama(nominal, 0, setoranPusatNama, 'BENDAHARA_PUSAT')
+    setSubmittingSetoranPusat(false)
+    if ('error' in res) return toast.error(res.error)
+    toast.success('Setoran dikirim ke Bendahara Pesantren!')
+    setSetoranPusatNama(''); setSetoranPusatNominal(''); refreshSetoranInfo()
+  }
+
   const tunggakanHistorisBelumLunas = tunggakanHistoris.filter(item => item.status !== 'LUNAS')
   const totalHistorisBelumLunas = tunggakanHistorisBelumLunas.reduce((sum, item) => sum + Number(item.nominal_tagihan || 0), 0)
 
@@ -669,6 +686,21 @@ export default function SPPPage() {
             )}
           </div>
         )
+      })()}
+
+      {((setoranInfo?.targetPusat ?? 0) > 0 || setoranInfo?.setoranPusat) && (() => {
+        const row = setoranInfo?.setoranPusat
+        const fmtRpLocal = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
+        return <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-4 py-3"><div><h3 className="text-sm font-bold text-emerald-900">Setoran SPP Juli Santri Baru ke Bendahara Pesantren</h3><p className="text-xs text-emerald-700">Target sistem periode penerimaan ini: {fmtRpLocal(setoranInfo?.targetPusat || 0)}</p></div><Wallet className="h-5 w-5 text-emerald-700"/></div>
+          {row?.tanggal_terima ? <div className="flex gap-3 p-4 text-sm"><CheckCircle className="h-5 w-5 text-green-600"/><div><b className="text-green-700">Sudah Dikonfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
+          : row?.tanggal_setor ? <div className="flex gap-3 p-4 text-sm"><Clock className="h-5 w-5 text-blue-600"/><div><b className="text-blue-700">Menunggu Konfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
+          : <form onSubmit={handleSubmitSetoranPusat} className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto]">
+            <input required value={setoranPusatNama} onChange={e=>setSetoranPusatNama(e.target.value)} placeholder="Nama penyetor" className="rounded-lg border px-3 py-2 text-sm"/>
+            <input required value={setoranPusatNominal ? Number(setoranPusatNominal.replace(/\D/g,'')).toLocaleString('id-ID') : ''} onChange={e=>setSetoranPusatNominal(e.target.value)} placeholder={`Nominal (target ${fmtRpLocal(setoranInfo?.targetPusat || 0)})`} className="rounded-lg border px-3 py-2 text-sm"/>
+            <button disabled={submittingSetoranPusat} className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{submittingSetoranPusat ? 'Mengirim...' : 'Kirim ke Bendahara'}</button>
+          </form>}
+        </div>
       })()}
 
       {/* REKAP & STATISTIK / MAIN LIST / PLACEHOLDER */}

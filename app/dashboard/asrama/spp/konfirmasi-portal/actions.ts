@@ -7,6 +7,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { getSppScope, isSadesaCategory, SADESA_CATEGORY } from '@/lib/spp/unit-setor'
 import { namaBulanId } from '@/lib/portal/format'
 import type { SppDetailItem } from '@/app/portal-ortu/(app)/tagihan/actions'
+import { getTujuanSetoranSpp } from '@/lib/spp/tujuan-setoran'
 
 const PATH = '/dashboard/asrama/spp/konfirmasi-portal'
 const REVALIDATE_PATHS = [
@@ -172,12 +173,15 @@ export async function approveSubmissionSpp(submissionId: string): Promise<{ succ
     }
 
     const keterangan = `Portal Ortu - ${submission.metode}`
+    const tujuanBerjalan = await Promise.all(berjalan.map(item =>
+      getTujuanSetoranSpp(submission.santri_id, item.tahun, item.bulan)
+    ))
     const statements = [
-      ...berjalan.map(item => ({
+      ...berjalan.map((item, index) => ({
         sql: `INSERT INTO spp_log
-                (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, portal_submission_id)
-              VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?)`,
-        params: [generateId(), submission.santri_id, item.tahun, item.bulan, item.nominal, session?.id ?? null, keterangan, submission.id],
+                (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, portal_submission_id, tujuan_setoran)
+              VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
+        params: [generateId(), submission.santri_id, item.tahun, item.bulan, item.nominal, session?.id ?? null, keterangan, submission.id, tujuanBerjalan[index]],
       })),
       ...historis.map(item => ({
         sql: `UPDATE spp_tunggakan_historis

@@ -17,6 +17,7 @@ import {
   SANTRI_BARU_MULAI_KEY,
 } from '@/lib/santri/kategori'
 import { getNominalSppForYear, getSppBillingStartSetting } from '@/lib/spp/tunggakan'
+import { getTujuanSetoranSpp } from '@/lib/spp/tujuan-setoran'
 
 const PSB_PATH = '/dashboard/psb'
 const MONITORING_PATH = '/dashboard/psb/monitoring'
@@ -835,6 +836,9 @@ export async function bayarPsbBatch(input: {
   const receiptNo = await nextReceiptNo()
   const total = normalized.reduce((sum, item) => sum + item.nominal, 0) + sppJuliNominal
   const statusAfterPayment: PsbStatus = 'PAID'
+  const tujuanSppJuli = wantSppJuli
+    ? await getTujuanSetoranSpp(input.santriId, tahunTagihan, SPP_JULI_BULAN)
+    : 'DEWAN_SANTRI'
   const db = await getDB()
   await db.batch([
     db.prepare(`
@@ -850,9 +854,9 @@ export async function bayarPsbBatch(input: {
     ),
     ...(wantSppJuli ? [
       db.prepare(`
-        INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, psb_receipt_id)
-        VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?)
-      `).bind(generateId(), input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId),
+        INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, psb_receipt_id, tujuan_setoran)
+        VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?, ?)
+      `).bind(generateId(), input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId, tujuanSppJuli),
     ] : []),
     ...preJulyWaiveMonths.map((mo) =>
       db.prepare(`
