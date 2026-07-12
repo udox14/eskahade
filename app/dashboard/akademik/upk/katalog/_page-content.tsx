@@ -1,10 +1,11 @@
 'use client'
 
 import type React from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { rupiah } from '@/lib/upk-utils'
 import {
   getKatalogUPK,
+  getDaftarKitabPerMarhalah,
   getMarhalahList,
   getMasterKitabOptions,
   getTokoList,
@@ -13,11 +14,14 @@ import {
   importKatalogUPK,
   simpanKatalogBatchUPK,
   simpanKatalog as simpanKatalogUPK,
+  simpanPengaturanTampilanKatalog,
   simpanTokoUPK,
 } from './actions'
 import {
   BookOpen,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Edit,
   FileSpreadsheet,
@@ -26,6 +30,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings2,
   Store,
   Trash2,
   Upload,
@@ -104,6 +109,9 @@ type ImportPreviewRow = {
   [key: string]: string | number | null | undefined
 }
 
+type DaftarMarhalah = Awaited<ReturnType<typeof getDaftarKitabPerMarhalah>>['marhalah'][number]
+type VisibilitySettings = Awaited<ReturnType<typeof getDaftarKitabPerMarhalah>>['settings']
+
 const emptyKatalogForm: KatalogForm = {
   id: '',
   kitab_id: '',
@@ -175,6 +183,11 @@ export default function KatalogUPKPage() {
   const [isImporting, setIsImporting] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  const [activeTab, setActiveTab] = useState<'DAFTAR' | 'KELOLA'>('DAFTAR')
+  const [daftarMarhalah, setDaftarMarhalah] = useState<DaftarMarhalah[]>([])
+  const [visibility, setVisibility] = useState<VisibilitySettings>({ showItemPrices: true, showTotalPrice: true })
+  const [daftarLoading, setDaftarLoading] = useState(true)
+  const [visibilitySaving, setVisibilitySaving] = useState<keyof VisibilitySettings | null>(null)
 
   const stok = numberValue(form.stok_lama) + numberValue(form.stok_baru)
   const modal = stok * numberValue(form.harga_beli)
@@ -183,17 +196,22 @@ export default function KatalogUPKPage() {
 
   const initData = useCallback(async () => {
     try {
-      const [marhalah, toko, kitab] = await Promise.all([
+      const [marhalah, toko, kitab, daftar] = await Promise.all([
         getMarhalahList(),
         getTokoList(true),
         getMasterKitabOptions(),
+        getDaftarKitabPerMarhalah(),
       ])
       setMarhalahList(marhalah)
       setTokoList(toko)
       setMasterKitab(kitab)
+      setDaftarMarhalah(daftar.marhalah)
+      setVisibility(daftar.settings)
     } catch (error) {
       console.error('[UPK Katalog] Gagal memuat data awal', error)
       toast.error('Gagal memuat data awal katalog.')
+    } finally {
+      setDaftarLoading(false)
     }
   }, [])
 
@@ -214,6 +232,34 @@ export default function KatalogUPKPage() {
   const loadToko = async () => {
     const toko = await getTokoList(true)
     setTokoList(toko)
+  }
+
+  const reloadDaftar = async () => {
+    const daftar = await getDaftarKitabPerMarhalah()
+    setDaftarMarhalah(daftar.marhalah)
+    setVisibility(daftar.settings)
+  }
+
+  const toggleVisibility = async (key: keyof VisibilitySettings) => {
+    if (visibilitySaving) return
+    const previous = visibility
+    const next = { ...visibility, [key]: !visibility[key] }
+    setVisibility(next)
+    setVisibilitySaving(key)
+    try {
+      const result = await simpanPengaturanTampilanKatalog(next)
+      if ('error' in result) {
+        setVisibility(previous)
+        toast.error(result.error)
+      } else {
+        toast.success('Pengaturan tampilan disimpan')
+      }
+    } catch {
+      setVisibility(previous)
+      toast.error('Gagal menyimpan pengaturan tampilan.')
+    } finally {
+      setVisibilitySaving(null)
+    }
   }
 
   useEffect(() => {
@@ -317,6 +363,7 @@ export default function KatalogUPKPage() {
     setIsBatchModalOpen(false)
     setBatchRows({})
     loadKatalog()
+    reloadDaftar()
   }
 
   const applySearch = () => {
@@ -401,6 +448,7 @@ export default function KatalogUPKPage() {
     resetForm()
     setIsKatalogModalOpen(false)
     loadKatalog()
+    reloadDaftar()
   }
 
   const handleDelete = async (id: number) => {
@@ -410,6 +458,7 @@ export default function KatalogUPKPage() {
     else {
       toast.success('Item katalog dihapus')
       loadKatalog()
+      reloadDaftar()
     }
   }
 
@@ -513,6 +562,7 @@ export default function KatalogUPKPage() {
     setIsImportModalOpen(false)
     loadKatalog()
     loadToko()
+    reloadDaftar()
   }
 
   const summary = useMemo(() => {
@@ -530,9 +580,9 @@ export default function KatalogUPKPage() {
     <div className="space-y-6 max-w-7xl mx-auto pb-24">
       <DashboardPageHeader
         title="Katalog UPK"
-        description="Master barang, stok, harga beli, harga jual, dan estimasi laba UPK."
+        description={activeTab === 'DAFTAR' ? 'Pilih daftar kitab per marhalah dan lihat perkiraan total harganya.' : 'Master barang, stok, harga beli, harga jual, dan estimasi laba UPK.'}
         className="border-b pb-4"
-        action={(
+        action={activeTab === 'KELOLA' ? (
           <div className="grid grid-cols-3 gap-2 w-full xl:w-auto">
             <div className="bg-white border rounded-lg px-4 py-2">
               <p className="text-[11px] font-bold text-slate-400 uppercase">Total Stok</p>
@@ -547,10 +597,64 @@ export default function KatalogUPKPage() {
               <p className="text-lg font-extrabold text-emerald-700">{rupiah(summary.labaBersih)}</p>
             </div>
           </div>
-        )}
+        ) : undefined}
       />
 
+      <div className="grid grid-cols-2 rounded-xl border bg-slate-100 p-1" role="tablist" aria-label="Katalog UPK">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'DAFTAR'}
+          onClick={() => setActiveTab('DAFTAR')}
+          className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${activeTab === 'DAFTAR' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Daftar Kitab
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'KELOLA'}
+          onClick={() => setActiveTab('KELOLA')}
+          className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${activeTab === 'KELOLA' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Kelola Katalog
+        </button>
+      </div>
+
+      {activeTab === 'DAFTAR' ? (
+        <DaftarKitabMarhalah
+          key={daftarLoading ? 'loading' : 'ready'}
+          marhalah={daftarMarhalah}
+          settings={visibility}
+          loading={daftarLoading}
+        />
+      ) : (
       <div className="space-y-4">
+          <div className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-amber-600" />
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-800">Tampilan Daftar Kitab</h2>
+                <p className="text-xs text-slate-500">Pengaturan ini berlaku untuk seluruh marhalah.</p>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <VisibilityToggle
+                label="Tampilkan harga per kitab"
+                description="Nominal harga jual muncul pada setiap item."
+                checked={visibility.showItemPrices}
+                loading={visibilitySaving === 'showItemPrices'}
+                onClick={() => toggleVisibility('showItemPrices')}
+              />
+              <VisibilityToggle
+                label="Tampilkan total harga"
+                description="Total pilihan muncul di bagian bawah card."
+                checked={visibility.showTotalPrice}
+                loading={visibilitySaving === 'showTotalPrice'}
+                onClick={() => toggleVisibility('showTotalPrice')}
+              />
+            </div>
+          </div>
           <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
             <button onClick={openBatchModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
               <Plus className="w-4 h-4" /> Tambah Kitab
@@ -668,6 +772,7 @@ export default function KatalogUPKPage() {
             />
           </div>
         </div>
+      )}
 
       {isKatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
@@ -1124,5 +1229,190 @@ export default function KatalogUPKPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function VisibilityToggle({
+  label,
+  description,
+  checked,
+  loading,
+  onClick,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  loading: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={loading}
+      onClick={onClick}
+      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-left transition hover:bg-slate-50 disabled:opacity-70"
+    >
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-slate-700">{label}</span>
+        <span className="block text-xs text-slate-500">{description}</span>
+      </span>
+      {loading ? (
+        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-amber-600" />
+      ) : (
+        <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-amber-600' : 'bg-slate-300'}`}>
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </span>
+      )}
+    </button>
+  )
+}
+
+function DaftarKitabMarhalah({
+  marhalah,
+  settings,
+  loading,
+}: {
+  marhalah: DaftarMarhalah[]
+  settings: VisibilitySettings
+  loading: boolean
+}) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [selected, setSelected] = useState<Record<string, boolean>>(() => Object.fromEntries(
+    marhalah.flatMap(group => group.items.map(item => [`${group.id}:${item.id}`, item.is_default]))
+  ))
+  const touchStartX = useRef<number | null>(null)
+
+  const goTo = (index: number) => {
+    if (!marhalah.length) return
+    setActiveIndex(Math.max(0, Math.min(index, marhalah.length - 1)))
+  }
+
+  const onTouchStart = (event: React.TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null
+  }
+
+  const onTouchEnd = (event: React.TouchEvent) => {
+    if (touchStartX.current == null) return
+    const distance = event.changedTouches[0]?.clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(distance) < 45) return
+    goTo(activeIndex + (distance < 0 ? 1 : -1))
+  }
+
+  if (loading) {
+    return <div className="flex min-h-72 items-center justify-center rounded-2xl border bg-white"><Loader2 className="h-7 w-7 animate-spin text-amber-600" /></div>
+  }
+
+  if (!marhalah.length) {
+    return <div className="rounded-2xl border border-dashed bg-white py-16 text-center text-sm text-slate-400">Belum ada marhalah.</div>
+  }
+
+  const group = marhalah[activeIndex]
+  const selectedItems = group.items.filter(item => selected[`${group.id}:${item.id}`])
+  const total = selectedItems.reduce((sum, item) => sum + item.harga_jual, 0)
+
+  return (
+    <section className="mx-auto w-full max-w-2xl" aria-label="Daftar kitab per marhalah">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => goTo(activeIndex - 1)}
+          disabled={activeIndex === 0}
+          aria-label="Marhalah sebelumnya"
+          className="flex h-10 w-10 items-center justify-center rounded-full border bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-30"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 text-center">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-amber-600">Marhalah {activeIndex + 1} dari {marhalah.length}</p>
+          <h2 className="truncate text-xl font-black text-slate-900">{group.nama}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => goTo(activeIndex + 1)}
+          disabled={activeIndex === marhalah.length - 1}
+          aria-label="Marhalah berikutnya"
+          className="flex h-10 w-10 items-center justify-center rounded-full border bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-30"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div
+        key={group.id}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        className="animate-in fade-in slide-in-from-right-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm duration-300 motion-reduce:animate-none"
+      >
+        <div className="border-b bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-extrabold text-slate-800">Paket Kitab {group.nama}</p>
+              <p className="mt-0.5 text-xs text-slate-500">Ketuk kitab untuk mengubah pilihan.</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 shadow-sm">{group.items.length} kitab</span>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {group.items.length === 0 ? (
+            <div className="px-5 py-16 text-center">
+              <BookOpen className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+              <p className="text-sm font-bold text-slate-500">Belum ada kitab aktif</p>
+              <p className="mt-1 text-xs text-slate-400">Tambahkan kitab untuk marhalah ini melalui tab Kelola Katalog.</p>
+            </div>
+          ) : group.items.map(item => {
+            const key = `${group.id}:${item.id}`
+            const checked = !!selected[key]
+            return (
+              <button
+                type="button"
+                key={item.id}
+                aria-pressed={checked}
+                onClick={() => setSelected(current => ({ ...current, [key]: !current[key] }))}
+                className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition sm:px-5 ${checked ? 'bg-amber-50/60' : 'bg-white hover:bg-slate-50'}`}
+              >
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition ${checked ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                  <CheckCircle className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-bold leading-snug text-slate-800">{item.nama_kitab}</span>
+                    {item.is_default && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-700">Default</span>}
+                  </span>
+                </span>
+                {settings.showItemPrices && <span className="shrink-0 font-mono text-sm font-extrabold text-emerald-700">{rupiah(item.harga_jual)}</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="border-t bg-slate-900 px-4 py-4 text-white sm:px-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold text-slate-400">{selectedItems.length} dari {group.items.length} kitab dipilih</p>
+              {settings.showTotalPrice && <p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-amber-400">Total harga</p>}
+            </div>
+            {settings.showTotalPrice && <p className="font-mono text-xl font-black text-white">{rupiah(total)}</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap justify-center gap-1.5" aria-label="Pilih marhalah">
+        {marhalah.map((item, index) => (
+          <button
+            type="button"
+            key={item.id}
+            onClick={() => goTo(index)}
+            aria-label={`Buka ${item.nama}`}
+            aria-current={index === activeIndex ? 'step' : undefined}
+            className={`h-2 rounded-full transition-all ${index === activeIndex ? 'w-7 bg-amber-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-center text-[11px] text-slate-400 sm:hidden">Geser card ke kiri atau kanan untuk pindah marhalah</p>
+    </section>
   )
 }

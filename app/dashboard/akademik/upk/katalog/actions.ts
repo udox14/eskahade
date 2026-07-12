@@ -9,6 +9,8 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 export { getCachedMarhalahList as getMarhalahList }
 
 const KATALOG_PATH = '/dashboard/akademik/upk/katalog'
+const SHOW_ITEM_PRICES_KEY = 'upk_katalog_show_item_prices'
+const SHOW_TOTAL_PRICE_KEY = 'upk_katalog_show_total_price'
 
 type KatalogRow = {
   id: number
@@ -64,6 +66,98 @@ type ImportRow = Record<string, unknown>
 type MarhalahRow = {
   id: number
   nama: string
+}
+
+type DaftarKitabRow = {
+  marhalah_id: number
+  katalog_id: number
+  nama_kitab: string
+  harga_jual: number
+  is_default: number
+}
+
+export type KatalogVisibilitySettings = {
+  showItemPrices: boolean
+  showTotalPrice: boolean
+}
+
+export async function getDaftarKitabPerMarhalah() {
+  const [marhalahRows, itemRows, settingRows] = await Promise.all([
+    query<{ id: number; nama: string; urutan: number | null }>(
+      'SELECT id, nama, urutan FROM marhalah ORDER BY COALESCE(urutan, 999999), nama'
+    ),
+    query<DaftarKitabRow>(`
+      SELECT km.marhalah_id, uk.id AS katalog_id, uk.nama_kitab,
+             uk.harga_jual, km.is_default
+      FROM upk_katalog_marhalah km
+      JOIN upk_katalog uk ON uk.id = km.katalog_id
+      WHERE uk.is_active = 1
+      ORDER BY km.is_default DESC, uk.nama_kitab
+    `),
+    query<{ key: string; value: string }>(
+      'SELECT key, value FROM app_settings WHERE key IN (?, ?)',
+      [SHOW_ITEM_PRICES_KEY, SHOW_TOTAL_PRICE_KEY]
+    ),
+  ])
+
+  const settings = new Map(settingRows.map(row => [row.key, row.value]))
+  const itemsByMarhalah = new Map<number, DaftarKitabRow[]>()
+  for (const row of itemRows) {
+    const items = itemsByMarhalah.get(row.marhalah_id) ?? []
+    items.push(row)
+    itemsByMarhalah.set(row.marhalah_id, items)
+  }
+
+  return {
+    settings: {
+      showItemPrices: settings.get(SHOW_ITEM_PRICES_KEY) !== '0',
+      showTotalPrice: settings.get(SHOW_TOTAL_PRICE_KEY) !== '0',
+    } satisfies KatalogVisibilitySettings,
+    marhalah: marhalahRows.map(row => ({
+      id: row.id,
+      nama: row.nama,
+      items: (itemsByMarhalah.get(row.id) ?? []).map(item => ({
+        id: item.katalog_id,
+        nama_kitab: item.nama_kitab,
+        harga_jual: item.harga_jual,
+        is_default: !!item.is_default,
+      })),
+    })),
+  }
+}
+
+export async function simpanPengaturanTampilanKatalog(
+  settings: KatalogVisibilitySettings
+): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  const timestamp = now()
+  const values: [string, string][] = [
+    [SHOW_ITEM_PRICES_KEY, settings.showItemPrices ? '1' : '0'],
+    [SHOW_TOTAL_PRICE_KEY, settings.showTotalPrice ? '1' : '0'],
+  ]
+
+  for (const [key, value] of values) {
+    await execute(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [key, value, timestamp]
+    )
+  }
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_katalog',
+    action: 'update',
+    fiturHref: KATALOG_PATH,
+    logKind: 'update',
+    entityType: 'app_settings',
+    entityId: 'upk-katalog-visibility',
+    entityLabel: 'Tampilan daftar kitab UPK',
+    summary: 'Memperbarui tampilan harga daftar kitab UPK',
+    details: settings,
+  })
+  revalidatePath(KATALOG_PATH)
+  return { success: true }
 }
 
 async function hasColumn(table: 'upk_katalog' | 'upk_belanja_item', column: string) {
