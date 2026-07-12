@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, CircleUserRound, Eye, EyeOff, KeyRound, Loader2, User } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, User } from 'lucide-react'
 
 export function LoginForm() {
   const router = useRouter()
@@ -27,19 +27,63 @@ export function LoginForm() {
   }
 
   return (
-    <div className="rounded-[2rem] border border-[var(--public-line)] bg-[var(--public-paper)] p-6 shadow-[0_28px_80px_rgba(18,55,42,.13)] sm:p-9">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--public-gold-light)] text-[#735417]"><CircleUserRound aria-hidden className="h-6 w-6" /></span>
-      <h2 className="public-display mt-6 text-3xl font-semibold text-[var(--public-forest)] sm:text-4xl">Portal Orang Tua</h2>
-      <p className="mt-2 text-sm leading-6 text-[var(--public-muted)]">Gunakan NIS putra Anda sebagai nama pengguna.</p>
+    <div className="bg-white rounded-[2rem] border border-gray-100 p-6 sm:p-10 shadow-xl shadow-gray-200/40">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500">NIS Santri</label>
+          <div className="relative">
+            <User aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input 
+              inputMode="numeric" 
+              autoComplete="username" 
+              value={nis} 
+              onChange={e => setNis(e.target.value.replace(/\s/g, ''))} 
+              placeholder="Contoh: 20240123" 
+              disabled={loading} 
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3.5 pl-12 pr-4 text-sm font-medium text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[var(--public-leaf)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-50 disabled:opacity-60" 
+              required 
+            />
+          </div>
+        </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-        <label className="public-field block"><span className="mb-2 block text-xs font-extrabold uppercase tracking-[.13em] text-[var(--public-muted)]">NIS Santri</span><span className="relative block"><User aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--public-muted)]" /><input inputMode="numeric" autoComplete="username" value={nis} onChange={e => setNis(e.target.value.replace(/\s/g, ''))} placeholder="Contoh: 20240123" disabled={loading} className="py-3 pl-11 pr-4 text-sm font-semibold placeholder:font-normal placeholder:text-[var(--public-muted)]/50" required /></span></label>
-        <label className="public-field block"><span className="mb-2 block text-xs font-extrabold uppercase tracking-[.13em] text-[var(--public-muted)]">Password</span><span className="relative block"><KeyRound aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--public-muted)]" /><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Masukkan password" disabled={loading} className="py-3 pl-11 pr-12 text-sm font-semibold placeholder:font-normal placeholder:text-[var(--public-muted)]/50" required /><button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[var(--public-muted)] transition hover:bg-[var(--public-leaf-light)] hover:text-[var(--public-leaf)] focus-visible:outline-3 focus-visible:outline-[var(--public-gold)]" aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}>{showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}</button></span></label>
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Password</label>
+          <div className="relative">
+            <KeyRound aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input 
+              type={showPassword ? 'text' : 'password'} 
+              autoComplete="current-password" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              placeholder="Masukkan password" 
+              disabled={loading} 
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3.5 pl-12 pr-12 text-sm font-medium text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[var(--public-leaf)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-50 disabled:opacity-60" 
+              required 
+            />
+            <button 
+              type="button" 
+              onClick={() => setShowPassword(v => !v)} 
+              className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--public-leaf)]" 
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+            >
+              {showPassword ? <EyeOff aria-hidden className="h-5 w-5" /> : <Eye aria-hidden className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold leading-5 text-rose-700">{error}</p>}
-        <button type="submit" disabled={loading} className="public-button public-button-primary w-full py-4 text-sm">{loading ? <><Loader2 aria-hidden className="h-4 w-4 animate-spin" /> Memeriksa...</> : <>Masuk ke Portal <ArrowRight aria-hidden className="h-4 w-4" /></>}</button>
+        
+        <button type="submit" disabled={loading} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--public-leaf)] py-4 text-sm font-bold text-white transition hover:bg-[#1d6345] focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:opacity-70 disabled:cursor-not-allowed">
+          {loading ? <><Loader2 aria-hidden className="h-5 w-5 animate-spin" /> Memeriksa...</> : <>Masuk ke Portal <ArrowRight aria-hidden className="h-5 w-5" /></>}
+        </button>
       </form>
 
-      <div className="mt-5 rounded-2xl border border-[var(--public-gold)]/25 bg-[var(--public-gold-light)]/45 px-4 py-3"><p className="text-[11px] leading-relaxed text-[#6f531c]"><span className="font-extrabold">Login pertama kali?</span> Password awal adalah <span className="font-extrabold">NIS</span> atau <span className="font-extrabold">tanggal lahir</span> putra Anda (format TGLBLNTHN, contoh: 01072012). Anda akan diminta menggantinya.</p></div>
+      <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+        <p className="text-xs leading-relaxed text-emerald-800">
+          <span className="font-bold block mb-1">Login pertama kali?</span> 
+          Password awal adalah <span className="font-bold text-emerald-900">NIS</span> atau <span className="font-bold text-emerald-900">tanggal lahir</span> putra Anda (format TGLBLNTHN, contoh: 01072012).
+        </p>
+      </div>
     </div>
   )
 }

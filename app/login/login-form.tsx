@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LayoutDashboard, Loader2, Lock, Mail, ShieldCheck, UsersRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutDashboard, Loader2, Lock, Mail, ShieldCheck, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { login } from './actions'
 
@@ -29,62 +29,91 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="public-theme min-h-dvh lg:grid lg:grid-cols-[1.02fr_.98fr]">
-      <section className="relative hidden min-h-dvh overflow-hidden bg-[var(--public-forest)] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
-        <div className="public-grid absolute inset-0 opacity-60" />
-        <div className="public-noise absolute inset-0 opacity-[.07]" />
-        <div className="absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[var(--public-leaf)]/45 blur-3xl" />
-        <div className="absolute -bottom-52 -right-40 h-[34rem] w-[34rem] rounded-full bg-[var(--public-gold)]/20 blur-3xl" />
+    <main className="public-theme min-h-dvh flex flex-col justify-center items-center bg-gray-50/50 px-4 py-8">
+      {/* Background Decor */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 h-[40rem] w-[40rem] rounded-full bg-emerald-50/80 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-[40rem] w-[40rem] rounded-full bg-blue-50/80 blur-3xl" />
+      </div>
 
-        <Link href="/" className="relative z-10 flex w-fit items-center gap-3 rounded-xl focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-gold)]">
-          <Image src="/logo.png" alt="Logo Pondok Pesantren Sukahideng" width={58} height={58} className="h-14 w-14 object-contain" priority />
-          <div><span className="block text-[10px] font-extrabold uppercase tracking-[.24em] text-emerald-200/70">ESKAHADE</span><span className="block font-extrabold">Pesantren Sukahideng</span></div>
-        </Link>
-
-        <div className="public-rise relative z-10 max-w-xl">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.07] px-4 py-2 text-[10px] font-bold uppercase tracking-[.22em] text-emerald-100"><ShieldCheck aria-hidden className="h-4 w-4" /> Akses Pengurus</div>
-          <h1 className="public-display text-5xl font-semibold leading-[1.04] tracking-[-.035em] xl:text-6xl">Kelola amanah dengan data yang tertata.</h1>
-          <p className="mt-6 max-w-lg text-base leading-8 text-white/60">Masuk ke pusat pengelolaan santri, akademik, asrama, keuangan, dan pelayanan pesantren.</p>
-          <div className="mt-10 grid gap-3 sm:grid-cols-2">
-            {['Akses berbasis wewenang', 'Data tersimpan terpusat', 'Laporan siap digunakan', 'Operasional lebih efisien'].map(item => <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.05] p-4 text-sm font-bold text-white/80"><CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-[var(--public-gold-light)]" />{item}</div>)}
-          </div>
+      <div className="w-full max-w-md relative z-10 public-rise">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-3 mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--public-leaf)] rounded-xl">
+            <Image src="/logo.png" alt="Logo" width={48} height={48} className="h-12 w-12 object-contain" priority />
+            <div className="text-left">
+              <span className="block text-[10px] font-bold uppercase tracking-widest text-[var(--public-leaf)]">ESKAHADE</span>
+              <span className="block text-sm font-bold text-gray-900">Pesantren Sukahideng</span>
+            </div>
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Portal Pengurus</h1>
+          <p className="mt-2 text-sm text-gray-500">Masuk ke sistem manajemen operasional pesantren.</p>
         </div>
 
-        <p className="relative z-10 text-xs text-white/35">Sistem Informasi Manajemen Pondok Pesantren Sukahideng</p>
-      </section>
+        {/* Card */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 p-6 sm:p-10 shadow-xl shadow-gray-200/40">
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email</label>
+              <div className="relative">
+                <Mail aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input 
+                  name="email" 
+                  type="email" 
+                  required 
+                  autoComplete="username" 
+                  placeholder="admin@sukahideng.or.id" 
+                  disabled={isSubmitting} 
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3.5 pl-12 pr-4 text-sm font-medium text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[var(--public-leaf)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-50 disabled:opacity-60"
+                />
+              </div>
+            </div>
 
-      <section className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[var(--public-cream)] px-5 py-8 sm:px-8 lg:px-12">
-        <div className="absolute -right-44 top-0 h-96 w-96 rounded-full bg-[var(--public-gold-light)]/55 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-[var(--public-leaf-light)] blur-3xl" />
-        <div className="public-rise relative z-10 w-full max-w-md">
-          <div className="mb-7 flex items-center justify-between lg:hidden">
-            <Link href="/" className="flex items-center gap-2 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--public-gold)]"><Image src="/logo.png" alt="Logo Pondok Pesantren Sukahideng" width={48} height={48} className="h-12 w-12 object-contain" priority /><span className="text-sm font-extrabold text-[var(--public-forest)]">ESKAHADE</span></Link>
-            <span className="rounded-full bg-[var(--public-leaf-light)] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[.14em] text-[var(--public-leaf)]">Pengurus</span>
-          </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Password</label>
+              <div className="relative">
+                <Lock aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input 
+                  name="password" 
+                  type={showPassword ? 'text' : 'password'} 
+                  required 
+                  autoComplete="current-password" 
+                  placeholder="Masukkan password" 
+                  disabled={isSubmitting} 
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3.5 pl-12 pr-12 text-sm font-medium text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[var(--public-leaf)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-50 disabled:opacity-60"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--public-leaf)]" 
+                  aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                >
+                  {showPassword ? <EyeOff aria-hidden className="h-5 w-5" /> : <Eye aria-hidden className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
 
-          <div className="rounded-[2rem] border border-[var(--public-line)] bg-[var(--public-paper)] p-6 shadow-[0_28px_80px_rgba(18,55,42,.13)] sm:p-9">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--public-leaf-light)] text-[var(--public-leaf)]"><LayoutDashboard aria-hidden className="h-6 w-6" /></span>
-            <h2 className="public-display mt-6 text-3xl font-semibold text-[var(--public-forest)] sm:text-4xl">Selamat datang kembali.</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--public-muted)]">Gunakan akun pengurus Anda untuk mengakses dashboard.</p>
+            <button type="submit" disabled={isSubmitting} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--public-leaf)] py-4 text-sm font-bold text-white transition hover:bg-[#1d6345] focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:opacity-70 disabled:cursor-not-allowed">
+              {isSubmitting ? <><Loader2 aria-hidden className="h-5 w-5 animate-spin" /> Memproses...</> : <>Masuk ke Dashboard <ArrowRight aria-hidden className="h-5 w-5" /></>}
+            </button>
+          </form>
 
-            <form onSubmit={handleLogin} className="mt-8 space-y-5">
-              <label className="public-field block">
-                <span className="mb-2 block text-xs font-extrabold uppercase tracking-[.13em] text-[var(--public-muted)]">Email</span>
-                <span className="relative block"><Mail aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--public-muted)]" /><input name="email" type="email" required autoComplete="username" placeholder="email@sukahideng.or.id" disabled={isSubmitting} className="py-3 pl-11 pr-4 text-sm font-semibold placeholder:font-normal placeholder:text-[var(--public-muted)]/50" /></span>
-              </label>
-              <label className="public-field block">
-                <span className="mb-2 block text-xs font-extrabold uppercase tracking-[.13em] text-[var(--public-muted)]">Password</span>
-                <span className="relative block"><Lock aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--public-muted)]" /><input name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" placeholder="Masukkan password" disabled={isSubmitting} className="py-3 pl-11 pr-12 text-sm font-semibold placeholder:font-normal placeholder:text-[var(--public-muted)]/50" /><button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[var(--public-muted)] transition hover:bg-[var(--public-leaf-light)] hover:text-[var(--public-leaf)] focus-visible:outline-3 focus-visible:outline-[var(--public-gold)]" aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}>{showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}</button></span>
-              </label>
-              <button type="submit" disabled={isSubmitting} className="public-button public-button-primary w-full py-4 text-sm">{isSubmitting ? <><Loader2 aria-hidden className="h-4 w-4 animate-spin" /> Memproses...</> : <>Masuk ke Dashboard <ArrowRight aria-hidden className="h-4 w-4" /></>}</button>
-            </form>
-
-            <a href="https://wa.me/6282218943383" target="_blank" rel="noopener noreferrer" className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--public-line)] bg-[var(--public-cream)]/60 px-4 text-center text-xs font-bold text-[var(--public-leaf)] transition hover:border-[var(--public-leaf)]/35 hover:bg-[var(--public-leaf-light)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-gold)]"><ShieldCheck aria-hidden className="h-4 w-4 shrink-0" /> Hubungi Admin IT untuk reset password</a>
-          </div>
-
-          <div className="mt-5 flex flex-col items-center justify-between gap-3 text-xs font-bold sm:flex-row"><Link href="/" className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-[var(--public-muted)] transition hover:text-[var(--public-forest)] focus-visible:outline-3 focus-visible:outline-[var(--public-gold)]"><ArrowLeft aria-hidden className="h-4 w-4" /> Kembali ke beranda</Link><Link href="/portal-ortu/login" className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-[var(--public-leaf)] transition hover:text-[var(--public-forest)] focus-visible:outline-3 focus-visible:outline-[var(--public-gold)]"><UsersRound aria-hidden className="h-4 w-4" /> Login Orang Tua</Link></div>
+          <a href="https://wa.me/6282218943383" target="_blank" rel="noopener noreferrer" className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-gray-50 py-3 text-xs font-medium text-gray-600 transition hover:bg-gray-100">
+            <ShieldCheck aria-hidden className="h-4 w-4" /> 
+            Lupa sandi? Hubungi Admin IT
+          </a>
         </div>
-      </section>
+
+        {/* Footer Navigation */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-medium">
+          <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition">
+            <ArrowLeft aria-hidden className="h-4 w-4" /> Kembali ke Beranda
+          </Link>
+          <Link href="/portal-ortu/login" className="flex items-center gap-2 text-[var(--public-leaf)] hover:text-[#1d6345] transition">
+            <UsersRound aria-hidden className="h-4 w-4" /> Portal Orang Tua
+          </Link>
+        </div>
+      </div>
     </main>
   )
 }
