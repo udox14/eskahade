@@ -1,6 +1,6 @@
 'use server'
 
-import { query, execute, generateId, now } from '@/lib/db'
+import { query, execute, batch, generateId, now } from '@/lib/db'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
@@ -365,59 +365,76 @@ export async function finalisasiDraft(draftIds: string[]) {
 
   if (!draftIds || draftIds.length === 0) return { error: 'Tidak ada draft yang dipilih.' }
 
-  const ph = draftIds.map(() => '?').join(',')
+  const uniqueDraftIds = [...new Set(draftIds.filter(Boolean))]
+  if (uniqueDraftIds.length === 0) return { error: 'Tidak ada draft yang dipilih.' }
+
+  const ph = uniqueDraftIds.map(() => '?').join(',')
   const drafts = await query<{ id: string; santri_id: string; kelas_id: string; riwayat_lama_id: string | null }>(
     `SELECT id, santri_id, kelas_id, riwayat_lama_id FROM penempatan_draft WHERE id IN (${ph})`,
-    draftIds
+    uniqueDraftIds
   )
   if (drafts.length === 0) return { error: 'Draft tidak ditemukan (mungkin sudah dihapus/difinalisasi).' }
+  if (drafts.length !== uniqueDraftIds.length) {
+    return { error: 'Sebagian draft sudah berubah atau tidak ditemukan. Muat ulang halaman lalu pilih kembali draft.' }
+  }
 
   const waktu = now()
 
   try {
-    const riwayatLamaIds = drafts.map(d => d.riwayat_lama_id).filter((id): id is string => !!id)
-    const CHUNK = 200
-    for (let i = 0; i < riwayatLamaIds.length; i += CHUNK) {
-      const chunk = riwayatLamaIds.slice(i, i + CHUNK)
-      const chunkPh = chunk.map(() => '?').join(',')
-      await execute(
-        `UPDATE riwayat_pendidikan SET status_riwayat = 'naik' WHERE id IN (${chunkPh})`,
-        chunk
-      )
+    // Satu batch D1 per potongan bersifat atomik dan hanya memakai satu subrequest.
+    // Ini mencegah finalisasi batch besar berhenti di tengah karena limit subrequest Worker.
+    const CHUNK = 75
+    for (let i = 0; i < drafts.length; i += CHUNK) {
+      const chunk = drafts.slice(i, i + CHUNK)
+      const statements: { sql: string; params: unknown[] }[] = []
+
+      for (const d of chunk) {
+        if (d.riwayat_lama_id) {
+          statements.push({
+            sql: "UPDATE riwayat_pendidikan SET status_riwayat = 'naik' WHERE id = ? AND santri_id = ? AND status_riwayat = 'aktif'",
+            params: [d.riwayat_lama_id, d.santri_id],
+          })
+        }
+        statements.push({
+          sql: `INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at)
+                SELECT ?, ?, ?, 'aktif', ?
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM riwayat_pendidikan
+                  WHERE santri_id = ? AND status_riwayat = 'aktif'
+                )`,
+          params: [generateId(), d.santri_id, d.kelas_id, waktu, d.santri_id],
+        })
+      }
+
+      const chunkIds = chunk.map(d => d.id)
+      const chunkPh = chunkIds.map(() => '?').join(',')
+      statements.push({
+        sql: `DELETE FROM penempatan_draft WHERE id IN (${chunkPh})`,
+        params: chunkIds,
+      })
+      await batch(statements)
     }
 
-    for (const d of drafts) {
-      await execute(
-        'INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at) VALUES (?, ?, ?, ?, ?)',
-        [generateId(), d.santri_id, d.kelas_id, 'aktif', waktu]
-      )
-    }
+    const jumlahBaru = drafts.filter(d => !d.riwayat_lama_id).length
+    const jumlahLama = drafts.filter(d => d.riwayat_lama_id).length
 
-    for (let i = 0; i < draftIds.length; i += CHUNK) {
-      const chunk = draftIds.slice(i, i + CHUNK)
-      const chunkPh = chunk.map(() => '?').join(',')
-      await execute(`DELETE FROM penempatan_draft WHERE id IN (${chunkPh})`, chunk)
-    }
-  } catch {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'akademik_penempatan',
+      action: 'update',
+      fiturHref: FITUR_HREF,
+      logKind: 'update',
+      entityType: 'penempatan_kelas_batch',
+      entityId: 'penempatan',
+      entityLabel: 'Penempatan kelas',
+      summary: `Finalisasi ${drafts.length} santri ke kelas (${jumlahBaru} baru, ${jumlahLama} naik)`,
+      details: { total: drafts.length, baru: jumlahBaru, naik: jumlahLama },
+    })
+
+    revalidatePath(FITUR_HREF)
+    return { success: true, count: drafts.length }
+  } catch (error) {
+    console.error('Gagal finalisasi draft penempatan:', error)
     return { error: 'Gagal memfinalisasi penempatan. Pastikan santri belum punya kelas aktif.' }
   }
-
-  const jumlahBaru = drafts.filter(d => !d.riwayat_lama_id).length
-  const jumlahLama = drafts.filter(d => d.riwayat_lama_id).length
-
-  await logActivity({
-    actor: actorFromSession(session),
-    module: 'akademik_penempatan',
-    action: 'update',
-    fiturHref: FITUR_HREF,
-    logKind: 'update',
-    entityType: 'penempatan_kelas_batch',
-    entityId: 'penempatan',
-    entityLabel: 'Penempatan kelas',
-    summary: `Finalisasi ${drafts.length} santri ke kelas (${jumlahBaru} baru, ${jumlahLama} naik)`,
-    details: { total: drafts.length, baru: jumlahBaru, naik: jumlahLama },
-  })
-
-  revalidatePath(FITUR_HREF)
-  return { success: true, count: drafts.length }
 }
