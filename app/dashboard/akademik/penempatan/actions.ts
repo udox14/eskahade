@@ -368,10 +368,11 @@ export async function finalisasiDraft(draftIds: string[]) {
   const uniqueDraftIds = [...new Set(draftIds.filter(Boolean))]
   if (uniqueDraftIds.length === 0) return { error: 'Tidak ada draft yang dipilih.' }
 
-  const ph = uniqueDraftIds.map(() => '?').join(',')
   const drafts = await query<{ id: string; santri_id: string; kelas_id: string; riwayat_lama_id: string | null }>(
-    `SELECT id, santri_id, kelas_id, riwayat_lama_id FROM penempatan_draft WHERE id IN (${ph})`,
-    uniqueDraftIds
+    `SELECT id, santri_id, kelas_id, riwayat_lama_id
+     FROM penempatan_draft
+     WHERE id IN (SELECT value FROM json_each(?))`,
+    [JSON.stringify(uniqueDraftIds)]
   )
   if (drafts.length === 0) return { error: 'Draft tidak ditemukan (mungkin sudah dihapus/difinalisasi).' }
   if (drafts.length !== uniqueDraftIds.length) {
@@ -379,41 +380,61 @@ export async function finalisasiDraft(draftIds: string[]) {
   }
 
   const waktu = now()
+  const draftIdsJson = JSON.stringify(uniqueDraftIds)
 
   try {
-    // Satu batch D1 per potongan bersifat atomik dan hanya memakai satu subrequest.
-    // Ini mencegah finalisasi batch besar berhenti di tengah karena limit subrequest Worker.
-    const CHUNK = 75
-    for (let i = 0; i < drafts.length; i += CHUNK) {
-      const chunk = drafts.slice(i, i + CHUNK)
-      const statements: { sql: string; params: unknown[] }[] = []
-
-      for (const d of chunk) {
-        if (d.riwayat_lama_id) {
-          statements.push({
-            sql: "UPDATE riwayat_pendidikan SET status_riwayat = 'naik' WHERE id = ? AND santri_id = ? AND status_riwayat = 'aktif'",
-            params: [d.riwayat_lama_id, d.santri_id],
-          })
-        }
-        statements.push({
-          sql: `INSERT INTO riwayat_pendidikan (id, santri_id, kelas_id, status_riwayat, created_at)
-                SELECT ?, ?, ?, 'aktif', ?
-                WHERE NOT EXISTS (
-                  SELECT 1 FROM riwayat_pendidikan
-                  WHERE santri_id = ? AND status_riwayat = 'aktif'
-                )`,
-          params: [generateId(), d.santri_id, d.kelas_id, waktu, d.santri_id],
-        })
-      }
-
-      const chunkIds = chunk.map(d => d.id)
-      const chunkPh = chunkIds.map(() => '?').join(',')
-      statements.push({
-        sql: `DELETE FROM penempatan_draft WHERE id IN (${chunkPh})`,
-        params: chunkIds,
-      })
-      await batch(statements)
+    const conflicts = await query<{ id: string }>(`
+      SELECT DISTINCT pd.id
+      FROM penempatan_draft pd
+      JOIN riwayat_pendidikan rp
+        ON rp.santri_id = pd.santri_id AND rp.status_riwayat = 'aktif'
+      WHERE pd.id IN (SELECT value FROM json_each(?))
+        AND (pd.riwayat_lama_id IS NULL OR rp.id <> pd.riwayat_lama_id)
+      LIMIT 1
+    `, [draftIdsJson])
+    if (conflicts.length > 0) {
+      return { error: 'Ada santri yang sudah memiliki kelas aktif lain. Muat ulang draft sebelum finalisasi.' }
     }
+
+    // Set-based: 2.400 maupun puluhan ribu santri tetap hanya menjadi tiga query
+    // dalam satu transaksi D1, bukan dua query per santri.
+    await batch([
+      {
+        sql: `UPDATE riwayat_pendidikan
+              SET status_riwayat = 'naik'
+              WHERE id IN (
+                SELECT riwayat_lama_id FROM penempatan_draft
+                WHERE id IN (SELECT value FROM json_each(?))
+                  AND riwayat_lama_id IS NOT NULL
+              )`,
+        params: [draftIdsJson],
+      },
+      {
+        // ID draft adalah UUID unik dan draft langsung dihapus setelah insert,
+        // sehingga aman dipakai sebagai ID riwayat baru tanpa generate per baris.
+        sql: `INSERT INTO riwayat_pendidikan
+                (id, santri_id, kelas_id, status_riwayat, created_at)
+              SELECT pd.id, pd.santri_id, pd.kelas_id, 'aktif', ?
+              FROM penempatan_draft pd
+              WHERE pd.id IN (SELECT value FROM json_each(?))
+                AND NOT EXISTS (
+                  SELECT 1 FROM riwayat_pendidikan rp
+                  WHERE rp.santri_id = pd.santri_id AND rp.status_riwayat = 'aktif'
+                )`,
+        params: [waktu, draftIdsJson],
+      },
+      {
+        sql: `DELETE FROM penempatan_draft
+              WHERE id IN (SELECT value FROM json_each(?))
+                AND EXISTS (
+                  SELECT 1 FROM riwayat_pendidikan rp
+                  WHERE rp.id = penempatan_draft.id
+                    AND rp.santri_id = penempatan_draft.santri_id
+                    AND rp.status_riwayat = 'aktif'
+                )`,
+        params: [draftIdsJson],
+      },
+    ])
 
     const jumlahBaru = drafts.filter(d => !d.riwayat_lama_id).length
     const jumlahLama = drafts.filter(d => d.riwayat_lama_id).length
