@@ -12,7 +12,8 @@ import {
   selesaikanAntrianUPK,
   batalkanAntrianUPK,
 } from './actions'
-import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
@@ -439,7 +440,14 @@ export default function KasirUPKPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="w-full min-w-[200px] sm:w-[240px]">
+            <Link
+              href="/dashboard/akademik/upk/pesanan"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition active:scale-90 hover:bg-slate-200"
+              title="Pesanan & Penagihan"
+            >
+              <ClipboardList className="h-4 w-4" />
+            </Link>
+            <div className="w-full min-w-[180px] sm:w-[240px]">
               <ModeTabs mode={mode} onChange={switchMode} />
             </div>
           </div>
