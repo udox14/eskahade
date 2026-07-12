@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   getMarhalahList, getTahunAjaranAktif, getKelasUntukMarhalah, getPenempatanData, simpanDraftPenempatan,
-  getDraftPenempatan, hapusDraftItem, finalisasiDraft, hapusDraftBatch,
-  type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan, type DraftPenempatan,
+  getDraftPenempatan, getHasilFinalPenempatan, hapusDraftItem, finalisasiDraft, hapusDraftBatch,
+  type KandidatPenempatan, type KelasTujuan, type JenjangPenempatan, type DraftPenempatan, type HasilFinalPenempatan,
 } from './actions'
 import { gradeCocokKelas, type Grade } from '@/lib/akademik/grade'
 import {
   Loader2, Users, GraduationCap, CheckSquare, Square, Filter, AlertTriangle, CalendarDays, Layers, ChevronDown, BarChart3, ClipboardList, X, FileSpreadsheet
 } from 'lucide-react'
 import Link from 'next/link'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -32,6 +32,26 @@ function gradeBadgeClass(grade: Grade | null): string {
 
 function naturalCompare(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function singkatKelasLama(nama: string | null) {
+  if (!nama) return 'BARU'
+  return nama
+    .replace(/\bTamhidiyyah\b/gi, 'TMH')
+    .replace(/\bIbtidaiyyah\b/gi, 'IBT')
+    .replace(/\bMutawassithah\b/gi, 'MTW')
+}
+
+function safeSheetName(name: string, used: Set<string>) {
+  const base = (name.replace(/[\\/?*\[\]:]/g, ' ').trim() || 'Marhalah').slice(0, 31)
+  let candidate = base
+  let suffix = 2
+  while (used.has(candidate.toLowerCase())) {
+    const tail = ` (${suffix++})`
+    candidate = `${base.slice(0, 31 - tail.length)}${tail}`
+  }
+  used.add(candidate.toLowerCase())
+  return candidate
 }
 
 function labelSekolah(santri: KandidatPenempatan) {
@@ -649,6 +669,7 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
   const [drafts, setDrafts] = useState<DraftPenempatan[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [statOpen, setStatOpen] = useState(false)
 
@@ -724,22 +745,114 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
     }
   }
 
-  const handleExportExcel = () => {
-    if (drafts.length === 0) return toast.warning('Tidak ada draft untuk diexport.')
-    const data = drafts.map((d, index) => ({
-      'No': index + 1,
-      'Nama Santri': d.nama,
-      'NIS': d.nis,
-      'Status': d.sumber === 'baru' ? 'Baru' : 'Lama',
-      'Jenjang': d.jenjang || '-',
-      'Grade': d.grade || '-',
-      'Kelas Asal': d.asal,
-      'Kelas Tujuan': d.nama_kelas,
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Draft Penempatan')
-    XLSX.writeFile(wb, 'draft_penempatan.xlsx')
+  const handleExportExcel = async () => {
+    setExporting(true)
+    const loadingToast = toast.loading('Menyiapkan hasil final penempatan...')
+    try {
+      const result = await getHasilFinalPenempatan()
+      if (result.rows.length === 0) {
+        toast.dismiss(loadingToast)
+        return toast.warning('Belum ada hasil final penempatan pada tahun ajaran aktif.')
+      }
+
+      const workbook = XLSX.utils.book_new()
+      const usedSheetNames = new Set<string>()
+      const marhalahGroups = new Map<string, HasilFinalPenempatan[]>()
+      for (const row of result.rows) {
+        const key = `${row.marhalah_urutan}:${row.marhalah_id}:${row.marhalah_nama}`
+        const group = marhalahGroups.get(key) || []
+        group.push(row)
+        marhalahGroups.set(key, group)
+      }
+
+      const thinBorder: XLSX.CellStyle['border'] = {
+        top: { style: 'thin', color: { rgb: '808080' } },
+        bottom: { style: 'thin', color: { rgb: '808080' } },
+        left: { style: 'thin', color: { rgb: '808080' } },
+        right: { style: 'thin', color: { rgb: '808080' } },
+      }
+      const headerStyle: XLSX.CellStyle = {
+        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { patternType: 'solid', fgColor: { rgb: '000000' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: thinBorder,
+      }
+      const contentStyle: XLSX.CellStyle = {
+        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: '000000' } },
+        fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+        alignment: { vertical: 'center' },
+        border: thinBorder,
+      }
+      const oldClassStyle = (isBaru: boolean): XLSX.CellStyle => ({
+        ...contentStyle,
+        font: { name: 'Arial Narrow', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { patternType: 'solid', fgColor: { rgb: isBaru ? 'C00000' : '1F4E78' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      })
+
+      for (const [, marhalahRows] of marhalahGroups) {
+        const rows: (string | number)[][] = []
+        const headerIndexes = new Set<number>()
+        const oldClassCells = new Map<number, boolean>()
+        const kelasGroups = new Map<string, HasilFinalPenempatan[]>()
+
+        for (const row of [...marhalahRows].sort((a, b) =>
+          naturalCompare(a.kelas_baru, b.kelas_baru) || a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+        )) {
+          const group = kelasGroups.get(row.kelas_baru) || []
+          group.push(row)
+          kelasGroups.set(row.kelas_baru, group)
+        }
+
+        let firstClass = true
+        for (const [, kelasRows] of kelasGroups) {
+          if (!firstClass) rows.push(['', '', '', ''])
+          firstClass = false
+          headerIndexes.add(rows.length)
+          rows.push(['No', 'Nama', 'Kelas Lama', 'Kelas Baru'])
+          kelasRows.forEach((row, index) => {
+            const kelasLama = singkatKelasLama(row.kelas_lama)
+            rows.push([index + 1, row.nama, kelasLama, row.kelas_baru])
+            oldClassCells.set(rows.length - 1, kelasLama === 'BARU')
+          })
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(rows)
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          if (rows[rowIndex].every(value => value === '')) continue
+          for (let colIndex = 0; colIndex < 4; colIndex++) {
+            const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })
+            const cell = worksheet[address]
+            if (!cell) continue
+            if (headerIndexes.has(rowIndex)) {
+              cell.s = headerStyle
+            } else if (colIndex === 2) {
+              cell.s = oldClassStyle(oldClassCells.get(rowIndex) === true)
+            } else {
+              cell.s = {
+                ...contentStyle,
+                alignment: { horizontal: colIndex === 1 ? 'left' : 'center', vertical: 'center' },
+              }
+            }
+          }
+        }
+        worksheet['!cols'] = [{ wch: 7 }, { wch: 38 }, { wch: 20 }, { wch: 20 }]
+        worksheet['!rows'] = rows.map((_, index) => ({ hpt: headerIndexes.has(index) ? 24 : 21 }))
+        const sheetName = safeSheetName(marhalahRows[0].marhalah_nama, usedSheetNames)
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+      }
+
+      const safeYear = (result.tahun_ajaran || 'tahun-aktif').replace(/[^a-zA-Z0-9_-]+/g, '-')
+      XLSX.writeFile(workbook, `hasil_penempatan_kelas_${safeYear}.xlsx`, { bookType: 'xlsx' })
+      toast.dismiss(loadingToast)
+      toast.success('Hasil final penempatan berhasil diekspor.', { description: `${result.rows.length} santri.` })
+    } catch (error) {
+      console.error('Gagal export hasil penempatan:', error)
+      toast.dismiss(loadingToast)
+      toast.error('Gagal mengekspor hasil final penempatan.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleFinalisasi = async () => {
@@ -777,10 +890,22 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
 
   if (drafts.length === 0) {
     return (
-      <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+      <div className="space-y-5">
+        <div className="flex justify-end">
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+            Export Hasil Penempatan
+          </button>
+        </div>
+        <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
         <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <h3 className="text-lg font-semibold text-slate-500">Belum ada draft penempatan</h3>
         <p className="text-sm text-slate-400 mt-1">Tempatkan santri di tab Penempatan — hasilnya akan muncul di sini untuk direview.</p>
+        </div>
       </div>
     )
   }
@@ -790,9 +915,11 @@ function TabReviewDraft({ onDraftCountChange }: { onDraftCountChange: (n: number
       <div className="flex justify-end mb-1">
         <button
           onClick={handleExportExcel}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 transition-all active:scale-95"
+          disabled={exporting}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60"
         >
-          <FileSpreadsheet className="w-4 h-4" /> Export Excel
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+          Export Hasil Penempatan
         </button>
       </div>
 

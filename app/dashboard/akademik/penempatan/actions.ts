@@ -3,6 +3,7 @@
 import { query, execute, batch, generateId, now } from '@/lib/db'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { assertCrud } from '@/lib/auth/crud'
+import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { normalizeGrade } from '@/lib/akademik/grade'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
@@ -294,6 +295,55 @@ export type DraftPenempatan = {
   kategori_efektif: string
   asal: string
   jenjang: JenjangPenempatan | null
+}
+
+export type HasilFinalPenempatan = {
+  santri_id: string
+  nama: string
+  kelas_baru: string
+  kelas_lama: string | null
+  marhalah_id: number
+  marhalah_nama: string
+  marhalah_urutan: number
+}
+
+export type ExportHasilPenempatan = {
+  tahun_ajaran: string
+  rows: HasilFinalPenempatan[]
+}
+
+// Seluruh hasil penempatan final pada tahun ajaran aktif. Riwayat nonaktif terbaru
+// menjadi kelas lama; santri tanpa riwayat sebelumnya akan ditandai BARU di Excel.
+export async function getHasilFinalPenempatan(): Promise<ExportHasilPenempatan> {
+  const access = await assertFeature(FITUR_HREF, 'read')
+  if ('error' in access) throw new Error(access.error)
+
+  const tahunAjaran = await getCachedTahunAjaranAktif()
+  if (!tahunAjaran) return { tahun_ajaran: '', rows: [] }
+
+  const rows = await query<HasilFinalPenempatan>(`
+    SELECT rp.santri_id, s.nama_lengkap AS nama,
+           k.nama_kelas AS kelas_baru,
+           (
+             SELECT kl.nama_kelas
+             FROM riwayat_pendidikan rpl
+             JOIN kelas kl ON kl.id = rpl.kelas_id
+             WHERE rpl.santri_id = rp.santri_id
+               AND rpl.id <> rp.id
+               AND rpl.status_riwayat <> 'aktif'
+             ORDER BY rpl.created_at DESC, rpl.id DESC
+             LIMIT 1
+           ) AS kelas_lama,
+           m.id AS marhalah_id, m.nama AS marhalah_nama, m.urutan AS marhalah_urutan
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
+    JOIN kelas k ON k.id = rp.kelas_id AND k.tahun_ajaran_id = ?
+    JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE rp.status_riwayat = 'aktif'
+    ORDER BY m.urutan, k.nama_kelas, s.nama_lengkap
+  `, [tahunAjaran.id])
+
+  return { tahun_ajaran: String(tahunAjaran.nama || ''), rows }
 }
 
 // Daftar seluruh draft yang belum difinalisasi, untuk tab Review Draft.
