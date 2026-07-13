@@ -105,9 +105,9 @@ export default function KepanitiaanPageContent() {
 
   const handleResetPanitia = async () => {
     const eventName = activeTab === 'ASRAMA' ? 'Pengurus Asrama' : activeTab
-    if (!confirm(\`PERINGATAN! Anda akan menghapus SELURUH hak akses \${eventName}. Lanjutkan?\`)) return
+    if (!confirm(`PERINGATAN! Anda akan menghapus SELURUH hak akses \${eventName}. Lanjutkan?`)) return
 
-    const toastId = toast.loading(\`Mengosongkan \${eventName}...\`)
+    const toastId = toast.loading(`Mengosongkan \${eventName}...`)
     try {
       if (activeTab === 'PSB') {
         await resetPanitiaPsb()
@@ -116,7 +116,7 @@ export default function KepanitiaanPageContent() {
       } else {
         await resetKepengurusanAsrama()
       }
-      toast.success(\`\${eventName} berhasil dikosongkan\`)
+      toast.success(`\${eventName} berhasil dikosongkan`)
       loadData()
     } catch (err) {
       toast.error('Gagal mengosongkan panitia')
@@ -136,19 +136,19 @@ export default function KepanitiaanPageContent() {
       <div className="flex border-b overflow-x-auto">
         <button 
           onClick={() => setActiveTab('PSB')}
-          className={\`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'PSB' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}\`}
+          className={`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'PSB' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           Panitia PSB
         </button>
         <button 
           onClick={() => setActiveTab('UPK')}
-          className={\`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'UPK' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}\`}
+          className={`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'UPK' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           Panitia UPK
         </button>
         <button 
           onClick={() => setActiveTab('ASRAMA')}
-          className={\`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'ASRAMA' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}\`}
+          className={`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 \${activeTab === 'ASRAMA' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           Pengurus Asrama (KSB)
         </button>
@@ -157,7 +157,7 @@ export default function KepanitiaanPageContent() {
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
         <div>
           <h2 className="font-bold text-lg text-slate-800">
-            {activeTab === 'ASRAMA' ? 'Anggota Pengurus' : \`Anggota Tim \${activeTab}\`}
+            {activeTab === 'ASRAMA' ? 'Anggota Pengurus' : `Anggota Tim \${activeTab}`}
           </h2>
           <p className="text-sm text-slate-500">
             Total {activeTab === 'PSB' ? psbMembers.length : activeTab === 'UPK' ? upkMembers.length : asramaMembers.length} anggota aktif
@@ -222,7 +222,7 @@ export default function KepanitiaanPageContent() {
               ))}
             </tbody>
           </table>
-        ) : (
+        ) : activeTab === 'UPK' ? (
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
@@ -283,11 +283,11 @@ export default function KepanitiaanPageContent() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={\`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-max \${
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-max \${
                       u.jabatan === 'ketua' ? 'bg-red-100 text-red-700' :
                       u.jabatan === 'sekretaris' ? 'bg-blue-100 text-blue-700' :
                       'bg-green-100 text-green-700'
-                    }\`}>
+                    }`}>
                       <ShieldAlert className="w-3 h-3"/> {u.jabatan?.toUpperCase()}
                     </span>
                   </td>
@@ -365,7 +365,7 @@ export default function KepanitiaanPageContent() {
                   {searchResults.map(user => {
                     const isSelected = selectedUserIds.includes(user.id)
                     return (
-                      <label key={user.id} className={\`flex items-center gap-3 p-3 cursor-pointer transition-colors \${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}\`}>
+                      <label key={user.id} className={`flex items-center gap-3 p-3 cursor-pointer transition-colors \${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <input 
                           type="checkbox" 
                           checked={isSelected}

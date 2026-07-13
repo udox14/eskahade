@@ -269,7 +269,7 @@ export async function simpanTarifNonSpp(input: {
     details: { tahun_ajaran_id: tahunAjaranId, tahun_angkatan: tahunAngkatan, tarif: input.tarif },
   })
 
-  revalidateTag('biaya-settings')
+  
   revalidatePath(PATH)
   return { success: true }
 }

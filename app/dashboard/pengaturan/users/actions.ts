@@ -885,7 +885,7 @@ export async function updateUserDetails(userId: string, fullName: string, email:
   const guruId = beforeUser.guru_id || (beforeUser.source_type === 'guru' ? beforeUser.source_ref_id : null)
   if (guruId) {
     await execute('UPDATE data_guru SET nama_lengkap = ? WHERE id = ?', [fullName, guruId])
-    revalidateTag('data-guru')
+    
     revalidatePath('/dashboard/master/wali-kelas')
   }
 
@@ -1207,7 +1207,7 @@ export async function mergeUserAccounts(primaryId: string, secondaryId: string):
     entityType: 'user_merge',
     entityId: primaryId,
     entityLabel: primary.full_name,
-    summary: \`Menggabungkan akun \${secondary.full_name} ke dalam \${primary.full_name}\`,
+    summary: `Menggabungkan akun \${secondary.full_name} ke dalam \${primary.full_name}`,
     details: { secondary_id: secondaryId, combined_roles: combinedRoles }
   })
 

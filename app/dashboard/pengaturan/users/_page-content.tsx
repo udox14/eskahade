@@ -1437,7 +1437,6 @@ export default function ManajemenUserPage() {
               </div>
             </form>
           </div>
-          </div>
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
-import { revalidateTag } from 'next/cache'
+
 
 const PAGE_SIZE = 30
 const VALID_KATEGORI = new Set(['RINGAN', 'SEDANG', 'BERAT'])
@@ -69,7 +69,7 @@ export async function tambahMasterPelanggaran(data: {
       deskripsi: data.deskripsi || null,
     },
   })
-  revalidateTag('master-pelanggaran')
+  
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
@@ -112,7 +112,7 @@ export async function editMasterPelanggaran(id: number, data: {
       ),
     },
   })
-  revalidateTag('master-pelanggaran')
+  
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
@@ -148,7 +148,7 @@ export async function hapusMasterPelanggaran(id: number): Promise<{ success: boo
       deskripsi: targetMaster.deskripsi,
     },
   })
-  revalidateTag('master-pelanggaran')
+  
   return { success: true }
 }
 
@@ -237,7 +237,7 @@ export async function importMasterPelanggaranMassal(
       details: { inserted, updated, skipped },
     })
 
-    revalidateTag('master-pelanggaran')
+    
     revalidatePath('/dashboard/keamanan')
     return { success: true, inserted, updated, skipped }
   } catch (error: any) {

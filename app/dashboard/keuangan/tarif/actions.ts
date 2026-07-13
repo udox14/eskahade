@@ -48,7 +48,7 @@ export async function simpanTarif(tahun: number, tarifData: any): Promise<{ succ
       `, [tahunAngkatan, item.jenis, item.nominal])
     }
 
-    revalidateTag('biaya-settings')
+    
     revalidatePath('/dashboard/keuangan/tarif')
     return { success: true }
   } catch (error) {

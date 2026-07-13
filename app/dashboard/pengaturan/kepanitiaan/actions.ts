@@ -222,12 +222,12 @@ export async function resetKepengurusanAsrama() {
 
 export async function searchUsers(q: string) {
   if (!q.trim()) return []
-  const searchTerm = \`%\${q.toLowerCase()}%\`
+  const searchTerm = `%\${q.toLowerCase()}%`
   const rows = await query<{ id: string, full_name: string, email: string, roles: string, source_type: string }>(
-    \`SELECT id, full_name, email, roles, source_type 
+    `SELECT id, full_name, email, roles, source_type 
      FROM users 
      WHERE lower(full_name) LIKE ? OR lower(email) LIKE ? 
-     ORDER BY full_name ASC LIMIT 50\`,
+     ORDER BY full_name ASC LIMIT 50`,
     [searchTerm, searchTerm]
   )
   return rows
