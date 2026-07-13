@@ -234,3 +234,14 @@ export async function searchUsers(q: string) {
   )
   return rows
 }
+
+export async function getAvailableUsersForDropdown() {
+  const rows = await query<{ id: string, full_name: string, source_type: string, guru_id: number | null, asrama: string | null }>(
+    `SELECT u.id, u.full_name, u.source_type, u.guru_id, s.asrama 
+     FROM users u
+     LEFT JOIN santri s ON s.id = u.source_ref_id AND u.source_type IN ('santri', 'sadesa')
+     ORDER BY u.full_name ASC`,
+    []
+  )
+  return rows
+}

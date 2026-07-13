@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getPanitiaPsb, getPanitiaUpk, getKepengurusanAsrama, addPanitiaPsb, addPanitiaUpk, addKepengurusanAsrama, removePanitiaPsb, removePanitiaUpk, removeKepengurusanAsrama, resetPanitiaPsb, resetPanitiaUpk, resetKepengurusanAsrama, searchUsers, PanitiaMember } from './actions'
-import { Users, Search, Plus, Trash2, ShieldAlert, CheckCircle, Shield, X, Loader2, RefreshCcw } from 'lucide-react'
+import { getPanitiaPsb, getPanitiaUpk, getKepengurusanAsrama, addPanitiaPsb, addPanitiaUpk, addKepengurusanAsrama, removePanitiaPsb, removePanitiaUpk, removeKepengurusanAsrama, resetPanitiaPsb, resetPanitiaUpk, resetKepengurusanAsrama, getAvailableUsersForDropdown, PanitiaMember } from './actions'
+import { Users, Search, Plus, Trash2, ShieldAlert, CheckCircle, Shield, X, Loader2, RefreshCcw, ChevronDown } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ALL_ASRAMA_LIST } from '@/lib/asrama'
 
@@ -14,26 +14,26 @@ export default function KepanitiaanPageContent() {
   const [asramaMembers, setAsramaMembers] = useState<PanitiaMember[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{ id: string, full_name: string, email: string, roles: string, source_type: string }[]>([])
+  const [availableUsers, setAvailableUsers] = useState<{ id: string, full_name: string, source_type: string, guru_id: number | null, asrama: string | null }[]>([])
+  const [selectedSource, setSelectedSource] = useState<'guru' | 'sadesa' | 'umum'>('guru')
+  
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [psbDivisi, setPsbDivisi] = useState<'verifikasi' | 'asrama' | 'bayar'>('verifikasi')
   
   const [asramaJabatan, setAsramaJabatan] = useState<'ketua' | 'sekretaris' | 'bendahara'>('ketua')
   const [selectedAsramaForAdd, setSelectedAsramaForAdd] = useState<string>('')
   
-  const [isSearching, setIsSearching] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [psb, upk, asrama] = await Promise.all([getPanitiaPsb(), getPanitiaUpk(), getKepengurusanAsrama()])
+      const [psb, upk, asrama, usersData] = await Promise.all([getPanitiaPsb(), getPanitiaUpk(), getKepengurusanAsrama(), getAvailableUsersForDropdown()])
       setPsbMembers(psb)
       setUpkMembers(upk)
       setAsramaMembers(asrama)
+      setAvailableUsers(usersData)
     } catch (err) {
       toast.error('Gagal memuat data kepanitiaan')
     } finally {
@@ -44,20 +44,6 @@ export default function KepanitiaanPageContent() {
   useEffect(() => {
     loadData()
   }, [])
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.trim().length > 2) {
-        setIsSearching(true)
-        const res = await searchUsers(searchQuery)
-        setSearchResults(res)
-        setIsSearching(false)
-      } else {
-        setSearchResults([])
-      }
-    }, 500)
-    return () => clearTimeout(delayDebounceFn)
-  }, [searchQuery])
 
   const handleAddSubmit = async () => {
     if (selectedUserIds.length === 0) return toast.warning('Pilih minimal 1 user')
@@ -77,7 +63,6 @@ export default function KepanitiaanPageContent() {
       toast.success('Berhasil menambahkan anggota')
       setIsAddModalOpen(false)
       setSelectedUserIds([])
-      setSearchQuery('')
       loadData()
     } catch (err: any) {
       toast.error(err.message || 'Gagal menambahkan anggota')
@@ -270,51 +255,62 @@ export default function KepanitiaanPageContent() {
             {ALL_ASRAMA_LIST.map(asramaName => {
               const membersInAsrama = asramaMembers.filter(m => m.asrama_binaan === asramaName)
               return (
-                <div key={asramaName} className="p-6 bg-white">
-                  <h3 className="font-bold text-lg text-slate-800 mb-4">{asramaName}</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {(['ketua', 'sekretaris', 'bendahara'] as const).map(jabatan => {
-                      const jabatanMembers = membersInAsrama.filter(m => m.jabatan === jabatan)
-                      return (
-                        <div key={jabatan} className="border rounded-xl p-4 flex flex-col h-full bg-slate-50 shadow-sm">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="font-bold text-xs uppercase tracking-wider text-slate-600">{jabatan}</span>
-                            <button
-                              onClick={() => {
-                                setAsramaJabatan(jabatan)
-                                setSelectedAsramaForAdd(asramaName)
-                                setSelectedUserIds([])
-                                setIsAddModalOpen(true)
-                              }}
-                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-1 rounded-md transition-colors"
-                              title={`Tambah ${jabatan} ${asramaName}`}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                          
-                          <div className="flex flex-col gap-2 flex-1">
-                            {jabatanMembers.length === 0 ? (
-                              <div className="text-slate-400 text-xs italic py-2 text-center border-2 border-dashed border-slate-200 rounded-lg bg-white">Belum ada {jabatan}</div>
-                            ) : (
-                              jabatanMembers.map(u => (
-                                <div key={u.id} className="flex justify-between items-start bg-white p-3 rounded-lg border shadow-sm">
-                                  <div>
-                                    <div className="font-bold text-sm text-slate-800">{u.full_name}</div>
-                                    <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded-full w-max">{u.source_type || 'MANUAL'}</div>
+                <details key={asramaName} className="group bg-white [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors outline-none select-none">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-sm text-slate-800">{asramaName}</span>
+                      {membersInAsrama.length > 0 && (
+                        <span className="bg-slate-100 text-slate-500 font-medium text-[10px] px-2 py-0.5 rounded-full">{membersInAsrama.length} Pengurus</span>
+                      )}
+                    </div>
+                    <ChevronDown className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" />
+                  </summary>
+                  
+                  <div className="p-4 pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+                      {(['ketua', 'sekretaris', 'bendahara'] as const).map(jabatan => {
+                        const jabatanMembers = membersInAsrama.filter(m => m.jabatan === jabatan)
+                        return (
+                          <div key={jabatan} className="border border-slate-100 rounded-lg bg-slate-50 flex flex-col h-full overflow-hidden">
+                            <div className="flex justify-between items-center bg-white px-3 py-2 border-b border-slate-100">
+                              <span className="font-bold text-[11px] uppercase tracking-wider text-slate-600">{jabatan}</span>
+                              <button
+                                onClick={() => {
+                                  setAsramaJabatan(jabatan)
+                                  setSelectedAsramaForAdd(asramaName)
+                                  setSelectedUserIds([])
+                                  setIsAddModalOpen(true)
+                                }}
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition-colors"
+                                title={`Tambah ${jabatan} ${asramaName}`}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            
+                            <div className="flex flex-col gap-1 p-2 flex-1">
+                              {jabatanMembers.length === 0 ? (
+                                <div className="text-slate-400 text-[10px] italic py-1 text-center bg-white border border-dashed border-slate-200 rounded">Belum ada {jabatan}</div>
+                              ) : (
+                                jabatanMembers.map(u => (
+                                  <div key={u.id} className="flex justify-between items-center bg-white px-2 py-1.5 rounded border border-slate-100 shadow-sm group/item">
+                                    <div className="truncate pr-2">
+                                      <div className="font-bold text-xs text-slate-700 truncate">{u.full_name}</div>
+                                      <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">{u.source_type || 'MANUAL'}</div>
+                                    </div>
+                                    <button onClick={() => handleRemoveMember(u.id, 'ASRAMA')} title="Cabut Jabatan" className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors flex-shrink-0 opacity-0 group-hover/item:opacity-100">
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
                                   </div>
-                                  <button onClick={() => handleRemoveMember(u.id, 'ASRAMA')} title="Jadikan Anggota Biasa" className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))
-                            )}
+                                ))
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
+                </details>
               )
             })}
           </div>
@@ -359,44 +355,42 @@ export default function KepanitiaanPageContent() {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cari User (Guru/Sadesa)</label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Ketik minimal 3 huruf nama/email..." 
-                    className="w-full border-2 border-slate-200 rounded-xl p-3 pl-10 outline-none focus:border-blue-500"
-                  />
-                  <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  {isSearching && <Loader2 className="w-4 h-4 text-blue-500 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />}
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pilih User</label>
+                <div className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                  <select
+                    value={selectedSource}
+                    onChange={(e) => {
+                      setSelectedSource(e.target.value as any)
+                      setSelectedUserIds([])
+                    }}
+                    className="w-full border-2 border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-bold text-slate-700"
+                  >
+                    <option value="guru">Guru</option>
+                    <option value="sadesa">SADESA</option>
+                    <option value="umum">Umum</option>
+                  </select>
+                  
+                  <select
+                    value={selectedUserIds[0] || ''}
+                    onChange={(e) => setSelectedUserIds(e.target.value ? [e.target.value] : [])}
+                    className="w-full border-2 border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-bold text-slate-700"
+                  >
+                    <option value="">-- Pilih User --</option>
+                    {availableUsers
+                      .filter(u => {
+                        if (selectedSource === 'guru') return u.source_type === 'guru' || u.guru_id !== null
+                        if (selectedSource === 'sadesa') {
+                          if (activeTab === 'ASRAMA' && u.asrama !== selectedAsramaForAdd) return false
+                          return u.source_type === 'sadesa'
+                        }
+                        return u.source_type !== 'guru' && u.source_type !== 'sadesa' && u.guru_id === null
+                      })
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.full_name}</option>
+                      ))}
+                  </select>
                 </div>
               </div>
-
-              {searchResults.length > 0 && (
-                <div className="border rounded-xl overflow-hidden mt-4 divide-y max-h-[40vh] overflow-y-auto">
-                  {searchResults.map(user => {
-                    const isSelected = selectedUserIds.includes(user.id)
-                    return (
-                      <label key={user.id} className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedUserIds(prev => [...prev, user.id])
-                            else setSelectedUserIds(prev => prev.filter(id => id !== user.id))
-                          }}
-                          className="w-5 h-5 text-blue-600 rounded"
-                        />
-                        <div>
-                          <div className="font-bold text-slate-800">{user.full_name}</div>
-                          <div className="text-xs text-slate-500">{user.email} • {user.source_type || 'User'}</div>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
             </div>
             
             <div className="p-5 border-t bg-slate-50 shrink-0 flex justify-between items-center">
