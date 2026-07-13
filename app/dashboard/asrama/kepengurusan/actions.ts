@@ -324,10 +324,10 @@ export async function saveKepengurusanAsrama(params: {
     if (jabatanKey === 'bendahara') targetJabatan = 'bendahara'
     if (!targetJabatan) return
 
-    // Temukan user berdasarkan guru_id atau nama
+    // Temukan user berdasarkan guru_id atau nama secara global, tidak harus asrama_binaan sama
     const q = clean.guru_id
-      ? await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE asrama_binaan = ? AND guru_id = ?', [asrama, clean.guru_id])
-      : await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE asrama_binaan = ? AND full_name = ?', [asrama, clean.nama])
+      ? await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE guru_id = ?', [clean.guru_id])
+      : await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE full_name = ? AND source_type IN ("sadesa", "santri")', [clean.nama])
     
     if (q.length > 0) {
       const u = q[0]
@@ -342,9 +342,9 @@ export async function saveKepengurusanAsrama(params: {
       }
       
       if (needsUpdateRoles) {
-        await execute('UPDATE users SET structural_jabatan = ?, roles = ? WHERE id = ?', [targetJabatan, JSON.stringify(rolesArray), u.id])
+        await execute('UPDATE users SET structural_jabatan = ?, asrama_binaan = ?, roles = ? WHERE id = ?', [targetJabatan, asrama, JSON.stringify(rolesArray), u.id])
       } else {
-        await execute('UPDATE users SET structural_jabatan = ? WHERE id = ?', [targetJabatan, u.id])
+        await execute('UPDATE users SET structural_jabatan = ?, asrama_binaan = ? WHERE id = ?', [targetJabatan, asrama, u.id])
       }
     }
   }

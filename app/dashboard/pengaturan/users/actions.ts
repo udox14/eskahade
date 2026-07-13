@@ -1149,9 +1149,13 @@ export async function mergeUserAccounts(primaryId: string, secondaryId: string):
     newSourceRefId = secondary.source_ref_id
   }
 
-  // Update related records
-  await execute('UPDATE kelas SET wali_kelas_id = ? WHERE wali_kelas_id = ?', [primaryId, secondaryId])
-  await execute('UPDATE user_fitur_override SET user_id = ? WHERE user_id = ?', [primaryId, secondaryId])
+  // Update related records gracefully
+  await execute('UPDATE OR IGNORE kelas SET wali_kelas_id = ? WHERE wali_kelas_id = ?', [primaryId, secondaryId])
+  await execute('UPDATE OR IGNORE user_fitur_override SET user_id = ? WHERE user_id = ?', [primaryId, secondaryId])
+  
+  // Cleanup duplicates that were ignored
+  await execute('DELETE FROM user_fitur_override WHERE user_id = ?', [secondaryId])
+  
   await execute('UPDATE activity_log SET actor_user_id = ? WHERE actor_user_id = ?', [primaryId, secondaryId])
   
   // Actually perform the update on primary user
@@ -1207,7 +1211,7 @@ export async function mergeUserAccounts(primaryId: string, secondaryId: string):
     entityType: 'user_merge',
     entityId: primaryId,
     entityLabel: primary.full_name,
-    summary: `Menggabungkan akun \${secondary.full_name} ke dalam \${primary.full_name}`,
+    summary: `Menggabungkan akun ${secondary.full_name} ke dalam ${primary.full_name}`,
     details: { secondary_id: secondaryId, combined_roles: combinedRoles }
   })
 

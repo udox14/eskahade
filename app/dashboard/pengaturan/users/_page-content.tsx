@@ -922,26 +922,6 @@ export default function ManajemenUserPage() {
                           </span>
                         </div>
                       )}
-                      {parseRoles(u).includes('pengurus_asrama') && (
-                        <div className="mt-2 flex flex-col items-start gap-1">
-                          <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Petugas PSB</span>
-                          {PSB_AKSES_TOGGLES.map(({ field, on, off, tip }) => (
-                            <button
-                              key={field}
-                              onClick={() => handleTogglePsbAkses(u, field, PSB_AKSES_LABEL[field])}
-                              disabled={processingId === u.id}
-                              title={u[field] ? `Cabut akses ${PSB_AKSES_LABEL[field]}` : tip}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
-                                u[field]
-                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                              }`}
-                            >
-                              <Coins className="w-3 h-3" /> {u[field] ? on : off}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4">
                       {parseRoles(u).includes('pengurus_asrama') ? (

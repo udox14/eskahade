@@ -138,10 +138,11 @@ export async function getKepengurusanAsrama() {
   return rows
 }
 
-export async function addKepengurusanAsrama(userIds: string[], jabatan: 'ketua' | 'sekretaris' | 'bendahara') {
+export async function addKepengurusanAsrama(userIds: string[], asrama: string, jabatan: 'ketua' | 'sekretaris' | 'bendahara') {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
   if (userIds.length === 0) return { error: 'Tidak ada user yang dipilih' }
+  if (!asrama) return { error: 'Asrama tidak valid' }
 
   const jabatanKey = jabatan === 'ketua' ? 'rois' : jabatan
 
@@ -162,20 +163,21 @@ export async function addKepengurusanAsrama(userIds: string[], jabatan: 'ketua' 
     }
     
     if (needsUpdateRoles) {
-      await execute('UPDATE users SET structural_jabatan = ?, roles = ? WHERE id = ?', [jabatan, JSON.stringify(rolesArray), uid])
+      await execute('UPDATE users SET structural_jabatan = ?, asrama_binaan = ?, roles = ? WHERE id = ?', [jabatan, asrama, JSON.stringify(rolesArray), uid])
     } else {
-      await execute('UPDATE users SET structural_jabatan = ? WHERE id = ?', [jabatan, uid])
+      await execute('UPDATE users SET structural_jabatan = ?, asrama_binaan = ? WHERE id = ?', [jabatan, asrama, uid])
     }
 
     // SYNC TO OLD MENU
-    if (u.asrama_binaan) {
+    const targetAsrama = asrama || u.asrama_binaan
+    if (targetAsrama) {
       // cari urutan terakhir
-      const urutanQ = await query<{ max_u: number }>('SELECT MAX(urutan) as max_u FROM asrama_kepengurusan WHERE asrama = ? AND jabatan_key = ?', [u.asrama_binaan, jabatanKey])
+      const urutanQ = await query<{ max_u: number }>('SELECT MAX(urutan) as max_u FROM asrama_kepengurusan WHERE asrama = ? AND jabatan_key = ?', [targetAsrama, jabatanKey])
       const nextUrutan = (urutanQ[0]?.max_u || 0) + 1
       
       await execute(
         'INSERT INTO asrama_kepengurusan (asrama, jabatan_key, guru_id, nama, urutan, updated_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
-        [u.asrama_binaan, jabatanKey, u.guru_id, u.full_name, nextUrutan]
+        [targetAsrama, jabatanKey, u.guru_id, u.full_name, nextUrutan]
       )
     }
   }
@@ -222,7 +224,7 @@ export async function resetKepengurusanAsrama() {
 
 export async function searchUsers(q: string) {
   if (!q.trim()) return []
-  const searchTerm = `%\${q.toLowerCase()}%`
+  const searchTerm = `%${q.toLowerCase()}%`
   const rows = await query<{ id: string, full_name: string, email: string, roles: string, source_type: string }>(
     `SELECT id, full_name, email, roles, source_type 
      FROM users 
