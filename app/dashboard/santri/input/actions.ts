@@ -178,6 +178,30 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
   )
   const existingMap = new Map(existingSantri.map(s => [String(s.nis), s]))
 
+  // ── Guard: cegah overwrite orang berbeda (NIS sama, nama beda) ────────
+  // Jika NIS di file cocok dengan santri di DB tapi nama_lengkap berbeda,
+  // kemungkinan besar ini orang berbeda yang NIS-nya kebetulan/salah sama.
+  // Tolak import untuk mencegah data santri asli tertimpa.
+  const nameConflicts = cleanData
+    .map((s, i) => {
+      const existing = existingMap.get(s.nis)
+      if (!existing) return null
+      const oldName = (existing.nama_lengkap || '').trim().toUpperCase().replace(/\s+/g, ' ')
+      const newName = s.nama_lengkap.trim().toUpperCase().replace(/\s+/g, ' ')
+      if (oldName === newName) return null
+      return { row: i + 2, nis: s.nis, namaDB: existing.nama_lengkap, namaFile: s.nama_lengkap }
+    })
+    .filter((c): c is { row: number; nis: string; namaDB: string; namaFile: string } => c !== null)
+  if (nameConflicts.length > 0) {
+    const preview = nameConflicts
+      .slice(0, 5)
+      .map(c => `baris ${c.row}: NIS ${c.nis} sudah milik "${c.namaDB}", file berisi "${c.namaFile}"`)
+      .join('; ')
+    return {
+      error: `${nameConflicts.length} baris akan MENIMPA santri lain (nama berbeda) — import dibatalkan agar data tidak hilang. ${preview}${nameConflicts.length > 5 ? '; ...' : ''}. Hapus baris tersebut dari file, perbaiki NIS-nya, atau update nama santri ybs terlebih dahulu secara manual.`,
+    }
+  }
+
   // Fetch riwayat pendidikan aktif untuk santri yang sudah ada (untuk cek kelas)
   const existingIds = existingSantri.map(s => s.id)
   let riwayatMap = new Map<string, string>() // santri_id → kelas_id

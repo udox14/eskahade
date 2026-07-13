@@ -1,0 +1,260 @@
+[
+  {
+    "uuid": "98f1b9e3-51d9-4264-881e-b1477736bd21",
+    "korban_asli": "MUHAMAD HAFID AMINUDIN",
+    "korban_nis_asli": "2627305",
+    "penimpa": "MUHAMAD HAFIZ AMINUDIN",
+    "penimpa_nis": "2627305",
+    "penimpa_uuid_baru": "b41d1a7a-28c3-4b77-961b-2717084d6a45",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "pembayaran_tahunan",
+        "milik_penimpa": 4,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_flow",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_payment_receipt",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  },
+  {
+    "uuid": "e61db83f-f92f-4b8f-a02a-c5527e6039ad",
+    "korban_asli": "WILDA FALAH RATNAMAYA",
+    "korban_nis_asli": "2627599",
+    "penimpa": "ISMI RIANTI",
+    "penimpa_nis": "2627599",
+    "penimpa_uuid_baru": "658dfdc6-5205-4899-a822-59e7f35de4a5",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "pembayaran_tahunan",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 4
+      },
+      {
+        "table": "psb_flow",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_payment_receipt",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  },
+  {
+    "uuid": "abdd39df-c47c-4fc0-af2e-d7f8edc768c2",
+    "korban_asli": "WILDAN HERMAWAN",
+    "korban_nis_asli": "2627600",
+    "penimpa": "ARIQA FATINA",
+    "penimpa_nis": "2627600",
+    "penimpa_uuid_baru": "7a4300d8-f207-4fe0-a054-6467afae4a10",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 1
+      },
+      {
+        "table": "pembayaran_tahunan",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 4
+      },
+      {
+        "table": "psb_flow",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_payment_receipt",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  },
+  {
+    "uuid": "55b60804-b8ec-4660-a4b6-951baf1f13b6",
+    "korban_asli": "WULAN NATA SARI",
+    "korban_nis_asli": "2627601",
+    "penimpa": "LISNA AL NAYYA",
+    "penimpa_nis": "2627601",
+    "penimpa_uuid_baru": "606b5e18-9378-4068-b0fa-6e9b516aa780",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 1
+      },
+      {
+        "table": "pembayaran_tahunan",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 4
+      },
+      {
+        "table": "psb_flow",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_payment_receipt",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  },
+  {
+    "uuid": "282922bb-ac52-42cc-a835-1b92069f80b6",
+    "korban_asli": "YANUAR NATADIWANGSA",
+    "korban_nis_asli": "2627602",
+    "penimpa": "TSANIA ASQALANY",
+    "penimpa_nis": "2627602",
+    "penimpa_uuid_baru": "27b6ad08-6810-48f8-91e2-e225c8421b9a",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 1
+      },
+      {
+        "table": "pembayaran_tahunan",
+        "milik_penimpa": 0,
+        "milik_korban": 0,
+        "konflik_inplace": 8
+      },
+      {
+        "table": "psb_flow",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "psb_payment_receipt",
+        "milik_penimpa": 0,
+        "milik_korban": 2,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  },
+  {
+    "uuid": "22e8f87f-d306-40db-b59a-a187519ea2c6",
+    "korban_asli": "ZAHRA JULIATINNAJAH",
+    "korban_nis_asli": "2627609",
+    "penimpa": "DENDI AWALUDIN HADIANSAH",
+    "penimpa_nis": "2627609",
+    "penimpa_uuid_baru": "70d9f398-dac3-43f5-bc02-7fa09f2f7df9",
+    "tabel": [
+      {
+        "table": "hasil_tes_klasifikasi",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "tes_klasifikasi_plotting",
+        "milik_penimpa": 0,
+        "milik_korban": 1,
+        "konflik_inplace": 0
+      },
+      {
+        "table": "penempatan_draft",
+        "milik_penimpa": 1,
+        "milik_korban": 0,
+        "konflik_inplace": 0
+      }
+    ]
+  }
+]
