@@ -57,7 +57,13 @@ async function ensureKepengurusanSchema() {
   await execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_asrama_pengurus_inti_unique
     ON asrama_kepengurusan(asrama, jabatan_key)
-    WHERE kamar IS NULL AND jabatan_key IN ('pembina_asrama', 'rois', 'wakil_rois')
+    WHERE kamar IS NULL AND jabatan_key IN ('pembina_asrama')
+  `)
+  await execute(`DROP INDEX IF EXISTS idx_asrama_pengurus_inti_unique`)
+  await execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_asrama_pengurus_inti_unique_v2
+    ON asrama_kepengurusan(asrama, jabatan_key)
+    WHERE kamar IS NULL AND jabatan_key IN ('pembina_asrama')
   `)
   await execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_asrama_pengurus_pembina_kamar_unique
@@ -295,6 +301,60 @@ export async function saveKepengurusanAsrama(params: {
   })
 
   await batch(statements)
+
+  // === SYNC TO USERS TABLE ===
+  // 1. Reset all KSB in this asrama
+  await execute(
+    `UPDATE users SET structural_jabatan = 'anggota' 
+     WHERE asrama_binaan = ? 
+       AND structural_jabatan IN ('ketua', 'sekretaris', 'bendahara') 
+       AND (roles LIKE '%pengurus_asrama%' OR role = 'pengurus_asrama')`,
+    [asrama]
+  )
+
+  // 2. Map jabatan to structural_jabatan
+  const syncToUsers = async (jabatanKey: string, input: PengurusInput | null | undefined) => {
+    if (!input) return
+    const clean = resolveNama(input, guruMap)
+    if (!clean.nama) return
+
+    let targetJabatan = ''
+    if (jabatanKey === 'rois' || jabatanKey === 'wakil_rois') targetJabatan = 'ketua'
+    if (jabatanKey === 'sekretaris') targetJabatan = 'sekretaris'
+    if (jabatanKey === 'bendahara') targetJabatan = 'bendahara'
+    if (!targetJabatan) return
+
+    // Temukan user berdasarkan guru_id atau nama
+    const q = clean.guru_id
+      ? await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE asrama_binaan = ? AND guru_id = ?', [asrama, clean.guru_id])
+      : await query<{ id: string, role: string, roles: string }>('SELECT id, role, roles FROM users WHERE asrama_binaan = ? AND full_name = ?', [asrama, clean.nama])
+    
+    if (q.length > 0) {
+      const u = q[0]
+      let rolesArray: string[] = []
+      try { rolesArray = JSON.parse(u.roles) } catch {}
+      if (!Array.isArray(rolesArray)) rolesArray = []
+      
+      let needsUpdateRoles = false
+      if (!rolesArray.includes('pengurus_asrama') && u.role !== 'pengurus_asrama') {
+        rolesArray.push('pengurus_asrama')
+        needsUpdateRoles = true
+      }
+      
+      if (needsUpdateRoles) {
+        await execute('UPDATE users SET structural_jabatan = ?, roles = ? WHERE id = ?', [targetJabatan, JSON.stringify(rolesArray), u.id])
+      } else {
+        await execute('UPDATE users SET structural_jabatan = ? WHERE id = ?', [targetJabatan, u.id])
+      }
+    }
+  }
+
+  await syncToUsers('rois', params.inti.rois)
+  await syncToUsers('wakil_rois', params.inti.wakil_rois)
+  for (const item of params.sekretaris) await syncToUsers('sekretaris', item)
+  for (const item of params.bendahara) await syncToUsers('bendahara', item)
+  // ==========================
+
   await logActivity({
     actor: actorFromSession(access.session),
     module: 'asrama_kepengurusan',
@@ -318,5 +378,6 @@ export async function saveKepengurusanAsrama(params: {
   })
   revalidatePath(KEPENGURUSAN_PATH)
   revalidatePath(KAMAR_PATH)
+  revalidatePath('/dashboard/pengaturan/kepanitiaan')
   return { success: true }
 }

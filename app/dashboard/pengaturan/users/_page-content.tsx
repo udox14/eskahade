@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts, setUserPsbAkses } from './actions'
+import { getUsersList, updateUserRoles, resetUserPassword, deleteUser, updateUserDetails, createUser, createUsersBatch, getUserOverrides, setUserFiturOverride, removeUserFiturOverride, getAllActiveFitur, getUserCreationCandidates, createUsersFromSourcesBatch, createAllGuruAccounts, setUserPsbAkses, mergeUserAccounts } from './actions'
 import type { UserCreationCandidate } from './actions'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { UserCog, Save, Loader2, Shield, Plus, X, Home, Mail, Key, Trash2, Edit, Filter, FileSpreadsheet, Upload, CheckCircle, AlertCircle, Download, AlertTriangle, Coins, ShieldCheck, ShieldOff, ToggleLeft, ToggleRight, Search } from 'lucide-react'
@@ -98,6 +98,11 @@ export default function ManajemenUserPage() {
   const [roleEditUser, setRoleEditUser] = useState<any>(null)
   const [roleEditSelected, setRoleEditSelected] = useState<string[]>([])
   const [roleEditJabatan, setRoleEditJabatan] = useState('')
+
+  // Merge Accounts
+  const [isOpenMerge, setIsOpenMerge] = useState(false)
+  const [isMerging, setIsMerging] = useState(false)
+  const [mergePrimaryId, setMergePrimaryId] = useState('')
 
   // Grant/Revoke modal
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false)
@@ -592,6 +597,32 @@ export default function ManajemenUserPage() {
     }
   }
 
+  const handleMergeUsers = async () => {
+    if (selectedIds.length !== 2) return toast.warning('Pilih tepat 2 user untuk digabung')
+    if (!mergePrimaryId) return toast.warning('Pilih mana yang akan jadi akun utama')
+    const secondaryId = selectedIds.find(id => id !== mergePrimaryId)
+    if (!secondaryId) return
+
+    setIsMerging(true)
+    const toastId = toast.loading('Menggabungkan akun...')
+    try {
+      const res = await mergeUserAccounts(mergePrimaryId, secondaryId)
+      if ('error' in res) {
+        toast.error('Gagal', { description: (res as any).error })
+      } else {
+        toast.success('Berhasil', { description: 'Akun berhasil digabungkan.' })
+        setSelectedIds([])
+        setIsOpenMerge(false)
+        loadData()
+      }
+    } catch (err: any) {
+      toast.error('Error', { description: err.message })
+    } finally {
+      setIsMerging(false)
+      toast.dismiss(toastId)
+    }
+  }
+
   // --- HANDLER IMPORT EXCEL ---
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
@@ -763,7 +794,16 @@ export default function ManajemenUserPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 xl:min-w-[420px]">
+          <div className="flex flex-wrap gap-2 xl:min-w-[420px] justify-end">
+            {selectedIds.length === 2 && (
+              <button 
+                onClick={() => setIsOpenMerge(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm font-medium transition-colors whitespace-nowrap"
+              >
+                <UserCog className="w-4 h-4" /> Gabung Akun (Merge)
+              </button>
+            )}
+
             <button 
               onClick={handleExportSelected}
               disabled={selectedIds.length === 0}
@@ -1397,8 +1437,49 @@ export default function ManajemenUserPage() {
               </div>
             </form>
           </div>
+          </div>
         </div>
       )}
+
+      {/* --- MODAL MERGE USER --- */}
+      {isOpenMerge && selectedIds.length === 2 && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="p-5 border-b bg-indigo-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-indigo-800 flex items-center gap-2"><UserCog className="w-5 h-5"/> Gabungkan (Merge) Akun</h3>
+              <button onClick={() => setIsOpenMerge(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                <p className="text-sm text-amber-800">
+                  Anda akan menggabungkan dua akun ini menjadi satu. Role, asrama, kelas, dan riwayat akan digabung ke <b>Akun Utama</b>. Akun yang lainnya akan dihapus.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Pilih yang akan dijadikan Akun Utama:</label>
+                <div className="space-y-2">
+                  {users.filter(u => selectedIds.includes(u.id)).map(u => (
+                    <label key={u.id} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${mergePrimaryId === u.id ? 'border-indigo-500 bg-indigo-50' : 'hover:bg-slate-50'}`}>
+                      <input type="radio" name="primaryAccount" value={u.id} checked={mergePrimaryId === u.id} onChange={() => setMergePrimaryId(u.id)} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"/>
+                      <div>
+                        <div className="font-bold text-slate-800">{u.full_name}</div>
+                        <div className="text-xs text-slate-500">{u.email} • Role saat ini: {parseRoles(u).join(', ')}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="pt-4 flex justify-end gap-3 border-t">
+                <button type="button" onClick={() => setIsOpenMerge(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50">Batal</button>
+                <button type="button" disabled={isMerging || !mergePrimaryId} onClick={handleMergeUsers} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {isMerging ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Jalankan Merge
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* --- MODAL IMPORT EXCEL --- */}
       {isOpenImport && (

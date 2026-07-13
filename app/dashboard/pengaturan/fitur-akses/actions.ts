@@ -85,7 +85,7 @@ export async function toggleFiturActive(id: number, currentActive: boolean) {
       ),
     },
   })
-  revalidateTag('fitur-akses', 'everything')
+  revalidateTag('fitur-akses')
   return { success: true }
 }
 
@@ -122,7 +122,7 @@ export async function addRoleToFitur(id: number, role: string) {
         ),
       },
     })
-    revalidateTag('fitur-akses', 'everything')
+    revalidateTag('fitur-akses')
   }
   return { success: true }
 }
@@ -158,7 +158,7 @@ export async function removeRoleFromFitur(id: number, role: string) {
       ),
     },
   })
-  revalidateTag('fitur-akses', 'everything')
+  revalidateTag('fitur-akses')
   return { success: true }
 }
 
@@ -257,7 +257,7 @@ export async function toggleBottomNavGlobal(currentEnabled: boolean) {
       after: newVal === '1',
     },
   })
-  revalidateTag('fitur-akses', 'everything')
+  revalidateTag('fitur-akses')
   return { success: true }
 }
 
@@ -298,7 +298,7 @@ export async function toggleFiturBottomNav(id: number, currentVal: boolean) {
       ),
     },
   })
-  revalidateTag('fitur-akses', 'everything')
+  revalidateTag('fitur-akses')
   return { success: true }
 }
 
@@ -331,6 +331,6 @@ export async function setBottomNavUrutan(id: number, urutan: number) {
       ),
     },
   })
-  revalidateTag('fitur-akses', 'everything')
+  revalidateTag('fitur-akses')
   return { success: true }
 }

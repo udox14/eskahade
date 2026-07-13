@@ -41,7 +41,7 @@ export async function tambahTahunAjaran(nama: string) {
     summary: `Menambahkan tahun ajaran ${nama}`,
   })
 
-  revalidateTag('tahun-ajaran', 'everything')
+  revalidateTag('tahun-ajaran')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   revalidatePath('/dashboard/master/kelas')
   return { success: true }
@@ -64,7 +64,7 @@ export async function aktifkanTahunAjaran(id: number): Promise<{ success: boolea
     summary: `Mengaktifkan tahun ajaran ${tahunAjaran?.nama || id}`,
   })
 
-  revalidateTag('tahun-ajaran', 'everything')
+  revalidateTag('tahun-ajaran')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   revalidatePath('/dashboard/master/kelas')
   revalidatePath('/dashboard')
@@ -95,7 +95,7 @@ export async function hapusTahunAjaran(id: number): Promise<{ success: boolean }
     summary: `Menghapus tahun ajaran ${ta.nama || id}`,
   })
 
-  revalidateTag('tahun-ajaran', 'everything')
+  revalidateTag('tahun-ajaran')
   revalidatePath('/dashboard/pengaturan/tahun-ajaran')
   return { success: true }
 }

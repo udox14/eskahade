@@ -25,6 +25,7 @@ export type SessionUser = {
   psb_verifikasi_akses?: boolean
   psb_asrama_akses?: boolean
   psb_bayar_akses?: boolean
+  upk_panitia_akses?: boolean
 }
 
 type SessionUserRow = {
@@ -37,6 +38,7 @@ type SessionUserRow = {
   psb_verifikasi_akses: number | null
   psb_asrama_akses: number | null
   psb_bayar_akses: number | null
+  upk_panitia_akses: number | null
 }
 
 export async function ensureUserStructuralJabatanColumn() {
@@ -48,7 +50,7 @@ export async function ensureUserStructuralJabatanColumn() {
       throw error
     }
   }
-  for (const col of ['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses']) {
+  for (const col of ['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses', 'upk_panitia_akses']) {
     try {
       await execute(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
     } catch (error: any) {
@@ -56,6 +58,21 @@ export async function ensureUserStructuralJabatanColumn() {
         throw error
       }
     }
+  }
+  for (const { col, type } of [{ col: 'guru_id', type: 'INTEGER' }, { col: 'santri_id', type: 'TEXT' }]) {
+    try {
+      await execute(`ALTER TABLE users ADD COLUMN ${col} ${type}`)
+    } catch (error: any) {
+      if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
+        throw error
+      }
+    }
+  }
+  try {
+    await execute(`UPDATE users SET guru_id = CAST(source_ref_id AS INTEGER) WHERE source_type = 'guru' AND guru_id IS NULL`)
+    await execute(`UPDATE users SET santri_id = source_ref_id WHERE (source_type = 'sadesa' OR source_type = 'santri') AND santri_id IS NULL`)
+  } catch (err: any) {
+    console.error('Failed to backfill guru_id/santri_id', err)
   }
   structuralJabatanColumnReady = true
 }
@@ -201,7 +218,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
   try {
     await ensureUserStructuralJabatanColumn()
     const user = await queryOne<SessionUserRow>(
-      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_verifikasi_akses, psb_asrama_akses, psb_bayar_akses FROM users WHERE id = ?',
+      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_verifikasi_akses, psb_asrama_akses, psb_bayar_akses, upk_panitia_akses FROM users WHERE id = ?',
       [session.id]
     )
 
@@ -219,6 +236,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       psb_verifikasi_akses: Number(user.psb_verifikasi_akses ?? 0) === 1,
       psb_asrama_akses: Number(user.psb_asrama_akses ?? 0) === 1,
       psb_bayar_akses: Number(user.psb_bayar_akses ?? 0) === 1,
+      upk_panitia_akses: Number(user.upk_panitia_akses ?? 0) === 1,
     }
   } catch (err: any) {
     console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
@@ -260,10 +278,12 @@ export function hasPsbBayarAkses(session: SessionUser | null): boolean {
   return Boolean(session?.psb_bayar_akses)
 }
 
-// True jika user punya salah satu grant petugas PSB. Dipakai untuk membuka
-// visibilitas seluruh santri (bypass scoping asrama binaan pengurus_asrama).
 export function hasAnyPsbAkses(session: SessionUser | null): boolean {
   return hasPsbVerifikasiAkses(session) || hasPsbAsramaAkses(session) || hasPsbBayarAkses(session)
+}
+
+export function hasUpkPanitiaAkses(session: SessionUser | null): boolean {
+  return Boolean(session?.upk_panitia_akses)
 }
 
 // Role AKUN DEMO: setara super admin (bypass gate fitur). Data sudah disandbox
@@ -303,6 +323,10 @@ export function getEffectiveRoles(session: SessionUser | null): string[] {
         expandedRoles.add(`${role}:${structuralJabatan}`)
       }
     }
+  }
+
+  if (session.upk_panitia_akses) {
+    expandedRoles.add('panitia_upk')
   }
 
   return Array.from(expandedRoles)

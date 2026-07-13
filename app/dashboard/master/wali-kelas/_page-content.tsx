@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran } from './actions'
+import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran, editGuruManual } from './actions'
 import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
@@ -100,6 +100,7 @@ export default function ManajemenGuruPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const [newGuru, setNewGuru] = useState({ nama: '', gelar: '', kode: '' })
+  const [editGuru, setEditGuru] = useState<{ id: number; nama: string; gelar: string; kode: string } | null>(null)
   const [search, setSearch] = useState('')
 
   const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
@@ -292,6 +293,20 @@ export default function ManajemenGuruPage() {
     if ((res as any).success) {
       toast.success('Guru ditambahkan')
       setNewGuru({ nama: '', gelar: '', kode: '' })
+      await loadInitialData()
+      if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
+    } else toast.error((res as any).error)
+  }
+
+  const handleSimpanEditGuru = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editGuru?.nama) return toast.warning('Nama wajib diisi')
+    const toastId = toast.loading('Menyimpan perubahan...')
+    const res = await editGuruManual(editGuru.id, editGuru.nama, editGuru.gelar, editGuru.kode)
+    toast.dismiss(toastId)
+    if ((res as any).success) {
+      toast.success('Guru diperbarui')
+      setEditGuru(null)
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
     } else toast.error((res as any).error)
@@ -824,9 +839,14 @@ export default function ManajemenGuruPage() {
                       <p className="text-xs text-slate-500">{g.gelar || '-'}</p>
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} className="text-slate-300 hover:text-red-500 p-2 transition-opacity" title="Hapus Guru Ini">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button onClick={(e) => { e.stopPropagation(); setEditGuru({ id: g.id, nama: g.nama_lengkap, gelar: g.gelar || '', kode: g.kode_guru || '' }) }} className="text-slate-300 hover:text-blue-600 p-2 transition-opacity" title="Edit Guru Ini">
+                      <Settings2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} className="text-slate-300 hover:text-red-500 p-2 transition-opacity" title="Hapus Guru Ini">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -874,6 +894,39 @@ export default function ManajemenGuruPage() {
                 {isCopying ? <Loader2 className="w-4 h-4 animate-spin"/> : <Copy className="w-4 h-4"/>} Copy Sekarang
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editGuru && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">Edit Data Guru</h3>
+              <button onClick={() => setEditGuru(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={handleSimpanEditGuru} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Nama Lengkap *</label>
+                <input required value={editGuru.nama} onChange={e => setEditGuru({...editGuru, nama: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Gelar</label>
+                  <input value={editGuru.gelar} onChange={e => setEditGuru({...editGuru, gelar: e.target.value})} placeholder="S.Pd.I" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Kode (opsional)</label>
+                  <input value={editGuru.kode} onChange={e => setEditGuru({...editGuru, kode: e.target.value})} placeholder="XYZ" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setEditGuru(null)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4"/> Simpan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

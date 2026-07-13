@@ -78,8 +78,12 @@ async function getUserById(id: string) {
     roles: string | null
     asrama_binaan: string | null
     structural_jabatan: string | null
+    guru_id: number | null
+    santri_id: string | null
+    source_type: string | null
+    source_ref_id: string | null
   }>(
-    'SELECT id, full_name, email, role, roles, asrama_binaan, structural_jabatan FROM users WHERE id = ?',
+    'SELECT id, full_name, email, role, roles, asrama_binaan, structural_jabatan, guru_id, santri_id, source_type, source_ref_id FROM users WHERE id = ?',
     [id]
   )
 }
@@ -459,7 +463,7 @@ export async function getUsersList() {
       u.created_at,
       GROUP_CONCAT(k.nama_kelas, ', ') AS kelas_binaan
     FROM users u
-    LEFT JOIN kelas k ON k.wali_kelas_id = u.id
+    LEFT JOIN kelas k ON k.wali_kelas_id = u.id AND k.tahun_ajaran_id IN (SELECT id FROM tahun_ajaran WHERE is_active = 1)
     GROUP BY
       u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
       u.structural_jabatan, u.psb_verifikasi_akses, u.psb_asrama_akses,
@@ -878,6 +882,13 @@ export async function updateUserDetails(userId: string, fullName: string, email:
     [fullName, emailClean, new Date().toISOString(), userId]
   )
 
+  const guruId = beforeUser.guru_id || (beforeUser.source_type === 'guru' ? beforeUser.source_ref_id : null)
+  if (guruId) {
+    await execute('UPDATE data_guru SET nama_lengkap = ? WHERE id = ?', [fullName, guruId])
+    revalidateTag('data-guru')
+    revalidatePath('/dashboard/master/wali-kelas')
+  }
+
   await logActivity({
     actor: actorFromSession(session),
     module: 'pengaturan_users',
@@ -1106,4 +1117,100 @@ function roleNeedsStructuralJabatan(roles: string[]) {
 function normalizeStructuralJabatan(value: unknown) {
   const normalized = String(value || '').trim().toLowerCase().replace(/\s+/g, '_')
   return STRUCTURAL_JABATAN_VALUES.includes(normalized) ? normalized : DEFAULT_STRUCTURAL_JABATAN
+}
+
+export async function mergeUserAccounts(primaryId: string, secondaryId: string): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  if (primaryId === secondaryId) return { error: 'Tidak bisa menggabungkan akun yang sama.' }
+  
+  const primary = await getUserById(primaryId)
+  const secondary = await getUserById(secondaryId)
+  
+  if (!primary || !secondary) return { error: 'Salah satu user tidak ditemukan.' }
+
+  // Combine roles
+  const r1 = parseRoles(primary.roles, primary.role)
+  const r2 = parseRoles(secondary.roles, secondary.role)
+  const combinedRoles = Array.from(new Set([...r1, ...r2]))
+  const newRole = combinedRoles[0] || 'User'
+  const newRolesStr = JSON.stringify(combinedRoles)
+
+  // Combine flags
+  const newAsramaBinaan = primary.asrama_binaan || secondary.asrama_binaan || null
+  const newStructural = primary.structural_jabatan || secondary.structural_jabatan || null
+  const newGuruId = primary.guru_id || secondary.guru_id || (primary.source_type === 'guru' ? primary.source_ref_id : (secondary.source_type === 'guru' ? secondary.source_ref_id : null))
+  const newSantriId = primary.santri_id || secondary.santri_id || (['sadesa', 'santri'].includes(primary.source_type || '') ? primary.source_ref_id : (['sadesa', 'santri'].includes(secondary.source_type || '') ? secondary.source_ref_id : null))
+
+  // Determine source type for backward compat (keep primary unless it's null)
+  let newSourceType = primary.source_type
+  let newSourceRefId = primary.source_ref_id
+  if (!newSourceType && secondary.source_type) {
+    newSourceType = secondary.source_type
+    newSourceRefId = secondary.source_ref_id
+  }
+
+  // Update related records
+  await execute('UPDATE kelas SET wali_kelas_id = ? WHERE wali_kelas_id = ?', [primaryId, secondaryId])
+  await execute('UPDATE user_fitur_override SET user_id = ? WHERE user_id = ?', [primaryId, secondaryId])
+  await execute('UPDATE activity_log SET actor_user_id = ? WHERE actor_user_id = ?', [primaryId, secondaryId])
+  
+  // Actually perform the update on primary user
+  await execute(`
+    UPDATE users SET
+      role = ?,
+      roles = ?,
+      asrama_binaan = ?,
+      structural_jabatan = ?,
+      guru_id = ?,
+      santri_id = ?,
+      source_type = ?,
+      source_ref_id = ?
+    WHERE id = ?
+  `, [
+    newRole, newRolesStr, newAsramaBinaan, newStructural, newGuruId ? Number(newGuruId) : null, newSantriId, newSourceType, newSourceRefId, primaryId
+  ])
+
+  // Merge PSB Akses flags (this needs manual read first since we didn't fetch them in getUserById)
+  try {
+    const psbRows = await queryOne<{ v1: number, a1: number, b1: number, v2: number, a2: number, b2: number }>(`
+      SELECT 
+        u1.psb_verifikasi_akses as v1, u1.psb_asrama_akses as a1, u1.psb_bayar_akses as b1,
+        u2.psb_verifikasi_akses as v2, u2.psb_asrama_akses as a2, u2.psb_bayar_akses as b2
+      FROM users u1
+      LEFT JOIN users u2 ON u2.id = ?
+      WHERE u1.id = ?
+    `, [secondaryId, primaryId])
+    
+    if (psbRows) {
+      await execute(`
+        UPDATE users SET 
+          psb_verifikasi_akses = ?, psb_asrama_akses = ?, psb_bayar_akses = ?
+        WHERE id = ?
+      `, [
+        psbRows.v1 || psbRows.v2 ? 1 : 0,
+        psbRows.a1 || psbRows.a2 ? 1 : 0,
+        psbRows.b1 || psbRows.b2 ? 1 : 0,
+        primaryId
+      ])
+    }
+  } catch (err) {}
+
+  // Delete secondary user
+  await execute('DELETE FROM users WHERE id = ?', [secondaryId])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'pengaturan_users',
+    action: 'update',
+    fiturHref: '/dashboard/pengaturan/users',
+    logKind: 'update',
+    entityType: 'user_merge',
+    entityId: primaryId,
+    entityLabel: primary.full_name,
+    summary: \`Menggabungkan akun \${secondary.full_name} ke dalam \${primary.full_name}\`,
+    details: { secondary_id: secondaryId, combined_roles: combinedRoles }
+  })
+
+  revalidatePath('/dashboard/pengaturan/users')
+  return { success: true }
 }

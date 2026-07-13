@@ -83,6 +83,7 @@ async function ensureFiturAksesReady() {
       ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
       ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8),
+      ('Master Data', 'Tim & Kepengurusan', '/dashboard/pengaturan/kepanitiaan', 'Users', '["admin"]', 1, 9),
       ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11),
       ('Akademik', 'Kalender Pendidikan', '/dashboard/akademik/kalender-pendidikan', 'CalendarDots', '["admin"]', 1, 10)
   `)
@@ -98,6 +99,12 @@ async function ensureFiturAksesReady() {
     await execute("UPDATE fitur_akses SET group_name = 'Akademik', title = 'Ranking', urutan = 4 WHERE href = '/dashboard/akademik/ranking'")
     await execute("UPDATE fitur_akses SET group_name = 'Keuangan Pusat', title = 'Keuangan Non-SPP', icon = 'HandCoins', is_active = 1, urutan = 0 WHERE href = '/dashboard/keuangan/non-spp'")
     await execute("UPDATE fitur_akses SET is_active = 0 WHERE href IN ('/dashboard/keuangan/pembayaran', '/dashboard/keuangan/tarif', '/dashboard/keuangan/laporan')")
+    
+    // Add panitia_upk to UPK features
+    await execute("UPDATE fitur_akses SET roles = replace(roles, ']', ',\"panitia_upk\"]') WHERE href LIKE '/dashboard/akademik/upk%' AND roles NOT LIKE '%panitia_upk%'")
+
+    // Rename menu title
+    await execute("UPDATE fitur_akses SET title = 'Tim & Kepengurusan' WHERE href = '/dashboard/pengaturan/kepanitiaan'")
   } catch {}
 
   fiturSchemaReady = true

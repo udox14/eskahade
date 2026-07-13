@@ -69,7 +69,7 @@ export async function tambahMasterPelanggaran(data: {
       deskripsi: data.deskripsi || null,
     },
   })
-  revalidateTag('master-pelanggaran', 'everything')
+  revalidateTag('master-pelanggaran')
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
@@ -112,7 +112,7 @@ export async function editMasterPelanggaran(id: number, data: {
       ),
     },
   })
-  revalidateTag('master-pelanggaran', 'everything')
+  revalidateTag('master-pelanggaran')
   revalidatePath('/dashboard/keamanan')
   return { success: true }
 }
@@ -148,7 +148,7 @@ export async function hapusMasterPelanggaran(id: number): Promise<{ success: boo
       deskripsi: targetMaster.deskripsi,
     },
   })
-  revalidateTag('master-pelanggaran', 'everything')
+  revalidateTag('master-pelanggaran')
   return { success: true }
 }
 
@@ -237,7 +237,7 @@ export async function importMasterPelanggaranMassal(
       details: { inserted, updated, skipped },
     })
 
-    revalidateTag('master-pelanggaran', 'everything')
+    revalidateTag('master-pelanggaran')
     revalidatePath('/dashboard/keamanan')
     return { success: true, inserted, updated, skipped }
   } catch (error: any) {
