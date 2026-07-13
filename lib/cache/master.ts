@@ -52,7 +52,7 @@ export const getCachedBiayaSettings = unstable_cache(
 
 // ─── DATA GURU ─────────────────────────────────────────────────────────────
 export const getCachedDataGuru = unstable_cache(
-  async () => query<any>('SELECT id, nama_lengkap, gelar FROM data_guru ORDER BY nama_lengkap'),
+  async () => query<any>('SELECT id, nama_lengkap, gelar, kode_guru FROM data_guru ORDER BY nama_lengkap'),
   ['data-guru'],
   { tags: ['data-guru'], revalidate: 3600 }
 )

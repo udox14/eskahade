@@ -89,7 +89,7 @@ export default function ManajemenGuruPage() {
   const [guruList, setGuruList] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [selectedGuruIds, setSelectedGuruIds] = useState<string[]>([])
+  const [selectedGuruIds, setSelectedGuruIds] = useState<number[]>([])
   const [guruSearch, setGuruSearch] = useState('')
 
   const [loading, setLoading] = useState(true)
@@ -312,9 +312,9 @@ export default function ManajemenGuruPage() {
     } else toast.error((res as any).error)
   }
 
-  const handleHapusGuru = async (id: string, nama: string) => {
+  const handleHapusGuru = async (id: number, nama: string) => {
     if (!await confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
-    const res = await hapusGuru(id as any)
+    const res = await hapusGuru(id)
     if ((res as any).success) {
       toast.success('Guru dihapus')
       await loadInitialData()
@@ -322,7 +322,7 @@ export default function ManajemenGuruPage() {
     } else toast.error((res as any).error)
   }
 
-  const toggleSelectGuru = (id: string) => {
+  const toggleSelectGuru = (id: number) => {
     setSelectedGuruIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
   }
 
@@ -336,7 +336,7 @@ export default function ManajemenGuruPage() {
     if (!await confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
     const toastId = toast.loading('Menghapus data...')
-    const res = await hapusGuruMassal(selectedGuruIds as any)
+    const res = await hapusGuruMassal(selectedGuruIds)
     setIsDeletingBatch(false)
     toast.dismiss(toastId)
     if ((res as any).success) {

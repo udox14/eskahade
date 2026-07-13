@@ -555,7 +555,7 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
     summary: `Menambahkan data guru ${nama}`,
     details: { gelar, kode_guru: kode || null },
   })
-  
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -586,8 +586,7 @@ export async function editGuruManual(id: number, nama: string, gelar: string, ko
     summary: `Mengubah data guru ${nama}`,
     details: { gelar, kode_guru: kode || null },
   })
-  
-  
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
@@ -631,7 +630,7 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
     summary: `Menghapus data guru ${guru.nama_lengkap || id}`,
     details: { gelar: guru.gelar, kode_guru: guru.kode_guru },
   })
-  
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -666,7 +665,7 @@ export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean
     summary: `Menghapus ${ids.length} data guru`,
     details: { count: ids.length },
   })
-  
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: ids.length }
 }
@@ -711,7 +710,7 @@ export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ su
     details: { count: toInsert.length, skipped },
   })
 
-  
+  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: toInsert.length, skipped }
 }
